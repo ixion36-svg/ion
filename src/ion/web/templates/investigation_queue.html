@@ -17,14 +17,22 @@
       <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Investigation Queue</h1>
       <p class="mt-3 text-[15px] text-base-content/60 max-w-2xl">Live view of the autonomous investigation pipeline. Running jobs, recently completed verdicts, and on-demand controls.</p>
     </div>
+    {# Outside #iq-content deliberately. Inside it, a render that says the
+       queue could not be read would take Refresh away with it and leave a
+       page reload as the only way to retry. It is the same hx-get the
+       container fires on load, so "what refresh does" has one definition.
+
+       The Pause/Resume toggle used to sit here and is now server-rendered
+       inside the fragment, because only the server knows which verb
+       applies. #}
     <div class="flex items-center gap-2 flex-wrap">
-      <button id="iq-pause-btn" data-click-action="iqTogglePause" class="btn btn-ghost">
-        <span id="iq-pause-label">Pause loop</span>
-      </button>
       <button data-click-action="iqCancelAllPending" class="btn btn-error">
         Cancel all pending
       </button>
-      <button data-click-action="iqRefresh" class="btn btn-ghost">
+      <button class="btn btn-ghost"
+              hx-get="/ui/investigation-queue"
+              hx-target="#iq-content"
+              hx-swap="innerHTML">
         <svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg>Refresh
       </button>
       <button data-click-action="iqRunSweep" class="btn btn-primary">
@@ -32,11 +40,6 @@
       </button>
     </div>
   </section>
-
-  <!-- loop pause banner -->
-  <div id="iq-pause-banner" class="alert alert-warning mb-4 hidden">
-    Sweep loop is <strong>paused</strong>. New investigations will not be auto-queued until you resume. Existing pending rows remain — click <em>Cancel all pending</em> if you want to clear the backlog.
-  </div>
 
   <!-- Manual-trigger card -->
   <section class="card bg-base-200 shadow mb-6">
@@ -59,382 +62,147 @@
     </div>
   </section>
 
-  <!-- Counts / summary strip -->
-  <div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow mb-6">
-    <div class="stat">
-      <div class="stat-title">Running</div>
-      <div id="iq-count-running" class="stat-value text-primary">—</div>
-    </div>
-    <div class="stat">
-      <div class="stat-title">Pending</div>
-      <div id="iq-count-pending" class="stat-value text-secondary">—</div>
-    </div>
-    <div class="stat">
-      <div class="stat-title">Recent completed</div>
-      <div id="iq-count-completed" class="stat-value text-success">—</div>
-    </div>
-    <div class="stat">
-      <div class="stat-title">Recent failed</div>
-      <div id="iq-count-failed" class="stat-value text-error">—</div>
+  {# The loop banner, the four queue depths and the three tables are
+     rendered whole by ion.web.ui.investigation_queue. They used to be two
+     fetches building six innerHTML sites, none of which a stylesheet sweep
+     could reach: frontend/ion-pages.css still carries a comment saying the
+     .iq-pill rows "cannot be restyled without changing the script".
+
+     hx-trigger="load" keeps this shell's first paint immediate and the data
+     arriving in its own request, which is what the fetches it replaces
+     already did. #}
+  <div id="iq-content"
+       hx-get="/ui/investigation-queue"
+       hx-trigger="load"
+       hx-swap="innerHTML">
+    <div class="flex justify-center items-center gap-2 py-14 text-center text-base-content/50">
+      <span class="loading loading-spinner loading-sm text-primary"></span> Loading…
     </div>
   </div>
-
-  <!-- Running / pending jobs -->
-  <section class="card bg-base-200 shadow mb-6">
-    <div class="card-body">
-      <h2 class="card-title text-sm">Running &amp; Pending</h2>
-      <div class="overflow-x-auto">
-        <table class="table table-sm w-full">
-          <thead>
-            <tr>
-              <th>Status</th>
-              <th>Started</th>
-              <th>Signature</th>
-              <th>Host</th>
-              <th>User</th>
-              <th>Alert ID</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="iq-running-tbody">
-            <tr><td colspan="7" class="text-center text-base-content/50 text-xs py-8">Loading…</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <!-- Recently completed -->
-  <section class="card bg-base-200 shadow mb-6">
-    <div class="card-body">
-      <h2 class="card-title text-sm">Recently completed (last 20)</h2>
-      <div class="overflow-x-auto">
-        <table class="table table-sm w-full">
-          <thead>
-            <tr>
-              <th>Completed</th>
-              <th>Signature</th>
-              <th>Host</th>
-              <th>Verdict</th>
-              <th>Severity</th>
-              <th>Duration</th>
-              <th>Model</th>
-              <th>Summary</th>
-            </tr>
-          </thead>
-          <tbody id="iq-completed-tbody">
-            <tr><td colspan="8" class="text-center text-base-content/50 text-xs py-8">Loading…</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <!-- Recent failures -->
-  <section class="card bg-base-200 shadow">
-    <div class="card-body">
-      <h2 class="card-title text-sm">Recent failures</h2>
-      <div class="overflow-x-auto">
-        <table class="table table-sm w-full">
-          <thead>
-            <tr>
-              <th>When</th>
-              <th>Signature</th>
-              <th>Alert ID</th>
-              <th>Summary / error</th>
-            </tr>
-          </thead>
-          <tbody id="iq-failed-tbody">
-            <tr><td colspan="4" class="text-center text-base-content/50 text-xs py-8">Loading…</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
 
 </div>
 </div>
 
 
 <script nonce="{{ csp_nonce }}">
-(function() {
-  const refreshMs = 10000;
-  let refreshTimer = null;
+// iqEscape(), iqFmtTime(), iqFmtDuration(), the three pill tables, the three
+// row builders and the loader that wrote them into the tbodies are gone with
+// the markup they served. Jinja autoescapes, the ts macro renders timestamps
+// on the viewer's clock rather than the server's, and the server decides
+// which rows a Cancel button belongs on.
+//
+// Every button below is either server-rendered into the fragment or part of
+// this shell, so all of them are wired through the delegated listener in
+// static/js/event-delegation.js rather than re-bound after each render.
+// There is no error handler here either: static/js/htmx-errors.js owns what
+// a failed fragment request means, including an expired session.
 
-  function iqEscape(s) {
-    return String(s == null ? "" : s)
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;").replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
-  function iqFmtTime(iso) {
-    if (!iso) return "—";
-    try {
-      const d = new Date(iso);
-      return d.toLocaleString(undefined, { hour12: false });
-    } catch (e) { return iso; }
-  }
-  function iqFmtDuration(ms) {
-    if (ms == null) return "—";
-    if (ms < 1000) return ms + " ms";
-    const s = ms / 1000;
-    if (s < 60) return s.toFixed(1) + "s";
-    const m = Math.floor(s / 60);
-    const rem = Math.round(s % 60);
-    return `${m}m ${rem}s`;
-  }
-  function iqVerdictPill(v) {
-    if (!v) return '<span class="iq-pill iq-pill-inc">—</span>';
-    const cls = {
-      "true_positive":  "iq-pill-tp",
-      "false_positive": "iq-pill-fp",
-      "benign":         "iq-pill-benign",
-      "inconclusive":   "iq-pill-inc",
-    }[v] || "iq-pill-inc";
-    return `<span class="iq-pill ${cls}">${iqEscape(v.replace("_", " "))}</span>`;
-  }
-  function iqSeverityPill(s) {
-    if (!s) return '<span class="iq-pill iq-pill-sev-low">—</span>';
-    const cls = {
-      "low":"iq-pill-sev-low", "medium":"iq-pill-sev-medium",
-      "high":"iq-pill-sev-high", "critical":"iq-pill-sev-critical",
-    }[s] || "iq-pill-sev-low";
-    return `<span class="iq-pill ${cls}">${iqEscape(s)}</span>`;
-  }
-  function iqStatusPill(s) {
-    const cls = ({
-      "pending":"iq-pill-pending", "running":"iq-pill-running",
-      "completed":"iq-pill-completed", "failed":"iq-pill-failed",
-    })[s] || "iq-pill-pending";
-    return `<span class="iq-pill ${cls}">${iqEscape(s || '?')}</span>`;
-  }
+// One definition of "what the page shows now". Every mutation below ends
+// here instead of patching rows it would have had to rebuild from strings.
+function refreshInvestigationQueue() {
+  return htmx.ajax('GET', '/ui/investigation-queue',
+                   { target: '#iq-content', swap: 'innerHTML' });
+}
 
-  async function iqFetch() {
-    try {
-      const res = await fetch('/api/investigate/jobs', { credentials: 'same-origin' });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      return await res.json();
-    } catch (e) {
-      console.warn('Failed to load investigation jobs:', e);
-      return { running:[], pending:[], completed:[], failed:[] };
-    }
+// Pause and resume, with the verb supplied by the render. iqTogglePause()
+// used to fetch /loop/status, pick the verb from the answer and then post,
+// which could flip a state that had changed in between.
+async function iqSetLoop(target) {
+  try {
+    const res = await fetch('/api/investigate/loop/' + target, {
+      method: 'POST', credentials: 'same-origin',
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    refreshInvestigationQueue();
+  } catch (e) {
+    window.alert('Loop ' + target + ' failed: ' + e.message);
   }
+}
 
-  function iqRenderRow_active(inv) {
-    // per-row cancel for pending/running investigations.
-    const cancelBtn = (inv.status === 'pending' || inv.status === 'running')
-      ? `<button data-click-action="iqCancelOne" data-args='[${inv.id}]' class="text-[11px] text-red-300 hover:text-red-200 hover:underline">Cancel</button>`
-      : '';
-    return `
-      <tr>
-        <td>${iqStatusPill(inv.status)}</td>
-        <td>${iqEscape(iqFmtTime(inv.created_at))}</td>
-        <td title="${iqEscape(inv.alert_signature)}">${iqEscape(inv.alert_signature || "—")}</td>
-        <td>${iqEscape(inv.host || "—")}</td>
-        <td>${iqEscape(inv.user_name || "—")}</td>
-        <td class="iq-mono">${iqEscape((inv.alert_id_ref||"").slice(0,16))}</td>
-        <td>
-          <a class="text-ion-cyan hover:underline text-[12px]" href="/investigation-memory?focus=${inv.id}">Open</a>
-          ${cancelBtn ? '<span class="text-slate-600 mx-2">·</span>' + cancelBtn : ''}
-        </td>
-      </tr>`;
+async function iqRunSweep() {
+  try {
+    const res = await fetch('/api/investigate/sweep', {
+      method: 'POST', credentials: 'same-origin',
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    refreshInvestigationQueue();
+  } catch (e) {
+    window.alert('Sweep trigger failed: ' + e.message);
   }
-  function iqRenderRow_completed(inv) {
-    const summary = (inv.summary_text || "").slice(0, 240);
-    return `
-      <tr>
-        <td>${iqEscape(iqFmtTime(inv.completed_at))}</td>
-        <td title="${iqEscape(inv.alert_signature)}">${iqEscape(inv.alert_signature || "—")}</td>
-        <td>${iqEscape(inv.host || "—")}</td>
-        <td>${iqVerdictPill(inv.verdict)}</td>
-        <td>${iqSeverityPill(inv.severity_assessment)}</td>
-        <td>${iqEscape(iqFmtDuration(inv.duration_ms))}</td>
-        <td class="iq-mono">${iqEscape(inv.llm_model_used || "—")}</td>
-        <td title="${iqEscape(inv.summary_text || '')}">${iqEscape(summary) || "—"}</td>
-      </tr>`;
-  }
-  function iqRenderRow_failed(inv) {
-    const summary = (inv.summary_text || "").slice(0, 400);
-    return `
-      <tr>
-        <td>${iqEscape(iqFmtTime(inv.completed_at || inv.created_at))}</td>
-        <td title="${iqEscape(inv.alert_signature)}">${iqEscape(inv.alert_signature || "—")}</td>
-        <td class="iq-mono">${iqEscape((inv.alert_id_ref||"").slice(0,16))}</td>
-        <td>${iqEscape(summary) || "—"}</td>
-      </tr>`;
-  }
+}
 
-  async function iqLoad() {
-    const data = await iqFetch();
-    const active = [
-      ...(data.running || []),
-      ...(data.pending || []),
-    ];
-    document.getElementById('iq-count-running').textContent = (data.running || []).length;
-    document.getElementById('iq-count-pending').textContent = (data.pending || []).length;
-    document.getElementById('iq-count-completed').textContent = (data.completed || []).length;
-    document.getElementById('iq-count-failed').textContent = (data.failed || []).length;
+async function iqManualSubmit(ev) {
+  ev.preventDefault();
+  const form = document.getElementById('iq-manual-form');
+  const fd = new FormData(form);
+  const alert_id = (fd.get('alert_id') || '').toString().trim();
+  const force = !!fd.get('force');
+  if (!alert_id) return;
 
-    const runTb = document.getElementById('iq-running-tbody');
-    if (active.length === 0) {
-      runTb.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-500 text-[12px]">No active investigations.</td></tr>';
+  const status = document.getElementById('iq-manual-status');
+  status.textContent = 'Submitting…';
+  try {
+    const res = await fetch('/api/investigate', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alert_id, force }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || ('HTTP ' + res.status));
+    if (data.queued) {
+      status.textContent = 'Queued.';
+    } else if (data.investigation_id) {
+      status.textContent = `Existing investigation #${data.investigation_id} (${data.status}). Use Force to re-run.`;
     } else {
-      runTb.innerHTML = active.map(iqRenderRow_active).join('');
+      status.textContent = 'Submitted.';
     }
-
-    const compTb = document.getElementById('iq-completed-tbody');
-    const completed = data.completed || [];
-    if (completed.length === 0) {
-      compTb.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-500 text-[12px]">No completed investigations yet.</td></tr>';
-    } else {
-      compTb.innerHTML = completed.map(iqRenderRow_completed).join('');
-    }
-
-    const failTb = document.getElementById('iq-failed-tbody');
-    const failed = data.failed || [];
-    if (failed.length === 0) {
-      failTb.innerHTML = '<tr><td colspan="4" class="px-4 py-8 text-center text-slate-500 text-[12px]">No recent failures.</td></tr>';
-    } else {
-      failTb.innerHTML = failed.map(iqRenderRow_failed).join('');
-    }
+    refreshInvestigationQueue();
+  } catch (e) {
+    status.textContent = 'Error: ' + e.message;
   }
+}
 
-  async function iqRunSweep() {
-    try {
-      const res = await fetch('/api/investigate/sweep', {
-        method: 'POST',
-        credentials: 'same-origin',
-      });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      await iqLoad();
-    } catch (e) {
-      console.warn('Sweep trigger failed:', e);
-      alert('Sweep trigger failed: ' + e.message);
-    }
+async function iqCancelAllPending() {
+  if (!window.confirm('Cancel ALL pending investigations? Running rows are left alone.')) return;
+  try {
+    const res = await fetch('/api/investigate/jobs/cancel-pending', {
+      method: 'POST', credentials: 'same-origin',
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || ('HTTP ' + res.status));
+    window.alert(`Cancelled ${data.cancelled_count} pending investigation(s).`);
+    refreshInvestigationQueue();
+  } catch (e) {
+    window.alert('Bulk cancel failed: ' + e.message);
   }
+}
 
-  async function iqManualSubmit(ev) {
-    ev.preventDefault();
-    const form = document.getElementById('iq-manual-form');
-    const fd = new FormData(form);
-    const alert_id = (fd.get('alert_id') || '').toString().trim();
-    const force = !!fd.get('force');
-    if (!alert_id) return;
-
-    const status = document.getElementById('iq-manual-status');
-    status.textContent = 'Submitting…';
-    try {
-      const res = await fetch('/api/investigate', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ alert_id, force }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || ('HTTP ' + res.status));
-      if (data.queued) {
-        status.textContent = 'Queued.';
-      } else if (data.investigation_id) {
-        status.textContent = `Existing investigation #${data.investigation_id} (${data.status}). Use Force to re-run.`;
-      } else {
-        status.textContent = 'Submitted.';
-      }
-      await iqLoad();
-    } catch (e) {
-      status.textContent = 'Error: ' + e.message;
-    }
+async function iqCancelOne(invId) {
+  if (!window.confirm('Cancel investigation #' + invId + '?')) return;
+  try {
+    const res = await fetch('/api/investigate/jobs/' + invId + '/cancel', {
+      method: 'POST', credentials: 'same-origin',
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || ('HTTP ' + res.status));
+    refreshInvestigationQueue();
+  } catch (e) {
+    window.alert('Cancel failed: ' + e.message);
   }
+}
 
-  function iqRefresh() { iqLoad(); iqLoadLoopStatus(); }
+window.iqSetLoop = iqSetLoop;
+window.iqRunSweep = iqRunSweep;
+window.iqManualSubmit = iqManualSubmit;
+window.iqCancelAllPending = iqCancelAllPending;
+window.iqCancelOne = iqCancelOne;
 
-  // queue control: pause/resume + bulk-cancel + per-row cancel.
-
-  async function iqLoadLoopStatus() {
-    try {
-      const res = await fetch('/api/investigate/loop/status', {
-        credentials: 'same-origin',
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      const label = document.getElementById('iq-pause-label');
-      const banner = document.getElementById('iq-pause-banner');
-      if (data.paused) {
-        if (label) label.textContent = 'Resume loop';
-        if (banner) banner.style.display = '';
-      } else {
-        if (label) label.textContent = 'Pause loop';
-        if (banner) banner.style.display = 'none';
-      }
-    } catch (e) {
-      console.warn('Loop status load failed:', e);
-    }
-  }
-
-  async function iqTogglePause() {
-    // Read current state, then flip via the matching endpoint.
-    try {
-      const cur = await fetch('/api/investigate/loop/status', {
-        credentials: 'same-origin',
-      });
-      const data = await cur.json();
-      const target = data.paused ? 'resume' : 'pause';
-      const res = await fetch('/api/investigate/loop/' + target, {
-        method: 'POST', credentials: 'same-origin',
-      });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      await iqLoadLoopStatus();
-    } catch (e) {
-      console.warn('Loop toggle failed:', e);
-      alert('Loop toggle failed: ' + e.message);
-    }
-  }
-
-  async function iqCancelAllPending() {
-    if (!confirm('Cancel ALL pending investigations? Running rows are left alone.')) return;
-    try {
-      const res = await fetch('/api/investigate/jobs/cancel-pending', {
-        method: 'POST', credentials: 'same-origin',
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || ('HTTP ' + res.status));
-      alert(`Cancelled ${data.cancelled_count} pending investigation(s).`);
-      await iqLoad();
-    } catch (e) {
-      console.warn('Bulk cancel failed:', e);
-      alert('Bulk cancel failed: ' + e.message);
-    }
-  }
-
-  async function iqCancelOne(invId) {
-    if (!confirm('Cancel investigation #' + invId + '?')) return;
-    try {
-      const res = await fetch('/api/investigate/jobs/' + invId + '/cancel', {
-        method: 'POST', credentials: 'same-origin',
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || ('HTTP ' + res.status));
-      await iqLoad();
-    } catch (e) {
-      console.warn('Cancel failed:', e);
-      alert('Cancel failed: ' + e.message);
-    }
-  }
-
-  window.iqLoad = iqLoad;
-  window.iqRefresh = iqRefresh;
-  window.iqRunSweep = iqRunSweep;
-  window.iqManualSubmit = iqManualSubmit;
-  window.iqTogglePause = iqTogglePause;
-  window.iqCancelAllPending = iqCancelAllPending;
-  window.iqCancelOne = iqCancelOne;
-
-  document.addEventListener('DOMContentLoaded', function() {
-    iqLoad();
-    iqLoadLoopStatus();
-    // SSE live updates — emits only when a job changes state, with a
-    // 10s polling fallback. refreshTimer holds the live-updates stop() handle.
-    refreshTimer = ionLiveUpdates('investigations', function() { iqLoad(); iqLoadLoopStatus(); }, refreshMs);
-  });
-})();
+document.addEventListener('DOMContentLoaded', function() {
+  // SSE live updates, emitted only when a job changes state, with a 10s
+  // polling fallback. The first render is hx-trigger="load" on the
+  // container, so nothing is requested here.
+  ionLiveUpdates('investigations', refreshInvestigationQueue, 10000);
+});
 </script>
 {% endblock %}

@@ -25,7 +25,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_page_auth, require_permission
@@ -243,33 +243,46 @@ async def trigger_sweep(
 # ---------------------------------------------------------------------------
 
 
+#: The four buckets the queue is read as, and the depth each is read to.
+#: /api/investigate/jobs and the /ui fragment share it, so a depth shown on
+#: the page can never come from a different slice than the API's.
+#:
+#: No caller filter: this queue is deliberately whole-estate. Every analyst
+#: holding alert:read sees every investigation, because an autonomous
+#: pipeline nobody owns has no per-caller rows to scope to, and a filter
+#: invented downstream would hide rows the API returns.
+_JOB_BUCKETS = (
+    ("running", "running", 50),
+    ("pending", "pending", 50),
+    ("completed", "completed", 20),
+    ("failed", "failed", 10),
+)
+
+
+def investigation_jobs_payload() -> dict[str, list[dict]]:
+    """Every queue bucket, exactly as /api/investigate/jobs returns it.
+
+    Extracted so the HTML fragment reads the queue through this rather than
+    restating four status filters and four limits of its own.
+    """
+    memory = get_investigation_memory_service()
+    return {
+        key: [
+            _inv_to_summary(row).model_dump()
+            for row in memory.list_investigations(
+                filters={"status": status}, limit=limit
+            )
+        ]
+        for key, status, limit in _JOB_BUCKETS
+    }
+
+
 @router.get("/api/investigate/jobs")
 async def list_jobs(
     user: User = Depends(require_permission("alert:read")),
 ) -> dict:
     """List currently running / pending jobs + the last 20 completed runs."""
-    memory = get_investigation_memory_service()
-
-    # Pending + running — newest first
-    active = memory.list_investigations(
-        filters={"status": "running"}, limit=50
-    )
-    pending = memory.list_investigations(
-        filters={"status": "pending"}, limit=50
-    )
-    completed = memory.list_investigations(
-        filters={"status": "completed"}, limit=20
-    )
-    failed = memory.list_investigations(
-        filters={"status": "failed"}, limit=10
-    )
-
-    return {
-        "running":   [_inv_to_summary(r).model_dump() for r in active],
-        "pending":   [_inv_to_summary(r).model_dump() for r in pending],
-        "completed": [_inv_to_summary(r).model_dump() for r in completed],
-        "failed":    [_inv_to_summary(r).model_dump() for r in failed],
-    }
+    return investigation_jobs_payload()
 
 
 @router.get("/api/investigate/jobs/{inv_id}", response_model=InvestigationSummary)
@@ -300,6 +313,29 @@ class CancelResponse(BaseModel):
     cancelled_count: int
 
 
+#: The statuses cancel_one's UPDATE will actually act on. The clause below
+#: is bound to this tuple, so the /ui fragment can derive a row's Cancel
+#: button from it rather than carrying a second copy of the rule that only
+#: disagrees after one of them changes.
+CANCELLABLE_STATUSES = ("pending", "running")
+
+
+def _paused(meta: dict) -> bool:
+    """The flag is stored as text, so `is_truthy` is the coercion. One
+    definition, because a second caller coercing it differently is how
+    "paused" and "not paused" come to disagree between two surfaces."""
+    return system_flags.is_truthy(meta.get("value"))
+
+
+def sweep_loop_paused(session: Session) -> bool:
+    """Whether the sweep loop is paused, as /loop/status reports it."""
+    return _paused(
+        system_flags.get_flag_metadata(
+            session, system_flags.INVESTIGATION_LOOP_PAUSED
+        )
+    )
+
+
 @router.get("/api/investigate/loop/status", response_model=LoopStatusResponse)
 def get_loop_status(
     user: User = Depends(require_permission("alert:read")),
@@ -310,7 +346,7 @@ def get_loop_status(
         session, system_flags.INVESTIGATION_LOOP_PAUSED
     )
     return LoopStatusResponse(
-        paused=system_flags.is_truthy(meta.get("value")),
+        paused=_paused(meta),
         updated_at=meta.get("updated_at"),
         updated_by_id=meta.get("updated_by_id"),
     )
@@ -410,9 +446,9 @@ def cancel_one(
         text(
             "UPDATE investigations SET status = 'cancelled', "
             "completed_at = CURRENT_TIMESTAMP "
-            "WHERE id = :id AND status IN ('pending', 'running')"
-        ),
-        {"id": inv_id},
+            "WHERE id = :id AND status IN :statuses"
+        ).bindparams(bindparam("statuses", expanding=True)),
+        {"id": inv_id, "statuses": list(CANCELLABLE_STATUSES)},
     )
     session.commit()
     count = result.rowcount or 0

@@ -1,0 +1,257 @@
+{# The sweep-loop banner, the four queue depths and the three tables.
+
+   Replaces all six innerHTML sites in investigation_queue.html: the active,
+   completed and failed table bodies and each one's empty state. The
+   hand-rolled iqEscape(), the toLocaleString() formatter, the duration
+   formatter and the three pill-colour tables went with them.
+
+   Two states the JavaScript collapsed into one are kept apart here.
+   `iqFetch()` returned four empty arrays on a failed request, so a queue
+   nobody could read rendered as "No active investigations." with four stat
+   values of 0; and `iqLoadLoopStatus()` returned silently on a non-OK
+   response, leaving the control reading "Pause loop".
+
+   The Refresh button, the manual-trigger form and the two estate-wide
+   buttons stay in the page shell, so a render that says the read failed
+   cannot remove the control that retries it. The Pause/Resume toggle is
+   here instead, because only this render knows which verb applies: the page
+   used to fetch /loop/status, decide the verb from the answer and then post,
+   which is a race between the read and the flip.
+
+   `ui._shared.plain` unwraps status, verdict and severity_assessment, each
+   of which feeds a colour map and visible text at once. The `ts` macro
+   renders every timestamp, because a server-formatted one is the server's
+   clock. The `safe_url` filter has no site on this page: the only link is
+   /investigation-memory?focus= plus an integer primary key, built here
+   rather than read out of a column, so there is no stored URL to filter. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{# Three states, not two. True is paused, False is running, and None is a
+   status read that failed. Mutating `is true` to truthiness changes nothing
+   while `is false` still catches None, so the middle branch is the one that
+   keeps "the loop is running" from being said about a state nobody read. #}
+{% if loop_paused is true %}
+  <div role="alert" class="alert alert-warning mb-6">
+    <div>
+      Sweep loop is <strong>paused</strong>. New investigations will not be
+      auto-queued until you resume. Existing pending rows remain, so use
+      Cancel all pending if you want to clear the backlog.
+      {% if can_triage %}
+        <button class="btn btn-sm btn-ghost ml-2"
+                data-click-action="iqSetLoop"
+                data-args='["resume"]'>Resume loop</button>
+      {% endif %}
+    </div>
+  </div>
+{% elif loop_paused is false %}
+  <div class="flex items-center gap-2 mb-6 text-sm text-base-content/60">
+    Sweep loop is running.
+    {% if can_triage %}
+      <button class="btn btn-sm btn-ghost"
+              data-click-action="iqSetLoop"
+              data-args='["pause"]'>Pause loop</button>
+    {% endif %}
+  </div>
+{% else %}
+  <div role="alert" class="alert alert-warning mb-6">
+    The sweep-loop state could not be read, so this page cannot say whether
+    new investigations are being queued. That is not the same as the loop
+    running. Use Refresh to retry.
+  </div>
+{% endif %}
+
+{% if jobs_failed %}
+  <div role="alert" class="alert alert-warning">
+    The investigation queue could not be read. This is not an empty queue and
+    not a depth of zero: nothing has been checked, so investigations may
+    still be running and failures may be going unseen. Use Refresh to retry.
+  </div>
+{% elif jobs is not none %}
+
+  {% set depths = [
+       ('Running', 'running', 'text-primary'),
+       ('Pending', 'pending', 'text-secondary'),
+       ('Recent completed', 'completed', 'text-success'),
+       ('Recent failed', 'failed', 'text-error'),
+     ] %}
+  <div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow mb-6">
+    {% for title, key, css in depths %}
+      <div class="stat">
+        <div class="stat-title">{{ title }}</div>
+        {# `is not none`, never truthiness. A depth of 0 is the good news
+           this page exists to deliver, and a truthiness test renders it as
+           unknown. The failed-read branch above never reaches here, so
+           there is no path on which a number is printed for a depth nobody
+           measured. #}
+        {% if jobs.counts[key] is not none %}
+          <div class="stat-value {{ css }}">{{ jobs.counts[key] }}</div>
+        {% else %}
+          <div class="stat-value text-base text-base-content/40">Unknown</div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+
+  <section class="card bg-base-200 shadow mb-6">
+    <div class="card-body">
+      <h2 class="card-title text-sm">Running &amp; Pending</h2>
+      <div class="overflow-x-auto">
+        <table class="table table-sm w-full">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Started</th>
+              <th>Signature</th>
+              <th>Host</th>
+              <th>User</th>
+              <th>Alert ID</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if not jobs.active %}
+              <tr>
+                <td colspan="7" class="text-center text-base-content/50 text-xs py-8">
+                  No active investigations.
+                </td>
+              </tr>
+            {% else %}
+              {% for inv in jobs.active %}
+                <tr>
+                  <td><span class="iq-pill {{ inv.status_pill }}">{{ inv.status_text }}</span></td>
+                  <td>{{ ts(inv.created_at, fallback='at an unrecorded time') }}</td>
+                  <td title="{{ inv.alert_signature or '' }}">{{ inv.alert_signature or '-' }}</td>
+                  <td>{{ inv.host or '-' }}</td>
+                  <td>{{ inv.user_name or '-' }}</td>
+                  <td class="iq-mono" title="{{ inv.alert_id_ref or '' }}">{{ inv.ref_short or '-' }}</td>
+                  <td>
+                    <a class="link link-primary text-[12px]"
+                       href="/investigation-memory?focus={{ inv.id }}">Open</a>
+                    {# Rendered only when cancel_one would accept the row and
+                       the viewer holds the permission it checks. The page
+                       used to offer it from its own status comparison. #}
+                    {% if inv.can_cancel %}
+                      <span class="text-base-content/30 mx-2">·</span>
+                      <button class="link link-error text-[11px]"
+                              data-click-action="iqCancelOne"
+                              data-args='[{{ inv.id }}]'>Cancel</button>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="card bg-base-200 shadow mb-6">
+    <div class="card-body">
+      <h2 class="card-title text-sm">Recently completed (last 20)</h2>
+      <div class="overflow-x-auto">
+        <table class="table table-sm w-full">
+          <thead>
+            <tr>
+              <th>Completed</th>
+              <th>Signature</th>
+              <th>Host</th>
+              <th>Verdict</th>
+              <th>Severity</th>
+              <th>Duration</th>
+              <th>Model</th>
+              <th>Summary</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if not jobs.completed %}
+              <tr>
+                <td colspan="8" class="text-center text-base-content/50 text-xs py-8">
+                  No completed investigations yet.
+                </td>
+              </tr>
+            {% else %}
+              {% for inv in jobs.completed %}
+                <tr>
+                  <td>{{ ts(inv.completed_at, fallback='at an unrecorded time') }}</td>
+                  <td title="{{ inv.alert_signature or '' }}">{{ inv.alert_signature or '-' }}</td>
+                  <td>{{ inv.host or '-' }}</td>
+                  <td>
+                    {# iqVerdictPill(null) rendered an inconclusive-coloured
+                       dash, which claims a conclusion the model never
+                       reached. #}
+                    {% if inv.verdict_text is not none %}
+                      <span class="iq-pill {{ inv.verdict_pill }}">{{ inv.verdict_text }}</span>
+                    {% else %}
+                      <span class="text-base-content/40 text-xs">no verdict recorded</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {# iqSeverityPill(null) fell back to the low-severity
+                       pill, so an investigation that assessed nothing looked
+                       like one that assessed the risk as low. #}
+                    {% if inv.severity_text is not none %}
+                      <span class="iq-pill {{ inv.severity_pill }}">{{ inv.severity_text }}</span>
+                    {% else %}
+                      <span class="text-base-content/40 text-xs">not assessed</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {# `is not none`: 0 ms is a measurement, and the one worth
+                       seeing, because it means the answer came from cache or
+                       the model refused. #}
+                    {% if inv.duration_text is not none %}
+                      {{ inv.duration_text }}
+                    {% else %}
+                      <span class="text-base-content/40 text-xs">not recorded</span>
+                    {% endif %}
+                  </td>
+                  <td class="iq-mono">{{ inv.llm_model_used or '-' }}</td>
+                  <td title="{{ inv.summary_text or '' }}">{{ inv.summary_short or '-' }}</td>
+                </tr>
+              {% endfor %}
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="card bg-base-200 shadow">
+    <div class="card-body">
+      <h2 class="card-title text-sm">Recent failures</h2>
+      <div class="overflow-x-auto">
+        <table class="table table-sm w-full">
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Signature</th>
+              <th>Alert ID</th>
+              <th>Summary / error</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if not jobs.failed %}
+              <tr>
+                <td colspan="4" class="text-center text-base-content/50 text-xs py-8">
+                  No recent failures.
+                </td>
+              </tr>
+            {% else %}
+              {% for inv in jobs.failed %}
+                <tr>
+                  <td>{{ ts(inv.when, fallback='at an unrecorded time') }}</td>
+                  <td title="{{ inv.alert_signature or '' }}">{{ inv.alert_signature or '-' }}</td>
+                  <td class="iq-mono" title="{{ inv.alert_id_ref or '' }}">{{ inv.ref_short or '-' }}</td>
+                  <td title="{{ inv.summary_text or '' }}">{{ inv.summary_short or '-' }}</td>
+                </tr>
+              {% endfor %}
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+{% endif %}

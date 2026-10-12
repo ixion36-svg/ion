@@ -1,0 +1,62 @@
+{% macro number(value, suffix='') -%}
+{{ (value ~ suffix) if value is not none else 'Unknown' }}
+{%- endmacro %}
+{% macro chips(values) -%}
+{% for value in values or [] %}<span class="badge badge-ghost badge-sm font-mono mr-[0.2rem] mb-[0.2rem]">{{ value }}</span>{% else %}<span class="text-base-content/60">-</span>{% endfor %}
+{%- endmacro %}
+
+{% if scores_failed %}
+<div role="alert" class="alert alert-error mb-6">AI scorecards could not be read. Feedback counts and agreement are unknown.</div>
+{% else %}
+<section class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow mb-6">
+  <div class="stat"><div class="stat-title">Templates with data</div><div id="sc-kpi-templates" class="stat-value text-primary">{{ number(summary.templates) }}</div></div>
+  <div class="stat"><div class="stat-title">Feedback rows (30d)</div><div id="sc-kpi-samples" class="stat-value">{{ number(summary.samples) }}</div></div>
+  <div class="stat"><div class="stat-title">Overall agreement</div><div id="sc-kpi-agreement" class="stat-value text-success">{{ number(summary.agreement, '%') }}</div></div>
+  <div class="stat"><div class="stat-title">Needs tuning</div><div id="sc-kpi-tuning" class="stat-value text-warning">{{ number(summary.tuning) }}</div></div>
+</section>
+{% endif %}
+
+<section class="card bg-base-200 shadow">
+<div class="card-body p-0 overflow-x-auto">
+<table class="table table-sm" id="prompts-table">
+  <thead><tr><th>Name</th><th>Rule IDs</th><th>Rule Groups</th><th>Pattern</th><th>Priority</th><th>Severity</th><th>AI Scorecard (30d)</th><th>Status</th><th>Actions</th></tr></thead>
+  <tbody id="prompts-body">
+  {% if failed %}
+    <tr><td colspan="9"><div role="alert" class="alert alert-error m-4">Prompt templates could not be read. This is not an empty list. Try Refresh.</div></td></tr>
+  {% elif not items %}
+    <tr><td colspan="9" class="text-center text-base-content/50 py-8">No templates match this filter. Click "+ New Template" to create one.</td></tr>
+  {% else %}
+    {% for t in items %}
+    <tr>
+      <td><strong>{{ t.name }}</strong><div class="text-base-content/60 text-[0.8rem]">{{ t.description or '' }}</div>
+        {% if t.mitre_techniques or t.mitre_tactics %}<div class="mt-[0.3rem] text-xs"><span class="text-base-content/60">MITRE:</span> {{ chips(t.mitre_techniques) }} {{ chips(t.mitre_tactics) }}</div>{% endif %}
+      </td>
+      <td>{{ chips(t.rule_ids) }}</td><td>{{ chips(t.rule_groups) }}</td>
+      <td>{% if t.rule_id_pattern %}<code>{{ t.rule_id_pattern }}</code>{% else %}-{% endif %}</td>
+      <td>{{ number(t.priority) }}</td>
+      <td>{% if t.severity_hint %}<span class="badge badge-sm {{ {'critical': 'badge-error', 'high': 'badge-warning', 'medium': 'badge-info', 'low': 'badge-success'}.get(t.severity_hint, 'badge-ghost') }}">{{ t.severity_hint }}</span>{% else %}-{% endif %}</td>
+      <td>
+        {% set s = scorecards.get(t.id) if scorecards is not none else none %}
+        {% if scores_failed %}<span class="text-error text-xs">Scorecard could not be read</span>
+        {% elif s is none %}<span class="text-base-content/60 text-xs">no data</span>
+        {% else %}
+          {% set agree = s.get('agreement_pct') %}
+          <div class="text-xs {% if agree is not none %}{% if agree >= 80 %}text-success{% elif agree >= 60 %}text-warning{% else %}text-error font-semibold{% endif %}{% else %}text-base-content/60{% endif %}">
+            agree <strong>{{ number(agree, '%') }}</strong> &middot; n={{ number(s.get('sample_size')) }}
+            {% if s.get('tuning_needed') is true %}<span class="text-error" title="Agreement below 60% on 10+ samples. Prompt may need tuning.">tune</span>{% elif s.get('tuning_needed') is not false %}<span class="text-base-content/60">Tuning unknown</span>{% endif %}
+            <div class="text-base-content/60 text-[0.7rem]">TP {{ number(s.get('tp_rate'), '%') }} &middot; FP {{ number(s.get('fp_rate'), '%') }} &middot; BTP {{ number(s.get('btp_rate'), '%') }}</div>
+          </div>
+        {% endif %}
+      </td>
+      <td>{% if t.enabled %}<span class="badge badge-success badge-sm">Enabled</span>{% elif t.enabled is false %}<span class="badge badge-ghost badge-sm">Disabled</span>{% else %}<span class="badge badge-ghost badge-sm">Unknown</span>{% endif %}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" data-click-action="editTemplate" data-args='{{ [t.id]|tojson }}'>Edit</button>
+        <button class="btn btn-ghost btn-sm btn-error" data-click-action="deleteTemplate" data-args='{{ [t.id, t.name]|tojson }}'>Delete</button>
+      </td>
+    </tr>
+    {% endfor %}
+  {% endif %}
+  </tbody>
+</table>
+</div>
+</section>

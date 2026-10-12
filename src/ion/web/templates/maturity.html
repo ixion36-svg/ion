@@ -16,12 +16,34 @@
     <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">SOC-CMM aligned capability scoring and roadmap.</p>
   </div>
   <div class="flex items-center gap-2 flex-wrap">
-    <button class="btn btn-ghost" data-click-action="matShowHistory">History</button>
-    <button class="btn btn-primary" data-click-action="matStartNew">New Assessment</button>
+    {# Both controls are the same hx-get the first load and the fragments'
+       own buttons use, so "what History does" has one definition. They sit
+       outside #mat-content deliberately: a failed render inside the swap
+       target must not be able to remove the control that retries it.
+       History doubles as this page's Refresh. #}
+    <button class="btn btn-ghost"
+            hx-get="/ui/maturity/history"
+            hx-target="#mat-content"
+            hx-swap="innerHTML">History</button>
+    <button class="btn btn-primary"
+            hx-get="/ui/maturity/questionnaire"
+            hx-target="#mat-content"
+            hx-swap="innerHTML">New Assessment</button>
   </div>
 </section>
 
-<div id="mat-content" class="max-w-[1400px] mx-auto">
+{# The history table, the questionnaire and the scored result are rendered
+   whole by ion.web.ui.maturity. They used to be eight innerHTML writes fed
+   by 220 lines of inline JavaScript with a hand-rolled matEsc, which no
+   stylesheet sweep could reach.
+
+   hx-trigger="load" keeps the shell's first paint immediate and the data
+   arriving in its own request, which is what the DOMContentLoaded fetch it
+   replaces already did. #}
+<div id="mat-content" class="max-w-[1400px] mx-auto"
+     hx-get="/ui/maturity/history"
+     hx-trigger="load"
+     hx-swap="innerHTML">
   <div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading...</div>
 </div>
 
@@ -31,224 +53,139 @@
 
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
+/* matEsc, scoreColor, matRenderQuestionnaire, matRenderResult,
+   matShowHistory and the matQuestionnaire / matResponses globals are gone
+   with the markup they served. Jinja autoescapes the fragments, the
+   _time.html macro emits the dates so they stay honest about whose clock
+   they are on, and the score bands now have one definition, in
+   ion.web.ui.maturity.SCORE_BANDS.
+
+   What is left is the two writes. Both prompt or validate first and POST
+   nested JSON to endpoints gated on alert:triage, a stricter permission
+   than the fragments' alert:read, so neither can be a declarative hx-post
+   at the fragment's gate. Neither builds markup.
+
+   There is no failure handler here on purpose: static/js/htmx-errors.js is
+   the one definition of what a failed fragment request means, and each
+   route returns a 200 fragment for the failures it can word properly.
+
+   static/js/csrf.js patches window.fetch, so the CSRF header is attached
+   without a call site here knowing about it. */
 const MAT_API = '/api/maturity';
-let matQuestionnaire = null;
-let matResponses = {};
 
-function matEsc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
-
-function scoreColor(s) {
-    if (s >= 5) return 'var(--mitre-covered,#3fb950)';
-    if (s >= 4) return 'var(--primary,#58a6ff)';
-    if (s >= 3) return 'var(--sev-medium,#d29922)';
-    if (s >= 2) return 'var(--sev-high,#f0883e)';
-    return 'var(--sev-critical,#f85149)';
+/* Re-request the fragment rather than patching the panel in place: another
+   analyst may have added or deleted an assessment, and the server is the
+   only thing that knows. The header buttons do the same thing
+   declaratively, so a rendered panel has one definition. */
+function matReload(url) {
+  return htmx.ajax('GET', url, { target: '#mat-content', swap: 'innerHTML' });
 }
 
-async function matStartNew() {
-    const c = document.getElementById('mat-content');
-    c.innerHTML = '<div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading questionnaire...</div>';
-    try {
-        const r = await fetch(MAT_API + '/questionnaire', {credentials: 'include'});
-        matQuestionnaire = await r.json();
-        matResponses = {};
-        matRenderQuestionnaire();
-    } catch (e) {
-        c.innerHTML = `<div class="alert alert-error text-[var(--sev-critical)]">${matEsc(e.message)}</div>`;
-    }
+function matGroups() {
+  return Array.from(document.querySelectorAll('.mat-q-score'));
 }
 
-function matRenderQuestionnaire() {
-    const q = matQuestionnaire;
-    const c = document.getElementById('mat-content');
-    let html = `<div class="alert alert-info mb-6">
-        <span><strong>SOC-CMM Maturity Assessment</strong> — Rate your SOC across 5 domains on a scale of 1 (Initial) to 5 (Optimising).
-        Score each question honestly based on current state, not aspirations. Results are saved for tracking progress over time.</span>
-    </div>
-    <div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow mb-6">
-        <div class="stat"><div class="stat-value text-error">1</div><div class="stat-title">Initial</div></div>
-        <div class="stat"><div class="stat-value text-warning">2</div><div class="stat-title">Managed</div></div>
-        <div class="stat"><div class="stat-value text-warning">3</div><div class="stat-title">Defined</div></div>
-        <div class="stat"><div class="stat-value text-primary">4</div><div class="stat-title">Measured</div></div>
-        <div class="stat"><div class="stat-value text-success">5</div><div class="stat-title">Optimising</div></div>
-    </div>`;
-
-    for (const domain of q.domains) {
-        html += `<div class="card bg-base-200 shadow mb-4">
-            <div class="flex flex-wrap items-center justify-between gap-4 px-6 py-5 cursor-pointer" data-toggle-next-display>
-                <div class="basis-full md:basis-auto md:flex-1">
-                    <div class="font-semibold text-lg">${matEsc(domain.name)}</div>
-                    <div class="text-xs uppercase tracking-wide opacity-50 mt-1">${matEsc(domain.description)}</div>
-                </div>
-                <div class="font-mono text-2xl font-extrabold" id="mat-domain-score-${domain.id}">-</div>
-            </div>
-            <div class="px-6 py-5 border-t border-base-300">`;
-        for (const question of domain.questions) {
-            html += `<div class="card bg-base-300 mb-3">
-                <div class="card-body p-4 gap-1">
-                <div class="font-semibold">${matEsc(question.text)}</div>
-                <div class="text-sm italic opacity-60 mb-3">${matEsc(question.guidance)}</div>
-                <div class="mat-q-score flex gap-1.5 mb-2.5" id="mat-q-${question.id}">
-                    ${[1,2,3,4,5].map(n => `<button class="btn btn-sm w-10" data-click-action="matScore" data-args='["${domain.id}", "${question.id}", ${n}, "$target"]'>${n}</button>`).join('')}
-                </div>
-                <input class="input input-sm w-full" placeholder="Notes (optional)" id="mat-notes-${question.id}">
-            </div></div>`;
-        }
-        html += `<div class="text-[.72rem] text-[var(--text-secondary)] mt-1.5">Related ION pages: ${(domain.ion_pages||[]).map(p => `<a class="link link-primary text-[var(--primary)] no-underline" href="${p}">${p}</a>`).join(', ')}</div>`;
-        html += '</div></div>';
-    }
-
-    html += `<div class="flex flex-wrap justify-end items-center gap-2.5 mt-6">
-        <input class="input _ion-s-56b5cc5749" id="mat-title" type="text" placeholder="Assessment title (optional)">
-        <button class="btn btn-primary" data-click-action="matSubmit">Submit Assessment</button>
-    </div>`;
-
-    c.innerHTML = html;
+/* The chosen score for one question, or null when it has none. null rather
+   than 0: an unanswered question is not a question answered zero, and the
+   server is what decides what an unanswered one scores. */
+function matAnswer(group) {
+  const chosen = group.querySelector('button.selected');
+  return chosen ? Number(chosen.dataset.score) : null;
 }
 
-function matScore(domainId, questionId, score, btn) {
-    if (!matResponses[domainId]) matResponses[domainId] = {};
-    matResponses[domainId][questionId] = {score};
-    const container = btn.parentElement;
-    container.querySelectorAll('button').forEach(b => b.classList.remove('selected'));
-    btn.classList.add('selected');
+function matScore(btn) {
+  const group = btn.closest('.mat-q-score');
+  if (!group) return;
+  group.querySelectorAll('button').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  matShowDomainAverage(group.dataset.domain);
+}
 
-    // Update domain average display
-    const domain = matQuestionnaire.domains.find(d => d.id === domainId);
-    if (domain) {
-        const dResponses = matResponses[domainId] || {};
-        const scores = domain.questions.map(q => (dResponses[q.id]||{}).score || 0).filter(s => s > 0);
-        if (scores.length) {
-            const avg = Math.round(scores.reduce((a,b) => a+b, 0) / scores.length);
-            const el = document.getElementById('mat-domain-score-' + domainId);
-            if (el) { el.textContent = avg; el.style.color = scoreColor(avg); }
-        }
-    }
+/* The mean of the answers given so far. It is a preview, not the score that
+   will be stored: maturity_service averages over all five questions and
+   scores an unanswered one as 1, so this number rises as the domain is
+   filled in. The element carries the band colours from the server, so there
+   is no second copy of SCORE_BANDS here to drift out of step with the ring. */
+function matShowDomainAverage(domainId) {
+  const el = document.getElementById('mat-domain-score-' + domainId);
+  if (!el) return;
+  const scores = matGroups()
+    .filter(g => g.dataset.domain === domainId)
+    .map(matAnswer)
+    .filter(s => s !== null);
+  if (!scores.length) return;
+  const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+  el.textContent = avg;
+  const colour = el.dataset['colourL' + avg];
+  if (colour) el.style.setProperty('color', colour);
+}
+
+/* Read the answers back out of the DOM, which is the only place the
+   in-progress scores live. A question with neither a score nor a note is
+   left out entirely rather than sent as a 1, so maturity_service keeps its
+   single opinion about what an unanswered question is worth. */
+function matCollect() {
+  const responses = {};
+  matGroups().forEach(function (group) {
+    const domain = group.dataset.domain;
+    const question = group.dataset.question;
+    if (!domain || !question) return;
+    const score = matAnswer(group);
+    const notesInput = document.getElementById('mat-notes-' + question);
+    const notes = notesInput ? notesInput.value.trim() : '';
+    if (score === null && !notes) return;
+    const answers = responses[domain] || (responses[domain] = {});
+    const answer = {};
+    if (score !== null) answer.score = score;
+    if (notes) answer.notes = notes;
+    answers[question] = answer;
+  });
+  return responses;
 }
 
 async function matSubmit() {
-    // Collect notes
-    for (const domain of matQuestionnaire.domains) {
-        for (const q of domain.questions) {
-            const notes = document.getElementById('mat-notes-' + q.id);
-            if (notes && notes.value.trim()) {
-                if (!matResponses[domain.id]) matResponses[domain.id] = {};
-                if (!matResponses[domain.id][q.id]) matResponses[domain.id][q.id] = {score: 1};
-                matResponses[domain.id][q.id].notes = notes.value.trim();
-            }
-        }
+  const titleInput = document.getElementById('mat-title');
+  /* An empty title is sent as empty and defaulted by the API, so the
+     default title has one definition and it is the server's. */
+  const title = titleInput ? titleInput.value.trim() : '';
+  let saved;
+  try {
+    const r = await fetch(MAT_API + '/assessments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ title: title, responses: matCollect() }),
+    });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body.detail || ('HTTP ' + r.status));
+    if (body.id === undefined || body.id === null) {
+      throw new Error('the assessment was saved without an id');
     }
-
-    const title = document.getElementById('mat-title').value.trim() || 'SOC Maturity Assessment';
-    try {
-        const r = await fetch(MAT_API + '/assessments', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            credentials: 'include',
-            body: JSON.stringify({title, responses: matResponses}),
-        });
-        if (!r.ok) throw new Error('Submit failed');
-        const result = await r.json();
-        matRenderResult(result);
-    } catch (e) {
-        alert('Submit failed: ' + e.message);
-    }
-}
-
-function matRenderResult(a) {
-    const c = document.getElementById('mat-content');
-    const color = scoreColor(a.overall_score);
-    const pct = a.overall_score * 20;
-
-    let html = `<div class="card bg-base-200 shadow mb-6">
-        <div class="card-body flex-col sm:flex-row items-center gap-8">
-        <div class="mat-result-ring" data-ion-style="background:conic-gradient(${color} ${pct}%, rgba(99,110,123,.2) ${pct}%)">
-            <div class="mat-result-inner">
-                <div class="font-mono text-4xl font-extrabold" data-ion-style="color:${color}">${a.overall_score}</div>
-                <div class="text-[0.62rem] uppercase tracking-widest font-bold opacity-50 mt-1">of 5</div>
-            </div>
-        </div>
-        <div>
-            <h3 class="text-2xl font-semibold m-0 mb-1.5">${matEsc(a.overall_level)} Maturity</h3>
-            <p class="m-0 opacity-70">${matEsc(a.title)} — ${a.created_at ? new Date(a.created_at).toLocaleDateString() : ''}</p>
-        </div>
-        </div>
-    </div>`;
-
-    html += '<div class="grid gap-4 mb-6 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">';
-    for (const [domainId, score] of Object.entries(a.scores || {})) {
-        const domain = (matQuestionnaire || {domains:[]}).domains.find(d => d.id === domainId) || {name: domainId};
-        const col = scoreColor(score.score);
-        html += `<div class="card bg-base-200 shadow">
-            <div class="card-body p-5">
-            <div class="flex justify-between items-center mb-2.5">
-                <span class="text-xs font-extrabold uppercase tracking-widest opacity-70">${matEsc(domain.name || domainId)}</span>
-                <span class="font-mono font-extrabold text-xl" data-ion-style="color:${col}">${score.score}/5</span>
-            </div>
-            <div class="h-1.5 bg-base-300 rounded overflow-hidden mb-1.5"><div class="mat-bar-fill" data-ion-style="width:${score.pct}%; background:${col}"></div></div>
-            <div class="text-[0.65rem] uppercase tracking-wide opacity-50 font-semibold">${score.pct}%</div>
-            </div>
-        </div>`;
-    }
-    html += '</div>';
-
-    html += `<div class="flex gap-2 justify-end">
-        <button class="btn btn-ghost" data-click-action="matShowHistory">View History</button>
-        <button class="btn btn-primary" data-click-action="matStartNew">New Assessment</button>
-    </div>`;
-
-    c.innerHTML = html;
-}
-
-async function matShowHistory() {
-    const c = document.getElementById('mat-content');
-    c.innerHTML = '<div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading history...</div>';
-    try {
-        const r = await fetch(MAT_API + '/assessments', {credentials: 'include'});
-        const d = await r.json();
-        const assessments = d.assessments || [];
-
-        if (!assessments.length) {
-            c.innerHTML = `<div class="card bg-base-200 shadow text-center">
-                <div class="card-body items-center text-center py-14">
-                <h3 class="card-title text-[var(--text-primary)] mb-2">No assessments yet</h3>
-                <p>Run your first SOC maturity assessment to establish a baseline.</p>
-                <button class="btn btn-primary mt-3.5" data-click-action="matStartNew">Start Assessment</button>
-            </div></div>`;
-            return;
-        }
-
-        let html = '<div class="alert alert-info mb-4"><span><strong>Assessment History</strong> — track your SOC maturity progression over time.</span></div>';
-        html += '<div class="card bg-base-200 shadow overflow-x-auto"><table class="table table-sm"><thead><tr><th>Date</th><th>Title</th><th>Score</th><th>Level</th><th>Business</th><th>People</th><th>Process</th><th>Technology</th><th>Services</th><th></th></tr></thead><tbody>';
-        for (const a of assessments) {
-            const s = a.scores || {};
-            const lvlBadge = a.overall_score >= 5 ? 'badge-success' : a.overall_score >= 4 ? 'badge-info' : a.overall_score >= 3 ? 'badge-warning' : 'badge-error';
-            html += `<tr>
-                <td>${a.created_at ? new Date(a.created_at).toLocaleDateString() : '-'}</td>
-                <td>${matEsc(a.title)}</td>
-                <td><strong data-ion-style="color:${scoreColor(a.overall_score)}">${a.overall_score}/5</strong></td>
-                <td><span class="badge ${lvlBadge}">${matEsc(a.overall_level)}</span></td>
-                <td>${(s.business||{}).score||'-'}</td>
-                <td>${(s.people||{}).score||'-'}</td>
-                <td>${(s.process||{}).score||'-'}</td>
-                <td>${(s.technology||{}).score||'-'}</td>
-                <td>${(s.services||{}).score||'-'}</td>
-                <td><button class="btn btn-ghost btn-sm btn-error py-0.5 px-2 text-[.7rem]" data-click-action="matDelete" data-args='[${a.id}]'>Delete</button></td>
-            </tr>`;
-        }
-        html += '</tbody></table></div>';
-        c.innerHTML = html;
-    } catch (e) {
-        c.innerHTML = `<div class="alert alert-error text-[var(--sev-critical)]">${matEsc(e.message)}</div>`;
-    }
+    saved = body.id;
+  } catch (e) {
+    alert('Submit failed: ' + (e.message || e));
+    return;
+  }
+  /* Render the stored assessment rather than the response body, so the
+     panel cannot show a figure the database does not hold. */
+  await matReload('/ui/maturity/assessments/' + saved);
 }
 
 async function matDelete(id) {
-    if (!confirm('Delete this assessment?')) return;
-    await fetch(MAT_API + '/assessments/' + id, {method: 'DELETE', credentials: 'include'});
-    matShowHistory();
+  if (!confirm('Delete this assessment?')) return;
+  try {
+    const r = await fetch(MAT_API + '/assessments/' + id, {
+      method: 'DELETE',
+      credentials: 'same-origin',
+    });
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({}));
+      throw new Error(body.detail || ('HTTP ' + r.status));
+    }
+  } catch (e) {
+    alert('Delete failed: ' + (e.message || e));
+  }
+  await matReload('/ui/maturity/history');
 }
-
-document.addEventListener('DOMContentLoaded', matShowHistory);
 </script>
 {% endblock %}
