@@ -40,8 +40,6 @@ WEB = SRC / "ion" / "web"
 EXPLICIT: dict = {}
 
 WRITE_RE = re.compile(r"innerHTML\s*\+?=|insertAdjacentHTML|outerHTML\s*\+?=")
-FETCH_RE = re.compile(r"""fetch\(\s*[`'"]([^`'"]+)""")
-TEMPLATED_FETCH_RE = re.compile(r"""fetch\(\s*`([^`]+)`""")
 SCRIPT_RE = re.compile(r"<script[^>]*>(.*?)</script>", re.S)
 
 
@@ -185,24 +183,77 @@ def _explicit_page_routes() -> dict[str, tuple[str, str]]:
     return out
 
 
-def _resolve_js_constants(js: str, urls: list[str]) -> list[str]:
-    """Substitute `${API_BASE}` style constants declared in the same script.
+def _fetch_urls(js: str) -> list[str]:
+    """Every URL the script fetches, however the expression is built.
 
-    Eight of the remaining pages hold their base path in a const and build
-    every URL from it, so without this the tool reported "check by hand"
-    for exactly the pages it was written to help. Only string literals are
-    substituted; anything computed stays as it is, because a guess here
-    would report a permission for the wrong endpoint.
+    Three idioms appear in ION and all three had to work, because a page
+    the tool reports "0 fetches" for is a page it cannot help:
+
+        fetch('/api/x')
+        fetch(`${API}/x?days=${d}`)
+        fetch(API + '/x?days=' + encodeURIComponent(d))
+
+    The last one is why this is not a regex over the whole call. The
+    argument is read to its matching paren, string constants declared in
+    the same script are substituted, and then the pieces are joined: a
+    quoted literal contributes its text and anything else contributes
+    `${...}`, which is what the matcher already treats as a parameter.
     """
     consts = dict(re.findall(
         r"""(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*['"]([^'"]+)['"]""", js))
-    out = []
-    for url in urls:
-        resolved = url
+
+    urls: list[str] = []
+    # A lookbehind rather than a consumed character, so a script that opens
+    # with the call still matches. `prefetch(` and `this.fetch(` are not the
+    # global fetch, and attributing a permission to a call that never
+    # happens is the same kind of wrong answer as resolving the wrong route.
+    for m in re.finditer(r"(?<![\w.$])fetch\s*\(", js):
+        i = m.end()
+        depth, arg = 1, []
+        while i < len(js) and depth:
+            c = js[i]
+            if c in "([{":
+                depth += 1
+            elif c in ")]}":
+                depth -= 1
+                if not depth:
+                    break
+            elif c == "," and depth == 1:
+                break
+            arg.append(c)
+            i += 1
+        urls.append(_expression_to_url("".join(arg), consts))
+    return [u for u in urls if u]
+
+
+def _expression_to_url(expr: str, consts: dict[str, str]) -> str:
+    """One fetch argument rendered as a path with `${...}` for the unknowns."""
+    expr = expr.strip()
+
+    # A template literal: keep it, with constants substituted.
+    tpl = re.match(r"^`(.*)`$", expr, re.S)
+    if tpl:
+        out = tpl.group(1)
         for name, value in consts.items():
-            resolved = resolved.replace("${" + name + "}", value)
-        out.append(resolved)
-    return out
+            out = out.replace("${" + name + "}", value)
+        return out
+
+    parts: list[str] = []
+    for piece in re.split(r"\+", expr):
+        piece = piece.strip()
+        if not piece:
+            continue
+        lit = re.match(r"""^['"](.*)['"]$""", piece, re.S)
+        if lit:
+            parts.append(lit.group(1))
+        elif piece in consts:
+            parts.append(consts[piece])
+        else:
+            # A value computed at runtime. `${}` is what the matcher reads
+            # as a path parameter, and marking it is better than dropping
+            # it: a dropped segment changes the path's shape.
+            parts.append("${" + piece + "}")
+    return "".join(parts)
 
 
 def _match_gate(url: str, gates: dict) -> list[tuple[str, dict]]:
@@ -280,8 +331,7 @@ def plan(template: str, pages: dict, gates: dict) -> None:
     for lineno, text in writes:
         print(f"    {template}:{lineno}  {text}")
 
-    urls = sorted(set(FETCH_RE.findall(js)) | set(TEMPLATED_FETCH_RE.findall(js)))
-    urls = sorted(set(_resolve_js_constants(js, urls)))
+    urls = sorted(set(_fetch_urls(js)))
     print(f"  fetches           {len(urls)}")
     for u in urls:
         print(f"    {u}")
