@@ -175,3 +175,112 @@ def test_systems_display_is_empty_when_there_is_nothing(raw):
 
 def test_systems_display_accepts_a_real_list():
     assert _systems_display(["x", "y"]) == "x, y"
+
+
+# ---------------------------------------------------------------------------
+# bob_eval samples: a paginated table whose pager is htmx, not JavaScript
+# ---------------------------------------------------------------------------
+
+SAMPLES = "_fragments/bob_eval_samples.html"
+
+
+def render_samples(payload, run_id=7):
+    env = make_templates().env
+    return env.get_template(SAMPLES).render(payload=payload, run_id=run_id)
+
+
+def _payload(samples, **over):
+    base = {"run_id": 7, "page": 1, "page_size": 50, "total": len(samples),
+            "total_pages": 1, "samples": samples}
+    base.update(over)
+    return base
+
+
+def _sample(**over):
+    base = {"ai_feedback_id": 11, "bob_verdict": "true_positive",
+            "human_verdict": "true_positive", "agreement": True,
+            "confidence_int": 80}
+    base.update(over)
+    return base
+
+
+@pytest.mark.parametrize("agreement,badge,label", [
+    (True, "badge-success", "Yes"),
+    (False, "badge-error", "No"),
+    (None, "badge-ghost", "Abstain"),
+])
+def test_agreement_has_three_states_not_two(agreement, badge, label):
+    """The JavaScript used `=== true` / `=== false`, so None rendered as
+    Abstain. A truthiness port folds abstain into "No", which turns "BOB
+    declined to judge" into "BOB was wrong"."""
+    html = render_samples(_payload([_sample(agreement=agreement)]))
+    assert badge in html
+    assert label in html
+
+
+def test_a_zero_confidence_is_a_score_not_a_blank():
+    html = render_samples(_payload([_sample(confidence_int=0)]))
+    assert ">0<" in html or ">0 " in html
+    assert html.count("-") == html.count("-")  # no silent dash for 0
+
+
+def test_a_missing_confidence_shows_a_dash():
+    html = render_samples(_payload([_sample(confidence_int=None)]))
+    assert "-" in html
+
+
+def test_a_missing_bob_verdict_shows_a_dash():
+    html = render_samples(_payload([_sample(bob_verdict=None)]))
+    assert "-" in html
+
+
+def test_the_pager_links_are_htmx_requests_not_javascript():
+    html = render_samples(_payload([_sample()], page=2, total_pages=3, total=150))
+    # &amp; because Jinja entity-encodes the ampersand in an attribute, which
+    # is correct HTML; the browser decodes it before htmx reads the value.
+    # Every ampersand is &amp; because each URL is one escaped value. Written
+    # as `{{ base }}&page={{ n }}` the attribute mixed &amp; with a bare &,
+    # since template text is not escaped and a variable is.
+    assert "run_id=7&amp;page_size=50&amp;page=1" in html
+    assert "run_id=7&amp;page_size=50&amp;page=3" in html
+    assert "data-click-action=\"loadSamplesPage\"" not in html
+    assert "Page 2 of 3 (150 total)" in html
+
+
+def test_the_first_page_has_no_prev_and_the_last_no_next():
+    first = render_samples(_payload([_sample()], page=1, total_pages=2))
+    assert "Prev" not in first and "Next" in first
+    last = render_samples(_payload([_sample()], page=2, total_pages=2))
+    assert "Prev" in last and "Next" not in last
+
+
+def test_an_empty_page_says_so_inside_the_table():
+    html = render_samples(_payload([]))
+    assert "No samples on this page" in html
+
+
+def test_a_missing_run_is_an_error_not_an_empty_table():
+    html = render_samples(None)
+    assert "Eval run not found" in html
+    assert "<table" not in html
+
+
+def test_the_error_state_can_still_be_dismissed():
+    """Found by driving the pager in a browser, not by reading the template.
+
+    Moving the card chrome into the fragment put the Close button inside the
+    success branch. A pager click on a run deleted since the page loaded then
+    swapped the chrome away, and the panel sat open with an error and no way
+    out but a reload. The chrome now wraps both states.
+    """
+    html = render_samples(None, run_id=12)
+    assert 'data-click-action="closeSamples"' in html
+    assert "Run 12" in html, "the heading must render without a payload"
+
+
+def test_the_fragment_carries_its_own_card_chrome():
+    """The page holds only an empty slot, so the panel's header and Close
+    button have to come from here or they have two definitions."""
+    html = render_samples(_payload([_sample()]))
+    assert "Samples &mdash; Run 7" in html or "Samples — Run 7" in html
+    assert 'data-click-action="closeSamples"' in html

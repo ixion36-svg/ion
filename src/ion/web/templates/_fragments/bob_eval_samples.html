@@ -1,0 +1,104 @@
+{# One page of eval samples, rows and pager together.
+
+   Replaces four innerHTML sites in bob_eval.html: a `tbody.innerHTML +=`
+   per row and three `pgEl.innerHTML` writes for the pager. The `+=` form is
+   why the status tool reported that page as having one write when it had
+   four.
+
+   The pager links are hx-gets back to this same endpoint, targeting the
+   container this fragment is swapped into, so paging needs no JavaScript at
+   all and there is one definition of what a page of samples looks like. #}
+
+{# The card chrome lives here too, so the page holds only an empty
+   container. That removes the hidden/reveal dance: nothing requested means
+   nothing shown, and there is no second place that decides what the panel
+   looks like.
+
+   It wraps BOTH states deliberately. With the error as a bare alert, a
+   pager click that landed on a deleted run swapped the chrome away and left
+   the panel open with no Close button, so the only way out was a reload.
+   Driving the pager in a browser is what surfaced that: the swap returned
+   the alert and the Close button count went to zero.
+
+   The heading reads `run_id`, passed by the route, not `payload.run_id`:
+   the payload is None in exactly the case the heading still has to render. #}
+<section class="card bg-base-200 shadow mt-6">
+  <div class="card-body p-0">
+    <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-base-300">
+      <h2 class="card-title text-base basis-full md:basis-auto">Samples &mdash; Run {{ run_id }}</h2>
+      <button data-click-action="closeSamples" class="btn btn-ghost btn-sm">Close</button>
+    </div>
+    <div class="px-5 py-3">
+{% if payload is none %}
+  <div role="alert" class="alert alert-error">
+    Eval run not found. It may have been deleted since this page loaded.
+  </div>
+{% else %}
+<div class="overflow-x-auto">
+  <table class="table table-sm">
+    <thead>
+      <tr>
+        <th>Feedback ID</th><th>BOB verdict</th><th>Human verdict</th>
+        <th>Agreement</th><th>Confidence</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in payload.samples %}
+        <tr>
+          <td>{{ s.get('ai_feedback_id') }}</td>
+          <td>{{ s.get('bob_verdict') or '-' }}</td>
+          <td>{{ s.get('human_verdict') }}</td>
+          <td>
+            {# Three states, not two. `agreement` is None when BOB abstained,
+               which is neither agreement nor disagreement, and the
+               JavaScript distinguished all three with `=== true` / `=== false`.
+               A truthiness test would fold abstain into "No". #}
+            {% if s.get('agreement') is true %}
+              <span class="badge badge-success badge-sm">Yes</span>
+            {% elif s.get('agreement') is false %}
+              <span class="badge badge-error badge-sm">No</span>
+            {% else %}
+              <span class="badge badge-ghost badge-sm">Abstain</span>
+            {% endif %}
+          </td>
+          {# `is not none`: a confidence of 0 is a real score, not a blank. #}
+          <td>{{ s.get('confidence_int') if s.get('confidence_int') is not none else '-' }}</td>
+        </tr>
+      {% endfor %}
+      {% if not payload.samples %}
+        <tr>
+          <td colspan="5" class="text-center p-6 text-base-content/60">
+            No samples on this page.
+          </td>
+        </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<div class="flex items-center gap-2 mt-3 text-sm text-base-content/70">
+  <span>Page {{ payload.page }} of {{ payload.total_pages }} ({{ payload.total }} total)</span>
+  {# Each URL is built as ONE value so the escaping is uniform. Written as
+     `{{ base }}&page={{ n }}` the ampersand inside `base` came out as
+     `&amp;` (an escaped variable) while the literal one stayed a bare `&`,
+     since template text is not escaped. Both parse, but a selector mixing
+     the two forms is the kind of thing that reads as a bug later. #}
+  {% set page_url = '/ui/bob-eval/samples?run_id=' ~ payload.run_id
+                    ~ '&page_size=' ~ payload.page_size %}
+  {% if payload.page > 1 %}
+    <button class="btn btn-ghost btn-sm"
+            hx-get="{{ page_url ~ '&page=' ~ (payload.page - 1) }}"
+            hx-target="#samples-body"
+            hx-swap="innerHTML">Prev</button>
+  {% endif %}
+  {% if payload.page < payload.total_pages %}
+    <button class="btn btn-ghost btn-sm"
+            hx-get="{{ page_url ~ '&page=' ~ (payload.page + 1) }}"
+            hx-target="#samples-body"
+            hx-swap="innerHTML">Next</button>
+  {% endif %}
+</div>
+{% endif %}
+    </div>
+  </div>
+</section>

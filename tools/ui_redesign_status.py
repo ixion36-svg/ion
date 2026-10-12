@@ -88,7 +88,15 @@ def measure(path: Path) -> dict:
     js = "".join(
         m.group(1) for m in re.finditer(r"<script(?![^>]*src=)[^>]*>(.*?)</script>", s, re.S)
     )
-    writes = len(re.findall(r"innerHTML\s*=|insertAdjacentHTML|outerHTML\s*=", js))
+    # `\+?=` catches `innerHTML +=` as well as `innerHTML =`. The first
+    # version matched only the latter, so bob_eval.html reported 1 write
+    # while building four rows and a pager with `+=`. It never produced a
+    # wrong verdict, because every template using `+=` also has a plain `=`
+    # somewhere and already failed the column, but it under-counted the work
+    # by 7 sites across 5 templates.
+    writes = len(re.findall(
+        r"innerHTML\s*\+?=|insertAdjacentHTML|outerHTML\s*\+?=", js
+    ))
     invisible = _invisible_light_rules(style)
     light = len(invisible)
     return {

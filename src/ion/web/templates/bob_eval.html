@@ -88,7 +88,10 @@
             <td class="text-xs text-base-content/60">{{ run.started_at or "-" }}</td>
             <td>{{ run.triggered_by_id or "-" }}</td>
             <td>
-              <a href="#" data-click-action="viewSamples" data-args='[{{ run.id }}]' class="btn btn-ghost btn-xs">Samples</a>
+              <button class="btn btn-ghost btn-xs"
+                 hx-get="/ui/bob-eval/samples?run_id={{ run.id }}&page=1"
+                 hx-target="#samples-body"
+                 hx-swap="innerHTML">Samples</button>
             </td>
           </tr>
           {% else %}
@@ -103,30 +106,11 @@
 </section>
 
 <!-- Samples drilldown -->
-<section class="card bg-base-200 shadow mt-6 hidden" id="samples-section">
-  <div class="card-body p-0">
-    <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-base-300">
-      <h2 class="card-title text-base basis-full md:basis-auto">Samples — Run <span id="samples-run-id"></span></h2>
-      <button data-click-action="closeSamples" class="btn btn-ghost btn-sm">Close</button>
-    </div>
-    <div class="overflow-x-auto">
-      <table class="table table-sm" id="samples-table">
-        <thead>
-          <tr>
-            <th>Feedback ID</th>
-            <th>Bob Verdict</th>
-            <th>Human Verdict</th>
-            <th>Agreement</th>
-            <th>Confidence</th>
-          </tr>
-        </thead>
-        <tbody id="samples-tbody">
-        </tbody>
-      </table>
-    </div>
-    <div id="samples-pagination" class="flex flex-wrap items-center gap-3 px-5 py-3 border-t border-base-300 text-sm text-base-content/60"></div>
-  </div>
-</section>
+{# The samples panel is rendered whole by ion.web.ui.bob_eval_samples_fragment,
+   card chrome included, so this is just the slot it lands in. Empty
+   means nothing requested yet, which is why there is no hidden class
+   and no reveal step. #}
+<div id="samples-body"></div>
 
 </div>
 </div>
@@ -210,44 +194,15 @@ async function submitRun(e) {
   }
 }
 
-async function viewSamples(runId) {
-  document.getElementById('samples-run-id').textContent = runId;
-  document.getElementById('samples-section').classList.remove('hidden');
-  await loadSamplesPage(runId, 1);
-}
-
-async function loadSamplesPage(runId, page) {
-  const res = await fetch(`/api/bob-eval/runs/${runId}/samples?page=${page}&page_size=50`);
-  if (!res.ok) return;
-  const data = await res.json();
-
-  const tbody = document.getElementById('samples-tbody');
-  tbody.replaceChildren();
-  for (const s of data.samples) {
-    const agr = s.agreement === true ? '<span class="badge badge-success badge-sm">Yes</span>'
-               : s.agreement === false ? '<span class="badge badge-error badge-sm">No</span>'
-               : '<span class="badge badge-ghost badge-sm">Abstain</span>';
-    tbody.innerHTML += `<tr>
-      <td>${s.ai_feedback_id}</td>
-      <td>${s.bob_verdict || '-'}</td>
-      <td>${s.human_verdict}</td>
-      <td>${agr}</td>
-      <td>${s.confidence_int !== null ? s.confidence_int : '-'}</td>
-    </tr>`;
-  }
-
-  const pgEl = document.getElementById('samples-pagination');
-  pgEl.innerHTML = `Page ${data.page} of ${data.total_pages} (${data.total} total)`;
-  if (data.page > 1) {
-    pgEl.innerHTML += ` <a href="#" data-click-action="loadSamplesPage" data-args='[${runId}, ${data.page-1}]' class="btn btn-ghost btn-sm">Prev</a>`;
-  }
-  if (data.page < data.total_pages) {
-    pgEl.innerHTML += ` <a href="#" data-click-action="loadSamplesPage" data-args='[${runId}, ${data.page+1}]' class="btn btn-ghost btn-sm">Next</a>`;
-  }
-}
-
+// viewSamples and loadSamplesPage are gone: the Samples button is an
+// hx-get and the pager links inside the fragment are too. What they
+// built was four innerHTML sites, three of them `+=`.
+//
+// closeSamples stays, and uses replaceChildren rather than innerHTML.
+// Emptying a container is DOM manipulation, not markup construction, so
+// it is not the thing the `server` column exists to remove.
 function closeSamples() {
-  document.getElementById('samples-section').classList.add('hidden');
+  document.getElementById('samples-body').replaceChildren();
 }
 </script>
 {% endblock %}
