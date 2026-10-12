@@ -420,8 +420,8 @@
 
 /* Light Cyan */
 [data-mode="light"][data-theme="cyan"] {
-    --neon-cyan: #0e7490;
-    --primary: #0e7490;
+    --neon-cyan: #155e75;
+    --primary: #155e75;
     --primary-dim: rgba(8, 145, 178, 0.1);
     --primary-glow: rgba(8, 145, 178, 0.2);
     --glow-sm: 0 2px 8px rgba(8, 145, 178, 0.15);
@@ -2409,10 +2409,25 @@ h1, h2, h3, h4, h5, h6 {
    would be the wrong answer rather than a late one. They are listed in the
    run's remaining tail instead of being quietly darkened.
    ============================================================================= */
+/* Revised: the floor covers every level below it now, not just /40 and /50.
+   The first version left /20 and /30 alone, reasoning that five uses read as
+   decorative. A full crawl found **27 failing instances** of them, among
+   them .folder-manage-counts (item counts like "(1)") and .sr-chiplabel,
+   which are informational text rather than decoration. The earlier call was
+   wrong on the evidence then available, so it is corrected here rather than
+   defended. Anything carrying text clamps to the floor; anything genuinely
+   decorative belongs behind aria-hidden, which puts it out of scope for AA
+   instead of leaving it faint enough to fail. */
+[data-mode="light"] .text-base-content\/10,
+[data-mode="light"] .text-base-content\/20,
+[data-mode="light"] .text-base-content\/30,
 [data-mode="light"] .text-base-content\/40,
 [data-mode="light"] .text-base-content\/50 {
     color: color-mix(in oklab, var(--color-base-content) 60%, #0000);
 }
+:root:not([data-mode="light"]) .text-base-content\/10,
+:root:not([data-mode="light"]) .text-base-content\/20,
+:root:not([data-mode="light"]) .text-base-content\/30,
 :root:not([data-mode="light"]) .text-base-content\/40 {
     color: color-mix(in oklab, var(--color-base-content) 50%, #0000);
 }

@@ -115,6 +115,26 @@ PROBE = r"""
   const out = [];
   const seen = new Set();
   let undeterminable = 0;
+  let decorative = 0;
+
+  // WCAG 1.4.3 governs text that conveys information. Text hidden from
+  // assistive technology does not, and nor does a logotype. ION's
+  // integration tiles are both: `<div class="integration-icon elasticsearch"
+  // aria-hidden="true">E</div>` is the first letter of a name printed in full
+  // beside it, on the vendor's own brand colour. White on Elasticsearch teal
+  // measures 2.31:1 and no recolouring is available, because the colour IS
+  // the brand. Counting those as failures would steer the work toward
+  // repainting other companies' marks, so an aria-hidden subtree is counted
+  // apart and never failed, the same treatment a gradient backdrop gets.
+  const hiddenFromAT = el => {
+    for (let n = el; n && n !== document.body; n = n.parentElement) {
+      if (n.getAttribute('aria-hidden') === 'true') return true;
+      const role = (n.getAttribute('role') || '').toLowerCase();
+      if (role === 'presentation' || role === 'none') return true;
+    }
+    return false;
+  };
+
   for (const el of document.querySelectorAll('body *')) {
     // only elements that paint their own visible text
     const txt = [...el.childNodes]
@@ -122,6 +142,7 @@ PROBE = r"""
     if (!txt) continue;
     const cs = getComputedStyle(el);
     if (cs.visibility === 'hidden' || cs.display === 'none' || +cs.opacity === 0) continue;
+    if (hiddenFromAT(el)) { decorative++; continue; }
     const r = el.getBoundingClientRect();
     if (r.width < 2 || r.height < 2) continue;
 
@@ -149,7 +170,7 @@ PROBE = r"""
       ratio: Math.round(got * 100) / 100,
     });
   }
-  return { bad: out.sort((a, b) => a.ratio - b.ratio), undeterminable };
+  return { bad: out.sort((a, b) => a.ratio - b.ratio), undeterminable, decorative };
 }
 """
 
@@ -179,6 +200,7 @@ def main() -> int:
 
     report: dict[str, dict[str, list]] = {}
     skipped: dict[str, int] = {}
+    decor: dict[str, int] = {}
     with sync_playwright() as p:
         b = p.chromium.launch(headless=True)
         ctx = b.new_context(viewport={"width": 1500, "height": 1100})
@@ -200,6 +222,7 @@ def main() -> int:
                 pg.wait_for_timeout(1200)
                 res = pg.evaluate(PROBE)
                 bad, undet = res["bad"], res["undeterminable"]
+                decor[mode] = decor.get(mode, 0) + res.get("decorative", 0)
                 report.setdefault(path, {})[mode] = bad
                 skipped[mode] = skipped.get(mode, 0) + undet
                 if bad:
@@ -215,7 +238,8 @@ def main() -> int:
     for mode in args.modes:
         n = sum(len(m.get(mode, [])) for m in report.values())
         print(f"  {mode:6} {n} unreadable, {skipped.get(mode, 0)} undeterminable "
-              f"(gradient or image backdrop, not judged)")
+              f"(gradient or image backdrop), {decor.get(mode, 0)} decorative "
+              f"(aria-hidden, out of WCAG 1.4.3 scope)")
 
     if args.out:
         args.out.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")

@@ -1584,7 +1584,7 @@ async function loadIntegrationStatus() {
             return `
                 <div class="integration-card">
                     <div class="integration-card-header">
-                        <div class="integration-icon ${iconClass}">${integration.display_name.charAt(0)}</div>
+                        <div class="integration-icon ${iconClass}" aria-hidden="true">${integration.display_name.charAt(0)}</div>
                         <div class="integration-card-title">${escapeHtml(integration.display_name)}</div>
                         ${versionBadgeHtml}
                     </div>

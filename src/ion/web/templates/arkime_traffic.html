@@ -574,7 +574,7 @@
     tbody.innerHTML = rows.map((r, idx) => `
       <tr>
         <td class="pr-4">
-          <span class="inline-block w-5 h-5 rounded text-center text-xs leading-5 bg-slate-700 text-slate-400 mr-2">${idx + 1}</span>
+          <span class="inline-block w-5 h-5 rounded text-center text-xs leading-5 bg-base-300 text-base-content mr-2">${idx + 1}</span>
           <span class="ip-cell">${r.ip || '—'}</span>
         </td>
         <td class="pr-4 bytes-cell">${fmtBytes(r.bytes)}</td>
