@@ -25,21 +25,48 @@ default, so the stale content stays and the user sees no lie.
 Each endpoint reuses the same service function its JSON counterpart calls,
 so the two cannot drift apart.
 
-One module per page, rather than one growing file. 35 pages at the size of
-the first two is around 2,000 lines, and more to the point a single file is
-a serialization point: the conversions are independent work, and a file
-every one of them edits is a file every one of them conflicts in. The
-module list below is the only shared line, and it is append-only.
+One module per page, discovered rather than listed. A module list would be
+a line that every one of the remaining conversions has to edit, which is
+the one thing that makes independent work conflict. Dropping a module in
+the package is the whole registration step.
+
+The loader is deliberately strict. It does not swallow ImportError: a
+fragment module that cannot be imported takes the app down at startup
+rather than quietly serving nothing, because a 404 on a fragment shows the
+user an empty panel that looks like an absence of data. Same reason a
+module without a `router` is an error and not a skip.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter
+import importlib
+import pkgutil
 
-from ion.web.ui import bob_eval, service_accounts
+from fastapi import APIRouter
 
 router = APIRouter(prefix="/ui", tags=["ui-fragments"])
 
-for _page in (service_accounts, bob_eval):
-    router.include_router(_page.router)
 
-__all__ = ["router"]
+def _page_modules() -> list[str]:
+    """Every fragment module in this package, underscore names excluded.
+
+    `_shared` and any other helper are private by that convention. Sorted
+    so the mounted route order does not depend on filesystem order.
+    """
+    return sorted(
+        m.name
+        for m in pkgutil.iter_modules(__path__)
+        if not m.name.startswith("_")
+    )
+
+
+for _name in _page_modules():
+    _mod = importlib.import_module(f"{__name__}.{_name}")
+    _page_router = getattr(_mod, "router", None)
+    if _page_router is None:
+        raise ImportError(
+            f"ion.web.ui.{_name} defines no `router`. Every fragment module "
+            "must expose one, or its endpoints are silently unreachable."
+        )
+    router.include_router(_page_router)
+
+__all__ = ["router", "_page_modules"]
