@@ -1,0 +1,49 @@
+{# One index's field mappings, from ui/discover.py's mappings_view.
+
+   Field names went into cells unescaped and into two data-args attributes
+   raw, alongside the index name. Both come from Elasticsearch.
+
+   `searchable` and `aggregatable` are tri-state. The page wrote
+   `f.searchable ? 'Yes' : 'No'`, so a mapping that did not say became a
+   mapping that said no.
+#}
+<span id="mappings-index-name" hx-swap-oob="innerHTML:#mappings-index-name">{{ index or '' }}</span>
+<span id="mappings-field-count" hx-swap-oob="innerHTML:#mappings-field-count">
+  {%- if total is not none %}{{ total }} fields{% else %}field count unknown{% endif %}
+</span>
+{% if state == 'unconfigured' %}
+<tr><td colspan="5" class="empty-state">{{ detail or 'Elasticsearch is not configured.' }}</td></tr>
+{% elif state == 'refused' %}
+<tr><td colspan="5" class="empty-state">That index pattern is not one this deployment allows.</td></tr>
+{% elif state == 'failed' %}
+<tr><td colspan="5" class="empty-state">The mappings could not be read{% if detail %}. {{ detail }}{% endif %}</td></tr>
+{% elif state == 'empty' %}
+<tr><td colspan="5" class="empty-state">No fields in this index</td></tr>
+{% else %}
+{%- for f in rows %}
+<tr>
+  <td>{% if f.name %}{{ f.name }}{% else %}<span class="dsc-absent" title="This mapping reported no field name"></span>{% endif %}</td>
+  <td>{% if f.type %}{{ f.type }}{% else %}<span class="dsc-absent" title="This mapping reported no type"></span>{% endif %}</td>
+  <td>
+    {%- if f.searchable is true %}Yes
+    {%- elif f.searchable is false %}No
+    {%- else %}<span class="dsc-absent" title="This mapping did not say"></span>{% endif %}
+  </td>
+  <td>
+    {%- if f.aggregatable is true %}Yes
+    {%- elif f.aggregatable is false %}No
+    {%- else %}<span class="dsc-absent" title="This mapping did not say"></span>{% endif %}
+  </td>
+  <td>
+    {%- if f.name and index %}
+    {%- if f.aggregatable is true %}
+    <button class="btn btn-sm" data-click-action="loadFieldStats"
+            data-args='{{ [index, f.name]|tojson }}'>Stats</button>
+    {%- endif %}
+    <button class="btn btn-sm" data-click-action="searchField"
+            data-args='{{ [index, f.name]|tojson }}'>Search</button>
+    {%- endif %}
+  </td>
+</tr>
+{%- endfor %}
+{% endif %}

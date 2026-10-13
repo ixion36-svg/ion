@@ -1,0 +1,47 @@
+{# One field's top values, from ui/discover.py's field_stats_view.
+
+   The Hunt button was the worst instance of one defect on this project:
+   `data-args='["${escapeHtml(String(v.value))}"]'` over a field value,
+   which is log content. escapeHtml turns a `"` into `&quot;`, six literal
+   characters inside a JSON string, so Hunt searched for something other
+   than the value sitting next to it.
+
+   Three summary figures and every row count were read with
+   `.toLocaleString()` on a value that could be undefined, which throws,
+   so a payload missing any one of them took the whole panel down through
+   the caller's catch.
+#}
+<span id="field-stats-name" hx-swap-oob="innerHTML:#field-stats-name">{{ field or '' }}</span>
+<div id="field-stats-summary" hx-swap-oob="innerHTML:#field-stats-summary">
+  <div class="stat"><span class="stat-label">Unique Values</span><span class="stat-value">
+    {{- "{:,}".format(unique) if unique is not none else 'unknown' -}}
+  </span></div>
+  <div class="stat"><span class="stat-label">Total Count</span><span class="stat-value">
+    {{- "{:,}".format(total) if total is not none else 'unknown' -}}
+  </span></div>
+  <div class="stat"><span class="stat-label">Documents</span><span class="stat-value">
+    {{- "{:,}".format(docs) if docs is not none else 'unknown' -}}
+  </span></div>
+</div>
+{% if state == 'unconfigured' %}
+<tr><td colspan="3" class="empty-state">{{ detail or 'Elasticsearch is not configured.' }}</td></tr>
+{% elif state == 'refused' %}
+<tr><td colspan="3" class="empty-state">That index pattern is not one this deployment allows.</td></tr>
+{% elif state == 'failed' %}
+<tr><td colspan="3" class="empty-state">The field statistics could not be read{% if detail %}. {{ detail }}{% endif %}</td></tr>
+{% elif state == 'empty' %}
+<tr><td colspan="3" class="empty-state">No values for this field</td></tr>
+{% else %}
+{%- for v in rows %}
+<tr>
+  <td>{% if v.is_null %}<em>null</em>{% else %}{{ v.value }}{% endif %}</td>
+  <td>{% if v.count is not none %}{{ "{:,}".format(v.count) }}{% else %}<span class="dsc-absent" title="This value carried no count"></span>{% endif %}</td>
+  <td>
+    {%- if not v.is_null and v.value %}
+    <button class="btn btn-sm" data-click-action="huntIOC"
+            data-args='{{ [v.value]|tojson }}'>Hunt</button>
+    {%- endif %}
+  </td>
+</tr>
+{%- endfor %}
+{% endif %}

@@ -852,3 +852,309 @@ def discover_saved_searches_fragment(
     view = saved_searches_view(
         payload, getattr(current_user, "id", None))
     return render_view(request, SAVED_FRAGMENT, view)
+
+
+# ---------------------------------------------------------------------------
+# The index browser
+# ---------------------------------------------------------------------------
+#
+# Three reads, three tables: the indices, one index's field mappings, and
+# one field's top values. Between them they held eight interpolations of
+# Elasticsearch-supplied text into markup or into a JSON attribute, which
+# is the whole reason this page was worth converting:
+#
+#   * ``data-args='["${idx.name}"]'`` three times in the indices table and
+#     ``data-args='["${indexName}", "${f.name}"]'`` twice in the mappings
+#     table. An index name and a field name are whatever Elasticsearch
+#     holds, and a `"` in either produced JSON that event-delegation.js
+#     throws on, logs, and returns from.
+#   * ``data-args='["${escapeHtml(String(v.value))}"]'`` on the Hunt
+#     button. That is the fourth shape of the same defect, over a *field
+#     value*: log content, the most exposed string on the page. escapeHtml
+#     turns `"` into `&quot;`, which inside a JSON string is six literal
+#     characters, so Hunt searched for something other than the value next
+#     to it.
+#   * `${idx.name}`, `${f.name}` and `${f.type}` went into cells unescaped.
+#
+# Two outright crashes, not just mislabelling:
+#
+#   * `data.unique_count.toLocaleString()`, and the same for total_count,
+#     doc_count and each row's count. `undefined.toLocaleString()` throws,
+#     so a payload missing any one of those four figures took the whole
+#     field-stats panel down through the caller's catch.
+#   * `(idx.doc_count != null ? idx.doc_count : 0).toLocaleString()` did
+#     guard, and printed 0 documents for an index whose count was missing.
+
+INDICES_FRAGMENT = "_fragments/discover_indices.html"
+MAPPINGS_FRAGMENT = "_fragments/discover_mappings.html"
+FIELD_STATS_FRAGMENT = "_fragments/discover_field_stats.html"
+
+
+class IndexRow(TypedDict):
+    name: Optional[str]
+    health: Optional[str]
+    docs: Optional[int]
+    size: Optional[str]
+
+
+class IndicesView(TypedDict):
+    state: str
+    detail: Optional[str]
+    rows: list[IndexRow]
+
+
+class MappingRow(TypedDict):
+    name: Optional[str]
+    type: Optional[str]
+    searchable: Optional[bool]
+    aggregatable: Optional[bool]
+
+
+class MappingsView(TypedDict):
+    state: str
+    detail: Optional[str]
+    index: Optional[str]
+    total: Optional[int]
+    rows: list[MappingRow]
+
+
+class TopValue(TypedDict):
+    """`value` is None for a genuinely null value, which the page already
+    told apart from a missing one and which this keeps."""
+
+    value: Optional[str]
+    is_null: bool
+    count: Optional[int]
+
+
+class FieldStatsView(TypedDict):
+    state: str
+    detail: Optional[str]
+    field: Optional[str]
+    unique: Optional[int]
+    total: Optional[int]
+    docs: Optional[int]
+    rows: list[TopValue]
+
+
+def _text(value: Any) -> Optional[str]:
+    plainest = plain(value)
+    return str(plainest) if plainest is not None else None
+
+
+def indices_view(payload: Any) -> IndicesView:
+    rows = payload.get("indices") if isinstance(payload, dict) else None
+    if not isinstance(rows, list):
+        return {"state": "failed",
+                "detail": "The index list answered something this page "
+                          "could not read.",
+                "rows": []}
+    out: list[IndexRow] = []
+    for raw in rows:
+        if not isinstance(raw, dict):
+            continue
+        out.append({
+            "name": _text(raw.get("name")),
+            "health": _text(raw.get("health")),
+            # Not 0: an index whose count is missing is not an empty index.
+            "docs": _int(raw.get("doc_count")),
+            "size": _text(raw.get("size")),
+        })
+    return {
+        "state": "data" if out else ("failed" if rows else "empty"),
+        "detail": ("The index list returned rows this page could not read."
+                   if rows and not out else None),
+        "rows": out,
+    }
+
+
+def mappings_view(payload: Any, index: str) -> MappingsView:
+    rows = payload.get("fields") if isinstance(payload, dict) else None
+    if not isinstance(rows, list):
+        return {"state": "failed",
+                "detail": "The mappings answered something this page could "
+                          "not read.",
+                "index": index, "total": None, "rows": []}
+    out: list[MappingRow] = []
+    for raw in rows:
+        if not isinstance(raw, dict):
+            continue
+        out.append({
+            "name": _text(raw.get("name")),
+            "type": _text(raw.get("type")),
+            # Tri-state: a mapping that did not say is not a mapping that
+            # said no, and the page's ternary made those one answer.
+            "searchable": (raw.get("searchable")
+                           if isinstance(raw.get("searchable"), bool)
+                           else None),
+            "aggregatable": (raw.get("aggregatable")
+                             if isinstance(raw.get("aggregatable"), bool)
+                             else None),
+        })
+    return {
+        "state": "data" if out else ("failed" if rows else "empty"),
+        "detail": ("The mappings returned rows this page could not read."
+                   if rows and not out else None),
+        "index": index,
+        "total": _int(payload.get("total")),
+        "rows": out,
+    }
+
+
+def field_stats_view(payload: Any, field: str) -> FieldStatsView:
+    rows = payload.get("top_values") if isinstance(payload, dict) else None
+    if not isinstance(rows, list):
+        return {"state": "failed",
+                "detail": "The field statistics answered something this "
+                          "page could not read.",
+                "field": field, "unique": None, "total": None,
+                "docs": None, "rows": []}
+    out: list[TopValue] = []
+    for raw in rows:
+        if not isinstance(raw, dict):
+            continue
+        value = raw.get("value")
+        out.append({
+            "value": None if value is None else str(value),
+            "is_null": value is None,
+            "count": _int(raw.get("count")),
+        })
+    return {
+        "state": "data" if out else ("failed" if rows else "empty"),
+        "detail": ("The field statistics returned rows this page could not "
+                   "read." if rows and not out else None),
+        "field": field,
+        "unique": _int(payload.get("unique_count")),
+        "total": _int(payload.get("total_count")),
+        "docs": _int(payload.get("doc_count")),
+        "rows": out,
+    }
+
+
+@router.get(
+    "/discover/indices",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def discover_indices_fragment(
+    request: Request,
+    pattern: str = "*",
+    include_system: bool = False,
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    """The index list."""
+    from fastapi import HTTPException
+
+    from ion.web.elasticsearch_api import list_indices
+
+    try:
+        payload = await list_indices(
+            pattern=pattern, include_system=include_system,
+            include_stats=True, current_user=current_user)
+    except HTTPException as refusal:
+        view: IndicesView = {
+            "state": failure(refusal.status_code, refusal.detail)["state"],
+            "detail": str(refusal.detail) if refusal.detail else None,
+            "rows": [],
+        }
+    except Exception:
+        logger.exception("Discover fragment could not list indices")
+        view = {"state": "failed",
+                "detail": "The index list did not complete.", "rows": []}
+    else:
+        view = indices_view(payload)
+    return render_view(request, INDICES_FRAGMENT, view)
+
+
+@router.get(
+    "/discover/mappings",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def discover_mappings_fragment(
+    request: Request,
+    index_pattern: str = "",
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    """One index pattern's field mappings."""
+    from fastapi import HTTPException
+
+    from ion.web.elasticsearch_api import get_index_mappings
+
+    if not index_pattern:
+        view: MappingsView = {
+            "state": "failed", "detail": "Pick an index first.",
+            "index": None, "total": None, "rows": [],
+        }
+        return render_view(request, MAPPINGS_FRAGMENT, view,
+                           status_code=422)
+    try:
+        payload = await get_index_mappings(
+            index_pattern, current_user=current_user)
+    except HTTPException as refusal:
+        view = {
+            "state": failure(refusal.status_code, refusal.detail)["state"],
+            "detail": str(refusal.detail) if refusal.detail else None,
+            "index": index_pattern, "total": None, "rows": [],
+        }
+    except Exception:
+        logger.exception("Discover fragment could not read mappings for %s",
+                         index_pattern)
+        view = {"state": "failed",
+                "detail": "The mappings did not load.",
+                "index": index_pattern, "total": None, "rows": []}
+    else:
+        view = mappings_view(payload, index_pattern)
+    return render_view(request, MAPPINGS_FRAGMENT, view)
+
+
+@router.post(
+    "/discover/field-stats",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def discover_field_stats_fragment(
+    request: Request,
+    index_pattern: str = Form(""),
+    field: str = Form(""),
+    size: int = Form(10),
+    time_field: str = Form("@timestamp"),
+    time_from: str = Form("now-24h"),
+    time_to: str = Form("now"),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    """One field's top values."""
+    from fastapi import HTTPException
+
+    from ion.web.elasticsearch_api import FieldStatsRequest, get_field_stats
+
+    if not index_pattern or not field:
+        view: FieldStatsView = {
+            "state": "failed",
+            "detail": "Pick an index and a field first.",
+            "field": field or None, "unique": None, "total": None,
+            "docs": None, "rows": [],
+        }
+        return render_view(request, FIELD_STATS_FRAGMENT, view,
+                           status_code=422)
+    body = FieldStatsRequest(
+        index_pattern=index_pattern, field=field, size=size,
+        time_field=time_field, time_from=time_from, time_to=time_to)
+    try:
+        payload = await get_field_stats(body, current_user=current_user)
+    except HTTPException as refusal:
+        view = {
+            "state": failure(refusal.status_code, refusal.detail)["state"],
+            "detail": str(refusal.detail) if refusal.detail else None,
+            "field": field, "unique": None, "total": None, "docs": None,
+            "rows": [],
+        }
+    except Exception:
+        logger.exception("Discover fragment could not read field stats")
+        view = {"state": "failed",
+                "detail": "The field statistics did not load.",
+                "field": field, "unique": None, "total": None,
+                "docs": None, "rows": []}
+    else:
+        view = field_stats_view(payload, field)
+    return render_view(request, FIELD_STATS_FRAGMENT, view)

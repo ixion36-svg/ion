@@ -746,3 +746,158 @@ def test_the_page_no_longer_builds_the_saved_search_lists():
     # The helper and the round trip it needed are gone.
     assert "function getCurrentUserId" not in body
     assert "window.currentUser" not in body
+
+
+# ---------------------------------------------------------------------------
+# The index browser
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def browser(monkeypatch):
+    def set(name, result=None, raises=None):
+        async def handler(*args, **kwargs):
+            if raises is not None:
+                raise raises
+            return result
+
+        monkeypatch.setattr("ion.web.elasticsearch_api." + name, handler)
+
+    return set
+
+
+def _bget(user, url):
+    with TestClient(_app(user)) as client:
+        return client.get(url)
+
+
+def test_an_index_name_with_a_quote_still_yields_parseable_args(browser):
+    """Three data-args carried the index name by raw interpolation, and an
+    index name is whatever Elasticsearch holds."""
+    import json as _json
+    browser("list_indices", result={"indices": [
+        {"name": 'logs-"odd"', "health": "green", "doc_count": 5,
+         "size": "1mb"}]})
+    html = _bget(_reader(), "/ui/discover/indices").text
+    found = re.findall(r"data-args='([^']*)'", html)
+    assert len(found) == 3, found
+    for raw in found:
+        assert _json.loads(unescape(raw)) == ['logs-"odd"']
+
+
+def test_an_index_with_no_document_count_is_not_shown_as_empty(browser):
+    """`(idx.doc_count != null ? idx.doc_count : 0)` printed 0 documents,
+    and an index with no count is not an empty index."""
+    browser("list_indices", result={"indices": [
+        {"name": "logs-1", "health": "green", "size": "1mb"}]})
+    html = _bget(_reader(), "/ui/discover/indices").text
+    assert "dsc-absent" in html
+    assert ">0<" not in html
+
+
+def test_a_mapping_that_did_not_say_is_not_a_no(browser):
+    """`f.searchable ? 'Yes' : 'No'` made a missing answer a negative one."""
+    browser("get_index_mappings", result={"fields": [
+        {"name": "host.name", "type": "keyword"}], "total": 1})
+    html = _bget(_reader(),
+                 "/ui/discover/mappings?index_pattern=logs-1").text
+    assert "No" not in flat(html).replace("No fields", "")
+    assert "dsc-absent" in html
+
+
+def test_a_field_name_with_a_quote_still_yields_parseable_args(browser):
+    import json as _json
+    browser("get_index_mappings", result={"fields": [
+        {"name": 'odd"field', "type": "keyword", "aggregatable": True,
+         "searchable": True}], "total": 1})
+    html = _bget(_reader(),
+                 "/ui/discover/mappings?index_pattern=logs-1").text
+    found = re.findall(r"data-args='([^']*)'", html)
+    assert found
+    for raw in found:
+        assert _json.loads(unescape(raw)) == ["logs-1", 'odd"field']
+
+
+def test_mappings_without_an_index_is_a_bad_request(browser):
+    browser("get_index_mappings", result={"fields": []})
+    resp = _bget(_reader(), "/ui/discover/mappings")
+    assert resp.status_code == 422
+    assert "Pick an index" in flat(resp.text)
+
+
+def _fstats(user, **form):
+    body = {"index_pattern": "logs-1", "field": "host.name"}
+    body.update(form)
+    with TestClient(_app(user)) as client:
+        return client.post("/ui/discover/field-stats", data=body)
+
+
+def test_a_missing_summary_figure_no_longer_takes_the_panel_down(browser):
+    """`data.unique_count.toLocaleString()` throws on undefined, and the
+    caller's catch turned that into a toast with no panel."""
+    browser("get_field_stats", result={"top_values": [
+        {"value": "web-01", "count": 3}]})
+    body = flat(_fstats(_reader()).text)
+    assert "web-01" in body
+    assert "unknown" in body
+    assert "could not" not in body.lower()
+
+
+def test_a_row_with_no_count_renders_rather_than_throwing(browser):
+    browser("get_field_stats", result={"top_values": [
+        {"value": "web-01"}], "unique_count": 1, "total_count": 1,
+        "doc_count": 1})
+    html = _fstats(_reader()).text
+    assert "web-01" in flat(html)
+    assert "dsc-absent" in html
+
+
+def test_the_hunt_argument_is_the_value_not_an_escaped_copy(browser):
+    """The worst instance of one defect on this project: the argument was
+    escapeHtml(String(v.value)) inside a JSON string, over a field value,
+    which is log content. Hunt searched for something other than the value
+    beside it."""
+    import json as _json
+    value = 'has"quote'
+    browser("get_field_stats", result={"top_values": [
+        {"value": value, "count": 1}], "unique_count": 1,
+        "total_count": 1, "doc_count": 1})
+    html = _fstats(_reader()).text
+    found = re.findall(r"data-args='([^']*)'", html)
+    assert found, html
+    assert _json.loads(unescape(found[0])) == [value]
+
+
+def test_a_genuinely_null_value_is_told_apart_from_a_missing_one(browser):
+    browser("get_field_stats", result={"top_values": [
+        {"value": None, "count": 4}], "unique_count": 1,
+        "total_count": 4, "doc_count": 4})
+    html = _fstats(_reader()).text
+    assert "<em>null</em>" in html
+    assert "huntIOC" not in html, "there is nothing to hunt for"
+
+
+def test_field_stats_without_a_field_is_a_bad_request(browser):
+    browser("get_field_stats", result={"top_values": []})
+    resp = _fstats(_reader(), field="")
+    assert resp.status_code == 422
+
+
+def test_the_page_builds_none_of_the_three_browser_tables():
+    body = re.sub(r"\{#.*?#\}", "", PAGE.read_text(encoding="utf-8"),
+                  flags=re.S)
+    for name in ("displayIndices", "displayMappings", "displayFieldStats"):
+        block = re.search(r"\bfunction " + name + r"\(.*?\n\}", body, re.S)
+        assert block, name
+        assert not re.search(r"\.innerHTML\s*=", block.group(0)), name
+        assert "htmx.ajax" in block.group(0), name
+
+
+def test_the_page_has_no_runtime_html_writes_left():
+    """discover.html reaches zero, which is what the server column means."""
+    body = re.sub(r"\{#.*?#\}", "", PAGE.read_text(encoding="utf-8"),
+                  flags=re.S)
+    body = re.sub(r"//[^\n]*", "", body)
+    assert not re.search(r"\.innerHTML\s*=", body)
+    assert not re.search(r"\.outerHTML\s*=", body)
+    assert "insertAdjacentHTML" not in body

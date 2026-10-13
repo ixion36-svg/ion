@@ -164,3 +164,39 @@ def test_the_enter_listener_is_bound_at_load_not_at_first_open():
     assert "e.target.id === 'nl-question'" in body
     opener = fn("openNlQueryModal")
     assert "addEventListener" not in opener
+
+
+def test_the_page_has_no_inline_style_block():
+    assert "<style" not in page()
+
+
+def test_the_page_links_its_stylesheet_from_head_css():
+    head = re.search(r"\{%\s*block head_css\s*%\}(.*?)\{%\s*endblock\s*%\}",
+                     PAGE.read_text(encoding="utf-8"), re.S)
+    assert head, "linked from head_css"
+    assert "discover-page.css" in head.group(1)
+
+
+def test_nothing_that_outranks_the_sheet_claims_its_selectors():
+    """head_css loses to ion-workspace.css and base.html's two in-body
+    blocks at equal specificity, so an overlap is a rule that is present and
+    never wins. Measured as empty before the move; asserted so adding one
+    is a failing test rather than a silent restyle."""
+    sheet = (ROOT / "src/ion/web/static/css/discover-page.css").read_text(
+        encoding="utf-8")
+    selectors = set()
+    for match in re.finditer(r"(^|\})\s*([^{}@][^{}]*?)\s*\{", sheet, re.M):
+        for part in match.group(2).split(","):
+            part = part.strip()
+            if part and not part.startswith("/*"):
+                selectors.add(part)
+    assert len(selectors) > 50, len(selectors)
+    workspace = (ROOT / "src/ion/web/static/css/ion-workspace.css").read_text(
+        encoding="utf-8", errors="replace")
+    base = (ROOT / "src/ion/web/templates/base.html").read_text(
+        encoding="utf-8")
+    base_blocks = "\n".join(
+        re.findall(r"<style[^>]*>(.*?)</style>", base, re.S))
+    clashes = sorted(s for s in selectors
+                     if s in workspace or s in base_blocks)
+    assert not clashes, clashes
