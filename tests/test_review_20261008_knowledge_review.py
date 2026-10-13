@@ -425,6 +425,24 @@ class TestWiring:
         assert '"/api/knowledge-review/summary"' in src
 
     def test_the_page_shows_the_inbox(self):
+        """The page asked for /api/knowledge-review with fetch() until the UI
+        redesign moved the render to the server. It is the same inbox, pulled
+        by htmx from a fragment route that calls the same endpoint, so this
+        follows the wiring rather than the old URL string: asserting
+        "knowledge-review" appeared in the template failed for a conversion
+        it should have followed."""
         tpl = (_SRC / "ion" / "web" / "templates" / "investigation_memory.html"
                ).read_text(encoding="utf-8")
-        assert "knowledge-review" in tpl
+        host = tpl[tpl.index('id="im-review-content"'):]
+        host = host[:host.index(">") + 1]
+        assert 'hx-get="/ui/investigation-memory/review"' in host
+        assert "hx-trigger=" in host
+
+    def test_the_fragment_behind_the_inbox_reads_the_review_endpoint(self):
+        """The other half of the move. A fragment route that rendered without
+        calling knowledge_review_endpoint would leave the page showing an
+        inbox with nothing behind it, and the test above would still pass."""
+        src = (_SRC / "ion" / "web" / "ui" / "investigation_memory.py"
+               ).read_text(encoding="utf-8")
+        block = src.split("'/investigation-memory/review'")[1][:800]
+        assert "knowledge_review_endpoint" in block
