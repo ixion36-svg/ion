@@ -1,0 +1,315 @@
+{% from "_fragments/_time.html" import ts %}
+{#
+  The duty sweep: cluster health, critical alerts, the three KPI cards, the
+  stale-case backlog, the two log-source panels, and the rule failures.
+
+  One fragment, because `daily_checks_payload` is one `asyncio.gather` over
+  ten checks. Sections 1 to 4 are contiguous in the page and go in as the
+  main swap; section 6 is on the far side of the Arkime panels and comes
+  back as an out-of-band swap, as does the duty line in section 11. Every
+  figure and the table under it therefore come from one read and cannot
+  disagree.
+
+  Every number here is rendered through `n()`, which prints "Unknown" for a
+  figure the sweep did not produce and the figure itself for one it did,
+  including zero. That is the whole point of the page: the JavaScript this
+  replaces used `?? 0` at thirteen sites and `|| []` at six, so a refused
+  Elasticsearch rendered as a quiet SOC.
+#}
+
+{%- macro n(value) -%}
+{%- if value is not none %}{{ value }}{% else %}<span class="ds-unmeasured" title="This figure was not measured. It is unknown, not zero.">Unknown</span>{% endif -%}
+{%- endmacro -%}
+
+{%- macro sev(row) -%}
+<span class="ds-sev-pill ds-sev-{{ row.severity }}">{{ row.severity_shown or 'unknown' }}</span>
+{%- endmacro -%}
+
+{%- macro unread(what) -%}
+<div role="alert" class="ds-read-failed">The {{ what }} could not be read. This is not an empty result: the check did not complete, so the figures are unknown rather than zero. Run the checks again to retry.</div>
+{%- endmacro -%}
+
+{%- macro diag(d) -%}
+{%- if d %}
+<div class="ds-diag">Queried <code>{{ d.index or 'no index' }}</code> for <code>{{ d.host_field or 'no host field' }}</code> matching
+{% if d.patterns %}{% for p in d.patterns %}<code>{{ p }}</code>{% if not loop.last %}, {% endif %}{% endfor %}{% else %}<em>no patterns</em>{% endif %}
+&middot; {{ n(d.total_hits) }} hits / {{ n(d.host_count) }} hosts</div>
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro log_panel(p) -%}
+<div class="ds-panel">
+  <h2 class="ds-panel-title">
+    <svg class="w-4 h-4 text-secondary"><use href="#i-server"/></svg> {{ p.title }}
+    <span class="ds-rag-light ds-rag-{{ p.state }}" title="{{ p.state }}"></span>
+  </h2>
+  {%- if p.failed %}{{ unread(p.title) }}
+  {%- elif p.mode == 'error' %}
+  <div role="alert" class="ds-logsrc-error"><strong>Elasticsearch query failed.</strong> {{ p.error }}</div>
+  {{ diag(p.diag) }}
+  {%- elif p.mode == 'not_configured' %}
+  <div role="alert" class="ds-logsrc-unconfigured"><strong>Not configured.</strong> {{ p.error }}</div>
+  {{ diag(p.diag) }}
+  {%- else %}
+  <div class="grid grid-cols-3 gap-3 mb-3 text-[12px]">
+    <div class="text-base-content/60">Events 24h: <span class="ds-figure">{{ n(p.total) }}</span></div>
+    <div class="text-base-content/60">Hosts w/ gaps: <span class="ds-figure">{{ n(p.gaps) }}</span></div>
+    <div class="text-base-content/60">Below avg: <span class="ds-figure">{{ n(p.below) }}</span></div>
+  </div>
+  {%- if p.mode == 'empty' %}
+  <p class="ds-empty">No host data &mdash; the patterns matched zero hosts in the last 24 h. That is a measured result, not a failed query.</p>
+  {{ diag(p.diag) }}
+  {%- else %}
+  <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+    {%- for h in p.hosts %}
+    <div class="ds-host-widget ds-hw-{{ h.state }}" title="{{ h.name }}&#10;Events 24h: {{ h.events if h.events is not none else 'unknown' }}&#10;7d avg: {{ h.avg if h.avg is not none else 'unknown' }}&#10;Gap hours: {{ h.gaps if h.gaps is not none else 'unknown' }}{% if h.below_average %}&#10;Below average{% endif %}">
+      <span class="ds-hw-light ds-rag-{{ h.state }}"></span>
+      <span class="ds-hw-name">{{ h.name }}</span>
+      <span class="ds-hw-meta">{{ n(h.events) }}{% if h.gap_shown %}<br><span class="ds-hw-gap">{{ h.gaps }}h gap</span>{% endif %}</span>
+    </div>
+    {%- endfor %}
+  </div>
+  {{ diag(p.diag) }}
+  {%- endif %}
+  {%- endif %}
+</div>
+{%- endmacro -%}
+
+{# ── Out-of-band: section 6, the far side of the Arkime panels ── #}
+<div hx-swap-oob="innerHTML:#ds-rules">
+  {%- if failed or rules.failed %}{{ unread('rule-failure check') }}
+  {%- else %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-[12px]">
+      <thead><tr><th class="dth">Rule Name</th><th class="dth">Failure Count</th><th class="dth">Last Failure</th></tr></thead>
+      <tbody>
+        {%- for r in rules.rows %}
+        <tr class="ds-row">
+          <td class="px-3 py-2 ds-figure">{{ r.name }}</td>
+          <td class="px-3 py-2 font-mono ds-rule-count">{{ n(r.failures) }}</td>
+          <td class="px-3 py-2 font-mono text-base-content/60">{{ ts(r.last_failure, fallback='No failure time recorded') }}</td>
+        </tr>
+        {%- else %}
+        <tr><td colspan="3" class="px-3 py-8 text-center text-base-content/50">No rule failures detected</td></tr>
+        {%- endfor %}
+      </tbody>
+    </table>
+  </div>
+  {%- endif %}
+</div>
+
+{# ── Out-of-band: the duty line in section 11 ── #}
+<div hx-swap-oob="innerHTML:#duty-line">
+  {%- with available=duty.available, assigned=duty.assigned, name=duty.name, acknowledged=duty.acknowledged %}
+  {%- include "_fragments/daily_standup_duty.html" %}
+  {%- endwith %}
+</div>
+
+{# ── Sections 1 to 4 ── #}
+{% if failed %}
+<div role="alert" class="ds-read-failed">The duty checks could not be read. Elasticsearch, the case database or both did not answer, so the cluster state, the alert counts, the stale-case backlog, the log-source health and the rule failures are all unknown rather than zero. Run the checks again to retry.</div>
+{% else %}
+
+{# The sweep as it was read, for the save, PDF and pptx endpoints that
+   already accept it as `checks_data`. Through |tojson, never interpolated:
+   collectState parses it with JSON.parse and a throw there would post an
+   empty sweep as though nothing had been checked. #}
+<div id="ds-checks-data" class="hidden" data-ds-checks='{{ raw|tojson }}'></div>
+
+<!-- S1: ES Cluster Health -->
+<div class="mb-6"><div class="ds-section-label">Section 1</div>
+  <div class="ds-panel">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h2 class="ds-panel-title">
+        <svg class="w-4 h-4 text-primary"><use href="#i-database"/></svg> ES Cluster Health
+      </h2>
+      {%- if cluster.failed %}<span class="ds-state-pill ds-state-unknown">unread</span>
+      {%- else %}<span class="ds-state-pill ds-state-{{ cluster.state }}">{{ cluster.status or 'unknown' }}</span>{% endif %}
+    </div>
+    {%- if cluster.failed %}{{ unread('cluster health check') }}
+    {%- elif cluster.mode == 'unconfigured' %}
+    <div role="alert" class="ds-logsrc-unconfigured"><strong>Not configured.</strong> No Elasticsearch cluster is configured, so its health was never asked for.</div>
+    {%- elif cluster.mode == 'error' %}
+    <div role="alert" class="ds-logsrc-error"><strong>Elasticsearch refused the health query.</strong> {{ cluster.error or 'No reason was given.' }}</div>
+    {%- else %}
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-2">
+      <div><div class="ds-stat-title">Nodes</div><div class="ds-stat-value">{{ n(cluster.nodes) }}</div></div>
+      <div><div class="ds-stat-title">Shards</div><div class="ds-stat-value">{{ n(cluster.shards) }}</div></div>
+      <div><div class="ds-stat-title">Indices</div><div class="ds-stat-value">{{ n(cluster.indices) }}</div></div>
+      <div><div class="ds-stat-title">Store</div><div class="ds-stat-value">{{ n(cluster.store) }}</div></div>
+    </div>
+    {%- endif %}
+  </div>
+</div>
+
+<!-- S2: Critical Alerts (Last 24h) -->
+<div class="mb-6"><div class="ds-section-label">Section 2</div>
+  <div class="ds-panel">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h2 class="ds-panel-title">
+        <svg class="w-4 h-4 text-error"><use href="#i-shield-alert"/></svg> Critical Alerts (Last 24h)
+      </h2>
+      <span class="ds-count-badge">Critical: {{ n(alerts.critical) }}</span>
+    </div>
+    {%- if alerts.failed %}{{ unread('critical-alert check') }}
+    {%- else %}
+    {%- if alerts.fallback %}
+    <div role="alert" class="ds-logsrc-unconfigured">ION-local fallback &middot; {{ alerts.fallback_reason }}</div>
+    {%- endif %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-[12px]">
+        <thead><tr><th class="dth">Time</th><th class="dth">Severity</th><th class="dth">Rule Name</th><th class="dth">Host</th><th class="dth">Status</th></tr></thead>
+        <tbody>
+          {%- for a in alerts.rows %}
+          <tr class="ds-row">
+            <td class="px-3 py-2 text-base-content/60 font-mono">{{ ts(a.timestamp, 'time', fallback='No time recorded') }}</td>
+            <td class="px-3 py-2">{{ sev(a) }}</td>
+            <td class="px-3 py-2 ds-figure truncate max-w-[320px]" title="{{ a.rule }}">{{ a.rule }}</td>
+            <td class="px-3 py-2 text-base-content/70">{{ a.host or 'No host recorded' }}</td>
+            <td class="px-3 py-2 text-base-content/60">{{ a.status or 'No status recorded' }}</td>
+          </tr>
+          {%- else %}
+          <tr><td colspan="5" class="px-3 py-8 text-center text-base-content/50">No critical alerts in last 24h</td></tr>
+          {%- endfor %}
+        </tbody>
+      </table>
+    </div>
+    {%- if alerts.hidden %}<p class="ds-empty">{{ alerts.hidden }} further critical alert(s) are not shown here. The saved report carries all of them.</p>{% endif %}
+    {%- endif %}
+    <div class="flex justify-end mt-2">
+      <a href="/alerts" class="link link-primary text-sm inline-flex items-center gap-1">
+        View all in Alerts <svg class="w-3 h-3"><use href="#i-arrow-up-right"/></svg>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- S2b: KPI strip -->
+<div class="mb-6">
+  <div class="ds-section-label">Section 2b &middot; KPIs</div>
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+    <div class="ds-panel">
+      <div class="flex items-baseline justify-between mb-3">
+        <span class="ds-section-label mb-0">Alerts &middot; 24h</span>
+        {%- if not alerts_24h.failed %}
+        <span class="text-[11px] text-base-content/50 tabular-nums">
+          {%- if alerts_24h.fallback %}ION fallback (ES down) &mdash; severity n/a
+          {%- elif alerts_24h.source %}{{ alerts_24h.source }}
+          {%- else %}source not stated{% endif %}</span>
+        {%- endif %}
+      </div>
+      {%- if alerts_24h.failed %}{{ unread('24-hour alert breakdown') }}
+      {%- else %}
+      <div class="flex items-end gap-3 mb-3">
+        <div class="ds-kpi-figure">{{ n(alerts_24h.total) }}</div>
+        <div class="text-[11px] text-base-content/50 leading-tight pb-1">total alerts<br><span class="text-base-content/40">last 24h</span></div>
+      </div>
+      <div class="ds-kpi-row grid-cols-4">
+        {%- for key, label in [('critical', 'critical'), ('high', 'high'), ('medium', 'medium'), ('low', 'low')] %}
+        <div><div class="ds-kpi-cell ds-sev-text-{{ key }}">{{ n(alerts_24h.severity[key]) }}</div><div class="ds-kpi-label">{{ label }}</div></div>
+        {%- endfor %}
+      </div>
+      <div class="ds-kpi-row grid-cols-3">
+        {%- for key, label in [('open', 'open'), ('acknowledged', 'ack'), ('closed', 'closed')] %}
+        <div><div class="ds-kpi-cell ds-status-text-{{ key }}">{{ n(alerts_24h.status[key]) }}</div><div class="ds-kpi-label">{{ label }}</div></div>
+        {%- endfor %}
+      </div>
+      {%- endif %}
+    </div>
+
+    <div class="ds-panel">
+      <div class="flex items-baseline justify-between mb-3">
+        <span class="ds-section-label mb-0">Cases &middot; 24h</span>
+        {%- if not cases.failed %}
+        <span class="text-[11px] text-base-content/50 tabular-nums">{{ n(cases.intake) }} new &middot; {{ n(cases.closed) }} closed</span>
+        {%- endif %}
+      </div>
+      {%- if cases.failed %}{{ unread('case status counts') }}
+      {%- else %}
+      <div class="flex items-end gap-3 mb-3">
+        <div class="ds-kpi-figure">{{ n(cases.intake) }}</div>
+        <div class="text-[11px] text-base-content/50 leading-tight pb-1">intake<br><span class="text-base-content/40">last 24h</span></div>
+      </div>
+      <div class="ds-kpi-row grid-cols-3">
+        <div><div class="ds-kpi-cell ds-status-text-open">{{ n(cases.open) }}</div><div class="ds-kpi-label">open</div></div>
+        <div><div class="ds-kpi-cell ds-status-text-acknowledged">{{ n(cases.in_progress) }}</div><div class="ds-kpi-label">in&nbsp;progress</div></div>
+        <div><div class="ds-kpi-cell ds-status-text-closed">{{ n(cases.closed) }}</div><div class="ds-kpi-label">closed</div></div>
+      </div>
+      <div class="ds-kpi-row grid-cols-4">
+        {%- for key, label in [('critical', 'critical'), ('high', 'high'), ('medium', 'medium'), ('low', 'low')] %}
+        <div><div class="ds-kpi-cell ds-sev-text-{{ key }}">{{ n(cases.severity[key]) }}</div><div class="ds-kpi-label">{{ label }}</div></div>
+        {%- endfor %}
+      </div>
+      {%- endif %}
+    </div>
+
+    <div class="ds-panel">
+      <div class="flex items-baseline justify-between mb-3">
+        <span class="ds-section-label mb-0">Triage &middot; 24h</span>
+        <span class="text-[11px] text-base-content/50">avg MTTA</span>
+      </div>
+      {%- if triage.failed %}{{ unread('triage throughput check') }}
+      {%- else %}
+      <div class="flex items-end gap-3 mb-3">
+        <div class="ds-kpi-figure text-primary">{{ n(triage.triaged) }}</div>
+        <div class="text-[11px] text-base-content/50 leading-tight pb-1">alerts triaged<br><span class="text-base-content/40">last 24h</span></div>
+      </div>
+      <div class="ds-kpi-row grid-cols-3">
+        <div><div class="ds-kpi-cell">{{ n(triage.avg) }}</div><div class="ds-kpi-label">avg&nbsp;min</div></div>
+        <div><div class="ds-kpi-cell">{{ n(triage.p50) }}</div><div class="ds-kpi-label">p50</div></div>
+        <div><div class="ds-kpi-cell">{{ n(triage.p90) }}</div><div class="ds-kpi-label">p90</div></div>
+      </div>
+      {%- endif %}
+    </div>
+
+  </div>
+</div>
+
+<!-- S3: Stale Cases -->
+<div class="mb-6"><div class="ds-section-label">Section 3</div>
+  <div class="ds-panel">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="ds-panel-title">
+        <svg class="w-4 h-4 text-warning"><use href="#i-clock"/></svg> Stale Cases (Open &gt; 24h)
+      </h2>
+      <span class="text-[12px] text-warning font-semibold">Count: {{ n(stale.count) }}</span>
+    </div>
+    {%- if stale.failed %}{{ unread('stale-case check') }}
+    {%- else %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-[12px]">
+        <thead><tr><th class="dth">Case #</th><th class="dth">Title</th><th class="dth">Triggered Rules</th><th class="dth">Severity</th><th class="dth">Assigned To</th><th class="dth">Hours Open</th></tr></thead>
+        <tbody>
+          {%- for c in stale.rows %}
+          <tr class="ds-row">
+            <td class="px-3 py-2 ds-figure font-mono">{{ c.case_number or 'No case number' }}</td>
+            <td class="px-3 py-2 text-base-content/70 truncate max-w-[220px]">{{ c.title or 'Untitled' }}</td>
+            <td class="px-3 py-2 text-base-content/70 truncate max-w-[220px]">
+              {%- if not c.rules_known %}<span class="ds-unmeasured">Unknown</span>
+              {%- elif not c.rules %}<span class="text-base-content/40">&mdash;</span>
+              {%- else %}{{ c.rules|join(', ') }}{% if c.rules_hidden %} <span class="text-base-content/50">+{{ c.rules_hidden }}</span>{% endif %}
+              {%- endif %}
+            </td>
+            <td class="px-3 py-2">{{ sev(c) }}</td>
+            <td class="px-3 py-2 text-base-content/60">{{ c.assigned_to or 'Unassigned' }}</td>
+            <td class="px-3 py-2 font-mono{% if c.hours_state %} ds-hours-{{ c.hours_state }}{% endif %}">{{ n(c.hours) }}</td>
+          </tr>
+          {%- else %}
+          <tr><td colspan="6" class="px-3 py-8 text-center text-base-content/50">No stale cases</td></tr>
+          {%- endfor %}
+        </tbody>
+      </table>
+    </div>
+    {%- endif %}
+  </div>
+</div>
+
+<!-- S4: DC + WEF Log Health -->
+<div class="mb-6"><div class="ds-section-label">Section 4</div>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    {%- for p in log_health %}{{ log_panel(p) }}{% endfor %}
+  </div>
+</div>
+
+{% endif %}

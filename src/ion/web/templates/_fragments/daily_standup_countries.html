@@ -1,0 +1,56 @@
+{#
+  Arkime ingress/egress to the five high-risk countries, with the per-node
+  session breakdown under each card.
+
+  All five cards are always rendered, in a fixed order, because a country
+  Arkime returned nothing for and a country it was never asked about are
+  different and a missing card could not tell them apart. `measured` says
+  which: a card the payload did not name carries no session figure at all
+  rather than a zero.
+
+  renderArkime() built the breakdown with innerHTML and three hex literals
+  in a template string (#94a3b8, #6de4ff, #64748b), which is why a restyle
+  never reached it.
+#}
+{% if failed %}
+<div role="alert" class="ds-read-failed">High-risk country traffic could not be read. Arkime did not answer, so these session counts are unknown rather than zero. Run the checks again to retry.</div>
+{% elif configured is sameas false %}
+<div role="alert" class="ds-logsrc-unconfigured"><strong>Arkime is not configured.</strong> No capture source has been set, so no country traffic was queried.</div>
+{% else %}
+{# The flag is decoration, so it is chosen here rather than carried in the
+   view model: a renderer built on that model should not have to know which
+   emoji ION picked for a country code. #}
+{% set flags = {'RU': '&#x1F1F7;&#x1F1FA;', 'CN': '&#x1F1E8;&#x1F1F3;', 'IR': '&#x1F1EE;&#x1F1F7;', 'KP': '&#x1F1F0;&#x1F1F5;', 'SY': '&#x1F1F8;&#x1F1FE;'} %}
+<div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+  {%- for c in countries %}
+  <div class="ds-country-card{% if c.active %} highlighted{% endif %}" data-country="{{ c.code }}">
+    <span class="text-[18px]" aria-hidden="true">{{ flags.get(c.code, '')|safe }}</span>
+    <div class="text-[12px] text-base-content/70 font-semibold">{{ c.name }}</div>
+    <div class="text-[11px] text-base-content/50">Sessions:
+      {%- if not c.measured %} <span class="ds-unmeasured" title="Arkime answered but did not report on {{ c.name }}.">Unknown</span>
+      {%- elif c.count is none %} <span class="ds-unmeasured" title="No session count was reported for {{ c.name }}.">Unknown</span>
+      {%- else %} <span class="ds-country-count{% if c.active %} active{% endif %}">{{ c.count }}</span>{% endif %}
+    </div>
+    {%- if c.nodes %}
+    <div class="ds-node-detail">
+      {%- for nd in c.nodes %}
+      <div class="ds-node-line">
+        <span class="ds-node-name">{{ nd.node }}</span>:
+        {%- if nd.count is none %} <span class="ds-unmeasured">Unknown</span> sessions
+        {%- else %} {{ nd.count }} session{% if nd.plural %}s{% endif %}{% endif %}
+        {%- for s in nd.sessions %}
+        <div class="ds-node-session">{{ s.src_ip }} &rarr; {{ s.dst_ip }} [{{ s.protocol }}] {% if s.bytes is not none %}{{ s.bytes }}{% else %}<span class="ds-unmeasured">size unknown</span>{% endif %}</div>
+        {%- endfor %}
+      </div>
+      {%- endfor %}
+    </div>
+    {%- endif %}
+  </div>
+  {%- endfor %}
+</div>
+{%- if errors %}
+<div role="alert" class="ds-logsrc-error mt-3"><strong>Some node queries failed, so the counts above are lower bounds.</strong>
+  <ul class="list-disc pl-5">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+</div>
+{%- endif %}
+{% endif %}

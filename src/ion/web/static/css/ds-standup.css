@@ -1,0 +1,430 @@
+/* The /daily-standup page's own stylesheet.
+ *
+ * These rules were the 42-line inline <style> block in daily_standup.html
+ * until 2026-10-13, plus the class names that replaced the Tailwind strings
+ * the page's JavaScript used to concatenate. They are page-scoped:
+ * daily_standup.html is the only template that links this file, from
+ * {% block head_css %}.
+ *
+ * Cascade note. The inline block sat in {% block scripts %}, at the end of
+ * <body>, after every linked sheet; in head_css it now loads before
+ * ion-workspace.css and base.html's own blocks. Checked before the move:
+ * none of the selectors below appears in ion.css, ion-workspace.css,
+ * ion-migrated-styles.css or base.html's inline blocks, and every one is
+ * prefixed .ds- or is .dth, so nothing changes winner at equal specificity.
+ *
+ * Two naming changes, and both are the point of moving the file. The RAG
+ * lights were .ds-rag-green / -amber / -red / -grey and the hours-open
+ * column was .ds-hours-red / -amber / -yellow, so the view model had to
+ * know a colour to pick a class. They are states now — good, warning,
+ * critical, unknown, elevated — chosen by the fragment from the semantic
+ * value the route returns, which is what lets this file repaint them.
+ *
+ * .ds-sev-unknown is new and is a fix rather than a rename: the page's
+ * severity map fell through to .ds-sev-low, so an alert nobody had
+ * classified was painted as one classified low.
+ */
+
+/* ── Table chrome ─────────────────────────────────────────────────────── */
+
+.dth {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ion-border);
+}
+
+.ds-row { border-bottom: 1px solid var(--ion-border); }
+.ds-row:hover { background: rgba(255, 255, 255, .02); }
+
+/* ── Page furniture ───────────────────────────────────────────────────── */
+
+.ds-section-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.ds-panel {
+  border-radius: var(--ion-radius-lg, 12px);
+  border: 1px solid var(--ion-border);
+  background: var(--bg-secondary);
+  padding: 20px;
+}
+
+.ds-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.ds-figure { color: var(--text-primary); font-weight: 600; }
+
+.ds-stat-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--text-muted);
+}
+
+.ds-stat-value {
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+/* A figure the sweep did not produce. Deliberately quiet rather than
+ * alarming: it is the absence of a measurement, not a bad measurement. */
+.ds-unmeasured {
+  color: var(--text-muted);
+  font-style: italic;
+  font-weight: 400;
+  cursor: help;
+}
+
+.ds-count-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger);
+  background: rgba(255, 108, 108, .1);
+  border: 1px solid rgba(255, 108, 108, .2);
+}
+
+/* ── Outcome blocks: failed, error, unconfigured, empty ───────────────── */
+
+.ds-read-failed {
+  border-radius: 8px;
+  border: 1px solid rgba(255, 108, 108, .3);
+  background: rgba(255, 108, 108, .08);
+  color: var(--danger);
+  font-size: 12px;
+  padding: 12px;
+  margin: 8px 0;
+}
+
+.ds-logsrc-error {
+  border-radius: 8px;
+  border: 1px solid rgba(239, 68, 68, .3);
+  background: rgba(239, 68, 68, .1);
+  color: var(--danger);
+  font-size: 12px;
+  padding: 12px;
+}
+
+.ds-logsrc-unconfigured {
+  border-radius: 8px;
+  border: 1px solid rgba(245, 158, 11, .3);
+  background: rgba(245, 158, 11, .1);
+  color: var(--warning);
+  font-size: 12px;
+  padding: 12px;
+}
+
+.ds-empty {
+  color: var(--text-muted);
+  font-size: 11px;
+  text-align: center;
+  padding: 12px 0;
+}
+
+.ds-diag {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  text-align: center;
+}
+
+.ds-diag code { color: var(--text-secondary); }
+
+/* ── Cluster state pill ───────────────────────────────────────────────── */
+
+.ds-state-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  border: 1px solid transparent;
+}
+
+.ds-state-good     { background: rgba(163, 230, 53, .1);  color: var(--success); border-color: rgba(163, 230, 53, .2); }
+.ds-state-warning  { background: rgba(245, 158, 11, .1);  color: var(--warning); border-color: rgba(245, 158, 11, .2); }
+.ds-state-critical { background: rgba(255, 108, 108, .1); color: var(--danger);  border-color: rgba(255, 108, 108, .2); }
+.ds-state-unknown  { background: rgba(148, 163, 184, .1); color: var(--text-muted); border-color: var(--ion-border); }
+
+/* ── Severity ─────────────────────────────────────────────────────────── */
+
+.ds-sev-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.ds-sev-critical { background: rgba(255, 108, 108, .12); color: var(--danger);       border: 1px solid rgba(255, 108, 108, .25); }
+.ds-sev-high     { background: rgba(245, 158, 11, .12);  color: var(--warning);      border: 1px solid rgba(245, 158, 11, .25); }
+.ds-sev-medium   { background: rgba(139, 92, 246, .12);  color: var(--neon-purple);  border: 1px solid rgba(139, 92, 246, .25); }
+.ds-sev-low      { background: rgba(148, 163, 184, .1);  color: var(--text-secondary); border: 1px solid rgba(148, 163, 184, .2); }
+.ds-sev-info     { background: rgba(96, 165, 250, .12);  color: var(--info);         border: 1px solid rgba(96, 165, 250, .25); }
+
+/* Not a quieter low. An unclassified alert is marked as unclassified. */
+.ds-sev-unknown {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px dashed var(--ion-border);
+}
+
+/* The KPI cards colour the figure rather than wrapping it in a pill. */
+.ds-sev-text-critical { color: var(--danger); }
+.ds-sev-text-high     { color: var(--warning); }
+.ds-sev-text-medium   { color: var(--text-secondary); }
+.ds-sev-text-low      { color: var(--text-muted); }
+
+.ds-status-text-open         { color: var(--danger); }
+.ds-status-text-acknowledged { color: var(--warning); }
+.ds-status-text-closed       { color: var(--success); }
+
+/* ── KPI cards ────────────────────────────────────────────────────────── */
+
+.ds-kpi-figure {
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.ds-kpi-row {
+  display: grid;
+  gap: 8px;
+  text-align: center;
+  padding-top: 8px;
+  margin-top: 8px;
+  border-top: 1px solid var(--ion-border);
+}
+
+.ds-kpi-cell {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.ds-kpi-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+/* ── Hours open, as a state rather than a colour name ─────────────────── */
+
+.ds-hours-critical { color: var(--danger);  font-weight: 700; }
+.ds-hours-warning  { color: var(--warning); font-weight: 700; }
+.ds-hours-elevated { color: var(--warning); font-weight: 600; }
+
+.ds-rule-count { color: var(--warning); }
+
+/* ── RAG traffic lights ───────────────────────────────────────────────── */
+
+.ds-rag-light {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid var(--ion-border);
+}
+
+.ds-rag-good     { background: var(--success); box-shadow: 0 0 8px rgba(34, 197, 94, .6); }
+.ds-rag-warning  { background: var(--warning); box-shadow: 0 0 8px rgba(245, 158, 11, .6); animation: ds-rag-pulse 1.5s ease-in-out infinite; }
+.ds-rag-critical { background: var(--danger);  box-shadow: 0 0 10px rgba(239, 68, 68, .7); animation: ds-rag-pulse .8s ease-in-out infinite; }
+.ds-rag-unknown  { background: var(--text-muted); }
+
+@keyframes ds-rag-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
+
+/* ── Host widget cards ────────────────────────────────────────────────── */
+
+.ds-host-widget {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--ion-border);
+  background: rgba(255, 255, 255, .02);
+  transition: border-color .2s;
+}
+
+.ds-host-widget.ds-hw-good     { border-color: rgba(34, 197, 94, .15); }
+.ds-host-widget.ds-hw-warning  { border-color: rgba(245, 158, 11, .25); background: rgba(245, 158, 11, .04); }
+.ds-host-widget.ds-hw-critical { border-color: rgba(239, 68, 68, .3);  background: rgba(239, 68, 68, .06); }
+.ds-host-widget.ds-hw-unknown  { border-style: dashed; }
+
+.ds-hw-light { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+.ds-hw-name {
+  font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace);
+  font-size: 10px;
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ds-hw-meta {
+  font-size: 9px;
+  color: var(--text-muted);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Was class="text-[#ef4444]" inside a JavaScript template string, which is
+ * why no restyle of this page ever reached it. */
+.ds-hw-gap { color: var(--danger); }
+
+/* ── Arkime country cards ─────────────────────────────────────────────── */
+
+.ds-country-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--ion-border);
+  background: rgba(255, 255, 255, .02);
+  transition: border-color .2s, background .2s;
+}
+
+.ds-country-card.highlighted {
+  border-color: rgba(255, 108, 108, .4);
+  background: rgba(255, 108, 108, .08);
+}
+
+.ds-country-count.active { color: var(--danger); font-weight: 700; }
+
+.ds-node-detail { width: 100%; }
+.ds-node-line { font-size: 9px; color: var(--text-secondary); margin-top: 4px; text-align: left; }
+.ds-node-name { color: var(--primary); }
+.ds-node-session { padding-left: 8px; color: var(--text-muted); }
+
+/* ── Arkime capture-node cards ────────────────────────────────────────── */
+
+.ds-node-card {
+  border-radius: 8px;
+  border: 1px solid var(--ion-border);
+  background: rgba(255, 255, 255, .02);
+  padding: 16px;
+}
+
+.ds-node-card.ds-node-dropping { border-color: rgba(255, 108, 108, .3); }
+
+.ds-node-rate { color: var(--primary); }
+.ds-node-drop { color: var(--danger); font-weight: 600; }
+
+/* ── Report slide-over ────────────────────────────────────────────────── */
+
+.ds-report-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .15s;
+}
+
+.ds-report-item:hover { background: rgba(255, 255, 255, .05); }
+
+.ds-rpt-sec-hdr {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 4px;
+  padding-top: 12px;
+}
+
+.ds-rpt-tag {
+  display: inline-flex;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(109, 228, 255, .1);
+  color: var(--primary);
+}
+
+.ds-rpt-ttp {
+  display: inline-flex;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  background: rgba(245, 158, 11, .12);
+  color: var(--warning);
+  border: 1px solid rgba(245, 158, 11, .25);
+}
+
+/* ── Duty line ────────────────────────────────────────────────────────── */
+
+.ds-duty-who { color: var(--text-primary); }
+.ds-duty-ack { color: var(--success); }
+.ds-duty-gap { color: var(--warning); }
+
+/* ── Sign-off status, which only the browser knows ────────────────────── */
+
+.ds-saved { color: var(--success); }
+.ds-save-failed { color: var(--danger); }
+.ds-save-pending { color: var(--text-muted); }
+
+/* ── Busy indicators ──────────────────────────────────────────────────── */
+
+.ds-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--ion-border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: ds-spin .7s linear infinite;
+}
+
+@keyframes ds-spin { to { transform: rotate(360deg); } }
+
+/* htmx adds .htmx-request to the element that issued a request, and to
+ * whatever hx-indicator names. The spinner inside the button is markup in
+ * the page, revealed rather than written: `btn.innerHTML = spinner` is what
+ * made the Run Checks label unstylable and unrecoverable on an error. */
+.ds-busy { display: none; }
+.htmx-request .ds-busy,
+.htmx-request.ds-busy { display: inline-flex; }
+.htmx-request .ds-idle { display: none; }
+/* The slide-over's spinner fills the panel rather than sitting in a label. */
+#ds-report-busy.htmx-request { display: flex; }
