@@ -36,39 +36,34 @@
     <div id="attn-list" class="attn-banner-list flex flex-wrap gap-2"></div>
   </div>
 
-  <!-- Stats Bar (JS-populated; IDs preserved) -->
-  <div id="cases-stats" class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3 mb-8 rise d-2">
-    <div class="ion-metric hover:border-ion-cyan/30 transition">
-      <div class="ion-metric-label">Open Cases</div>
-      <div id="stat-open" class="ion-metric-value text-ion-cyan">0</div>
-    </div>
-    <div class="ion-metric hover:border-ion-iris/30 transition">
-      <div class="ion-metric-label">Acknowledged</div>
-      <div id="stat-acknowledged" class="ion-metric-value text-ion-iris">0</div>
-    </div>
-    <div class="ion-metric hover:border-ion-coral/30 transition">
-      <div class="ion-metric-label">Critical Active</div>
-      <div id="stat-critical" class="ion-metric-value text-ion-coral">0</div>
-    </div>
+  <!-- Stats bar. Server-rendered by /ui/cases/summary, which also fills the
+       Management Analytics panel out of band. Re-requested when loadAllCases()
+       dispatches cases-changed on the body after a status change. -->
+  <div id="cases-stats" class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3 mb-8 rise d-2"
+       hx-get="/ui/cases/summary"
+       hx-trigger="load, cases-changed from:body"
+       hx-swap="innerHTML">
+    {# Placeholders, not zeros: a tile reading 0 before the read answers
+       is the same glyph as a measured zero. #}
+    {% for label in ("Open Cases", "Acknowledged", "Critical Active", "Avg Resolution",
+                     "MTTR · 30d", "Closure rate · 7d", "Created / Closed · 7d", "Unassigned") %}
     <div class="ion-metric">
-      <div class="ion-metric-label">Avg Resolution</div>
-      <div id="stat-resolution" class="ion-metric-value">–</div>
+      <div class="ion-metric-label">{{ label }}</div>
+      <div class="ion-metric-value text-base-content/40" aria-busy="true">&hellip;</div>
     </div>
-    <div class="ion-metric">
-      <div class="ion-metric-label">MTTR · 30d</div>
-      <div id="stat-mttr" class="ion-metric-value">–</div>
-    </div>
-    <div class="ion-metric">
-      <div class="ion-metric-label">Closure rate · 7d</div>
-      <div id="stat-closure-rate" class="ion-metric-value text-ion-lime">–</div>
-    </div>
-    <div class="ion-metric">
-      <div class="ion-metric-label">Created / Closed · 7d</div>
-      <div id="stat-weekly" class="ion-metric-value">–</div>
-    </div>
-    <div class="ion-metric hover:border-ion-amber/30 transition">
-      <div class="ion-metric-label">Unassigned</div>
-      <div id="stat-unassigned" class="ion-metric-value text-ion-amber">0</div>
+    {% endfor %}
+  </div>
+  <!-- Outside #cases-stats and #analytics-panel-body on purpose: the retry
+       control a failed render offers must not live inside what it refreshes.
+       Replaced out of band by the fragment. The hidden control inside is
+       for the request itself failing, when nothing out of band arrives;
+       the listener at the end of the script reveals it. -->
+  <div id="cases-summary-retry" class="mb-4">
+    <div class="hidden" data-summary-retry>
+      <div role="alert" class="alert alert-error flex items-center justify-between gap-3">
+        <span>The stat tiles and the analytics could not be requested. Nothing here has been measured.</span>
+        <button type="button" class="btn btn-sm" hx-get="/ui/cases/summary" hx-target="#cases-stats" hx-swap="innerHTML">Retry</button>
+      </div>
     </div>
   </div>
 
@@ -141,41 +136,9 @@
     <span class="chevron" id="analytics-chevron"><i class="icon-chevron-down"></i></span>
 </div>
 <div class="analytics-panel" id="analytics-panel-body">
-    <!-- Summary Strip -->
-    <div class="grid grid-cols-4 max-[1100px]:grid-cols-2 max-[900px]:grid-cols-1 gap-3 mb-4" id="analytics-summary-strip"></div>
-    <div class="grid grid-cols-3 max-[1100px]:grid-cols-2 max-[900px]:grid-cols-1 gap-4 mb-4">
-        <div class="bg-base-100 border border-base-300 border-t-2 border-t-error rounded-lg p-4 transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,.15)]">
-            <h4 class="m-0 mb-3 text-[0.7rem] font-semibold text-base-content/60 uppercase tracking-[0.06em]">Severity Distribution</h4>
-            <div id="analytics-severity-donut" class="donut-container"></div>
-        </div>
-        <div class="bg-base-100 border border-base-300 border-t-2 border-t-secondary rounded-lg p-4 transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,.15)]">
-            <h4 class="m-0 mb-3 text-[0.7rem] font-semibold text-base-content/60 uppercase tracking-[0.06em]">Closure Reasons</h4>
-            <div id="analytics-closure-donut" class="donut-container"></div>
-        </div>
-        <div class="bg-base-100 border border-base-300 border-t-2 border-t-info rounded-lg p-4 transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,.15)]">
-            <h4 class="m-0 mb-3 text-[0.7rem] font-semibold text-base-content/60 uppercase tracking-[0.06em]">Status Breakdown</h4>
-            <div id="analytics-status-donut" class="donut-container"></div>
-        </div>
-    </div>
-    <div class="grid grid-cols-2 max-[900px]:grid-cols-1 gap-4 mb-4">
-        <div class="bg-base-100 border border-base-300 border-t-2 border-t-primary rounded-lg p-4 transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,.15)]">
-            <h4 class="m-0 mb-3 text-[0.7rem] font-semibold text-base-content/60 uppercase tracking-[0.06em]">Analyst Workload</h4>
-            <div id="analytics-workload"></div>
-        </div>
-        <div class="bg-base-100 border border-base-300 border-t-2 border-t-warning rounded-lg p-4 transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,.15)]">
-            <!-- Not an SLA: there is no response or resolution policy
-                 behind this, no pause handling and no recorded breaches,
-                 only fixed age thresholds. Review 2026-10-08 §2 — a label
-                 has to match what the thing measures. -->
-            <h4 class="m-0 mb-1 text-[0.7rem] font-semibold text-base-content/60 uppercase tracking-[0.06em]">Open Case Age</h4>
-            <p class="m-0 mb-3 text-[0.65rem] text-base-content/50">Fixed age thresholds, not an SLA policy.</p>
-            <div id="analytics-sla"></div>
-        </div>
-    </div>
-    <div class="bg-base-100 border border-base-300 rounded-lg p-4">
-        <h4 class="m-0 mb-3 text-[0.7rem] font-semibold text-base-content/60 uppercase tracking-[0.06em]">Recent Closures</h4>
-        <div id="analytics-recent"></div>
-    </div>
+    <!-- Filled out of band by /ui/cases/summary. The collapsed state is a
+         class on this element, which an innerHTML swap does not touch. -->
+    <p class="text-[0.8rem] text-[var(--text-secondary)]" aria-busy="true">Loading analytics&hellip;</p>
 </div>
 
 <!-- Case Detail Slide-out Panel -->
@@ -1744,6 +1707,11 @@
 
 .analytics-panel.collapsed { display: none; }
 
+/* States the /ui/cases/summary fragment renders. */
+.cases-stat-sub { font-size: 0.65rem; color: var(--text-secondary); margin-top: 0.25rem; }
+.cases-card-failed { font-size: 0.8rem; color: var(--danger); margin: 0; }
+.age-bar-seg { height: 6px; border-radius: 3px; }
+
 .analytics-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -2207,7 +2175,6 @@ let allCases = [];
 let filteredCases = [];
 let usersCache = [];
 let pendingClosure = null; // { caseId, targetStatus }
-let teamMetricsCache = null;
 let attentionDismissed = false;
 let casesLoaded = false;
 
@@ -2286,6 +2253,7 @@ let casesTruncated = false;
 let casesTotal = 0;
 
 async function loadAllCases() {
+    const wasLoaded = casesLoaded;
     const collected = [];
     casesTruncated = false;
     casesTotal = 0;
@@ -2317,6 +2285,10 @@ async function loadAllCases() {
     }
     renderCaseLoadNotice();
     filterCases();
+    // The stat tiles and the analytics panel are rendered by
+    // /ui/cases/summary, whose hx-trigger listens for this on the body.
+    // Only on a reload: the first load is the fragment's own `load`.
+    if (wasLoaded) document.body.dispatchEvent(new CustomEvent('cases-changed'));
 }
 
 function renderCaseLoadNotice() {
@@ -2421,38 +2393,7 @@ function filterCases() {
     });
 
     renderBoard();
-    renderStats();
     computeAttentionAlerts();
-    renderAnalyticsPanel();
-}
-
-function renderStats() {
-    const open = allCases.filter(c => c.status === 'open').length;
-    const acked = allCases.filter(c => c.status === 'acknowledged').length;
-    const critActive = allCases.filter(c => c.severity === 'critical' && (c.status === 'open' || c.status === 'acknowledged')).length;
-
-    document.getElementById('stat-open').textContent = open;
-    document.getElementById('stat-acknowledged').textContent = acked;
-    document.getElementById('stat-critical').textContent = critActive;
-
-    // Avg resolution time
-    const resolved = allCases.filter(c => c.status === 'closed' && c.created_at && c.closed_at);
-    if (resolved.length > 0) {
-        const totalMs = resolved.reduce((sum, c) => sum + (new Date(c.closed_at) - new Date(c.created_at)), 0);
-        const avgMs = totalMs / resolved.length;
-        const avgHrs = Math.round(avgMs / 3600000);
-        if (avgHrs < 24) {
-            document.getElementById('stat-resolution').textContent = avgHrs + 'h';
-        } else {
-            document.getElementById('stat-resolution').textContent = Math.round(avgHrs / 24) + 'd';
-        }
-    } else {
-        document.getElementById('stat-resolution').textContent = '-';
-    }
-
-    // Update unassigned count (always available from client-side data)
-    const unassigned = allCases.filter(c => !c.assigned_to && (c.status === 'open' || c.status === 'acknowledged')).length;
-    document.getElementById('stat-unassigned').textContent = unassigned;
 }
 
 // Sort the filtered cases per the board's current sort mode.
@@ -5042,31 +4983,9 @@ async function submitCreateCase() {
 }
 
 // =============================================================================
-// Team Metrics & Management Analytics
+// Attention banner. The stat tiles and the Management Analytics panel are
+// server-rendered by /ui/cases/summary (src/ion/web/ui/cases.py).
 // =============================================================================
-async function loadTeamMetrics() {
-    try {
-        const resp = await fetch('/api/dashboard/team-metrics');
-        if (!resp.ok) throw new Error('Failed to load team metrics');
-        teamMetricsCache = await resp.json();
-    } catch (e) {
-        console.error('Error loading team metrics:', e);
-        teamMetricsCache = null;
-    }
-    renderRow2Stats();
-    renderAnalyticsPanel();
-}
-
-function renderRow2Stats() {
-    if (!teamMetricsCache) return;
-    const tm = teamMetricsCache;
-    document.getElementById('stat-mttr').textContent = tm.mttr_hours != null ? tm.mttr_hours + 'h' : '-';
-    document.getElementById('stat-closure-rate').textContent = tm.closure_rate_7d != null ? tm.closure_rate_7d + '%' : '-';
-    document.getElementById('stat-weekly').textContent = (tm.created_7d || 0) + ' / ' + (tm.closed_7d || 0);
-    const unassigned = allCases.filter(c => !c.assigned_to && (c.status === 'open' || c.status === 'acknowledged')).length;
-    document.getElementById('stat-unassigned').textContent = unassigned;
-}
-
 function computeAttentionAlerts() {
     const banner = document.getElementById('attn-banner');
     if (!banner || attentionDismissed) return;
@@ -5134,267 +5053,22 @@ function dismissAttentionBanner() {
     if (banner) banner.style.display = 'none';
 }
 
-function renderAnalyticsPanel() {
-    if (!casesLoaded || !teamMetricsCache) return;
-
-    renderSummaryStrip();
-    renderSeverityDonut();
-    renderClosureDonut();
-    renderStatusDonut();
-    renderWorkloadBars();
-    renderOpenCaseAges();
-    renderRecentClosures();
+// When the request for /ui/cases/summary itself fails, htmx-errors.js words
+// the tiles target, but the analytics panel body and the Retry control travel
+// out of band in that same response and never arrive: measured, the panel sat
+// at its loading text for ever. Word the panel (textContent, not markup) and
+// reveal the shell's own Retry, which sits outside both targets.
+function summaryRequestFailed(e) {
+    const target = e.detail && e.detail.target;
+    if (!target || target.id !== 'cases-stats') return;
+    const panel = document.getElementById('analytics-panel-body');
+    if (panel) panel.textContent = 'The analytics were not produced. They travel with the stat tiles above, whose request failed; nothing here has been measured.';
+    const retry = document.querySelector('#cases-summary-retry [data-summary-retry]');
+    if (retry) retry.classList.remove('hidden');
 }
-
-// ── SVG Donut Renderer ─────────────────────────────────────
-function renderDonutChart(containerId, data, colors, centerLabel) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-
-    const total = data.reduce((s, d) => s + d.value, 0);
-    if (!total) {
-        container.innerHTML = '<p class="text-[0.8rem] text-[var(--text-secondary)]">No data</p>';
-        return;
-    }
-
-    const size = 120, cx = 60, cy = 60, r = 45, strokeWidth = 14;
-    const circumference = 2 * Math.PI * r;
-    let offset = 0;
-
-    let arcs = '';
-    data.forEach((d, i) => {
-        if (d.value === 0) return;
-        const pct = d.value / total;
-        const dashLen = circumference * pct;
-        const dashGap = circumference - dashLen;
-        arcs += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" '
-            + 'stroke="' + colors[i] + '" stroke-width="' + strokeWidth + '" '
-            + 'stroke-dasharray="' + dashLen + ' ' + dashGap + '" '
-            + 'stroke-dashoffset="' + (-offset) + '" '
-            + 'transform="rotate(-90 ' + cx + ' ' + cy + ')" '
-            + 'class="donut-arc"/>';
-        offset += dashLen;
-    });
-
-    const svg = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 ' + size + ' ' + size + '">'
-        + '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="rgba(99,110,123,.15)" stroke-width="' + strokeWidth + '"/>'
-        + arcs
-        + '<text x="' + cx + '" y="' + (cy - 2) + '" text-anchor="middle" dominant-baseline="central" class="donut-center-text">' + total + '</text>'
-        + '<text x="' + cx + '" y="' + (cy + 12) + '" text-anchor="middle" dominant-baseline="central" class="donut-center-sub">' + (centerLabel || 'total') + '</text>'
-        + '</svg>';
-
-    let legend = '<div class="donut-legend-list">';
-    data.forEach((d, i) => {
-        if (d.value === 0) return;
-        const pctLabel = Math.round((d.value / total) * 100);
-        legend += '<div class="donut-legend-item">'
-            + '<span class="donut-legend-dot" data-ion-style="background:' + colors[i] + '"></span>'
-            + '<span class="donut-legend-label">' + d.label + '</span>'
-            + '<span class="donut-legend-val">' + d.value + ' <span class="font-normal text-[var(--text-secondary)] text-[0.65rem]">' + pctLabel + '%</span></span>'
-            + '</div>';
-    });
-    legend += '</div>';
-
-    container.innerHTML = svg + legend;
-}
-
-// ── Summary Strip ──────────────────────────────────────────
-function renderSummaryStrip() {
-    const strip = document.getElementById('analytics-summary-strip');
-    if (!strip) return;
-
-    const active = allCases.filter(c => c.status !== 'closed');
-    const critHigh = active.filter(c => c.severity === 'critical' || c.severity === 'high').length;
-    const unassigned = active.filter(c => !c.assigned_to).length;
-    const oldestActive = active.reduce((oldest, c) => {
-        const age = Date.now() - new Date(c.created_at).getTime();
-        return age > oldest ? age : oldest;
-    }, 0);
-    const oldestDays = Math.floor(oldestActive / 86400000);
-    const closedToday = allCases.filter(c => {
-        if (c.status !== 'closed' || !c.closed_at) return false;
-        const d = new Date(c.closed_at);
-        const now = new Date();
-        return d.toDateString() === now.toDateString();
-    }).length;
-
-    strip.replaceChildren()
-        + '<div class="summary-chip"><span class="summary-chip-dot bg-[var(--danger)]"></span><span class="summary-chip-label">Critical/High Active</span><span class="summary-chip-value text-[var(--danger)]">' + critHigh + '</span></div>'
-        + '<div class="summary-chip"><span class="summary-chip-dot bg-[var(--warning)]"></span><span class="summary-chip-label">Unassigned</span><span class="summary-chip-value text-[var(--warning)]">' + unassigned + '</span></div>'
-        + '<div class="summary-chip"><span class="summary-chip-dot" data-ion-style="background:' + (oldestDays > 7 ? 'var(--danger)' : oldestDays > 3 ? 'var(--warning)' : 'var(--success)') + '"></span><span class="summary-chip-label">Oldest Active</span><span class="summary-chip-value">' + oldestDays + 'd</span></div>'
-        + '<div class="summary-chip"><span class="summary-chip-dot bg-[var(--success)]"></span><span class="summary-chip-label">Closed Today</span><span class="summary-chip-value text-[var(--success)]">' + closedToday + '</span></div>';
-}
-
-// ── Severity Donut ─────────────────────────────────────────
-function renderSeverityDonut() {
-    const sev = teamMetricsCache.cases_by_severity || {};
-    renderDonutChart('analytics-severity-donut', [
-        { label: 'Critical', value: sev.critical || 0 },
-        { label: 'High', value: sev.high || 0 },
-        { label: 'Medium', value: sev.medium || 0 },
-        { label: 'Low', value: sev.low || 0 },
-    ], ['#ef4444', '#f59e0b', '#3b82f6', '#6b7280'], 'cases');
-}
-
-// ── Closure Reason Donut ───────────────────────────────────
-const closureReasonColors = {
-    true_positive: '#ef4444',
-    false_positive: '#9ca3af',
-    benign_true_positive: '#f59e0b',
-    duplicate: '#8b5cf6',
-    insufficient_data: '#6b7280',
-    not_applicable: '#64748b',
-};
-
-function computeClosureReasonCounts() {
-    const counts = {};
-    allCases.forEach(c => {
-        if (c.closure_reason) {
-            counts[c.closure_reason] = (counts[c.closure_reason] || 0) + 1;
-        }
-    });
-    return counts;
-}
-
-function renderClosureDonut() {
-    const counts = computeClosureReasonCounts();
-    const entries = Object.entries(counts);
-    if (!entries.length) {
-        const el = document.getElementById('analytics-closure-donut');
-        if (el) el.innerHTML = '<p class="text-[0.8rem] text-[var(--text-secondary)]">No closed cases</p>';
-        return;
-    }
-
-    const data = entries.map(([reason, count]) => ({
-        label: closureReasonLabels[reason] || reason,
-        value: count,
-    }));
-    const colors = entries.map(([reason]) => closureReasonColors[reason] || '#6b7280');
-    renderDonutChart('analytics-closure-donut', data, colors, 'closed');
-}
-
-// ── Status Donut ───────────────────────────────────────────
-function renderStatusDonut() {
-    const statusCounts = { open: 0, acknowledged: 0, closed: 0 };
-    allCases.forEach(c => {
-        if (statusCounts.hasOwnProperty(c.status)) statusCounts[c.status]++;
-    });
-    renderDonutChart('analytics-status-donut', [
-        { label: 'Open', value: statusCounts.open },
-        { label: 'Acknowledged', value: statusCounts.acknowledged },
-        { label: 'Closed', value: statusCounts.closed },
-    ], ['#3b82f6', '#f59e0b', '#6b7280'], 'total');
-}
-
-// ── Workload Bars ──────────────────────────────────────────
-function renderWorkloadBars() {
-    const container = document.getElementById('analytics-workload');
-    if (!container) return;
-    const data = teamMetricsCache.cases_by_assignee || [];
-    if (!data.length) {
-        container.innerHTML = '<p class="text-[0.8rem] text-[var(--text-secondary)]">No data</p>';
-        return;
-    }
-    const max = Math.max(...data.map(d => d.open_count), 1);
-    const barColors = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#f97316'];
-    container.innerHTML = data.map((d, i) => {
-        const pct = (d.open_count / max) * 100;
-        const color = barColors[i % barColors.length];
-        return '<div class="hbar-row">'
-            + '<span class="hbar-label" title="' + esc(d.display_name) + '">' + esc(d.display_name) + '</span>'
-            + '<div class="hbar-track"><div class="hbar-fill" data-ion-style="width:' + pct + '%;background:' + color + '"></div></div>'
-            + '<span class="hbar-value">' + d.open_count + '</span>'
-            + '</div>';
-    }).join('');
-}
-
-// Colours a case by age alone. Named for what it does: there is no SLA
-// policy, target or breach record behind these thresholds. The CSS class
-// names still read `sla-*` because they are referenced by the hashed
-// class map; only the labels people read have changed.
-function getCaseAgeColor(ageMs) {
-    const hours = ageMs / 3600000;
-    if (hours < 24) return 'sla-green';
-    if (hours < 72) return 'sla-yellow';
-    if (hours < 168) return 'sla-orange';
-    return 'sla-red';
-}
-
-function renderOpenCaseAges() {
-    const container = document.getElementById('analytics-sla');
-    if (!container) return;
-    const active = allCases.filter(c => c.status === 'open' || c.status === 'acknowledged');
-    active.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-    const top8 = active.slice(0, 8);
-
-    if (!top8.length) {
-        container.innerHTML = '<p class="text-[0.8rem] text-[var(--text-secondary)]">No active cases</p>';
-        return;
-    }
-
-    // SLA summary bar at top
-    const now = Date.now();
-    const slaCounts = { green: 0, yellow: 0, orange: 0, red: 0 };
-    active.forEach(c => {
-        const ageMs = now - new Date(c.created_at).getTime();
-        const cls = getCaseAgeColor(ageMs);
-        if (cls === 'sla-green') slaCounts.green++;
-        else if (cls === 'sla-yellow') slaCounts.yellow++;
-        else if (cls === 'sla-orange') slaCounts.orange++;
-        else slaCounts.red++;
-    });
-    const slaTotal = active.length || 1;
-    let slaBar = '<div class="flex gap-1 mb-3 text-[0.7rem]">';
-    if (slaCounts.green) slaBar += '<div class="_ion-s-09b0c9a2e1" data-ion-style="flex:' + slaCounts.green + '" title="<24h: ' + slaCounts.green + '"></div>';
-    if (slaCounts.yellow) slaBar += '<div class="_ion-s-b2ff45bb5d" data-ion-style="flex:' + slaCounts.yellow + '" title="24-72h: ' + slaCounts.yellow + '"></div>';
-    if (slaCounts.orange) slaBar += '<div class="_ion-s-d28cf57fed" data-ion-style="flex:' + slaCounts.orange + '" title="72h-7d: ' + slaCounts.orange + '"></div>';
-    if (slaCounts.red) slaBar += '<div class="_ion-s-eaadf28b85" data-ion-style="flex:' + slaCounts.red + '" title=">7d: ' + slaCounts.red + '"></div>';
-    slaBar += '</div>';
-    slaBar += '<div class="flex gap-3 mb-2 text-[0.65rem] text-[var(--text-secondary)]">'
-        + '<span><span class="sla-dot sla-green inline-block w-[6px] h-[6px] align-middle mr-0.5"></span>&lt;24h: ' + slaCounts.green + '</span>'
-        + '<span><span class="sla-dot sla-yellow inline-block w-[6px] h-[6px] align-middle mr-0.5"></span>1-3d: ' + slaCounts.yellow + '</span>'
-        + '<span><span class="sla-dot sla-orange inline-block w-[6px] h-[6px] align-middle mr-0.5"></span>3-7d: ' + slaCounts.orange + '</span>'
-        + '<span><span class="sla-dot sla-red inline-block w-[6px] h-[6px] align-middle mr-0.5"></span>&gt;7d: ' + slaCounts.red + '</span>'
-        + '</div>';
-
-    container.innerHTML = slaBar + top8.map(c => {
-        const ageMs = now - new Date(c.created_at).getTime();
-        const colorClass = getCaseAgeColor(ageMs);
-        const sevBadge = '<span class="cw-sevtag sev-' + esc(c.severity || 'medium') + ' mr-1">' + esc(c.severity || 'med') + '</span>';
-        return '<div class="sla-row" data-click-action="openCaseDetail" data-args=\'[' + c.id + ']\'>'
-            + '<span class="sla-dot ' + colorClass + '"></span>'
-            + sevBadge
-            + '<span class="sla-case-num">' + esc(c.case_number) + '</span>'
-            + '<span class="sla-case-title">' + esc(c.title) + '</span>'
-            + '<span class="sla-age">' + ageLabel(c.created_at) + '</span>'
-            + '</div>';
-    }).join('');
-}
-
-function renderRecentClosures() {
-    const container = document.getElementById('analytics-recent');
-    if (!container) return;
-    const closures = (teamMetricsCache.recent_closures || []).slice(0, 5);
-    if (!closures.length) {
-        container.innerHTML = '<p class="text-[0.8rem] text-[var(--text-secondary)]">No recent closures</p>';
-        return;
-    }
-    container.innerHTML = closures.map(c => {
-        const reasonLabel = closureReasonLabels[c.closure_reason] || c.closure_reason || '-';
-        const reasonClass = c.closure_reason ? 'reason-' + c.closure_reason : '';
-        const sevBadge = c.severity
-            ? '<span class="cw-sevtag sev-' + esc(c.severity) + ' mr-[0.35rem]">' + esc(c.severity) + '</span>'
-            : '';
-        return '<div class="rclosure-row">'
-            + sevBadge
-            + '<span class="rclosure-num">' + esc(c.case_number) + '</span>'
-            + '<span class="rclosure-title">' + esc(c.title) + '</span>'
-            + '<span class="rclosure-reason cw-closure ' + esc(reasonClass) + '">' + esc(reasonLabel) + '</span>'
-            + '<span class="rclosure-who">' + esc(c.closed_by) + '</span>'
-            + '<span class="rclosure-when">' + ageLabel(c.closed_at) + ' ago</span>'
-            + '</div>';
-    }).join('');
-}
+document.body.addEventListener('htmx:responseError', summaryRequestFailed);
+document.body.addEventListener('htmx:sendError', summaryRequestFailed);
+document.body.addEventListener('htmx:timeout', summaryRequestFailed);
 
 function toggleAnalyticsPanel() {
     const panel = document.getElementById('analytics-panel-body');
@@ -5762,7 +5436,6 @@ async function deleteAnnotation(caseId, annId) {
 document.addEventListener('DOMContentLoaded', async function() {
     loadUsers();
     await loadAllCases();
-    loadTeamMetrics();
 
     // Restore analytics panel collapse state
     if (localStorage.getItem('ion-analytics-collapsed') === '1') {
