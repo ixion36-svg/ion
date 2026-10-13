@@ -29,6 +29,7 @@ import sys
 from pathlib import Path
 
 TEMPLATES = Path("src/ion/web/templates")
+STYLESHEETS = Path("src/ion/web/static/css")
 BASELINE = Path("tools/ui_rewrite_baseline.json")
 
 # The guard is load-bearing. See module docstring.
@@ -59,6 +60,36 @@ def scan_all() -> dict:
 def load_map() -> dict:
     p = Path("tools/hashed_class_map.json")
     return json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {}
+
+
+def _replaced_by_a_rule(entry: dict | None) -> bool:
+    """Did this class's styling move to a page stylesheet rather than to a
+    utility?
+
+    The audit knew two legitimate destinations: a Tailwind utility, which is
+    `kind` other than manual, and a `data-ion-style` hook, which the
+    gained-hooks offset below covers. The redesign uses a third throughout,
+    and this check was behind it: a page stylesheet, `static/css/<page>.css`,
+    which is where a declaration goes that no utility expresses and that is
+    not computed at runtime. `background:var(--bg-secondary,#0d1117)` is the
+    usual reason, since the map's generator could not express a var() with a
+    fallback.
+
+    An entry claims that destination with `replaced_by`, a list of selectors.
+    The claim is CHECKED rather than trusted: every selector has to exist in
+    a stylesheet, so the field cannot be used to silence a real loss. That is
+    the whole point of it being a list of selectors and not a boolean.
+    """
+    if not entry:
+        return False
+    selectors = entry.get("replaced_by")
+    if not isinstance(selectors, list) or not selectors:
+        return False
+    css = "\n".join(
+        p.read_text(encoding="utf-8", errors="replace")
+        for p in sorted(STYLESHEETS.glob("*.css"))
+    )
+    return all(isinstance(s, str) and s and s in css for s in selectors)
 
 
 def _never_valid_css(entry: dict | None) -> bool:
@@ -118,6 +149,7 @@ def check(baseline: dict, current: dict) -> list[str]:
             c for c in lost
             if (c not in cmap or cmap[c].get("kind") == "manual")
             and not _never_valid_css(cmap.get(c))
+            and not _replaced_by_a_rule(cmap.get(c))
         )
         # A utility is not the only legitimate replacement. Where the original
         # style was computed at runtime -- `flex:' + slaCounts.green + '` -- no

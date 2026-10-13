@@ -2088,7 +2088,11 @@
   "_ion-s-5eaab7cb30": {
     "css": "display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;padding:8px;background:var(--bg-secondary,#0d1117);border-radius:6px;",
     "kind": "manual",
+    "note": "The playbook step preview became a <template> clone. Its container rule is .pb-preview-step in static/css/forensics-page.css, arranged as a column because the clone puts the title and description in sequence. Pinned by tests/test_forensics_playbook_preview.py.",
     "partial_do_not_apply": "flex items-start gap-2 mb-1.5 p-2 rounded-[6px]",
+    "replaced_by": [
+      ".pb-preview-step"
+    ],
     "tailwind": "",
     "unmapped": [
       "background:var(--bg-secondary,#0d1117)"
@@ -3554,7 +3558,11 @@
   "_ion-s-a55ef5c079": {
     "css": "flex:1;background:var(--border-color,#30363d);border-radius:3px;height:4px;min-width:40px;overflow:hidden;",
     "kind": "manual",
+    "note": "The hand-built div progress bar (track, fill, and a runtime width) became a native <progress class=\"forensic-progress\">, styled in static/css/forensics-page.css including ::-webkit-progress-value and ::-moz-progress-bar. The element announces itself to a screen reader and the runtime width is its value attribute rather than an inline style, so this is a better destination than a utility would have been.",
     "partial_do_not_apply": "flex-1 rounded-[3px] h-[4px] min-w-[40px] overflow-hidden",
+    "replaced_by": [
+      ".forensic-progress"
+    ],
     "tailwind": "",
     "unmapped": [
       "background:var(--border-color,#30363d)"
@@ -3993,7 +4001,11 @@
   "_ion-s-b76ce82a4d": {
     "css": "height:100%;background:var(--accent,#00e5ff);border-radius:4px;transition:width .3s;width:0%;",
     "kind": "manual",
+    "note": "The hand-built div progress bar (track, fill, and a runtime width) became a native <progress class=\"forensic-progress\">, styled in static/css/forensics-page.css including ::-webkit-progress-value and ::-moz-progress-bar. The element announces itself to a screen reader and the runtime width is its value attribute rather than an inline style, so this is a better destination than a utility would have been.",
     "partial_do_not_apply": "h-full rounded-[4px] [transition:width_.3s] w-[0%]",
+    "replaced_by": [
+      ".forensic-progress"
+    ],
     "tailwind": "",
     "unmapped": [
       "background:var(--accent,#00e5ff)"
@@ -4992,7 +5004,11 @@
   "_ion-s-e26f061ab9": {
     "css": "background:var(--border-color,#30363d);border-radius:4px;height:6px;overflow:hidden;",
     "kind": "manual",
+    "note": "The hand-built div progress bar (track, fill, and a runtime width) became a native <progress class=\"forensic-progress\">, styled in static/css/forensics-page.css including ::-webkit-progress-value and ::-moz-progress-bar. The element announces itself to a screen reader and the runtime width is its value attribute rather than an inline style, so this is a better destination than a utility would have been.",
     "partial_do_not_apply": "rounded-[4px] h-[6px] overflow-hidden",
+    "replaced_by": [
+      ".forensic-progress"
+    ],
     "tailwind": "",
     "unmapped": [
       "background:var(--border-color,#30363d)"

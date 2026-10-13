@@ -426,7 +426,7 @@
 <template id="forensic-list-row"><div class="sf-list-row"><input class="form-input sf-input"><button type="button" class="btn-icon sf-list-remove" data-remove-parent title="Remove">×</button></div></template>
 <template id="forensic-table-row"><tr><td><button type="button" class="btn-icon sf-list-remove" data-remove-closest="tr" title="Remove">×</button></td></tr></template>
 <template id="forensic-table-cell"><td><input class="form-input sf-input"></td></template>
-<template id="forensic-playbook-preview"><div class="pb-preview-step"><strong class="pb-preview-title"></strong><div class="pb-preview-desc"></div></div></template>
+<template id="forensic-playbook-preview"><div class="pb-preview-step"><div class="pb-preview-head"><strong class="pb-preview-title"></strong><span class="pb-preview-req"></span><span class="pb-preview-fields"></span></div><div class="pb-preview-desc"></div></div></template>
 <template id="forensic-playbook-step"><div class="pb-step-row"><span class="pb-step-num"></span><div class="flex-1"><input type="text" class="form-input pb-step-title" placeholder="Step title"><textarea class="form-input pb-step-desc mt-1" rows="2" placeholder="Description"></textarea><div class="flex gap-3 items-center mt-1"><label><input type="checkbox" class="pb-step-req"> Required</label><label>Est. hours: <input type="number" class="pb-step-hours" step="0.5" min="0"></label></div></div><button class="btn btn-secondary" data-click-action="removeStepAndRenumber">×</button></div></template>
 <template id="forensic-ioc-category"><div class="ioc-category"><div class="ioc-category-header"><span class="ioc-category-title"></span><span class="ioc-category-count"></span></div><div class="ioc-items"></div></div></template>
 <template id="forensic-ioc-chip"><label class="ioc-chip selected"><input type="checkbox" checked><span></span></label></template>
@@ -517,7 +517,23 @@ function onPlaybookSelect() {
  if(pb.investigation_type)document.getElementById('nc-type').value=pb.investigation_type;
  const target=document.getElementById('nc-pb-steps'); target.replaceChildren();
  if(!Array.isArray(pb.steps)){ionMessage(target,'Playbook steps unavailable');return;}
- pb.steps.forEach((step,index)=>{const row=cloneTemplate('forensic-playbook-preview');row.querySelector('.pb-preview-title').textContent=(index+1)+'. '+(step.title ?? 'Unknown');row.querySelector('.pb-preview-desc').textContent=step.description ?? '';target.appendChild(row);});
+ pb.steps.forEach((step,index)=>{
+  const row=cloneTemplate('forensic-playbook-preview');
+  row.querySelector('.pb-preview-title').textContent=(index+1)+'. '+(step.title ?? 'Unknown');
+  row.querySelector('.pb-preview-desc').textContent=step.description ?? '';
+  // The REQUIRED marker and the field count were on this preview before the
+  // conversion and they are what an analyst picks a playbook on. Dropping
+  // them left the preview looking complete while saying less.
+  const req=row.querySelector('.pb-preview-req');
+  if(step.is_required===true){req.textContent='REQUIRED';}else{req.remove();}
+  // Three outcomes: a list with fields, a list with none, and a payload
+  // that did not carry one. The first two were the page's behaviour.
+  const fields=row.querySelector('.pb-preview-fields');
+  if(!Array.isArray(step.fields)){fields.textContent='fields unknown';}
+  else if(step.fields.length){fields.textContent=step.fields.length+' fields';}
+  else{fields.remove();}
+  target.appendChild(row);
+ });
 }
 
 // ======== CASES ========

@@ -334,3 +334,56 @@ body[data-page="forensics"] .forensic-progress { display: block; width: 100%; he
 body[data-page="forensics"] .forensic-progress::-webkit-progress-bar { background: var(--bg-secondary); }
 body[data-page="forensics"] .forensic-progress::-webkit-progress-value { background: var(--primary); }
 body[data-page="forensics"] .forensic-progress::-moz-progress-bar { background: var(--primary); }
+
+/* ── Playbook step preview ──────────────────────────────────
+ *
+ * These rules are _ion-s-5eaab7cb30, which the conversion dropped. The
+ * preview rows had no rule in any sheet afterwards, so they rendered as
+ * bare text with no container: the hashed class carried the padding, the
+ * tinted background and the rounded corners that separated one step from
+ * the next.
+ *
+ * tools/hashed_class_map.json marks that entry `manual` because its
+ * generator could not express `background:var(--bg-secondary,#0d1117)` as
+ * a utility. The declarations are here instead, which is where a page's
+ * own colours belong.
+ *
+ * The original was a flex ROW, with a number badge beside a column of
+ * title and description. The template clone puts the title and the
+ * description in sequence, so this is a column: same container, arranged
+ * for the markup that now fills it.
+ */
+body[data-page="forensics"] .pb-preview-step {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 6px;
+    padding: 8px;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+}
+
+body[data-page="forensics"] .pb-preview-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
+}
+
+/* Was text-[#f0c000] inside a JS template string. */
+body[data-page="forensics"] .pb-preview-req {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #f0c000;
+}
+
+body[data-page="forensics"] .pb-preview-fields {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+body[data-page="forensics"] .pb-preview-desc {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
