@@ -36,7 +36,11 @@ def converted() -> list[pathlib.Path]:
     """The ui modules that render through the shared helper."""
     out = []
     for path in sorted(UI.glob("*.py")):
-        if path.name.startswith("_"):
+        # _shared is the helper itself. Everything else is a page module,
+        # including the underscore-prefixed ones a page splits itself into:
+        # skipping those by prefix left ui/_training_plans.py, which is
+        # converted, outside this suite entirely.
+        if path.name in ("_shared.py", "__init__.py"):
             continue
         text = path.read_text(encoding="utf-8")
         if "render_view" in text and "import" in text:
