@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-
 {% block page_id %}observables{% endblock %}
 {% block head_css %}<link rel="stylesheet" href="/static/css/observables-page.css?v={{ ion_version }}">{% endblock %}
 
@@ -23,9 +22,9 @@
       <button data-click-action="showGraphView" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-network"/></svg>Graph</button>
       <button data-click-action="showPatternsView" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-sparkles"/></svg>Patterns</button>
       <button data-click-action="showWatchlist" class="relative inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-eye"/></svg>Watchlist<span id="watchlist-count" class="ml-1 px-1.5 py-0.5 rounded-full bg-ion-coral/20 text-ion-coral text-[10px] hidden">0</span></button>
-      <button data-click-action="showImportModal" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-upload"/></svg>Import</button>
+      {% if current_user and current_user.has_permission('observable:create') %}<button data-click-action="showImportModal" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-upload"/></svg>Import</button>{% endif %}
       <button data-click-action="exportCSV" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-download"/></svg>Export</button>
-      <button data-click-action="showMigrateModal" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">Migrate</button>
+      {% if current_user and current_user.has_permission('observable:create') %}<button data-click-action="showMigrateModal" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">Migrate</button>{% endif %}
     </div>
   </section>
 
@@ -218,7 +217,7 @@
         </div>
         <div class="modal-footer">
             <button class="ion-btn" data-click-action="closeMigrateModal">Cancel</button>
-            <button class="ion-btn ion-btn-primary" id="migrate-btn" data-click-action="runMigration">Run Migration</button>
+            {% if current_user and current_user.has_permission('observable:create') %}<button class="ion-btn ion-btn-primary" id="migrate-btn" data-click-action="runMigration">Run Migration</button>{% endif %}
         </div>
     </div>
 </div>
@@ -266,7 +265,7 @@ sha256,abc123...,c2,</pre>
                     <input type="text" id="import-tags" class="ion-input" placeholder="e.g., imported, threat-intel">
                 </div>
                 <div class="mb-4">
-                    <label class="flex items-center gap-2"><input type="checkbox" id="import-auto-enrich" class="checkbox checkbox-sm"> Auto-enrich imported observables</label>
+                    {% if current_user and current_user.has_permission('observable:enrich') %}<label class="flex items-center gap-2"><input type="checkbox" id="import-auto-enrich" class="checkbox checkbox-sm"> Auto-enrich imported observables</label>{% endif %}
                 </div>
             </div>
 
@@ -289,7 +288,7 @@ sha256,abc123...,c2,</pre>
         </div>
         <div class="modal-footer">
             <button class="ion-btn" data-click-action="closeImportModal">Cancel</button>
-            <button class="ion-btn ion-btn-primary" id="import-btn" data-click-action="runImport">Import</button>
+            {% if current_user and current_user.has_permission('observable:create') %}<button class="ion-btn ion-btn-primary" id="import-btn" data-click-action="runImport">Import</button>{% endif %}
         </div>
     </div>
 </div>
@@ -337,7 +336,7 @@ sha256,abc123...,c2,</pre>
                     <option value="false">Unread Only</option>
                     <option value="true">Read Only</option>
                 </select>
-                <button class="ion-btn" data-click-action="markAllAlertsRead">Mark All Read</button>
+                {% if current_user and current_user.has_permission('observable:update') %}<button class="ion-btn" data-click-action="markAllAlertsRead">Mark All Read</button>{% endif %}
             </div>
             <div id="watchlist-alerts-list" class="max-h-[60vh] overflow-y-auto">
                 <div class="loading">Loading alerts...</div>
@@ -369,13 +368,14 @@ sha256,abc123...,c2,</pre>
 {% block scripts %}
 {% include "_fragments/ion_fragment_client.html" %}
 <script src="/static/js/ion-fragments.js?v={{ ion_version }}"></script>
+<template id="observable-heatmap-cell"><div class="heatmap-day"></div></template>
+<template id="observable-migration-result"><div><p><strong>Alerts processed:</strong> <span data-result="alerts_processed"></span></p><p><strong>Observables created:</strong> <span data-result="observables_created"></span></p><p><strong>Existing observables found:</strong> <span data-result="observables_existing"></span></p><p><strong>Links created:</strong> <span data-result="links_created"></span></p><p><strong>Errors:</strong> <span data-result="errors"></span></p></div></template>
+<template id="observable-import-result"><div class="import-result-stats"><p><strong>Created:</strong> <span data-result="created"></span></p><p><strong>Updated:</strong> <span data-result="updated"></span></p><p><strong>Enriched:</strong> <span data-result="enriched"></span></p><p><strong>Errors:</strong> <span data-result="error_count"></span></p></div></template>
 <script nonce="{{ csp_nonce }}">
 {% raw %}
 // State
-let observables = [];
 let currentPage = 1;
 let pageSize = 50;
-let totalCount = 0;
 let currentObservable = null;
 
 // Filter/search changes restart from page 1 — a stale offset from earlier
@@ -405,82 +405,47 @@ function debounce(fn, delay) {
     };
 }
 
-function timeAgo(dateStr) {
-    if (!dateStr) return '-';
-    const date = new Date(dateStr);
-    const now = new Date();
-    const seconds = Math.floor((now - date) / 1000);
-
-    if (seconds < 60) return 'just now';
-    if (seconds < 3600) return Math.floor(seconds / 60) + 'm ago';
-    if (seconds < 86400) return Math.floor(seconds / 3600) + 'h ago';
-    if (seconds < 604800) return Math.floor(seconds / 86400) + 'd ago';
-    return date.toLocaleDateString();
-}
-
-function formatDate(dateStr) {
-    if (!dateStr) return '-';
-    const date = new Date(dateStr);
-    return date.toLocaleString();
-}
-
 function showToast(message, type = 'info') {
     // Create toast element if it doesn't exist
     let container = document.getElementById('toast-container');
     if (!container) {
         container = document.createElement('div');
         container.id = 'toast-container';
-        container.style.cssText = 'position: fixed; bottom: 20px; right: 20px; z-index: 10000;';
+        container.className = 'observable-toast-container';
         document.body.appendChild(container);
     }
 
     const toast = document.createElement('div');
     toast.className = `ion-toast toast-${type}`;
-    toast.style.cssText = `
-        background: ${type === 'error' ? '#ef4444' : type === 'success' ? '#22c55e' : '#3b82f6'};
-        color: white;
-        padding: 12px 20px;
-        border-radius: 8px;
-        margin-top: 10px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        animation: slideIn 0.3s ease;
-    `;
     toast.textContent = message;
     container.appendChild(toast);
 
     setTimeout(() => {
-        toast.style.animation = 'fadeOut 0.3s ease';
+        toast.classList.add('observable-toast-exit');
         setTimeout(() => toast.remove(), 300);
     }, 3000);
 }
 
-// Load Stats
+// Observable read panels
 async function loadStats() {
     for (const key of ['total', 'ips', 'domains', 'enriched', 'critical']) document.getElementById('stat-' + key).textContent = 'Unknown';
     await ionLoadFragment('/ui/observables/stats', 'observables-stats-read', 'Loading statistics...');
     loadWatchedCount(); checkWatchlistAlerts();
 }
-
-// Load watched count
 async function loadWatchedCount() {
     document.getElementById('watchlist-count').textContent = '?';
     await ionLoadFragment('/ui/observables/watched-count', 'stat-watched', 'Loading...');
     document.getElementById('watchlist-count').classList.remove('hidden');
 }
-
-// Check for unread watchlist alerts
 async function checkWatchlistAlerts() {
     const banner = document.getElementById('watchlist-banner');
     banner.classList.remove('hidden');
     await ionLoadFragment('/ui/observables/watchlist/banner', 'watchlist-banner', 'Checking alerts...');
     banner.classList.toggle('hidden', !banner.textContent.trim());
 }
-
 function dismissWatchlistBanner() {
-    document.getElementById('watchlist-banner').style.display = 'none';
+    document.getElementById('watchlist-banner').classList.add('hidden');
 }
-
-// Load Observables
 async function loadObservables() {
     const params = new URLSearchParams();
     for (const [field, key] of [['search-input','query'], ['type-filter','type'], ['threat-filter','threat_level'], ['whitelist-filter','is_whitelisted'], ['enriched-filter','is_enriched']]) {
@@ -493,10 +458,6 @@ async function loadObservables() {
     params.set('limit', pageSize); params.set('offset', (currentPage - 1) * pageSize);
     if (!await ionLoadFragment('/ui/observables/list?' + params, 'observables-tbody', 'Loading observables...')) document.getElementById('pagination').replaceChildren();
 }
-
-
-
-
 
 function goToPage(page) {
     currentPage = page;
@@ -523,8 +484,6 @@ async function showObservableDetail(id) {
         if (state) currentObservable = JSON.parse(state.textContent);
     }
 }
-
-
 
 function closeDetailModal() {
     document.getElementById('observable-detail-modal').style.display = 'none';
@@ -677,13 +636,11 @@ async function runMigration() {
         if (!response.ok) throw new Error('Migration failed');
         const data = await response.json();
 
-        document.getElementById('migrate-stats').innerHTML = `
-            <p><strong>Alerts processed:</strong> ${data.alerts_processed}</p>
-            <p><strong>Observables created:</strong> ${data.observables_created}</p>
-            <p><strong>Existing observables found:</strong> ${data.observables_existing}</p>
-            <p><strong>Links created:</strong> ${data.links_created}</p>
-            <p><strong>Errors:</strong> ${data.errors}</p>
-        `;
+        const resultNode = cloneTemplate('observable-migration-result');
+        resultNode.querySelectorAll('[data-result]').forEach(element => {
+            element.textContent = data[element.dataset.result] ?? '—';
+        });
+        document.getElementById('migrate-stats').replaceChildren(resultNode);
         document.getElementById('migrate-result').style.display = 'block';
         showToast('Migration complete', 'success');
         loadStats();
@@ -884,59 +841,6 @@ function viewPatternInGraph(observableId) {
 }
 
 // Utility
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-const CONTEXT_LABELS = {
-    source_ip: ['Source IP', 'ctx-source'],
-    destination_ip: ['Dest IP', 'ctx-dest'],
-    host_ip: ['Host IP', 'ctx-host'],
-    hostname: ['Host', 'ctx-host'],
-    source_hostname: ['Source Host', 'ctx-source'],
-    destination_hostname: ['Dest Host', 'ctx-dest'],
-    subject_user: ['Subject User', 'ctx-subject'],
-    target_user: ['Target User', 'ctx-target'],
-    user_account: ['User', 'ctx-generic'],
-    subject_domain: ['Subject Domain', 'ctx-subject'],
-    target_domain: ['Target Domain', 'ctx-target'],
-    source_port: ['Src Port', 'ctx-source'],
-    destination_port: ['Dst Port', 'ctx-dest'],
-    process_name: ['Process', 'ctx-generic'],
-    process_path: ['Process Path', 'ctx-generic'],
-    parent_process: ['Parent Proc', 'ctx-generic'],
-    parent_process_path: ['Parent Path', 'ctx-generic'],
-    command_line: ['Cmdline', 'ctx-generic'],
-    process_id: ['PID', 'ctx-generic'],
-    file_path: ['File', 'ctx-generic'],
-    rule_name: ['Rule', 'ctx-generic'],
-    alert_reason: ['Reason', 'ctx-generic'],
-    severity: ['Severity', 'ctx-generic'],
-    risk_score: ['Risk', 'ctx-generic'],
-    event_action: ['Action', 'ctx-generic'],
-    event_category: ['Category', 'ctx-generic'],
-    event_outcome: ['Outcome', 'ctx-generic'],
-    event_id: ['Event ID', 'ctx-generic'],
-    logon_type: ['Logon Type', 'ctx-generic'],
-    mitre_technique: ['MITRE Tech', 'ctx-generic'],
-    mitre_technique_name: ['MITRE Name', 'ctx-generic'],
-    mitre_tactic: ['MITRE Tactic', 'ctx-generic'],
-};
-
-function formatContext(ctx) {
-    if (!ctx) return '';
-    const entry = CONTEXT_LABELS[ctx];
-    if (entry) {
-        return `<span class="context-badge ${entry[1]}">${entry[0]}</span>`;
-    }
-    // Fallback: replace underscores and title-case
-    const label = ctx.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-    return `<span class="context-badge ctx-generic">${escapeHtml(label)}</span>`;
-}
-
 // =============================================================================
 // Import Functions
 // =============================================================================
@@ -977,7 +881,7 @@ async function runImport() {
             const csvData = document.getElementById('import-csv-data').value;
             const defaultType = document.getElementById('import-default-type').value;
             const tags = document.getElementById('import-tags').value.split(',').map(t => t.trim()).filter(t => t);
-            const autoEnrich = document.getElementById('import-auto-enrich').checked;
+            const autoEnrich = document.getElementById('import-auto-enrich')?.checked ?? false;
 
             response = await fetch('/api/observables/import/csv', {
                 method: 'POST',
@@ -1014,16 +918,14 @@ async function runImport() {
         const result = await response.json();
 
         document.getElementById('import-result').style.display = 'block';
-        document.getElementById('import-stats').innerHTML = `
-            <div class="import-result-stats">
-                <p><strong>Created:</strong> ${result.created}</p>
-                <p><strong>Updated:</strong> ${result.updated}</p>
-                ${result.enriched ? `<p><strong>Enriched:</strong> ${result.enriched}</p>` : ''}
-                ${result.errors && result.errors.length ? `<p><strong>Errors:</strong> ${result.errors.length}</p>` : ''}
-            </div>
-        `;
+        const resultNode = cloneTemplate('observable-import-result');
+        const resultValues = {...result, error_count: Array.isArray(result.errors) ? result.errors.length : null};
+        resultNode.querySelectorAll('[data-result]').forEach(element => {
+            element.textContent = resultValues[element.dataset.result] ?? '—';
+        });
+        document.getElementById('import-stats').replaceChildren(resultNode);
 
-        showToast(`Imported ${result.total_processed} observables`, 'success');
+        showToast(`Imported ${result.total_processed ?? '—'} observables`, 'success');
         loadStats();
         loadObservables();
     } catch (error) {
@@ -1197,100 +1099,33 @@ function closeTimelineModal() {
 }
 
 async function loadTimeline(observableId) {
-    const eventsContainer = document.getElementById('timeline-events');
-    const heatmapContainer = document.getElementById('timeline-heatmap');
-    const infoContainer = document.getElementById('timeline-observable-info');
-
-    eventsContainer.innerHTML = '<div class="loading">Loading timeline...</div>';
-    heatmapContainer.replaceChildren();
-    infoContainer.replaceChildren();
-
-    try {
-        // Load observable info
-        const obsResponse = await fetch(`/api/observables/${observableId}`);
-        if (obsResponse.ok) {
-            const obsData = await obsResponse.json();
-            infoContainer.innerHTML = `
-                <h4 class="mb-2">
-                    <span class="badge badge-type">${obsData.type}</span>
-                    <code>${escapeHtml(obsData.value)}</code>
-                </h4>
-                <p class="text-[var(--text-muted)] mb-4">
-                    First seen: ${formatDate(obsData.first_seen)} |
-                    Last seen: ${formatDate(obsData.last_seen)} |
-                    Sightings: ${obsData.sighting_count}
-                </p>
-            `;
-        }
-
-        // Load heatmap
-        const heatmapResponse = await fetch(`/api/observables/${observableId}/heatmap?days=30`);
-        if (heatmapResponse.ok) {
-            const heatmapData = await heatmapResponse.json();
-            renderHeatmap(heatmapContainer, heatmapData.heatmap);
-        }
-
-        // Load timeline events
-        const response = await fetch(`/api/observables/${observableId}/timeline?limit=50`);
-        if (!response.ok) throw new Error('Failed to load timeline');
-        const data = await response.json();
-
-        if (data.events.length === 0) {
-            eventsContainer.innerHTML = '<div class="empty-state">No timeline events</div>';
-            return;
-        }
-
-        eventsContainer.innerHTML = data.events.map(event => {
-            if (event.type === 'sighting') {
-                return `
-                    <div class="timeline-event sighting">
-                        <div class="timeline-event-icon">S</div>
-                        <div class="timeline-event-content">
-                            <div class="timeline-event-time">${formatDate(event.timestamp)}</div>
-                            <p><strong>Sighting</strong> - ${event.source_type}${event.context ? ` (${event.context})` : ''}</p>
-                        </div>
-                    </div>
-                `;
-            } else if (event.type === 'enrichment') {
-                return `
-                    <div class="timeline-event enrichment">
-                        <div class="timeline-event-icon">E</div>
-                        <div class="timeline-event-content">
-                            <div class="timeline-event-time">${formatDate(event.timestamp)}</div>
-                            <p><strong>Enrichment</strong> from ${event.source}${event.is_malicious ? ' - <span class="text-[#ef4444]">MALICIOUS</span>' : ''}</p>
-                            ${event.score ? `<p>Score: ${event.score}/100</p>` : ''}
-                        </div>
-                    </div>
-                `;
-            }
-            return '';
-        }).join('');
-    } catch (error) {
-        console.error('Error loading timeline:', error);
-        eventsContainer.innerHTML = '<div class="error">Error loading timeline</div>';
-    }
+    const base = '/ui/observables/' + encodeURIComponent(observableId);
+    await Promise.all([
+        ionLoadFragment(base + '/timeline-info', 'timeline-observable-info', 'Loading observable...'),
+        ionLoadFragment(base + '/timeline', 'timeline-events', 'Loading timeline...'),
+        ionLoadFragment(base + '/heatmap', 'timeline-heatmap', 'Loading heatmap...').then(loaded => {
+            if (!loaded) return;
+            const element = document.querySelector('#timeline-heatmap [data-heatmap]');
+            if (element) renderHeatmap(element, JSON.parse(element.dataset.heatmap));
+        }),
+    ]);
 }
 
 function renderHeatmap(container, data) {
-    // Generate last 30 days
-    const days = [];
     const today = new Date();
+    const cells = [];
     for (let i = 29; i >= 0; i--) {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
         const dateStr = date.toISOString().split('T')[0];
-        const count = data[dateStr] || 0;
-        let level = 0;
-        if (count > 0) level = 1;
-        if (count > 2) level = 2;
-        if (count > 5) level = 3;
-        if (count > 10) level = 4;
-        days.push({ date: dateStr, count, level });
+        const count = Object.prototype.hasOwnProperty.call(data, dateStr) ? data[dateStr] : 0;
+        const level = count > 10 ? 4 : count > 5 ? 3 : count > 2 ? 2 : count > 0 ? 1 : 0;
+        const cell = cloneTemplate('observable-heatmap-cell');
+        cell.classList.add('level-' + level);
+        cell.title = dateStr + ': ' + count + ' sightings';
+        cells.push(cell);
     }
-
-    container.innerHTML = days.map(d =>
-        `<div class="heatmap-day level-${d.level}" title="${d.date}: ${d.count} sightings"></div>`
-    ).join('');
+    container.replaceChildren(...cells);
 }
 {% endraw %}
 </script>

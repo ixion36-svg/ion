@@ -1,0 +1,2 @@
+{% if state == 'failed' %}<div class="error">Failed to load observable information.</div>
+{% else %}<h4 class="mb-2"><span class="badge badge-type">{{ observable.type or '—' }}</span> <code>{{ observable.value or '—' }}</code></h4><p class="text-[var(--text-muted)] mb-4">First seen: {{ observable.first_seen or '—' }} | Last seen: {{ observable.last_seen or '—' }} | Sightings: {{ observable.sighting_count if observable.sighting_count is not none else '—' }}</p>{% endif %}

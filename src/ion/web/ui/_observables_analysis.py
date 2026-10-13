@@ -82,7 +82,46 @@ def patterns(request: Request, min_occurrences: int = Query(3, ge=2, le=100),
     return render_view(request, '_fragments/observables_analysis_patterns.html', view)
 
 
+@router.get('/observables/{observable_id}/timeline', response_class=HTMLResponse)
+def timeline(request: Request, observable_id: int,
+             session: Session = Depends(get_db_session), user: User = Depends(require_permission('observable:read'))):
+    items = None
+    try:
+        service = ObservableService(session)
+        if service.get_by_id(observable_id) is not None:
+            items = _records(service.get_timeline(observable_id, limit=50))
+    except Exception:
+        logger.exception('Could not read observable timeline')
+    view: TimelinePanel = {'state': _state(items), 'events': items}
+    return render_view(request, '_fragments/observables_analysis_timeline.html', view)
 
 
+@router.get('/observables/{observable_id}/heatmap', response_class=HTMLResponse)
+def heatmap(request: Request, observable_id: int,
+            session: Session = Depends(get_db_session), user: User = Depends(require_permission('observable:read'))):
+    payload = None
+    try:
+        service = ObservableService(session)
+        if service.get_by_id(observable_id) is not None:
+            candidate = service.get_activity_heatmap(observable_id, days=30)
+            if isinstance(candidate, dict) and all(isinstance(key, str) and isinstance(value, int) and value >= 0 for key, value in candidate.items()):
+                payload = candidate
+    except Exception:
+        logger.exception('Could not read observable heatmap')
+    view: HeatmapPanel = {'state': _state(payload), 'heatmap': payload}
+    return render_view(request, '_fragments/observables_analysis_heatmap.html', view)
 
 
+@router.get('/observables/{observable_id}/timeline-info', response_class=HTMLResponse)
+def timeline_info(request: Request, observable_id: int,
+                  session: Session = Depends(get_db_session), user: User = Depends(require_permission('observable:read'))):
+    observable = None
+    try:
+        obs = ObservableService(session).get_by_id(observable_id)
+        if obs is not None:
+            observable = {key: plain(getattr(obs, key, None)) for key in ('type', 'value', 'sighting_count')}
+            observable.update({key: str(getattr(obs, key)) if getattr(obs, key, None) is not None else None for key in ('first_seen', 'last_seen')})
+    except Exception:
+        logger.exception('Could not read observable timeline info')
+    view: TimelineInfo = {'state': 'data' if observable is not None else 'failed', 'observable': observable}
+    return render_view(request, '_fragments/observables_analysis_info.html', view)

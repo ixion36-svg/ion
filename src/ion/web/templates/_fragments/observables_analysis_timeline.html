@@ -1,0 +1,8 @@
+{% if state == 'failed' %}<div class="error">Failed to load timeline.</div>
+{% elif state == 'empty' %}<div class="empty-state">No timeline events</div>
+{% else %}{% for event in events %}
+<div class="timeline-event {{ event.type if event.type in ['sighting', 'enrichment'] else '' }}"><div class="timeline-event-icon">{{ 'S' if event.type == 'sighting' else 'E' if event.type == 'enrichment' else '?' }}</div><div class="timeline-event-content"><div class="timeline-event-time">{{ event.timestamp or '—' }}</div>
+{% if event.type == 'sighting' %}<p><strong>Sighting</strong> - {{ event.source_type or '—' }}{% if event.context %} ({{ event.context }}){% endif %}</p>
+{% elif event.type == 'enrichment' %}<p><strong>Enrichment</strong> from {{ event.source or '—' }}{% if event.is_malicious %} - <span class="text-error">MALICIOUS</span>{% endif %}</p><p>Score: {{ event.score if event.score is defined and event.score is not none else '—' }}/100</p>
+{% else %}<p>Unknown event</p>{% endif %}</div></div>
+{% endfor %}{% endif %}
