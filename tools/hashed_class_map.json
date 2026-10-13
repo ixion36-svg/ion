@@ -2568,12 +2568,10 @@
   },
   "_ion-s-78cae35616": {
     "css": "background:var(--bg-tertiary);border:1px dashed var(--ion-border);border-radius:6px;padding:10px 14px;margin-top:10px;",
-    "kind": "manual",
-    "partial_do_not_apply": "bg-[var(--bg-tertiary)] rounded-[6px] py-2.5 px-3.5 mt-2.5",
-    "tailwind": "",
-    "unmapped": [
-      "border:1px dashed var(--ion-border)"
-    ]
+    "kind": "exact",
+    "note": "border:1px dashed var(--ion-border) was recorded as having no utility; border border-dashed border-[var(--ion-border)] expresses it exactly, so the entry was incomplete rather than the declaration unmappable.",
+    "tailwind": "mt-2.5 py-2.5 px-3.5 rounded-[6px] bg-[var(--bg-tertiary)] border border-dashed border-[var(--ion-border)]",
+    "unmapped": []
   },
   "_ion-s-78f8e7f1d2": {
     "css": "font-size:.7rem;",
