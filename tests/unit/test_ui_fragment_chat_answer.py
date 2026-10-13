@@ -29,11 +29,10 @@ A GROUNDING WARNING COULD BECOME A REASSURANCE
                                               in the cited sources.'
 
 with `claims = g.unsupported_claims || []`. A claims payload that is not
-a list becomes an empty one, and the service upstream does the same
-coercion before deriving `grounded = not claims`, so a model that answered
-with claims in an unreadable shape is reported as grounded. The service
-half of that is filed separately; this fragment refuses to print the
-reassurance unless the claims list it is based on was readable.
+a list becomes an empty one. The service now stores that value as None
+and does not derive a pass from it. This fragment's unreadable state is
+that result, and it refuses the reassurance unless the claims list was
+readable.
 
 CITATIONS
 
@@ -169,6 +168,21 @@ def test_an_unreadable_claims_list_is_not_a_clean_check():
         "unsupported_claims": "lots of things"})).text)
     assert "appears in the cited sources" not in body
     assert "not in a shape" in body or "could not" in body.lower()
+
+
+def test_the_service_records_an_unreadable_list_as_the_unreadable_state():
+    """The service emits None for a claims value that was not a list, and
+    leaves skipped false. That is this panel's unreadable state, not the
+    reassurance and not the not-checked box."""
+    from ion.services.chat_grounding_service import _normalize_result
+
+    recorded = _normalize_result(
+        {"unsupported_claims": "CVE-2024-1 is used in the wild"})
+    assert recorded["skipped"] is False
+    body = flat(_post(_reader(), **_meta(grounding=recorded)).text)
+    assert "not in a shape" in body
+    assert "appears in the cited sources" not in body
+    assert "Not checked against sources" not in body
 
 
 def test_not_grounded_with_no_claims_listed_says_that():

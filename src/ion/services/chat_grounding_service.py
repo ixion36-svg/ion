@@ -28,9 +28,15 @@ Result contract::
 
     # skipped (flag off / no context / air-gapped / unparseable):
     {"skipped": True, "grounded": None, "reason": str}
-    # ran:
+    # ran, and the claims list was a list:
     {"skipped": False, "grounded": bool,
      "unsupported_claims": [str, ...], "notes": str}
+    # ran, and the claims value was not a list. None is the unread list,
+    # which is a different answer from []. grounded stays None unless the
+    # model stated one. skipped stays false so the event still reaches
+    # the page.
+    {"skipped": False, "grounded": bool | None,
+     "unsupported_claims": None, "notes": str}
 """
 
 from __future__ import annotations
@@ -86,23 +92,35 @@ def _skipped(reason: str) -> Dict[str, Any]:
 
 
 def _normalize_result(obj: Dict[str, Any]) -> Dict[str, Any]:
-    """Coerce the parsed JSON into the stable grounding-result contract."""
-    claims = obj.get("unsupported_claims")
-    if not isinstance(claims, list):
-        claims = []
-    claims = [str(c).strip() for c in claims if str(c).strip()][:20]
+    """Coerce the parsed JSON into the stable grounding-result contract.
+
+    The verdict is derived from the claims list only when that value was a
+    list. Anything else used to be replaced with [] first, and the
+    derivation then read ``not []`` as a pass. An unread list is stored as
+    None, which the page's unreadable state already handles, and the
+    result is not marked skipped: ai_api emits the event only when it is
+    not.
+    """
+    raw_claims = obj.get("unsupported_claims")
+    claims_readable = isinstance(raw_claims, list)
+    if claims_readable:
+        claims = [str(c).strip() for c in raw_claims if str(c).strip()][:20]
+    else:
+        claims = None
 
     grounded = obj.get("grounded")
     if isinstance(grounded, str):
         grounded = grounded.strip().lower() in ("true", "yes", "grounded")
-    if grounded is None:
-        # A model that returns claims but omits the verdict still told us the
-        # answer to the question we actually asked.
+    if grounded is None and claims_readable:
+        # A model that returns a readable claims list but omits the verdict
+        # still told us the answer to the question we actually asked.
         grounded = not claims
+    if grounded is not None:
+        grounded = bool(grounded)
 
     return {
         "skipped": False,
-        "grounded": bool(grounded),
+        "grounded": grounded,
         "unsupported_claims": claims,
         "notes": str(obj.get("notes") or "").strip()[:500],
     }

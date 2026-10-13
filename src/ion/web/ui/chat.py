@@ -36,22 +36,12 @@ A GROUNDING WARNING COULD BECOME A REASSURANCE
     if (g.grounded && !claims.length) return 'Every specific here appears
                                               in the cited sources.'
 
-A claims payload that is not a list became an empty one. The service does
-the same coercion before deriving its verdict:
-
-    claims = obj.get("unsupported_claims")
-    if not isinstance(claims, list):
-        claims = []
-    ...
-    if grounded is None:
-        grounded = not claims
-
-so a model that returned its claims in an unreadable shape is recorded as
-grounded and then reassures the analyst. The service half of that is a
-separate change, filed rather than made here, because it is a change to
-what ION records and not to how a page draws it. What this module can do
-is refuse to print the reassurance when the list it rests on was not
-readable, and say so instead.
+A claims payload that is not a list became an empty one, and an empty
+one with `grounded` set printed the reassurance. The service now derives
+that verdict only from a list, and stores any other claims value as
+None with skipped left false. This module's unreadable state is that
+result: a missing list and a list in the wrong shape both refuse the
+reassurance.
 """
 from __future__ import annotations
 
@@ -180,8 +170,8 @@ def grounding_view(raw: Any, *, parsed: bool) -> Grounding:
 
     claims = raw.get("unsupported_claims")
     if claims is None:
-        # The verdict without the list it rests on. The page showed the
-        # reassurance for this.
+        # The service stores None when the claims value was not a list.
+        # The page showed the reassurance for that, after coercing it to [].
         return {"state": "unreadable", "reason": None, "claims": [],
                 "notes": notes}
     if not isinstance(claims, list):
