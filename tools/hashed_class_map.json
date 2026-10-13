@@ -2980,7 +2980,11 @@
   "_ion-s-8bc7ebe99c": {
     "css": "flex:1;background:var(--bg-code, rgba(0,0,0,0.08));border-radius:3px;height:14px;overflow:hidden;",
     "kind": "manual",
+    "note": "The threat distribution bar track. My first pass at the velocity panel replaced this markup with a shared macro and dropped it; the rewrite audit caught that by its contents rather than its exit code. The rule is .an-dist-track in static/css/analytics-page.css, declaration for declaration.",
     "partial_do_not_apply": "flex-1 rounded-[3px] h-[14px] overflow-hidden",
+    "replaced_by": [
+      ".an-dist-track"
+    ],
     "tailwind": "",
     "unmapped": [
       "background:var(--bg-code, rgba(0,0,0,0.08))"

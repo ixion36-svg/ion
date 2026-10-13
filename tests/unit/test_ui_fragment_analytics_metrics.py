@@ -306,3 +306,70 @@ def test_the_page_builds_neither_panel_nor_the_breakdown():
         assert "htmx.ajax" in block.group(0), name
     assert "function renderSeverityBreakdown" not in body, (
         "it only existed to build a string for renderCaseMetrics")
+
+
+# ---------------------------------------------------------------------------
+# The threat distribution, restored after my own regression
+# ---------------------------------------------------------------------------
+
+
+def test_the_distribution_always_lists_its_six_levels(job):
+    """The page iterated a fixed list, so a level with no observables
+    showed as a zero row. My first pass used a generic macro over the
+    payload's keys instead, and those rows vanished."""
+    job(result={"threat_distribution": {"critical": 3}})
+    body = flat(_get(_reader(), VELOCITY).text)
+    for level in ("critical", "high", "medium", "low", "benign", "unknown"):
+        assert level in body, level
+
+
+def test_a_level_absent_from_the_payload_shows_as_zero(job):
+    """`dist[level] || 0`, which is a real statement: none of them."""
+    job(result={"threat_distribution": {"critical": 3}})
+    html = _get(_reader(), VELOCITY).text
+    # Up to and including the count span: an earlier version of this
+    # pattern stopped at the track's closing divs, so the count it was
+    # asserting on was not in the captured text.
+    rows = re.findall(
+        r'threat-dist-row.*?threat-dist-count">(.*?)</span>', html, re.S)
+    labels = re.findall(r'threat-dist-label">(\w+)</span>', html)
+    counts = dict(zip(labels, (c.strip() for c in rows)))
+    assert counts.get("critical") == "3", counts
+    assert counts.get("benign") == "0", counts
+
+
+def test_the_distribution_bar_has_its_track(job):
+    """_ion-s-8bc7ebe99c, which my first pass dropped and the rewrite audit
+    caught by comparing its contents rather than its exit code."""
+    job(result={"threat_distribution": {"critical": 3}})
+    html = _get(_reader(), VELOCITY).text
+    assert "an-dist-track" in html
+    sheet = (ROOT / "src/ion/web/static/css/analytics-page.css").read_text(
+        encoding="utf-8")
+    rule = re.search(r"\.an-dist-track\s*\{([^}]*)\}", sheet)
+    assert rule, "the track rule"
+    for declaration in ("flex", "background", "border-radius", "height",
+                        "overflow"):
+        assert declaration in rule.group(1), declaration
+
+
+def test_the_totals_line_is_back(job):
+    """`Total: ${r.total_observables || 0} | Watched: ${r.total_watched ||
+    0}` went with the macro too."""
+    job(result={"threat_distribution": {}, "total_observables": 120,
+                "total_watched": 9})
+    body = flat(_get(_reader(), VELOCITY).text)
+    assert "Total: 120" in body
+    assert "Watched: 9" in body
+
+
+def test_a_missing_total_is_not_printed_as_zero(job):
+    job(result={"threat_distribution": {}})
+    html = _get(_reader(), VELOCITY).text
+    assert "Total: 0" not in flat(html)
+    assert "an-absent" in html
+
+
+def test_a_distribution_that_is_not_a_mapping_says_so(job):
+    job(result={"threat_distribution": "broken"})
+    assert "not in a shape" in flat(_get(_reader(), VELOCITY).text)

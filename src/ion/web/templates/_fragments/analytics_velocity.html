@@ -15,7 +15,43 @@
 {% else %}
 <div class="grid grid-cols-2 gap-4 mb-4">
   {{ sp.sparkline(daily, 'New Observables / Day (30d)') }}
-  {{ sp.share_bars(threat_distribution, 'Threat Distribution', 'severity-') }}
+  {#- The threat distribution is its own markup, not the shared share_bars
+      macro. My first pass used that macro and lost three things with it:
+      the bar track's own rule (_ion-s-8bc7ebe99c, which the rewrite audit
+      caught), the fixed list of six levels, so a level with no observables
+      vanished where it used to show as a zero row, and the totals line
+      below. -#}
+  <div class="velocity-chart-container">
+    <div class="velocity-chart-title">Threat Level Distribution</div>
+    {%- if threat_distribution is none %}
+    <div class="empty-state">This distribution is not in a shape this page
+      can read.</div>
+    {%- else %}
+    {%- for r in threat_distribution %}
+    <div class="threat-dist-row">
+      <span class="threat-dist-label">{{ r.level }}</span>
+      <div class="an-dist-track">
+        {%- if r.pct is not none %}
+        <div class="threat-dist-bar tl-{{ r.level }} h-full"
+             data-ion-style="width:{{ r.pct }}%"></div>
+        {%- endif %}
+      </div>
+      <span class="threat-dist-count">
+        {%- if r.count is not none %}{{ r.count }}
+        {%- else %}<span class="an-absent" title="Not readable"></span>{% endif %}
+      </span>
+    </div>
+    {%- endfor %}
+    <div class="an-dist-totals">
+      Total:
+      {%- if total_observables is not none %} {{ total_observables }}
+      {%- else %} <span class="an-absent" title="Not recorded"></span>{% endif %}
+      | Watched:
+      {%- if total_watched is not none %} {{ total_watched }}
+      {%- else %} <span class="an-absent" title="Not recorded"></span>{% endif %}
+    </div>
+    {%- endif %}
+  </div>
 </div>
 {%- if stale_iocs is none %}
 {{ st.unreadable_list('dormant indicators') }}

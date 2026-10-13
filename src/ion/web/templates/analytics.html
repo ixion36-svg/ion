@@ -1223,68 +1223,38 @@ function showToast(msg, isError) {
 }
 
 // =========================================================================
-function renderIndexTable(indices, total) {
-    const container = document.getElementById('index-table-container');
-    if (!indices.length) {
-        container.innerHTML = '<div class="empty-state">No indices found</div>';
-        return;
-    }
-
-    const maxCount = Math.max(...indices.map(i => i.count), 1);
-
-    let rows = indices.map(idx => {
-        const sev = idx.severity || {};
-        const pct = Math.round((idx.count / maxCount) * 100);
-        let sevPills = '';
-        if (sev.critical) sevPills += `<span class="sev-pill crit">C ${sev.critical}</span>`;
-        if (sev.high) sevPills += `<span class="sev-pill high">H ${sev.high}</span>`;
-        if (sev.medium) sevPills += `<span class="sev-pill med">M ${sev.medium}</span>`;
-        if (sev.low) sevPills += `<span class="sev-pill low">L ${sev.low}</span>`;
-
-        return `<tr>
-            <td><span class="idx-name">${esc(idx.index)}</span></td>
-            <td><span class="idx-count">${idx.count.toLocaleString()}</span></td>
-            <td>
-                <div class="idx-bar-container">
-                    <div class="idx-bar" data-pct="${pct}"></div>
-                </div>
-            </td>
-            <td><div class="idx-sev-pills">${sevPills || '-'}</div></td>
-        </tr>`;
-    }).join('');
-
-    container.innerHTML = `
-        <table class="eng-index-table">
-            <thead>
-                <tr>
-                    <th>Index</th>
-                    <th>Count</th>
-                    <th>Volume</th>
-                    <th>Severity</th>
-                </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-        </table>`;
-
-    // The volume bars were dead on the old page: the v0.31.21 inline-style
-    // migration hashed `width:${pct}%` into the STATIC class
-    // ._ion-s-95aea49e0e, leaving the literal `${pct}` in the CSS — an invalid
-    // rule the browser drops, so every bar rendered at zero width. Set it here
-    // instead (CSP-safe, no inline style attribute).
-    container.querySelectorAll('.idx-bar[data-pct]').forEach(function (el) {
-        el.style.width = el.getAttribute('data-pct') + '%';
-    });
-}
 
 // System Analytics Tab
 // =========================================================================
 let sysOverviewData = null;
 let sysTabLoaded = false;
 
+// One message into the card grid, built rather than parsed. Both the
+// loading line and the failure line were innerHTML with a class in a
+// string, and neither is markup a stylesheet needs to reach.
+function ionSysMessage(host, message) {
+    if (!host) return;
+    const box = document.createElement('div');
+    box.className = 'empty-state col-span-full';
+    box.textContent = message;
+    host.replaceChildren(box);
+}
+
+// GET /ui/analytics/system renders the index breakdown and swaps the
+// six stat figures out of band.
+function loadSystemFragment() {
+    const host = document.getElementById('index-table-container');
+    if (!host) return Promise.resolve();
+    const hours = (document.getElementById('sys-time-range') || {}).value || 24;
+    return htmx.ajax('GET', '/ui/analytics/system', {
+        source: host, target: host, swap: 'innerHTML',
+        values: { hours: hours },
+    });
+}
 async function loadSystemAnalyticsTab() {
     const hours = document.getElementById('sys-time-range').value;
     const grid = document.getElementById('sys-cards-grid');
-    grid.innerHTML = '<div class="loading-state">Loading system analytics...</div>';
+    ionSysMessage(grid, 'Loading system analytics...');
 
     try {
         const resp = await fetch(`/api/analytics/system-overview?hours=${hours}`, { credentials: 'include' });
@@ -1295,26 +1265,22 @@ async function loadSystemAnalyticsTab() {
         setText('astat-systems', sysOverviewData.total_systems || 0);
     } catch (e) {
         console.error('System analytics error:', e);
-        grid.innerHTML = `<div class="empty-state">${esc(e.message || 'Failed to load')}</div>`;
+        ionSysMessage(grid, e.message || 'Failed to load');
     }
 }
 
 function renderSystemAnalytics(data) {
-    // Stats bar
-    const sev = data.total_severity || {};
-    setText('sys-s-total', (data.total_alerts || 0).toLocaleString());
-    setText('sys-s-logs', (data.total_logs_ingested || 0).toLocaleString());
-    setText('sys-s-systems', data.total_systems || 0);
-    setText('sys-s-mapped', data.mapped_systems || 0);
-    const covEl = document.getElementById('sys-s-coverage');
-    if (covEl) {
-        covEl.textContent = (data.avg_tide_coverage || 0) + '%';
-        covEl.style.color = data.avg_tide_coverage >= 70 ? 'var(--neon-green)' : data.avg_tide_coverage >= 40 ? 'var(--neon-yellow)' : 'var(--neon-red)';
-    }
-    setText('sys-s-critical', (sev.critical || 0).toLocaleString());
-
-    // Index Breakdown (ported from /engineering-analytics, phase 7)
-    renderIndexTable(data.indices || [], data.total_alerts || 1);
+    // The stats bar and the index breakdown come from
+    // GET /ui/analytics/system, which is also where the es_failed flag
+    // is finally read. The six figures were
+    // `(data.total_alerts || 0).toLocaleString()` and four more like
+    // it, so a deployment whose Elasticsearch was unreachable showed
+    // zero alerts, zero logs and no severity: a clean estate. The
+    // endpoint has said so since the flag was added; nothing read it.
+    //
+    // The coverage colour went with them. It was three thresholds
+    // written into covEl.style.color in JavaScript.
+    loadSystemFragment();
 
     // Summary text
     const sumEl = document.getElementById('sys-summary-text');

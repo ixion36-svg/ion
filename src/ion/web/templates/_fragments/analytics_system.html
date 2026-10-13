@@ -1,0 +1,111 @@
+{% macro sev_pills(items, prefix, alert_count) %}
+{#- None means no readable severity breakdown; an empty list means one was
+    recorded and every band is zero. `if (sev.critical)` drew nothing for
+    both, and the fallback sentence turned on `alert_count > 0`, which is
+    false for a missing count as well as for a real zero. -#}
+{%- if items is none %}
+<span class="{{ prefix }}-pill an-absent-text">no severity breakdown</span>
+{%- elif items %}
+{%- for p in items %}<span class="{{ prefix }}-pill {{ p.key }}">{{ p.letter }} {{ p.count }}</span>{% endfor %}
+{%- elif alert_count is not none and alert_count > 0 %}
+<span class="{{ prefix }}-pill an-absent-text">no severity data</span>
+{%- elif alert_count == 0 %}
+<span class="an-absent-text">no alerts in time range</span>
+{%- endif %}
+{% endmacro %}
+{% macro figure(value, why) %}
+{%- if value is not none %}{{ "{:,}".format(value) }}
+{%- else %}<span class="an-absent" title="{{ why }}"></span>{% endif %}
+{% endmacro %}
+{# System analytics: the stats bar and the index breakdown, from
+   ui/analytics.py's system_view.
+
+   THE PAGE NEVER READ es_failed
+
+   This endpoint merges two halves: the Elasticsearch alert figures and the
+   CyAB namespace mappings out of ION's own database. Its own comment says
+   the first half's figures "are placeholders when this is true, not
+   measurements of a quiet estate". The page rendered them as measurements,
+   with `(data.total_alerts || 0).toLocaleString()` and three more like it,
+   so a deployment whose Elasticsearch was unreachable saw zero alerts,
+   zero logs and no severity anywhere: a clean estate. The flag was added
+   to the endpoint to make that visible and nothing was taught to read it.
+
+   The stat values are swapped out of band into the spans the page already
+   has, so there is one source of truth for them rather than a fragment and
+   a setText pass disagreeing.
+
+   The per-system card grid is NOT here, deliberately. buildSysCard is a
+   hundred lines of structure: a header whose ::before is the mapped
+   indicator, a per-namespace icon and colour, a sparkline, a top-rules
+   table, a TIDE coverage bar with its own threshold colours and rule
+   breakdown, a CyAB readiness line and an unmapped badge. A simplified
+   card here would have dropped most of it, which is the regression this
+   project keeps catching in conversions. The grid is a later pass and the
+   page still builds it.
+#}
+<span id="sys-s-total" hx-swap-oob="innerHTML:#sys-s-total">
+  {{- figure(total_alerts, 'Not read from Elasticsearch') -}}
+</span>
+<span id="sys-s-logs" hx-swap-oob="innerHTML:#sys-s-logs">
+  {{- figure(total_logs, 'Not read from Elasticsearch') -}}
+</span>
+<span id="sys-s-critical" hx-swap-oob="innerHTML:#sys-s-critical">
+  {%- if es_failed %}<span class="an-absent" title="Not read from Elasticsearch"></span>
+  {%- elif total_pills is none %}<span class="an-absent" title="No severity breakdown was recorded"></span>
+  {%- else %}{{ (total_pills | selectattr('key', 'equalto', 'critical') | map(attribute='count') | sum) }}{% endif %}
+</span>
+{#- These two come from ION's own records, so they are figures even when
+    the Elasticsearch half failed. That is what the endpoint means by
+    being able to answer with one half down. -#}
+<span id="sys-s-systems" hx-swap-oob="innerHTML:#sys-s-systems">
+  {{- figure(total_systems, 'Not recorded') -}}
+</span>
+<span id="sys-s-mapped" hx-swap-oob="innerHTML:#sys-s-mapped">
+  {{- figure(mapped_systems, 'Not recorded') -}}
+</span>
+<span id="sys-s-coverage" hx-swap-oob="innerHTML:#sys-s-coverage"
+      class="{% if avg_coverage is not none %}an-cov-{{ 'good' if avg_coverage >= 70 else 'fair' if avg_coverage >= 40 else 'poor' }}{% endif %}">
+  {%- if avg_coverage is not none %}{{ avg_coverage }}%
+  {%- else %}<span class="an-absent" title="Not recorded"></span>{% endif %}
+</span>
+{% if es_failed %}
+<div class="an-es-notice">
+  The alert figures in this tab could not be read from Elasticsearch, so
+  they are not shown. This is not a quiet estate.
+  {%- if error %} Elasticsearch reported: {{ error }}{% endif %}
+  The system and coverage figures come from ION's own records and are
+  unaffected.
+</div>
+{% elif indices is none %}
+<div class="empty-state">The index breakdown is not in a shape this page
+  can read.</div>
+{% elif not indices %}
+<div class="empty-state">No indices found</div>
+{% else %}
+<h3 class="an-breakdown-title">Index Breakdown</h3>
+<table class="analytics-table">
+  <thead><tr><th>Index</th><th>Alerts</th><th></th><th>Severity</th></tr></thead>
+  <tbody>
+    {%- for i in indices %}
+    <tr>
+      <td><span class="idx-name">{{ i.name or 'unnamed index' }}</span></td>
+      {#- `idx.count.toLocaleString()` throws on undefined, which took the
+          whole tab down through the caller's catch and put the exception
+          message where the panel should be. -#}
+      <td><span class="idx-count">
+        {{- figure(i.count, 'This index carried no count') -}}
+      </span></td>
+      <td>
+        <div class="idx-bar-container">
+          {%- if i.width is not none %}
+          <div class="idx-bar" data-ion-style="width: {{ i.width }}%"></div>
+          {%- endif %}
+        </div>
+      </td>
+      <td>{{ sev_pills(i.pills, 'sev', i.count) }}</td>
+    </tr>
+    {%- endfor %}
+  </tbody>
+</table>
+{% endif %}

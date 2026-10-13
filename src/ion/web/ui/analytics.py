@@ -709,10 +709,54 @@ class CaseMetricsView(TypedDict):
     by_severity: Optional[list[SeverityRow]]
 
 
+#: The threat levels the distribution always lists, in this order. The
+#: page iterated this fixed list rather than the payload's keys, so a
+#: level with no observables showed as a zero row instead of vanishing.
+#: Dropping that was a regression in my own first pass at this panel.
+THREAT_LEVELS: tuple[str, ...] = (
+    "critical", "high", "medium", "low", "benign", "unknown",
+)
+
+
+class ThreatRow(TypedDict):
+    """One of the six levels. `count` is 0 for a level the payload does not
+    mention, which is what `dist[level] || 0` meant, and None only when the
+    distribution itself was unreadable."""
+
+    level: str
+    count: Optional[int]
+    pct: Optional[int]
+
+
+def threat_rows(mapping: Any) -> Optional[list[ThreatRow]]:
+    """The six levels, or None when the distribution is not a mapping."""
+    if not isinstance(mapping, dict):
+        return None
+    counts = {str(k): _num(v) for k, v in mapping.items()}
+    total = sum(v for v in counts.values() if v is not None)
+    rows: list[ThreatRow] = []
+    for level in THREAT_LEVELS:
+        if level in counts:
+            value = counts[level]
+        else:
+            # Absent from the payload means none of them, which is what
+            # the page's `dist[level] || 0` said.
+            value = 0.0
+        rows.append({
+            "level": level,
+            "count": None if value is None else int(value),
+            "pct": (int(round(value / total * 100))
+                    if value is not None and total > 0 else None),
+        })
+    return rows
+
+
 class VelocityView(TypedDict):
     job: JobState
     daily: Optional[list[SparkBar]]
-    threat_distribution: Optional[list[Share]]
+    threat_distribution: Optional[list[ThreatRow]]
+    total_observables: Optional[int]
+    total_watched: Optional[int]
     stale_iocs: Optional[list[StaleIOC]]
 
 
@@ -757,12 +801,16 @@ def velocity_view(job: Any) -> VelocityView:
     result = job.get("result") if isinstance(job, dict) else None
     if not isinstance(result, dict):
         return {"job": state, "daily": None, "threat_distribution": None,
+                "total_observables": None, "total_watched": None,
                 "stale_iocs": None}
     raw_iocs = result.get("stale_iocs")
     return {
         "job": state,
         "daily": spark(result.get("daily_counts")),
-        "threat_distribution": shares(result.get("threat_distribution")),
+        "threat_distribution": threat_rows(
+            result.get("threat_distribution")),
+        "total_observables": _int(result.get("total_observables")),
+        "total_watched": _int(result.get("total_watched")),
         "stale_iocs": (None if not isinstance(raw_iocs, list) else
                        [i for i in (stale_ioc(r) for r in raw_iocs)
                         if i is not None]),
@@ -782,3 +830,215 @@ router.add_api_route(
            velocity_view),
     methods=["GET"], response_class=HTMLResponse,
     dependencies=[Depends(require_permission(PERMISSION))])
+
+
+# ---------------------------------------------------------------------------
+# System analytics
+# ---------------------------------------------------------------------------
+#
+# One read, GET /api/analytics/system-overview?hours=N, feeding a stats
+# bar, a per-system card grid, a timeline and an index breakdown.
+#
+# THE PAGE NEVER READ es_failed, AND THAT IS THE WHOLE POINT
+#
+# That endpoint merges two halves: the Elasticsearch alert figures, and the
+# CyAB namespace mappings out of ION's own database. Its own comment says
+# so, and says what the flag means:
+#
+#     # Whether the Elasticsearch half of this payload happened. The
+#     # figures above that come from it are placeholders when this is
+#     # true, not measurements of a quiet estate.
+#
+# The page rendered those placeholders as measurements:
+# `(data.total_alerts || 0).toLocaleString()` and three more like it. So a
+# deployment whose Elasticsearch was unreachable saw a clean estate: zero
+# alerts, zero logs ingested, no severity anywhere. The flag was added to
+# the endpoint to make that visible and nothing was ever taught to read it.
+#
+# So this view is split by provenance. The figures that come from the
+# database are real whether or not Elasticsearch answered, and the ones
+# that come from Elasticsearch are withheld when it did not.
+#
+# Three smaller defects in the same panel:
+#
+#   * `idx.count.toLocaleString()` throws on undefined, taking the index
+#     breakdown down through the caller's catch, which then rendered the
+#     exception message in place of the whole tab.
+#   * `Math.max(...indices.map(i => i.count), 1)` is NaN if any one count
+#     is not a number, so every bar width became "NaN%".
+#   * The severity pills used `if (sev.critical)`, so a count of zero and a
+#     count that was never recorded both drew nothing, and the fallback
+#     sentence depended on `sys.alert_count > 0`, which is false for a
+#     missing count as well as for a genuine zero.
+
+SYSTEM_FRAGMENT = "_fragments/analytics_system.html"
+
+#: The severity pills a system or index card shows, in this order, with the
+#: single letter the page used.
+SEVERITY_PILLS: tuple[tuple[str, str], ...] = (
+    ("critical", "C"), ("high", "H"), ("medium", "M"), ("low", "L"),
+)
+
+
+class Pill(TypedDict):
+    key: str
+    letter: str
+    count: int
+
+
+def pills(mapping: Any) -> Optional[list[Pill]]:
+    """The severity pills for one row, or None when there is no readable
+    severity breakdown at all.
+
+    `if (sev.critical)` drew nothing both for a recorded zero and for a
+    severity that was never recorded. None here is the second case, and an
+    empty list is the first.
+    """
+    if not isinstance(mapping, dict):
+        return None
+    out: list[Pill] = []
+    for key, letter in SEVERITY_PILLS:
+        count = _int(mapping.get(key))
+        if count:
+            out.append({"key": key, "letter": letter, "count": count})
+    return out
+
+
+class SystemCard(TypedDict):
+    name: Optional[str]
+    mapped: bool
+    alert_count: Optional[int]
+    pills: Optional[list[Pill]]
+    coverage: Optional[int]
+
+
+class IndexRow(TypedDict):
+    name: Optional[str]
+    count: Optional[int]
+    width: Optional[float]
+    pills: Optional[list[Pill]]
+
+
+class SystemView(TypedDict):
+    """`es_failed` decides whether the Elasticsearch-derived figures are
+    figures at all. The database-derived ones are real either way, which is
+    what the endpoint means by being able to answer with one half down."""
+
+    es_failed: bool
+    error: Optional[str]
+    hours: Optional[int]
+    # From Elasticsearch.
+    total_alerts: Optional[int]
+    total_logs: Optional[int]
+    total_pills: Optional[list[Pill]]
+    indices: Optional[list[IndexRow]]
+    # From ION's own database. The systems list stays in the model because
+    # the page still builds the card grid itself: buildSysCard is a hundred
+    # lines of structure, with a per-namespace icon and colour, a
+    # sparkline, a top-rules table, a TIDE coverage bar carrying its own
+    # threshold colours, a CyAB readiness line and an unmapped badge. A
+    # simplified card here would have dropped most of that, which is the
+    # regression this project keeps catching in conversions. The grid is a
+    # later pass, so renderSysCards stays a write site on purpose.
+    total_systems: Optional[int]
+    mapped_systems: Optional[int]
+    avg_coverage: Optional[int]
+    systems: Optional[list[SystemCard]]
+
+
+def system_card(raw: Any, *, es_failed: bool) -> Optional[SystemCard]:
+    if not isinstance(raw, dict):
+        return None
+    name = _text(raw.get("system"))
+    return {
+        "name": name,
+        "mapped": raw.get("mapped") is True,
+        # Withheld rather than zero when the half that counts them failed.
+        "alert_count": (None if es_failed
+                        else _int(raw.get("alert_count"))),
+        "pills": None if es_failed else pills(raw.get("severity")),
+        "coverage": _int(raw.get("tide_coverage")),
+    }
+
+
+def index_row(raw: Any, top: Optional[float]) -> Optional[IndexRow]:
+    if not isinstance(raw, dict):
+        return None
+    count = _num(raw.get("count"))
+    return {
+        "name": _text(raw.get("index")),
+        "count": _int(raw.get("count")),
+        "width": (round(count / top * 100, 2)
+                  if count is not None and top else None),
+        "pills": pills(raw.get("severity")),
+    }
+
+
+def system_view(payload: Any) -> SystemView:
+    if not isinstance(payload, dict):
+        return {
+            "es_failed": True,
+            "error": "The system overview answered something this page "
+                     "could not read.",
+            "hours": None, "total_alerts": None, "total_logs": None,
+            "total_pills": None, "indices": None, "total_systems": None,
+            "mapped_systems": None, "avg_coverage": None, "systems": None,
+        }
+    es_failed = payload.get("es_failed") is True
+    raw_systems = payload.get("systems")
+    raw_indices = payload.get("indices")
+    readable_indices = ([i for i in raw_indices if isinstance(i, dict)]
+                        if isinstance(raw_indices, list) else [])
+    top = scale([_num(i.get("count")) for i in readable_indices])
+    return {
+        "es_failed": es_failed,
+        "error": _text(payload.get("error")),
+        "hours": _int(payload.get("hours")),
+        "total_alerts": None if es_failed else _int(
+            payload.get("total_alerts")),
+        "total_logs": None if es_failed else _int(
+            payload.get("total_logs_ingested")),
+        "total_pills": None if es_failed else pills(
+            payload.get("total_severity")),
+        "indices": (None if es_failed or not isinstance(raw_indices, list)
+                    else [r for r in (index_row(i, top)
+                                      for i in readable_indices)
+                          if r is not None]),
+        "total_systems": _int(payload.get("total_systems")),
+        "mapped_systems": _int(payload.get("mapped_systems")),
+        "avg_coverage": _int(payload.get("avg_tide_coverage")),
+        "systems": (None if not isinstance(raw_systems, list) else
+                    [c for c in (system_card(s, es_failed=es_failed)
+                                 for s in raw_systems) if c is not None]),
+    }
+
+
+@router.get(
+    "/analytics/system",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def analytics_system_fragment(
+    request: Request,
+    hours: int = 24,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> Response:
+    """The system analytics tab."""
+    from fastapi import HTTPException
+
+    from ion.web.analytics_api import get_system_overview
+
+    try:
+        payload = await get_system_overview(
+            hours=hours, current_user=current_user, session=session)
+    except HTTPException as refusal:
+        view = system_view(None)
+        view["error"] = (str(refusal.detail) if refusal.detail
+                         else "The system overview was refused.")
+    except Exception:
+        logger.exception("Analytics system fragment could not read")
+        view = system_view(None)
+    else:
+        view = system_view(payload)
+    return render_view(request, SYSTEM_FRAGMENT, view)
