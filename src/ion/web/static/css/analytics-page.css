@@ -115,3 +115,11 @@
     font-size: 0.75rem;
     color: var(--text-muted);
 }
+
+/* The job config table.
+   The two status colours were text-[#ef4444] and text-[#22c55e] written
+   into each row, so they ignored the theme. */
+.config-status-error { color: var(--neon-red); }
+.config-status-ok { color: var(--neon-green); }
+.config-status-pending { color: var(--text-muted); }
+.config-job-type { font-size: 0.6875rem; color: var(--text-muted); }

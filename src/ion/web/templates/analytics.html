@@ -915,40 +915,37 @@ document.querySelectorAll('.astat-card[data-tab]').forEach(card => {
 // =========================================================================
 // Data Loading
 // =========================================================================
+// GET /ui/analytics/dashboard renders the overview grid and pushes the
+// six summary spans out of band beside it, the way the system tab's
+// stats bar already works.
+//
+// Each of those six was `|| 0` over an endpoint that had already
+// defaulted the figure to 0, on a bar where zero reads as good news. A
+// job that has never run, a job whose stored result holds no such figure
+// and a job type that is not registered at all all reported the same
+// confident zero as a real measurement of none. `astat-stale` was worse
+// still: `(s.stale_cases || 0) + (s.stale_alerts || 0)` reports a
+// total that silently omits whichever half was unreadable.
+//
+// The overview cards' staleness badge was decided with
+// `Date.now() - new Date(job.last_run_at)`, which reads a naive UTC
+// value in the viewer's zone. Against a two-hour threshold a viewer's
+// offset flipped the badge outright.
 async function loadDashboard() {
     try {
-        const [dashResp, jobsResp] = await Promise.all([
-            fetch('/api/analytics/dashboard'),
-            fetch('/api/analytics/jobs'),
-        ]);
-        if (dashResp.status === 401 || jobsResp.status === 401) { window.location.href = '/login?redirect=/analytics'; return; }
-        dashboardData = await dashResp.json();
+        const jobsResp = await fetch('/api/analytics/jobs');
+        if (jobsResp.status === 401) { window.location.href = '/login?redirect=/analytics'; return; }
         const jobsData = await jobsResp.json();
         jobsList = jobsData.jobs || [];
-        renderDashboard();
+        dashboardData = true;
     } catch (e) {
-        console.error('Failed to load analytics:', e);
-        document.getElementById('overview-grid').innerHTML = '<div class="empty-state">Failed to load analytics data</div>';
+        console.error('Failed to load the job list:', e);
+        jobsList = [];
     }
-}
-
-// =========================================================================
-// Rendering
-// =========================================================================
-function renderDashboard() {
-    if (!dashboardData) return;
-    const s = dashboardData.summary || {};
-    const jobs = dashboardData.jobs || {};
-
-    // Summary stats
-    setText('astat-entities', s.entities_at_risk || 0);
-    setText('astat-offenders', s.repeat_offenders || 0);
-    setText('astat-noisy', s.noisy_rules || 0);
-    setText('astat-mttr', s.mttr_hours != null ? s.mttr_hours : '-');
-    setText('astat-velocity', s.observable_velocity || 0);
-    setText('astat-stale', (s.stale_cases || 0) + (s.stale_alerts || 0));
-
-    renderOverview(jobs);
+    htmx.ajax('GET', '/ui/analytics/dashboard', {
+        source: document.getElementById('overview-grid'),
+        target: '#overview-grid', swap: 'innerHTML',
+    });
     renderEntityRisk();
     renderRepeatOffenders();
     renderRuleNoise();
@@ -956,59 +953,6 @@ function renderDashboard() {
     renderCaseMetrics();
     renderStaleInvestigations();
     renderConfig();
-}
-
-function renderOverview(jobs) {
-    const grid = document.getElementById('overview-grid');
-    const cards = Object.entries(jobs).map(([type, job]) => {
-        const result = job.result || {};
-        const status = getJobStatus(job);
-        const metric = getOverviewMetric(type, result);
-
-        return `<div class="overview-card" data-click-action="switchTab" data-args='["${type === 'entity_risk_score' ? 'entity_risk' : type === 'repeat_offenders' ? 'repeat_offenders' : type}"]'>
-            <div class="overview-card-header">
-                <span class="overview-card-title">${esc(job.display_name)}</span>
-                <span class="overview-card-status ${status.cls}">${status.label}</span>
-            </div>
-            <div class="overview-card-body">
-                <div class="overview-card-metric">${metric.value}</div>
-                <div class="overview-card-detail">${metric.detail}</div>
-            </div>
-            <div class="overview-card-footer">${job.last_run_at ? 'Last run: ' + timeAgo(job.last_run_at) : 'Never run'} ${job.last_duration_ms ? '(' + job.last_duration_ms + 'ms)' : ''}</div>
-        </div>`;
-    });
-    grid.innerHTML = cards.join('');
-}
-
-function getJobStatus(job) {
-    if (job.last_error) return { cls: 'error', label: 'Error' };
-    if (!job.last_run_at) return { cls: 'pending', label: 'Pending' };
-    const age = Date.now() - new Date(job.last_run_at).getTime();
-    if (age > 2 * 3600000) return { cls: 'stale', label: 'Stale' };
-    return { cls: 'ok', label: 'OK' };
-}
-
-function getOverviewMetric(type, result) {
-    switch (type) {
-        case 'entity_risk_score': {
-            const top = (result.entities || [])[0];
-            return { value: result.total_scored || 0, detail: top ? `Top: ${top.entity} (${top.risk_score})` : 'No entities scored' };
-        }
-        case 'repeat_offenders':
-            return { value: result.total_flagged || 0, detail: `Threshold: ${result.threshold || 3}+ alerts in 30d` };
-        case 'rule_noise': {
-            const noisy = (result.rules || []).filter(r => r.fp_ratio > 0.5).length;
-            return { value: noisy, detail: `${result.total_rules || 0} rules analyzed` };
-        }
-        case 'observable_velocity':
-            return { value: result.velocity_7d || 0, detail: `Change: ${result.velocity_change > 0 ? '+' : ''}${result.velocity_change || 0} vs prev week` };
-        case 'case_metrics':
-            return { value: result.mttr_hours != null ? result.mttr_hours + 'h' : '-', detail: `${result.open_cases || 0} open / ${result.closed_cases || 0} closed` };
-        case 'stale_investigations':
-            return { value: (result.total_stale_cases || 0) + (result.total_stale_alerts || 0), detail: `${result.total_stale_cases || 0} cases, ${result.total_stale_alerts || 0} alerts` };
-        default:
-            return { value: '-', detail: '' };
-    }
 }
 
 // GET /ui/analytics/entity-risk renders the panel. The fragment reads its own job, so
@@ -1078,24 +1022,17 @@ function renderStaleInvestigations() {
     });
 }
 
+// GET /ui/analytics/config renders the table. `${j.run_count}` and
+// `${j.schedule_minutes}` printed "undefined" for a job whose columns
+// were null, and the second of those went into a number input's value
+// attribute, so the field was unusable until retyped. The two status
+// colours were text-[#ef4444] and text-[#22c55e] written into the row,
+// so they ignored the theme; they are classes in analytics-page.css now.
 function renderConfig() {
-    const container = document.getElementById('config-content');
-    if (!jobsList.length) { container.innerHTML = '<div class="empty-state">No jobs configured</div>'; return; }
-
-    container.innerHTML = `<table class="config-table">
-        <thead><tr><th>Job</th><th>Enabled</th><th>Schedule (min)</th><th>Last Run</th><th>Next Run</th><th>Runs</th><th>Duration</th><th>Status</th><th></th></tr></thead>
-        <tbody>${jobsList.map(j => `<tr>
-            <td><strong>${esc(j.display_name)}</strong><div class="text-[0.6875rem] text-[var(--text-muted)]">${j.job_type}</div></td>
-            <td><button class="config-toggle ${j.enabled ? 'on' : 'off'}" data-click-action="toggleJob" data-args='["${j.job_type}", ${!j.enabled}]'></button></td>
-            <td><input type="number" class="schedule-input" value="${j.schedule_minutes}" min="5" data-change-action="updateSchedule" data-args='["${j.job_type}", "$value"]'></td>
-            <td class="run-time">${j.last_run_at ? timeAgo(j.last_run_at) : 'Never'}</td>
-            <td class="run-time">${j.next_run_at ? timeAgo(j.next_run_at) : '-'}</td>
-            <td>${j.run_count}</td>
-            <td class="run-time">${j.last_duration_ms != null ? j.last_duration_ms + 'ms' : '-'}</td>
-            <td>${j.last_error ? '<span class="text-[#ef4444]" title="' + esc(j.last_error) + '">Error</span>' : (j.has_results ? '<span class="text-[#22c55e]">OK</span>' : '<span class="text-[var(--text-muted)]">Pending</span>')}</td>
-            <td><button class="btn btn-sm btn-secondary" data-click-action="runJob" data-args='["${j.job_type}"]'>Run Now</button></td>
-        </tr>`).join('')}</tbody>
-    </table>`;
+    htmx.ajax('GET', '/ui/analytics/config', {
+        source: document.getElementById('config-content'),
+        target: '#config-content', swap: 'innerHTML',
+    });
 }
 
 // =========================================================================

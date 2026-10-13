@@ -1,0 +1,54 @@
+{# The summary bar and the overview grid, from ui/analytics.py's
+   dashboard_view.
+
+   The six stat spans go out of band because they sit above the tab strip,
+   outside this swap's target, exactly as the system tab's do.
+
+   Each of them was `|| 0` over an endpoint that had already defaulted the
+   figure to 0, on a bar where zero reads as good news. A job that has
+   never run, a job whose result holds no such figure and a job type that
+   is not registered at all all reported the same confident zero as a real
+   measurement of none.
+#}
+{%- for ident, stat in stats.items() %}
+<span id="{{ ident }}" hx-swap-oob="innerHTML"
+      class="text-[1.75rem] font-bold font-mono text-primary leading-tight">
+  {%- if stat.value is not none %}{{ stat.value }}
+  {%- else %}<span class="an-absent" title="{{ stat.note }}"></span>
+  {%- endif %}
+</span>
+{%- endfor %}
+{%- if state == 'failed' %}
+<div class="empty-state">The analytics dashboard could not be read. The
+  figures above are not a measurement of a quiet estate.</div>
+{%- elif state == 'empty' %}
+<div class="empty-state">No analytics jobs are registered.</div>
+{%- else %}
+{%- for c in cards %}
+{#- data-job-type is new. The grid had no per-card identifier, so
+    nothing could address one card. -#}
+<div class="overview-card" data-job-type="{{ c.job_type }}"
+     data-click-action="switchTab" data-args='{{ [c.tab]|tojson }}'>
+  <div class="overview-card-header">
+    <span class="overview-card-title">{{ c.display_name or c.job_type }}</span>
+    <span class="overview-card-status {{ c.status }}">{{ c.status_label }}</span>
+  </div>
+  <div class="overview-card-body">
+    <div class="overview-card-metric">
+      {%- if c.metric is not none %}{{ c.metric }}
+      {%- else %}<span class="an-absent"
+          title="This job's last run recorded no figure for this card"></span>
+      {%- endif %}
+    </div>
+    {#- The entity name in this line reached markup unescaped. -#}
+    <div class="overview-card-detail">{{ c.detail or '' }}</div>
+  </div>
+  <div class="overview-card-footer">
+    {%- if c.last_run %}Last run: {{ c.last_run }}
+    {%- else %}Never run{% endif %}
+    {#- `job.last_duration_ms ? ... : ''` hid a genuine 0ms run. -#}
+    {%- if c.duration_ms is not none %} ({{ c.duration_ms }}ms){% endif %}
+  </div>
+</div>
+{%- endfor %}
+{%- endif %}

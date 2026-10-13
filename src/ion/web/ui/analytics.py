@@ -55,7 +55,8 @@ from ion.auth.dependencies import get_current_user, require_permission
 from ion.models.analytics import AnalyticsJobType
 from ion.models.user import User
 from ion.storage.database import get_db_session
-from ion.web.ui._shared import age_label, instant_label, plain, render_view
+from ion.web.ui._shared import (age_label, instant_label, parse_instant, plain,
+                                 render_view)
 
 logger = logging.getLogger(__name__)
 
@@ -1042,3 +1043,393 @@ async def analytics_system_fragment(
     else:
         view = system_view(payload)
     return render_view(request, SYSTEM_FRAGMENT, view)
+
+
+# ---------------------------------------------------------------------------
+# The summary bar, the overview grid and the job config table
+# ---------------------------------------------------------------------------
+#
+# Two endpoints, three panels. GET /api/analytics/dashboard carries the
+# summary bar and the overview cards; GET /api/analytics/jobs carries the
+# config table. The page fetched both in one Promise.all, so the dashboard
+# route here renders the overview grid and pushes the six stat spans out of
+# band beside it.
+#
+# THE STALENESS BADGE WAS DECIDED IN THE VIEWER'S TIMEZONE
+#
+#     const age = Date.now() - new Date(job.last_run_at).getTime();
+#     if (age > 2 * 3600000) return { cls: 'stale', label: 'Stale' };
+#
+# `last_run_at` is isoformat() of a naive UTC column, which `new Date`
+# reads in the viewer's zone, so the age was out by their offset. Against a
+# two-hour threshold that is not a rounding error: a viewer at UTC+5 saw
+# every job that ran in the last five hours as fresh, and one at UTC-5 saw
+# a job that ran twenty minutes ago as stale. Seventh page with the
+# zoneless-UTC defect and the first where it changes a badge rather than a
+# number.
+#
+# A SUMMARY FIGURE OF ZERO MEANT FOUR DIFFERENT THINGS
+#
+# The endpoint seeds `summary` with zeros and only overwrites a key when a
+# job of that type exists, from `r = job.last_result or {}`:
+#
+#     summary = {"entities_at_risk": 0, ...}
+#     if job.job_type == "entity_risk_score":
+#         summary["entities_at_risk"] = r.get("total_scored", 0)
+#
+# So "0 entities at risk" was returned for a job that scored zero, a job
+# that has never run, a job whose result holds no such figure, and a job
+# type not registered at all. The page then applied `|| 0` on top. The
+# per-job state is decidable from the same payload, so the bar below is
+# computed from `jobs` rather than from `summary` and only a measured zero
+# prints as zero. Changing the endpoint would be the better fix and is not
+# this branch's to make, since every other consumer of `summary` would
+# have to be found first.
+#
+# `astat-stale` was the worst of them:
+# `(s.stale_cases || 0) + (s.stale_alerts || 0)` reports 4 when there are
+# four stale cases and an unreadable number of stale alerts.
+#
+# AN ENTITY NAME WENT INTO MARKUP UNESCAPED
+#
+#     detail: `Top: ${top.entity} (${top.risk_score})`
+#     <div class="overview-card-detail">${metric.detail}</div>
+#
+# The card title went through esc(). The detail line beside it did not,
+# and an entity name is whatever the alerts carried.
+
+DASHBOARD_FRAGMENT = "_fragments/analytics_dashboard.html"
+CONFIG_FRAGMENT = "_fragments/analytics_config.html"
+
+#: How long since its last run before a job is called stale, from the
+#: page's `age > 2 * 3600000`.
+STALE_AFTER_SECONDS = 2 * 3600
+
+
+def _now() -> Any:
+    """The reference instant, as a seam the staleness tests drive."""
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc)
+
+
+class Stat(TypedDict):
+    value: Optional[str]
+    note: Optional[str]
+
+
+class OverviewCard(TypedDict):
+    job_type: str
+    tab: str
+    display_name: Optional[str]
+    status: str
+    status_label: str
+    metric: Optional[str]
+    detail: Optional[str]
+    last_run: Optional[str]
+    duration_ms: Optional[int]
+
+
+class DashboardView(TypedDict):
+    state: str
+    cards: Optional[list[OverviewCard]]
+    stats: dict[str, Stat]
+
+
+class ConfigRow(TypedDict):
+    job_type: Optional[str]
+    display_name: Optional[str]
+    enabled: bool
+    schedule_minutes: Optional[int]
+    last_run: Optional[str]
+    next_run: Optional[str]
+    run_count: Optional[int]
+    duration_ms: Optional[int]
+    status: str
+    last_error: Optional[str]
+
+
+class ConfigView(TypedDict):
+    state: str
+    rows: Optional[list[ConfigRow]]
+
+
+def job_status(job: Any) -> tuple[str, str]:
+    """The job's freshness, from the stored instant rather than the clock
+    the viewer happens to keep."""
+    if not isinstance(job, dict):
+        return "pending", "Pending"
+    if plain(job.get("last_error")):
+        return "error", "Error"
+    ran = parse_instant(job.get("last_run_at"))
+    if ran is None:
+        return "pending", "Pending"
+    if (_now() - ran).total_seconds() > STALE_AFTER_SECONDS:
+        return "stale", "Stale"
+    return "ok", "OK"
+
+
+#: Which tab each job type opens. The page wrote a nested ternary whose
+#: middle branch returned the same value as its fallback, so exactly one
+#: job type is renamed.
+OVERVIEW_TABS: dict[str, str] = {
+    AnalyticsJobType.ENTITY_RISK_SCORE.value: "entity_risk",
+}
+
+
+def _absent(note: str) -> Stat:
+    return {"value": None, "note": note}
+
+
+def _figure(result: Any, key: str, *, ran: bool) -> Stat:
+    """One summary figure, with the reason it is not a number when it
+    isn't one."""
+    if not ran:
+        return _absent("This job has not run yet.")
+    if not isinstance(result, dict):
+        return _absent("This job stored nothing a figure can be read "
+                       "from.")
+    value = _num(result.get(key))
+    if value is None:
+        return _absent("This job's last run recorded no such figure.")
+    return {"value": ("%g" % value), "note": None}
+
+
+def summary_stats(jobs: dict) -> dict[str, Stat]:
+    """The six stat spans, measured from the per-job results.
+
+    Every one of them was `|| 0` over an endpoint that had already
+    defaulted it to 0, on a bar where zero reads as good news.
+    """
+    missing = "No job of this type is registered."
+
+    def job(job_type: AnalyticsJobType) -> Optional[dict]:
+        found = jobs.get(job_type.value)
+        return found if isinstance(found, dict) else None
+
+    def ran(found: Optional[dict]) -> bool:
+        return found is not None and bool(found.get("last_run_at"))
+
+    stats: dict[str, Stat] = {}
+
+    for ident, job_type, key in (
+        ("astat-entities", AnalyticsJobType.ENTITY_RISK_SCORE,
+         "total_scored"),
+        ("astat-offenders", AnalyticsJobType.REPEAT_OFFENDERS,
+         "total_flagged"),
+        ("astat-velocity", AnalyticsJobType.OBSERVABLE_VELOCITY,
+         "velocity_7d"),
+        ("astat-mttr", AnalyticsJobType.CASE_METRICS, "mttr_hours"),
+    ):
+        found = job(job_type)
+        stats[ident] = (_absent(missing) if found is None else
+                        _figure(found.get("result"), key, ran=ran(found)))
+
+    # Noisy rules is a count over the rules list rather than a stored
+    # figure, so an unreadable list is not zero noisy rules.
+    noise = job(AnalyticsJobType.RULE_NOISE)
+    if noise is None:
+        stats["astat-noisy"] = _absent(missing)
+    elif not ran(noise):
+        stats["astat-noisy"] = _absent("This job has not run yet.")
+    else:
+        result = noise.get("result")
+        rules = result.get("rules") if isinstance(result, dict) else None
+        if not isinstance(rules, list):
+            stats["astat-noisy"] = _absent(
+                "This job's rule list is not in a shape this page can "
+                "count.")
+        else:
+            stats["astat-noisy"] = {
+                "value": str(sum(
+                    1 for r in rules
+                    if isinstance(r, dict)
+                    and (_num(r.get("fp_ratio")) or 0) > FP_HIGH)),
+                "note": None}
+
+    # Stale items is two figures added. `(a || 0) + (b || 0)` reports a
+    # confident total when one half is missing.
+    stale = job(AnalyticsJobType.STALE_INVESTIGATIONS)
+    if stale is None:
+        stats["astat-stale"] = _absent(missing)
+    else:
+        cases = _figure(stale.get("result"), "total_stale_cases",
+                        ran=ran(stale))
+        alerts = _figure(stale.get("result"), "total_stale_alerts",
+                         ran=ran(stale))
+        if cases["value"] is None or alerts["value"] is None:
+            stats["astat-stale"] = _absent(
+                "One half of this total is not readable, so the total "
+                "would understate it.")
+        else:
+            stats["astat-stale"] = {
+                "value": str(int(float(cases["value"]))
+                             + int(float(alerts["value"]))),
+                "note": None}
+    return stats
+
+
+def overview_metric(job_type: str,
+                    result: Any) -> tuple[Optional[str], Optional[str]]:
+    """A card's headline figure and the line under it.
+
+    Every branch of the page's switch defaulted with `|| 0`, so a job that
+    recorded no figure reported a confident zero on the panel an analyst
+    reads first.
+    """
+    if not isinstance(result, dict):
+        return None, None
+    if job_type == AnalyticsJobType.ENTITY_RISK_SCORE.value:
+        scored = _int(result.get("total_scored"))
+        entities = result.get("entities")
+        top = entities[0] if isinstance(entities, list) and entities else None
+        if isinstance(top, dict):
+            score = _int(top.get("risk_score"))
+            detail = "Top: %s (%s)" % (
+                _text(top.get("entity")) or "unnamed",
+                score if score is not None else "no score")
+        else:
+            detail = "No entities scored"
+        return (None if scored is None else str(scored)), detail
+    if job_type == AnalyticsJobType.REPEAT_OFFENDERS.value:
+        flagged = _int(result.get("total_flagged"))
+        threshold = _int(result.get("threshold"))
+        return ((None if flagged is None else str(flagged)),
+                "Threshold: %s+ alerts in 30d" % (
+                    threshold if threshold is not None else 3))
+    if job_type == AnalyticsJobType.RULE_NOISE.value:
+        rules = result.get("rules")
+        if not isinstance(rules, list):
+            return None, "The rule list is not in a readable shape"
+        noisy = sum(1 for r in rules if isinstance(r, dict)
+                    and (_num(r.get("fp_ratio")) or 0) > FP_HIGH)
+        total = _int(result.get("total_rules"))
+        return (str(noisy), "%s rules analysed" % (
+            total if total is not None else "An unrecorded number of"))
+    if job_type == AnalyticsJobType.OBSERVABLE_VELOCITY.value:
+        week = _int(result.get("velocity_7d"))
+        change = _num(result.get("velocity_change"))
+        detail = ("Change not recorded" if change is None else
+                  "Change: %s%g vs prev week" % (
+                      "+" if change > 0 else "", change))
+        return (None if week is None else str(week)), detail
+    if job_type == AnalyticsJobType.CASE_METRICS.value:
+        mttr = _num(result.get("mttr_hours"))
+        opened = _int(result.get("open_cases"))
+        closed = _int(result.get("closed_cases"))
+        return ((None if mttr is None else "%gh" % mttr),
+                "%s open / %s closed" % (
+                    opened if opened is not None else "unknown",
+                    closed if closed is not None else "unknown"))
+    if job_type == AnalyticsJobType.STALE_INVESTIGATIONS.value:
+        cases = _int(result.get("total_stale_cases"))
+        alerts = _int(result.get("total_stale_alerts"))
+        if cases is None or alerts is None:
+            return None, "%s cases, %s alerts" % (
+                cases if cases is not None else "an unreadable number of",
+                alerts if alerts is not None else "an unreadable number of")
+        return (str(cases + alerts),
+                "%s cases, %s alerts" % (cases, alerts))
+    return None, None
+
+
+def overview_cards(jobs: dict) -> list[OverviewCard]:
+    cards: list[OverviewCard] = []
+    for job_type, job in jobs.items():
+        if not isinstance(job_type, str):
+            continue
+        entry = job if isinstance(job, dict) else {}
+        status, label = job_status(entry)
+        metric, detail = overview_metric(job_type, entry.get("result"))
+        cards.append({
+            "job_type": job_type,
+            "tab": OVERVIEW_TABS.get(job_type, job_type),
+            "display_name": _text(entry.get("display_name")),
+            "status": status,
+            "status_label": label,
+            "metric": metric,
+            "detail": detail,
+            "last_run": age_label(entry.get("last_run_at")),
+            "duration_ms": _int(entry.get("last_duration_ms")),
+        })
+    return cards
+
+
+def dashboard_view(payload: Any) -> DashboardView:
+    jobs = payload.get("jobs") if isinstance(payload, dict) else None
+    if not isinstance(jobs, dict):
+        return {"state": "failed", "cards": None,
+                "stats": summary_stats({})}
+    return {"state": "data" if jobs else "empty",
+            "cards": overview_cards(jobs),
+            "stats": summary_stats(jobs)}
+
+
+def config_view(payload: Any) -> ConfigView:
+    jobs = payload.get("jobs") if isinstance(payload, dict) else None
+    if not isinstance(jobs, list):
+        return {"state": "failed", "rows": None}
+    rows: list[ConfigRow] = []
+    for job in jobs:
+        if not isinstance(job, dict):
+            continue
+        error = _text(job.get("last_error"))
+        rows.append({
+            "job_type": _text(job.get("job_type")),
+            "display_name": _text(job.get("display_name")),
+            "enabled": job.get("enabled") is True,
+            "schedule_minutes": _int(job.get("schedule_minutes")),
+            "last_run": age_label(job.get("last_run_at")),
+            "next_run": age_label(job.get("next_run_at")),
+            "run_count": _int(job.get("run_count")),
+            "duration_ms": _int(job.get("last_duration_ms")),
+            "status": ("error" if error else
+                       "ok" if job.get("has_results") else "pending"),
+            "last_error": error,
+        })
+    return {"state": "data" if rows else "empty", "rows": rows}
+
+
+@router.get(
+    "/analytics/dashboard",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+def analytics_dashboard_fragment(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> Response:
+    """The summary bar and the overview grid."""
+    from ion.web import analytics_api
+
+    try:
+        payload = analytics_api.get_analytics_dashboard(
+            current_user=current_user, session=session)
+    except Exception:
+        logger.exception("Analytics dashboard fragment could not read")
+        payload = None
+    return render_view(request, DASHBOARD_FRAGMENT,
+                       dashboard_view(payload))
+
+
+@router.get(
+    "/analytics/config",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+def analytics_config_fragment(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> Response:
+    """The job config table."""
+    from ion.web import analytics_api
+
+    try:
+        payload = analytics_api.list_analytics_jobs(
+            current_user=current_user, session=session)
+    except Exception:
+        logger.exception("Analytics config fragment could not read")
+        payload = None
+    return render_view(request, CONFIG_FRAGMENT, config_view(payload))

@@ -1,0 +1,61 @@
+{# The job config table, from ui/analytics.py's config_view.
+
+   `${j.run_count}` and `${j.schedule_minutes}` printed "undefined" for a
+   job whose columns were null, and the second of those went into a number
+   input's value attribute, so the field was unusable until retyped.
+
+   The two status colours were `text-[#ef4444]` and `text-[#22c55e]`
+   written into the row. They are classes in analytics-page.css now, so
+   they take the theme like every other status in ION.
+#}
+{%- if state == 'failed' %}
+<div class="empty-state">The job list could not be read.</div>
+{%- elif state == 'empty' %}
+<div class="empty-state">No jobs configured</div>
+{%- else %}
+<table class="config-table">
+  <thead><tr>
+    <th>Job</th><th>Enabled</th><th>Schedule (min)</th><th>Last Run</th>
+    <th>Next Run</th><th>Runs</th><th>Duration</th><th>Status</th><th></th>
+  </tr></thead>
+  <tbody>
+    {%- for j in rows %}
+    <tr>
+      <td>
+        <strong>{{ j.display_name or j.job_type or 'unnamed' }}</strong>
+        <div class="config-job-type">{{ j.job_type or '' }}</div>
+      </td>
+      <td><button class="config-toggle {{ 'on' if j.enabled else 'off' }}"
+                  data-click-action="toggleJob"
+                  data-args='{{ [j.job_type, not j.enabled]|tojson }}'></button></td>
+      <td><input type="number" class="schedule-input" min="5"
+                 value="{{ j.schedule_minutes if j.schedule_minutes is not none else '' }}"
+                 data-change-action="updateSchedule"
+                 data-args='{{ [j.job_type, "$value"]|tojson }}'></td>
+      <td class="run-time">{{ j.last_run or 'Never' }}</td>
+      <td class="run-time">{{ j.next_run or '-' }}</td>
+      <td>
+        {%- if j.run_count is not none %}{{ j.run_count }}
+        {%- else %}<span class="an-absent"
+            title="This job has no run count recorded"></span>{% endif %}
+      </td>
+      <td class="run-time">
+        {%- if j.duration_ms is not none %}{{ j.duration_ms }}ms
+        {%- else %}-{% endif %}
+      </td>
+      <td>
+        {%- if j.status == 'error' %}
+        <span class="config-status-error" title="{{ j.last_error }}">Error</span>
+        {%- elif j.status == 'ok' %}
+        <span class="config-status-ok">OK</span>
+        {%- else %}
+        <span class="config-status-pending">Pending</span>
+        {%- endif %}
+      </td>
+      <td><button class="btn btn-sm btn-secondary" data-click-action="runJob"
+                  data-args='{{ [j.job_type]|tojson }}'>Run Now</button></td>
+    </tr>
+    {%- endfor %}
+  </tbody>
+</table>
+{%- endif %}
