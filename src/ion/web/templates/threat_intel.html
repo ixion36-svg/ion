@@ -4,7 +4,14 @@
 <link rel="stylesheet" href="/static/css/threat-intel.css?v={{ ion_version }}">
 {% endblock %}
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+{# data-can-manage-watches carries the viewer's observable:enrich to the
+   script, which still builds the actor and campaign result tables. It is a
+   data attribute rather than a Jinja expression inside <script>, because
+   that block currently contains no Jinja at all and keeping it that way
+   means it stays checkable with `node --check`. #}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden"
+     id="ti-root"
+     data-can-manage-watches="{{ 'true' if can_manage_watches else 'false' }}">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 
 <div class="max-w-[1400px] mx-auto">
@@ -38,11 +45,20 @@
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="ioc">IOC Feed</button>
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="reports">Reports</button>
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="watchlist">Watchlist <span id="ti-unread-badge" class="ti-badge hidden">0</span></button>
+        {# Attack Stories reads /api/attack-stories and KEV reads /api/kev.
+           Both require alert:read. This page requires observable:read,
+           which does not imply it, so both tabs used to be offered to
+           everyone who could open the page: Stories answered 403, and KEV
+           rendered the refusal as "Search failed: HTTP 403". Withheld
+           instead, the way security_dashboard withholds Block and
+           Unblock. #}
+        {% if can_read_alerts %}
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="stories">Attack Stories</button>
         {# CISA KEV, shipped as a snapshot inside the image. Lives here
            rather than under Reporting because "is this being exploited right
            now" is a triage question, not a metric. #}
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="kev">KEV Catalog</button>
+        {% endif %}
     </div>
 
     <!-- Overview Panel -->
@@ -174,18 +190,44 @@
     <!-- Watchlist Panel -->
     <div class="ti-panel" id="panel-watchlist">
         <h3 class="text-[.95rem] mt-0 mr-0 mb-4 ml-0">Active Watches</h3>
+        {# Rows arrive from /ui/threat-intel/watchlist. The table and its
+           header stay here, outside the swap target, so no render of the
+           fragment can remove the structure that names the columns.
+
+           ti-show is dispatched by the tab switcher on each [hx-get] inside
+           the panel being activated, so a tab that is never opened costs no
+           request. hx-trigger cannot use an event filter here: the CSP
+           carries no unsafe-eval, and htmx compiles a filter expression
+           with Function(), which throws silently. A plain event name is
+           native and fine. #}
         <table class="ti-table" id="watchlist-table">
             <thead><tr><th>Name</th><th>Origin</th><th>Type</th><th>Matches</th><th>Last Match</th><th>Watched By</th><th>Reason</th><th>Actions</th></tr></thead>
-            <tbody id="watchlist-body"><tr><td colspan="8" class="ti-empty">Loading...</td></tr></tbody>
+            <tbody id="watchlist-body"
+                   hx-get="/ui/threat-intel/watchlist"
+                   hx-trigger="ti-show"
+                   hx-swap="innerHTML">
+              <tr><td colspan="8" class="ti-empty">Loading...</td></tr>
+            </tbody>
         </table>
 
         <h3 class="text-[.95rem] mt-6 mr-0 mb-3 ml-0">
             Match Alerts
             <button class="btn btn-ghost ti-btn-sm ml-2.5" id="match-filter-btn" data-click-action="toggleMatchFilter">Show Unread Only</button>
         </h3>
+        {# The toggle's state lives in this input rather than in a script
+           variable, so the server receives it with the request and the
+           fragment can word its empty state for the filter that was
+           actually applied. hx-include takes it by name. #}
+        <input type="hidden" id="ti-matches-unread" name="unread_only" value="false">
         <table class="ti-table" id="matches-table">
             <thead><tr><th>Time</th><th>Observable</th><th>Matched Entity</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody id="matches-body"><tr><td colspan="5" class="ti-empty">Loading...</td></tr></tbody>
+            <tbody id="matches-body"
+                   hx-get="/ui/threat-intel/matches"
+                   hx-trigger="ti-show"
+                   hx-include="#ti-matches-unread"
+                   hx-swap="innerHTML">
+              <tr><td colspan="5" class="ti-empty">Loading...</td></tr>
+            </tbody>
         </table>
     </div>
 
@@ -252,17 +294,34 @@ data-click-action="tiCloseReport"></div>
     <!-- Attack Stories Panel — ported from /attack-stories. -->
     <div class="ti-panel" id="panel-stories">
         <div class="flex items-center gap-2.5 mb-5">
-            <select id="ti-stories-hours" class="select flex-1 flex-[0_0_auto] w-[auto]" data-change-action="tiLoadStories">
+            {# `name` so hx-include can send it. The window is now a request
+               parameter the server bounds, rather than a value only the
+               script knew. #}
+            <select id="ti-stories-hours" name="hours" class="select flex-1 flex-[0_0_auto] w-[auto]"
+                    hx-get="/ui/threat-intel/stories"
+                    hx-target="#ti-stories-list"
+                    hx-trigger="change"
+                    hx-include="#ti-stories-hours">
                 <option value="4">Last 4h</option>
                 <option value="12">Last 12h</option>
                 <option value="24" selected>Last 24h</option>
                 <option value="72">Last 3 days</option>
                 <option value="168">Last 7 days</option>
             </select>
-            <button class="btn btn-primary" data-click-action="tiLoadStories">Refresh</button>
+            <button class="btn btn-primary"
+                    hx-get="/ui/threat-intel/stories"
+                    hx-target="#ti-stories-list"
+                    hx-include="#ti-stories-hours">Refresh</button>
         </div>
-        <div id="ti-stories-list">
-            <div class="ti-empty">Click Refresh to correlate recent alerts into attack stories.</div>
+        {# The window control and Refresh are outside this target, so a
+           failed correlation cannot remove the control that would retry
+           it. #}
+        <div id="ti-stories-list"
+             hx-get="/ui/threat-intel/stories"
+             hx-trigger="ti-show"
+             hx-include="#ti-stories-hours"
+             hx-swap="innerHTML">
+            <div class="ti-empty">Loading...</div>
         </div>
     </div>
 
@@ -298,6 +357,13 @@ data-click-action="tiCloseReport"></div>
     let watchedIds = new Set();
     let matchUnreadOnly = false;
 
+    // The viewer's observable:enrich, decided on the server and read off
+    // the page root. The script never asks the API whether it may write;
+    // a control whose POST is going to answer 403 is a worse answer than
+    // no control.
+    const canManageWatches =
+        document.getElementById('ti-root').dataset.canManageWatches === 'true';
+
     // ── Tab switching ──────────────────────────
     document.getElementById('ti-tabs').addEventListener('click', function(e) {
         const tab = e.target.closest('.ti-tab');
@@ -308,12 +374,21 @@ data-click-action="tiCloseReport"></div>
         const panel = document.getElementById('panel-' + tab.dataset.panel);
         if (panel) panel.classList.add('active');
 
+        // Server-rendered regions in the panel being shown load themselves.
+        // Dispatching the event the fragments listen for keeps the lazy
+        // behaviour the panels already had: a tab nobody opens costs no
+        // request. Re-dispatching on every visit refreshes the panel, which
+        // the old per-tab _tiXLoaded flags deliberately did not do, so a
+        // watchlist changed in another window stayed stale until reload.
+        if (panel) {
+            panel.querySelectorAll('[hx-get]').forEach(
+                el => el.dispatchEvent(new Event('ti-show')));
+        }
+
         if (tab.dataset.panel === 'overview') loadOverview();
-        if (tab.dataset.panel === 'watchlist') { loadWatches(); loadMatches(); }
         // lazy-load the merged tabs.
         if (tab.dataset.panel === 'ioc' && !window._tiIOCLoaded) { tiLoadIOCFeed(); window._tiIOCLoaded = true; }
         if (tab.dataset.panel === 'reports' && !window._tiReportsLoaded) { tiLoadReports(); window._tiReportsLoaded = true; }
-        if (tab.dataset.panel === 'stories' && !window._tiStoriesLoaded) { tiLoadStories(); window._tiStoriesLoaded = true; }
         if (tab.dataset.panel === 'kev' && !window._tiKevLoaded) { kevSearch(); window._tiKevLoaded = true; }
     });
 
@@ -1008,47 +1083,19 @@ data-click-action="tiCloseReport"></div>
     };
 
     // ── v0.27.0: Attack Stories tab (ported from /attack-stories) ──
-    window.tiLoadStories = async function() {
-        const host = document.getElementById('ti-stories-list');
-        const hours = document.getElementById('ti-stories-hours').value;
-        host.innerHTML = '<div class="ti-loading"><span class="ti-spinner"></span>Correlating alerts into attack stories…</div>';
-        try {
-            const r = await fetch('/api/attack-stories?hours=' + hours);
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            const d = await r.json();
-            const stories = d.stories || [];
-            const chainOrder = d.kill_chain_order || [];
-            if (!stories.length) {
-                host.innerHTML = '<div class="ti-empty">No attack stories — alerts did not correlate into multi-step patterns over the selected window.</div>';
-                return;
-            }
-            host.innerHTML = stories.map(s => {
-                const tacticsSet = new Set(s.tactics_progression || []);
-                const chainHtml = chainOrder.length
-                    ? `<div class="flex gap-0 items-center overflow-x-auto my-2 mx-0">
-                        ${chainOrder.map((stage, i) => {
-                            const active = tacticsSet.has(stage);
-                            return (i > 0 ? '<span class="py-0 px-1 text-[var(--text-muted)] text-[.8rem]">→</span>' : '') +
-                                `<span class="py-[3px] px-2 rounded-[4px] text-[.7rem] font-semibold uppercase whitespace-nowrap${active ? ' active' : ''}">${escapeHtml(stage)}</span>`;
-                        }).join('')}
-                       </div>`
-                    : '';
-                return `<div class="bg-[var(--bg-secondary)] border border-[var(--ion-border)] rounded-[var(--ion-radius-lg)] py-3.5 px-4 mb-3">
-                    <div class="flex items-center gap-3 mb-2">
-                        <div class="w-[42px] h-[42px] rounded-[50%] flex items-center justify-center font-bold font-mono text-[.85rem] bg-[rgba(220,38,38,0.15)] text-[#fecaca] border-[2px] border-[rgba(220,38,38,0.4)] shrink-0">${s.score}</div>
-                        <div class="flex-1">
-                            <div class="text-[.95rem] font-bold text-[var(--text-primary)]">${escapeHtml(s.entity)} <small class="text-[.72rem] text-[var(--text-secondary)] font-normal">(${escapeHtml(s.entity_type)})</small></div>
-                            <div class="text-xs text-[var(--text-secondary)] mt-0.5">${s.alert_count} alerts · ${(s.unique_techniques||[]).length} techniques · ${s.time_span_hours}h span · <span class="sev-badge sev-${escapeHtml(s.severity)}">${escapeHtml(s.severity)}</span></div>
-                        </div>
-                    </div>
-                    <div class="py-2.5 px-3 bg-[var(--bg-primary)] border border-[var(--ion-border)] rounded-[var(--radius)] text-[.82rem] leading-[1.55] text-[var(--text-primary)]">${escapeHtml(s.narrative)}</div>
-                    ${chainHtml}
-                </div>`;
-            }).join('');
-        } catch(e) {
-            host.innerHTML = '<div class="ti-empty text-[var(--danger)]">Failed: ' + escapeHtml(String(e)) + '</div>';
-        }
-    };
+    // tiLoadStories is gone. /ui/threat-intel/stories renders the panel,
+    // gated on alert:read, which is what /api/attack-stories requires and
+    // what this page's own observable:read does not imply.
+    //
+    // The defect it carried: that endpoint answers 200 with
+    // {"enabled": false, "error": ...} when the correlation read fails,
+    // because the disabled state is a payload and not a status. The
+    // `if (!r.ok) throw` never fired, `d.stories || []` found nothing, and
+    // the panel rendered "No attack stories: alerts did not correlate into
+    // multi-step patterns over the selected window." Measured live on this
+    // deployment, where it returns {"enabled":false,"error":
+    // "ElasticsearchError"}. A switched-off correlation engine was being
+    // reported to the analyst as a clean result.
 
     function renderMatchRows(tbodyId, matches, showType) {
         const tbody = document.getElementById(tbodyId);
@@ -1075,9 +1122,21 @@ data-click-action="tiCloseReport"></div>
     }
 
     window.markRead = async function(id) {
-        await fetch(API + '/matches/' + id + '/read', { method: 'POST' });
+        // r.ok, because POST .../read answers 404 for a match that is gone.
+        // The old code awaited the response, ignored it, and refreshed as
+        // though the write had landed, so a failed mark-read looked exactly
+        // like a successful one.
+        const r = await fetch(API + '/matches/' + id + '/read', { method: 'POST' });
+        if (!r.ok) {
+            if (typeof showToast === 'function') {
+                showToast('Could not mark as read: HTTP ' + r.status, 'error');
+            }
+            return;
+        }
         loadOverview();
-        loadMatches();
+        // Both match tables: the one on the Watchlist tab is server-rendered
+        // now, and the overview copy is still built by renderMatchRows.
+        tiRefresh('#matches-body');
     };
 
     // ── Actors ────────────────────────────────
@@ -1107,7 +1166,13 @@ data-click-action="tiCloseReport"></div>
                 const flag = a.country_flag || '';
                 const countryName = a.country_name || '';
                 const isWatched = watchedIds.has(a.id);
-                const watchBtn = isWatched
+                // Withheld without observable:enrich, which is what POST
+                // /api/threat-intel/watches requires. The page is gated on
+                // observable:read and never checked, so a read-only analyst
+                // was offered a Watch button that answers 403 on click.
+                const watchBtn = !canManageWatches
+                    ? ''
+                    : isWatched
                     ? `<button class="ti-btn-outline ti-btn-sm ti-btn-watched" disabled>Watched</button>`
                     : `<button class="ti-btn ti-btn-sm ti-btn-watch" data-click-action="watchActor" data-args='[${idx}]'>Watch</button>`;
                 // open the deep-dive profile page for this actor.
@@ -1233,7 +1298,11 @@ data-click-action="tiCloseReport"></div>
                 const conf = c.confidence != null ? c.confidence : '-';
                 const confCls = conf >= 70 ? 'high' : conf >= 40 ? 'medium' : 'low';
                 const isWatched = watchedIds.has(c.id);
-                const watchBtn = isWatched
+                // Same gate as the actor table: POST /watches needs
+                // observable:enrich.
+                const watchBtn = !canManageWatches
+                    ? ''
+                    : isWatched
                     ? `<button class="ti-btn-outline ti-btn-sm ti-btn-watched" disabled>Watched</button>`
                     : `<button class="ti-btn ti-btn-sm ti-btn-watch" data-click-action="watchCampaign" data-args='[${idx}]'>Watch</button>`;
                 html += `<tr>
@@ -1322,70 +1391,40 @@ data-click-action="tiCloseReport"></div>
     };
 
     // ── Watchlist ─────────────────────────────
-    async function loadWatches() {
-        try {
-            const data = await fetch(API + '/watches?limit=200').then(r => r.json());
-            const watches = data.watches || [];
-            const tbody = document.getElementById('watchlist-body');
-            if (!watches.length) {
-                tbody.innerHTML = '<tr><td colspan="8" class="ti-empty">No active watches. Search for actors or campaigns and add them.</td></tr>';
-                return;
-            }
-            tbody.innerHTML = watches.map(w => {
-                const type = (w.entity_type || '').replace('_', ' ');
-                const lastSeen = w.last_seen_at ? new Date(w.last_seen_at).toLocaleString() : 'Never';
-                const flag = w.country_flag || '';
-                const countryName = w.country_name || '';
-                return `<tr>
-                    <td class="font-semibold">${esc(w.name)}</td>
-                    <td>${flag ? `<span class="country-flag" title="${esc(countryName)}">${flag}</span> ${esc(countryName)}` : '<span class="text-[var(--text-muted)]">-</span>'}</td>
-                    <td>${esc(type)}</td>
-                    <td>${w.match_count}</td>
-                    <td>${esc(lastSeen)}</td>
-                    <td>${esc(w.watched_by)}</td>
-                    <td>${esc(w.watch_reason || '-')}</td>
-                    <td><button class="ti-btn-outline ti-btn-sm ti-btn-danger" data-click-action="removeWatch" data-args='[${w.id}, "${esc(w.name)}"]'>Remove</button></td>
-                </tr>`;
-            }).join('');
-        } catch(e) {
-            document.getElementById('watchlist-body').innerHTML = '<tr><td colspan="8" class="ti-empty">Failed to load watches.</td></tr>';
-        }
-    }
+    // loadWatches and loadMatches are gone. Both tables are rendered by
+    // /ui/threat-intel/watchlist and /ui/threat-intel/matches, which reach
+    // the same ThreatIntelService the JSON endpoints use.
+    //
+    // Both read with `fetch(url).then(r => r.json())` and no r.ok check,
+    // then `data.watches || []`. A refusal or a fault answers
+    // {"detail": ...}, which carries neither key, so each fell through to
+    // its empty state: a failed watchlist read said "No active watches" and
+    // a failed match read said "No match alerts". The second is the
+    // sentence an analyst reads before deciding nothing on their watchlist
+    // has fired.
 
-    async function loadMatches() {
-        try {
-            const url = API + '/matches?limit=50' + (matchUnreadOnly ? '&unread_only=true' : '');
-            const data = await fetch(url).then(r => r.json());
-            const tbody = document.getElementById('matches-body');
-            const matches = data.matches || [];
-            if (!matches.length) {
-                tbody.innerHTML = '<tr><td colspan="5" class="ti-empty">No match alerts.</td></tr>';
-                return;
-            }
-            tbody.innerHTML = matches.map(m => {
-                const d = m.details || {};
-                const cls = m.is_read ? '' : ' class="ti-unread"';
-                const time = m.created_at ? new Date(m.created_at).toLocaleString() : '-';
-                const readBtn = m.is_read ? '<span class="text-[var(--text-secondary)] text-xs">Read</span>' :
-                    `<button class="ti-btn-outline ti-btn-sm" data-click-action="markRead" data-args='[${m.id}]'>Mark Read</button>`;
-                return `<tr${cls}>
-                    <td>${esc(time)}</td>
-                    <td><code>${esc(m.observable_value || '-')}</code></td>
-                    <td>${esc(d.watch_name || '-')}</td>
-                    <td>${m.is_read ? 'Read' : '<strong class="text-[var(--accent)]">Unread</strong>'}</td>
-                    <td>${readBtn}</td>
-                </tr>`;
-            }).join('');
-        } catch(e) {
-            document.getElementById('matches-body').innerHTML = '<tr><td colspan="5" class="ti-empty">Failed to load matches.</td></tr>';
-        }
+    // Re-render whichever fragments are on screen. Used after a write, so
+    // the table reflects it without a second notion of how a row looks.
+    function tiRefresh(selector) {
+        const el = document.querySelector(selector);
+        if (el) el.dispatchEvent(new Event('ti-show'));
     }
 
     window.removeWatch = async function(id, name) {
         if (!confirm('Remove watch for "' + name + '"?')) return;
         try {
-            await fetch(API + '/watches/' + id, { method: 'DELETE' });
-            loadWatches();
+            // r.ok, because DELETE answers 403 without observable:enrich and
+            // 404 for a watch already gone. Neither threw, so the old code
+            // reported success and refreshed a table that had not changed.
+            const r = await fetch(API + '/watches/' + id, { method: 'DELETE' });
+            if (!r.ok) {
+                const what = r.status === 403
+                    ? 'You do not have permission to remove a watch'
+                    : 'Failed to remove: HTTP ' + r.status;
+                if (typeof showToast === 'function') showToast(what, 'error');
+                return;
+            }
+            tiRefresh('#watchlist-body');
             if (typeof showToast === 'function') showToast('Removed: ' + name, 'success');
         } catch(e) {
             if (typeof showToast === 'function') showToast('Failed to remove', 'error');
@@ -1395,13 +1434,28 @@ data-click-action="tiCloseReport"></div>
     window.toggleMatchFilter = function() {
         matchUnreadOnly = !matchUnreadOnly;
         document.getElementById('match-filter-btn').textContent = matchUnreadOnly ? 'Show All' : 'Show Unread Only';
-        loadMatches();
+        // The state lives in the hidden input so it travels with the
+        // request and the fragment can word its empty state for the filter
+        // that was applied.
+        document.getElementById('ti-matches-unread').value = matchUnreadOnly ? 'true' : 'false';
+        tiRefresh('#matches-body');
     };
 
     // ── Helpers ───────────────────────────────
     async function refreshWatchedIds() {
         try {
-            const data = await fetch(API + '/watches?limit=1000').then(r => r.json());
+            // 500, not 1000. GET /watches bounds limit at le=500, so the old
+            // request answered 422 on every call. The body was still JSON so
+            // nothing threw, data.watches was undefined, and watchedIds was
+            // permanently empty: the watched state on every actor and
+            // campaign result was always wrong. Measured live.
+            //
+            // 500 is the endpoint's own maximum, which is the honest way to
+            // ask for all of them. If an estate ever holds more watches than
+            // that, the fix is paging rather than a bigger number.
+            const r = await fetch(API + '/watches?limit=500');
+            if (!r.ok) return;
+            const data = await r.json();
             watchedIds = new Set((data.watches || []).map(w => w.opencti_id));
         } catch(e) { /* ignore */ }
     }

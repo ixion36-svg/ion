@@ -117,3 +117,21 @@
 .ti-report-body { margin: 0; font-size: .82rem; line-height: 1.6; color: var(--text-primary); white-space: pre-wrap; max-height: 320px; overflow-y: auto; }
 .ti-ttp[data-click-action] { cursor: pointer; }
 .ti-ttp[data-click-action]:hover { opacity: .8; }
+
+/* Attack-story kill-chain ribbon.
+   The stage pills carried a bare `active` class and no rule for a bare
+   .active exists in this file or in ion.css, so a kill-chain stage the
+   attacker reached looked exactly like one they never got to. Namespaced
+   here and given the cyan treatment .ti-tab.active already uses, which
+   is this page's existing vocabulary for an active state. */
+.ti-chain-stage {
+    padding: 3px 8px; border-radius: 4px; font-size: .7rem;
+    font-weight: 600; text-transform: uppercase; white-space: nowrap;
+    background: var(--bg-primary); color: var(--text-muted);
+    border: 1px solid var(--ion-border);
+}
+.ti-chain-stage.active {
+    background: var(--ion-cyan, #6de4ff); color: #0a0c12;
+    border-color: var(--ion-cyan, #6de4ff);
+    box-shadow: 0 0 14px -5px rgba(109,228,255,0.9);
+}

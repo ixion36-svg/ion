@@ -1,0 +1,77 @@
+{# Threat Intel: the Match Alerts rows.
+
+   Replaces three innerHTML sites in threat_intel.html (the empty state,
+   the row build, and the catch) plus the `esc()` they needed. Rows only;
+   the table and its header stay in the page shell, outside this target.
+
+   The defect this fragment exists for: `loadMatches` read with
+   `fetch(url).then(r => r.json())` and no `r.ok` check, then
+   `data.matches || []`. A refusal or a fault answers `{"detail": ...}`,
+   which has no `matches` key, so the page fell through to its empty state
+   and rendered "No match alerts." That is the sentence an analyst reads
+   before concluding that nothing on their watchlist has fired, and a
+   failed read is the opposite of that finding.
+
+   Mark Read is offered to every reader on purpose. POST
+   /api/threat-intel/matches/{id}/read requires observable:read, the same
+   permission this fragment is gated on, so there is no state where a
+   reader sees the row and cannot clear it. That is unlike the watchlist's
+   Remove, which needs observable:enrich and is withheld. Both decisions
+   are read off the route table rather than guessed from the verb. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% if failed %}
+  <tr>
+    <td colspan="5" class="ti-empty text-[var(--danger)]" role="alert">
+      Match alerts could not be read{% if unread_only %} with the unread
+      filter applied{% endif %}. This is not a quiet watchlist: any matches
+      against watched actors and campaigns are still recorded and will
+      appear once this read succeeds. Use Refresh to try again.
+    </td>
+  </tr>
+{% elif not matches %}
+  <tr>
+    <td colspan="5" class="ti-empty">
+      {# Two empty states, not one. The JavaScript said "No match alerts."
+         whichever way the toggle was set, so an analyst who had filtered to
+         unread and cleared everything read the same sentence as one whose
+         watchlist had never matched at all. #}
+      {% if unread_only %}
+        No unread match alerts. Clear the filter to see matches already read.
+      {% else %}
+        No match alerts.
+      {% endif %}
+    </td>
+  </tr>
+{% else %}
+  {% for m in matches %}
+    <tr{% if not m.is_read %} class="ti-unread"{% endif %}>
+      <td>{{ ts(m.created_at) }}</td>
+      <td><code>{% if m.observable_value %}{{ m.observable_value }}{% else %}-{% endif %}</code></td>
+      {# `details` is a JSON column, so it can be absent, null, or a shape
+         with no watch_name. The JavaScript's `m.details || {}` then
+         `d.watch_name || '-'` handled all three as a dash, which is right:
+         a match whose watch name was not recorded cannot name the entity.
+         Spelled out here because `m.details.watch_name` on a null details
+         raises in Jinja's default undefined rather than rendering. #}
+      <td>{{ (m.details or {}).get('watch_name') or '-' }}</td>
+      <td>
+        {%- if m.is_read -%}
+          Read
+        {%- else -%}
+          <strong class="text-[var(--accent)]">Unread</strong>
+        {%- endif -%}
+      </td>
+      <td>
+        {%- if m.is_read -%}
+          <span class="text-[var(--text-secondary)] text-xs">Read</span>
+        {%- else -%}
+          <button class="ti-btn-outline ti-btn-sm"
+                  data-click-action="markRead"
+                  data-args='[{{ m.id }}]'>Mark Read</button>
+        {%- endif -%}
+      </td>
+    </tr>
+  {% endfor %}
+{% endif %}

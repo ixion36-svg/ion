@@ -1284,7 +1284,9 @@ _PAGES: list[tuple[str, str, str]] = [
     ("/audit-logs",             "audit_logs.html",                 "system:audit_view"),
     ("/security",               "security_dashboard.html",         "security:read"),
     ("/observables",            "observables.html",                "observable:read"),
-    ("/threat-intel",           "threat_intel.html",               "observable:read"),
+    # /threat-intel is a dedicated handler below: it has to pass the
+    # viewer's alert:read and observable:enrich into the template, and this
+    # table passes no context.
     ("/tools",                  "tools.html",                      "alert:read"),
     ("/discover",               "discover.html",                   "alert:read"),
     ("/analyst",                "analyst.html",                    "alert:read"),
@@ -1616,6 +1618,46 @@ async def case_page(
 
 
 
+
+
+@app.get("/threat-intel", response_class=HTMLResponse)
+async def threat_intel_page(
+    request: Request,
+    user: User = Depends(require_page_permission("observable:read")),
+):
+    """The unified threat intel page: eight tabs over OpenCTI, KEV and alerts.
+
+    Lifted out of the _PAGES table because it needs context. That table
+    renders a template behind a page guard and passes nothing, and two of
+    this page's tabs and three of its controls depend on permissions this
+    page's own guard does not imply.
+
+    `can_read_alerts`: the Stories and KEV tabs read /api/attack-stories
+    and /api/kev, which require `alert:read`. This page requires
+    `observable:read`, which does not imply it, so both tabs were offered
+    to everyone who could open the page and KEV rendered the refusal as
+    "Search failed: HTTP 403". The tabs are withheld instead.
+
+    `can_manage_watches`: adding and removing a watch requires
+    `observable:enrich`. The page offered Remove on every watchlist row and
+    Add on every actor and campaign result without checking, so a
+    read-only analyst reached a 403 only after confirming a dialog. Same
+    reasoning as security_dashboard's Block and Unblock.
+
+    Both come from the permissions the routes actually declare rather than
+    from the endpoint names, and both are passed as facts about the viewer
+    rather than re-derived in the template.
+    """
+    return templates.TemplateResponse(
+        request=request,
+        name="threat_intel.html",
+        context={
+            "can_read_alerts": bool(user and user.has_permission("alert:read")),
+            "can_manage_watches": bool(
+                user and user.has_permission("observable:enrich")
+            ),
+        },
+    )
 
 
 @app.get("/threat-intel/actors/{entity_id}", response_class=HTMLResponse)
