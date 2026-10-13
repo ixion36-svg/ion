@@ -32,6 +32,26 @@ reference markdown and cloned client templates preserve CSP protections. Failed
 reads remain distinct from empty collections and measured zero. No new credential,
 permission grant, external sink or dependency is added.
 
+### Unreleased settings and integrations UI conversion, 2026-10-13
+
+Settings fragments retain `system:settings` and the stronger administrator or
+`integration:manage` dependencies on diagnostic and wizard reads. Integrations
+fragments require the page's `alert:read`; mutation controls require
+`integration:manage`. GitLab topology data additionally requires `template:read`
+before its source is queried. No bare-auth fragment exception is added.
+
+No secret value reaches fragment markup or negotiated JSON view models. Secret
+fields expose only set, unset or unknown status. Explicit field allowlists omit
+credentials and webhook payloads/headers; endpoint addresses omit userinfo and
+query strings, and truncated addresses are withheld. Diagnostic text removes
+configured secrets and labelled credentials. Sensitive redacted address fields
+remain locked so saving another section cannot overwrite a credential-bearing
+address with the display value. Environment precedence badges and explanations
+remain intact, with no change to the `.env`/config.json boundary. Existing write
+APIs remain responsible for authorization and validation. Browser-owned geometry
+and carousel state use DOM nodes and inert templates under the existing CSP.
+No credential store, permission grant, external sink or dependency is added.
+
 ### Unreleased detection engineering UI conversion, 2026-10-13
 
 Fourteen authenticated fragment routes are added for detection posture, spaces,
