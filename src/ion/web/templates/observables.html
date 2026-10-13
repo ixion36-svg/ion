@@ -717,33 +717,18 @@ function closeGraphModal() {
 }
 
 async function loadGraph(centerId = null) {
-    const container = document.getElementById('graph-container');
-    container.innerHTML = '<div class="loading flex items-center justify-center h-full">Loading graph...</div>';
-
-    try {
-        const minCooccur = document.getElementById('graph-min-cooccur').value;
-        const maxNodes = document.getElementById('graph-max-nodes').value;
-
-        const params = new URLSearchParams({
-            min_co_occurrence: minCooccur,
-            limit: maxNodes,
-        });
-        if (centerId) params.set('observable_id', centerId);
-
-        const response = await fetch(`/api/observables/graph?${params}`);
-        if (!response.ok) throw new Error('Failed to load graph');
-
-        graphData = await response.json();
-
-        if (graphData.nodes.length === 0) {
-            container.innerHTML = '<div class="empty-state flex items-center justify-center h-full">No relationships found. Try lowering minimum co-occurrence or add more observables.</div>';
-            return;
-        }
-
-        renderGraph(container, graphData);
-    } catch (error) {
-        console.error('Error loading graph:', error);
-        container.innerHTML = '<div class="error flex items-center justify-center h-full">Error loading graph data.</div>';
+    if (graphNetwork) { graphNetwork.destroy(); graphNetwork = null; }
+    const params = new URLSearchParams({
+        min_co_occurrence: document.getElementById('graph-min-cooccur').value,
+        limit: document.getElementById('graph-max-nodes').value,
+    });
+    if (centerId !== null) params.set('observable_id', centerId);
+    const loaded = await ionLoadFragment('/ui/observables/graph?' + params, 'graph-container', 'Loading graph...');
+    if (!loaded) return;
+    const dataElement = document.querySelector('#graph-container [data-graph]');
+    if (dataElement) {
+        graphData = JSON.parse(dataElement.dataset.graph);
+        renderGraph(document.getElementById('graph-container'), graphData);
     }
 }
 
@@ -886,72 +871,16 @@ function closePatternsModal() {
 }
 
 async function loadPatterns() {
-    const container = document.getElementById('patterns-list');
-    container.innerHTML = '<div class="loading">Analyzing patterns...</div>';
-
-    try {
-        const minOccur = document.getElementById('pattern-min-occur').value;
-        const params = new URLSearchParams({ min_occurrences: minOccur });
-
-        const response = await fetch(`/api/observables/patterns?${params}`);
-        if (!response.ok) throw new Error('Failed to load patterns');
-
-        const data = await response.json();
-        renderPatterns(data.patterns);
-    } catch (error) {
-        console.error('Error loading patterns:', error);
-        container.innerHTML = '<div class="error">Error analyzing patterns.</div>';
-    }
+    const params = new URLSearchParams({min_occurrences: document.getElementById('pattern-min-occur').value});
+    return ionLoadFragment('/ui/observables/patterns?' + params, 'patterns-list', 'Analyzing patterns...');
 }
 
-function renderPatterns(patterns) {
-    const container = document.getElementById('patterns-list');
 
-    if (patterns.length === 0) {
-        container.innerHTML = '<div class="empty-state">No patterns detected. Try lowering minimum occurrences or add more observables.</div>';
-        return;
-    }
 
-    container.innerHTML = patterns.map((p, idx) => `
-        <div class="pattern-card">
-            <div class="pattern-header">
-                <div>
-                    <span class="pattern-count">${p.occurrence_count}</span>
-                    <span class="pattern-count-label">occurrences</span>
-                </div>
-                <div class="pattern-meta">
-                    First: ${p.first_seen ? timeAgo(p.first_seen) : 'N/A'} |
-                    Last: ${p.last_seen ? timeAgo(p.last_seen) : 'N/A'}
-                </div>
-            </div>
-            <div class="pattern-observables">
-                ${p.observables.map(o => `
-                    <span class="pattern-observable" data-click-action="showObsAndClosePatterns" data-args='[${o.id}]'>
-                        <span class="obs-type-badge ${o.type}">${o.type}</span>
-                        <span>${escapeHtml(o.value.substring(0, 40))}${o.value.length > 40 ? '...' : ''}</span>
-                        <span class="threat-badge ${o.threat_level} text-[0.5625rem]">${o.threat_level}</span>
-                    </span>
-                `).join('')}
-            </div>
-            <div class="pattern-actions">
-                <button class="btn btn-sm" data-click-action="viewPatternInGraph" data-args='[${idx}]'>View in Graph</button>
-            </div>
-        </div>
-    `).join('');
-
-    // Store patterns for graph view
-    window.detectedPatterns = patterns;
-}
-
-function viewPatternInGraph(patternIdx) {
-    if (!window.detectedPatterns || !window.detectedPatterns[patternIdx]) return;
-    const pattern = window.detectedPatterns[patternIdx];
-    if (pattern.observables.length > 0) {
-        closePatternsModal();
-        showGraphView();
-        // Load graph centered on first observable in pattern
-        setTimeout(() => loadGraph(pattern.observables[0].id), 500);
-    }
+function viewPatternInGraph(observableId) {
+    closePatternsModal();
+    document.getElementById('graph-modal').style.display = 'flex';
+    loadGraph(observableId);
 }
 
 // Utility

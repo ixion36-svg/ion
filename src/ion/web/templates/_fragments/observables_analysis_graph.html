@@ -1,0 +1,3 @@
+{% if state == 'failed' %}<div class="error flex items-center justify-center h-full">Failed to load graph data.</div>
+{% elif state == 'empty' %}<div class="empty-state flex items-center justify-center h-full">No relationships found. Try lowering minimum co-occurrence or add more observables.</div>
+{% else %}<div data-graph='{{ graph|tojson }}' class="h-full"></div>{% endif %}
