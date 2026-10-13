@@ -1041,41 +1041,26 @@ function docJumpTo(sectionId) {
 }
 window.docJumpTo = docJumpTo;
 
-async function loadVersions() {
+// GET /ui/documents/{id}/versions renders the history table. The loading
+// line is htmx's own: the container keeps its content until the swap, so
+// there is nothing to write first.
+//
+// What moved to the server: Revert appears only where the endpoint allows
+// it, which is document:update, so a reader no longer gets a 403 per
+// click; data-args goes through tojson; an amendment with no stated
+// reason reads differently from a field we could not read, where both
+// printed a dash; the date is formatted from the naive UTC column rather
+// than read in the viewer's zone; and `Current` is decided by the
+// document row rather than by currentDocVersion, a page variable set when
+// the modal opened that a stale value would have put on the wrong row.
+function loadVersions() {
     const container = document.getElementById('versions-list');
-    container.innerHTML = '<p class="loading">Loading versions...</p>';
-
-    try {
-        const versions = await api.get('/api/documents/' + currentDocId + '/versions');
-
-        if (versions.length === 0) {
-            container.innerHTML = '<p class="empty-state">No version history available</p>';
-            return;
-        }
-
-        let html = '<table class="table versions-table">';
-        html += '<thead><tr><th>Version</th><th>Reason</th><th>By</th><th>Date</th><th>Actions</th></tr></thead>';
-        html += '<tbody>';
-        versions.forEach(function(v) {
-            const isCurrent = v.version_number === currentDocVersion;
-            html += '<tr' + (isCurrent ? ' class="current-version"' : '') + '>';
-            html += '<td>v' + v.version_number + (isCurrent ? ' <span class="badge badge-current">Current</span>' : '') + '</td>';
-            html += '<td>' + escapeHtml(v.amendment_reason || '-') + '</td>';
-            html += '<td>' + escapeHtml(v.amended_by || '-') + '</td>';
-            html += '<td>' + formatDate(v.created_at) + '</td>';
-            html += '<td>';
-            html += `<button class="btn btn-sm" data-click-action="previewVersion" data-args='[${v.version_number}]'>View</button>`;
-            if (!isCurrent) {
-                html += ` <button class="btn btn-sm btn-warning" data-click-action="confirmRevert" data-args='[${v.version_number}]'>Revert</button>`;
-            }
-            html += '</td>';
-            html += '</tr>';
-        });
-        html += '</tbody></table>';
-        container.innerHTML = html;
-    } catch (e) {
-        container.innerHTML = '<p class="error">Failed to load versions</p>';
+    if (!container || currentDocId === null || currentDocId === undefined) {
+        return Promise.resolve();
     }
+    return htmx.ajax('GET', '/ui/documents/' + encodeURIComponent(currentDocId) + '/versions', {
+        source: container, target: container, swap: 'innerHTML',
+    });
 }
 
 async function previewVersion(versionNumber) {

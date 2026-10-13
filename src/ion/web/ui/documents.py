@@ -394,3 +394,130 @@ def documents_list_fragment(
         documents, current_user, search=search, fmt=format, status=status,
         tag=tag, folder=folder or None, collections=collections,
         may_read_folders=may_read_folders))
+
+
+# ---------------------------------------------------------------------------
+# Version history
+# ---------------------------------------------------------------------------
+#
+# GET /api/documents/{id}/versions (document:read) lists the amendments.
+# loadVersions wrote four times: loading, empty, the table, and the catch,
+# so a failed read and an empty history were already distinct. The rest
+# was defects:
+#
+#   * Revert was offered on every version that was not current. POST
+#     /api/documents/{id}/revert/{n} requires document:update, which
+#     document:read does not imply, so a reader got a button that answered
+#     403. The same shape as the Delete control on the library list.
+#   * `data-args='[${v.version_number}]'` by interpolation.
+#   * `v.amendment_reason || '-'` printed one dash for an amendment nobody
+#     explained and the same dash for a field the payload did not carry.
+#   * formatDate again, so the dates were the viewer's local reading of a
+#     naive UTC column.
+#   * `isCurrent` compared against `currentDocVersion`, a page variable set
+#     when the modal opened, where the document row holds the fact.
+
+VERSIONS_FRAGMENT = "_fragments/documents_versions.html"
+
+#: What POST /api/documents/{id}/revert/{n} requires. Not PERMISSION: the
+#: history is readable by anyone who can read the document, and reverting
+#: it is not.
+REVERT = "document:update"
+
+
+class VersionRow(TypedDict):
+    """One amendment.
+
+    `number` is whatever the payload carried, so the argument the dispatcher
+    parses is honest about a version number that is not a number. `reason`
+    and `author` are None when nothing was recorded, which the template
+    words rather than printing a dash that meant two things.
+    """
+
+    number: Any
+    reason: Optional[str]
+    author: Optional[str]
+    when: Optional[str]
+    is_current: bool
+    may_revert: bool
+
+
+class VersionsView(TypedDict):
+    """`rows` is None when the document or its history could not be read."""
+
+    rows: Optional[list[VersionRow]]
+
+
+def version_row(version: Any, *, current: Optional[int],
+                may_revert: bool) -> Optional[VersionRow]:
+    """One row, or None for an entry with no version number at all."""
+    number = getattr(version, "version_number", None)
+    if number is None:
+        return None
+    reason = plain(getattr(version, "amendment_reason", None))
+    author = plain(getattr(version, "amended_by", None))
+    is_current = current is not None and number == current
+    return {
+        "number": number,
+        "reason": str(reason) if reason else None,
+        "author": str(author) if author else None,
+        "when": instant_label(getattr(version, "created_at", None)),
+        "is_current": is_current,
+        # Reverting to the version you are already on is not an action.
+        "may_revert": may_revert and not is_current,
+    }
+
+
+def versions_view(versions: Any, *, current: Any,
+                  may_revert: bool) -> VersionsView:
+    """The repository's answer as the history's model."""
+    if not isinstance(versions, list):
+        return {"rows": None}
+    rows = [r for r in (version_row(v, current=_number(current),
+                                    may_revert=may_revert)
+                        for v in versions) if r is not None]
+    if versions and not rows:
+        return {"rows": None}
+    return {"rows": rows}
+
+
+@router.get(
+    "/documents/{document_id}/versions",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+def documents_versions_fragment(
+    request: Request,
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> Response:
+    """The version history table.
+
+    Reads through the same repository the endpoint uses, which also gives
+    the document's current version: the page compared against a variable it
+    had set when the modal opened, and a stale one would have marked the
+    wrong row as current.
+    """
+    from ion.storage.document_repository import DocumentRepository
+
+    current: Any = None
+    try:
+        repo = DocumentRepository(session)
+        document = repo.get_by_id(document_id)
+        if document is None:
+            # The endpoint raises 404 here, and a document we cannot read is
+            # not a document with no history.
+            versions: Any = None
+        else:
+            current = getattr(document, "current_version", None)
+            versions = repo.list_versions(document_id)
+    except Exception:
+        logger.exception(
+            "Documents fragment could not read versions for %s", document_id)
+        versions = None
+
+    may_revert = bool(
+        current_user and current_user.has_permission(REVERT))
+    return render_view(request, VERSIONS_FRAGMENT, versions_view(
+        versions, current=current, may_revert=may_revert))
