@@ -1054,6 +1054,17 @@ function dscRenderProvenance(fields) {
         .join('\n');
 }
 
+// An <option> is not markup a stylesheet sweep has to reach, so the three
+// writes in dscLoadCaseOptions needed the DOM call that does the same job
+// without parsing a string, not a fragment and a round trip.
+function dscOnlyOption(select, label) {
+    if (!select) return;
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = label;
+    select.replaceChildren(opt);
+}
+
 async function dscLoadCaseOptions() {
     const select = document.getElementById('pin-query-case');
     if (!select) return;
@@ -1061,17 +1072,30 @@ async function dscLoadCaseOptions() {
         const r = await fetch('/api/elasticsearch/alerts/cases?status=OPEN&limit=500&sort=case_number&order=desc');
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const data = await r.json();
-        const cases = data.cases || data || [];
-        if (!cases.length) {
-            select.innerHTML = '<option value="">No open cases</option>';
+        // `data.cases || data || []` sent a payload that was neither shape
+        // to `.length` of undefined, which is falsey, so a body we could
+        // not read said "No open cases": we looked and there are none.
+        const cases = Array.isArray(data) ? data
+            : (data && Array.isArray(data.cases) ? data.cases : null);
+        if (cases === null) {
+            dscOnlyOption(select, 'Could not read the case list');
             return;
         }
-        select.innerHTML = '<option value="">Select a case...</option>' +
-            cases.map(c => '<option value="' + escapeHtml(String(c.id)) + '">' +
-                escapeHtml((c.case_number ? c.case_number + ' — ' : '') + (c.title || ('Case ' + c.id))) +
-                '</option>').join('');
+        if (!cases.length) {
+            dscOnlyOption(select, 'No open cases');
+            return;
+        }
+        dscOnlyOption(select, 'Select a case...');
+        cases.forEach(c => {
+            if (!c || c.id === undefined || c.id === null) return;
+            const opt = document.createElement('option');
+            opt.value = String(c.id);
+            const prefix = c.case_number ? c.case_number + ' — ' : '';
+            opt.textContent = prefix + (c.title || ('Case ' + c.id));
+            select.appendChild(opt);
+        });
     } catch (e) {
-        select.innerHTML = '<option value="">Could not load cases</option>';
+        dscOnlyOption(select, 'Could not load cases');
     }
 }
 
