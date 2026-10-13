@@ -569,7 +569,13 @@
     <div id="rm-content"><div class="rm-loading">Loading...</div></div>
 </div>
 
+{% include '_fragments/training_client.html' %}
 <script nonce="{{ csp_nonce }}">
+function cloneTemplate(id) {
+    const template = document.getElementById(id);
+    if (!template || !template.content.firstElementChild) return null;
+    return template.content.firstElementChild.cloneNode(true);
+}
 // small delegated-action helpers for patterns the generic
 // event-delegation.js can't express directly. Exposed as window.* so
 // the dispatcher finds them by name.
@@ -2799,293 +2805,174 @@ function getPathwayCumulative(steps) {
     return { allSkills, allCerts, totalCost };
 }
 
+function trainingElement(tag, classes = '', text = null, action = null, args = []) {
+    const element = cloneTemplate('training-el-' + tag);
+    element.className = classes;
+    if (text != null) element.textContent = String(text);
+    if (action) {
+        element.dataset.clickAction = action;
+        element.dataset.args = JSON.stringify(args);
+    }
+    return element;
+}
+
+function trainingSection(root, heading) {
+    const section = cloneTemplate('training-section-template');
+    section.querySelector('h3').textContent = heading;
+    root.querySelector('[data-detail-sections]').append(section);
+    return section.querySelector('[data-section-body]');
+}
+
+function trainingList(root, heading, values, classes, tag = 'span') {
+    if (!values || !values.length) return;
+    const body = trainingSection(root, heading);
+    const list = trainingElement(tag === 'li' ? 'ul' : 'div', tag === 'li' ? classes : '');
+    values.forEach(value => list.append(trainingElement(tag, tag === 'li' ? '' : classes, value)));
+    body.append(list);
+}
+
+function trainingKpis(root, values) {
+    values.forEach(([label, value]) => {
+        const kpi = cloneTemplate('training-kpi-template');
+        kpi.querySelector('.kpi-label').textContent = label;
+        kpi.querySelector('.kpi-value').textContent = value;
+        root.querySelector('.detail-kpis').append(kpi);
+    });
+}
+
+function trainingCertCard(cert, funding = false) {
+    const card = cloneTemplate('training-cert-template');
+    const inPlan = tpIsCertInActivePlan(cert.name);
+    const button = card.querySelector('.cert-add-plan');
+    button.classList.toggle('added', inPlan);
+    button.textContent = inPlan ? 'In Plan' : '+ Plan';
+    button.dataset.cert = btoa(JSON.stringify({name:cert.name, provider:cert.provider, price:cert.price, difficulty:cert.difficulty}));
+    card.querySelector('.cert-name').textContent = cert.name;
+    card.querySelector('.cert-price').textContent = '~£' + cert.price.toLocaleString();
+    card.querySelector('.cert-provider').textContent = cert.provider;
+    card.querySelector('.cert-difficulty').textContent = cert.difficulty;
+    card.querySelector('.cert-difficulty').classList.add(cert.difficulty);
+    if (funding) {
+        const isFunded = getCertFunding(cert) === 'cs';
+        card.querySelector('.cert-meta-row').append(trainingElement('span', 'cert-funding ' + (isFunded ? 'cs-funded' : 'self-fund'), isFunded ? 'CS Funded' : 'Self-Fund'));
+        if (certFilter === 'contractor' && cert.provider === 'GIAC / SANS') {
+            card.querySelector('.cert-meta-row').append(trainingElement('span', 'detail-desc', '(uncommon for contractors)'));
+        }
+    }
+    return card;
+}
+
+function trainingPathSteps(body, steps, roles, names, action) {
+    const wrap = trainingElement('div', 'pathway-steps');
+    steps.forEach((id, index) => {
+        const role = roles[id];
+        const step = trainingElement('span', 'pathway-step' + (index === steps.length - 1 ? ' current' : ''), names[id] || id, action, [id]);
+        step.append(trainingElement('span', 'step-fw', role ? (action === 'modShowDetail' ? 'SFIA ' + role.sfia : role.ukcsc + ' · SFIA ' + role.sfia) : ''));
+        wrap.append(step);
+        if (index < steps.length - 1) wrap.append(trainingElement('span', 'pathway-arrow', '→'));
+    });
+    body.append(wrap);
+}
+
 function renderDetailPanel() {
     const role = ROLES[activeRole];
     if (!role) return;
-
-    const tierClass = 't' + role.tier;
-
-    // Get active pathway steps (or just this role if entry point / FROM mode)
-    const pathwaySteps = (viewMode === 'to' && role.pathways.length > 0)
-        ? role.pathways[activePathwayIndex].steps
-        : [activeRole];
-    const cumulative = getPathwayCumulative(pathwaySteps);
-
-    // KPI row — reflects cert filter
-    const filteredKpiCerts = cumulative.allCerts.filter(({ cert }) => certPassesFilter(cert));
-    const filteredKpiCost = filteredKpiCerts.reduce((sum, { cert }) => sum + cert.price, 0);
+    const steps = viewMode === 'to' && role.pathways.length ? role.pathways[activePathwayIndex].steps : [activeRole];
+    const cumulative = getPathwayCumulative(steps);
+    const certs = cumulative.allCerts.filter(({cert}) => certPassesFilter(cert));
+    const cost = certs.reduce((sum, {cert}) => sum + cert.price, 0);
+    const root = cloneTemplate('training-detail-template');
+    root.querySelector('.detail-title').textContent = role.title;
+    const badges = root.querySelector('.detail-fw-row');
+    badges.append(trainingElement('span', 'detail-tier-badge t' + role.tier, role.tierLabel), trainingElement('span', 'detail-fw-badge fw-ukcsc', 'UKCSC ' + role.ukcsc), trainingElement('span', 'detail-fw-badge fw-sfia', 'SFIA ' + role.sfia));
+    const equiv = root.querySelector('.detail-fw-equiv');
+    equiv.append(trainingElement('span', '', 'CS: ' + role.csGrade), trainingElement('span', '', 'DCA: ' + role.dcaTrain), trainingElement('span', '', 'GSP: ' + role.govProf));
+    const mod = getModEquivalents(activeRole);
+    if (mod && (mod.soldier.length || mod.officer.length)) {
+        const row = trainingElement('div', 'detail-fw-equiv');
+        row.append(trainingElement('span', '', 'MOD:'));
+        [...mod.soldier, ...mod.officer].forEach(item => {
+            const chip = trainingElement('span', 'mod-detail-pill cursor-pointer', item.label, 'modShowDetail', [item.id]);
+            chip.title = item.sub;
+            row.append(chip);
+        });
+        equiv.after(row);
+    }
     const filterLabel = certFilter === 'cs' ? ' (CS)' : certFilter === 'contractor' ? ' (Ctr)' : '';
-    const kpiHtml = `
-        <div class="detail-kpis">
-            <div class="detail-kpi">
-                <div class="kpi-value">${esc(role.experience)}</div>
-                <div class="kpi-label">Experience</div>
-            </div>
-            <div class="detail-kpi">
-                <div class="kpi-value">${cumulative.allSkills.length}</div>
-                <div class="kpi-label">Skills</div>
-            </div>
-            <div class="detail-kpi">
-                <div class="kpi-value">${filteredKpiCerts.length}</div>
-                <div class="kpi-label">Certs${esc(filterLabel)}</div>
-            </div>
-            <div class="detail-kpi">
-                <div class="kpi-value">~\u00a3${filteredKpiCost.toLocaleString()}</div>
-                <div class="kpi-label">Cert Cost${esc(filterLabel)}</div>
-            </div>
-        </div>
-    `;
-
-    // Mode toggle
-    const modeToggleHtml = `
-        <div class="mode-toggle">
-            <button class="mode-btn ${viewMode === 'to' ? 'active' : ''}" data-click-action="switchMode" data-args='["to"]'>Paths TO This Role</button>
-            <button class="mode-btn ${viewMode === 'from' ? 'active' : ''}" data-click-action="switchMode" data-args='["from"]'>Explore FROM Here</button>
-        </div>
-    `;
-
-    // Pathway section (depends on mode)
-    let pathwaySectionHtml = '';
-
+    trainingKpis(root, [['Experience',role.experience],['Skills',cumulative.allSkills.length],['Certs' + filterLabel,certs.length],['Cert Cost' + filterLabel,'~£' + cost.toLocaleString()]]);
+    const pathway = trainingSection(root, 'Career Pathways');
+    const modes = trainingElement('div', 'mode-toggle');
+    [['to','Paths TO This Role'],['from','Explore FROM Here']].forEach(([mode, label]) => modes.append(trainingElement('button', 'mode-btn' + (viewMode === mode ? ' active' : ''), label, 'switchMode', [mode])));
+    pathway.append(modes);
     if (viewMode === 'to') {
-        if (role.pathways.length === 0) {
-            pathwaySectionHtml = `
-                <div class="detail-section">
-                    <h3>Career Pathways</h3>
-                    ${modeToggleHtml}
-                    <p class="entry-point-msg">All career paths start here. This is the entry point into cybersecurity operations.</p>
-                </div>
-            `;
-        } else {
-            const btns = role.pathways.map((p, i) =>
-                `<button class="pathway-btn ${i === activePathwayIndex ? 'active' : ''}" data-click-action="switchPathway" data-args='[${i}]'>${esc(p.name)}</button>`
-            ).join('');
-
-            const pathway = role.pathways[activePathwayIndex];
-            const stepsHtml = pathway.steps.map((s, i) => {
-                const isLast = i === pathway.steps.length - 1;
-                const stepClass = isLast ? 'pathway-step current' : 'pathway-step';
-                const arrow = i < pathway.steps.length - 1 ? '<span class="pathway-arrow">\u2192</span>' : '';
-                const stepRole = ROLES[s];
-                const fwLabel = stepRole ? `${stepRole.ukcsc} \u00b7 SFIA ${stepRole.sfia}` : '';
-                return `<span class="${stepClass}" data-click-action="showRoleDetail" data-args='["${s}"]'>${esc(SHORT_NAMES[s] || s)}<span class="step-fw">${fwLabel}</span></span>${arrow}`;
-            }).join('');
-
-            pathwaySectionHtml = `
-                <div class="detail-section">
-                    <h3>Career Pathways</h3>
-                    ${modeToggleHtml}
-                    <div class="pathway-btns">${btns}</div>
-                    <div class="pathway-steps">${stepsHtml}</div>
-                </div>
-            `;
+        if (!role.pathways.length) pathway.append(trainingElement('p', 'entry-point-msg', 'All career paths start here. This is the entry point into cybersecurity operations.'));
+        else {
+            const buttons = trainingElement('div', 'pathway-btns');
+            role.pathways.forEach((item,index) => buttons.append(trainingElement('button', 'pathway-btn' + (index === activePathwayIndex ? ' active' : ''), item.name, 'switchPathway', [index])));
+            pathway.append(buttons);
+            trainingPathSteps(pathway, steps, ROLES, SHORT_NAMES, 'showRoleDetail');
         }
     } else {
-        // "Explore FROM" mode
-        const { reachable } = getReachableFrom(activeRole);
-        let fromHtml = '';
-
-        if (reachable.size === 0) {
-            fromHtml = '<p class="detail-desc italic text-[var(--text-muted)]">This is a terminal specialization \u2014 no further standard progressions mapped. Consider lateral moves or leadership paths.</p>';
-        } else {
-            // Sort by tier
-            const sorted = [...reachable.entries()].sort((a, b) => {
-                return (ROLES[a[0]]?.tier || 0) - (ROLES[b[0]]?.tier || 0);
-            });
-            const chips = sorted.map(([id, pathNames]) => {
-                const r = ROLES[id];
-                const fwTag = r ? `${r.ukcsc} \u00b7 S${r.sfia}` : `T${r?.tier || '?'}`;
-                return `<span class="reachable-chip" data-click-action="showRoleDetail" data-args='["${id}"]'>
-                    <span class="chip-arrow">\u2192</span>
-                    ${esc(r?.title || id)}
-                    <span class="chip-tier">${fwTag}</span>
-                </span>`;
-            }).join('');
-            fromHtml = `<div class="reachable-roles">${chips}</div>`;
-        }
-
-        pathwaySectionHtml = `
-            <div class="detail-section">
-                <h3>Career Pathways</h3>
-                ${modeToggleHtml}
-                <p class="detail-desc mb-[0.6rem]">Roles reachable from <strong>${esc(role.title)}</strong>:</p>
-                ${fromHtml}
-            </div>
-        `;
-    }
-
-    // Prerequisites
-    const prereqHtml = (role.prerequisites || []).map(p => `<li>${esc(p)}</li>`).join('');
-
-    // Sub-specializations
-    const specHtml = (role.subspecializations || []).map(s =>
-        `<span class="spec-pill">${esc(s)}</span>`
-    ).join('');
-
-    // Skills pills — cumulative across pathway, current role highlighted
-    const hasMultipleSteps = pathwaySteps.length > 1;
-    const skillsHtml = cumulative.allSkills.map(s => {
-        const cls = (!s.isCurrent && hasMultipleSteps) ? 'skill-pill prior' : 'skill-pill';
-        const tipRole = (!s.isCurrent && hasMultipleSteps) ? ` title="From: ${esc(ROLES[s.fromRole]?.title || s.fromRole)}"` : '';
-        return `<span class="${cls}"${tipRole}>${esc(s.name)}</span>`;
-    }).join('');
-    const skillsLegendHtml = hasMultipleSteps ? `
-        <div class="skill-legend">
-            <span class="leg-current">This role</span>
-            <span class="leg-prior">Earlier in pathway</span>
-        </div>` : '';
-
-    // Certs — cumulative across pathway, grouped by step, with funding + filter
-    function renderCertCard(c) {
-        const funding = getCertFunding(c);
-        const fundingBadge = funding === 'cs'
-            ? '<span class="cert-funding cs-funded">CS Funded</span>'
-            : '<span class="cert-funding self-fund">Self-Fund</span>';
-        const isSansContractor = certFilter === 'contractor' && c.provider === 'GIAC / SANS';
-        const sansNote = isSansContractor ? ' <span class="text-[0.6rem] text-[var(--neon-yellow)] italic">(uncommon for contractors)</span>' : '';
-        if (!certPassesFilter(c)) return '';
-        const inPlan = tpIsCertInActivePlan(c.name);
-        const addBtnCls = inPlan ? 'cert-add-plan added' : 'cert-add-plan';
-        const addBtnText = inPlan ? 'In Plan' : '+ Plan';
-        const certDataAttr = btoa(JSON.stringify({name:c.name,provider:c.provider,price:c.price,difficulty:c.difficulty}));
-        return `
-            <div class="cert-card">
-                <button class="${addBtnCls}" data-cert="${certDataAttr}" data-click-action="tpAddCertFromCardBtn" data-stop-propagation data-args='["$target"]'>${addBtnText}</button>
-                <div class="cert-header">
-                    <span class="cert-name">${esc(c.name)}</span>
-                    <span class="cert-price">~\u00a3${c.price.toLocaleString()}</span>
-                </div>
-                <div class="cert-meta-row">
-                    <span class="cert-provider">${esc(c.provider)}</span>
-                    ${fundingBadge}${sansNote}
-                </div>
-                <span class="cert-difficulty ${c.difficulty}">${c.difficulty}</span>
-            </div>`;
-    }
-
-    // Filter + note
-    const certFilterHtml = `
-        <div class="cert-filter">
-            <button class="cert-filter-btn ${certFilter === 'all' ? 'active' : ''}" data-click-action="switchCertFilter" data-args='["all"]'>All</button>
-            <button class="cert-filter-btn ${certFilter === 'cs' ? 'active' : ''}" data-click-action="switchCertFilter" data-args='["cs"]'>Civil Servant</button>
-            <button class="cert-filter-btn ${certFilter === 'contractor' ? 'active' : ''}" data-click-action="switchCertFilter" data-args='["contractor"]'>Contractor</button>
-            <button class="cert-filter-btn ${certFilter === 'mod' ? 'active' : ''}" data-ion-style="${certFilter === 'mod' ? '' : 'border-color:rgba(251,191,36,0.3);'}color:${certFilter === 'mod' ? '' : '#fbbf24'}" data-click-action="switchCertFilter" data-args='["mod"]'>MOD</button>
-        </div>
-        <div class="cert-note">${
-            certFilter === 'cs'
-                ? 'Showing certs funded for civil servants (CompTIA + SANS/GIAC).'
-                : certFilter === 'contractor'
-                ? 'Contractors can pursue any certification. SANS/GIAC are uncommon due to cost (~\u00a37,900 course + exam, self-funded).'
-                : certFilter === 'mod'
-                ? 'Showing certs available through Defence funding (ELCAS / Unit Training Budget). Includes CompTIA, SANS/GIAC, EC-Council, ISC\u00b2.'
-                : 'Showing all certifications. Use filters to see availability by employment type.'
-        }</div>`;
-
-    // Filter cumulative certs
-    const filteredCerts = cumulative.allCerts.filter(({ cert }) => certPassesFilter(cert));
-    const filteredCost = filteredCerts.reduce((sum, { cert }) => sum + cert.price, 0);
-
-    let certsHtml = certFilterHtml;
-    if (hasMultipleSteps) {
-        const certsByStep = new Map();
-        filteredCerts.forEach(({ cert, fromRole }) => {
-            if (!certsByStep.has(fromRole)) certsByStep.set(fromRole, []);
-            certsByStep.get(fromRole).push(cert);
+        pathway.append(trainingElement('p', 'detail-desc', 'Roles reachable from ' + role.title + ':'));
+        const reachable = [...getReachableFrom(activeRole).reachable.entries()].sort((a,b) => (ROLES[a[0]]?.tier || 0) - (ROLES[b[0]]?.tier || 0));
+        if (!reachable.length) pathway.append(trainingElement('p', 'detail-desc', 'This is a terminal specialization. No further standard progressions mapped. Consider lateral moves or leadership paths.'));
+        const chips = trainingElement('div', 'reachable-roles');
+        reachable.forEach(([id]) => {
+            const next = ROLES[id];
+            const chip = trainingElement('span', 'reachable-chip', '', 'showRoleDetail', [id]);
+            chip.append(trainingElement('span', 'chip-arrow', '→'), trainingElement('span', '', next?.title || id), trainingElement('span', 'chip-tier', next ? next.ukcsc + ' · S' + next.sfia : '?'));
+            chips.append(chip);
         });
-        const seenSteps = new Set();
-        pathwaySteps.forEach(stepId => {
-            if (!certsByStep.has(stepId) || seenSteps.has(stepId)) return;
-            seenSteps.add(stepId);
-            const stepRole = ROLES[stepId];
-            const stepCerts = certsByStep.get(stepId);
-            certsHtml += `<div class="cert-step-group">
-                <div class="cert-step-label"><span class="cert-step-role">${esc(SHORT_NAMES[stepId] || stepRole?.title || stepId)}</span> Stage</div>
-                ${stepCerts.map(renderCertCard).join('')}
-            </div>`;
+        pathway.append(chips);
+    }
+    trainingSection(root, 'Overview').append(trainingElement('p', 'detail-desc', role.description));
+    trainingList(root, 'Sub-Specializations', role.subspecializations, 'spec-pill');
+    trainingList(root, 'Key Responsibilities', role.responsibilities, 'resp-list', 'li');
+    trainingList(root, 'Prerequisites', role.prerequisites, 'prereq-list', 'li');
+    const multi = steps.length > 1;
+    const skills = trainingSection(root, 'Key Skills & Tools' + (multi ? ' (Full Pathway)' : ''));
+    if (multi) {
+        const legend = trainingElement('div', 'skill-legend');
+        legend.append(trainingElement('span', 'leg-current', 'This role'), trainingElement('span', 'leg-prior', 'Earlier in pathway'));
+        skills.append(legend);
+    }
+    const pills = trainingElement('div', 'skill-pills');
+    cumulative.allSkills.forEach(skill => {
+        const prior = multi && !skill.isCurrent;
+        const pill = trainingElement('span', 'skill-pill' + (prior ? ' prior' : ''), skill.name);
+        if (prior) pill.title = 'From: ' + (ROLES[skill.fromRole]?.title || skill.fromRole);
+        pills.append(pill);
+    });
+    skills.append(pills);
+    const certifications = trainingSection(root, 'Recommended Certifications' + (multi ? ' (Full Pathway)' : ''));
+    const filters = trainingElement('div', 'cert-filter');
+    [['all','All'],['cs','Civil Servant'],['contractor','Contractor'],['mod','MOD']].forEach(([value,label]) => filters.append(trainingElement('button', 'cert-filter-btn' + (certFilter === value ? ' active' : ''), label, 'switchCertFilter', [value])));
+    certifications.append(filters);
+    const notes = {cs:'Showing certs funded for civil servants (CompTIA + SANS/GIAC).',contractor:'Contractors can pursue any certification. SANS/GIAC are uncommon due to cost (~£7,900 course + exam, self-funded).',mod:'Showing certs available through Defence funding (ELCAS / Unit Training Budget). Includes CompTIA, SANS/GIAC, EC-Council, ISC².',all:'Showing all certifications. Use filters to see availability by employment type.'};
+    certifications.append(trainingElement('div', 'cert-note', notes[certFilter]));
+    if (multi) {
+        const seen = new Set();
+        steps.forEach(id => {
+            const groupCerts = certs.filter(item => item.fromRole === id);
+            if (!groupCerts.length || seen.has(id)) return;
+            seen.add(id);
+            const group = trainingElement('div', 'cert-step-group');
+            group.append(trainingElement('div', 'cert-step-label', (SHORT_NAMES[id] || ROLES[id]?.title || id) + ' Stage'));
+            groupCerts.forEach(({cert}) => group.append(trainingCertCard(cert, true)));
+            certifications.append(group);
         });
-        certsHtml += `<div class="cert-total-bar">
-            <span class="ctb-label">${certFilter !== 'all' ? esc(certFilter === 'cs' ? 'CS' : 'Contractor') + ' ' : ''}Pathway Cost (${filteredCerts.length} certs)</span>
-            <span class="ctb-value">~\u00a3${filteredCost.toLocaleString()}</span>
-        </div>`;
+        const total = trainingElement('div', 'cert-total-bar');
+        total.append(trainingElement('span', 'ctb-label', (certFilter === 'all' ? '' : certFilter === 'cs' ? 'CS ' : certFilter === 'mod' ? 'MOD ' : 'Contractor ') + 'Pathway Cost (' + certs.length + ' certs)'), trainingElement('span', 'ctb-value', '~£' + cost.toLocaleString()));
+        certifications.append(total);
     } else {
-        const singleFiltered = role.certs.filter(certPassesFilter);
-        certsHtml += singleFiltered.map(renderCertCard).join('');
-        if (singleFiltered.length === 0) {
-            certsHtml += '<p class="detail-desc italic text-[var(--text-muted)]">No certifications match this filter for this role.</p>';
-        }
+        const matches = role.certs.filter(certPassesFilter);
+        matches.forEach(cert => certifications.append(trainingCertCard(cert, true)));
+        if (!matches.length) certifications.append(trainingElement('p', 'detail-desc', 'No certifications match this filter for this role.'));
     }
-
-    const html = `
-        <div class="detail-title">${esc(role.title)}</div>
-        <div class="detail-fw-row">
-            <span class="detail-tier-badge ${tierClass}">${esc(role.tierLabel)}</span>
-            <span class="detail-fw-badge fw-ukcsc">UKCSC ${esc(role.ukcsc)}</span>
-            <span class="detail-fw-badge fw-sfia">SFIA ${role.sfia}</span>
-        </div>
-        <div class="detail-fw-equiv">
-            <span title="Civil Service grade equivalent">CS: ${esc(role.csGrade)}</span>
-            <span title="Defence Cyber Academy training stage">DCA: ${esc(role.dcaTrain)}</span>
-            <span title="Gov Security Profession proficiency">GSP: ${esc(role.govProf)}</span>
-        </div>
-        ${(() => {
-            const modEq = getModEquivalents(activeRole);
-            if (!modEq) return '';
-            const soldierHtml = modEq.soldier.map(s => `<span class="mod-detail-pill cursor-pointer" data-click-action="modShowDetail" data-args='["${s.id}"]' title="${s.sub}">${esc(s.label)}</span>`).join('');
-            const officerHtml = modEq.officer.map(o => `<span class="mod-detail-pill cursor-pointer" data-click-action="modShowDetail" data-args='["${o.id}"]' title="${o.sub}">${esc(o.label)}</span>`).join('');
-            if (!soldierHtml && !officerHtml) return '';
-            return `<div class="detail-fw-equiv mt-0">
-                <span class="text-[0.58rem] text-[var(--text-muted)] mr-[0.2rem]" title="Military equivalent at SFIA ${modEq.sfia}">MOD:</span>
-                ${soldierHtml}${officerHtml}
-            </div>`;
-        })()}
-
-        ${kpiHtml}
-        ${pathwaySectionHtml}
-
-        <div class="detail-section">
-            <h3>Overview</h3>
-            <p class="detail-desc">${esc(role.description)}</p>
-        </div>
-
-        ${specHtml ? `
-        <div class="detail-section">
-            <h3>Sub-Specializations</h3>
-            <div class="spec-pills">${specHtml}</div>
-        </div>` : ''}
-
-        <div class="detail-section">
-            <h3>Key Responsibilities</h3>
-            <ul class="resp-list">
-                ${role.responsibilities.map(r => `<li>${esc(r)}</li>`).join('')}
-            </ul>
-        </div>
-
-        ${prereqHtml ? `
-        <div class="detail-section">
-            <h3>Prerequisites</h3>
-            <ul class="prereq-list">${prereqHtml}</ul>
-        </div>` : ''}
-
-        <div class="detail-section">
-            <h3>Key Skills &amp; Tools${hasMultipleSteps ? ' (Full Pathway)' : ''}</h3>
-            ${skillsLegendHtml}
-            <div class="skill-pills">${skillsHtml}</div>
-        </div>
-
-        <div class="detail-section">
-            <h3>Recommended Certifications${hasMultipleSteps ? ' (Full Pathway)' : ''}</h3>
-            ${certsHtml}
-        </div>
-
-        <div class="detail-section border-t-[1px] border-t-[var(--ion-border)] pt-4 mt-4">
-            <button class="tp-btn tp-btn-primary w-full p-3 text-[0.9rem]" data-click-action="tpCreateFromPathway">
-                Create "${esc(role.title)}" Training Plan (${filteredKpiCerts.length} certs, ~\u00a3${filteredKpiCost.toLocaleString()})
-            </button>
-            <p class="text-center text-[0.7rem] text-[var(--text-muted)] mt-2">Auto-creates a plan named after this role with all ${certFilter !== 'all' ? (certFilter === 'cs' ? 'CS-funded' : certFilter === 'mod' ? 'MOD-funded' : 'contractor') + ' ' : ''}certs</p>
-        </div>
-    `;
-
-    document.getElementById('detail-content').innerHTML = html;
+    const create = trainingSection(root, 'Training Plan');
+    create.append(trainingElement('button', 'tp-btn tp-btn-primary w-full p-3', 'Create "' + role.title + '" Training Plan (' + certs.length + ' certs, ~£' + cost.toLocaleString() + ')', 'tpCreateFromPathway'));
+    create.append(trainingElement('p', 'detail-desc', 'Auto-creates a plan named after this role with all ' + (certFilter === 'all' ? '' : certFilter === 'cs' ? 'CS-funded ' : certFilter === 'mod' ? 'MOD-funded ' : 'contractor ') + 'certs'));
+    document.getElementById('detail-content').replaceChildren(root);
 }
 
 function switchPathway(index) {
@@ -3122,9 +3009,7 @@ document.addEventListener('keydown', e => {
 
 // Escape HTML helper
 function esc(str) {
-    const d = document.createElement('div');
-    d.textContent = str;
-    return d.innerHTML;
+    return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 // =========================================================================
@@ -3153,158 +3038,43 @@ function switchTab(tabId) {
 function modShowDetail(roleId) {
     const role = MOD_ROLES[roleId];
     if (!role) return;
-
-    // Detail rendering
-
-    // Build pathway steps
-    let pathwayHtml = '';
-    if (role.pathways && role.pathways.length > 0) {
-        const steps = role.pathways[0].steps;
-        const stepsHtml = steps.map((s, i) => {
-            const isLast = i === steps.length - 1;
-            const cls = isLast ? 'pathway-step current' : 'pathway-step';
-            const arrow = i < steps.length - 1 ? '<span class="pathway-arrow">\u2192</span>' : '';
-            const sr = MOD_ROLES[s];
-            const fw = sr ? `SFIA ${sr.sfia}` : '';
-            return `<span class="${cls} cursor-pointer" data-click-action="modShowDetail" data-args='["${s}"]'>${esc(MOD_SHORT_NAMES[s] || s)}<span class="step-fw block text-[0.5rem] opacity-60">${fw}</span></span>${arrow}`;
-        }).join('');
-        pathwayHtml = `
-            <div class="detail-section">
-                <h3>Career Progression</h3>
-                <div class="pathway-steps flex flex-wrap items-center gap-[0.35rem]">${stepsHtml}</div>
-            </div>`;
-    } else {
-        pathwayHtml = `
-            <div class="detail-section">
-                <h3>Career Progression</h3>
-                <p class="detail-desc italic text-[var(--text-muted)]">Entry point for the ${role.track === 'soldier' ? 'Soldier' : 'Officer'} track.</p>
-            </div>`;
+    const root = cloneTemplate('training-detail-template');
+    root.querySelector('.detail-title').textContent = role.title;
+    const badges = root.querySelector('.detail-fw-row');
+    badges.append(trainingElement('span', 'detail-fw-badge', role.nato), trainingElement('span', 'detail-fw-badge fw-sfia', 'SFIA ' + role.sfia));
+    if (role.ukcsc !== '-') badges.append(trainingElement('span', 'detail-fw-badge fw-ukcsc', 'UKCSC ' + role.ukcsc));
+    const equiv = root.querySelector('.detail-fw-equiv');
+    [role.armyRank, role.tradeClass, 'CS: ' + role.csGrade].forEach(value => equiv.append(trainingElement('span', '', value)));
+    equiv.append(trainingElement('span', '', 'Equivalent Roles:'));
+    const civilians = getCivilianEquivalents(roleId);
+    if (!civilians || !civilians.length) equiv.append(trainingElement('span', '', 'No direct civilian SOC role at this level'));
+    else civilians.forEach(item => {
+        const chip = trainingElement('span', 'mod-detail-pill cursor-pointer', item.label, '__switchToPathwaysAndShowRole');
+        delete chip.dataset.args;
+        chip.dataset.roleId = item.id;
+        equiv.append(chip);
+    });
+    trainingKpis(root, [['DCA Courses',role.dcaCourses.length],[role.track === 'soldier' ? 'ALDP' : 'PME',role.aldp.length],['Certs',role.certs.length],['Key Units',role.units.length]]);
+    const path = trainingSection(root, 'Career Progression');
+    if (role.pathways?.length) trainingPathSteps(path, role.pathways[0].steps, MOD_ROLES, MOD_SHORT_NAMES, 'modShowDetail');
+    else path.append(trainingElement('p', 'detail-desc', 'Entry point for the ' + (role.track === 'soldier' ? 'Soldier' : 'Officer') + ' track.'));
+    trainingSection(root, 'Overview').append(trainingElement('p', 'detail-desc', role.description));
+    trainingList(root, 'DCA Training', role.dcaCourses, 'mod-detail-pill');
+    trainingList(root, role.track === 'soldier' ? 'ALDP Milestones' : 'Professional Military Education', role.aldp, 'mod-detail-pill');
+    trainingList(root, 'Sub-Specializations', role.subspecializations, 'mod-detail-pill');
+    trainingList(root, 'Key Responsibilities', role.responsibilities, 'resp-list', 'li');
+    trainingList(root, 'Prerequisites', role.prerequisites, 'prereq-list', 'li');
+    trainingList(root, 'Key Skills', role.skills, 'skill-pill');
+    const certs = trainingSection(root, 'Recommended Certifications');
+    role.certs.forEach(cert => certs.append(trainingCertCard(cert)));
+    if (!role.certs.length) certs.append(trainingElement('p', 'detail-desc', 'No specific certifications at this level. Focus is on strategic leadership and governance.'));
+    trainingList(root, 'Key Units / Postings', role.units, 'mod-unit-badge');
+    if (role.certs.length) {
+        const create = trainingSection(root, 'Training Plan');
+        create.append(trainingElement('button', 'tp-btn tp-btn-primary w-full p-3', 'Create "' + role.title + '" Training Plan (' + role.certs.length + ' certs, ~£' + role.certs.reduce((sum,cert) => sum + cert.price, 0).toLocaleString() + ')', 'tpCreateFromModRole', [roleId]));
+        create.append(trainingElement('p', 'detail-desc', 'Auto-creates a plan with all MOD-funded certifications for this role'));
     }
-
-    // Cert cards
-    let certsHtml = '';
-    if (role.certs && role.certs.length > 0) {
-        certsHtml = role.certs.map(c => {
-            const inPlan = (typeof tpIsCertInActivePlan === 'function') && tpIsCertInActivePlan(c.name);
-            const addCls = inPlan ? 'cert-add-plan added' : 'cert-add-plan';
-            const addTxt = inPlan ? 'In Plan' : '+ Plan';
-            const certData = btoa(JSON.stringify({name:c.name,provider:c.provider,price:c.price,difficulty:c.difficulty}));
-            return `<div class="cert-card">
-                <button class="${addCls}" data-cert="${certData}" data-click-action="tpAddCertFromCardBtn" data-stop-propagation data-args='["$target"]'>${addTxt}</button>
-                <div class="cert-header">
-                    <span class="cert-name">${esc(c.name)}</span>
-                    <span class="cert-price">~\u00a3${c.price.toLocaleString()}</span>
-                </div>
-                <div class="cert-meta-row">
-                    <span class="cert-provider">${esc(c.provider)}</span>
-                </div>
-                <span class="cert-difficulty ${c.difficulty}">${c.difficulty}</span>
-            </div>`;
-        }).join('');
-    } else {
-        certsHtml = '<p class="detail-desc italic text-[var(--text-muted)]">No specific certifications at this level \u2014 focus is on strategic leadership and governance.</p>';
-    }
-
-    const html = `
-        <div class="detail-title">${esc(role.title)}</div>
-        <div class="detail-fw-row">
-            <span class="detail-fw-badge text-[#fbbf24] border border-[rgba(251,191,36,0.5)]">${esc(role.nato)}</span>
-            <span class="detail-fw-badge fw-sfia">SFIA ${esc(role.sfia)}</span>
-            ${role.ukcsc !== '-' ? `<span class="detail-fw-badge fw-ukcsc">UKCSC ${esc(role.ukcsc)}</span>` : ''}
-        </div>
-        <div class="detail-fw-equiv">
-            <span title="Army rank">${esc(role.armyRank)}</span>
-            <span title="Trade classification">${esc(role.tradeClass)}</span>
-            <span title="Civil Service equivalent">CS: ${esc(role.csGrade)}</span>
-        </div>
-        ${(() => {
-            const civRoles = getCivilianEquivalents(roleId);
-            if (!civRoles || civRoles.length === 0) return '<div class="detail-fw-equiv mt-0"><span class="text-[0.58rem] text-[var(--text-muted)]">Equivalent Roles:</span> <span class="text-[0.58rem] text-[var(--text-muted)] italic">No direct civilian SOC role at this level</span></div>';
-            return '<div class="detail-fw-equiv mt-0"><span class="text-[0.58rem] text-[var(--text-muted)] mr-[0.2rem]">Equivalent Roles:</span>' +
-                civRoles.map(r => `<span class="mod-detail-pill cursor-pointer" data-click-action="__switchToPathwaysAndShowRole" data-role-id="${r.id}">${esc(r.label)}</span>`).join('') +
-                '</div>';
-        })()}
-
-        <div class="detail-kpis">
-            <div class="detail-kpi">
-                <div class="kpi-value">${role.dcaCourses.length}</div>
-                <div class="kpi-label">DCA Courses</div>
-            </div>
-            <div class="detail-kpi">
-                <div class="kpi-value">${role.aldp.length}</div>
-                <div class="kpi-label">${role.track === 'soldier' ? 'ALDP' : 'PME'}</div>
-            </div>
-            <div class="detail-kpi">
-                <div class="kpi-value">${role.certs.length}</div>
-                <div class="kpi-label">Certs</div>
-            </div>
-            <div class="detail-kpi">
-                <div class="kpi-value">${role.units.length}</div>
-                <div class="kpi-label">Key Units</div>
-            </div>
-        </div>
-
-        ${pathwayHtml}
-
-        <div class="detail-section">
-            <h3>Overview</h3>
-            <p class="detail-desc">${esc(role.description)}</p>
-        </div>
-
-        ${role.dcaCourses.length ? `
-        <div class="detail-section">
-            <h3>DCA Training</h3>
-            <div class="mod-detail-pills">${role.dcaCourses.map(c => `<span class="mod-detail-pill">${esc(c)}</span>`).join('')}</div>
-        </div>` : ''}
-
-        ${role.aldp.length ? `
-        <div class="detail-section">
-            <h3>${role.track === 'soldier' ? 'ALDP Milestones' : 'Professional Military Education'}</h3>
-            <div class="mod-detail-pills">${role.aldp.map(a => `<span class="mod-detail-pill">${esc(a)}</span>`).join('')}</div>
-        </div>` : ''}
-
-        ${role.subspecializations && role.subspecializations.length ? `
-        <div class="detail-section">
-            <h3>Sub-Specializations</h3>
-            <div class="mod-detail-pills">${role.subspecializations.map(s => `<span class="mod-detail-pill">${esc(s)}</span>`).join('')}</div>
-        </div>` : ''}
-
-        <div class="detail-section">
-            <h3>Key Responsibilities</h3>
-            <ul class="resp-list">${role.responsibilities.map(r => `<li>${esc(r)}</li>`).join('')}</ul>
-        </div>
-
-        ${role.prerequisites && role.prerequisites.length ? `
-        <div class="detail-section">
-            <h3>Prerequisites</h3>
-            <ul class="prereq-list">${role.prerequisites.map(p => `<li>${esc(p)}</li>`).join('')}</ul>
-        </div>` : ''}
-
-        <div class="detail-section">
-            <h3>Key Skills</h3>
-            <div class="skill-pills">${role.skills.map(s => `<span class="skill-pill">${esc(s)}</span>`).join('')}</div>
-        </div>
-
-        <div class="detail-section">
-            <h3>Recommended Certifications</h3>
-            ${certsHtml}
-        </div>
-
-        <div class="detail-section">
-            <h3>Key Units / Postings</h3>
-            <div class="mod-detail-units">${role.units.map(u => `<span class="mod-unit-badge">${esc(u)}</span>`).join('')}</div>
-        </div>
-
-        ${role.certs && role.certs.length > 0 ? `
-        <div class="detail-section border-t-[1px] border-t-[var(--ion-border)] pt-4 mt-4">
-            <button class="tp-btn tp-btn-primary w-full p-3 text-[0.9rem]" data-click-action="tpCreateFromModRole" data-args='["${roleId}"]'>
-                Create "${esc(role.title)}" Training Plan (${role.certs.length} certs, ~\u00a3${role.certs.reduce((s,c)=>s+c.price,0).toLocaleString()})
-            </button>
-            <p class="text-center text-[0.7rem] text-[var(--text-muted)] mt-2">Auto-creates a plan with all MOD-funded certifications for this role</p>
-        </div>` : ''}
-    `;
-
-    document.getElementById('detail-content').innerHTML = html;
+    document.getElementById('detail-content').replaceChildren(root);
     document.getElementById('detail-overlay').classList.add('open');
 }
 
@@ -3460,72 +3230,29 @@ let assessmentFormRendered = false;
 function renderAssessmentForm() {
     const container = document.getElementById('sa-form');
     if (!container) return;
-
-    const targetRole = careerGoal.target_role || '';
-    let html = '';
-
-    Object.entries(SKILLS_MATRIX).forEach(([catName, skills]) => {
-        let skillRowsHtml = '';
-        let catSkillCount = 0;
-        let catRatedCount = 0;
-        Object.entries(skills).forEach(([key, skill]) => {
-            const target = targetRole ? (skill.targets[targetRole] || 0) : 0;
+    const open = new Set([...container.querySelectorAll('.sa-category.open .sa-cat-title')].map(el => el.textContent.trim()));
+    const categories = [];
+    Object.entries(SKILLS_MATRIX).forEach(([name, skills]) => {
+        const category = cloneTemplate('training-category-template');
+        category.classList.toggle('open', !assessmentFormRendered || open.has(name));
+        category.querySelector('.sa-cat-title').textContent = name;
+        const entries = Object.entries(skills);
+        category.querySelector('.sa-cat-badge').textContent = entries.filter(([key]) => userRatings[key] > 0).length + '/' + entries.length + ' rated';
+        entries.forEach(([key, skill]) => {
+            const target = careerGoal.target_role ? (skill.targets[careerGoal.target_role] || 0) : 0;
             const rating = userRatings[key] || 0;
-            const gap = (target > 0 && rating > 0 && rating < target) ? target - rating : 0;
-
-            catSkillCount++;
-            if (rating > 0) catRatedCount++;
-
-            const ratingBtns = [1,2,3,4,5].map(v =>
-                `<button class="sa-rating-btn r${v} ${rating === v ? 'selected' : ''}" data-click-action="setRating" data-args='["${key}", ${v}]'>${v}</button>`
-            ).join('');
-
-            const targetBadge = target > 0
-                ? `<span class="sa-target-badge tgt-${target}">Target: ${target}</span>`
-                : `<span class="sa-target-badge tgt-0">N/A</span>`;
-
-            const gapBadge = gap > 0
-                ? `<span class="sa-gap-badge">Gap -${gap}</span>`
-                : '';
-
-            skillRowsHtml += `
-                <div class="sa-skill-row">
-                    <span class="sa-skill-name">${esc(skill.name)}</span>
-                    ${targetBadge}
-                    <div class="sa-rating-group">${ratingBtns}</div>
-                    ${gapBadge}
-                </div>`;
+            const row = cloneTemplate('training-skill-template');
+            row.querySelector('.sa-skill-name').textContent = skill.name;
+            const badge = row.querySelector('.sa-target-badge');
+            badge.classList.add('tgt-' + target);
+            badge.textContent = target > 0 ? 'Target: ' + target : 'N/A';
+            [1,2,3,4,5].forEach(value => row.querySelector('.sa-rating-group').append(trainingElement('button', 'sa-rating-btn r' + value + (rating === value ? ' selected' : ''), value, 'setRating', [key,value])));
+            if (target > 0 && rating > 0 && rating < target) row.append(trainingElement('span', 'sa-gap-badge', 'Gap -' + (target - rating)));
+            category.querySelector('.sa-category-body').append(row);
         });
-
-        html += `
-            <div class="sa-category${assessmentFormRendered ? '' : ' open'}">
-                <div class="sa-category-header" data-click-action="__toggleParentClassOpen">
-                    <span class="sa-cat-title">${esc(catName)}</span>
-                    <span class="sa-cat-badge">${catRatedCount}/${catSkillCount} rated</span>
-                    <span class="sa-cat-chevron"><i class="icon-chevron-down"></i></span>
-                </div>
-                <div class="sa-category-body">${skillRowsHtml}</div>
-            </div>`;
+        categories.push(category);
     });
-
-    // Save which categories are currently open before replacing HTML
-    const openCategories = new Set();
-    container.querySelectorAll('.sa-category.open .sa-cat-title').forEach(el => {
-        openCategories.add(el.textContent.trim());
-    });
-
-    container.innerHTML = html;
-
-    // Restore open state for previously-open categories
-    if (assessmentFormRendered && openCategories.size > 0) {
-        container.querySelectorAll('.sa-category').forEach(cat => {
-            const title = cat.querySelector('.sa-cat-title');
-            if (title && openCategories.has(title.textContent.trim())) {
-                cat.classList.add('open');
-            }
-        });
-    }
-
+    container.replaceChildren(...categories);
     assessmentFormRendered = true;
     renderForecast();
 }
@@ -3710,56 +3437,44 @@ async function deleteAssessment() {
 function renderReviewBanner() {
     const banner = document.getElementById('sa-review-banner');
     if (!banner) return;
-
     if (!reviewCycle) {
-        // Never submitted — no banner needed, show submit button
         banner.style.display = 'none';
+        banner.replaceChildren();
         toggleSubmitButton(true);
         return;
     }
-
-    const submitted = new Date(reviewCycle.submitted_at);
-    const nextReview = new Date(reviewCycle.next_review_at);
-    const submittedStr = submitted.toLocaleDateString();
-    const nextStr = nextReview.toLocaleDateString();
-
+    const root = cloneTemplate('training-review-template');
+    const title = root.querySelector('strong');
+    const text = root.querySelector('.sa-review-info span');
+    const button = root.querySelector('button');
+    const submitted = reviewCycle.submitted_at ? new Date(reviewCycle.submitted_at).toLocaleDateString() : 'Unknown';
+    const next = reviewCycle.next_review_at ? new Date(reviewCycle.next_review_at).toLocaleDateString() : 'Unknown';
+    banner.style.display = 'flex';
     if (reviewCycle.is_overdue) {
-        banner.style.display = 'flex';
         banner.className = 'sa-review-banner overdue';
-        banner.innerHTML = `
-            <div class="sa-review-info">
-                <strong>Review Overdue</strong>
-                <span>Your last assessment was submitted on ${submittedStr}. A review was due on ${nextStr}. Please review and re-submit your skills.</span>
-            </div>
-            <button class="sa-review-btn primary" data-click-action="startReview">Start Review</button>
-        `;
+        title.textContent = 'Review Overdue';
+        text.textContent = 'Your last assessment was submitted on ' + submitted + '. A review was due on ' + next + '. Please review and re-submit your skills.';
+        button.classList.add('primary');
+        button.dataset.clickAction = 'startReview';
+        button.textContent = 'Start Review';
         toggleSubmitButton(true);
     } else if (reviewCycle.is_locked) {
-        banner.style.display = 'flex';
-        const dueSoon = reviewCycle.days_until_review <= 14;
-        banner.className = 'sa-review-banner ' + (dueSoon ? 'due-soon' : 'locked');
-        banner.innerHTML = `
-            <div class="sa-review-info">
-                <strong>${dueSoon ? 'Review Due Soon' : 'Assessment Submitted'}</strong>
-                <span>Submitted on ${submittedStr}. Next review due ${nextStr} (${reviewCycle.days_until_review} days).</span>
-            </div>
-            <button class="sa-review-btn" data-click-action="unlockAssessment">Edit Assessment</button>
-        `;
+        const soon = reviewCycle.days_until_review != null && reviewCycle.days_until_review <= 14;
+        banner.className = 'sa-review-banner ' + (soon ? 'due-soon' : 'locked');
+        title.textContent = soon ? 'Review Due Soon' : 'Assessment Submitted';
+        text.textContent = 'Submitted on ' + submitted + '. Next review due ' + next + ' (' + (reviewCycle.days_until_review ?? 'Unknown') + ' days).';
+        button.dataset.clickAction = 'unlockAssessment';
+        button.textContent = 'Edit Assessment';
         toggleSubmitButton(false);
     } else {
-        // Unlocked (user chose to edit early)
-        banner.style.display = 'flex';
         banner.className = 'sa-review-banner locked';
-        banner.innerHTML = `
-            <div class="sa-review-info">
-                <strong>Editing Mode</strong>
-                <span>Assessment unlocked for editing. Submit when you are done to lock until next review.</span>
-            </div>
-        `;
+        title.textContent = 'Editing Mode';
+        text.textContent = 'Assessment unlocked for editing. Submit when you are done to lock until next review.';
+        button.remove();
         toggleSubmitButton(true);
     }
+    banner.replaceChildren(...root.childNodes);
 }
-
 function applyLockState() {
     const isLocked = reviewCycle && reviewCycle.is_locked && !reviewCycle.is_overdue;
     const tab = document.getElementById('tab-assessment');
