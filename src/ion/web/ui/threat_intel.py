@@ -756,3 +756,156 @@ async def threat_intel_campaign_detail_fragment(
         return await get_campaign_detail(entity_id=entity_id, user=None)
 
     return await _entity_detail(request, CAMPAIGN_COLUMNS, fetch)
+
+
+# ---------------------------------------------------------------------------
+# The global search bar and the KEV Catalog tab
+#
+# tiUnifiedSearch rendered both of its failures into the ti-empty class,
+# which is the no-results styling, so "Search failed: HTTP 403" and "no
+# matches" looked alike. It also printed `${d.total}` unguarded, so a
+# payload without a total read "undefined results", and it read
+# `d.actors.length` on all four kinds without a guard.
+#
+# Those four accesses are a fragility rather than a live bug: the endpoint
+# pre-seeds all four keys and wraps each source in its own try/except, so
+# they are always present. That same best-effort design is the real defect
+# and it belongs to the endpoint, not to this page: a source that fails
+# contributes an empty list and a debug log, so a reader cannot tell "OpenCTI
+# matched no actors" from "OpenCTI was down". Filed separately, because
+# fixing it changes the JSON contract.
+#
+# kevSearch was the best-written region on this page and most of it is
+# carried over unchanged, including two judgements worth keeping: the empty
+# state names which catalog found nothing, because a bare "no results"
+# invites the reader to conclude the CVE is safe; and "ransomware: unknown"
+# is worded as CISA not having established use rather than as having ruled
+# it out. Its one defect is the same as the search bar's: the catch rendered
+# into ti-empty, so a failed lookup read as an empty catalog.
+# ---------------------------------------------------------------------------
+
+UNIFIED_FRAGMENT = "_fragments/threat_intel_unified_search.html"
+KEV_FRAGMENT = "_fragments/threat_intel_kev.html"
+
+#: What GET /api/threat-intel/unified-search asks each source for, from the
+#: page's `&limit_per_kind=8`.
+UNIFIED_PER_KIND = 8
+
+#: The shortest term the search endpoint accepts, from its `min_length=2`.
+#: The page had `if (q.length < 2) return;`, which silently did nothing and
+#: left whatever was on screen in place.
+UNIFIED_MIN_CHARS = 2
+
+#: Rows the KEV table shows, from the page's `limit: '50'`.
+KEV_LIMIT = 50
+
+#: The four kinds the search bar groups its results under, in the order the
+#: page showed them, with the heading each carried.
+UNIFIED_KINDS = (
+    ("actors", "Threat Actors"),
+    ("campaigns", "Campaigns"),
+    ("iocs", "IOCs"),
+    ("cases", "Cases"),
+)
+
+
+@router.get(
+    "/threat-intel/unified-search",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def threat_intel_unified_search_fragment(
+    request: Request,
+    q: str = Query("", max_length=200),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    """The global search bar's grouped results.
+
+    A term shorter than the endpoint's minimum renders a prompt saying so,
+    rather than returning and leaving stale results from a previous search
+    on screen, which is what `if (q.length < 2) return;` did.
+    """
+    from ion.web.threat_intel_api import unified_search
+
+    term = q.strip()
+
+    def answer(ctx: dict) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request=request, name=UNIFIED_FRAGMENT,
+            context={"q": term, "failed": False, "error": None,
+                     "too_short": False, "groups": None, "total": None,
+                     "kinds": UNIFIED_KINDS, "min_chars": UNIFIED_MIN_CHARS,
+                     **ctx},
+            status_code=200,
+        )
+
+    if len(term) < UNIFIED_MIN_CHARS:
+        return answer({"too_short": True})
+
+    try:
+        payload = await unified_search(
+            q=term, limit_per_kind=UNIFIED_PER_KIND, session=session, user=None
+        )
+    except Exception:
+        logger.exception("Threat intel unified search could not be rendered")
+        return answer({"failed": True})
+
+    if not isinstance(payload, dict):
+        return answer({"failed": True})
+
+    # One list per kind, each through `_rows`, so a payload that stops
+    # carrying one of them reaches the template as None and that group says
+    # so rather than reading as a source with no matches.
+    return answer({
+        "groups": {key: _rows(payload, key) for key, _ in UNIFIED_KINDS},
+        "total": payload.get("total"),
+    })
+
+
+@router.get(
+    "/threat-intel/kev",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(STORIES_PERMISSION))],
+)
+def threat_intel_kev_fragment(
+    request: Request,
+    q: str = Query("", max_length=200),
+    ransomware_only: bool = Query(False),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    """The KEV catalog table, and the catalog status bar out of band.
+
+    Gated on alert:read, which is what /api/kev requires, and not on this
+    page's own observable:read. The tab is withheld from a viewer without
+    it; this is the second gate, so a direct request cannot reach what the
+    tab does not offer.
+
+    One read answers both regions: GET /api/kev returns the status block
+    alongside the results, which is why the page called kevRenderStatus with
+    `data.status` rather than reading /kev/status separately. The status bar
+    swaps out of band for the same reason it did there.
+    """
+    from ion.web.kev_api import kev_search
+
+    def answer(ctx: dict) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request=request, name=KEV_FRAGMENT,
+            context={"q": q.strip(), "ransomware_only": ransomware_only,
+                     "failed": False, "results": None, "status": None, **ctx},
+            status_code=200,
+        )
+
+    try:
+        payload = kev_search(
+            q=q.strip(), ransomware_only=ransomware_only, limit=KEV_LIMIT,
+            session=session,
+        )
+    except Exception:
+        logger.exception("Threat intel KEV fragment could not be rendered")
+        return answer({"failed": True})
+
+    status = payload.get("status") if isinstance(payload, dict) else None
+    return answer({
+        "results": _rows(payload, "results"),
+        "status": status if isinstance(status, dict) else None,
+    })

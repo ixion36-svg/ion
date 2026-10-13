@@ -60,6 +60,17 @@ MATCHES = "_fragments/threat_intel_matches.html"
 STORIES = "_fragments/threat_intel_stories.html"
 
 
+def flat(html: str) -> str:
+    """Rendered HTML with its whitespace collapsed.
+
+    Prose in a template wraps, so a sentence asserted as one string
+    fails on where the paragraph happens to break rather than on what
+    it says. Three tests in this file failed that way before this
+    existed, and reflowing a comment should not red a guard.
+    """
+    return " ".join(html.split())
+
+
 def render(name: str, **ctx: Any) -> str:
     env = make_templates().env
     return env.get_template(name).render(**ctx)
@@ -1153,6 +1164,8 @@ DELETED_FUNCTIONS = [
     "loadOverviewActors", "loadOverviewIOCs", "loadRecentlyActive",
     "renderMatchRows", "searchActors", "searchCampaigns",
     "toggleActorDetail", "toggleCampaignDetail", "refreshWatchedIds",
+    "kevRenderStatus", "kevRow", "kevDetail", "kevRansomware",
+    "tiUnifiedSearch",
 ]
 
 
@@ -1284,7 +1297,7 @@ def test_an_unconfigured_opencti_is_not_reported_as_a_search_with_no_matches(
 def test_a_failed_search_is_a_fault_not_an_absence_of_matches(fragment, key):
     html = _results(fragment, key, None, failed=True, error="OpenCTIError")
     assert "did not complete" in html
-    assert "rather than an absence of matches" in html
+    assert "fault rather than an absence of matches" in flat(html)
     assert "OpenCTIError" in html
     assert 'role="alert"' in html
 
@@ -1749,3 +1762,462 @@ def test_a_search_that_raises_is_reported_without_the_services_own_message(
     assert "did not complete" in body
     assert "RuntimeError" in body
     assert "cti.internal" not in body
+
+
+# ---------------------------------------------------------------------------
+# The global search bar and the KEV Catalog tab
+#
+# Both rendered their failures into the ti-empty class, which is the
+# no-results styling, so "Search failed: HTTP 403" and "no matches" looked
+# alike. On the KEV panel that is the worst confusion available: the panel
+# exists to answer whether a CVE is being exploited right now, and an empty
+# catalog reads as no.
+# ---------------------------------------------------------------------------
+
+UNIFIED = "_fragments/threat_intel_unified_search.html"
+KEV = "_fragments/threat_intel_kev.html"
+
+KINDS = (("actors", "Threat Actors"), ("campaigns", "Campaigns"),
+         ("iocs", "IOCs"), ("cases", "Cases"))
+
+
+def _unified(groups, **over):
+    ctx = {"q": "apt", "failed": False, "error": None, "too_short": False,
+           "groups": groups, "total": None, "kinds": KINDS, "min_chars": 2}
+    ctx.update(over)
+    return render(UNIFIED, **ctx)
+
+
+def _kev(results, status=None, **over):
+    ctx = {"q": "", "ransomware_only": False, "failed": False,
+           "results": results,
+           "status": status if status is not None else {
+               "loaded": True, "catalog_version": "2026.10.01",
+               "count": 1284, "age_days": 12, "ahead_of_bundle": False}}
+    ctx.update(over)
+    return render(KEV, **ctx)
+
+
+def _entry(**over):
+    base = {
+        "cve_id": "CVE-2026-8037",
+        "vendor_project": "Fortinet",
+        "product": "FortiOS",
+        "vulnerability_name": "Path traversal",
+        "date_added": "2026-09-01",
+        "due_date": "2026-09-22",
+        "known_ransomware": False,
+        "known_ransomware_raw": "Unknown",
+        "short_description": "Traversal in the admin API.",
+        "required_action": "Apply the vendor patch.",
+        "cwes": ["CWE-22"],
+        "notes": "https://example.invalid/advisory",
+        "catalog_version": "2026.10.01",
+        "source": "bundled",
+    }
+    base.update(over)
+    return base
+
+
+def test_a_failed_global_search_is_not_styled_as_no_matches():
+    html = _unified(None, failed=True)
+    assert "did not complete" in html
+    assert "rather than an absence of matches" in flat(html)
+    assert 'role="alert"' in html
+    assert "No matches for" not in html
+
+
+def test_a_global_search_with_nothing_under_any_heading_says_no_matches():
+    html = _unified({k: [] for k, _ in KINDS})
+    assert "No matches for apt" in html
+    assert "did not complete" not in html
+
+
+def test_a_source_that_could_not_be_read_is_not_a_source_with_no_matches():
+    """The endpoint pre-seeds all four keys, so a missing one means the shape
+    changed rather than that a source was quiet. Either way it is not a
+    finding that nothing matched under that heading."""
+    html = _unified({"actors": None, "campaigns": [{"name": "SolarWinds"}],
+                     "iocs": [], "cases": []})
+    assert "could not be read" in html
+    assert "SolarWinds" in html, "the source that did answer still renders"
+
+
+def test_a_term_shorter_than_the_endpoint_accepts_says_so():
+    """`if (q.length < 2) return;` silently did nothing and left results
+    from a previous search on screen."""
+    html = _unified(None, too_short=True, q="a")
+    assert "at least 2 characters" in html
+    assert "No matches" not in html
+
+
+def test_the_result_count_is_computed_when_the_payload_gives_no_total():
+    """`${d.total}` went in unguarded, so a payload without a total read
+    "undefined results"."""
+    rows = {"actors": [{"name": "A"}, {"name": "B"}], "campaigns": [],
+            "iocs": [], "cases": []}
+    without = _unified(rows, total=None)
+    withtotal = _unified(rows, total=99)
+    assert "2 results for apt" in without
+    assert "undefined" not in without
+    assert "99 results for apt" in withtotal
+
+
+def test_one_result_is_not_pluralised():
+    html = _unified({"actors": [{"name": "A"}], "campaigns": [], "iocs": [],
+                     "cases": []})
+    assert "1 result for apt" in html
+    assert "1 results" not in html
+
+
+def test_the_search_says_a_missing_heading_is_not_proof_of_nothing():
+    """The endpoint wraps each source in its own try/except and returns an
+    empty list for one that fails, logging at debug, so the payload cannot
+    tell them apart. The page should not imply it can."""
+    html = _unified({"actors": [{"name": "A"}], "campaigns": [], "iocs": [],
+                     "cases": []})
+    assert "not distinguished from one that matched nothing" in flat(html)
+
+
+def test_an_ioc_and_a_case_result_link_to_their_own_pages():
+    html = _unified({"actors": [], "campaigns": [],
+                     "iocs": [{"id": "7", "type": "ipv4-addr", "value": "1.2.3.4"}],
+                     "cases": [{"id": "3", "case_number": "CASE-0003", "title": "t"}]})
+    assert "/observables/7" in html
+    assert "/cases?selected=3" in html
+
+
+def test_a_failed_kev_lookup_is_not_an_empty_catalog():
+    """The panel answers whether a CVE is being exploited right now, so a
+    failure styled as no results is the worst confusion it can offer."""
+    html = _kev(None, failed=True)
+    assert "did not complete" in html
+    assert "fault rather than an empty catalog" in flat(html)
+    assert html.count('role="alert"') == 2, "the status bar says so too"
+    assert "No entries in catalog" not in html
+
+
+def test_an_unreadable_kev_payload_is_not_an_empty_catalog():
+    html = _kev(None)
+    assert "cannot read" in html
+    assert "No entries in catalog" not in html
+
+
+def test_an_empty_kev_result_names_the_catalog_that_found_nothing():
+    """A bare "no results" invites the reader to conclude the CVE is safe,
+    when what they have learned is that one snapshot does not list it. The
+    page got this right and it is kept."""
+    html = _kev([], q="CVE-2026-9999")
+    assert "No entries in catalog 2026.10.01" in html
+    assert "CVE-2026-9999" in html
+
+
+def test_an_empty_kev_result_says_when_the_ransomware_filter_was_applied():
+    html = _kev([], ransomware_only=True)
+    assert "ransomware-linked filter applied" in html
+
+
+def test_a_kev_row_carries_its_whole_entry():
+    html = _kev([_entry()])
+    assert "CVE-2026-8037" in html
+    assert "Fortinet" in html
+    assert "Path traversal" in html
+    assert "Apply the vendor patch." in html
+    assert "CWE-22" in html
+    assert "2026-09-22" in html
+
+
+def test_ransomware_unknown_is_worded_as_not_established_not_as_ruled_out():
+    """CISA not having established use is not the same as having ruled it
+    out, and an analyst reading this cell is deciding how urgent a patch
+    is."""
+    unknown = _kev([_entry(known_ransomware=False)])
+    known = _kev([_entry(known_ransomware=True)])
+    assert "has not established ransomware use" in unknown
+    assert "not the same as ruling it out" in unknown
+    assert "ransomware: unknown" in unknown
+    assert "ransomware: known" in known
+    assert "not established" not in known
+
+
+def test_kev_references_are_text_rather_than_links():
+    """ION ships to air-gapped sites where an external anchor is a dead end
+    that looks broken."""
+    html = _kev([_entry()])
+    assert "example.invalid/advisory" in html
+    assert "ti-kev-notes" in html
+    assert '<a href="https://example.invalid' not in html
+
+
+def test_a_catalog_that_was_never_loaded_says_so_rather_than_showing_an_age():
+    html = _kev([], status={"loaded": False})
+    assert "No KEV catalog loaded" in html
+    assert "days old" not in html
+
+
+def test_a_catalog_of_unknown_age_is_not_painted_as_fresh():
+    """`age <= 30` on a null age would band as fresh. The page got this
+    right with an explicit null check and it is kept: an age nobody measured
+    is not a recent catalog."""
+    unknown = _kev([], status={"loaded": True, "catalog_version": "x",
+                               "count": 1, "age_days": None})
+    fresh = _kev([], status={"loaded": True, "catalog_version": "x",
+                             "count": 1, "age_days": 5})
+    stale = _kev([], status={"loaded": True, "catalog_version": "x",
+                             "count": 1, "age_days": 200})
+    assert "age unknown" in unknown
+    assert "text-ion-lime" not in unknown
+    assert "text-ion-lime" in fresh
+    assert "text-ion-coral" in stale
+
+
+def test_a_catalog_with_no_recorded_count_does_not_print_undefined():
+    """`${st.count}` went in unguarded."""
+    html = _kev([], status={"loaded": True, "catalog_version": "x",
+                            "count": None, "age_days": 1})
+    assert "number of known-exploited CVEs" in html
+    assert "undefined" not in html
+    assert "None" not in html
+
+
+def test_the_kev_status_bar_swaps_out_of_band():
+    """One read answers both regions, because GET /api/kev returns the status
+    block alongside the results."""
+    html = _kev([_entry()])
+    assert 'id="kev-status-bar"' in html
+    assert 'hx-swap-oob="innerHTML"' in html
+
+
+def test_the_unified_search_fragment_needs_observable_read(session):
+    app = _client(session, _User())
+    with TestClient(app) as client:
+        assert client.get("/ui/threat-intel/unified-search?q=apt").status_code == 403
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        assert client.get("/ui/threat-intel/unified-search?q=apt").status_code == 200
+
+
+def test_the_kev_fragment_needs_alert_read_not_the_pages_own_permission(session):
+    """/api/kev requires alert:read, which this page's observable:read does
+    not imply. The tab is withheld from a viewer without it; this is the
+    second gate, so a direct request cannot reach what the tab does not
+    offer."""
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        assert client.get("/ui/threat-intel/kev").status_code == 403
+    app = _client(session, _User(STORIES_PERMISSION))
+    with TestClient(app) as client:
+        assert client.get("/ui/threat-intel/kev").status_code == 200
+
+
+def test_a_short_term_reaches_the_prompt_rather_than_the_endpoint(session):
+    """The endpoint declares min_length=2 and would answer 422. The fragment
+    renders the prompt instead, so a reader typing one character sees why
+    nothing happened."""
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        r = client.get("/ui/threat-intel/unified-search?q=a")
+    assert r.status_code == 200
+    assert "at least 2 characters" in r.text
+
+
+def test_the_kev_route_answers_the_real_catalog_on_this_deployment(session):
+    """KEV is a snapshot shipped in the image, so unlike OpenCTI it has real
+    data here: measured, /api/kev returned 5 results. This is the one search
+    on this page a test can exercise end to end against real rows."""
+    app = _client(session, _User(STORIES_PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/kev").text
+    assert "did not complete" not in body
+    assert "cannot read" not in body
+
+
+def test_the_unified_limits_match_what_the_endpoint_declares():
+    import inspect
+    from ion.web.threat_intel_api import unified_search
+    from ion.web.ui.threat_intel import UNIFIED_MIN_CHARS, UNIFIED_PER_KIND
+
+    q = inspect.signature(unified_search).parameters["q"].default
+    per = inspect.signature(unified_search).parameters["limit_per_kind"].default
+    assert UNIFIED_MIN_CHARS == next(m.min_length for m in q.metadata
+                                     if hasattr(m, "min_length"))
+    assert UNIFIED_PER_KIND <= next(m.le for m in per.metadata if hasattr(m, "le"))
+
+
+def test_both_new_search_boxes_are_forms():
+    page = _page()
+    for url in ("/ui/threat-intel/unified-search", "/ui/threat-intel/kev"):
+        i = page.index('hx-get="' + url + '"')
+        before = page[max(0, i - 300):i]
+        assert "<form" in before, url
+
+
+def test_the_ransomware_toggle_sends_both_of_its_states():
+    page = _page()
+    assert 'name="ransomware_only" value="false"' in page
+    assert 'name="ransomware_only" value="true"' in page
+
+
+def test_the_page_no_longer_renders_kev_or_the_search_bar_in_javascript():
+    for gone in ("function kevRenderStatus", "function kevRow",
+                 "function kevDetail", "function kevRansomware",
+                 "async function kevSearch", "window.tiUnifiedSearch"):
+        assert gone not in _script(), gone + " should have been removed"
+
+
+def test_clearing_the_global_search_uses_classes_not_inline_styles():
+    """style-src-attr is 'none', and a class keeps the decision in the
+    stylesheet where a sweep can reach it."""
+    script = _script()
+    clear = script[script.index("window.tiClearSearch"):]
+    clear = clear[:clear.index("};")]
+    assert "classList.add" in clear
+    assert "style.display" not in clear
+
+
+# ---------------------------------------------------------------------------
+# The module paths behind the two searches
+#
+# Three mutations survived the first pass over this stage, and all three
+# were the same gap that has now shown up in seven rounds of this project:
+# the template is tested by rendering it with a hand-built context while the
+# module function that computes that context is never driven. A template
+# test proves the branch renders; it proves nothing about whether the module
+# ever selects it.
+#
+# Dropping `_rows` for `.get(key) or []` in either search, and dropping the
+# isinstance check on the KEV status, were all invisible to the renders
+# above. These drive the routes with the service stubbed.
+# ---------------------------------------------------------------------------
+
+
+def _stub_unified(monkeypatch, payload):
+    import ion.web.threat_intel_api as api
+
+    async def answer(**kw):
+        if isinstance(payload, Exception):
+            raise payload
+        return payload
+
+    monkeypatch.setattr(api, "unified_search", answer)
+
+
+def _stub_kev(monkeypatch, payload):
+    import ion.web.kev_api as api
+
+    def answer(**kw):
+        if isinstance(payload, Exception):
+            raise payload
+        return payload
+
+    monkeypatch.setattr(api, "kev_search", answer)
+
+
+def test_a_search_payload_missing_a_kind_is_a_failure_for_that_kind(
+        session, monkeypatch):
+    """Closes a survivor. `.get(key) or []` turns a kind the payload does not
+    carry into an empty list, and that heading then reads as a source which
+    matched nothing."""
+    _stub_unified(monkeypatch, {"q": "apt", "campaigns": [{"name": "Solar"}],
+                                "iocs": [], "cases": [], "total": 1})
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/unified-search?q=apt").text
+    assert "could not be read" in body
+    assert "Solar" in body, "the kinds that did arrive still render"
+
+
+def test_a_search_payload_carrying_every_kind_renders_none_as_a_failure(
+        session, monkeypatch):
+    """The other side of the same branch, so the pair pins `_rows` from both
+    directions: an empty list is an empty result, a missing key is not."""
+    _stub_unified(monkeypatch, {"q": "apt", "actors": [], "campaigns": [],
+                                "iocs": [], "cases": [], "total": 0})
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/unified-search?q=apt").text
+    assert "No matches for apt" in body
+    assert "could not be read" not in body
+
+
+def test_a_non_dict_search_payload_is_a_failed_search(session, monkeypatch):
+    _stub_unified(monkeypatch, ["not", "a", "mapping"])
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/unified-search?q=apt").text
+    assert "did not complete" in body
+    assert "No matches" not in body
+
+
+def test_a_kev_payload_with_no_results_list_is_not_an_empty_catalog(
+        session, monkeypatch):
+    """Closes a survivor. `.get("results") or []` turns a payload that
+    carries no results key into an empty catalog, which on this panel reads
+    as "this CVE is not known to be exploited"."""
+    _stub_kev(monkeypatch, {"count": 0, "status": {"loaded": True,
+                                                   "catalog_version": "x",
+                                                   "count": 1, "age_days": 1}})
+
+    app = _client(session, _User(STORIES_PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/kev").text
+    assert "cannot read" in body
+    assert "No entries in catalog" not in body
+
+
+def test_a_kev_payload_with_an_empty_results_list_is_an_empty_catalog(
+        session, monkeypatch):
+    _stub_kev(monkeypatch, {"results": [], "count": 0,
+                            "status": {"loaded": True, "catalog_version": "v9",
+                                       "count": 1, "age_days": 1}})
+
+    app = _client(session, _User(STORIES_PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/kev").text
+    assert "No entries in catalog v9" in body
+    assert "cannot read" not in body
+
+
+def test_a_kev_status_that_is_not_a_mapping_is_treated_as_no_status(
+        session, monkeypatch):
+    """Closes a survivor. Dropping the isinstance check let a list or a
+    string reach the template, where `status.get` raises and the whole
+    fragment 500s instead of rendering the panel."""
+    _stub_kev(monkeypatch, {"results": [], "count": 0, "status": "broken"})
+
+    app = _client(session, _User(STORIES_PERMISSION))
+    with TestClient(app) as client:
+        r = client.get("/ui/threat-intel/kev")
+    assert r.status_code == 200
+    assert "No KEV catalog loaded" in r.text
+    assert "broken" not in r.text
+
+
+def test_a_kev_read_that_raises_is_reported_as_a_fault(session, monkeypatch):
+    _stub_kev(monkeypatch, RuntimeError("catalog table is gone"))
+
+    app = _client(session, _User(STORIES_PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/kev").text
+    assert "did not complete" in body
+    assert "catalog table is gone" not in body, (
+        "the service's own message can carry estate detail"
+    )
+
+
+def test_a_kev_read_that_answers_renders_its_rows(session, monkeypatch):
+    _stub_kev(monkeypatch, {
+        "results": [_entry()], "count": 1,
+        "status": {"loaded": True, "catalog_version": "2026.10.01",
+                   "count": 1284, "age_days": 12}})
+
+    app = _client(session, _User(STORIES_PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/kev").text
+    assert "CVE-2026-8037" in body
+    assert "1284" in body
+    assert "12 days old" in body
+    assert "cannot read" not in body
