@@ -1040,6 +1040,18 @@
     font-size: 0.68rem;
     font-style: italic;
 }
+/* The docgen preview's two cloned states. The error used to be
+   `<div class="text-[var(--danger)] p-3">` built from a string, and the
+   plain-format body a <pre> built the same way, so neither was reachable
+   from the stylesheet. */
+.ai-preview-error { color: var(--danger); padding: 0.75rem; }
+.ai-preview-plain {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 0.8125rem;
+}
+
 .ai-citation-chip.ai-cite-unreadable {
     color: var(--text-muted);
     font-style: italic;
@@ -1651,23 +1663,18 @@
     // Chat
     // =========================================================================
 
+    // Clone one of the page's <template> elements. Everything these
+    // replace used to be an innerHTML assignment from a string literal.
+    function ionTpl(id) {
+        const tpl = document.getElementById(id);
+        return tpl ? tpl.content.cloneNode(true) : document.createDocumentFragment();
+    }
+
     function startNewChat() {
         currentSessionId = null;
         aiPageMessages = [];
         const container = document.getElementById('ai-page-messages');
-        container.innerHTML = `
-            <div class="ai-welcome">
-                <div class="ai-welcome-orb">
-                    <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
-                        <circle cx="9" cy="13" r="1.5" fill="currentColor"/>
-                        <circle cx="15" cy="13" r="1.5" fill="currentColor"/>
-                        <path d="M9 17h6"/>
-                    </svg>
-                </div>
-                <h2>ION AI Assistant</h2>
-                <p>Security analysis, threat investigation, and technical guidance — powered by your local LLM.</p>
-            </div>`;
+        container.replaceChildren(ionTpl('tpl-ai-welcome'));
     }
 
     async function handleFormSubmit(event) {
@@ -1777,18 +1784,33 @@
         }
     }
 
+    // The shell is cloned from tpl-ai-msg. The body is the one place
+    // the stream writes, so it is the only part filled from a string, and
+    // formatMessage routes through DOMPurify.
+    //
+    // 'msg-' + Date.now() is unique only to the millisecond. In the
+    // common path the user's message and the assistant's placeholder are
+    // separated by the fetch, so they do not collide; the sequence
+    // counter closes the case where two are added inside one tick,
+    // because the consequence is bad out of proportion to the odds. Both
+    // bodies would carry the same id, getElementById returns the first,
+    // and the stream would write the answer into the user's own message.
+    let aiMsgSeq = 0;
+
     function addMessage(role, content) {
         const container = document.getElementById('ai-page-messages');
-        const msgId = 'msg-' + Date.now();
+        const msgId = 'msg-' + Date.now() + '-' + (++aiMsgSeq);
         aiPageMessages.push({ id: msgId, role, content });
 
-        const avatar = role === 'user' ? getUserInitial() : '\u{1F916}';
-        container.insertAdjacentHTML('beforeend', `
-            <div class="ai-msg ${role}">
-                <div class="ai-msg-avatar">${avatar}</div>
-                <div class="ai-msg-body" id="${msgId}">${formatMessage(content)}</div>
-            </div>
-        `);
+        const node = ionTpl('tpl-ai-msg');
+        const msg = node.querySelector('.ai-msg');
+        msg.classList.add(role);
+        msg.querySelector('.ai-msg-avatar').textContent =
+            role === 'user' ? getUserInitial() : '\u{1F916}';
+        const body = msg.querySelector('.ai-msg-body');
+        body.id = msgId;
+        body.innerHTML = formatMessage(content);
+        container.appendChild(node);
         scrollToBottom();
         return msgId;
     }
@@ -1849,10 +1871,10 @@
         const previewContent = document.getElementById('docgen-preview-content');
 
         btn.disabled = true;
-        btn.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span> Generating...';
+        btn.replaceChildren(ionTpl('tpl-ai-generating'));
         saveBtn.style.display = 'none';
         previewArea.style.display = 'flex';
-        previewContent.innerHTML = '<span class="ai-cursor"></span>';
+        previewContent.replaceChildren(ionTpl('tpl-ai-cursor'));
         docgenContent = '';
 
         try {
@@ -1887,9 +1909,17 @@
                             if (format === 'markdown' && typeof marked !== 'undefined') {
                                 previewContent.innerHTML = safeMarkdown(docgenContent);
                             } else if (format === 'html') {
-                                previewContent.innerHTML = docgenContent;
+                                // This branch assigned model output
+                                // straight to innerHTML while the two
+                                // beside it sanitised and escaped. app.js
+                                // states the rule above the helper it
+                                // bypassed: all user-controlled markup
+                                // must go through it.
+                                previewContent.innerHTML = safeHtml(docgenContent);
                             } else {
-                                previewContent.innerHTML = '<pre>' + escapeHtml(docgenContent) + '</pre>';
+                                const plain = ionTpl('tpl-ai-preview-plain');
+                                plain.querySelector('pre').textContent = docgenContent;
+                                previewContent.replaceChildren(plain);
                             }
                         }
                     } catch (e) {
@@ -1901,10 +1931,13 @@
             saveBtn.style.display = 'inline-flex';
             showToast('Document generated successfully', 'success');
         } catch (error) {
-            previewContent.innerHTML = `<div class="text-[var(--danger)] p-3">Error: ${escapeHtml(error.message)}</div>`;
+            const failed = ionTpl('tpl-ai-preview-error');
+            failed.querySelector('.ai-preview-error').textContent =
+                'Error: ' + (error.message || 'Unknown error');
+            previewContent.replaceChildren(failed);
         } finally {
             btn.disabled = false;
-            btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Generate Preview';
+            btn.replaceChildren(ionTpl('tpl-ai-generate-idle'));
         }
     };
 
@@ -2156,4 +2189,47 @@
 
 </div><!-- /ion-tw inner -->
 </div><!-- /ion-tw -->
+
+{#- Static markup that used to be built from JavaScript strings. A node
+    built from a string is a node no sweep of the stylesheet finds, which
+    is what the redesign's `server` column is measuring. These are cloned
+    at runtime instead. -#}
+<template id="tpl-ai-welcome">
+  <div class="ai-welcome">
+    <div class="ai-welcome-orb">
+      <svg viewBox="0 0 24 24" width="40" height="40" fill="none"
+           stroke="currentColor" stroke-width="1.5">
+        <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
+        <circle cx="9" cy="13" r="1.5" fill="currentColor"/>
+        <circle cx="15" cy="13" r="1.5" fill="currentColor"/>
+        <path d="M9 17h6"/>
+      </svg>
+    </div>
+    <h2>ION AI Assistant</h2>
+    <p>Security analysis, threat investigation, and technical guidance,
+      powered by your local LLM.</p>
+  </div>
+</template>
+<template id="tpl-ai-msg">
+  <div class="ai-msg">
+    <div class="ai-msg-avatar"></div>
+    <div class="ai-msg-body"></div>
+  </div>
+</template>
+<template id="tpl-ai-cursor"><span class="ai-cursor"></span></template>
+<template id="tpl-ai-generating">
+  <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+  Generating...
+</template>
+<template id="tpl-ai-generate-idle">
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none"
+       stroke="currentColor" stroke-width="2">
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+  </svg>
+  Generate Preview
+</template>
+<template id="tpl-ai-preview-error">
+  <div class="ai-preview-error"></div>
+</template>
+<template id="tpl-ai-preview-plain"><pre class="ai-preview-plain"></pre></template>
 {% endblock %}

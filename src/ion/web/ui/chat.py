@@ -2,8 +2,8 @@
 
 The chat page is not like the rest of the redesign. Its centre is a token
 stream: `contentEl.innerHTML = formatMessage(fullResponse)` runs once per
-chunk, and a server fragment per token would be a round trip per token. So
-this module does not try to take the stream. It takes everything around it
+chunk, and serving that from a fragment would mean a round trip per token.
+So this module does not try to take the stream. It takes everything around it
 that is built from server data, and chat.html documents the writes that
 stay and why.
 
