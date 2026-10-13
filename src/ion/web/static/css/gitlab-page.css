@@ -1,0 +1,172 @@
+/* The /gitlab page's own stylesheet.
+ *
+ * These rules were the inline <style> block at the end of gitlab.html
+ * until 2026-10-13. They are page-scoped: gitlab.html is the only template
+ * that links this file, and it is linked from {% block head_css %}.
+ *
+ * Cascade note. The inline block sat in {% block scripts %}, at the end of
+ * <body>, so it loaded after every linked sheet and after base.html's own
+ * two inline blocks. From head_css it now loads before ion-workspace.css
+ * and those two. Measured before the move: of the 27 (at-rule, selector)
+ * pairs here, zero appear in ion-workspace.css or either base.html block,
+ * so no rule changes winner at equal specificity.
+ *
+ * What these rules have to beat is daisyUI in ion.css, which still loads
+ * first: `.modal`, which is hidden unless `.modal-open` is set, and
+ * `.loading`, which daisyUI draws as a masked spinner and this page uses
+ * as a word.
+ */
+/* JS opens these via CSSOM display:flex, not daisyUI .modal-open. Bridge. */
+#create-issue-modal[style*="flex"],
+#issue-detail-modal[style*="flex"] {
+    display: grid;
+    place-items: center;
+    align-items: center;
+    justify-content: center;
+    visibility: visible;
+    pointer-events: auto;
+    opacity: 1;
+    background-color: oklch(0% 0 0 / 0.4);
+}
+#create-issue-modal[style*="flex"] > .modal-box,
+#issue-detail-modal[style*="flex"] > .modal-box {
+    opacity: 1;
+    scale: 1;
+    translate: 0;
+}
+#create-issue-modal[style*="flex"] > .modal-box { max-width: 700px; }
+#issue-detail-modal[style*="flex"] > .modal-box { max-width: 900px; }
+
+/* The status fragment adds .connected or .error on the banner. */
+.connection-status.connected {
+    background: color-mix(in oklab, var(--color-success) 15%, transparent);
+    border: 1px solid var(--color-success);
+    color: var(--color-success);
+}
+.connection-status.error {
+    background: color-mix(in oklab, var(--color-error) 15%, transparent);
+    border: 1px solid var(--color-error);
+    color: var(--color-error);
+}
+
+/* The loading placeholder is text, not daisyUI's spinner. */
+#issues-list .loading,
+#issue-comments-list .loading {
+    display: block;
+    aspect-ratio: auto;
+    width: auto;
+    height: auto;
+    background: none;
+    mask-image: none;
+    -webkit-mask-image: none;
+    text-align: center;
+    padding: 2rem;
+    opacity: 0.6;
+}
+
+.issue-card {
+    background: var(--color-base-200);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box, 1rem);
+    padding: 1rem 1.5rem;
+    margin-bottom: 0.75rem;
+    cursor: pointer;
+    transition: box-shadow 0.2s;
+}
+.issue-card:hover {
+    box-shadow: 0 2px 8px color-mix(in oklab, var(--color-base-content) 15%, transparent);
+}
+.issue-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+}
+.issue-id {
+    opacity: 0.6;
+    font-weight: 500;
+}
+.issue-title-text {
+    flex: 1;
+    font-weight: 500;
+}
+
+.issue-state {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+.issue-state.opened {
+    background: var(--color-success);
+    color: var(--color-success-content);
+}
+.issue-state.closed {
+    background: var(--color-neutral);
+    color: var(--color-neutral-content);
+}
+
+/* GitLab label colours come from the API via data-ion-style. */
+.issue-labels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+.issue-label {
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    /* The background is the label's own colour from the GitLab API, applied
+       at runtime from data-ion-style. This rule carried `color: white` and
+       no background of its own, so the one case the server cannot cover --
+       data-ion-style not applied, because ion-dynamic-styles.js has not run
+       or its observer missed the insert -- rendered white text straight onto
+       the page: invisible in light mode, measured 1.00:1. The fallback here
+       is #6c757d, the same value `_safe_color` in web/ui/gitlab.py hands a
+       label whose colour is missing or not a bare hex, so a chip that loses
+       its runtime colour degrades to the grey the server already means by
+       it rather than to nothing. setProperty still wins over this. */
+    background: #6c757d;
+    color: white;
+}
+.issue-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+    opacity: 0.6;
+}
+
+.comment-item {
+    background: var(--color-base-200);
+    padding: 1rem;
+    border-radius: var(--radius-box, 1rem);
+    margin-bottom: 0.75rem;
+}
+.comment-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    font-size: 0.85rem;
+}
+.comment-author { font-weight: 500; }
+.comment-date { opacity: 0.6; }
+.comment-body { white-space: pre-wrap; }
+
+/* Native multi-select: daisyUI .select is a single-line dropdown. */
+#issue-labels {
+    height: auto;
+    background-image: none;
+    padding-right: 0.75rem;
+}
+
+.error-message {
+    color: var(--color-error);
+    padding: 1rem;
+}
+.empty-message {
+    opacity: 0.6;
+    padding: 1rem;
+    text-align: center;
+}
