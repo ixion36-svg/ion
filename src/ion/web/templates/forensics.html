@@ -1010,11 +1010,7 @@ function renderTimeline(entries){
     if(!entries.length){d.innerHTML='<div class="empty-state">No timeline entries</div>';return}
     d.innerHTML=entries.map(e=>`<div class="tl-entry ${e.entry_type}"><div class="tl-meta">${esc(e.username||'System')} &middot; ${fmtDateTime(e.timestamp)} &middot; <em>${fmtLabel(e.entry_type)}</em></div><div class="tl-content">${esc(e.content)}</div></div>`).join('');
 }
-function renderDetailEvidence(items){
-    const d=document.getElementById('cd-evidence-list');
-    if(!items.length){d.innerHTML='<div class="empty-state">No evidence items</div>';return}
-    d.innerHTML=items.map(e=>`<div class="ev-card"><div class="ev-card-header"><div><strong>${esc(e.evidence_number)}</strong> &mdash; ${esc(e.name)} <span class="badge badge-${e.status==='under_analysis'?'analysis':'intake'} text-[.7rem]">${fmtLabel(e.status)}</span></div><div class="flex gap-1.5"><button class="btn btn-secondary py-0.5 px-2 text-xs" data-click-action="showCustodyLog" data-args='[${e.id}, "${esc(e.evidence_number)}"]'>Custody (${e.custody_entries||0})</button><button class="btn btn-secondary py-0.5 px-2 text-xs" data-click-action="showCustodyModal" data-args='[${e.id}]'>+ Action</button></div></div><div class="text-[.8rem] text-[var(--text-secondary)]">${fmtLabel(e.evidence_type)} &middot; ${esc(e.source||'N/A')} &middot; ${esc(e.storage_location||'N/A')}</div>${e.hash_sha256?`<div class="ev-card-hash">SHA256: ${e.hash_sha256}</div>`:''}${e.hash_md5?`<div class="ev-card-hash">MD5: ${e.hash_md5}</div>`:''}</div>`).join('');
-}
+function renderDetailEvidence(){return ionLoadFragment('/ui/forensics/cases/'+encodeURIComponent(currentCaseId)+'/evidence','cd-evidence-list','Loading evidence…');}
 
 // ======== CASE ACTIONS ========
 // ======== INLINE EDIT: Title & Description ========
@@ -1086,11 +1082,15 @@ async function generateReport(){
 function copyReport(){navigator.clipboard.writeText(document.getElementById('rpt-content').textContent).then(()=>showToast('Copied'))}
 
 // ======== EVIDENCE ========
-function populateEvidenceCaseSelect(){const sel=document.getElementById('evidence-case-select');sel.innerHTML='<option value="">Select an investigation...</option>';allCases.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.case_number+' - '+c.title;sel.appendChild(o)})}
-async function loadEvidenceForCase(){
-    const caseId=document.getElementById('evidence-case-select').value;
-    if(!caseId){document.getElementById('evidence-tbody').replaceChildren();document.getElementById('evidence-empty').style.display='';return}
-    try{const r=await fetch(API+'/cases/'+caseId+'/evidence');if(!r.ok)throw 0;renderEvidenceTable(await r.json())}catch(e){showToast('Failed',true)}
+function populateEvidenceCaseSelect(){
+ const sel=document.getElementById('evidence-case-select'),initial=cloneTemplate('forensic-evidence-option');sel.replaceChildren(initial);
+ if(!Array.isArray(allCases)){ionMessage(sel,'Investigations unavailable');return;}
+ allCases.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=(c.case_number ?? 'Unknown')+' - '+(c.title ?? 'Unknown');sel.appendChild(o);});
+}
+function loadEvidenceForCase(){
+ const id=document.getElementById('evidence-case-select').value;document.getElementById('evidence-empty').style.display='none';
+ if(!id){ionMessage(document.getElementById('evidence-tbody'),'Select an investigation to view evidence');return;}
+ return ionLoadFragment('/ui/forensics/cases/'+encodeURIComponent(id)+'/evidence?table=true','evidence-tbody','Loading evidence…');
 }
 function renderEvidenceTable(items){
     const tbody=document.getElementById('evidence-tbody'),empty=document.getElementById('evidence-empty');
@@ -1112,7 +1112,8 @@ async function submitCustody(){
     try{const r=await fetch(API+'/evidence/'+currentEvidenceId+'/custody',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw 0;closeModal('modal-custody');showToast('Custody action logged');if(currentCaseId)openCaseDetail(currentCaseId)}catch(e){showToast('Failed',true)}
 }
 async function showCustodyLog(evId,evNum){
-    try{const r=await fetch(API+'/evidence/'+evId+'/custody');if(!r.ok)throw 0;const entries=await r.json();document.getElementById('cl-title').textContent='Chain of Custody: '+evNum;const d=document.getElementById('cl-entries');d.innerHTML=entries.length?entries.map(e=>`<div class="tl-entry custody_change"><div class="tl-meta">${fmtDateTime(e.timestamp)} &middot; <strong>${fmtLabel(e.action)}</strong></div><div class="tl-content">Performed by: ${esc(e.performed_by_username||'-')}${e.received_by_username?' &rarr; Received by: '+esc(e.received_by_username):''}${e.location?'<br>Location: '+esc(e.location):''}${e.notes?'<br>Notes: '+esc(e.notes):''}</div></div>`).join(''):'<div class="empty-state">No custody entries</div>';document.getElementById('modal-custody-log').style.display='flex'}catch(e){showToast('Failed',true)}
+ document.getElementById('cl-title').textContent='Chain of Custody: '+evNum;document.getElementById('modal-custody-log').style.display='flex';
+ return ionLoadFragment('/ui/forensics/evidence/'+encodeURIComponent(evId)+'/custody','cl-entries','Loading custody log…');
 }
 
 // ======== PLAYBOOKS ========

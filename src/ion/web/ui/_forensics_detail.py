@@ -77,8 +77,16 @@ def sections(request:Request,case_id:int,user=Depends(read_user),session:Session
     return render_view(request,'_fragments/forensics_sections.html',view)
 
 
+@router.get('/forensics/cases/{case_id}/evidence',response_class=HTMLResponse)
+def evidence(request:Request,case_id:int,table:bool=False,user=Depends(read_user),session:Session=Depends(get_db_session)):
+    view:CollectionPanel=_collection(_read(forensics_api.list_evidence,case_id=case_id,user=user,session=session),user,case_id=case_id,table=table)
+    return render_view(request,'_fragments/forensics_evidence.html',view)
 
 
+@router.get('/forensics/evidence/{evidence_id}/custody',response_class=HTMLResponse)
+def custody(request:Request,evidence_id:int,user=Depends(read_user),session:Session=Depends(get_db_session)):
+    view:CollectionPanel=_collection(_read(forensics_api.get_custody_log,evidence_id=evidence_id,user=user,session=session),user)
+    return render_view(request,'_fragments/forensics_custody.html',view)
 
 
 

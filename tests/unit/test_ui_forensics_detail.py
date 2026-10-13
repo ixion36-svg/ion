@@ -23,7 +23,7 @@ def client():
     app.dependency_overrides[get_db_session] = lambda: None
     return TestClient(app)
 
-@pytest.mark.parametrize('path,service,module,key', [('cases/1/sections', 'get_case_steps', forensics_api, None)])
+@pytest.mark.parametrize('path,service,module,key', [('cases/1/sections', 'get_case_steps', forensics_api, None), ('cases/1/evidence', 'list_evidence', forensics_api, None), ('evidence/1/custody', 'get_custody_log', forensics_api, None)])
 @pytest.mark.parametrize('payload,state', [(None, 'failed'), ({}, 'failed'), ([], 'empty'), ([{'id': 1, 'title': '<attack>', 'name': 'Example', 'content': 'Text'}], 'data')])
 def test_collection_outcomes(client, monkeypatch, path, service, module, key, payload, state):
     result = {key: payload} if key else payload
@@ -46,7 +46,16 @@ def test_sections_missing_and_zero(client, monkeypatch, field, value):
     assert response.status_code == 200
     assert 'undefined' not in response.text
 
-@pytest.mark.parametrize('path,service,module', [('cases/1/sections', 'get_case_steps', forensics_api)])
+@pytest.mark.parametrize('field', ['custody_entries'])
+@pytest.mark.parametrize('value', [None, 0, 4])
+def test_figures_keep_unknown(client, monkeypatch, field, value):
+    service = 'list_evidence' if field == 'custody_entries' else 'list_playbooks'
+    path = 'cases/1/evidence' if field == 'custody_entries' else 'playbooks'
+    monkeypatch.setattr(forensics_api, service, lambda **kw: [{'id': 1, 'name': 'N', field: value}])
+    html = client.get('/ui/forensics/' + path).text
+    assert ('Unknown' if value is None else str(value)) in html
+
+@pytest.mark.parametrize('path,service,module', [('cases/1/sections', 'get_case_steps', forensics_api), ('cases/1/evidence', 'list_evidence', forensics_api), ('evidence/1/custody', 'get_custody_log', forensics_api)])
 def test_refusal_never_looks_empty(client, monkeypatch, path, service, module):
 
     def refused(**kwargs):
@@ -97,7 +106,7 @@ def test_missing_summary_fields_are_unavailable(client, monkeypatch, payload):
     assert 'unavailable' in html
     assert '0%' not in html
 
-@pytest.mark.parametrize('path,service,payload', [('cases/1/sections', 'get_case_steps', [{'id': 1, 'title': 'Readonly', 'fields': [], 'fields_data': {}}])])
+@pytest.mark.parametrize('path,service,payload', [('cases/1/sections', 'get_case_steps', [{'id': 1, 'title': 'Readonly', 'fields': [], 'fields_data': {}}]), ('cases/1/evidence', 'list_evidence', [{'id': 1, 'name': 'Readonly'}])])
 def test_readonly_view_withholds_write_controls(monkeypatch, path, service, payload):
     ui = importlib.import_module('ion.web.ui._forensics_detail')
     from ion.auth.dependencies import get_current_user
@@ -124,12 +133,25 @@ def test_fragment_read_permission_is_enforced(monkeypatch):
     assert response.status_code == 403 and calls == []
 
 @pytest.mark.parametrize('payload', [[None], [4], ['bad']])
-@pytest.mark.parametrize('path,service', [('cases/1/sections', 'get_case_steps')])
+@pytest.mark.parametrize('path,service', [('cases/1/sections', 'get_case_steps'), ('cases/1/evidence', 'list_evidence'), ('evidence/1/custody', 'get_custody_log')])
 def test_malformed_record_lists_are_failed_reads(client, monkeypatch, payload, path, service):
     monkeypatch.setattr(forensics_api, service, lambda **kw: payload)
     response = client.get('/ui/forensics/' + path, headers={'Accept': 'application/json'})
     assert response.status_code == 200
     assert response.json()['state'] == 'failed'
+
+@pytest.mark.parametrize('field', ['evidence_number', 'name', 'evidence_type', 'status', 'hash_sha256', 'hash_md5', 'storage_location', 'collected_by_username', 'source'])
+@pytest.mark.parametrize('value', [None, 0, '', '<img src=x>'])
+def test_evidence_fields_are_safe_in_both_presentations(client, monkeypatch, field, value):
+    from bs4 import BeautifulSoup
+    row = {'id': 1, 'name': 'Evidence', field: value}
+    monkeypatch.setattr(forensics_api, 'list_evidence', lambda **kw: [row])
+    for suffix in ['', '?table=true']:
+        response = client.get('/ui/forensics/cases/1/evidence' + suffix)
+        assert response.status_code == 200
+        assert BeautifulSoup(response.text, 'html.parser').find('img') is None
+        if value == '<img src=x>' and (not (field == 'source' and suffix or (field == 'collected_by_username' and (not suffix)))):
+            assert '&lt;img src=x&gt;' in response.text.lower()
 
 def test_section_missing_fields_does_not_offer_save(client, monkeypatch):
     monkeypatch.setattr(forensics_api, 'get_case_steps', lambda **kw: [{'id': 1, 'title': 'Section'}])
