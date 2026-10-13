@@ -258,3 +258,131 @@ async def discover_search_fragment(
         view = search_view(payload)
 
     return render_view(request, FRAGMENT, view)
+
+
+# ---------------------------------------------------------------------------
+# The time histogram
+# ---------------------------------------------------------------------------
+#
+# POST /api/elasticsearch/discover/histogram, drawn as one bar per bucket
+# with its height as a percentage of the tallest.
+#
+#   * ``title="${b.timestamp}: ${b.count} events"`` interpolated an
+#     Elasticsearch value into an attribute with no escaping. A timestamp
+#     is unlikely to carry a quote, which is what makes it the kind of
+#     place that stops being true quietly: the same pattern one field along
+#     is a broken attribute.
+#   * `total.textContent = `${data.total} total events`` printed "undefined
+#     total events" for a payload without one.
+#   * `!data.buckets || data.buckets.length === 0` sent a body whose
+#     buckets were not a list to "No data for histogram".
+#   * `Math.max(...data.buckets.map(b => b.count))` spreads every bucket
+#     into an argument list, and a bucket whose count was not a number made
+#     every height NaN, so the whole chart rendered as nothing with no
+#     error. The maximum is taken over readable counts only.
+
+HISTOGRAM_FRAGMENT = "_fragments/discover_histogram.html"
+
+
+class HistogramBar(TypedDict):
+    """One bucket. `height` is a percentage of the tallest readable bucket,
+    and None for a bucket whose count we could not read: that bar is drawn
+    as unmeasured rather than as zero."""
+
+    when: Optional[str]
+    count: Optional[int]
+    height: Optional[float]
+
+
+class HistogramView(TypedDict):
+    state: str
+    detail: Optional[str]
+    bars: list[HistogramBar]
+    total: Optional[int]
+
+
+def histogram_view(payload: Any) -> HistogramView:
+    """The endpoint's body as the chart's model."""
+    buckets = payload.get("buckets") if isinstance(payload, dict) else None
+    if not isinstance(buckets, list):
+        return {
+            "state": "failed",
+            "detail": "The histogram answered something this page could not read.",
+            "bars": [], "total": None,
+        }
+    total = _int(payload.get("total"))
+    if not buckets:
+        return {"state": "empty", "detail": None, "bars": [],
+                "total": total}
+
+    readable = [b for b in buckets if isinstance(b, dict)]
+    counts = [c for c in (_int(b.get("count")) for b in readable)
+              if c is not None]
+    tallest = max(counts) if counts else 0
+    bars: list[HistogramBar] = []
+    for bucket in readable:
+        count = _int(bucket.get("count"))
+        when = plain(bucket.get("timestamp"))
+        bars.append({
+            "when": str(when) if when is not None else None,
+            "count": count,
+            "height": (round(count / tallest * 100, 2)
+                       if count is not None and tallest > 0 else None),
+        })
+    if not bars:
+        return {
+            "state": "failed",
+            "detail": "The histogram returned buckets this page could not read.",
+            "bars": [], "total": total,
+        }
+    return {"state": "data", "detail": None, "bars": bars, "total": total}
+
+
+@router.post(
+    "/discover/histogram",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def discover_histogram_fragment(
+    request: Request,
+    index_pattern: str = Form("logs-*"),
+    query: str = Form("*"),
+    time_field: str = Form("@timestamp"),
+    time_from: str = Form("now-24h"),
+    time_to: str = Form("now"),
+    interval: str = Form("1h"),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    """The time histogram."""
+    from fastapi import HTTPException
+
+    from ion.web.elasticsearch_api import (
+        DiscoverHistogramRequest,
+        discover_histogram,
+    )
+
+    body = DiscoverHistogramRequest(
+        index_pattern=index_pattern,
+        query=query or "*",
+        time_field=time_field,
+        time_from=time_from,
+        time_to=time_to,
+        interval=interval,
+    )
+    try:
+        payload = await discover_histogram(body, current_user=current_user)
+    except HTTPException as refusal:
+        view: HistogramView = {
+            "state": failure(refusal.status_code, refusal.detail)["state"],
+            "detail": str(refusal.detail) if refusal.detail else None,
+            "bars": [], "total": None,
+        }
+    except Exception:
+        logger.exception("Discover histogram fragment could not read")
+        view = {"state": "failed",
+                "detail": "The histogram did not complete.",
+                "bars": [], "total": None}
+    else:
+        view = histogram_view(payload)
+
+    return render_view(request, HISTOGRAM_FRAGMENT, view)

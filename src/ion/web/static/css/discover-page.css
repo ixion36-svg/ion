@@ -1,0 +1,21 @@
+/* /discover, the page's own rules for the server-rendered fragments. */
+
+/* A figure the payload did not carry. Deliberately not a zero: a
+   zero-height histogram bar looks like a quiet hour, and a blank cell
+   looks like a field that is not there. */
+.dsc-bar-unmeasured {
+    height: 100%;
+    background: repeating-linear-gradient(
+        45deg,
+        color-mix(in srgb, var(--text-muted) 25%, transparent) 0 3px,
+        transparent 3px 6px);
+    border: 1px dashed color-mix(in srgb, var(--text-muted) 40%, transparent);
+}
+
+/* A field the document does not carry, as against one it carries and sets
+   to null. The page rendered both as "-". */
+.dsc-absent::after {
+    content: "\2014";
+    color: var(--text-muted);
+    opacity: 0.5;
+}

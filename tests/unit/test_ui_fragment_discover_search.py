@@ -317,3 +317,114 @@ def test_the_page_no_longer_builds_the_results_table():
     assert block, "the entry point is still there"
     assert not re.search(r"\.innerHTML\s*=", block.group(0))
     assert "htmx.ajax" in block.group(0)
+
+
+# ---------------------------------------------------------------------------
+# The time histogram
+# ---------------------------------------------------------------------------
+
+
+HIST = "/ui/discover/histogram"
+
+
+@pytest.fixture
+def histogram(monkeypatch):
+    def set(result=None, raises=None):
+        async def handler(request, current_user=None):
+            if raises is not None:
+                raise raises
+            return result
+
+        monkeypatch.setattr(
+            "ion.web.elasticsearch_api.discover_histogram", handler)
+
+    return set
+
+
+def _hpost(user, accept=None):
+    headers = {"accept": accept} if accept else {}
+    with TestClient(_app(user)) as client:
+        return client.post(HIST, data={"index_pattern": "logs-*"},
+                           headers=headers)
+
+
+def test_the_histogram_needs_the_pages_permission(histogram):
+    histogram(result={"buckets": [], "total": 0})
+    assert _hpost(_User()).status_code == 403
+    assert _hpost(_reader()).status_code == 200
+
+
+def test_bars_are_scaled_against_the_tallest_bucket(histogram):
+    histogram(result={"buckets": [
+        {"timestamp": "t1", "count": 5},
+        {"timestamp": "t2", "count": 10},
+    ], "total": 15})
+    html = _hpost(_reader()).text
+    assert "height: 100.0%" in html or "height: 100%" in html
+    assert "height: 50.0%" in html or "height: 50%" in html
+
+
+def test_a_bucket_with_an_unreadable_count_is_not_drawn_as_zero(histogram):
+    """`Math.max(...buckets.map(b => b.count))` made every height NaN if any
+    one count was not a number, so the whole chart rendered as nothing. A
+    zero-height bar also reads as a quiet hour, which is a claim."""
+    histogram(result={"buckets": [
+        {"timestamp": "t1", "count": 10},
+        {"timestamp": "t2", "count": "lots"},
+    ], "total": 10})
+    html = _hpost(_reader()).text
+    assert "dsc-bar-unmeasured" in html
+    assert "height: 100.0%" in html or "height: 100%" in html
+
+
+def test_a_bar_title_carrying_a_quote_cannot_break_the_attribute(histogram):
+    """The page interpolated an Elasticsearch timestamp into
+    `title="${b.timestamp}: ..."` with no escaping."""
+    histogram(result={"buckets": [
+        {"timestamp": 'x" onmouseover="alert(1)', "count": 1}], "total": 1})
+    html = _hpost(_reader()).text
+    assert 'onmouseover="alert(1)"' not in html
+    assert "&#34;" in html or "&quot;" in html
+
+
+@pytest.mark.parametrize("result", [{}, {"buckets": None},
+                                     {"buckets": "two"}, None])
+def test_a_histogram_body_of_the_wrong_shape_is_a_failure(
+        histogram, result):
+    histogram(result=result)
+    body = flat(_hpost(_reader()).text)
+    assert "No data for histogram" not in body, result
+    assert "could not" in body.lower(), result
+
+
+def test_an_empty_histogram_says_so(histogram):
+    histogram(result={"buckets": [], "total": 0})
+    body = flat(_hpost(_reader()).text)
+    assert "No data for histogram" in body
+
+
+def test_a_missing_total_is_not_printed_as_undefined(histogram):
+    histogram(result={"buckets": [{"timestamp": "t", "count": 1}]})
+    body = flat(_hpost(_reader()).text)
+    assert "undefined" not in body
+    assert "total unknown" in body
+
+
+def test_the_histogram_reports_an_unconfigured_elasticsearch_distinctly(
+        histogram):
+    histogram(raises=HTTPException(status_code=400,
+                                  detail="Elasticsearch is not configured"))
+    body = flat(_hpost(_reader()).text)
+    assert "not configured" in body
+    assert "No data for histogram" not in body
+
+
+def test_the_page_no_longer_draws_the_histogram():
+    body = re.sub(r"\{#.*?#\}", "", PAGE.read_text(encoding="utf-8"),
+                  flags=re.S)
+    block = re.search(r"\bfunction displayHistogram\(.*?\n\}", body, re.S)
+    assert block, "the entry point is still there"
+    assert not re.search(r"\.innerHTML\s*=", block.group(0))
+    assert "htmx.ajax" in block.group(0)
+    assert "style.display" not in block.group(0), (
+        "the panel is shown by removing the hidden class")

@@ -2,6 +2,14 @@
 
 {% block title %}Discover - ION{% endblock %}
 
+{% block head_css %}
+{# The page's own rules, for the classes the server-rendered fragments
+   emit. head_css loads at base.html line 50, so this beats ion.css and
+   ion-migrated-styles.css and loses to ion-workspace.css; neither of the
+   selectors here appears in that sheet. #}
+<link rel="stylesheet" href="/static/css/discover-page.css?v={{ ion_version }}">
+{% endblock %}
+
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
@@ -829,47 +837,37 @@ async function getHistogram() {
     const timeField = document.getElementById('search-time-field').value;
     const timeFrom = document.getElementById('search-time-from').value;
 
-    try {
-        const response = await fetch('/api/elasticsearch/discover/histogram', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                index_pattern: indexPattern,
-                query: query,
-                time_field: timeField,
-                time_from: timeFrom,
-                time_to: 'now',
-                interval: '1h'
-            })
-        });
-
-        if (!response.ok) throw new Error('Histogram failed');
-
-        const data = await response.json();
-        displayHistogram(data);
-    } catch (error) {
-        showToast('Histogram failed: ' + error.message, 'error');
-    }
+    // One read, rendered by the server. The toast went with the second
+    // fetch: a histogram that fails now says so in the panel, where the
+    // chart would have been, instead of in a notification that disappears
+    // and leaves the previous chart on screen looking current.
+    return displayHistogram({
+        index_pattern: indexPattern,
+        query: query,
+        time_field: timeField,
+        time_from: timeFrom,
+        time_to: 'now',
+        interval: '1h',
+    });
 }
 
-function displayHistogram(data) {
+// POST /ui/discover/histogram draws the bars and swaps the total out of
+// band. The bar titles were the reason: the page interpolated an
+// Elasticsearch timestamp into title="..." with no escaping.
+//
+// Also moved: a body whose buckets were not a list read as "No data for
+// histogram"; a missing total printed "undefined total events"; and
+// `Math.max(...buckets.map(b => b.count))` made every height NaN if any
+// one count was not a number, so the whole chart rendered as nothing.
+function displayHistogram(params) {
     const panel = document.getElementById('histogram-panel');
     const container = document.getElementById('histogram-container');
-    const total = document.getElementById('histogram-total');
-
-    panel.style.display = 'block';
-    total.textContent = `${data.total} total events`;
-
-    if (!data.buckets || data.buckets.length === 0) {
-        container.innerHTML = '<div class="empty-state">No data for histogram</div>';
-        return;
-    }
-
-    const maxCount = Math.max(...data.buckets.map(b => b.count));
-    container.innerHTML = data.buckets.map(b => {
-        const height = maxCount > 0 ? (b.count / maxCount * 100) : 0;
-        return `<div class="histogram-bar" data-ion-style="height: ${height}%" title="${b.timestamp}: ${b.count} events"></div>`;
-    }).join('');
+    if (!container) return Promise.resolve();
+    if (panel) panel.classList.remove('hidden');
+    return htmx.ajax('POST', '/ui/discover/histogram', {
+        source: container, target: container, swap: 'innerHTML',
+        values: params,
+    });
 }
 
 // RFC 4180 quoting, no formula guard. Used for the column names, which
