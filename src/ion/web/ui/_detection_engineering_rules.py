@@ -32,6 +32,12 @@ class RulesView(TypedDict):
     limit: int
 
 
+class ProgressionView(TypedDict):
+    state: State
+    progressions: list[dict[str, Any]] | None
+    total_hosts_checked: int | None
+    playbook_count: int | None
+    hours: int
 
 
 def _state(items: list | None) -> State:
@@ -87,3 +93,19 @@ def rules_panel(request: Request, search: str = '', severity: str = '', enabled:
     return render_view(request, '_fragments/detection_engineering_rules.html', view)
 
 
+@router.get('/detection-engineering/progression', response_class=HTMLResponse)
+async def progression(request: Request, hours: int = Query(24, ge=1, le=168)):
+    progressions = None
+    payload = None
+    try:
+        payload = await de_tide_api.tide_de_kill_chain_alerts(hours=hours)
+        if isinstance(payload, dict) and payload.get('enabled') is True and not payload.get('error'):
+            progressions = _objects(rows(payload, 'progressions'))
+    except Exception:
+        logger.exception('Could not read kill chain progressions')
+    view: ProgressionView = {
+        'state': _state(progressions), 'progressions': progressions, 'hours': hours,
+        'total_hosts_checked': payload.get('total_hosts_checked') if isinstance(payload, dict) else None,
+        'playbook_count': payload.get('playbook_count') if isinstance(payload, dict) else None,
+    }
+    return render_view(request, '_fragments/detection_engineering_progression.html', view)

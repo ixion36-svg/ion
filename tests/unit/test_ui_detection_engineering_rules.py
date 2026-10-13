@@ -22,6 +22,7 @@ def client():
 @pytest.mark.parametrize('panel,method,empty,data', [
     ('killchains', 'tide_de_use_cases', [], [{'name': 'A < B', 'steps': []}]),
     ('rules', 'tide_de_rules', {'rows': [], 'total': 0}, {'rows': [{'name': 'A < B'}], 'total': 1}),
+    ('progression', 'tide_de_kill_chain_alerts', {'enabled': True, 'progressions': []}, {'enabled': True, 'progressions': [{'host': 'A < B', 'steps': []}]}),
 ])
 @pytest.mark.parametrize('outcome', ['failed', 'empty', 'data', 'exception'])
 def test_outcomes(client, monkeypatch, panel, method, empty, data, outcome):
@@ -68,6 +69,13 @@ def test_rule_filters(client, monkeypatch):
     assert calls == [dict(search='a&b', severity='high', enabled='0', offset=50, limit=50)]
 
 
+@pytest.mark.parametrize('payload', [{'enabled': False}, {'enabled': True, 'error': 'Failed query'}, {'enabled': True}, {}])
+def test_progression_refusals(client, monkeypatch, payload):
+    c, ui = client
+    async def read(**kw):
+        return payload
+    monkeypatch.setattr(ui.de_tide_api, 'tide_de_kill_chain_alerts', read)
+    assert c.get('/ui/detection-engineering/progression', headers={'Accept': 'application/json'}).json()['state'] == 'failed'
 
 
 @pytest.mark.parametrize('coverage,text', [
@@ -98,8 +106,38 @@ def test_killchain_techniques(client, monkeypatch, techniques, text):
     assert text in c.get('/ui/detection-engineering/killchains').text
 
 
+@pytest.mark.parametrize('key', ['fired_steps', 'total_steps', 'pct_complete', 'host', 'playbook_name', 'severity'])
+def test_each_progression_field_missing(client, monkeypatch, key):
+    c, ui = client
+    p = {'fired_steps': 0, 'total_steps': 0, 'pct_complete': 0, 'host': 'Host', 'playbook_name': 'Playbook', 'severity': 'high', 'steps': []}
+    p.pop(key)
+    async def read(**kw):
+        return {'enabled': True, 'progressions': [p], 'total_hosts_checked': 0, 'playbook_count': 0}
+    monkeypatch.setattr(ui.de_tide_api, 'tide_de_kill_chain_alerts', read)
+    text = c.get('/ui/detection-engineering/progression').text
+    assert 'Unavailable' in text
+    assert '0 hosts scanned, 0 playbooks' in text
 
 
+@pytest.mark.parametrize('step,text', [
+    ({'fired': False}, 'Not fired'),
+    ({}, 'Firing status unavailable'),
+    ({'fired': True}, 'Alert details unavailable'),
+    ({'fired': True, 'alert_data': {'count': 0}}, '0 alert'),
+    ({'fired': True, 'alert_data': {'rules': ['<rule>', 'second', 'hidden']}}, 'Unavailable alert'),
+    ({'fired': True, 'alert_data': {'count': 2}}, '2 alerts'),
+])
+def test_progression_steps(client, monkeypatch, step, text):
+    c, ui = client
+    async def read(**kw):
+        assert kw['hours'] == 72
+        return {'enabled': True, 'progressions': [{'steps': [step]}]}
+    monkeypatch.setattr(ui.de_tide_api, 'tide_de_kill_chain_alerts', read)
+    response = c.get('/ui/detection-engineering/progression?hours=72').text
+    assert text in response
+    if step.get('alert_data', {}).get('rules'):
+        assert '&lt;rule&gt;, second' in response
+        assert 'hidden' not in response
 
 
 def test_permissions_without_licence_gate(client):
