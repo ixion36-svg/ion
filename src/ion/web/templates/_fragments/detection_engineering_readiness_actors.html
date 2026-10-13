@@ -1,0 +1,94 @@
+{% macro n(v) %}{{ v if v is not none else 'Unknown' }}{% endmacro %}
+{% if state == 'failed' %}
+<div class="de-empty" role="alert">{{ error }}</div>
+{% elif state == 'empty' %}
+<div class="de-empty">No threat actors found. Try searching for "APT", "Lazarus", "Turla", etc.</div>
+{% else %}
+<div class="text-[.78rem] text-[var(--text-secondary)] mb-3">TIDE covers <strong>{{ n(tide_covered_techniques) }}</strong>/{{ n(tide_total_techniques) }} MITRE techniques globally. Showing readiness against <strong>{{ actors|length }}</strong> threat actors.</div>
+{% for a in actors %}
+{% set readiness=a.get('readiness_pct') %}
+{% set color='mitre-covered' if readiness is not none and readiness >= 75 else 'mitre-partial' if readiness is not none and readiness >= 50 else 'sev-critical' %}
+<div class="de-actor">
+<div class="de-actor-header" data-click-action="toggleActorDetail" data-args='{{ ["$target"]|tojson }}'>
+<span class="de-actor-chevron">▶</span>
+<div class="flex-1">
+<div class="de-actor-name">
+{% if a.get('country_flag') %}
+<span class="country-flag" title="{{ a.get('country_name','') }}">{{ a.country_flag }}</span> {% endif %}{{ a.get('name','Unknown') }}</div>
+{% if a.get('aliases') %}
+<div class="de-actor-aliases">{{ a.aliases[:4]|join(', ') }}</div>
+{% endif %}
+</div>
+<div class="de-actor-meta">
+<div class="de-actor-meta-item">{{ n(a.get('covered_count')) }}/{{ n(a.get('total_ttps')) }} TTPs</div>
+<div class="de-actor-meta-item">{{ n(a.get('gap_count')) }} gaps</div>
+</div>
+<div class="de-actor-gauge">
+<div class="de-actor-gauge-ring" {% if readiness is not none %}data-ion-style="background:conic-gradient(var(--{{ color }}) {{ readiness }}%, var(--ion-border) {{ readiness }}%)"{% endif %}>
+<div class="w-[36px] h-[36px] rounded-[50%] bg-[var(--bg-secondary)] flex items-center justify-center">
+<span class="de-actor-gauge-val">{{ n(readiness) }}{% if readiness is not none %}%{% endif %}
+</span>
+</div>
+</div>
+<div class="de-actor-gauge-label">Readiness</div>
+</div>
+</div>
+<div class="de-actor-body">
+{% if a.get('description') %}
+<div class="text-[.78rem] text-[var(--text-secondary)] mt-3 mb-2">{{ a.description }}</div>
+{% endif %}
+<div class="de-actor-ttp-grid">
+<div class="de-ttp-covered">
+<div class="de-section-title mb-2">Covered TTPs ({{ n(a.get('covered_count')) }})</div>
+{% if a.get('covered') is none %}
+<div>Coverage unavailable</div>
+{% elif not a.covered %}
+<div>None</div>
+{% else %}
+<table class="de-table">
+<thead>
+<tr>
+<th>Technique</th>
+<th>Rules</th>
+<th>Enabled</th>
+</tr>
+</thead>
+<tbody>
+{% for t in a.covered %}
+<tr>
+<td>
+<span class="de-mitre-chip">{{ t.get('mitre_id','Unknown') }}</span> {{ t.get('name','') }}</td>
+<td class="mono">{{ n(t.get('rule_count')) }}</td>
+<td class="mono de-enabled">{{ n(t.get('enabled_rules')) }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% endif %}
+</div>
+<div class="de-ttp-gap">
+<div class="de-section-title mb-2 text-[var(--mitre-gap)]">Detection Gaps ({{ n(a.get('gap_count')) }})</div>
+{% if a.get('gaps') is none %}
+<div>Gaps unavailable</div>
+{% elif not a.gaps %}
+<div>Full coverage!</div>
+{% else %}
+{% for t in a.gaps %}
+<div class="py-1 text-[.78rem]">
+<span class="de-mitre-chip">{{ t.get('mitre_id','Unknown') }}</span> {{ t.get('name','') }}</div>
+{% endfor %}
+{% endif %}
+</div>
+</div>
+{% if a.get('id') %}
+<div class="flex gap-2 mt-3 items-center">
+<button class="de-btn-report" data-click-action="deGenerateReport" data-args='{{ [a.id,a.get("entity_type","threat_actor"),"$event"]|tojson }}'>Assess</button>
+<button class="de-btn-pdf" data-click-action="deDownloadPdf" data-args='{{ [a.id,a.get("entity_type","threat_actor"),"$event"]|tojson }}'>Download PDF</button>
+</div>
+<div id="de-sysreadiness-{{ a.id }}">
+</div>
+{% endif %}
+</div>
+</div>
+{% endfor %}
+{% endif %}
