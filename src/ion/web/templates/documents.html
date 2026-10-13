@@ -2,6 +2,14 @@
 
 {% block title %}Documents - ION{% endblock %}
 
+{% block head_css %}
+{# The page's own rules, for the classes the server-rendered list emits.
+   head_css loads at base.html line 50, so this beats ion.css and
+   ion-migrated-styles.css and loses to ion-workspace.css. None of the
+   selectors here appears in that sheet, so nothing changes winner. #}
+<link rel="stylesheet" href="/static/css/documents-page.css?v={{ ion_version }}">
+{% endblock %}
+
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
@@ -596,18 +604,55 @@ function initDocQuillEditor(content, format) {
     docQuillInitialHtml = docQuillEditor.root.innerHTML;
 }
 
+// GET /ui/documents/list renders the library, filtered. The five controls
+// the page filtered with are the route's five query parameters, so the
+// filter now runs over the whole library rather than over allDocuments,
+// which GET /api/documents caps: the old filter searched whatever had
+// been loaded and presented the result as the library.
+//
+// Also moved to the server: Delete appears only where the endpoint would
+// allow it, which is ownership or document:delete, so a reader who owns
+// nothing no longer collects a 403 per row; data-args goes through
+// tojson, so a document called "Bob's SOP" no longer closes the
+// attribute early and kills the control; a missing version says so
+// instead of printing v1; the date is formatted from the naive UTC column
+// and labelled, where formatDate read it in the viewer's zone; and a
+// folder filter that cannot be honoured says so, where the page logged
+// the refusal to the console and showed an unfiltered list as filtered.
+function documentFilterQuery() {
+    const value = id => (document.getElementById(id) || {}).value || '';
+    const params = new URLSearchParams({
+        search: value('search-input'),
+        format: value('format-filter'),
+        status: value('status-filter'),
+        tag: value('tag-filter'),
+    });
+    // selectedFolderId is the tree's own state: null, a numeric id, or the
+    // string 'uncategorized'. Only the last two are a filter.
+    if (selectedFolderId !== null && selectedFolderId !== undefined) {
+        params.set('folder', String(selectedFolderId));
+    }
+    return params.toString();
+}
+
+function renderDocuments() {
+    const container = document.getElementById('documents-list');
+    if (!container) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/documents/list?' + documentFilterQuery(), {
+        source: container, target: container, swap: 'innerHTML',
+    });
+}
+
 async function loadDocuments() {
+    // allDocuments still backs the tag list and the folder counts. The
+    // list itself is no longer drawn from it, so a failed read here no
+    // longer decides what the list says: the fragment reads for itself.
     try {
         allDocuments = await api.get('/api/documents');
-        // the Knowledge Base is no longer hidden here. It used to be
-        // filtered out of both the document list and the folder tree, which
-        // meant the ~600 KB articles had NO browsing surface anywhere in ION —
-        // reachable only by searching from the SOC workspace, and this page
-        // read "No documents found" on a library that was almost entirely KB.
-        renderDocuments(filterDocuments());
     } catch (e) {
-        document.getElementById('documents-list').innerHTML = '<p class="error">Failed to load documents</p>';
+        allDocuments = null;
     }
+    return renderDocuments();
 }
 
 async function loadCollections() {
@@ -681,7 +726,7 @@ function selectFolder(folderId) {
     updateFolderPath();
 
     // Re-render documents
-    renderDocuments(filterDocuments());
+    renderDocuments();
 }
 
 function updateFolderPath() {
@@ -742,64 +787,9 @@ function filterDocuments() {
     });
 }
 
-function renderDocuments(documents) {
-    const container = document.getElementById('documents-list');
-
-    if (documents.length === 0) {
-        container.innerHTML = '<p class="empty-state">No documents found. Render a template to create one!</p>';
-        return;
-    }
-
-    let html = '';
-    documents.forEach(function(d) {
-        const isArchived = d.status === 'archived';
-        const folder = allCollections.find(c => c.id === d.collection_id);
-        const folderBadge = folder
-            ? '<span class="collection-badge">' + escapeHtml(folder.name) + '</span>'
-            : '';
-        const docTypeBadge = d.source_template_document_type
-            ? '<span class="doc-type-badge doc-type-' + d.source_template_document_type + '">' + d.source_template_document_type + '</span>'
-            : '';
-
-        html += '<div class="list-item' + (isArchived ? ' archived' : '') + '">';
-        html += '<div class="list-item-content">';
-        let tagBadges = '';
-        if (d.tags && d.tags.length > 0) {
-            d.tags.forEach(function(tag) {
-                tagBadges += '<span class="tag-badge">' + escapeHtml(tag) + '</span>';
-            });
-        }
-
-        html += '<span class="list-item-title">' + escapeHtml(d.name) + docTypeBadge + folderBadge + tagBadges + '</span>';
-        html += '<div class="list-item-meta">';
-        html += '<span class="badge">' + d.output_format + '</span>';
-        html += '<span class="badge badge-version">v' + (d.current_version || 1) + '</span>';
-        if (isArchived) {
-            html += '<span class="badge badge-archived">Archived</span>';
-        }
-        if (d.source_template_id) {
-            html += '<span>From template #' + d.source_template_id + ' v' + d.source_template_version + '</span>';
-        }
-        html += '<span>' + formatDate(d.created_at) + '</span>';
-        html += '</div>';
-        html += '</div>';
-        html += '<div class="list-item-actions">';
-        html += `<button class="btn btn-sm" data-click-action="viewDocument" data-args='[${d.id}]'>View</button>`;
-        html += `<button class="btn btn-sm move-btn" data-click-action="showMoveModal" data-args='[${d.id}, ${d.collection_id || 'null'}]'>Move</button>`;
-        if (isArchived) {
-            html += `<button class="btn btn-sm btn-success" data-click-action="restoreDocument" data-args='[${d.id}]'>Restore</button>`;
-        } else {
-            html += `<button class="btn btn-sm btn-warning" data-click-action="archiveDocument" data-args='[${d.id}]'>Archive</button>`;
-        }
-        html += `<button class="btn btn-sm btn-danger" data-click-action="deleteDocument" data-args='[${d.id}, ${JSON.stringify(d.name)}]'>Delete</button>`;
-        html += '</div>';
-        html += '</div>';
-    });
-    container.innerHTML = html;
-}
 
 function applyFilters() {
-    renderDocuments(filterDocuments());
+    renderDocuments();
 }
 
 function renderContent(content, format) {
@@ -1611,7 +1601,7 @@ async function addDocTag() {
         // Update the list view
         const doc = allDocuments.find(function(d) { return d.id === currentDocId; });
         if (doc) doc.tags = [...currentDocTags];
-        renderDocuments(filterDocuments());
+        renderDocuments();
         updateTagFilter();
     } catch (e) {
         // Revert on error
@@ -1633,7 +1623,7 @@ async function removeDocTag(tagName) {
         // Update the list view
         const doc = allDocuments.find(function(d) { return d.id === currentDocId; });
         if (doc) doc.tags = [...currentDocTags];
-        renderDocuments(filterDocuments());
+        renderDocuments();
         updateTagFilter();
     } catch (e) {
         showToast('Failed to remove tag', 'error');

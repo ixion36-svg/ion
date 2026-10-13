@@ -1,0 +1,37 @@
+/* /documents, the page's own rules.
+ *
+ * The list rows are server-rendered now. These are the classes the
+ * fragment emits that the page's existing styling did not already cover,
+ * kept here rather than in the view model so a theme can reach them.
+ */
+
+/* The row. `list-item` already carries the layout; this is the hook the
+   fragment's tests pin so a future restyle has somewhere to land. */
+.doc-row { position: relative; }
+
+/* An archived document. The page set a bare `archived` class whose rule
+   lives with the rest of the page styling; this names the same state in
+   the page's own namespace so the two can diverge without a surprise. */
+.doc-row-archived { opacity: 0.72; }
+
+/* A figure the payload did not carry. Deliberately not the same as a zero
+   or a one: the page printed "v1" for a missing version, which is a
+   confident claim about which revision is on screen. */
+.doc-unmeasured {
+    font-style: italic;
+    color: var(--text-muted);
+    border: 1px dashed color-mix(in srgb, var(--text-muted) 40%, transparent);
+    background: transparent;
+}
+
+/* A filter dimension that could not be honoured. The page logged the
+   refusal to the console, so the list looked filtered and was not. */
+.doc-filter-notice {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.5rem;
+    border-left: 3px solid var(--warning, #f59e0b);
+    background: color-mix(in srgb, var(--warning, #f59e0b) 8%, transparent);
+    border-radius: 0.25rem;
+}
