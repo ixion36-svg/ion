@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-
 {% block page_id %}forensics{% endblock %}
 {% block head_css %}<link rel="stylesheet" href="/static/css/forensics-page.css?v={{ ion_version }}">{% endblock %}
 
@@ -17,7 +16,7 @@
     <h1 class="ion-ph-title">Forensics</h1>
     <p class="ion-ph-sub">Evidence tracking and investigation management.</p>
   </div>
-  <button id="btn-new-investigation" data-click-action="showNewCaseModal" class="ion-btn ion-btn-primary">
+  <button id="btn-new-investigation" data-click-action="showNewCaseModal" class="ion-btn ion-btn-primary" data-forensic-permission="forensic:create" hidden disabled>
     <svg class="w-3.5 h-3.5"><use href="#i-plus"/></svg>
     New Investigation
   </button>
@@ -27,27 +26,27 @@
 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-8 rise d-2">
   <div class="ion-metric">
     <div class="ion-metric-label">Intake</div>
-    <div id="stat-intake" class="ion-metric-value text-ion-cyan">0</div>
+    <div id="stat-intake" class="ion-metric-value text-ion-cyan">Unknown</div>
   </div>
   <div class="ion-metric">
     <div class="ion-metric-label">Active</div>
-    <div id="stat-active" class="ion-metric-value text-ion-cyan">0</div>
+    <div id="stat-active" class="ion-metric-value text-ion-cyan">Unknown</div>
   </div>
   <div class="ion-metric">
     <div class="ion-metric-label">SLA Overdue</div>
-    <div id="stat-overdue" class="ion-metric-value text-ion-coral">0</div>
+    <div id="stat-overdue" class="ion-metric-value text-ion-coral">Unknown</div>
   </div>
   <div class="ion-metric">
     <div class="ion-metric-label">Closed</div>
-    <div id="stat-closed" class="ion-metric-value text-ion-lime">0</div>
+    <div id="stat-closed" class="ion-metric-value text-ion-lime">Unknown</div>
   </div>
   <div class="ion-metric">
     <div class="ion-metric-label">Evidence Items</div>
-    <div id="stat-evidence" class="ion-metric-value text-ion-iris">0</div>
+    <div id="stat-evidence" class="ion-metric-value text-ion-iris">Unknown</div>
   </div>
   <div class="ion-metric">
     <div class="ion-metric-label">Locked</div>
-    <div id="stat-locked" class="ion-metric-value text-ion-amber">0</div>
+    <div id="stat-locked" class="ion-metric-value text-ion-amber">Unknown</div>
   </div>
 </div>
 
@@ -64,27 +63,27 @@
 <div class="fr-panel" id="panel-pipeline">
     <div class="fr-pipeline grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-2.5 overflow-x-auto min-h-[300px] w-full">
         <div class="fr-stage bg-base-200 border border-base-300 rounded-[10px] flex flex-col min-w-0" data-status="intake">
-            <div class="fr-stage-header flex justify-between items-center px-3 py-2.5 font-bold text-[0.8rem] uppercase tracking-wide rounded-t-[10px] bg-info/[0.12] text-info"><span>Intake</span><span class="fr-stage-count bg-white/15 px-2 py-0.5 rounded-[10px] text-[0.75rem] text-base-content" id="pipe-intake">0</span></div>
+            <div class="fr-stage-header flex justify-between items-center px-3 py-2.5 font-bold text-[0.8rem] uppercase tracking-wide rounded-t-[10px] bg-info/[0.12] text-info"><span>Intake</span><span class="fr-stage-count bg-white/15 px-2 py-0.5 rounded-[10px] text-[0.75rem] text-base-content" id="pipe-intake">Unknown</span></div>
             <div class="fr-stage-cards p-2 flex-1 overflow-y-auto max-h-[500px]" id="pipe-col-intake"></div>
         </div>
         <div class="fr-stage bg-base-200 border border-base-300 rounded-[10px] flex flex-col min-w-0" data-status="evidence_collection">
-            <div class="fr-stage-header flex justify-between items-center px-3 py-2.5 font-bold text-[0.8rem] uppercase tracking-wide rounded-t-[10px] bg-success/[0.12] text-success"><span>Evidence Collection</span><span class="fr-stage-count bg-white/15 px-2 py-0.5 rounded-[10px] text-[0.75rem] text-base-content" id="pipe-evidence_collection">0</span></div>
+            <div class="fr-stage-header flex justify-between items-center px-3 py-2.5 font-bold text-[0.8rem] uppercase tracking-wide rounded-t-[10px] bg-success/[0.12] text-success"><span>Evidence Collection</span><span class="fr-stage-count bg-white/15 px-2 py-0.5 rounded-[10px] text-[0.75rem] text-base-content" id="pipe-evidence_collection">Unknown</span></div>
             <div class="fr-stage-cards p-2 flex-1 overflow-y-auto max-h-[500px]" id="pipe-col-evidence_collection"></div>
         </div>
         <div class="fr-stage bg-base-200 border border-base-300 rounded-[10px] flex flex-col min-w-0" data-status="analysis">
-            <div class="fr-stage-header flex justify-between items-center px-3 py-2.5 font-bold text-[0.8rem] uppercase tracking-wide rounded-t-[10px] bg-warning/[0.12] text-warning"><span>Analysis</span><span class="fr-stage-count bg-white/15 px-2 py-0.5 rounded-[10px] text-[0.75rem] text-base-content" id="pipe-analysis">0</span></div>
+            <div class="fr-stage-header flex justify-between items-center px-3 py-2.5 font-bold text-[0.8rem] uppercase tracking-wide rounded-t-[10px] bg-warning/[0.12] text-warning"><span>Analysis</span><span class="fr-stage-count bg-white/15 px-2 py-0.5 rounded-[10px] text-[0.75rem] text-base-content" id="pipe-analysis">Unknown</span></div>
             <div class="fr-stage-cards p-2 flex-1 overflow-y-auto max-h-[500px]" id="pipe-col-analysis"></div>
         </div>
         <div class="fr-stage bg-base-200 border border-base-300 rounded-[10px] flex flex-col min-w-0" data-status="reporting">
-            <div class="fr-stage-header fr-stage-reporting flex justify-between items-center px-3 py-2.5 font-bold text-[0.8rem] uppercase tracking-wide rounded-t-[10px]"><span>Reporting</span><span class="fr-stage-count bg-white/15 px-2 py-0.5 rounded-[10px] text-[0.75rem] text-base-content" id="pipe-reporting">0</span></div>
+            <div class="fr-stage-header fr-stage-reporting flex justify-between items-center px-3 py-2.5 font-bold text-[0.8rem] uppercase tracking-wide rounded-t-[10px]"><span>Reporting</span><span class="fr-stage-count bg-white/15 px-2 py-0.5 rounded-[10px] text-[0.75rem] text-base-content" id="pipe-reporting">Unknown</span></div>
             <div class="fr-stage-cards p-2 flex-1 overflow-y-auto max-h-[500px]" id="pipe-col-reporting"></div>
         </div>
         <div class="fr-stage bg-base-200 border border-base-300 rounded-[10px] flex flex-col min-w-0" data-status="review">
-            <div class="fr-stage-header fr-stage-review flex justify-between items-center px-3 py-2.5 font-bold text-[0.8rem] uppercase tracking-wide rounded-t-[10px]"><span>Review</span><span class="fr-stage-count bg-white/15 px-2 py-0.5 rounded-[10px] text-[0.75rem] text-base-content" id="pipe-review">0</span></div>
+            <div class="fr-stage-header fr-stage-review flex justify-between items-center px-3 py-2.5 font-bold text-[0.8rem] uppercase tracking-wide rounded-t-[10px]"><span>Review</span><span class="fr-stage-count bg-white/15 px-2 py-0.5 rounded-[10px] text-[0.75rem] text-base-content" id="pipe-review">Unknown</span></div>
             <div class="fr-stage-cards p-2 flex-1 overflow-y-auto max-h-[500px]" id="pipe-col-review"></div>
         </div>
         <div class="fr-stage bg-base-200 border border-base-300 rounded-[10px] flex flex-col min-w-0" data-status="closed">
-            <div class="fr-stage-header fr-stage-closed flex justify-between items-center px-3 py-2.5 font-bold text-[0.8rem] uppercase tracking-wide rounded-t-[10px]"><span>Closed</span><span class="fr-stage-count bg-white/15 px-2 py-0.5 rounded-[10px] text-[0.75rem] text-base-content" id="pipe-closed">0</span></div>
+            <div class="fr-stage-header fr-stage-closed flex justify-between items-center px-3 py-2.5 font-bold text-[0.8rem] uppercase tracking-wide rounded-t-[10px]"><span>Closed</span><span class="fr-stage-count bg-white/15 px-2 py-0.5 rounded-[10px] text-[0.75rem] text-base-content" id="pipe-closed">Unknown</span></div>
             <div class="fr-stage-cards p-2 flex-1 overflow-y-auto max-h-[500px]" id="pipe-col-closed"></div>
         </div>
     </div>
@@ -139,7 +138,7 @@
 <div class="fr-panel hidden" id="panel-playbooks">
     <div class="flex justify-between items-center mb-3">
         <select id="pb-filter-type" class="ion-select sm:min-w-[150px] sm:w-auto" data-change-action="loadPlaybooks"><option value="">All Types</option></select>
-        <button class="ion-btn ion-btn-primary" data-click-action="showNewPlaybookModal">+ New Playbook</button>
+        <button class="ion-btn ion-btn-primary" data-click-action="showNewPlaybookModal" data-forensic-permission="forensic:manage_playbooks" hidden disabled>+ New Playbook</button>
     </div>
     <div class="overflow-x-auto w-full">
         <table class="data-table" id="playbooks-table">
@@ -194,7 +193,7 @@
         </div>
         <div class="flex gap-3 px-5 py-4 border-t border-base-300 justify-end bg-base-100 rounded-b-xl">
             <button class="btn btn-secondary" data-click-action="closeModal" data-args='["modal-new-case"]'>Cancel</button>
-            <button class="btn btn-primary" data-click-action="createCase">Create Investigation</button>
+            <button class="btn btn-primary" data-click-action="createCase" data-forensic-permission="forensic:create" hidden disabled>Create Investigation</button>
         </div>
     </div>
 </div>
@@ -294,7 +293,7 @@
         </div>
         <div class="flex gap-3 px-5 py-4 border-t border-base-300 justify-end bg-base-100 rounded-b-xl">
             <button class="btn btn-secondary" data-click-action="closeModal" data-args='["modal-close-case"]'>Cancel</button>
-            <button class="btn btn-primary" data-click-action="closeCaseSubmit">Close Investigation</button>
+            <button class="btn btn-primary" data-click-action="closeCaseSubmit" data-forensic-permission="forensic:close" hidden disabled>Close Investigation</button>
         </div>
     </div>
 </div>
@@ -314,7 +313,7 @@
         </div>
         <div class="flex gap-3 px-5 py-4 border-t border-base-300 justify-end bg-base-100 rounded-b-xl">
             <button class="btn btn-secondary" data-click-action="closeModal" data-args='["modal-add-evidence"]'>Cancel</button>
-            <button class="btn btn-primary" data-click-action="addEvidence">Add Evidence</button>
+            <button class="btn btn-primary" data-click-action="addEvidence" data-forensic-permission="forensic:create" hidden disabled>Add Evidence</button>
         </div>
     </div>
 </div>
@@ -331,7 +330,7 @@
         </div>
         <div class="flex gap-3 px-5 py-4 border-t border-base-300 justify-end bg-base-100 rounded-b-xl">
             <button class="btn btn-secondary" data-click-action="closeModal" data-args='["modal-custody"]'>Cancel</button>
-            <button class="btn btn-primary" data-click-action="submitCustody">Log Action</button>
+            <button class="btn btn-primary" data-click-action="submitCustody" data-forensic-permission="forensic:update" hidden disabled>Log Action</button>
         </div>
     </div>
 </div>
@@ -406,7 +405,7 @@
         </div>
         <div class="flex gap-3 px-5 py-4 border-t border-base-300 justify-end bg-base-100 rounded-b-xl">
             <button class="btn btn-secondary" data-click-action="closeModal" data-args='["modal-playbook"]'>Cancel</button>
-            <button class="btn btn-primary" data-click-action="savePlaybook">Save</button>
+            <button class="btn btn-primary" data-click-action="savePlaybook" data-forensic-permission="forensic:manage_playbooks" hidden disabled>Save</button>
         </div>
     </div>
 </div>
@@ -433,6 +432,17 @@
 
 </div><!-- /ion-tw inner -->
 </div><!-- /ion-tw -->
+
+<div id="forensic-options" hidden></div>
+<div id="forensic-overview" hidden></div>
+<template id="forensic-list-row"><div class="sf-list-row"><input class="form-input sf-input"><button type="button" class="btn-icon sf-list-remove" data-remove-parent title="Remove">×</button></div></template>
+<template id="forensic-table-row"><tr><td><button type="button" class="btn-icon sf-list-remove" data-remove-closest="tr" title="Remove">×</button></td></tr></template>
+<template id="forensic-table-cell"><td><input class="form-input sf-input"></td></template>
+<template id="forensic-playbook-preview"><div class="pb-preview-step"><strong class="pb-preview-title"></strong><div class="pb-preview-desc"></div></div></template>
+<template id="forensic-playbook-step"><div class="pb-step-row"><span class="pb-step-num"></span><div class="flex-1"><input type="text" class="form-input pb-step-title" placeholder="Step title"><textarea class="form-input pb-step-desc mt-1" rows="2" placeholder="Description"></textarea><div class="flex gap-3 items-center mt-1"><label><input type="checkbox" class="pb-step-req"> Required</label><label>Est. hours: <input type="number" class="pb-step-hours" step="0.5" min="0"></label></div></div><button class="btn btn-secondary" data-click-action="removeStepAndRenumber">×</button></div></template>
+<template id="forensic-ioc-category"><div class="ioc-category"><div class="ioc-category-header"><span class="ioc-category-title"></span><span class="ioc-category-count"></span></div><div class="ioc-items"></div></div></template>
+<template id="forensic-ioc-chip"><label class="ioc-chip selected"><input type="checkbox" checked><span></span></label></template>
+<template id="forensic-evidence-option"><option value="">Select an investigation...</option></template>
 {% endblock %}
 
 {% block scripts %}
@@ -440,6 +450,12 @@
 <script src="/static/js/ion-fragments.js?v={{ ion_version }}"></script>
 <script nonce="{{ csp_nonce }}">
 const API = '/api/forensics';
+function applyForensicPermissions(view){
+ forensicPermissions={'forensic:create':view.can_create===true,'forensic:update':view.can_update===true,'forensic:close':view.can_close===true,'forensic:manage_playbooks':view.can_manage_playbooks===true};
+ document.querySelectorAll('[data-forensic-permission]').forEach(el=>{const allowed=forensicPermissions[el.dataset.forensicPermission]===true;el.hidden=!allowed;el.disabled=!allowed;});
+ for(const id of ['cd-title','cd-description']){const el=document.getElementById(id);if(forensicPermissions['forensic:update'])el.dataset.clickAction=id==='cd-title'?'startEditTitle':'startEditDesc';else delete el.dataset.clickAction;}
+}
+let forensicPermissions={};
 let allCases = [];
 let allPlaybooks = [];
 let currentCaseId = null;
@@ -452,33 +468,28 @@ let referenceDocs = [];
 let filterTimeout = null;
 
 async function init() {
-    try {
-        const [enumsRes, usersRes, refRes, pbRes] = await Promise.all([
-            fetch(API + '/enums'), fetch('/api/users'), fetch(API + '/reference-docs'), fetch(API + '/playbooks?active_only=true')
-        ]);
-        if (enumsRes.ok) enums = await enumsRes.json();
-        if (usersRes.ok) users = await usersRes.json();
-        if (refRes.ok) referenceDocs = await refRes.json();
-        if (pbRes.ok) allPlaybooks = await pbRes.json();
-    } catch(e) {
-        if (!enums.investigation_types) {
-            enums = {case_statuses:['intake','evidence_collection','analysis','reporting','review','closed'],case_priorities:['critical','high','medium','low'],investigation_types:['malware_analysis','insider_threat','data_breach','unauthorized_access','network_intrusion','fraud','policy_violation','other'],evidence_types:['disk_image','memory_dump','network_capture','log_files','documents','email','mobile_device','physical_media','screenshot','other'],evidence_statuses:['collected','in_transit','in_storage','under_analysis','returned','destroyed'],custody_actions:['collected','transferred','checked_out','checked_in','analyzed','imaged','returned','destroyed']};
-        }
-    }
-    populateDropdowns();
-    loadCases();
+    await populateDropdowns();
+    const refResponse = await fetch(API + '/reference-docs');
+    if (refResponse.ok) referenceDocs = await refResponse.json();
+    await loadCases();
 }
 
-function populateDropdowns() {
-    const types = enums.investigation_types || [];
-    for (const sel of ['filter-type','pb-filter-type']) { const el=document.getElementById(sel); if(!el)continue; el.innerHTML='<option value="">All Types</option>'; types.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=fmtLabel(t);el.appendChild(o)}); }
-    for (const sel of ['nc-type','pb-type']) { const el=document.getElementById(sel); if(!el)continue; if(sel==='pb-type')el.innerHTML='<option value="">Any</option>'; else el.replaceChildren(); types.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=fmtLabel(t);el.appendChild(o)}); }
-    // Playbook selector in New Case modal
-    const pbSel=document.getElementById('nc-playbook'); if(pbSel){pbSel.innerHTML='<option value="">-- No Playbook (blank investigation) --</option>';allPlaybooks.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name+(p.investigation_type?' ('+fmtLabel(p.investigation_type)+')':'');pbSel.appendChild(o)})}
-    const aeType=document.getElementById('ae-type'); if(aeType){aeType.replaceChildren();(enums.evidence_types||[]).forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=fmtLabel(t);aeType.appendChild(o)});}
-    const custAct=document.getElementById('cust-action'); if(custAct){custAct.replaceChildren();(enums.custody_actions||[]).forEach(a=>{const o=document.createElement('option');o.value=a;o.textContent=fmtLabel(a);custAct.appendChild(o)});}
-    const cdStatus=document.getElementById('cd-status-select'); if(cdStatus){cdStatus.replaceChildren();(enums.case_statuses||[]).forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=fmtLabel(s);cdStatus.appendChild(o)});}
-    if(users.length){for(const sel of ['nc-lead','cust-received-by']){const el=document.getElementById(sel);if(!el)continue;const first=el.querySelector('option');el.replaceChildren();if(first)el.appendChild(first);users.forEach(u=>{const o=document.createElement('option');o.value=u.id;o.textContent=u.display_name||u.username;el.appendChild(o)});}}
+async function populateDropdowns() {
+    const loaded = await ionLoadFragment('/ui/forensics/options', 'forensic-options', 'Loading options...');
+    if (!loaded) {
+        for (const id of ['nc-lead','cust-received-by']) {
+            const element = document.getElementById(id);
+            element.disabled = true;
+            ionMessage(element, 'Analyst options unavailable');
+        }
+        return;
+    }
+    const element = document.querySelector('#forensic-options [data-forensic-options]');
+    if (!element) return;
+    const model = JSON.parse(element.dataset.forensicOptions);
+    enums = model.enums;
+    allPlaybooks = model.playbooks;
+    applyForensicPermissions(model);
 }
 
 function fmtLabel(s){return s?s.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()):''}
@@ -487,7 +498,10 @@ function fmtDate(iso){if(!iso)return'-';const d=new Date(iso);return d.toLocaleD
 function fmtDateTime(iso){if(!iso)return'-';const d=new Date(iso);return fmtDate(iso)+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}
 function showToast(msg,err){const d=document.createElement('div');d.textContent=msg;d.style.cssText='position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;z-index:9999;font-size:.9rem;color:#fff;background:'+(err?'var(--sev-critical)':'var(--mitre-covered)');document.body.appendChild(d);setTimeout(()=>d.remove(),3000)}
 function closeModal(id){document.getElementById(id).style.display='none'}
-function debouncedFilter(){clearTimeout(filterTimeout);filterTimeout=setTimeout(()=>renderCasesTable(),300)}
+function debouncedFilter() {
+    clearTimeout(filterTimeout);
+    filterTimeout = setTimeout(loadCases, 300);
+}
 
 // ======== TABS ========
 function switchTab(tab){
@@ -509,112 +523,56 @@ function switchDetailTab(tab){
 
 // ======== PLAYBOOK SELECTION IN CREATE MODAL ========
 function onPlaybookSelect() {
-    const pbId = document.getElementById('nc-playbook').value;
-    const preview = document.getElementById('nc-playbook-preview');
-    if (!pbId) { preview.style.display = 'none'; return; }
-    const pb = allPlaybooks.find(p => p.id == pbId);
-    if (!pb) { preview.style.display = 'none'; return; }
-    preview.style.display = '';
-    document.getElementById('nc-pb-name').textContent = pb.name;
-    document.getElementById('nc-pb-desc').textContent = pb.description || '';
-    // Auto-set investigation type if the playbook has one
-    if (pb.investigation_type) document.getElementById('nc-type').value = pb.investigation_type;
-    // Show steps preview
-    const stepsDiv = document.getElementById('nc-pb-steps');
-    stepsDiv.innerHTML = (pb.steps || []).map((s, i) => {
-        const fc = (s.fields||[]).length;
-        return `<div class="_ion-s-5eaab7cb30">
-            <span class="section-num min-w-[24px] h-[24px] text-[.7rem]">${i+1}</span>
-            <div class="flex-1 text-[.85rem]">
-                <strong>${esc(s.title)}</strong>${s.is_required?' <span class="text-[#f0c000] text-[.7rem]">REQUIRED</span>':''}${fc?' <span class="text-[var(--text-secondary)] text-[.7rem]">'+fc+' fields</span>':''}
-                ${s.description?'<div class="text-[var(--text-secondary)] text-[.8rem] mt-0.5">'+esc(s.description)+'</div>':''}
-            </div>
-        </div>`;
-    }).join('') || '<div class="text-[var(--text-secondary)] text-[.8rem]">No steps defined</div>';
+ const id=document.getElementById('nc-playbook').value;
+ const pb=allPlaybooks.find(p=>String(p.id)===id), preview=document.getElementById('nc-playbook-preview');
+ preview.style.display=pb?'block':'none'; if(!pb)return;
+ document.getElementById('nc-pb-name').textContent=pb.name ?? 'Unknown';
+ document.getElementById('nc-pb-desc').textContent=pb.description ?? '';
+ if(pb.investigation_type)document.getElementById('nc-type').value=pb.investigation_type;
+ const target=document.getElementById('nc-pb-steps'); target.replaceChildren();
+ if(!Array.isArray(pb.steps)){ionMessage(target,'Playbook steps unavailable');return;}
+ pb.steps.forEach((step,index)=>{const row=cloneTemplate('forensic-playbook-preview');row.querySelector('.pb-preview-title').textContent=(index+1)+'. '+(step.title ?? 'Unknown');row.querySelector('.pb-preview-desc').textContent=step.description ?? '';target.appendChild(row);});
 }
 
 // ======== CASES ========
-async function loadCases(){
-    const params=new URLSearchParams();
-    const s=document.getElementById('filter-status');if(s&&s.value)params.set('status',s.value);
-    const t=document.getElementById('filter-type');if(t&&t.value)params.set('investigation_type',t.value);
-    const p=document.getElementById('filter-priority');if(p&&p.value)params.set('priority',p.value);
-    try{const res=await fetch(API+'/cases?'+params);if(!res.ok)throw 0;allCases=await res.json()}catch(e){allCases=[]}
-    renderCasesTable();renderPipeline();updateStats();loadOverdueCount();
-}
-
-function stepProgress(c) {
-    if (!c.step_count) return '';
-    const pct = c.step_count > 0 ? Math.round((c.steps_completed / c.step_count) * 100) : 0;
-    const color = pct === 100 ? 'var(--mitre-covered)' : pct > 0 ? 'var(--primary)' : '#6e7681';
-    return `<div class="flex items-center gap-1.5" title="${c.steps_completed}/${c.step_count} sections">
-        <div class="_ion-s-a55ef5c079">
-            <div class="h-full rounded-[3px]" data-ion-style="width:${pct}%; background:${color}"></div>
-        </div>
-        <span class="text-[.7rem]" data-ion-style="color:${color}">${c.steps_completed}/${c.step_count}</span>
-    </div>`;
-}
-
-function renderCasesTable(){
-    const search=(document.getElementById('filter-search')?.value||'').toLowerCase();
-    const filtered=allCases.filter(c=>!search||c.case_number.toLowerCase().includes(search)||c.title.toLowerCase().includes(search));
-    const tbody=document.getElementById('cases-tbody'),empty=document.getElementById('cases-empty');
-    if(!filtered.length){tbody.replaceChildren();empty.style.display='';return}
-    empty.style.display='none';
-    tbody.innerHTML=filtered.map(c=>`<tr data-click-action="openCaseDetail" data-args='[${c.id}]'>
-        <td><strong>${esc(c.case_number)}</strong></td><td>${esc(c.title)}</td><td>${fmtLabel(c.investigation_type)}</td>
-        <td><span class="badge badge-${c.priority}">${c.priority}</span></td>
-        <td><span class="badge badge-${c.status}">${fmtLabel(c.status)}</span></td>
-        <td>${esc(c.lead_investigator_username||'Unassigned')}</td>
-        <td>${stepProgress(c)}</td>
-        <td>${renderSlaCell(c)}</td>
-        <td>${c.is_locked?'<span class="text-[#f0c000]" title="Locked by '+esc(c.locked_by_username||'')+'">Locked</span>':'-'}</td>
-        <td>${fmtDate(c.created_at)}</td></tr>`).join('');
-}
-
-function renderSlaCell(c){
-    if(c.status==='closed')return'<span class="sla-badge sla-met">Done</span>';
-    const now=new Date();let worst='on_track';
-    for(const m of ['initial_response','evidence_collection','analysis','reporting']){
-        const due=c['sla_'+m+'_due'],met=c['sla_'+m+'_met'];if(!due||met)continue;
-        if(new Date(due)<now){worst='breached';break}
-        const total=new Date(due)-new Date(c.created_at),remaining=new Date(due)-now;
-        if(remaining/total<0.25&&worst!=='breached')worst='at_risk';
+async function loadCases() {
+    const params = new URLSearchParams();
+    for (const [id,key] of [['filter-status','status'],['filter-type','investigation_type'],['filter-priority','priority'],['filter-search','search']]) {
+        const value = document.getElementById(id)?.value;
+        if (value) params.set(key,value);
     }
-    const cls={on_track:'sla-on-track',at_risk:'sla-at-risk',breached:'sla-breached'}[worst];
-    const label={on_track:'On Track',at_risk:'At Risk',breached:'Overdue'}[worst];
-    return`<span class="sla-badge ${cls}">${label}</span>`;
+    for (const key of ['intake','active','closed','evidence','locked']) document.getElementById('stat-'+key).textContent = '—';
+    for (const stage of ['intake','evidence_collection','analysis','reporting','review','closed']) {
+        document.getElementById('pipe-'+stage).textContent = '—';
+        ionMessage('pipe-col-'+stage, 'Loading pipeline...', true);
+    }
+    document.getElementById('cases-empty').style.display = 'none';
+    allCases = null;
+    ionMessage('cases-tbody', 'Loading investigations...', true);
+    const loaded = await ionLoadFragment('/ui/forensics/overview?' + params, 'forensic-overview', 'Loading investigations...');
+    if (loaded) {
+        const element = document.querySelector('#forensic-overview [data-forensic-cases]');
+        if (element) allCases = JSON.parse(element.dataset.forensicCases);
+    } else {
+        ionMessage('cases-tbody', 'Failed to load investigations');
+        for (const stage of ['intake','evidence_collection','analysis','reporting','review','closed']) ionMessage('pipe-col-'+stage, 'Investigations unavailable');
+    }
+    await loadOverdueCount();
 }
+
+
+
+
+
+
 
 // ======== PIPELINE ========
-function renderPipeline(){
-    const stages=['intake','evidence_collection','analysis','reporting','review','closed'];
-    stages.forEach(s=>{
-        const col=document.getElementById('pipe-col-'+s);
-        const cards=allCases.filter(c=>c.status===s);
-        document.getElementById('pipe-'+s).textContent=cards.length;
-        col.innerHTML=cards.map(c=>`<div class="fr-card" data-click-action="openCaseDetail" data-args='[${c.id}]'>
-            <div class="fr-card-num">${esc(c.case_number)}</div>
-            <div class="fr-card-title">${esc(c.title)}</div>
-            ${stepProgress(c)}
-            <div class="fr-card-meta">
-                <span class="badge badge-${c.priority} text-[.65rem] py-[1px] px-1.5">${c.priority}</span>
-                <span>${esc(c.lead_investigator_username||'Unassigned')}</span>
-                ${c.is_locked?'<span class="fr-card-lock" title="Locked">Locked</span>':''}
-                ${renderSlaCell(c)}
-            </div>
-        </div>`).join('')||'<div class="text-center p-5 text-[var(--text-secondary)] text-[.8rem]">No cases</div>';
-    });
-}
 
-function updateStats(){
-    document.getElementById('stat-intake').textContent=allCases.filter(c=>c.status==='intake').length;
-    document.getElementById('stat-active').textContent=allCases.filter(c=>!['intake','closed'].includes(c.status)).length;
-    document.getElementById('stat-closed').textContent=allCases.filter(c=>c.status==='closed').length;
-    document.getElementById('stat-evidence').textContent=allCases.reduce((s,c)=>s+(c.evidence_count||0),0);
-    document.getElementById('stat-locked').textContent=allCases.filter(c=>c.is_locked).length;
+
+
+async function loadOverdueCount() {
+    return ionLoadFragment('/ui/forensics/overdue', 'stat-overdue', '—');
 }
-async function loadOverdueCount(){try{const r=await fetch(API+'/cases/overdue');if(r.ok){const d=await r.json();document.getElementById('stat-overdue').textContent=d.length}}catch(e){}}
 
 // ======== CASE DETAIL ========
 async function openCaseDetail(id){
