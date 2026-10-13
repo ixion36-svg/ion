@@ -44,3 +44,53 @@ route; `tests/test_route_references_resolve.py` fails if the file is stale,
 and also fails if any `/api` or `/ui` URL a template or script names has no
 route behind it. That check found the alerts page posting Translate to
 `/api/ai/translate`, which nothing has ever served.
+
+## Running it locally
+
+The venv is `../ION/.venv`; tests are `python -m pytest tests/...`.
+
+Two traps when serving a **worktree** rather than `projects/ION`:
+
+- The venv has ION installed from `projects/ION/src`, so `import ion`
+  resolves there whatever directory you launch from. Without
+  `PYTHONPATH=<worktree>/src` you serve the other checkout's templates with
+  no error and no sign: same port, same pages. Assert it at startup,
+  `pathlib.Path(ion.__file__).parent == <worktree>/src/ion`.
+- A SQLite `ION_DATABASE_URL` is not how you ask for SQLite. `get_engine`
+  branches on `if database_url:` and that branch is the Postgres one, so it
+  hands SQLite a libpq `options` connect-arg and startup dies with
+  `TypeError: 'options' is an invalid keyword argument for Connection()`.
+  Leave the variable unset and it falls through to `get_config().db_path`.
+
+`ION_ADMIN_PASSWORD` is fatal if weak or unset (`_validate_startup_config`)
+and `launch.json` has no `env` field, so a dev server needs a wrapper
+script rather than a bare command.
+
+Static assets are served with `?v={{ ion_version }}`. That does not change
+between builds, so an edit to a CSS or JS file is invisible in a browser
+until the cache is bust. A computed style that refuses to move is usually
+this and not the rule.
+
+## Working on the UI
+
+The redesign's rule, and what most of the fragment tests are about: a
+failed read, an empty result and data are three outcomes, never two. `||
+0` and `|| []` collapse the first two into the third, which is how a
+degraded Elasticsearch came to render as a quiet estate. Numbers are
+guarded with `is not none`, not truthiness, so a measured zero and an
+unmeasured figure stay different. `_rows(payload, key)` returns `None`
+rather than `[]` when the payload is not that shape, so a caller cannot
+render "none found" for a refusal.
+
+CSP is `script-src 'self' 'nonce-...'` with no `unsafe-eval`, and
+`style-src-attr 'none'`. No `hx-on`, no `js:` expressions, no inline
+`style=`. A dynamic style goes on `data-ion-style` and
+`static/js/ion-dynamic-styles.js` applies it, on a MutationObserver, so it
+lands a microtask after the element is inserted rather than synchronously.
+
+`data-args` must go through `|tojson` or `JSON.stringify`, never string
+interpolation. `event-delegation.js` parses it with `JSON.parse` and on a
+throw it logs and returns, so the control looks live and does nothing.
+
+`tools/ui_redesign_status.py` measures each template on three columns and
+is the only thing that decides whether a page is done.
