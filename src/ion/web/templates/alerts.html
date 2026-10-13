@@ -1381,16 +1381,6 @@ function showCaseDetail(caseId) {
     if (!host) return Promise.resolve();
     return htmx.ajax('GET', '/ui/alerts/case-manage/' + encodeURIComponent(caseId), {
         source: host, target: host, swap: 'innerHTML',
-    }).then(function () {
-        const overlay = document.getElementById('case-mgmt-overlay');
-        if (!overlay) return;
-        if (overlay.dataset.caseStatus !== 'closed' && overlay.dataset.kfpContext) {
-            try {
-                checkKFPMatches(JSON.parse(overlay.dataset.kfpContext));
-            } catch (e) {
-                console.error('KFP context on the case modal was not readable:', e);
-            }
-        }
     });
 }
 
@@ -1965,47 +1955,6 @@ async function updateCaseField(caseId, field, value) {
     }
 }
 
-async function checkKFPMatches(caseData) {
-    const bannerId = `case-fp-banner-${caseData.id}`;
-    const container = document.getElementById(bannerId);
-    if (!container) return;
-
-    // Gather observables
-    const hosts = caseData.affected_hosts || [];
-    const users = caseData.affected_users || [];
-    const rules = caseData.triggered_rules || [];
-    const ips = (caseData.observables || [])
-        .filter(o => o.type === 'source_ip' || o.type === 'destination_ip')
-        .map(o => o.value);
-
-    if (!hosts.length && !users.length && !ips.length && !rules.length) return;
-
-    try {
-        const resp = await fetch('/api/known-false-positives/match', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ hosts, users, ips, rules }),
-        });
-        if (!resp.ok) return;
-        const data = await resp.json();
-        if (!data.matches || data.matches.length === 0) return;
-
-        const match = data.matches[0];
-        container.innerHTML = `
-            <div class="fp-suggestion-banner">
-                <span class="fp-icon"><i class="icon-alert-triangle"></i></span>
-                <span class="fp-text">
-                    Matches known false positive: <strong>${escapeHtml(match.title)}</strong>
-                    <span class="text-xs text-[var(--text-muted)] ml-1">(matched: ${match.matched_fields.join(', ')})</span>
-                </span>
-                <button class="btn btn-sm btn-warning" data-click-action="closeAsKnownFP" data-args='[${caseData.id}, ${match.id}]'>Close as Known FP</button>
-                <button class="fp-dismiss" data-remove-closest=".fp-suggestion-banner" title="Dismiss">&times;</button>
-            </div>
-        `;
-    } catch (e) {
-        console.error('Error checking KFP matches:', e);
-    }
-}
 
 async function closeAsKnownFP(caseId, kfpId) {
     try {
@@ -2038,46 +1987,6 @@ async function closeAsKnownFP(caseId, kfpId) {
     }
 }
 
-async function checkKFPMatchesForTab(caseData) {
-    const bannerId = `case-tab-fp-banner-${caseData.id}`;
-    const container = document.getElementById(bannerId);
-    if (!container) return;
-
-    const hosts = caseData.affected_hosts || [];
-    const users = caseData.affected_users || [];
-    const rules = caseData.triggered_rules || [];
-    const ips = (caseData.observables || [])
-        .filter(o => o.type === 'source_ip' || o.type === 'destination_ip')
-        .map(o => o.value);
-
-    if (!hosts.length && !users.length && !ips.length && !rules.length) return;
-
-    try {
-        const resp = await fetch('/api/known-false-positives/match', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ hosts, users, ips, rules }),
-        });
-        if (!resp.ok) return;
-        const data = await resp.json();
-        if (!data.matches || data.matches.length === 0) return;
-
-        const match = data.matches[0];
-        container.innerHTML = `
-            <div class="fp-suggestion-banner">
-                <span class="fp-icon"><i class="icon-alert-triangle"></i></span>
-                <span class="fp-text">
-                    Matches known false positive: <strong>${escapeHtml(match.title)}</strong>
-                    <span class="text-xs text-[var(--text-muted)] ml-1">(matched: ${match.matched_fields.join(', ')})</span>
-                </span>
-                <button class="btn btn-sm btn-warning" data-click-action="closeAsKnownFP" data-args='[${caseData.id}, ${match.id}]'>Close as Known FP</button>
-                <button class="fp-dismiss" data-remove-closest=".fp-suggestion-banner" title="Dismiss">&times;</button>
-            </div>
-        `;
-    } catch (e) {
-        console.error('Error checking KFP matches for tab:', e);
-    }
-}
 
 async function addCaseNoteFromModal(caseId) {
     const input = document.getElementById('case-mgmt-note-input');
@@ -2328,228 +2237,25 @@ async function linkAlertToCase(alertId) {
 // Triage
 // =========================================================================
 async function loadTriage(alertId) {
-    try {
-        const response = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/triage`);
-        if (!response.ok) return;
-        const data = await response.json();
-
-        // Update cache
-        if (data.triage) {
-            triageCache[alertId] = data.triage;
-        }
-
-        // If we're viewing this alert in the modal, update the triage bar
-        if (currentDetailAlert && currentDetailAlert.id === alertId) {
-            renderTriageBar(alertId, data.triage);
-            renderCommentsTab(alertId, data.comments || []);
-            if (data.triage && data.triage.case_id) {
-                renderCaseTab(data.triage.case_id);
-            } else {
-                document.getElementById('detail-tab-case').innerHTML = '<div class="empty-state">Not linked to any case. Use "Create Case" or "Link to Case" in the triage bar above.</div>';
-            }
-
-            // Auto-populate observables if empty
-            const hasObservables = data.triage && data.triage.observables && data.triage.observables.length > 0;
-            if (!hasObservables) {
-                const alert = allAlerts.find(a => a.id === alertId);
-                if (alert) {
-                    autoPopulateObservables(alertId, alert);
-                }
-            }
-        }
-    } catch (e) {
-        console.error('Error loading triage:', e);
-    }
-}
-
-function renderTriageBar(alertId, triage) {
+    // The bar, the comments tab and the case tab come from one request to
+    // /ui/alerts/triage; the comments and case tabs arrive out of band. The
+    // alert's own MITRE technique is client state, the row the analyst
+    // clicked, so it travels as query parameters for the auto badge to be
+    // merged server-side the way renderTriageBar merged it.
     const bar = document.getElementById('triage-bar');
     if (!bar) return;
-
-    const status = triage ? triage.status : 'open';
-    const priority = triage ? (triage.priority || '') : '';
-    const caseNumber = triage ? triage.case_number : null;
-    const caseId = triage ? triage.case_id : null;
-    const analystNotes = triage ? (triage.analyst_notes || '') : '';
-    const observables = triage ? (triage.observables || []) : [];
-    const mitreTechniques = triage ? (triage.mitre_techniques || []) : [];
-    // Bob confidence badge + auto-escalated pill
-    const bobConfidenceInt = triage ? triage.suggested_verdict_confidence_int : null;
-    const bobEscalationBadge = triage ? triage.bob_escalation_badge : null;
-    const bobSuggestedVerdict = triage ? triage.suggested_verdict : null;
-
-    // Merge auto-detected MITRE from alert with saved techniques
-    const alert = currentDetailAlert;
-    const allMitreTechniques = [...mitreTechniques];
-    if (alert && alert.mitre_technique_id) {
-        const autoExists = allMitreTechniques.some(t => t.technique_id === alert.mitre_technique_id);
-        if (!autoExists) {
-            allMitreTechniques.unshift({
-                technique_id: alert.mitre_technique_id,
-                technique_name: alert.mitre_technique_name || '',
-                tactic_name: alert.mitre_tactic_name || '',
-                source: 'auto'
-            });
-        }
-    }
-
-    const statusOptions = TRIAGE_STATUSES.map(s =>
-        `<option value="${s}" ${s === status ? 'selected' : ''}>${s.replace('_', ' ')}</option>`
-    ).join('');
-
-    const priorityOptions = ['', ...PRIORITIES].map(p =>
-        `<option value="${p}" ${p === priority ? 'selected' : ''}>${p || '-- priority --'}</option>`
-    ).join('');
-
-    let caseHtml = '';
-    if (caseNumber) {
-        caseHtml = `<span class="triage-case-link" data-click-action="__switchDetailTabBySelector" data-tab="case" data-selector="[data-tab=case]">${escapeHtml(caseNumber)}</span>`;
-    } else {
-        caseHtml = `
-            <button class="btn btn-sm btn-primary" data-click-action="showCreateCaseForm" data-args='["${escapeHtml(alertId)}"]'>Create Case</button>
-            <button class="btn btn-sm btn-secondary" data-click-action="linkAlertToCase" data-args='["${escapeHtml(alertId)}"]'>Link to Case</button>
-        `;
-    }
-
-    // Build observables HTML
-    let observablesListHtml = '';
-    if (observables.length > 0) {
-        observablesListHtml = observables.map((obs, idx) =>
-            `<div class="observable-row" data-value="${escapeHtml(obs.value)}" data-type="${escapeHtml(obs.type)}">
-                <span class="observable-badge ${escapeHtml(obs.type)}">${escapeHtml(obs.type.replace('_', ' '))}</span>
-                <span class="observable-value observable-link" data-click-action="openObservableDetail" data-args='["${escapeHtml(obs.type)}", "${escapeHtml(obs.value)}"]' title="View in Observables">${escapeHtml(obs.value)}</span>
-                <span class="threat-indicator hidden" id="threat-${idx}"></span>
-                <button class="btn-icon" data-click-action="removeObservable" data-args='["${escapeHtml(alertId)}", ${idx}]' title="Remove">&times;</button>
-            </div>`
-        ).join('');
-    } else {
-        observablesListHtml = '<div class="observable-empty">No observables yet</div>';
-    }
-
-    const typeOptions = OBSERVABLE_TYPES.map(t =>
-        `<option value="${t}">${t.replace('_', ' ')}</option>`
-    ).join('');
-
-    bar.innerHTML = `
-        <div class="triage-row flex gap-4 items-center flex-wrap">
-            <div class="triage-group">
-                <label>Status</label>
-                <select data-change-action="updateTriage" data-args='["${escapeHtml(alertId)}", "status", "$value"]'>${statusOptions}</select>
-            </div>
-            <div class="triage-group">
-                <label>Priority</label>
-                <select data-change-action="updateTriage" data-args='["${escapeHtml(alertId)}", "priority", "$value"]'>${priorityOptions}</select>
-            </div>
-            <div class="triage-group ml-[auto]">
-                ${caseHtml}
-            </div>
-        </div>
-        <div class="alert-closure-actions">
-            <span class="text-xs font-semibold text-[var(--text-muted)] self-center">Close as:</span>
-            <button class="alert-closure-btn benign" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(alertId)}", "benign"]'>&#10003; Benign</button>
-            <button class="alert-closure-btn escalated" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(alertId)}", "escalated"]'>&#9650; Escalated</button>
-            <button class="alert-closure-btn false-positive" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(alertId)}", "false_positive"]'>&#10007; False Positive</button>
-        </div>
-        ${(() => {
-            if (bobConfidenceInt === null && bobConfidenceInt === undefined && !bobEscalationBadge) return '';
-            const parts = [];
-            if (bobConfidenceInt !== null && bobConfidenceInt !== undefined) {
-                let color, label;
-                if (bobConfidenceInt >= 80) {
-                    color = '#22c55e'; label = 'High';
-                } else if (bobConfidenceInt >= 60) {
-                    color = '#f59e0b'; label = 'Medium';
-                } else {
-                    color = '#ef4444'; label = 'Low';
-                }
-                const verdictStr = bobSuggestedVerdict ? ` &middot; ${escapeHtml(bobSuggestedVerdict.replace('_', ' '))}` : '';
-                parts.push(`<span class="inline-flex items-center gap-[0.3rem] py-[0.15rem] px-2 rounded-[9999px] text-[0.72rem] font-semibold" data-ion-style="background:${color}22; color:${color}; border:1px solid ${color}55" title="Bob confidence score">&#129302; Bob ${label} ${bobConfidenceInt}%${verdictStr}</span>`);
-            }
-            if (bobEscalationBadge === 'low_confidence_triage') {
-                parts.push(`<span class="inline-flex items-center gap-[0.3rem] py-[0.15rem] px-2 rounded-[9999px] text-[0.72rem] font-semibold bg-[#f59e0b22] text-[#f59e0b] border border-[#f59e0b55]" title="Bob could not produce a confident verdict — human review required">&#9650; Auto-escalated</span>`);
-            }
-            return parts.length ? `<div class="flex gap-[0.4rem] flex-wrap mt-[0.4rem]">${parts.join('')}</div>` : '';
-        })()}
-        <div class="triage-notes-row mt-2">
-            <label class="text-xs font-semibold block mb-1">Analyst Notes</label>
-            <div class="flex gap-2">
-                <textarea class="flex-1 min-h-[2.5rem] resize-y text-[0.8125rem] p-1.5 border border-[var(--ion-border)] rounded-[4px] bg-[var(--bg-secondary)] text-[var(--text-primary)]" id="analyst-notes-input" placeholder="Add analyst assessment...">${escapeHtml(analystNotes)}</textarea>
-                <button class="btn btn-sm btn-primary self-end" data-click-action="saveAnalystNotes" data-args='["${escapeHtml(alertId)}"]'>Save</button>
-            </div>
-        </div>
-        <div class="observables-section">
-            <div class="flex items-center justify-between mb-1.5">
-                <div class="flex items-center gap-2">
-                    <label class="mb-0">Observables</label>
-                    ${aiAvailable ? `<button class="ai-micro-btn" data-click-action="aiExtractObservables" data-args='["${escapeHtml(alertId)}"]' title="AI extract observables">AI Extract</button>` : ''}
-                </div>
-                <button class="enrich-btn" id="enrich-btn" data-click-action="enrichObservables" data-args='["${escapeHtml(alertId)}"]' ${observables.length === 0 ? 'disabled' : ''}>
-                    <span class="enrich-icon">&#9733;</span> Enrich via OpenCTI
-                </button>
-            </div>
-            <div id="observables-list">${observablesListHtml}</div>
-            <div class="observable-add-row">
-                <select id="observable-type-select">${typeOptions}</select>
-                <input type="text" id="observable-value-input" placeholder="Value..." data-keydown-action="__observableInputEnter" data-alert-id="${escapeHtml(alertId)}">
-                <button class="btn btn-sm btn-primary" data-click-action="addObservable" data-args='["${escapeHtml(alertId)}"]'>Add</button>
-            </div>
-            <div id="enrich-results"></div>
-        </div>
-        ${renderMitreSection(alertId, allMitreTechniques)}
-        <div class="playbooks-section" id="playbooks-section">
-            <div class="flex items-center justify-between">
-                <label>Investigation Playbooks</label>
-                <button class="btn btn-sm btn-secondary text-xs" title="Reload playbooks" data-click-action="loadPlaybooksForAlert" data-args='["${escapeHtml(alertId)}"]'>&#8635;</button>
-            </div>
-            <div id="playbooks-content">
-                <span class="text-[var(--text-muted)] text-[0.8125rem]">Loading playbooks...</span>
-            </div>
-        </div>
-    `;
-
-    // The section is /ui/alerts/playbooks/{id}, requested once this markup
-    // has landed; the reload control above is outside the target it fills.
-    setTimeout(() => loadPlaybooksForAlert(alertId), 100);
+    const a = currentDetailAlert || {};
+    const params = new URLSearchParams();
+    if (a.mitre_technique_id) params.set('mitre_technique_id', a.mitre_technique_id);
+    if (a.mitre_technique_name) params.set('mitre_technique_name', a.mitre_technique_name);
+    if (a.mitre_tactic_name) params.set('mitre_tactic_name', a.mitre_tactic_name);
+    const qs = params.toString();
+    return htmx.ajax('GET', '/ui/alerts/triage/' + encodeURIComponent(alertId) + (qs ? '?' + qs : ''), {
+        source: bar, target: bar, swap: 'innerHTML',
+    });
 }
 
-function renderMitreSection(alertId, techniques) {
-    // Build techniques list HTML
-    let techniquesListHtml = '';
-    if (techniques.length > 0) {
-        techniquesListHtml = techniques.map((tech, idx) => {
-            const isAuto = tech.source === 'auto';
-            const removeBtn = !isAuto
-                ? `<span class="remove-btn" data-click-action="removeMitreTechnique" data-stop-propagation data-args='["${escapeHtml(alertId)}", ${idx}]'>&times;</span>`
-                : '';
-            return `<span class="mitre-badge ${isAuto ? 'auto' : 'manual'}" data-click-action="__filterMitreAndClose" data-tech-id="${escapeHtml(tech.technique_id)}" title="${isAuto ? 'Auto-detected' : 'Manually added'} - Click to filter">
-                <strong>${escapeHtml(tech.technique_id)}</strong>
-                ${tech.technique_name ? ` - ${escapeHtml(tech.technique_name)}` : ''}
-                ${removeBtn}
-            </span>`;
-        }).join('');
-    } else {
-        techniquesListHtml = '<span class="text-[var(--text-muted)] text-[0.8125rem] italic">No MITRE techniques</span>';
-    }
 
-    // Build tactic dropdown options
-    const tacticOptions = MITRE_TACTICS.map(t => `<option value="${t}">${t}</option>`).join('');
-
-    return `
-        <div class="mitre-section">
-            <div class="flex items-center gap-2">
-                <label>MITRE ATT&CK Techniques</label>
-                ${aiAvailable ? `<button class="ai-micro-btn" data-click-action="aiSuggestMitre" data-args='["${escapeHtml(alertId)}"]' title="AI suggest MITRE techniques">AI Suggest</button>` : ''}
-            </div>
-            <div class="mitre-techniques-list" id="mitre-techniques-list">${techniquesListHtml}</div>
-            <div class="mitre-add-row">
-                <input type="text" id="mitre-id-input" placeholder="T1234" maxlength="9">
-                <input type="text" id="mitre-name-input" class="mitre-name-input" placeholder="Technique name">
-                <select id="mitre-tactic-select">${tacticOptions}</select>
-                <button class="btn btn-sm btn-primary" data-click-action="addMitreTechnique" data-args='["${escapeHtml(alertId)}"]'>Add</button>
-            </div>
-        </div>
-    `;
-}
 
 async function saveAnalystNotes(alertId) {
     const input = document.getElementById('analyst-notes-input');
@@ -2601,7 +2307,7 @@ async function saveObservables(alertId, observables) {
 
         // Re-render triage bar
         if (currentDetailAlert && currentDetailAlert.id === alertId) {
-            renderTriageBar(alertId, triageCache[alertId]);
+            loadTriage(alertId);
         }
     } catch (e) {
         console.error('Error saving observables:', e);
@@ -2777,7 +2483,7 @@ async function aiSuggestMitre(alertId) {
                 const result = await resp2.json();
                 triageCache[alertId] = { ...triageCache[alertId], mitre_techniques: result.mitre_techniques };
                 if (currentDetailAlert && currentDetailAlert.id === alertId) {
-                    renderTriageBar(alertId, triageCache[alertId]);
+                    loadTriage(alertId);
                 }
             }
             showNotification(`AI suggested ${added} new MITRE technique(s)`);
@@ -2868,7 +2574,7 @@ async function autoPopulateObservables(alertId, alert) {
                 observables: result.observables,
             };
             if (currentDetailAlert && currentDetailAlert.id === alertId) {
-                renderTriageBar(alertId, triageCache[alertId]);
+                loadTriage(alertId);
             }
         }
     } catch (e) {
@@ -2949,7 +2655,7 @@ async function saveMitreTechniques(alertId, techniques) {
 
         // Re-render triage bar
         if (currentDetailAlert && currentDetailAlert.id === alertId) {
-            renderTriageBar(alertId, triageCache[alertId]);
+            loadTriage(alertId);
         }
 
         // Refresh heatmap if visible
@@ -3129,192 +2835,8 @@ async function skipRemainingSteps(alertId, executionId) {
 // =========================================================================
 // OpenCTI Enrichment
 // =========================================================================
-async function enrichObservables(alertId) {
-    const btn = document.getElementById('enrich-btn');
-    const resultsContainer = document.getElementById('enrich-results');
-    if (!btn || !resultsContainer) return;
 
-    const cached = triageCache[alertId];
-    const observables = (cached && cached.observables) ? cached.observables : [];
-    if (observables.length === 0) return;
 
-    // Map ION observable types to OpenCTI types
-    const typeMap = {
-        'source_ip': 'ipv4-addr',
-        'destination_ip': 'ipv4-addr',
-        'hostname': 'domain-name',
-        'domain': 'domain-name',
-        'url': 'url',
-        'user_account': null,  // not enrichable
-    };
-
-    const enrichable = observables
-        .map(obs => {
-            const mappedType = typeMap[obs.type] !== undefined ? typeMap[obs.type] : obs.type;
-            if (!mappedType) return null;
-            return { type: mappedType, value: obs.value, original_type: obs.type };
-        })
-        .filter(Boolean);
-
-    if (enrichable.length === 0) {
-        resultsContainer.innerHTML = '<div class="enrich-no-match mt-2">No enrichable observables (IPs, domains, URLs, hashes).</div>';
-        return;
-    }
-
-    // Show loading state
-    btn.disabled = true;
-    btn.innerHTML = '<span class="enrich-icon">&#8987;</span> Enriching...';
-    resultsContainer.innerHTML = '<div class="text-[var(--text-muted)] text-[0.8125rem] mt-2">Querying OpenCTI...</div>';
-
-    try {
-        const payload = {
-            observables: enrichable.map(o => ({ type: o.type, value: o.value })),
-        };
-        const response = await fetch('/api/opencti/enrich/batch', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-            const errData = await response.json().catch(() => ({}));
-            throw new Error(errData.detail || errData.error || 'Enrichment request failed');
-        }
-
-        const data = await response.json();
-
-        if (data.error) {
-            resultsContainer.innerHTML = `<div class="enrich-no-match mt-2">${escapeHtml(data.error)}</div>`;
-            return;
-        }
-
-        renderEnrichResults(resultsContainer, data.results || [], enrichable);
-
-        // Add "Discuss with AI" button after enrichment results
-        if (aiAvailable) {
-            const discussDiv = document.createElement('div');
-            discussDiv.style.marginTop = '0.5rem';
-            discussDiv.innerHTML = `<button class="ai-micro-btn" data-click-action="openAIChatWithContext" data-args='["${alertId}"]' title="Discuss enrichment results with AI">Discuss with AI</button>`;
-            resultsContainer.appendChild(discussDiv);
-        }
-
-        // Update observable list with enrichment dots
-        updateObservableEnrichDots(data.results || []);
-    } catch (e) {
-        console.error('Error enriching observables:', e);
-        resultsContainer.innerHTML = `<div class="enrich-no-match mt-2">Enrichment failed: ${escapeHtml(e.message)}</div>`;
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<span class="enrich-icon">&#9733;</span> Enrich via OpenCTI';
-    }
-}
-
-function renderEnrichResults(container, results, enrichable) {
-    if (!results || results.length === 0) {
-        container.innerHTML = '<div class="enrich-no-match mt-2">No results returned.</div>';
-        return;
-    }
-
-    const foundCount = results.filter(r => r.found).length;
-    let html = `<div class="enrich-results">
-        <div class="text-xs text-[var(--text-muted)] uppercase font-semibold mb-2">
-            OpenCTI Enrichment &mdash; ${foundCount} of ${results.length} matched
-        </div>`;
-
-    results.forEach((r, idx) => {
-        const origType = enrichable[idx] ? enrichable[idx].original_type : r.type;
-        const matchBadge = r.found
-            ? '<span class="enrich-match-badge found">MATCH</span>'
-            : '<span class="enrich-match-badge clean">NO MATCH</span>';
-
-        html += `<div class="enrich-result-item">
-            <div class="enrich-result-header">
-                ${matchBadge}
-                <span class="observable-badge ${escapeHtml(origType)}">${escapeHtml(origType.replace('_', ' '))}</span>
-                <span class="text-[0.8125rem] font-medium">${escapeHtml(r.value)}</span>
-            </div>`;
-
-        if (r.found) {
-            // Labels
-            if (r.labels && r.labels.length > 0) {
-                html += '<div class="my-1 mx-0">';
-                r.labels.forEach(lbl => {
-                    const bg = lbl.color ? lbl.color + '22' : 'rgba(139,92,246,0.1)';
-                    const fg = lbl.color || '#8b5cf6';
-                    html += `<span class="enrich-label" data-ion-style="background:${bg}; color:${fg}">${escapeHtml(lbl.value)}</span>`;
-                });
-                html += '</div>';
-            }
-
-            // Threat actors
-            if (r.threat_actors && r.threat_actors.length > 0) {
-                html += '<div class="my-1 mx-0">';
-                r.threat_actors.forEach(ta => {
-                    html += `<span class="enrich-actor" title="${escapeHtml(ta.description || '')}">&#9760; ${escapeHtml(ta.name)}</span>`;
-                });
-                html += '</div>';
-            }
-
-            // Indicators
-            if (r.indicators && r.indicators.length > 0) {
-                r.indicators.forEach(ind => {
-                    html += `<div class="enrich-indicator">
-                        <div class="enrich-indicator-name">${escapeHtml(ind.name)}</div>
-                        ${ind.description ? `<div class="enrich-indicator-desc">${escapeHtml(ind.description)}</div>` : ''}
-                        ${ind.score !== null && ind.score !== undefined ? `<div class="enrich-indicator-desc">Score: ${ind.score}</div>` : ''}
-                    </div>`;
-                });
-            }
-
-            // Observable score
-            if (r.observable && r.observable.score !== null && r.observable.score !== undefined) {
-                html += `<div class="text-xs text-[var(--text-muted)] mt-1">Observable score: ${r.observable.score}</div>`;
-            }
-        }
-
-        if (r.error) {
-            html += `<div class="text-xs text-[#ef4444] mt-1">${escapeHtml(r.error)}</div>`;
-        }
-
-        html += '</div>';
-    });
-
-    html += '</div>';
-    container.innerHTML = html;
-}
-
-function updateObservableEnrichDots(results) {
-    const obsList = document.getElementById('observables-list');
-    if (!obsList) return;
-
-    const rows = obsList.querySelectorAll('.observable-row');
-    // Build a lookup by value
-    const resultByValue = {};
-    results.forEach(r => {
-        resultByValue[r.value] = r.found;
-    });
-
-    rows.forEach(row => {
-        const valueSpan = row.querySelector('.observable-value');
-        if (!valueSpan) return;
-        const value = valueSpan.textContent.trim();
-        if (value in resultByValue) {
-            // Remove existing dots
-            const existingDot = row.querySelector('.enrich-dot');
-            if (existingDot) existingDot.remove();
-
-            const dot = document.createElement('span');
-            dot.className = 'enrich-dot ' + (resultByValue[value] ? 'hit' : 'miss');
-            dot.title = resultByValue[value] ? 'Found in OpenCTI' : 'Not found in OpenCTI';
-            valueSpan.appendChild(dot);
-
-            // Add styling to the row
-            if (resultByValue[value]) {
-                row.classList.add('enriched', 'malicious');
-            }
-        }
-    });
-}
 
 // Open observable detail page in new tab or navigate
 function openObservableDetail(type, value) {
@@ -3394,88 +2916,49 @@ function revertAlertMessage() {
 }
 
 async function translateComment(cmtId) {
+    // The body is text now, not rendered markdown, so the toggle swaps
+    // textContent. The page stored both data-original-raw and
+    // data-rendered-html and swapped innerHTML between them; there is one
+    // text, in data-original-text.
     const el = document.getElementById(cmtId);
     if (!el) return;
-    const original = el.dataset.originalRaw || el.textContent;
-    if (!original.trim()) return;
-    if (el.dataset.translated === '1') {
-        // Toggle back to original on second click.
-        el.innerHTML = el.dataset.renderedHtml || '';
-        el.dataset.translated = '0';
+    if (el.dataset.translated === 'yes') {
+        el.textContent = el.dataset.originalText || '';
+        el.dataset.translated = 'no';
         return;
     }
-    el.style.opacity = '0.6';
     try {
-        const r = await fetch('/api/translator/translate', {
+        const resp = await fetch('/api/ai/translate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: original, source: 'auto', target: 'en' }),
+            body: JSON.stringify({ text: el.dataset.originalText || '' }),
         });
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status));
-        // Render translated text as plain text (no markdown round-trip).
-        el.textContent = d.translation;
-        el.dataset.translated = '1';
+        if (!resp.ok) throw new Error('translation failed');
+        const data = await resp.json();
+        if (!data || typeof data.translation !== 'string') {
+            throw new Error('no translation in the answer');
+        }
+        el.textContent = data.translation;
+        el.dataset.translated = 'yes';
     } catch (e) {
-        el.textContent = '[translation failed: ' + (e.message || e) + ']';
-    } finally {
-        el.style.opacity = '';
+        showNotification('The comment could not be translated: ' + (e.message || e), 'error');
     }
 }
 
 // =========================================================================
 // Comments
 // =========================================================================
-function renderCommentsTab(alertId, comments) {
-    const container = document.getElementById('detail-tab-comments');
-    if (!container) return;
-
-    let html = '<div class="comments-list">';
-    if (comments.length === 0) {
-        html += '<div class="empty-state">No comments yet</div>';
-    } else {
-        comments.forEach(c => {
-            // render comment content as markdown (mirrors cases.html
-            // line 2491). Falls back to escaped plain text when marked or
-            // DOMPurify isn't loaded for some reason. Both are loaded by
-            // base.html so this should always hit the markdown path.
-            const raw = c.content || '';
-            let rendered;
-            if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
-                try {
-                    rendered = safeHtml(marked.parse(raw));
-                } catch (e) {
-                    console.warn('renderCommentsTab: markdown render failed, falling back to plain text:', e);
-                    rendered = escapeHtml(raw);
-                }
-            } else {
-                rendered = escapeHtml(raw);
-            }
-            // wrap each comment-body so it can be translated in place.
-            const cmtId = 'cmt-' + (c.id != null ? c.id : Math.random().toString(36).slice(2,9));
-            const safeOriginalRaw = escapeHtml(raw);
-            html += `
-                <div class="comment-item" data-comment-id="${escapeHtml(String(c.id||''))}">
-                    <div class="comment-header">
-                        <span class="comment-user">${escapeHtml(c.user)}</span>
-                        <span class="comment-time">${c.created_at ? new Date(c.created_at).toLocaleString() : ''}</span>
-                        <button class="cmt-translate-btn ml-[auto] text-[10px] bg-transparent border border-[rgba(255,255,255,0.1)] text-[#94a3b8] py-0.5 px-2 rounded-[3px] cursor-pointer" type="button" data-click-action="translateComment" data-args='["${cmtId}"]'>Translate</button>
-                    </div>
-                    <div class="comment-body cpanel-note-markdown" id="${cmtId}" data-original-raw="${safeOriginalRaw}" data-rendered-html="${escapeHtml(rendered)}">${rendered}</div>
-                </div>
-            `;
-        });
-    }
-    html += '</div>';
-
-    html += `
-        <div class="comment-form">
-            <textarea id="comment-input" placeholder="Add a comment..."></textarea>
-            <button class="btn btn-primary" data-click-action="addComment" data-args='["${escapeHtml(alertId)}"]'>Submit</button>
-        </div>
-    `;
-
-    container.innerHTML = html;
+function renderCommentsTab(alertId) {
+    // Kept as a function because static/js/alert-detail.js probes for it and
+    // writes its own simpler markup into #detail-tab-comments when it is
+    // absent. It re-requests the fragment rather than rendering the comments
+    // it was handed; the second argument is accepted and ignored so the
+    // shared module's call signature still works.
+    const el = document.getElementById('detail-tab-comments');
+    if (!el) return;
+    return htmx.ajax('GET', '/ui/alerts/comments/' + encodeURIComponent(alertId), {
+        source: el, target: el, swap: 'innerHTML',
+    });
 }
 
 async function addComment(alertId) {
@@ -3502,201 +2985,16 @@ async function addComment(alertId) {
 // =========================================================================
 // Case Observables
 // =========================================================================
-function renderCaseObservables(observables) {
-    if (!observables || observables.length === 0) return '';
-
-    const rows = observables.map(obs => {
-        const tl = obs.threat_level || (obs.enrichment && obs.enrichment.threat_level) || 'unknown';
-        const enriched = obs.enrichment || obs.observable_id;
-        const isMalicious = obs.enrichment && obs.enrichment.is_malicious;
-        const rowClass = isMalicious ? 'observable-row enriched malicious' : enriched ? 'observable-row enriched' : 'observable-row';
-
-        let threatDot = '';
-        if (tl && tl !== 'unknown') {
-            threatDot = `<span class="threat-indicator ${tl}" title="Threat: ${tl}"></span>`;
-        }
-
-        let enrichBadge = '';
-        if (obs.enrichment) {
-            const score = obs.enrichment.score;
-            if (score !== null && score !== undefined) {
-                enrichBadge = `<span class="observable-enriched" title="Score: ${score}"><span class="enrich-dot"></span>${score}</span>`;
-            }
-            if (obs.enrichment.threat_actors && obs.enrichment.threat_actors.length > 0) {
-                const names = obs.enrichment.threat_actors.map(ta => ta.name || ta).join(', ');
-                enrichBadge += `<span class="text-[0.6875rem] text-[#f97316] ml-1" title="${escapeHtml(names)}">&#9888; ${escapeHtml(names)}</span>`;
-            }
-        }
-
-        return `<div class="${rowClass}">
-            <span class="observable-badge ${escapeHtml(obs.type)}">${escapeHtml(obs.type.replace(/_/g, ' '))}</span>
-            <span class="observable-value observable-link" data-click-action="openObservableDetail" data-args='["${escapeHtml(obs.type)}", "${escapeHtml(obs.value)}"]' title="View in Observables">${escapeHtml(obs.value)}</span>
-            ${threatDot}${enrichBadge}
-        </div>`;
-    }).join('');
-
-    return `<div class="observables-section">
-        <label>Observables (${observables.length})</label>
-        ${rows}
-    </div>`;
-}
 
 // =========================================================================
 // Case Tab
 // =========================================================================
 async function renderCaseTab(caseId) {
-    const container = document.getElementById('detail-tab-case');
-    if (!container) return;
-
-    container.innerHTML = '<div class="loading">Loading case...</div>';
-
-    try {
-        const response = await fetch(`/api/cases/${caseId}`);
-        if (!response.ok) throw new Error('Failed');
-        const c = await response.json();
-
-        // Build tag badges for context fields
-        function renderTags(items, label, colorClass) {
-            if (!items || items.length === 0) return '';
-            const badges = items.map(i => `<span class="context-tag ${colorClass}">${escapeHtml(i)}</span>`).join('');
-            return `<div class="case-context-group"><span class="case-context-label">${label}:</span> ${badges}</div>`;
-        }
-
-        const contextHtml = [
-            renderTags(c.affected_hosts, 'Hosts', 'tag-host'),
-            renderTags(c.affected_users, 'Users', 'tag-user'),
-            renderTags(c.triggered_rules, 'Rules', 'tag-rule'),
-        ].filter(Boolean).join('');
-
-        const evidenceHtml = c.evidence_summary
-            ? `<div class="case-evidence-block"><strong>Evidence Summary</strong><p>${escapeHtml(c.evidence_summary)}</p></div>`
-            : '';
-
-        // Notes journal
-        const notes = c.notes || [];
-        let notesHtml = '<div class="case-notes-section"><h5>Investigation Notes</h5>';
-        if (notes.length === 0) {
-            notesHtml += '<div class="empty-state">No notes yet</div>';
-        } else {
-            notes.forEach(n => {
-                notesHtml += `
-                    <div class="comment-item">
-                        <div class="comment-header">
-                            <span class="comment-user">${escapeHtml(n.user)}</span>
-                            <span class="comment-time">${n.created_at ? new Date(n.created_at).toLocaleString() : ''}</span>
-                        </div>
-                        <div class="comment-body">${escapeHtml(n.content)}</div>
-                    </div>
-                `;
-            });
-        }
-        notesHtml += `
-            <div class="comment-form mt-3">
-                <textarea id="case-note-input" placeholder="Add investigation note..."></textarea>
-                <button class="btn btn-primary" data-click-action="addCaseNote" data-args='[${c.id}]'>Add Note</button>
-            </div>
-        </div>`;
-
-        // Closure info display
-        const closureReasonLabels = {
-            true_positive: 'True Positive', false_positive: 'False Positive',
-            benign_true_positive: 'Benign True Positive', duplicate: 'Duplicate',
-            insufficient_data: 'Insufficient Data', not_applicable: 'Not Applicable',
-        };
-        let closureInfoHtml = '';
-        if (c.status === 'closed' && c.closure_reason) {
-            closureInfoHtml = `
-                <div class="closure-info-block">
-                    <div class="closure-info-header">
-                        <span class="closure-reason-badge reason-${c.closure_reason}">${closureReasonLabels[c.closure_reason] || c.closure_reason}</span>
-                    </div>
-                    ${c.closure_notes ? `<div class="closure-info-notes">${escapeHtml(c.closure_notes)}</div>` : ''}
-                    <div class="closure-info-meta">
-                        Closed by ${escapeHtml(c.closed_by || 'unknown')}${c.closed_at ? ' on ' + new Date(c.closed_at).toLocaleString() : ''}
-                    </div>
-                </div>`;
-        }
-
-        container.innerHTML = `
-            <div class="case-detail-box">
-                <h4 class="flex items-center justify-between">
-                    <span>${escapeHtml(c.case_number)}: ${escapeHtml(c.title)}</span>
-                    <div class="flex items-center gap-2">
-                        ${aiAvailable ? `<button class="ai-micro-btn" data-click-action="aiSummarizeCase" data-args='[${c.id}]' title="AI case summary">AI Summary</button>` : ''}
-                        <button class="btn btn-sm text-xs" data-click-action="showCaseDetail" data-args='[${c.id}]' title="Open case management modal">Manage Case</button>
-                    </div>
-                </h4>
-                <div class="ai-case-summary" id="ai-case-summary-${c.id}"></div>
-                ${c.status !== 'closed' ? `
-                <div class="alert-closure-actions my-2 mx-0 p-2 bg-[rgba(255,255,255,0.03)] border border-[var(--ion-border)] rounded-[6px] flex flex-wrap gap-1.5 items-center">
-                    <span class="text-xs text-[var(--text-muted)] mr-2">Close Case As:</span>
-                    <button class="alert-closure-btn true-positive" data-click-action="closeCaseWithAlerts" data-args='[${c.id}, "true_positive"]'>&#9650; True Positive</button>
-                    <button class="alert-closure-btn benign-true-positive" data-click-action="closeCaseWithAlerts" data-args='[${c.id}, "benign_true_positive"]'>&#10003; Benign True Positive</button>
-                    <button class="alert-closure-btn false-positive" data-click-action="closeCaseWithAlerts" data-args='[${c.id}, "false_positive"]'>&#10007; False Positive</button>
-                    <button class="alert-closure-btn duplicate" data-click-action="closeCaseWithAlerts" data-args='[${c.id}, "duplicate"]'>&#9866; Duplicate</button>
-                    <button class="alert-closure-btn insufficient-data" data-click-action="closeCaseWithAlerts" data-args='[${c.id}, "insufficient_data"]'>? Insufficient Data</button>
-                    <button class="alert-closure-btn not-applicable" data-click-action="closeCaseWithAlerts" data-args='[${c.id}, "not_applicable"]'>&#8709; Not Applicable</button>
-                </div>
-                ` : ''}
-                ${closureInfoHtml}
-                <div id="case-tab-fp-banner-${c.id}"></div>
-                <div class="case-meta">
-                    <div>
-                        <div class="case-meta-label">Status</div>
-                        <div>${escapeHtml(c.status)}</div>
-                    </div>
-                    <div>
-                        <div class="case-meta-label">Severity</div>
-                        <div>${escapeHtml(c.severity || '-')}</div>
-                    </div>
-                    <div>
-                        <div class="case-meta-label">Created By</div>
-                        <div>${escapeHtml(c.created_by || '-')}</div>
-                    </div>
-                    <div>
-                        <div class="case-meta-label">Assigned To</div>
-                        <div>${escapeHtml(c.assigned_to || 'Unassigned')}</div>
-                    </div>
-                </div>
-                ${contextHtml ? `<div class="case-context-tags my-3 mx-0 flex flex-col gap-1.5">${contextHtml}</div>` : ''}
-                ${evidenceHtml}
-                ${c.description ? `<p class="text-sm leading-[1.5]">${escapeHtml(c.description)}</p>` : ''}
-                ${renderCaseObservables(c.observables)}
-                <div class="case-alerts-list">
-                    <h5>Linked Alerts (${c.alerts.length})</h5>
-                    ${c.alerts.length > 0 ? c.alerts.map(a => `
-                        <div class="related-alert-item flex-wrap">
-                            <span class="triage-dot triage-${a.status}"></span>
-                            <span class="text-[0.8125rem] flex-1 cursor-pointer" data-click-action="showAlertDetail" data-args='["${escapeHtml(a.es_alert_id)}"]'>${escapeHtml(a.es_alert_id)}</span>
-                            <span class="text-xs text-[var(--text-muted)]">${escapeHtml(a.priority || '')}</span>
-                            <div class="flex gap-1 ml-[auto]">
-                                <button class="alert-closure-btn benign py-[0.2rem] px-2 text-[0.6875rem]" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "benign"]'>&#10003;</button>
-                                <button class="alert-closure-btn escalated py-[0.2rem] px-2 text-[0.6875rem]" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "escalated"]'>&#9650;</button>
-                                <button class="alert-closure-btn false-positive py-[0.2rem] px-2 text-[0.6875rem]" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "false_positive"]'>&#10007;</button>
-                            </div>
-                        </div>
-                    `).join('') : '<div class="empty-state">No other alerts linked</div>'}
-                </div>
-                ${notesHtml}
-            </div>
-        `;
-
-        // Check for KFP matches on the case tab too
-        if (c.status !== 'closed') {
-            checkKFPMatchesForTab(c);
-        }
-    } catch (e) {
-        // Say WHICH case and WHY. The bare message here previously threw the
-        // exception away, which meant a failure the user could see was one
-        // nobody could diagnose: the request returns 200, so the server logs
-        // show nothing wrong, and the only evidence left was the words
-        // "Failed to load case details".
-        console.error('renderCaseTab(' + caseId + ') failed:', e);
-        container.innerHTML =
-            '<div class="empty-state">Failed to load case details'
-            + '<br><small>' + escapeHtml(String(e && e.message || e)) + '</small>'
-            + '</div>';
-    }
+    const el = document.getElementById('detail-tab-case');
+    if (!el) return;
+    return htmx.ajax('GET', '/ui/alerts/case-tab/' + encodeURIComponent(caseId), {
+        source: el, target: el, swap: 'innerHTML',
+    });
 }
 
 async function addCaseNote(caseId) {

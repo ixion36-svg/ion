@@ -474,7 +474,8 @@ def test_the_management_modal_renders_the_case():
     assert "Linked Alerts (1)" in html_
     assert 'data-click-action="showAlertDetail"' in html_
     assert "Looking." in html_
-    assert 'data-case-status="open"' in html_
+    # data-case-status is gone: its only reader was the client-side KFP
+    # check, which stage 5 replaced with a fragment.
 
 
 def test_the_management_modal_description_is_text_not_markup():
@@ -543,14 +544,19 @@ def test_ai_summary_is_offered_only_when_the_service_answered():
     assert "aiSummarizeCase" not in render(MANAGE, **manage_ctx(ai_available=False))
 
 
-def test_the_kfp_context_on_the_overlay_is_json_the_page_can_parse():
+def test_the_kfp_banner_is_requested_by_its_container_not_matched_on_the_client():
+    """Stage 5 replaced the client-side match. The overlay used to carry the
+    whole case as data-kfp-context so checkKFPMatches could run it in the
+    browser; the container requests /ui/alerts/kfp-banner instead, and
+    neither that attribute nor data-case-status has a reader any more."""
     html_ = render(MANAGE, **manage_ctx(case=_case(title='Quote " in title',
                                                    affected_hosts=['ws-"01'])))
-    raw = re.search(r"data-kfp-context='([^']*)'", html_).group(1)
-    ctx = json.loads(html.unescape(raw))
-    assert ctx["id"] == 7
-    assert ctx["affected_hosts"] == ['ws-"01']
-    assert ctx["observables"] == [{"type": "source_ip", "value": "10.0.0.5"}]
+    assert "data-kfp-context" not in html_
+    assert "data-case-status" not in html_
+    banner = html_[html_.index('id="case-fp-banner-7"'):]
+    banner = banner[:banner.index(">") + 1]
+    assert 'hx-get="/ui/alerts/kfp-banner/7"' in banner
+    assert 'hx-trigger="load"' in banner
 
 
 def test_dfir_iris_shows_the_link_when_escalated_and_the_button_only_when_allowed():
@@ -1154,7 +1160,7 @@ def test_the_five_modal_refreshes_go_through_the_fragment():
 #: loadPlaybooksForAlert 1): 80 to 69. Stage 4, the alert queue, removed
 #: 15 more (loadAlerts 9, _renderAlertsFallback 2, renderSideList 2,
 #: renderFilterChips 1, populateSystemFilterFromAlerts 1): 69 to 54.
-WRITES_REMAINING = 54
+WRITES_REMAINING = 36
 
 
 def test_the_dom_writes_in_the_page_do_not_increase():

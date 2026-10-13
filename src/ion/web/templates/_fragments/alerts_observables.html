@@ -1,0 +1,51 @@
+{# Alerts: the triage observables list.
+
+   Included by the triage bar and swapped out of band by the enrichment
+   route, so the dots can be redrawn without rebuilding the bar and losing
+   an analyst's unsaved notes. One definition either way, which is the whole
+   reason this is its own file rather than markup in two places.
+
+   `found` is True, False or None, and None means no enrichment has run or
+   this value was not in the results. No dot is drawn for None: an
+   observable nobody has looked up is not an observable that came back
+   clean. The page set the class to `hit` or `miss` from
+   `resultByValue[value] ? 'hit' : 'miss'`, so a value missing from the
+   results map was painted as a miss.
+
+   Every argument goes through `|tojson`. The page wrote
+   data-args='["${escapeHtml(obs.type)}", "${escapeHtml(obs.value)}"]', and
+   escapeHtml turns a double quote into &quot;, which the browser decodes to
+   a bare quote inside the JSON string. event-delegation.js parses data-args
+   with JSON.parse and on a throw it logs and returns, so for any observable
+   whose value contains a quote, which a URL or a mangled hostname can,
+   openObservableDetail and Remove were both silently dead while looking
+   like working controls.
+
+   `index` is the position in the stored list, which is what removeObservable
+   splices. The module keeps every element's position, including a malformed
+   one, because dropping it here would make Remove delete its neighbour. #}
+
+{% if not observables %}
+  <div class="observable-empty">No observables yet</div>
+{% else %}
+  {% for o in observables %}
+    <div class="observable-row" data-value="{{ o.value }}" data-type="{{ o.type }}">
+      <span class="observable-badge {{ o.type }}">{{ o.type_label or 'untyped' }}</span>
+      <span class="observable-value observable-link"
+            data-click-action="openObservableDetail"
+            data-args='[{{ o.type|tojson }}, {{ o.value|tojson }}]'
+            title="View in Observables">{{ o.value }}</span>
+      {% if o.found is not none %}
+        {# Drawn only when an enrichment actually reported on this value. #}
+        <span class="enrich-dot {{ 'hit' if o.found else 'miss' }}"
+              title="{{ 'Found in OpenCTI' if o.found else 'Not found in OpenCTI' }}"></span>
+      {% endif %}
+      {% if can_triage %}
+        <button class="btn-icon"
+                data-click-action="removeObservable"
+                data-args='[{{ alert_id|tojson }}, {{ o.index|tojson }}]'
+                title="Remove">&times;</button>
+      {% endif %}
+    </div>
+  {% endfor %}
+{% endif %}

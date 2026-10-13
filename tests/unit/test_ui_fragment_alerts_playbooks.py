@@ -829,8 +829,14 @@ def test_the_section_is_requested_from_the_fragment_and_the_read_fact_is_on_the_
 
 
 def test_the_section_reload_control_sits_outside_the_content_it_refreshes():
-    script = _script()
-    section = script[script.index('<div class="playbooks-section" id="playbooks-section">'):]
+    """The same invariant, now asserted where the markup lives. Stage 5 moved
+    the playbooks section out of renderTriageBar's template literal and into
+    the triage bar fragment, so the control is checked against the fragment
+    rather than against the page's script. The point is unchanged: a failed
+    render of #playbooks-content must not be able to remove the button that
+    re-requests it."""
+    text = (FRAGMENTS / "alerts_triage_bar.html").read_text(encoding="utf-8")
+    section = text[text.index('<div class="playbooks-section" id="playbooks-section">'):]
     section = section[:section.index('id="playbooks-content"')]
     assert 'data-click-action="loadPlaybooksForAlert"' in section
 
@@ -896,4 +902,4 @@ def test_the_region_removed_eleven_write_sites():
     """80 before stage 3, measured by the status tool's expression; the six
     writers held 11 between them. Stage 4, the alert queue, took 15 more,
     so the page reads 54; this equality is lowered by every later stage."""
-    assert len(WRITES.findall(_page())) == 54
+    assert len(WRITES.findall(_page())) == 36

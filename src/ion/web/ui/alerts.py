@@ -1626,3 +1626,691 @@ async def alerts_queue_fragment(
         },
         status_code=200,
     )
+
+
+# ---------------------------------------------------------------------------
+# The alert detail modal: triage bar, comments, case tab, KFP banner, OpenCTI
+# ---------------------------------------------------------------------------
+#
+# Stage 5. What the ten writers did, measured against the tree before it:
+#
+#   * `loadTriage` returned on `!response.ok`, so a failed read left the bar
+#     saying "Loading triage..." for the life of the modal, and wrote
+#     `data.comments || []`, so a payload without a comment list said "No
+#     comments yet". When the triage carried no case it wrote the "Not
+#     linked" sentence itself; when the read failed it wrote nothing, so the
+#     case tab kept whatever the previous alert had left there.
+#
+#   * `renderTriageBar` offered the status and priority selects, the three
+#     closure buttons, Save, Add and Remove on observables and techniques,
+#     Create Case and Link to Case to every reader. All of those PUT or POST
+#     routes carrying alert:triage or case:create; the page is gated on
+#     alert:read.
+#
+#   * `renderCommentsTab` put comment prose through marked plus DOMPurify on
+#     the client. ION has no server-side sanitiser and none is being added
+#     (ui/template_render.py records the decision), so comments ship as
+#     escaped text with their line breaks kept. Markdown formatting is lost;
+#     stored XSS is not reintroduced.
+#
+#   * `renderCaseTab` wrote `c.notes || []`, `c.severity || '-'`,
+#     `c.assigned_to || 'Unassigned'` and `c.closed_by || 'unknown'`, and
+#     offered Close Case As, the per-alert closure buttons and Add Note to
+#     every reader. It also called checkKFPMatchesForTab, a second round
+#     trip for data the server already had in hand.
+#
+#   * `checkKFPMatches` and `checkKFPMatchesForTab` returned on `!resp.ok`
+#     and on `!data.matches`, so a refusal, a malformed answer and "no known
+#     false positive matches" all rendered nothing. The banner is the one
+#     place this page tells an analyst a case is probably noise; a failed
+#     check looked exactly like a clean one. Both built data-args by string
+#     concatenation.
+#
+#   * `enrichObservables` wrote `data.results || []` and
+#     `renderEnrichResults` said "No results returned." for it, so a 503 body
+#     without a list, a malformed answer and an empty answer were one
+#     sentence. Its two button-label writes were a loading state that a CSS
+#     rule on .htmx-request now paints.
+#
+#   * `translateComment` wrote `el.dataset.renderedHtml` back with innerHTML
+#     to toggle to the original. The original is text now, so the toggle is
+#     textContent.
+#
+# Three permissions beyond alert:read decide what is offered, each read off
+# the live route table rather than guessed: alert:triage for every triage
+# mutation, the comment POST, the closure endpoints and close-as-fp;
+# case:create for Create Case; case:read for the case tab, which is GET
+# /api/cases/{id}. A viewer with alert:read and not case:read gets a case
+# tab that says the case is withheld and names the permission, a fourth
+# outcome beside unlinked, failed and read.
+#
+# The triage dict the page's mutation functions still need (addObservable,
+# removeObservable, aiSuggestMitre and the closure form all read
+# triageCache[alertId]) rides inside the bar in an application/json block,
+# which the page copies into its cache after the swap. Same transitional
+# shape as the queue's data block, for the same reason: the mutations stay
+# on fetch because their routes take JSON bodies.
+
+TRIAGE_BAR_FRAGMENT = "_fragments/alerts_triage_bar.html"
+COMMENTS_FRAGMENT = "_fragments/alerts_comments.html"
+CASE_TAB_FRAGMENT = "_fragments/alerts_case_tab.html"
+KFP_BANNER_FRAGMENT = "_fragments/alerts_kfp_banner.html"
+ENRICH_FRAGMENT = "_fragments/alerts_enrich.html"
+
+#: What GET /api/elasticsearch/alerts/{id}/triage, POST
+#: /api/known-false-positives/match and POST /api/translator/translate carry.
+#: POST /api/opencti/enrich/batch is auth-only, but the observables it is
+#: given come from the triage read, so the enrich fragment is gated on this
+#: too: the stricter of the two reads it folds together.
+DETAIL_PERMISSION = "alert:read"
+
+#: The page's TRIAGE_STATUSES, PRIORITIES and OBSERVABLE_TYPES, and the
+#: tactic list its MITRE add row offered.
+TRIAGE_STATUSES = ("open", "acknowledged", "closed")
+PRIORITIES = ("critical", "high", "medium", "low")
+OBSERVABLE_TYPES = ("hostname", "source_ip", "destination_ip", "url", "domain", "user_account",
+                    "ipv4", "ipv6", "email", "sha256", "sha1", "md5", "filename", "mac", "cve")
+MITRE_TACTICS = (
+    "Reconnaissance", "Resource Development", "Initial Access", "Execution",
+    "Persistence", "Privilege Escalation", "Defense Evasion", "Credential Access",
+    "Discovery", "Lateral Movement", "Collection", "Command and Control",
+    "Exfiltration", "Impact",
+)
+
+#: ION observable type to the OpenCTI type enrichObservables sent. None
+#: means not enrichable; a type absent from the map is sent as itself, which
+#: is what the page did (`typeMap[obs.type] !== undefined ? ... : obs.type`).
+OPENCTI_TYPE_MAP: dict[str, Optional[str]] = {
+    "source_ip": "ipv4-addr",
+    "destination_ip": "ipv4-addr",
+    "hostname": "domain-name",
+    "domain": "domain-name",
+    "url": "url",
+    "user_account": None,
+}
+
+#: Bob confidence thresholds, from the page: 80 and over is High, 60 and
+#: over Medium, anything else Low. A measured 0 is Low, not absent.
+BOB_HIGH = 80
+BOB_MEDIUM = 60
+
+#: The bob_escalation_badge value that means the circuit breaker fired.
+BOB_LOW_CONFIDENCE = "low_confidence_triage"
+
+#: Observable types whose values the KFP check matches as IPs, as
+#: checkKFPMatches filtered them.
+KFP_IP_TYPES = ("source_ip", "destination_ip")
+
+
+def triage_outcome(payload: Any) -> dict:
+    """The triage read as failed, or as a triage (dict or None for no
+    record) plus a comment list (or None when the payload carried no list).
+
+    A payload that is not a dict, or whose `triage` is neither a dict nor
+    None, is a failed read: the handler did not produce what it promises.
+    `comments` is read separately so a payload with a triage and no comment
+    list renders the bar and says the comments could not be read, rather
+    than "No comments yet".
+    """
+    if not isinstance(payload, dict):
+        return {"failed": True, "triage": None, "comments": None}
+    triage = payload.get("triage")
+    if triage is not None and not isinstance(triage, dict):
+        return {"failed": True, "triage": None, "comments": None}
+    return {"failed": False, "triage": triage, "comments": _rows(payload, "comments")}
+
+
+def mitre_rows(saved: Any, alert_mitre: dict) -> list:
+    """The saved techniques with the alert's own auto-detected one put first
+    when none of them already names it, as renderTriageBar merged them.
+    `index` is the position in the SAVED list, which is what
+    removeMitreTechnique splices, so the auto row has none."""
+    out = []
+    for idx, t in enumerate(saved if isinstance(saved, list) else []):
+        if not isinstance(t, dict):
+            continue
+        out.append({"index": idx, "technique_id": t.get("technique_id"),
+                    "technique_name": t.get("technique_name"),
+                    "auto": t.get("source") == "auto"})
+    auto_id = alert_mitre.get("technique_id")
+    if auto_id and not any(r["technique_id"] == auto_id for r in out):
+        out.insert(0, {"index": None, "technique_id": auto_id,
+                       "technique_name": alert_mitre.get("technique_name") or "",
+                       "auto": True})
+    return out
+
+
+def bob_badge(confidence: Any, verdict: Any, escalation: Any) -> Optional[dict]:
+    """The Bob confidence pill and the auto-escalated pill, or None when
+    there is neither. `confidence` is an int or None; 0 is a measured Low."""
+    conf = _count(confidence)
+    escalated = escalation == BOB_LOW_CONFIDENCE
+    if conf is None and not escalated:
+        return None
+    level = None
+    if conf is not None:
+        level = "high" if conf >= BOB_HIGH else "medium" if conf >= BOB_MEDIUM else "low"
+    verdict_text = str(plain(verdict)).replace("_", " ") if verdict else None
+    return {"confidence": conf, "level": level, "verdict": verdict_text, "escalated": escalated}
+
+
+def observable_rows(observables: Any, enrichment: Optional[dict] = None) -> list:
+    """The triage's observables with the derivations the list needs.
+
+    Every element keeps its position, including one that is not a dict,
+    because `index` is what removeObservable splices out of the stored
+    list; dropping a malformed row would make Remove delete its neighbour.
+    `found` is True, False or None: None when no enrichment was run or the
+    value was not in its results, so the dot is not drawn.
+    """
+    out = []
+    for idx, o in enumerate(observables if isinstance(observables, list) else []):
+        if isinstance(o, dict):
+            otype = str(o.get("type") or "")
+            value = str(o.get("value") or "")
+        else:
+            otype, value = "", str(o)
+        found = enrichment.get(value) if isinstance(enrichment, dict) else None
+        out.append({"index": idx, "type": otype, "type_label": otype.replace("_", " "),
+                    "value": value, "found": found if isinstance(found, bool) else None})
+    return out
+
+
+def enrichable_observables(observables: Any) -> list:
+    """What enrichObservables sent: each observable mapped through
+    OPENCTI_TYPE_MAP, the unmappable dropped, the original type kept for
+    the result rows."""
+    out = []
+    for o in observables if isinstance(observables, list) else []:
+        if not isinstance(o, dict):
+            continue
+        otype = o.get("type")
+        mapped = OPENCTI_TYPE_MAP.get(otype, otype) if otype in OPENCTI_TYPE_MAP else otype
+        if not mapped or not o.get("value"):
+            continue
+        out.append({"type": mapped, "value": o.get("value"), "original_type": otype})
+    return out
+
+
+def triage_view(triage: Optional[dict], alert_mitre: dict) -> dict:
+    """What the bar renders, derived from the handler's triage dict or from
+    no record at all. No record is status open with nothing else, which is
+    what the page showed and what an alert that nobody has touched is."""
+    t = triage if isinstance(triage, dict) else {}
+    observables = t.get("observables")
+    observables = observables if isinstance(observables, list) else []
+    return {
+        "exists": triage is not None,
+        "status": plain(t.get("status")) if triage is not None else "open",
+        "priority": t.get("priority") or "",
+        "case_id": t.get("case_id"),
+        "case_number": t.get("case_number"),
+        "analyst_notes": t.get("analyst_notes") or "",
+        "observables": observable_rows(observables),
+        "observable_count": len(observables),
+        "enrichable": bool(enrichable_observables(observables)),
+        "mitre": mitre_rows(t.get("mitre_techniques"), alert_mitre),
+        "bob": bob_badge(t.get("suggested_verdict_confidence_int"), t.get("suggested_verdict"),
+                         t.get("bob_escalation_badge")),
+    }
+
+
+def comment_rows(comments: list) -> list:
+    return [
+        {"id": c.get("id"), "user": c.get("user"), "content": c.get("content") or "",
+         "created_at": c.get("created_at")}
+        for c in comments if isinstance(c, dict)
+    ]
+
+
+def kfp_criteria(case: dict) -> dict:
+    """hosts, users, rules and ips, as checkKFPMatches gathered them: the
+    three list columns and the values of source_ip and destination_ip
+    observables."""
+    def strings(value: Any) -> list:
+        return [str(v) for v in value if v] if isinstance(value, list) else []
+
+    observables = case.get("observables")
+    ips = [
+        str(o.get("value")) for o in (observables if isinstance(observables, list) else [])
+        if isinstance(o, dict) and o.get("type") in KFP_IP_TYPES and o.get("value")
+    ]
+    return {"hosts": strings(case.get("affected_hosts")), "users": strings(case.get("affected_users")),
+            "rules": strings(case.get("triggered_rules")), "ips": ips}
+
+
+def kfp_check(session: Session, case: dict) -> dict:
+    """The known-false-positive check for a case, as one of four outcomes.
+
+      skipped  the case is closed, or has nothing to match on. The page
+               returned before asking in both cases.
+      failed   the match raised. The page returned on !resp.ok and rendered
+               nothing, so a failed check and a clean case were one picture.
+      match    the first match, as the page showed only the first.
+      none     the check ran and nothing matched.
+
+    Calls _match_known_false_positives, the function POST
+    /api/known-false-positives/match calls, with the same four lists.
+    """
+    from ion.web.api import _match_known_false_positives
+
+    # `reason` on a skip, because "closed" and "nothing to match on" are two
+    # facts and the banner words them differently. The page returned early
+    # for both and said nothing either way, so they were one picture; the
+    # second one is the case where an analyst could otherwise assume the
+    # check ran and came back clean.
+    if plain(case.get("status")) == "closed":
+        return {"skipped": True, "reason": "closed", "failed": False,
+                "match": None, "total": None}
+    criteria = kfp_criteria(case)
+    if not any(criteria.values()):
+        return {"skipped": True, "reason": "nothing-to-match", "failed": False,
+                "match": None, "total": None}
+    try:
+        matches = _match_known_false_positives(session, **criteria)
+    except Exception:
+        logger.exception("KFP check could not run for case %s", case.get("id"))
+        return {"skipped": False, "reason": None, "failed": True,
+                "match": None, "total": None}
+    if not isinstance(matches, list):
+        return {"skipped": False, "reason": None, "failed": True,
+                "match": None, "total": None}
+    found = [m for m in matches if isinstance(m, dict)]
+    first = found[0] if found else None
+    if first is not None:
+        fields = first.get("matched_fields")
+        first = {**first, "matched_fields": [str(f) for f in fields] if isinstance(fields, list) else []}
+    return {"skipped": False, "reason": None, "failed": False,
+            "match": first, "total": len(found)}
+
+
+def case_tab_view(case: dict) -> dict:
+    """What the case tab renders beyond _case_view: the context tag groups,
+    the closure block, the linked alert rows and the observable rows with
+    their enrichment, as renderCaseTab and renderCaseObservables derived
+    them."""
+    view = _case_view(case)
+    groups = []
+    for key, label, cls in (("affected_hosts", "Hosts", "tag-host"),
+                            ("affected_users", "Users", "tag-user"),
+                            ("triggered_rules", "Rules", "tag-rule")):
+        items = case.get(key)
+        if isinstance(items, list) and items:
+            groups.append({"label": label, "cls": cls, "items": [str(i) for i in items]})
+    alerts = []
+    for a in view["alerts"]:
+        if not isinstance(a, dict):
+            continue
+        alerts.append({"es_alert_id": a.get("es_alert_id"), "status": plain(a.get("status")),
+                       "priority": a.get("priority")})
+    observables = []
+    for o in view["observables"]:
+        if not isinstance(o, dict):
+            continue
+        enrichment = o.get("enrichment") if isinstance(o.get("enrichment"), dict) else None
+        level = o.get("threat_level") or (enrichment or {}).get("threat_level") or "unknown"
+        actors = (enrichment or {}).get("threat_actors")
+        names = [str(ta.get("name") if isinstance(ta, dict) else ta) for ta in actors] \
+            if isinstance(actors, list) and actors else []
+        otype = str(o.get("type") or "")
+        observables.append({
+            "type": otype, "type_label": otype.replace("_", " "), "value": str(o.get("value") or ""),
+            "threat_level": str(level), "enriched": bool(enrichment or o.get("observable_id")),
+            "malicious": bool(enrichment and enrichment.get("is_malicious")),
+            "score": enrichment.get("score") if enrichment else None,
+            "actors": names,
+        })
+    return {
+        **view,
+        "closed": view["status"] == "closed",
+        "groups": groups,
+        "alert_rows": alerts,
+        "observable_rows": observables,
+    }
+
+
+def enrich_outcome(result: Any) -> dict:
+    """What the enrich handler answered, as unavailable (it returned a
+    JSONResponse, which is how it says 503 with an `error`), failed (no
+    list under `results`), or the list."""
+    from fastapi.responses import JSONResponse
+
+    if isinstance(result, JSONResponse):
+        import json
+
+        try:
+            body = json.loads(result.body)
+        except Exception:
+            body = {}
+        error = body.get("error") if isinstance(body, dict) else None
+        return {"unavailable": str(error) if error else f"OpenCTI answered HTTP {result.status_code}",
+                "failed": False, "results": None}
+    results = _rows(result, "results")
+    if results is None:
+        return {"unavailable": None, "failed": True, "results": None}
+    return {"unavailable": None, "failed": False, "results": [r for r in results if isinstance(r, dict)]}
+
+
+def enrich_rows(results: list, enrichable: list) -> list:
+    """The result rows as renderEnrichResults derived them, each score
+    guarded with `is not none` so a score of 0 renders."""
+    out = []
+    for idx, r in enumerate(results):
+        original = enrichable[idx]["original_type"] if idx < len(enrichable) else r.get("type")
+        original = str(original or "")
+        labels = []
+        for lbl in r.get("labels") if isinstance(r.get("labels"), list) else []:
+            if not isinstance(lbl, dict):
+                continue
+            color = lbl.get("color")
+            style = (f"background:{color}22; color:{color}" if color
+                     else "background:rgba(139,92,246,0.1); color:#8b5cf6")
+            labels.append({"value": lbl.get("value"), "style": style})
+        actors = [{"name": ta.get("name"), "description": ta.get("description") or ""}
+                  for ta in (r.get("threat_actors") if isinstance(r.get("threat_actors"), list) else [])
+                  if isinstance(ta, dict)]
+        indicators = [{"name": ind.get("name"), "description": ind.get("description"),
+                       "score": ind.get("score")}
+                      for ind in (r.get("indicators") if isinstance(r.get("indicators"), list) else [])
+                      if isinstance(ind, dict)]
+        observable = r.get("observable") if isinstance(r.get("observable"), dict) else None
+        out.append({
+            "found": r.get("found") is True,
+            "type": original, "type_label": original.replace("_", " "),
+            "value": str(r.get("value") or ""),
+            "labels": labels, "actors": actors, "indicators": indicators,
+            "observable_score": observable.get("score") if observable else None,
+            "error": r.get("error"),
+        })
+    return out
+
+
+def enrichment_map(results: list) -> dict:
+    """value to found, for the dots on the observables list."""
+    return {str(r.get("value")): r.get("found") is True for r in results if isinstance(r, dict)}
+
+
+async def _read_triage(alert_id: str, current_user: User, session: Session) -> dict:
+    """triage_outcome over the handler GET .../triage runs, or failed."""
+    from ion.web.api import get_alert_triage
+
+    try:
+        payload = await get_alert_triage(alert_id, current_user=current_user, session=session)
+    except Exception:
+        logger.exception("Triage could not be read for alert %s", alert_id)
+        return {"failed": True, "triage": None, "comments": None}
+    return triage_outcome(payload)
+
+
+async def _case_tab(case_id: int, current_user: User, session: Session, flags: dict,
+                    ai_available: bool) -> dict:
+    """The case tab's context for one case: missing, failed, or the case
+    with its view, its KFP check and the controls the viewer may use."""
+    base = {"case_id": case_id, "ai_available": ai_available, **flags}
+    try:
+        case = await _read_case(case_id, current_user, session)
+    except HTTPException as exc:
+        if exc.status_code == 404:
+            return {**base, "missing": True, "failed": False, "case": None, "view": None,
+                    "kfp": None, "can_close": False}
+        logger.exception("Case tab refused for case %s", case_id)
+        return {**base, "missing": False, "failed": True, "case": None, "view": None,
+                "kfp": None, "can_close": False}
+    except Exception:
+        logger.exception("Case tab could not read case %s", case_id)
+        return {**base, "missing": False, "failed": True, "case": None, "view": None,
+                "kfp": None, "can_close": False}
+    view = case_tab_view(case)
+    return {
+        **base, "missing": False, "failed": False, "case": case, "view": view,
+        "kfp": kfp_check(session, case),
+        # closeCaseWithAlerts closes the first linked alert (alert:triage) and
+        # the backend closes the rest and the case; with no alerts it PATCHes
+        # the case (case:update). Stage 2's rule, repeated here.
+        "can_close": flags["can_triage"] if view["alerts"] else flags["can_update"],
+    }
+
+
+def _detail_flags(user: Optional[User]) -> dict:
+    return {
+        "can_triage": _can(user, TRIAGE_PERMISSION),
+        "can_create_case": _can(user, CREATE_PERMISSION),
+        "can_read_case": _can(user, PERMISSION),
+        "can_update": _can(user, UPDATE_PERMISSION),
+        "can_read_playbooks": _can(user, PLAYBOOK_READ_PERMISSION),
+    }
+
+
+@router.get(
+    "/alerts/triage/{alert_id}",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(DETAIL_PERMISSION))],
+)
+async def alerts_triage_fragment(
+    request: Request,
+    alert_id: str,
+    mitre_technique_id: str = Query("", description="The alert's own technique id, from the row"),
+    mitre_technique_name: str = Query(""),
+    mitre_tactic_name: str = Query(""),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    """The triage bar, and out of band the comments tab and the case tab,
+    from one call to the handler GET .../triage runs.
+
+    The alert's own MITRE technique is client state (the row the analyst
+    clicked), passed as parameters so the auto badge can be merged here as
+    renderTriageBar merged it.
+
+    Outcomes. The triage read: failed, no record, record. The comments:
+    not read (the payload had no list), none, rows. The case tab: not read
+    (the triage read failed), unlinked, withheld (no case:read), missing,
+    failed, read. The page had one render for the first of each.
+    """
+    flags = _detail_flags(current_user)
+    alert_mitre = {"technique_id": mitre_technique_id or None,
+                   "technique_name": mitre_technique_name or None,
+                   "tactic_name": mitre_tactic_name or None}
+    read = await _read_triage(alert_id, current_user, session)
+    ai_available = await _ai_available()
+
+    view = None if read["failed"] else triage_view(read["triage"], alert_mitre)
+    case_tab: Optional[dict] = None
+    if read["failed"]:
+        case_link = "unread"
+    elif view is None or view["case_id"] is None:
+        case_link = "none"
+    elif not flags["can_read_case"]:
+        case_link = "withheld"
+    else:
+        case_link = "read"
+        case_tab = await _case_tab(int(view["case_id"]), current_user, session, flags, ai_available)
+
+    return templates.TemplateResponse(
+        request=request, name=TRIAGE_BAR_FRAGMENT,
+        context={
+            "alert_id": alert_id,
+            "failed": read["failed"],
+            "triage": read["triage"],
+            "view": view,
+            "comments": comment_rows(read["comments"]) if read["comments"] is not None else None,
+            "comments_failed": read["comments"] is None,
+            "case_link": case_link,
+            "case_tab": case_tab,
+            "ai_available": ai_available,
+            "statuses": TRIAGE_STATUSES,
+            "priorities": PRIORITIES,
+            "observable_types": OBSERVABLE_TYPES,
+            "tactics": MITRE_TACTICS,
+            "case_read_permission": PERMISSION,
+            **flags,
+        },
+        status_code=200,
+    )
+
+
+@router.get(
+    "/alerts/comments/{alert_id}",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(DETAIL_PERMISSION))],
+)
+async def alerts_comments_fragment(
+    request: Request,
+    alert_id: str,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    """The comments tab alone, for the page's renderCommentsTab, which the
+    shared detail module calls and addComment calls after posting. The bar
+    is not re-rendered, so an analyst's unsaved notes stay in the box."""
+    read = await _read_triage(alert_id, current_user, session)
+    return templates.TemplateResponse(
+        request=request, name=COMMENTS_FRAGMENT,
+        context={
+            "alert_id": alert_id,
+            "comments": comment_rows(read["comments"]) if read["comments"] is not None else None,
+            "comments_failed": read["comments"] is None,
+            "can_triage": _can(current_user, TRIAGE_PERMISSION),
+        },
+        status_code=200,
+    )
+
+
+@router.get(
+    "/alerts/case-tab/{case_id}",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION)),
+                  Depends(require_permission(DETAIL_PERMISSION))],
+)
+async def alerts_case_tab_fragment(
+    request: Request,
+    case_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    """The case tab alone, for renderCaseTab's callers after a mutation.
+
+    Two guards: case:read for GET /api/cases/{id}, and alert:read for the
+    KFP match the tab runs inline, which POST
+    /api/known-false-positives/match carries.
+    """
+    flags = _detail_flags(current_user)
+    ctx = await _case_tab(case_id, current_user, session, flags, await _ai_available())
+    return templates.TemplateResponse(request=request, name=CASE_TAB_FRAGMENT,
+                                      context=ctx, status_code=200)
+
+
+@router.get(
+    "/alerts/kfp-banner/{case_id}",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION)),
+                  Depends(require_permission(DETAIL_PERMISSION))],
+)
+async def alerts_kfp_banner_fragment(
+    request: Request,
+    case_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    """The known-false-positive banner for the case management modal.
+
+    Reads the case through GET /api/cases/{id}'s handler and runs the match
+    the JSON endpoint runs. Close as Known FP is offered only with
+    alert:triage, which POST /api/cases/{id}/close-as-fp carries.
+    """
+    can_triage = _can(current_user, TRIAGE_PERMISSION)
+
+    def answer(ctx: dict) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request=request, name=KFP_BANNER_FRAGMENT,
+            context={"case_id": case_id, "can_triage": can_triage, **ctx}, status_code=200,
+        )
+
+    try:
+        case = await _read_case(case_id, current_user, session)
+    except HTTPException as exc:
+        if exc.status_code == 404:
+            return answer({"missing": True, "kfp": None})
+        logger.exception("KFP banner refused for case %s", case_id)
+        return answer({"missing": False, "kfp": {"skipped": False, "reason": None,
+                                                 "failed": True, "match": None, "total": None}})
+    except Exception:
+        logger.exception("KFP banner could not read case %s", case_id)
+        return answer({"missing": False, "kfp": {"skipped": False, "reason": None,
+                                                 "failed": True, "match": None, "total": None}})
+    return answer({"missing": False, "kfp": kfp_check(session, case)})
+
+
+@router.get(
+    "/alerts/enrich/{alert_id}",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(DETAIL_PERMISSION))],
+)
+async def alerts_enrich_fragment(
+    request: Request,
+    alert_id: str,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    """OpenCTI enrichment of the alert's triage observables, into
+    #enrich-results, with the observables list re-rendered out of band so
+    each row carries its found or not-found dot.
+
+    The observables are read off the AlertTriage row directly, the column
+    GET .../triage emits as `observables`; calling that handler here would
+    write a second alert_view audit event and re-run its memory lookups
+    for a list already in hand. Then the handler POST /api/opencti/enrich/batch
+    runs, with the same mapped list enrichObservables sent.
+
+    Outcomes: no triage record or no observables; none enrichable;
+    OpenCTI unavailable (the handler's 503, with its reason); failed; an
+    answer with no results; results. The page folded the last four into
+    "No results returned." and a catch.
+    """
+    from ion.models.alert_triage import AlertTriage
+    from ion.web.api import OpenCTIEnrichBatchRequest, enrich_batch
+
+    can_triage = _can(current_user, TRIAGE_PERMISSION)
+
+    def answer(ctx: dict) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request=request, name=ENRICH_FRAGMENT,
+            context={"alert_id": alert_id, "can_triage": can_triage,
+                     "no_observables": False, "enrichable": None, "unavailable": None,
+                     "failed": False, "results": None, "observables": None,
+                     "found_count": None, "ai_available": False, **ctx},
+            status_code=200,
+        )
+
+    try:
+        triage = session.query(AlertTriage).filter_by(es_alert_id=alert_id).first()
+    except Exception:
+        logger.exception("Enrich fragment could not read the triage for alert %s", alert_id)
+        return answer({"failed": True})
+    observables = triage.observables if triage is not None and isinstance(triage.observables, list) else []
+    if not observables:
+        return answer({"no_observables": True})
+    enrichable = enrichable_observables(observables)
+    if not enrichable:
+        return answer({"enrichable": []})
+
+    try:
+        result = await enrich_batch(
+            OpenCTIEnrichBatchRequest(observables=[{"type": e["type"], "value": e["value"]} for e in enrichable]),
+            current_user=current_user,
+        )
+        outcome = enrich_outcome(result)
+    except Exception:
+        logger.exception("Enrich fragment failed for alert %s", alert_id)
+        return answer({"enrichable": enrichable, "failed": True})
+    if outcome["results"] is None:
+        return answer({"enrichable": enrichable, "unavailable": outcome["unavailable"],
+                       "failed": outcome["failed"]})
+    results = outcome["results"]
+    return answer({
+        "enrichable": enrichable,
+        "results": enrich_rows(results, enrichable),
+        "found_count": sum(1 for r in results if r.get("found") is True),
+        "observables": observable_rows(observables, enrichment_map(results)),
+        "ai_available": await _ai_available(),
+    })

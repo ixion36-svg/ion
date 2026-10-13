@@ -6,12 +6,11 @@
    produced, with every control gated on the permission its endpoint
    carries; the page offered all of them to every reader.
 
-   Two things the page did after the markup landed and still does, from
-   data this fragment carries on the overlay rather than from a second
-   GET /api/cases/{id}: loadCasePlaybookExecutions fills
-   #case-playbook-executions-{id}, and checkKFPMatches reads
-   data-kfp-context. Both belong to later stages and are called by
-   showCaseDetail once the swap settles.
+   The playbook executions and the known-false-positive banner both fill
+   themselves now, each from its own fragment requested by the container
+   that holds it. The overlay used to carry data-case-status and
+   data-kfp-context so the page could run the match on the client; both
+   attributes had no other consumer and went with it.
 
    The description was rendered through the page's safeMarkdown (marked
    plus DOMPurify). ION has no HTML sanitiser among its server
@@ -49,9 +48,7 @@
     </div>
   </div>
 {% else %}
-  <div class="case-mgmt-overlay" id="case-mgmt-overlay" data-remove-self-on-self-click
-       data-case-status="{{ view.status or '' }}"
-       data-kfp-context='{{ kfp|tojson }}'>
+  <div class="case-mgmt-overlay" id="case-mgmt-overlay" data-remove-self-on-self-click>
     <div class="case-mgmt-modal">
       <h3>
         <span>{{ case.case_number }}: {{ case.title }}</span>
@@ -94,7 +91,12 @@
         </div>
       {% endif %}
 
-      <div id="case-fp-banner-{{ case.id }}"></div>
+      {# The banner requests itself. It is outside no target of its own, so
+         a failed render cannot remove the container that would retry. #}
+      <div id="case-fp-banner-{{ case.id }}"
+           hx-get="/ui/alerts/kfp-banner/{{ case.id }}"
+           hx-trigger="load"
+           hx-swap="innerHTML"></div>
 
       <div class="case-meta-editable">
         <div class="meta-field">
