@@ -30,7 +30,7 @@ Server-rendered fragments. `render_view` routes also answer the view model as JS
 | GET | `/ui/alerts/playbook-library/{alert_id}` | `playbook:read` | [alerts.py:1175](src/ion/web/ui/alerts.py#L1175) | `_fragments/alerts_playbook_library.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
 | GET | `/ui/alerts/playbooks/{alert_id}` | `playbook:read` | [alerts.py:1116](src/ion/web/ui/alerts.py#L1116) | `_fragments/alerts_playbooks.html` | `alert_arkime.html`, `alerts_triage_bar.html`, `alert_arkime.html`, `alerts.html` |
 | GET | `/ui/alerts/queue` | `alert:read` | [alerts.py:1533](src/ion/web/ui/alerts.py#L1533) | `_fragments/alerts_queue.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/systems` | `alert:read` | [alerts.py:2916](src/ion/web/ui/alerts.py#L2916) | `_fragments/alerts_systems.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/systems` | `alert:read` | [alerts.py:2914](src/ion/web/ui/alerts.py#L2914) | `_fragments/alerts_systems.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
 | GET | `/ui/alerts/triage/{alert_id}` | `alert:read` | [alerts.py:2071](src/ion/web/ui/alerts.py#L2071) | `_fragments/alerts_triage_bar.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
 | POST | `/ui/alerts/{alert_id}/arkime` | `alert:read` | [alert_arkime.py:570](src/ion/web/ui/alert_arkime.py#L570) |  | `alert_arkime.html`, `alert_arkime.html` |
 | POST | `/ui/alerts/{alert_id}/arkime/commit` | `alert:read` | [alert_arkime.py:719](src/ion/web/ui/alert_arkime.py#L719) |  | `alert_arkime.html`, `alert_arkime.html` |

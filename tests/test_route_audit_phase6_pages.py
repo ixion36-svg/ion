@@ -161,12 +161,27 @@ def test_analytics_bar_widths_are_not_the_dead_migrated_class():
 
 
 def test_ai_scorecard_kpis_folded_into_alert_prompts():
+    """The four KPI tiles and the count behind them.
+
+    They were written by renderScorecardKpis in the page's script until the
+    UI conversion moved the render to the server. The tiles are in
+    _fragments/alert_prompt_templates.html now and the arithmetic is in
+    ui/alert_prompt_templates.py, so this follows them rather than
+    asserting a function the page no longer has.
+    """
     html = (TEMPLATES / "alert_prompt_templates.html").read_text(encoding="utf-8")
-    for tile in ("sc-kpi-templates", "sc-kpi-samples", "sc-kpi-agreement", "sc-kpi-tuning"):
-        assert tile in html
-    assert "function renderScorecardKpis" in html
+    fragment = (TEMPLATES / "_fragments" / "alert_prompt_templates.html"
+                ).read_text(encoding="utf-8")
+    module = Path("src/ion/web/ui/alert_prompt_templates.py").read_text(
+        encoding="utf-8")
+
+    for tile in ("sc-kpi-templates", "sc-kpi-samples", "sc-kpi-agreement",
+                 "sc-kpi-tuning"):
+        assert tile in fragment, tile
+    # the page still reaches them, or the fragment is never asked for
+    assert 'hx-get="/ui/alert-prompts"' in html
     # the old page approximated `evaluated`; the KPI must use the real count
-    assert "c.evaluated" in html
+    assert 'c.get("evaluated")' in module
 
 
 def test_scorecards_api_exposes_exact_evaluated_count():
@@ -212,11 +227,22 @@ def test_analyst_efficiency_merged_into_executive_report(paths):
     assert not (TEMPLATES / "analyst_efficiency.html").exists()
     assert "/api/analyst-efficiency/metrics" in paths   # API backs the Team tab
     html = (TEMPLATES / "executive_report.html").read_text(encoding="utf-8")
-    assert "er-tab-team" in html and "function erLoadTeam" in html
-    assert "Per-Analyst Breakdown" in html
+    team = (TEMPLATES / "_fragments" / "executive_report_team.html"
+            ).read_text(encoding="utf-8")
+
+    # erLoadTeam fetched and wrote the tab; the UI conversion replaced it
+    # with a fragment the shell pulls, so the wiring is what to assert.
+    assert 'id="er-team"' in html
+    assert 'hx-get="/ui/executive-report/team"' in html
+    assert "Per-Analyst Breakdown" in team
+
     # the activity bars must not use the dead migrated height rule
-    assert 'class="ae-activity-bar _ion-s-9ce2eb0cde"' not in html
-    assert "b.style.height" in html
+    for text in (html, team):
+        assert 'class="ae-activity-bar _ion-s-9ce2eb0cde"' not in text
+    # the height is still per-row. b.style.height was the JS that set it;
+    # under the CSP the page runs with, an inline style= cannot, so it is a
+    # data-ion-style attribute applied by ion-dynamic-styles.js.
+    assert 'data-ion-style="height:' in team
 
 
 @pytest.mark.parametrize("tpl", ["detection_health.html", "de_metrics.html"])
