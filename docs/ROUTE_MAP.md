@@ -47,7 +47,7 @@ Server-rendered fragments. `render_view` routes also answer the view model as JS
 | GET | `/ui/bug-reports` | — | [bug_reports.py:51](src/ion/web/ui/bug_reports.py#L51) | `_fragments/bug_reports.html` | `bug_reports.html`, `bug_reports.html` |
 | GET | `/ui/canaries` | `alert:read` | [canaries.py:176](src/ion/web/ui/canaries.py#L176) | `_fragments/canaries.html` | `canaries.html` |
 | GET | `/ui/case-grouper/status` | `alert:triage` | [case_grouper.py:88](src/ion/web/ui/case_grouper.py#L88) | `_fragments/case_grouper_status.html` | `case_grouper.html` |
-| GET | `/ui/cases/summary` | `case:read` | [cases.py:674](src/ion/web/ui/cases.py#L674) | `_fragments/cases_summary.html` | `cases_summary.html`, `cases.html` |
+| GET | `/ui/cases/summary` | `case:read` | [cases.py:672](src/ion/web/ui/cases.py#L672) | `_fragments/cases_summary.html` | `cases_summary.html`, `cases.html` |
 | GET | `/ui/change-requests` | `system:settings` | [change_requests.py:106](src/ion/web/ui/change_requests.py#L106) | `_fragments/change_requests.html` | `change_requests.html` |
 | GET | `/ui/compliance/posture` | `alert:read` | [compliance.py:427](src/ion/web/ui/compliance.py#L427) | `_fragments/compliance_posture.html` | `compliance_posture.html`, `compliance.html` |
 | GET | `/ui/daily-standup/slides` | `alert:read` | [daily_standup_slides.py:15](src/ion/web/ui/daily_standup_slides.py#L15) | `_fragments/daily_standup_slides.html` | `daily_standup_slides.html` |
