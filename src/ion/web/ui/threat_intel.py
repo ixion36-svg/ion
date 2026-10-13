@@ -909,3 +909,402 @@ def threat_intel_kev_fragment(
         "results": _rows(payload, "results"),
         "status": status if isinstance(status, dict) else None,
     })
+
+
+# ---------------------------------------------------------------------------
+# The last six regions: the IOC feed and its sparklines, the Reports tab and
+# its drill panel, the ATT&CK technique drill, and the AI briefing.
+#
+# The sharpest defect on the page was in the sparklines. Three outcomes all
+# rendered the same em-dash:
+#
+#     if (!r.ok) { spark.innerHTML = '-' }        a refused or failed read
+#     catch { spark.innerHTML = '-' }             a thrown read
+#     '-' with title="No local sightings..."      nothing seen
+#
+# The only thing separating "this indicator has never been seen in your
+# estate" from "we could not check" was a tooltip that one of them happened
+# to carry. For an analyst triaging an indicator those are opposite
+# conclusions. The old SVG also put the sightings total in a `title`
+# attribute on the <svg> element, which is not how SVG tooltips work, so
+# that number was never readable on hover either.
+#
+# Elsewhere: `i.score || 0` painted an unscored indicator with the resting
+# grey a genuinely low score gets; `d.local_cases.length` and
+# `d.actors.length` were read without a guard in the technique drill, so a
+# payload omitting either key raised into the catch and the whole panel
+# became "Failed: TypeError"; and the reports filter ran in the browser over
+# the 25 rows the endpoint returns, which is kept but moved to the server so
+# the empty state can say whether a filter was responsible.
+# ---------------------------------------------------------------------------
+
+IOC_FEED_FRAGMENT = "_fragments/threat_intel_ioc_feed.html"
+IOC_SPARK_FRAGMENT = "_fragments/threat_intel_ioc_spark.html"
+REPORTS_FRAGMENT = "_fragments/threat_intel_reports.html"
+REPORT_DRILL_FRAGMENT = "_fragments/threat_intel_report_drill.html"
+TECHNIQUE_DRILL_FRAGMENT = "_fragments/threat_intel_technique_drill.html"
+AI_BRIEF_FRAGMENT = "_fragments/threat_intel_ai_brief.html"
+
+#: Rows the IOC feed asks for, from the page's `?limit=50`.
+IOC_FEED_LIMIT = 50
+
+#: Labels a feed row shows, from the page's `.slice(0, 3)`.
+IOC_LABEL_LIMIT = 3
+
+#: Months of local sightings a sparkline covers, from the page's
+#: `&months=12`.
+SPARK_MONTHS = 12
+
+#: Reports the tab asks for, from the page's `?limit=25`.
+REPORT_LIMIT = 25
+
+#: Characters of a report description the card shows, from the page's
+#: `.slice(0, 200)`.
+REPORT_SUMMARY_CHARS = 200
+
+#: Indicators the report drill lists, from the page's `.slice(0, 10)`. The
+#: endpoint already caps its own list at 20.
+REPORT_INDICATOR_LIMIT = 10
+
+#: The window the technique drill reports local cases over. The endpoint
+#: fixes it at 90 days and the page's heading said so.
+TECHNIQUE_LOCAL_DAYS = 90
+
+#: Markdown the AI briefing strips before rendering as paragraphs, in the
+#: order the page applied it. Headings, bold, italics, bullets, ordered-list
+#: numbers, and fenced code blocks.
+_MARKDOWN_STRIPS: tuple[tuple[str, str], ...] = (
+    (r"^#{1,4}\s+", ""),
+    (r"\*\*(.+?)\*\*", r"\1"),
+    (r"\*(.+?)\*", r"\1"),
+    (r"^[-*]\s+", ""),
+    (r"^\d+\.\s+", ""),
+    (r"```[\s\S]*?```", ""),
+)
+
+
+def brief_paragraphs(summary: object) -> list[str]:
+    """An AI summary as paragraphs, with its light markdown removed.
+
+    The same six substitutions the page applied, then a split on blank
+    lines, then newlines inside a paragraph collapsed to spaces. Jinja
+    escapes each paragraph when it renders, which is the order the page used
+    too: strip, escape, split.
+
+    Anything that is not a string gives no paragraphs, so the template's
+    no-summary branch handles it rather than this raising.
+    """
+    import re
+
+    if not isinstance(summary, str):
+        return []
+    text = summary
+    for pattern, repl in _MARKDOWN_STRIPS:
+        text = re.sub(pattern, repl, text, flags=re.MULTILINE)
+    return [
+        " ".join(part.strip().split())
+        for part in re.split(r"\n\n+", text)
+        if part.strip()
+    ]
+
+
+async def _landscape_list(request: Request, fragment: str, rows_key: str,
+                          fetch, label: str, extra: dict,
+                          match=None) -> HTMLResponse:
+    """Shared body for the two full-length OpenCTI-backed lists.
+
+    Separate from `_landscape`, which serves the Overview cards and trims to
+    five rows. These are whole tabs and keep every row the endpoint
+    returned.
+
+    `match`, when given, filters the rows and `total` reports how many were
+    read before filtering, so an empty result can say whether the filter was
+    responsible rather than implying the source had nothing.
+    """
+    from ion.services.opencti_service import get_opencti_service
+
+    def answer(ctx: dict) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request=request, name=fragment,
+            context={rows_key: None, "configured": True, "failed": False,
+                     "error": None, "total": None, **extra, **ctx},
+            status_code=200,
+        )
+
+    service = get_opencti_service()
+    if not service.is_configured:
+        return answer({"configured": False})
+
+    try:
+        payload = await fetch(service)
+    except Exception as exc:
+        logger.exception("Threat intel %s could not be rendered", label)
+        return answer({"failed": True, "error": type(exc).__name__})
+
+    rows = _rows(payload, rows_key)
+    if rows is None:
+        return answer({rows_key: None})
+    return answer({
+        rows_key: [r for r in rows if match(r)] if match else rows,
+        "total": len(rows),
+    })
+
+
+@router.get(
+    "/threat-intel/ioc-feed",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def threat_intel_ioc_feed_fragment(
+    request: Request,
+    min_score: int = Query(0, ge=0, le=100),
+) -> HTMLResponse:
+    """The IOC Feed table.
+
+    Each row's sightings cell fetches itself from
+    /ui/threat-intel/ioc-spark, which is the shape the page had: it rendered
+    the table and then filled the cells, so the first paint is not blocked
+    by one request per row.
+    """
+    from ion.web.threat_landscape_api import get_ioc_feed
+
+    async def fetch(_service):
+        return await get_ioc_feed(
+            limit=IOC_FEED_LIMIT, min_score=min_score, user=None
+        )
+
+    return await _landscape_list(
+        request, IOC_FEED_FRAGMENT, "indicators", fetch, "ioc-feed",
+        {"min_score": min_score, "label_limit": IOC_LABEL_LIMIT},
+    )
+
+
+@router.get(
+    "/threat-intel/ioc-spark",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+def threat_intel_ioc_spark_fragment(
+    request: Request,
+    value: str = Query(..., min_length=2, max_length=512),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    """One indicator's local sightings over the last year.
+
+    Reads the same local tables GET /api/threat-intel/ioc-sightings reads,
+    so a cell and the JSON agree about how often an indicator has been seen.
+    No OpenCTI, so this answers on a deployment where the feed itself does
+    not.
+    """
+    from ion.web.threat_intel_api import ioc_sightings
+
+    def answer(ctx: dict) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request=request, name=IOC_SPARK_FRAGMENT,
+            context={"months": SPARK_MONTHS, "failed": False,
+                     "series": None, "total": None, **ctx},
+            status_code=200,
+        )
+
+    try:
+        payload = ioc_sightings(
+            value=value, months=SPARK_MONTHS, session=session, user=None
+        )
+    except Exception:
+        logger.exception("Threat intel sightings sparkline could not be read")
+        return answer({"failed": True})
+
+    return answer({
+        "series": _rows(payload, "series"),
+        # `is not none` is not enough here: the template treats a falsy
+        # total as nothing seen, which is right, and only a non-number needs
+        # to become None so it cannot be rendered.
+        "total": (payload or {}).get("total_sightings")
+        if isinstance(payload, dict) else None,
+    })
+
+
+@router.get(
+    "/threat-intel/reports",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def threat_intel_reports_fragment(
+    request: Request,
+    q: str = Query("", max_length=200),
+) -> HTMLResponse:
+    """The Reports tab's card list, optionally filtered.
+
+    The filter is a substring match over the reports the endpoint returns,
+    because GET /api/threat-landscape/reports takes no search parameter. It
+    ran in the browser before; running it here changes nothing about which
+    reports match and lets the empty state say whether the filter was
+    responsible.
+    """
+    from ion.web.threat_landscape_api import get_recent_reports
+
+    term = q.strip()
+
+    async def fetch(_service):
+        return await get_recent_reports(limit=REPORT_LIMIT, user=None)
+
+    return await _landscape_list(
+        request, REPORTS_FRAGMENT, "reports", fetch, "reports",
+        {"q": term, "summary_chars": REPORT_SUMMARY_CHARS},
+        # The filter is a substring match over what the endpoint returned,
+        # because it takes no search parameter. `total` is how many were
+        # read, so the empty state can say that clearing the filter helps.
+        match=(lambda r: term.lower() in (r.get("name") or "").lower())
+        if term else None,
+    )
+
+
+async def _report_or_technique(request: Request, fragment: str, key: str,
+                               fetch, extra: dict) -> HTMLResponse:
+    """Shared body for the two drill panels.
+
+    Both slide over the page, both swap a heading out of band, and both have
+    the same four outcomes: OpenCTI unconfigured, the read failing, the read
+    answering with something unreadable, and the detail.
+    """
+    from ion.services.opencti_service import get_opencti_service
+
+    def answer(ctx: dict) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request=request, name=fragment,
+            context={"configured": True, "failed": False, "error": None,
+                     key: None, **extra, **ctx},
+            status_code=200,
+        )
+
+    service = get_opencti_service()
+    if not service.is_configured:
+        return answer({"configured": False})
+
+    try:
+        detail = await fetch(service)
+    except Exception as exc:
+        logger.exception("Threat intel %s drill could not be rendered", key)
+        return answer({"failed": True, "error": type(exc).__name__})
+
+    return answer({key: detail if isinstance(detail, dict) else None})
+
+
+@router.get(
+    "/threat-intel/report-drill",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def threat_intel_report_drill_fragment(
+    request: Request,
+    report_id: str = Query(..., min_length=1, max_length=400),
+) -> HTMLResponse:
+    """One report's detail."""
+    from ion.web.threat_landscape_api import get_report_detail
+
+    async def fetch(_service):
+        return await get_report_detail(report_id=report_id, user=None)
+
+    return await _report_or_technique(
+        request, REPORT_DRILL_FRAGMENT, "report", fetch,
+        {"indicator_limit": REPORT_INDICATOR_LIMIT},
+    )
+
+
+@router.get(
+    "/threat-intel/technique-drill",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def threat_intel_technique_drill_fragment(
+    request: Request,
+    technique_id: str = Query(..., min_length=1, max_length=64),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    """One ATT&CK technique: its tactics, the local cases that triggered it,
+    and the actors OpenCTI maps to it.
+
+    Unlike the report drill this reads local case data as well as OpenCTI,
+    so it is useful on a deployment with no OpenCTI: the endpoint reports
+    its own OpenCTI failure in an `actors_error` field and the fragment
+    words that separately from an empty actor list. The two sections answer
+    for themselves, which is what the unguarded `.length` reads prevented.
+    """
+    from ion.web.threat_intel_api import technique_drill
+
+    def answer(ctx: dict) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request=request, name=TECHNIQUE_DRILL_FRAGMENT,
+            context={"technique_id": technique_id, "failed": False,
+                     "error": None, "detail": None, "local_cases": None,
+                     "actors": None, "local_days": TECHNIQUE_LOCAL_DAYS,
+                     **ctx},
+            status_code=200,
+        )
+
+    try:
+        # Not awaited: technique_drill is a sync def, unlike most of the
+        # handlers in that module.
+        detail = technique_drill(
+            technique_id=technique_id, session=session, user=None
+        )
+    except Exception as exc:
+        logger.exception("Threat intel technique drill could not be rendered")
+        return answer({"failed": True, "error": type(exc).__name__})
+
+    if not isinstance(detail, dict):
+        return answer({"failed": True})
+
+    return answer({
+        "detail": detail,
+        "local_cases": _rows(detail, "local_cases"),
+        "actors": _rows(detail, "actors"),
+    })
+
+
+@router.post(
+    "/threat-intel/ai-brief",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def threat_intel_ai_brief_fragment(request: Request) -> HTMLResponse:
+    """The AI threat briefing.
+
+    A POST, because POST /api/threat-landscape/ai-summary is one: generating
+    a briefing costs a model call. csrf.js attaches the token, and the
+    fragment is gated on the same observable:read that endpoint carries.
+
+    The button label and the model line swap out of band, because both sit
+    outside this fragment's target and both are part of the panel's state.
+    """
+    from ion.web.threat_landscape_api import ai_threat_summary
+
+    def answer(ctx: dict) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request=request, name=AI_BRIEF_FRAGMENT,
+            context={"failed": False, "error": None, "summary": None,
+                     "model": None, "paragraphs": [], **ctx},
+            status_code=200,
+        )
+
+    try:
+        payload = await ai_threat_summary(user=None)
+    except Exception as exc:
+        logger.exception("Threat intel AI briefing could not be generated")
+        # A detail if the service raised an HTTPException with one, because
+        # that is the message the endpoint means a caller to read, and the
+        # class name otherwise.
+        detail = getattr(exc, "detail", None)
+        return answer({"failed": True,
+                       "error": detail if isinstance(detail, str)
+                       else type(exc).__name__})
+
+    if not isinstance(payload, dict):
+        return answer({"failed": True})
+
+    summary = payload.get("summary")
+    return answer({
+        "summary": summary,
+        "model": payload.get("model"),
+        "paragraphs": brief_paragraphs(summary),
+    })

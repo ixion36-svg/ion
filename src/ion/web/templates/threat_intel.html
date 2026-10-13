@@ -82,7 +82,16 @@
                 <span class="text-ion-amber text-base">★</span>
                 <span class="text-[11px] uppercase tracking-wider text-ion-amber font-semibold">AI Threat Briefing</span>
               </div>
-              <button id="ai-brief-btn" data-click-action="tiLoadAISummary"
+              {# A POST, because generating a briefing costs a model
+                 call and POST /api/threat-landscape/ai-summary is one.
+                 The fragment swaps this button out of band, so its
+                 label carries the panel state: Generate, Regenerate
+                 after a summary, Retry after a failure. #}
+              <button id="ai-brief-btn"
+                      hx-post="/ui/threat-intel/ai-brief"
+                      hx-target="#ai-brief-content"
+                      hx-swap="innerHTML"
+                      hx-indicator="#ai-brief-content"
                       class="px-3 py-1.5 rounded-md text-xs font-medium bg-ion-amber/10 text-ion-amber border border-ion-amber/30 hover:bg-ion-amber/20 transition">
                 Generate Briefing
               </button>
@@ -288,28 +297,56 @@
     <!-- IOC Feed Panel — ported from /threat-landscape. -->
     <div class="ti-panel" id="panel-ioc">
         <div class="flex items-center gap-2.5 mb-5">
-            <select id="ti-ioc-min-score" class="select flex-1 flex-[0_0_auto] w-[auto]" data-change-action="tiLoadIOCFeed">
+            {# `name` so hx-include sends it. The threshold is a request
+               parameter the server bounds now, rather than a value only
+               the script knew. #}
+            <select id="ti-ioc-min-score" name="min_score" class="select flex-1 flex-[0_0_auto] w-[auto]"
+                    hx-get="/ui/threat-intel/ioc-feed"
+                    hx-target="#ioc-body"
+                    hx-trigger="change"
+                    hx-include="#ti-ioc-min-score">
                 <option value="0">All scores</option>
                 <option value="50">Score ≥ 50</option>
                 <option value="75" selected>Score ≥ 75</option>
                 <option value="90">Score ≥ 90</option>
             </select>
-            <button class="btn btn-primary" data-click-action="tiLoadIOCFeed">Refresh</button>
+            <button class="btn btn-primary"
+                    hx-get="/ui/threat-intel/ioc-feed"
+                    hx-target="#ioc-body"
+                    hx-include="#ti-ioc-min-score">Refresh</button>
         </div>
         <table class="ti-table" id="ioc-table">
             <thead><tr><th>Score</th><th>Type</th><th>Value</th><th>Labels</th><th>Source</th><th title="Local sightings over the last 12 months">Sightings</th><th>Actions</th></tr></thead>
-            <tbody id="ioc-body"><tr><td colspan="7" class="ti-empty">Click Refresh to load OpenCTI indicators.</td></tr></tbody>
+            {# The table and its header stay outside this target, so no
+               render can remove the structure that names the columns,
+               and the threshold control stays outside it too so a
+               failed read cannot remove the control that would retry. #}
+            <tbody id="ioc-body"
+                   hx-get="/ui/threat-intel/ioc-feed"
+                   hx-trigger="ti-show"
+                   hx-include="#ti-ioc-min-score"
+                   hx-swap="innerHTML"><tr><td colspan="7" class="ti-empty">Loading indicators&hellip;</td></tr></tbody>
         </table>
     </div>
 
     <!-- Reports Panel — ported from /threat-landscape. -->
     <div class="ti-panel" id="panel-reports">
-        <div class="flex items-center gap-2.5 mb-5">
-            <input type="text" class="input flex-1" id="ti-report-filter" placeholder="Filter reports by title…">
-            <button class="btn btn-primary" data-click-action="tiLoadReports">Refresh</button>
-        </div>
-        <div id="ti-reports-list">
-            <div class="ti-empty">Click Refresh to load latest threat reports from OpenCTI.</div>
+        {# A form, so Enter applies the filter natively. hx-trigger
+           cannot express Enter: an event filter is compiled with
+           Function() and this CSP carries no unsafe-eval. #}
+        <form class="flex items-center gap-2.5 mb-5"
+              hx-get="/ui/threat-intel/reports"
+              hx-target="#ti-reports-list"
+              hx-swap="innerHTML">
+            <input type="text" class="input flex-1" id="ti-report-filter" name="q" placeholder="Filter reports by title…">
+            <button type="submit" class="btn btn-primary">Refresh</button>
+        </form>
+        <div id="ti-reports-list"
+             hx-get="/ui/threat-intel/reports"
+             hx-trigger="ti-show"
+             hx-include="#ti-report-filter"
+             hx-swap="innerHTML">
+            <div class="ti-empty">Loading reports&hellip;</div>
         </div>
     </div>
 
@@ -457,8 +494,9 @@ data-click-action="tiCloseReport"></div>
         // The overview tab needs no special case: the ti-show dispatch
         // above reaches all five of its server-rendered regions.
         // lazy-load the merged tabs.
-        if (tab.dataset.panel === 'ioc' && !window._tiIOCLoaded) { tiLoadIOCFeed(); window._tiIOCLoaded = true; }
-        if (tab.dataset.panel === 'reports' && !window._tiReportsLoaded) { tiLoadReports(); window._tiReportsLoaded = true; }
+        // No tab needs a special case any more: every server-rendered
+        // region in the panel being shown carries hx-trigger="ti-show"
+        // and the dispatch above reaches all of them.
         // The KEV tab needs no special case: #kev-results carries
         // hx-trigger="ti-show" and the dispatch above reaches it.
     });
@@ -540,41 +578,47 @@ data-click-action="tiCloseReport"></div>
     // ── v0.27.0: Top 5 High-Score IOCs preview (Overview tab) ──
 
     // ── v0.27.0: AI Threat Briefing (Overview tab) ──
-    window.tiLoadAISummary = async function() {
-        const btn = document.getElementById('ai-brief-btn');
-        const content = document.getElementById('ai-brief-content');
-        const modelEl = document.getElementById('ai-brief-model');
-        btn.disabled = true;
-        btn.textContent = 'Generating…';
-        content.innerHTML = '<span class="text-slate-500 animate-pulse">Analyzing the current threat landscape with AI… this typically takes 15–30 seconds.</span>';
-        try {
-            const r = await fetch('/api/threat-landscape/ai-summary', { method: 'POST' });
-            if (!r.ok) {
-                const err = await r.json().catch(() => ({}));
-                throw new Error(err.detail || 'HTTP ' + r.status);
-            }
-            const d = await r.json();
-            // Strip light markdown so the prose renders cleanly.
-            let text = (d.summary || 'No summary generated.')
-                .replace(/^#{1,4}\s+/gm, '')
-                .replace(/\*\*(.+?)\*\*/g, '$1')
-                .replace(/\*(.+?)\*/g, '$1')
-                .replace(/^[-*]\s+/gm, '')
-                .replace(/^\d+\.\s+/gm, '')
-                .replace(/```[\s\S]*?```/g, '');
-            content.innerHTML = text.split(/\n\n+/).filter(p => p.trim()).map(p =>
-                '<p class="mt-3 first:mt-0">' + escapeHtml(p.trim()).replace(/\n/g, ' ') + '</p>'
-            ).join('');
-            if (d.model) {
-                modelEl.textContent = 'Model: ' + d.model;
-                modelEl.classList.remove('hidden');
-            }
-            btn.textContent = 'Regenerate';
-        } catch(e) {
-            content.innerHTML = '<span class="text-ion-coral text-xs">Failed: ' + escapeHtml(String(e.message || e)) + '</span>';
-            btn.textContent = 'Retry';
-        }
-        btn.disabled = false;
+    // ── The two drill panels ─────────────────────────────
+    // tiLoadAISummary, tiLoadIOCFeed, tiLoadSparklines, tiRenderSpark
+    // and tiLoadReports are gone. Those four regions are rendered by
+    // /ui/threat-intel/ai-brief, ioc-feed, ioc-spark and reports.
+    //
+    // The sparklines carried the sharpest defect on this page. A failed
+    // read, a thrown read and no sightings at all rendered the same
+    // em-dash, separated only by a tooltip one of them happened to have.
+    // For an analyst triaging an indicator, "never seen in your estate"
+    // and "we could not check" are opposite conclusions.
+    //
+    // tiDrillTechnique and tiOpenReport keep a small opener each: htmx
+    // fetches the body, this only reveals the panel. Both fragments swap
+    // their heading out of band, so a failed read replaces the previous
+    // entity's title rather than leaving it above a message about a
+    // different one.
+
+    function tiShowPanel(panelId, backdropId) {
+        // classList, not style.display. The panels are hidden by a class
+        // and the old code set an inline display that outranked it, which
+        // left an inline style on the element for every later read of it
+        // to contend with.
+        document.getElementById(panelId).classList.remove('hidden');
+        document.getElementById(backdropId).classList.remove('hidden');
+    }
+
+    window.tiDrillTechnique = function(techId) {
+        if (!techId) return;
+        tiShowPanel('ti-drill-panel', 'ti-drill-backdrop');
+        window.htmx.ajax('GET', '/ui/threat-intel/technique-drill'
+            + '?technique_id=' + encodeURIComponent(techId),
+            { target: '#ti-drill-body', swap: 'innerHTML' });
+    };
+
+    window.tiOpenReport = function(reportId) {
+        if (!reportId) return;
+        tiCloseDrill();
+        tiShowPanel('ti-report-panel', 'ti-report-backdrop');
+        window.htmx.ajax('GET', '/ui/threat-intel/report-drill'
+            + '?report_id=' + encodeURIComponent(reportId),
+            { target: '#ti-report-panel-body', swap: 'innerHTML' });
     };
 
     // ── v0.27.0: Tab-switch helper (used by "View all →" links) ──
@@ -584,187 +628,17 @@ data-click-action="tiCloseReport"></div>
     };
 
     // ── v0.27.0: ATT&CK technique drill-down ──
-    window.tiDrillTechnique = async function(techId) {
-        const panel = document.getElementById('ti-drill-panel');
-        const backdrop = document.getElementById('ti-drill-backdrop');
-        const title = document.getElementById('ti-drill-title');
-        const body = document.getElementById('ti-drill-body');
-        title.textContent = techId;
-        body.innerHTML = '<div class="ti-loading"><span class="ti-spinner"></span>Loading technique details…</div>';
-        panel.style.display = 'block';
-        backdrop.style.display = 'block';
-        try {
-            const r = await fetch(API + '/techniques/' + encodeURIComponent(techId) + '/drill');
-            if (!r.ok) {
-                const err = await r.json().catch(() => ({}));
-                throw new Error(err.detail || 'HTTP ' + r.status);
-            }
-            const d = await r.json();
-            title.textContent = `${d.technique_id} — ${d.name}`;
-            const sections = [];
-
-            // Tactic chips
-            if (d.tactic_ids && d.tactic_ids.length) {
-                sections.push(`<div class="mb-3.5">
-                    <div class="text-[.72rem] text-[var(--text-secondary)] uppercase tracking-[.05em] mb-1.5">Tactics</div>
-                    ${d.tactic_ids.map(t =>
-                        `<span class="inline-block py-0.5 px-2 bg-[rgba(109,228,255,0.1)] border border-[rgba(109,228,255,0.3)] rounded-[4px] text-[.72rem] text-[var(--ion-cyan,#6de4ff)] mr-1 font-mono">${escapeHtml(t)}</span>`
-                    ).join('')}
-                </div>`);
-            }
-            if (d.is_subtechnique && d.parent_id) {
-                sections.push(`<div class="text-[.78rem] text-[var(--text-secondary)] mb-3.5">
-                    Sub-technique of <a class="text-[var(--ion-cyan,#6de4ff)] no-underline font-mono" href="javascript:void(0)" data-click-action="tiCloseAndDrillTechnique" data-args='[${JSON.stringify(d.parent_id)}]'>${escapeHtml(d.parent_id)}</a>
-                </div>`);
-            }
-
-            // Local cases
-            sections.push(`<div class="mb-3.5">
-                <h4 class="text-[.85rem] mt-0 mr-0 mb-2 ml-0 text-[var(--text-primary)]">Local Cases <span class="text-[var(--text-secondary)] font-normal text-xs">(last 90 days)</span></h4>
-                ${!d.local_cases.length
-                    ? '<em class="text-[.78rem] text-[var(--text-secondary)]">No cases triggered this technique in the last 90 days.</em>'
-                    : '<ul class="list-none p-0 m-0">' + d.local_cases.map(c => `
-                        <li class="py-1.5 px-0 border-b-[1px] border-b-[var(--ion-border)] text-[.8rem]">
-                            <a class="text-[var(--ion-cyan,#6de4ff)] no-underline font-mono" href="/cases?selected=${c.id}">${escapeHtml(c.case_number)}</a>
-                            <span class="ml-1.5 text-[var(--text-primary)]">${escapeHtml(c.title)}</span>
-                            <span class="sev-badge sev-${escapeHtml(c.severity)} ml-1.5 text-[.7rem]">${escapeHtml(c.severity)}</span>
-                        </li>`).join('') + '</ul>'
-                }
-            </div>`);
-
-            // Actors
-            sections.push(`<div class="mb-3.5">
-                <h4 class="text-[.85rem] mt-0 mr-0 mb-2 ml-0 text-[var(--text-primary)]">Actors Using This Technique <span class="text-[var(--text-secondary)] font-normal text-xs">(OpenCTI)</span></h4>
-                ${d.actors_error
-                    ? `<em class="text-[.78rem] text-[var(--text-secondary)]">OpenCTI lookup unavailable: ${escapeHtml(d.actors_error)}</em>`
-                    : !d.actors.length
-                        ? '<em class="text-[.78rem] text-[var(--text-secondary)]">No actors mapped to this technique in OpenCTI, or actor-by-technique lookup is not supported by this OpenCTI service build.</em>'
-                        : '<ul class="list-none p-0 m-0">' + d.actors.map(a => `
-                            <li class="py-1 px-0 text-[.8rem]">
-                                <span class="text-[var(--ion-cyan,#6de4ff)]">${escapeHtml(a.name || a.id || '')}</span>
-                            </li>`).join('') + '</ul>'
-                }
-            </div>`);
-
-            body.innerHTML = sections.join('');
-        } catch(e) {
-            body.innerHTML = '<div class="ti-empty text-[var(--danger)]">Failed: ' + escapeHtml(String(e.message || e)) + '</div>';
-        }
-    };
 
     window.tiCloseDrill = function() {
-        document.getElementById('ti-drill-panel').style.display = 'none';
-        document.getElementById('ti-drill-backdrop').style.display = 'none';
+        document.getElementById('ti-drill-panel').classList.add('hidden');
+        document.getElementById('ti-drill-backdrop').classList.add('hidden');
     };
 
     // ── Report detail panel ──────────────────────────────────────────────
-    window.tiOpenReport = async function(reportId) {
-        tiCloseDrill();
-        const panel    = document.getElementById('ti-report-panel');
-        const backdrop = document.getElementById('ti-report-backdrop');
-        const title    = document.getElementById('ti-report-panel-title');
-        const body     = document.getElementById('ti-report-panel-body');
-        title.textContent = '—';
-        body.innerHTML = '<div class="ti-loading"><span class="ti-spinner"></span>Loading report…</div>';
-        panel.style.display = 'block';
-        backdrop.style.display = 'block';
-        try {
-            const r = await fetch('/api/threat-landscape/reports/' + encodeURIComponent(reportId));
-            if (!r.ok) {
-                const err = await r.json().catch(() => ({}));
-                throw new Error(err.detail || 'HTTP ' + r.status);
-            }
-            const d = await r.json();
-            title.textContent = d.name || 'Report';
-            const secs = [];
-
-            // Meta row
-            const meta = [];
-            if (d.published) meta.push(new Date(d.published).toLocaleDateString());
-            if (d.types && d.types.length) meta.push(d.types.join(', '));
-            if (d.source) meta.push('Source: ' + escapeHtml(d.source));
-            if (d.confidence != null) meta.push('Confidence: ' + d.confidence + '%');
-            if (meta.length) secs.push('<div class="text-[.72rem] text-[var(--text-muted)] mt-1.5 font-mono ti-detail-section">' + meta.join(' · ') + '</div>');
-
-            // Labels
-            if (d.labels && d.labels.length) {
-                secs.push('<div class="ti-detail-section">' +
-                    d.labels.map(l => `<span class="ti-tag">${escapeHtml(l.value)}</span>`).join(' ') +
-                '</div>');
-            }
-
-            // Body
-            if (d.body) {
-                secs.push('<div class="ti-detail-section"><h4>Report Content</h4>' +
-                    '<p class="ti-report-body">' + escapeHtml(d.body) + '</p></div>');
-            }
-
-            // Threat actors
-            if (d.related_actors && d.related_actors.length) {
-                secs.push('<div class="ti-detail-section"><h4>Threat Actors</h4>' +
-                    '<ul class="list-none p-0 m-0">' + d.related_actors.map(a =>
-                        '<li class="py-1 px-0 text-[.8rem]"><span class="text-[var(--ion-cyan,#6de4ff)]">' + escapeHtml(a.name) + '</span>' +
-                        (a.aliases && a.aliases.length ? ' <span class="ml-1.5 text-[var(--text-primary)]">(' + escapeHtml(a.aliases.join(', ')) + ')</span>' : '') +
-                        '</li>'
-                    ).join('') + '</ul></div>');
-            }
-
-            // MITRE ATT&CK
-            if (d.related_ttps && d.related_ttps.length) {
-                secs.push('<div class="ti-detail-section"><h4>MITRE ATT&amp;CK</h4>' +
-                    '<div class="ti-ttp-list">' + d.related_ttps.map(t => {
-                        const label = (t.mitre_id ? escapeHtml(t.mitre_id) + ' — ' : '') + escapeHtml(t.name);
-                        return t.mitre_id
-                            ? `<span class="ti-ttp" data-click-action="tiCloseAndDrillTechnique" data-args='[${JSON.stringify(t.mitre_id)}]'>${label}</span>`
-                            : `<span class="ti-ttp">${label}</span>`;
-                    }).join('') + '</div></div>');
-            }
-
-            // Malware
-            if (d.related_malware && d.related_malware.length) {
-                secs.push('<div class="ti-detail-section"><h4>Malware</h4>' +
-                    '<div class="ti-ttp-list">' +
-                    d.related_malware.map(m => `<span class="ti-tag">${escapeHtml(m.name)}</span>`).join(' ') +
-                    '</div></div>');
-            }
-
-            // Vulnerabilities
-            if (d.related_vulns && d.related_vulns.length) {
-                secs.push('<div class="ti-detail-section"><h4>Vulnerabilities</h4>' +
-                    '<div class="ti-ttp-list">' +
-                    d.related_vulns.map(v => `<span class="ti-ttp">${escapeHtml(v.name)}</span>`).join('') +
-                    '</div></div>');
-            }
-
-            // Target geography / sectors
-            if ((d.related_countries && d.related_countries.length) || (d.related_sectors && d.related_sectors.length)) {
-                secs.push('<div class="ti-detail-section">' +
-                    (d.related_countries && d.related_countries.length
-                        ? '<h4>Target Countries</h4><p>' + escapeHtml(d.related_countries.join(', ')) + '</p>' : '') +
-                    (d.related_sectors && d.related_sectors.length
-                        ? '<h4>Target Sectors</h4><p>' + escapeHtml(d.related_sectors.join(', ')) + '</p>' : '') +
-                '</div>');
-            }
-
-            // Indicators
-            if (d.related_indicators && d.related_indicators.length) {
-                const shown = d.related_indicators.slice(0, 10);
-                secs.push('<div class="ti-detail-section"><h4>Indicators <span class="text-[var(--text-secondary)] font-normal text-xs">(' +
-                    shown.length + (d.related_indicators.length > 10 ? '+' : '') + ')</span></h4>' +
-                    '<ul class="list-none p-0 m-0">' + shown.map(i =>
-                        `<li class="py-1.5 px-0 border-b-[1px] border-b-[var(--ion-border)] text-[.8rem]"><code class="text-xs text-[var(--text-muted)]">${escapeHtml(i.pattern)}</code></li>`
-                    ).join('') + '</ul></div>');
-            }
-
-            body.innerHTML = secs.join('') || '<em class="text-[.78rem] text-[var(--text-secondary)]">No content available.</em>';
-        } catch(e) {
-            body.innerHTML = '<div class="ti-empty text-[var(--danger)]">Failed: ' + escapeHtml(String(e.message || e)) + '</div>';
-        }
-    };
 
     window.tiCloseReport = function() {
-        document.getElementById('ti-report-panel').style.display = 'none';
-        document.getElementById('ti-report-backdrop').style.display = 'none';
+        document.getElementById('ti-report-panel').classList.add('hidden');
+        document.getElementById('ti-report-backdrop').classList.add('hidden');
     };
 
     window.tiCloseAndDrillTechnique = function(techId) {
@@ -782,138 +656,35 @@ data-click-action="tiCloseReport"></div>
     // Found by driving the real page.
 
     // ── v0.27.0: helper for safe HTML escaping in inline-rendered cells ──
-    function escapeHtml(s) {
-        if (s == null) return '';
-        return String(s).replace(/[&<>"']/g, c =>
-            ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])
-        );
-    }
+    // escapeHtml, formatDate and esc are gone. They were the page's own
+    // escaping and date formatting, needed only because the markup was
+    // assembled from strings here. Jinja escapes, and the ts macro in
+    // _fragments/_time.html decides how a timestamp is shown, including
+    // whether it can be localised at all.
+    //
+    // escapeHtml's body was `return d.innerHTML`, a read rather than a
+    // write, but it was the last occurrence of that string in the file.
 
     // ── v0.27.0: Global search bar (fans out to actors, campaigns, IOCs, cases) ──
 
     window.tiClearSearch = function() {
         document.getElementById('ti-global-search').value = '';
         const out = document.getElementById('ti-global-search-results');
-        out.innerHTML = '';
+        // replaceChildren, not innerHTML. This empties the panel
+        // rather than building markup, and the redesign measures the
+        // string rather than the intent, so a clear would have kept
+        // this page off the finished list for no behavioural reason.
+        out.replaceChildren();
         out.classList.add('hidden');
         document.getElementById('ti-global-search-clear').classList.add('hidden');
     };
 
 
     // ── v0.27.0: IOC Feed tab (ported from /threat-landscape) ──
-    window.tiLoadIOCFeed = async function() {
-        const tbody = document.getElementById('ioc-body');
-        const minScore = document.getElementById('ti-ioc-min-score').value || '0';
-        tbody.innerHTML = '<tr><td colspan="7" class="ti-empty"><span class="ti-spinner"></span>Loading IOC feed…</td></tr>';
-        try {
-            const r = await fetch('/api/threat-landscape/ioc-feed?limit=50&min_score=' + minScore);
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            const d = await r.json();
-            const iocs = d.indicators || [];
-            if (!iocs.length) {
-                tbody.innerHTML = '<tr><td colspan="7" class="ti-empty">No indicators at this score threshold.</td></tr>';
-                return;
-            }
-            tbody.innerHTML = iocs.map((i, idx) => {
-                const score = i.score || 0;
-                const labels = (i.labels || []).slice(0, 3).map(l =>
-                    `<span class="inline-block py-[1px] px-1.5 rounded-[3px] text-[.7rem] bg-[rgba(255,255,255,0.04)] border border-[var(--ion-border)] mr-0.5">${escapeHtml(l.value || l)}</span>`
-                ).join('');
-                const sparkId = 'ti-spark-' + idx;
-                return `<tr>
-                    <td><strong data-ion-style="color:${score >= 90 ? 'var(--danger)' : score >= 70 ? 'var(--neon-orange)' : 'var(--text-secondary)'}">${score}</strong></td>
-                    <td><code class="text-xs text-[var(--text-muted)]">${escapeHtml(i.ioc_type)}</code></td>
-                    <td><code class="text-[var(--text-primary)]">${escapeHtml(i.ioc_value)}</code></td>
-                    <td>${labels || '<span class="text-[var(--text-muted)]">—</span>'}</td>
-                    <td>${escapeHtml(i.source || '—')}</td>
-                    <td><span id="${sparkId}" data-ioc="${escapeHtml(i.ioc_value)}" class="ti-spark"><span class="text-[.7rem] text-[var(--text-muted)]">…</span></span></td>
-                    <td>
-                        <button class="ti-btn-outline ti-btn-sm" data-click-action="tiCopyIOC" data-args='["$event", ${JSON.stringify(i.ioc_value)}]'>Copy</button>
-                    </td>
-                </tr>`;
-            }).join('');
-            // lazy-load sparklines AFTER the table renders so the
-            // initial paint isn't blocked by N parallel requests. Batched
-            // to 6 at a time to keep the OpenCTI backend honest.
-            tiLoadSparklines();
-        } catch(e) {
-            tbody.innerHTML = '<tr><td colspan="7" class="ti-empty text-[var(--danger)]">Failed: ' + escapeHtml(String(e)) + '</td></tr>';
-        }
-    };
 
     // ── v0.27.0: per-IOC sightings sparkline ──
-    async function tiLoadSparklines() {
-        const sparks = Array.from(document.querySelectorAll('.ti-spark'));
-        // Throttle: 6 concurrent fetches. The endpoint is local-DB-only
-        // and cheap, but batching avoids paint-thrash on slow databases.
-        const batchSize = 6;
-        for (let i = 0; i < sparks.length; i += batchSize) {
-            const batch = sparks.slice(i, i + batchSize);
-            await Promise.all(batch.map(spark => tiRenderSpark(spark)));
-        }
-    }
-    async function tiRenderSpark(spark) {
-        const value = spark.getAttribute('data-ioc');
-        if (!value) return;
-        try {
-            const r = await fetch(API + '/ioc-sightings?value=' + encodeURIComponent(value) + '&months=12');
-            if (!r.ok) { spark.innerHTML = '<span class="text-[.7rem] text-[var(--text-muted)]">—</span>'; return; }
-            const d = await r.json();
-            const series = d.series || [];
-            const total = d.total_sightings || 0;
-            if (!series.length || total === 0) {
-                spark.innerHTML = '<span class="text-[.7rem] text-[var(--text-muted)]" title="No local sightings in the last 12 months">—</span>';
-                return;
-            }
-            // Inline SVG sparkline: 12 bars, max bar = 14px tall.
-            const max = Math.max(...series.map(b => b.count));
-            const barW = 6, gap = 1, h = 14;
-            const w = series.length * (barW + gap);
-            const bars = series.map((b, idx) => {
-                if (b.count === 0) return '';
-                const bh = Math.max(1, Math.round((b.count / max) * h));
-                const x = idx * (barW + gap);
-                const y = h - bh;
-                const col = b.count === max ? 'var(--ion-cyan, #6de4ff)' : 'var(--text-secondary)';
-                return `<rect x="${x}" y="${y}" width="${barW}" height="${bh}" fill="${col}"><title>${b.month}: ${b.count}</title></rect>`;
-            }).join('');
-            spark.innerHTML = `<svg class="align-middle" width="${w}" height="${h}" title="${total} local sightings in last 12 months">${bars}</svg> <span class="text-[.7rem] text-[var(--text-muted)] ml-1">${total}</span>`;
-        } catch(e) {
-            spark.innerHTML = '<span class="text-[.7rem] text-[var(--text-muted)]">—</span>';
-        }
-    }
 
     // ── v0.27.0: Reports tab (ported from /threat-landscape) ──
-    window.tiLoadReports = async function() {
-        const host = document.getElementById('ti-reports-list');
-        const filterTerm = (document.getElementById('ti-report-filter').value || '').toLowerCase().trim();
-        host.innerHTML = '<div class="ti-loading"><span class="ti-spinner"></span>Loading reports…</div>';
-        try {
-            const r = await fetch('/api/threat-landscape/reports?limit=25');
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            const d = await r.json();
-            let reports = d.reports || [];
-            if (filterTerm) {
-                reports = reports.filter(rep =>
-                    (rep.name || '').toLowerCase().includes(filterTerm)
-                );
-            }
-            if (!reports.length) {
-                host.innerHTML = '<div class="ti-empty">No reports' + (filterTerm ? ' match the filter' : ' available') + '.</div>';
-                return;
-            }
-            host.innerHTML = reports.map(rep => {
-                const published = rep.published ? new Date(rep.published).toLocaleDateString() : '-';
-                return `<div class="p-3 border border-[var(--ion-border)] border-l-[3px] border-l-[var(--ion-cyan,#6de4ff)] rounded-[var(--radius)] mb-2 bg-[var(--bg-secondary)] ti-report-card" data-click-action="tiOpenReport" data-args='[${JSON.stringify(rep.id)}]'>
-                    <div class="text-[.9rem] font-semibold text-[var(--ion-cyan,#6de4ff)] mb-1">${escapeHtml(rep.name || 'Untitled')}</div>
-                    <div class="text-xs text-[var(--text-secondary)]">${escapeHtml((rep.description || '').slice(0, 200))}${(rep.description || '').length > 200 ? '…' : ''}</div>
-                    <div class="text-[.72rem] text-[var(--text-muted)] mt-1.5 font-mono">${escapeHtml(rep.report_type || 'report')} · ${published}</div>
-                </div>`;
-            }).join('');
-        } catch(e) {
-            host.innerHTML = '<div class="ti-empty text-[var(--danger)]">Failed: ' + escapeHtml(String(e)) + '</div>';
-        }
-    };
 
     // ── v0.27.0: Attack Stories tab (ported from /attack-stories) ──
     // tiLoadStories is gone. /ui/threat-intel/stories renders the panel,
@@ -1091,17 +862,7 @@ data-click-action="tiCloseReport"></div>
     // through the same service the watchlist table uses, so there is no
     // client-side copy to go stale or to be silently empty.
 
-    function formatDate(iso) {
-        if (!iso) return '-';
-        try { return new Date(iso).toLocaleDateString(); } catch(e) { return iso; }
-    }
 
-    function esc(s) {
-        if (s == null) return '';
-        const d = document.createElement('div');
-        d.textContent = String(s);
-        return d.innerHTML;
-    }
 
     // ── Init ──────────────────────────────────
     // Nothing to kick off. The Overview tab is the one active on first

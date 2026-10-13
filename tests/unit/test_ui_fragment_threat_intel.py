@@ -1571,9 +1571,11 @@ def test_the_page_no_longer_searches_or_expands_rows_in_javascript():
                  "window.toggleActorDetail", "window.toggleCampaignDetail",
                  "async function refreshWatchedIds", "container._actors"):
         assert gone not in _script(), f"{gone} should have been removed"
-    # `_actors` on its own is a substring of `related_actors`, which belongs
-    # to the report drill panel and is not this stage's to remove.
-    assert "related_actors" in _script(), "the report drill is untouched"
+    # `_actors` on its own is a substring of `related_actors`, which was
+    # the report drill panel's and was not that stage's to remove. The
+    # drill is a fragment now, so the name is gone from the script and
+    # this guard checks the precise token instead.
+    assert "container._actors" not in _script()
 
 
 def test_the_client_side_watched_set_is_gone():
@@ -2221,3 +2223,856 @@ def test_a_kev_read_that_answers_renders_its_rows(session, monkeypatch):
     assert "1284" in body
     assert "12 days old" in body
     assert "cannot read" not in body
+
+
+# ---------------------------------------------------------------------------
+# The last six regions: the IOC feed and its sparklines, the Reports tab and
+# its drill panel, the technique drill, and the AI briefing.
+#
+# Written with a route-level test for every context key the module computes,
+# rather than discovering the gap by mutation for a ninth time. Each
+# template branch is still rendered directly, but no value the module
+# chooses is left to a template test alone.
+#
+# The sharpest defect on this page was in the sparklines. Three outcomes all
+# rendered the same em-dash: a failed read, a thrown read, and nothing seen.
+# The only thing separating "this indicator has never been seen in your
+# estate" from "we could not check" was a tooltip one of them carried.
+# ---------------------------------------------------------------------------
+
+SPARK = "_fragments/threat_intel_ioc_spark.html"
+IOC_FEED = "_fragments/threat_intel_ioc_feed.html"
+REPORTS = "_fragments/threat_intel_reports.html"
+REPORT_DRILL = "_fragments/threat_intel_report_drill.html"
+TECH_DRILL = "_fragments/threat_intel_technique_drill.html"
+AI_BRIEF = "_fragments/threat_intel_ai_brief.html"
+
+
+def _spark(series, total, **over):
+    ctx = {"months": 12, "failed": False, "series": series, "total": total}
+    ctx.update(over)
+    return render(SPARK, **ctx)
+
+
+def _feed(indicators, **over):
+    ctx = {"configured": True, "failed": False, "error": None,
+           "indicators": indicators, "min_score": 75, "label_limit": 3,
+           "total": None}
+    ctx.update(over)
+    return render(IOC_FEED, **ctx)
+
+
+def _reports(reports, **over):
+    ctx = {"configured": True, "failed": False, "error": None,
+           "reports": reports, "q": "", "summary_chars": 200, "total": None}
+    ctx.update(over)
+    return render(REPORTS, **ctx)
+
+
+def _tech(detail, **over):
+    ctx = {"technique_id": "T1059", "failed": False, "error": None,
+           "detail": detail, "local_cases": None, "actors": None,
+           "local_days": 90}
+    ctx.update(over)
+    return render(TECH_DRILL, **ctx)
+
+
+# ---- the sparkline, the sharpest defect ----
+
+
+def test_a_failed_sightings_read_is_not_the_same_mark_as_no_sightings():
+    """The defect, stated as a test. Both rendered '-'; the failure had no
+    tooltip and the empty state had one, and that was the whole
+    difference."""
+    failed = _spark(None, None, failed=True)
+    empty = _spark([], 0)
+    assert 'role="alert"' in failed
+    assert "could not be read" in failed
+    # The claim itself, not a phrase that appears inside its own
+    # denial: the failure tooltip says "this is not a finding that it
+    # has never been seen", so matching that substring failed on the
+    # sentence written to prevent exactly this confusion.
+    assert "No local sightings" not in failed
+    assert 'role="alert"' not in empty
+    assert "No local sightings" in empty
+    assert failed != empty
+
+
+def test_a_sightings_payload_with_no_series_is_a_failure_not_an_absence():
+    html = _spark(None, 5)
+    assert 'role="alert"' in html
+    assert "cannot say whether" in html
+    assert "No local sightings" not in html
+
+
+@pytest.mark.parametrize("series,total", [
+    ([], 0), ([], None), ([{"month": "2026-01", "count": 0}], 0),
+])
+def test_nothing_seen_is_a_genuine_answer_and_says_so(series, total):
+    """A series of all-zero buckets and no buckets at all are the same
+    finding, and both are answers rather than failures."""
+    html = _spark(series, total)
+    assert "No local sightings in the last 12 months" in html
+    assert 'role="alert"' not in html
+
+
+def test_a_sparkline_puts_its_total_in_a_title_child_not_an_attribute():
+    """`<svg title="...">` does nothing. SVG needs a <title> child, so the
+    old sightings total was never readable on hover."""
+    html = _spark([{"month": "2026-01", "count": 3},
+                   {"month": "2026-02", "count": 6}], 9)
+    assert "<svg" in html
+    assert "<title>9 local sightings in the last 12 months</title>" in html
+    assert 'title="9 local sightings' not in html
+    assert 'aria-label="9 local sightings' in html
+
+
+def test_the_tallest_sparkline_bar_is_the_peak_month():
+    html = _spark([{"month": "2026-01", "count": 2},
+                   {"month": "2026-02", "count": 8}], 10)
+    assert html.count("<rect") == 2
+    assert "var(--ion-cyan, #6de4ff)" in html, "the peak month is highlighted"
+    assert "<title>2026-02: 8</title>" in html
+
+
+def test_a_zero_month_draws_no_bar():
+    """A bar of zero height is not drawn, which the page had right: an empty
+    month is a gap in the series, not a one-pixel mark."""
+    html = _spark([{"month": "2026-01", "count": 0},
+                   {"month": "2026-02", "count": 4}], 4)
+    assert html.count("<rect") == 1
+
+
+# ---- the IOC feed ----
+
+
+def test_an_unscored_indicator_is_not_painted_as_a_low_score():
+    """`i.score || 0` sent an unscored indicator through the colour bands as
+    a zero and gave it the resting grey a genuinely low score gets."""
+    row = {"ioc_type": "ipv4-addr", "ioc_value": "1.2.3.4"}
+    unscored = _feed([dict(row, score=None)])
+    low = _feed([dict(row, score=10)])
+    high = _feed([dict(row, score=95)])
+    assert "records no score" in unscored
+    assert "var(--danger)" not in unscored
+    assert "var(--text-secondary)" in low
+    assert "var(--danger)" in high
+
+
+def test_each_feed_row_loads_its_own_sightings_cell():
+    html = _feed([{"ioc_type": "ipv4-addr", "ioc_value": "1.2.3.4"}])
+    assert "/ui/threat-intel/ioc-spark?value=1.2.3.4" in html
+    assert 'hx-trigger="load"' in html
+
+
+def test_a_feed_label_can_be_a_mapping_or_a_bare_string():
+    """Both shapes come out of OpenCTI depending on the query, which is what
+    `l.value || l` handled."""
+    html = _feed([{"ioc_value": "x", "ioc_type": "t",
+                   "labels": [{"value": "ransomware"}, "apt"]}])
+    assert "ransomware" in html
+    assert ">apt<" in html
+
+
+def test_the_feed_empty_state_names_the_threshold_it_applied():
+    html = _feed([], min_score=90)
+    assert "score of 90" in html
+    assert "could not be read" not in html
+
+
+def test_an_unconfigured_feed_is_not_an_empty_feed():
+    html = _feed(None, configured=False)
+    assert "not configured" in html
+    assert "No indicators" not in html
+
+
+# ---- the reports tab ----
+
+
+def test_the_reports_empty_state_says_whether_a_filter_was_responsible():
+    """The page said "No reports match the filter" or "No reports
+    available", which was the right distinction and is kept."""
+    filtered = _reports([], q="solar", total=25)
+    unfiltered = _reports([], q="")
+    assert "No reports match solar" in filtered
+    assert "clearing the filter" in filtered
+    assert "No reports available" in unfiltered
+    assert "match" not in unfiltered
+
+
+def test_a_report_with_no_name_is_still_listed():
+    html = _reports([{"id": "1", "name": None, "description": "d"}])
+    assert "Untitled" in html
+    assert "None" not in html
+
+
+def test_a_long_report_description_is_cut_with_an_ellipsis():
+    html = _reports([{"id": "1", "name": "r", "description": "x" * 400}],
+                    summary_chars=200)
+    assert "&hellip;" in html or "…" in html
+    assert "x" * 201 not in html
+
+
+# ---- the technique drill ----
+
+
+def test_a_failed_technique_read_lists_what_is_not_known():
+    html = _tech(None, failed=True, error="OpenCTIError")
+    assert "could not be read" in html
+    assert "not which tactics" in html
+    assert "No cases triggered" not in html
+    assert "OpenCTIError" in html
+
+
+def test_a_missing_local_case_list_is_a_failure_not_a_quiet_estate():
+    """`d.local_cases.length` raised on a payload without the key and the
+    whole panel became "Failed: TypeError". Each section answers for
+    itself now."""
+    html = _tech({"technique_id": "T1059", "name": "Command Line"},
+                 local_cases=None, actors=[])
+    assert "local case lookup did not answer" in html
+    assert "No cases triggered this technique" not in html
+
+
+def test_no_local_case_having_triggered_a_technique_says_so():
+    html = _tech({"technique_id": "T1059"}, local_cases=[], actors=[])
+    assert "No cases triggered this technique in the last 90 days" in html
+    assert "did not answer" not in html
+
+
+def test_an_opencti_actor_error_is_worded_differently_from_no_actors():
+    """The page had this right and it is kept: an errored lookup and an
+    empty result are different, and the empty one says the lookup may not be
+    supported by this OpenCTI build."""
+    errored = _tech({"technique_id": "T1059", "actors_error": "timeout"},
+                    local_cases=[], actors=[])
+    empty = _tech({"technique_id": "T1059"}, local_cases=[], actors=[])
+    assert "OpenCTI lookup unavailable: timeout" in errored
+    assert "not supported by this OpenCTI service build" in empty
+    assert "lookup unavailable" not in empty
+
+
+def test_the_technique_heading_swaps_out_of_band():
+    html = _tech({"technique_id": "T1059", "name": "Command Line"},
+                 local_cases=[], actors=[])
+    assert 'id="ti-drill-title"' in html
+    assert 'hx-swap-oob="innerHTML"' in html
+    assert "T1059" in html
+    assert "Command Line" in html
+
+
+def test_a_failed_technique_read_still_replaces_the_previous_heading():
+    """Otherwise the previous technique's title sits above a failure message
+    about a different one."""
+    html = _tech(None, failed=True)
+    assert 'hx-swap-oob="innerHTML"' in html
+    assert "could not be read" in html
+
+
+def test_a_subtechnique_links_to_its_parent_as_a_button():
+    """The page used <a href="javascript:void(0)">, a dead link in the
+    accessibility tree."""
+    html = _tech({"technique_id": "T1059.001", "is_subtechnique": True,
+                  "parent_id": "T1059"}, local_cases=[], actors=[])
+    assert "javascript:void(0)" not in html
+    assert "<button" in html
+    assert "tiCloseAndDrillTechnique" in html
+
+
+# ---- the report drill ----
+
+
+def test_a_failed_report_read_lists_what_is_not_known():
+    html = render(REPORT_DRILL, configured=True, failed=True, error="E",
+                  report=None, indicator_limit=10)
+    assert "could not be read" in html
+    assert "not its content" in html
+    assert "No content available" not in html
+
+
+def test_a_report_opencti_holds_nothing_in_says_so():
+    html = render(REPORT_DRILL, configured=True, failed=False, error=None,
+                  report={"name": "Thin report"}, indicator_limit=10)
+    assert "No content available for this report" in html
+    assert "could not be read" not in html
+
+
+def test_a_report_assessed_at_zero_confidence_shows_that_figure():
+    zero = render(REPORT_DRILL, configured=True, failed=False, error=None,
+                  report={"name": "r", "confidence": 0}, indicator_limit=10)
+    missing = render(REPORT_DRILL, configured=True, failed=False, error=None,
+                     report={"name": "r", "confidence": None},
+                     indicator_limit=10)
+    assert "Confidence: 0%" in zero
+    assert "Confidence" not in missing
+
+
+def test_a_report_drill_renders_every_section_the_endpoint_returns():
+    html = render(REPORT_DRILL, configured=True, failed=False, error=None,
+                  indicator_limit=10,
+                  report={
+                      "name": "SolarWinds", "body": "A supply chain attack.",
+                      "types": ["threat-report"], "source": "Mandiant",
+                      "confidence": 80,
+                      "labels": [{"value": "apt"}],
+                      "related_actors": [{"name": "APT29",
+                                          "aliases": ["Cozy Bear"]}],
+                      "related_ttps": [{"mitre_id": "T1195", "name": "Supply Chain"}],
+                      "related_malware": [{"name": "SUNBURST"}],
+                      "related_vulns": [{"name": "CVE-2020-10148"}],
+                      "related_countries": ["United States"],
+                      "related_sectors": ["Government"],
+                      "related_indicators": [{"pattern": "[file:hashes.'SHA-256' = 'x']"}],
+                  })
+    for expected in ("SolarWinds", "A supply chain attack.", "Mandiant",
+                     "Confidence: 80%", "apt", "APT29", "Cozy Bear",
+                     "T1195", "SUNBURST", "CVE-2020-10148",
+                     "United States", "Government", "SHA-256"):
+        assert expected in html, expected
+
+
+def test_a_ttp_without_a_mitre_id_is_not_offered_as_a_drill_control():
+    """The drill endpoint keys on the MITRE id, so a technique without one
+    cannot be drilled into. It renders as text rather than a control that
+    cannot work."""
+    html = render(REPORT_DRILL, configured=True, failed=False, error=None,
+                  indicator_limit=10,
+                  report={"name": "r", "related_ttps": [
+                      {"mitre_id": "T1195", "name": "Supply Chain"},
+                      {"name": "Unmapped"}]})
+    assert html.count("tiCloseAndDrillTechnique") == 1
+    assert "Unmapped" in html
+
+
+# ---- the AI briefing ----
+
+
+def test_the_markdown_stripping_matches_what_the_page_did():
+    from ion.web.ui.threat_intel import brief_paragraphs
+
+    text = ("## Heading\n\n**Bold** and *italic* text.\n\n"
+            "- a bullet\n\n1. numbered\n\n```\ncode\n```\n\nLast para.")
+    paras = brief_paragraphs(text)
+    joined = " ".join(paras)
+    assert "##" not in joined
+    assert "**" not in joined
+    assert "Bold and italic text." in joined
+    assert "a bullet" in joined
+    assert "numbered" in joined
+    assert "code" not in joined
+    assert "Last para." in paras[-1]
+
+
+def test_a_non_string_summary_gives_no_paragraphs_rather_than_raising():
+    from ion.web.ui.threat_intel import brief_paragraphs
+
+    assert brief_paragraphs(None) == []
+    assert brief_paragraphs({"not": "a string"}) == []
+    assert brief_paragraphs(42) == []
+
+
+def test_a_newline_inside_a_paragraph_becomes_a_space():
+    from ion.web.ui.threat_intel import brief_paragraphs
+
+    assert brief_paragraphs("one\ntwo\n\nthree") == ["one two", "three"]
+
+
+def test_a_failed_briefing_says_it_concluded_nothing():
+    html = render(AI_BRIEF, failed=True, error="AI service not available",
+                  summary=None, model=None, paragraphs=[])
+    assert "could not be generated" in html
+    assert "AI service not available" in html
+    assert "says nothing about the current threat landscape" in flat(html)
+    assert 'role="alert"' in html
+    assert ">Retry<" in html
+
+
+def test_a_briefing_that_came_back_empty_is_not_a_failure():
+    html = render(AI_BRIEF, failed=False, error=None, summary="", model=None,
+                  paragraphs=[])
+    assert "No summary was generated" in html
+    assert 'role="alert"' not in html
+    assert ">Generate<" in html
+
+
+def test_a_briefing_renders_its_paragraphs_and_names_its_model():
+    html = render(AI_BRIEF, failed=False, error=None, summary="x",
+                  model="llama3", paragraphs=["First.", "Second."])
+    assert "<p class=\"mt-3 first:mt-0\">First.</p>" in html
+    assert "Second." in html
+    assert "Model: llama3" in html
+    assert ">Regenerate<" in html
+
+
+def test_the_model_line_is_hidden_when_no_model_was_reported():
+    html = render(AI_BRIEF, failed=False, error=None, summary="x", model=None,
+                  paragraphs=["p"])
+    line = html[html.index('id="ai-brief-model"'):]
+    line = line[:line.index("</div>")]
+    assert "hidden" in line
+
+
+# ---- the routes, one per context key the module computes ----
+
+
+FINAL_PATHS = [
+    "/ui/threat-intel/ioc-feed",
+    "/ui/threat-intel/ioc-spark?value=1.2.3.4",
+    "/ui/threat-intel/reports",
+    "/ui/threat-intel/report-drill?report_id=x",
+    "/ui/threat-intel/technique-drill?technique_id=T1059",
+]
+
+
+@pytest.mark.parametrize("path", FINAL_PATHS)
+def test_a_final_fragment_refuses_a_caller_with_no_permissions(session, path):
+    app = _client(session, _User())
+    with TestClient(app) as client:
+        assert client.get(path).status_code == 403
+
+
+@pytest.mark.parametrize("path", FINAL_PATHS)
+def test_a_final_fragment_answers_a_reader_with_something(session, path):
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        r = client.get(path)
+    assert r.status_code == 200
+    assert r.text.strip(), "a blank panel is what the old code did on failure"
+
+
+def test_the_ai_brief_is_a_post_gated_on_observable_read(session):
+    """POST /api/threat-landscape/ai-summary is a POST because generating a
+    briefing costs a model call, and it carries observable:read."""
+    app = _client(session, _User())
+    with TestClient(app) as client:
+        assert client.post("/ui/threat-intel/ai-brief").status_code == 403
+        assert client.get("/ui/threat-intel/ai-brief").status_code == 405
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        assert client.post("/ui/threat-intel/ai-brief").status_code == 200
+
+
+def test_the_sparkline_route_rejects_a_value_shorter_than_the_endpoint_takes(
+        session):
+    """GET /api/threat-intel/ioc-sightings bounds value at min_length=2, so
+    the fragment must not be looser than the endpoint it mirrors."""
+    import inspect
+    from ion.web.threat_intel_api import ioc_sightings
+
+    bound = inspect.signature(ioc_sightings).parameters["value"].default
+    floor = next(m.min_length for m in bound.metadata
+                 if hasattr(m, "min_length"))
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        assert client.get("/ui/threat-intel/ioc-spark?value=a").status_code == 422
+    assert floor == 2
+
+
+def test_the_sparkline_route_reads_the_real_local_tables(session, monkeypatch):
+    """Closes the gap before mutation finds it: `_rows(payload, "series")`
+    and the total are module computations no template test reaches.
+
+    Unlike everything else in this stage the sightings read is local-DB
+    only, so it answers on a deployment with no OpenCTI.
+    """
+    import ion.web.threat_intel_api as api
+
+    monkeypatch.setattr(api, "ioc_sightings", lambda **kw: {
+        "series": [{"month": "2026-01", "count": 3}], "total_sightings": 3})
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/ioc-spark?value=1.2.3.4").text
+    assert "<svg" in body
+    assert "2026-01: 3" in body
+
+
+def test_a_sightings_payload_with_no_series_reaches_the_failure_branch(
+        session, monkeypatch):
+    import ion.web.threat_intel_api as api
+
+    monkeypatch.setattr(api, "ioc_sightings", lambda **kw: {"total_sightings": 5})
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/ioc-spark?value=1.2.3.4").text
+    assert 'role="alert"' in body
+    assert "No local sightings" not in body
+
+
+def test_a_sightings_read_that_raises_is_reported_as_a_failure(session,
+                                                              monkeypatch):
+    import ion.web.threat_intel_api as api
+
+    def boom(**kw):
+        raise RuntimeError("sightings table is gone")
+
+    monkeypatch.setattr(api, "ioc_sightings", boom)
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/ioc-spark?value=1.2.3.4").text
+    assert "could not be read" in body
+    assert "sightings table is gone" not in body
+
+
+def test_the_reports_filter_runs_on_the_server_over_what_was_read(
+        session, monkeypatch):
+    """Closes the gap before mutation finds it: the filter and `total` are
+    module computations. The endpoint takes no search parameter, so the
+    filter is a substring match over the rows it returned, and `total`
+    reports how many were read before filtering."""
+    import ion.web.threat_landscape_api as api
+    import ion.services.opencti_service as octi
+
+    class _Svc:
+        is_configured = True
+
+    monkeypatch.setattr(octi, "get_opencti_service", lambda: _Svc())
+
+    async def answer(**kw):
+        return {"reports": [{"id": "1", "name": "SolarWinds brief"},
+                            {"id": "2", "name": "Unrelated"}]}
+
+    monkeypatch.setattr(api, "get_recent_reports", answer)
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        filtered = client.get("/ui/threat-intel/reports?q=solar").text
+        everything = client.get("/ui/threat-intel/reports").text
+    assert "SolarWinds brief" in filtered
+    assert "Unrelated" not in filtered
+    assert "SolarWinds brief" in everything
+    assert "Unrelated" in everything
+
+
+def test_a_reports_payload_with_no_list_is_a_failure_not_an_empty_tab(
+        session, monkeypatch):
+    import ion.web.threat_landscape_api as api
+    import ion.services.opencti_service as octi
+
+    class _Svc:
+        is_configured = True
+
+    monkeypatch.setattr(octi, "get_opencti_service", lambda: _Svc())
+
+    async def answer(**kw):
+        return {"detail": "Not authenticated"}
+
+    monkeypatch.setattr(api, "get_recent_reports", answer)
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/reports").text
+    assert "cannot read" in body
+    assert "No reports available" not in body
+
+
+def test_the_technique_drill_splits_its_two_lists_at_the_route(session,
+                                                              monkeypatch):
+    """Closes the gap before mutation finds it: `local_cases` and `actors`
+    are computed with `_rows` in the module, and the template renders
+    whichever it is handed."""
+    import ion.web.threat_intel_api as api
+
+    monkeypatch.setattr(api, "technique_drill", lambda **kw: {
+        "technique_id": "T1059", "name": "Command Line",
+        "local_cases": [{"id": 1, "case_number": "CASE-0001",
+                         "title": "t", "severity": "high"}],
+        # No `actors` key at all, which is the case the unguarded
+        # `.length` raised on.
+    })
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get(
+            "/ui/threat-intel/technique-drill?technique_id=T1059").text
+    assert "CASE-0001" in body
+    assert "actor lookup did not answer" in body
+    assert "No actors mapped" not in body
+
+
+def test_a_non_mapping_technique_payload_is_a_failure(session, monkeypatch):
+    import ion.web.threat_intel_api as api
+
+    monkeypatch.setattr(api, "technique_drill", lambda **kw: ["not", "a", "map"])
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get(
+            "/ui/threat-intel/technique-drill?technique_id=T1059").text
+    assert "could not be read" in body
+
+
+def test_the_ai_brief_route_strips_markdown_and_names_the_model(
+        session, monkeypatch):
+    """Closes the gap before mutation finds it: `paragraphs` and `model` are
+    module computations."""
+    import ion.web.threat_landscape_api as api
+
+    async def answer(**kw):
+        return {"summary": "## Title\n\n**Bold** text.\n\nSecond para.",
+                "model": "llama3"}
+
+    monkeypatch.setattr(api, "ai_threat_summary", answer)
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.post("/ui/threat-intel/ai-brief").text
+    assert "Bold text." in body
+    assert "Second para." in body
+    assert "##" not in body
+    assert "Model: llama3" in body
+
+
+def test_the_ai_brief_route_reports_an_http_detail_when_the_service_gives_one(
+        session, monkeypatch):
+    """The endpoint raises HTTPException with a message meant for a caller
+    to read, such as its 503 when Ollama is unavailable. The class name is
+    the fallback, not the first choice."""
+    import ion.web.threat_landscape_api as api
+    from fastapi import HTTPException
+
+    async def boom(**kw):
+        raise HTTPException(status_code=503, detail="AI service not available")
+
+    monkeypatch.setattr(api, "ai_threat_summary", boom)
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.post("/ui/threat-intel/ai-brief").text
+    assert "AI service not available" in body
+    assert "HTTPException" not in body
+
+
+# ---- the page shell, now complete ----
+
+
+def test_the_page_builds_no_markup_in_javascript_at_all():
+    """This is the whole point of the conversion. The redesign's `server`
+    column passes when a template contains no innerHTML,
+    insertAdjacentHTML or outerHTML, because markup built from strings in
+    JavaScript cannot be restyled from markup and a stylesheet sweep
+    silently fails to reach it."""
+    script = _script()
+    for pattern in ("innerHTML =", "insertAdjacentHTML", "outerHTML ="):
+        assert pattern not in script, pattern
+
+
+def test_the_page_carries_no_hand_rolled_escaping_or_date_formatting():
+    """escapeHtml, formatDate and esc existed only because the markup was
+    assembled here. Jinja escapes, and the ts macro decides how a timestamp
+    is shown, including whether it can be localised at all."""
+    script = _script()
+    for gone in ("function escapeHtml", "function formatDate", "function esc("):
+        assert gone not in script, gone
+
+
+@pytest.mark.parametrize("target,url", [
+    ("ioc-body", "/ui/threat-intel/ioc-feed"),
+    ("ti-reports-list", "/ui/threat-intel/reports"),
+])
+def test_each_final_region_pulls_its_markup_from_its_fragment(target, url):
+    page = _page()
+    block = page[page.index(f'id="{target}"'):]
+    block = block[:block.index(">") + 500]
+    assert url in block
+
+
+def test_the_drill_panels_are_revealed_with_classes_not_inline_styles():
+    """The panels are hidden by a class and the old code set an inline
+    display that outranked it, leaving an inline style on the element for
+    every later read to contend with."""
+    script = _script()
+    assert "tiShowPanel" in script
+    assert "classList.remove('hidden')" in script
+    assert "style.display" not in script
+
+
+def test_the_drill_panels_fetch_their_bodies_through_htmx():
+    script = _script()
+    assert "htmx.ajax('GET', '/ui/threat-intel/technique-drill'" in script
+    assert "htmx.ajax('GET', '/ui/threat-intel/report-drill'" in script
+
+
+def test_the_ioc_threshold_and_report_filter_travel_with_their_requests():
+    page = _page()
+    assert 'name="min_score"' in page
+    assert 'hx-include="#ti-ioc-min-score"' in page
+    assert 'id="ti-report-filter" name="q"' in page
+
+
+def test_the_limits_are_the_ones_the_page_asked_for():
+    from ion.web.ui.threat_intel import (
+        IOC_FEED_LIMIT, IOC_LABEL_LIMIT, REPORT_INDICATOR_LIMIT,
+        REPORT_LIMIT, REPORT_SUMMARY_CHARS, SPARK_MONTHS,
+        TECHNIQUE_LOCAL_DAYS,
+    )
+
+    assert IOC_FEED_LIMIT == 50
+    assert IOC_LABEL_LIMIT == 3
+    assert SPARK_MONTHS == 12
+    assert REPORT_LIMIT == 25
+    assert REPORT_SUMMARY_CHARS == 200
+    assert REPORT_INDICATOR_LIMIT == 10
+    assert TECHNIQUE_LOCAL_DAYS == 90
+
+
+# ---------------------------------------------------------------------------
+# Two survivors from the final pass, and what they corrected about the rule
+#
+# The rule written down after eight rounds was: for every context key the
+# module computes, drive the route rather than only rendering the template.
+# It was applied here in advance and still let two through, because a test
+# per key is not enough. It has to be per key PER BRANCH.
+#
+#   * `local_cases` dropping `rows` for `.get(k) or []` survived because the
+#     route test supplied a payload where that key was PRESENT. The
+#     difference between the two only shows when the key is absent, and that
+#     case was covered for `actors` and not for its sibling.
+#
+#   * The shared drill helper's isinstance check survived because the
+#     non-mapping test drove the technique drill, which has its own separate
+#     check. The shared helper is reached only by the report drill.
+#
+# Both gaps are closed below, and both are the sibling of a case that was
+# already covered.
+# ---------------------------------------------------------------------------
+
+
+def test_a_missing_local_case_key_reaches_the_failure_branch(session, monkeypatch):
+    """Closes a survivor. The sibling of
+    test_the_technique_drill_splits_its_two_lists_at_the_route, which
+    supplied local_cases and omitted actors. This omits local_cases, which
+    is the only state where `rows` and `.get(k) or []` differ."""
+    import ion.web.threat_intel_api as api
+
+    monkeypatch.setattr(api, "technique_drill", lambda **kw: {
+        "technique_id": "T1059", "name": "Command Line",
+        "actors": [{"name": "APT29"}],
+        # No `local_cases` key.
+    })
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get(
+            "/ui/threat-intel/technique-drill?technique_id=T1059").text
+    assert "local case lookup did not answer" in body
+    assert "No cases triggered this technique" not in body
+    assert "APT29" in body, "the list that did arrive still renders"
+
+
+def test_an_empty_local_case_list_is_still_an_empty_result(session, monkeypatch):
+    """The other side, so the pair pins `rows` from both directions for this
+    key as well as for actors."""
+    import ion.web.threat_intel_api as api
+
+    monkeypatch.setattr(api, "technique_drill", lambda **kw: {
+        "technique_id": "T1059", "local_cases": [], "actors": [],
+    })
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get(
+            "/ui/threat-intel/technique-drill?technique_id=T1059").text
+    assert "No cases triggered this technique in the last 90 days" in body
+    assert "did not answer" not in body
+
+
+def test_a_non_mapping_report_payload_is_rejected_by_the_shared_helper(
+        session, monkeypatch):
+    """Closes a survivor. The technique drill has its own isinstance check
+    and was tested; the shared _report_or_technique helper is reached only
+    by the report drill, and dropping its check let a list reach the
+    template where `report.get` is undefined and every section skipped, so
+    the panel claimed the report held nothing."""
+    import ion.web.threat_landscape_api as api
+    import ion.services.opencti_service as octi
+
+    class _Svc:
+        is_configured = True
+
+    monkeypatch.setattr(octi, "get_opencti_service", lambda: _Svc())
+
+    async def answer(**kw):
+        return ["not", "a", "mapping"]
+
+    monkeypatch.setattr(api, "get_report_detail", answer)
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/report-drill?report_id=x").text
+    assert "could not be read" in body
+    assert "No content available" not in body
+
+
+def test_a_report_the_helper_accepts_renders_its_sections(session, monkeypatch):
+    """The other side of the same check, so a mutation that always rejects
+    is caught as well as one that always accepts."""
+    import ion.web.threat_landscape_api as api
+    import ion.services.opencti_service as octi
+
+    class _Svc:
+        is_configured = True
+
+    monkeypatch.setattr(octi, "get_opencti_service", lambda: _Svc())
+
+    async def answer(**kw):
+        return {"name": "SolarWinds", "body": "A supply chain attack."}
+
+    monkeypatch.setattr(api, "get_report_detail", answer)
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/report-drill?report_id=x").text
+    assert "SolarWinds" in body
+    assert "A supply chain attack." in body
+    assert "could not be read" not in body
+
+
+# ---------------------------------------------------------------------------
+# The third survivor of the final mutation pass.
+#
+# test_the_ioc_threshold_and_report_filter_travel_with_their_requests asserts
+# that `hx-include="#ti-ioc-min-score"` appears in the page. Three elements
+# carry it: the select, the Refresh button, and the #ioc-body tbody. Removing
+# it from any one of them leaves the other two, so the substring still
+# matches and that assertion cannot fail for this defect. It looked like
+# coverage and was not.
+#
+# The tbody is the one that matters most. It loads on `ti-show`, so without
+# the include, opening the panel renders an unfiltered table underneath a
+# control that reads "Score >= 75", while a later change or Refresh does
+# send the threshold. The panel would agree with its own control only after
+# the reader touched it.
+#
+# Asserted per element rather than per file, so it fails whichever of the
+# three loses the attribute, and so a fourth requester added later has to
+# carry the threshold as well.
+# ---------------------------------------------------------------------------
+
+
+def test_every_ioc_feed_request_on_the_page_sends_the_threshold():
+    page = _page()
+    requesters = re.findall(
+        r'<[a-z][a-z0-9]*[^>]*hx-get="/ui/threat-intel/ioc-feed"[^>]*>', page)
+    assert len(requesters) == 3, (
+        "expected the select, the Refresh button and the #ioc-body tbody; "
+        f"found {len(requesters)}. A new requester needs the threshold too."
+    )
+    for tag in requesters:
+        assert 'hx-include="#ti-ioc-min-score"' in flat(tag), (
+            "this element asks for the feed without sending the threshold, "
+            f"so its render ignores the control: {flat(tag)[:200]}"
+        )
+
+
+def test_the_feed_body_loads_on_show_rather_than_on_page_load():
+    """The reason the tbody's include is load-bearing. It fires on `ti-show`,
+    which is the panel opening, so its request is the first render the reader
+    sees and the one most likely to disagree with the control."""
+    page = _page()
+    body = page[page.index('<tbody id="ioc-body"'):]
+    body = body[:body.index(">") + 1]
+    assert 'hx-trigger="ti-show"' in flat(body)
+    assert 'hx-include="#ti-ioc-min-score"' in flat(body)

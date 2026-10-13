@@ -1,0 +1,53 @@
+{# Threat Intel: the AI threat briefing on the Overview tab.
+
+   Replaces three innerHTML sites in tiLoadAISummary, plus the button label
+   and the model line, both of which swap out of band because they sit
+   outside this fragment's target.
+
+   The light markdown stripping and the paragraph split move to the server,
+   unchanged in effect: headings, bold, italics, list bullets, ordered-list
+   numbers and fenced code blocks are removed, then the remainder is split
+   on blank lines into paragraphs. Escaping happens after the stripping and
+   before the split, as it did, so a summary containing markup renders as
+   text.
+
+   `d.summary || 'No summary generated.'` collapsed two cases. A model that
+   returned an empty string and a payload with no summary key at all are
+   both "nothing came back", so that collapse was defensible, but neither is
+   the same as the request having failed, and the page's catch handled only
+   the third. All three are separate here. #}
+
+{# The button, out of band: its label is the state of this panel. #}
+<button id="ai-brief-btn" hx-swap-oob="outerHTML"
+        class="btn btn-ghost btn-xs"
+        hx-post="/ui/threat-intel/ai-brief"
+        hx-target="#ai-brief-content"
+        hx-swap="innerHTML">
+  {%- if failed -%}Retry{%- elif summary -%}Regenerate{%- else -%}Generate{%- endif -%}
+</button>
+
+{# The model line, out of band. Hidden when no model was reported, which is
+   what the page did by only ever un-hiding it on success. #}
+<div id="ai-brief-model" hx-swap-oob="outerHTML"
+     class="mt-2 text-[10px] text-slate-600 font-mono{% if not model %} hidden{% endif %}">
+  {%- if model %}Model: {{ model }}{% endif -%}
+</div>
+
+{% if failed %}
+  <span class="text-ion-coral text-xs" role="alert">
+    The briefing could not be generated{% if error %}: {{ error }}{% endif %}. No
+    summary was produced, which says nothing about the current threat
+    landscape either way.
+  </span>
+{% elif not summary %}
+  {# The model answered with nothing. Not a failure, and not a finding
+     about the estate: a briefing nobody wrote is not a quiet week. #}
+  <span class="text-slate-500 text-xs">
+    No summary was generated. The model returned nothing to brief on, so
+    this says nothing about the current threat landscape.
+  </span>
+{% else %}
+  {% for para in paragraphs %}
+    <p class="mt-3 first:mt-0">{{ para }}</p>
+  {% endfor %}
+{% endif %}
