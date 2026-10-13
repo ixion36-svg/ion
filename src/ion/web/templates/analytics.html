@@ -2,6 +2,13 @@
 
 {% block title %}Analytics Engine - ION{% endblock %}
 
+{% block head_css %}
+{# The page's own rules, for the classes the server-rendered panels emit.
+   head_css loses to ion-workspace.css and base.html's two in-body blocks,
+   and neither of the selectors here appears in those. #}
+<link rel="stylesheet" href="/static/css/analytics-page.css?v={{ ion_version }}">
+{% endblock %}
+
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
@@ -947,7 +954,7 @@ function renderDashboard() {
     renderRuleNoise(jobs.rule_noise);
     renderObservableVelocity(jobs.observable_velocity);
     renderCaseMetrics(jobs.case_metrics);
-    renderStaleInvestigations(jobs.stale_investigations);
+    renderStaleInvestigations();
     renderConfig();
 }
 
@@ -1201,50 +1208,16 @@ function renderSeverityBreakdown(bySev) {
     </div>`;
 }
 
-function renderStaleInvestigations(job) {
+// GET /ui/analytics/stale renders the panel. The argument is ignored:
+// the fragment reads its own job, so a panel whose job is missing or
+// whose stored result is unreadable says which, where every panel on
+// this page said "No data yet. Click Run All Jobs" for all three.
+function renderStaleInvestigations() {
     const container = document.getElementById('stale-content');
-    if (!job || !job.result) { container.innerHTML = '<div class="empty-state">No data yet. Click "Run All Jobs" to generate.</div>'; return; }
-    const r = job.result;
-    const staleCases = r.stale_cases || [];
-    const staleAlerts = r.stale_alerts || [];
-
-    if (!staleCases.length && !staleAlerts.length) {
-        container.innerHTML = '<div class="empty-state">No stale investigations found. All items have recent activity.</div>';
-        return;
-    }
-
-    let html = '';
-
-    if (staleCases.length) {
-        html += `<div class="stale-section">
-            <h3>Stale Cases <span class="stale-badge">${staleCases.length}</span></h3>
-            <table class="analytics-table"><thead><tr><th>Case</th><th>Title</th><th>Severity</th><th>Assigned To</th><th>Last Activity</th><th>Days Stale</th></tr></thead>
-            <tbody>${staleCases.map(c => `<tr>
-                <td><a href="/cases">${esc(c.case_number)}</a></td>
-                <td>${esc(c.title)}</td>
-                <td><span class="severity-badge severity-${c.severity || 'medium'}">${c.severity || '-'}</span></td>
-                <td>${esc(c.assigned_to || 'Unassigned')}</td>
-                <td class="run-time">${timeAgo(c.last_activity)}</td>
-                <td class="days-stale ${c.days_stale > 7 ? 'danger' : 'warn'}">${c.days_stale}d</td>
-            </tr>`).join('')}</tbody></table>
-        </div>`;
-    }
-
-    if (staleAlerts.length) {
-        html += `<div class="stale-section">
-            <h3>Stale Alerts (uncased) <span class="stale-badge">${staleAlerts.length}</span></h3>
-            <table class="analytics-table"><thead><tr><th>Alert ID</th><th>Status</th><th>Assigned To</th><th>Last Activity</th><th>Days Stale</th></tr></thead>
-            <tbody>${staleAlerts.map(a => `<tr>
-                <td class="text-xs max-w-[200px] overflow-hidden text-ellipsis" title="${esc(a.es_alert_id)}">${esc(a.es_alert_id.substring(0, 20))}...</td>
-                <td>${a.status}</td>
-                <td>${esc(a.assigned_to || 'Unassigned')}</td>
-                <td class="run-time">${timeAgo(a.last_activity)}</td>
-                <td class="days-stale ${a.days_stale > 10 ? 'danger' : 'warn'}">${a.days_stale}d</td>
-            </tr>`).join('')}</tbody></table>
-        </div>`;
-    }
-
-    container.innerHTML = html;
+    if (!container) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/analytics/stale', {
+        source: container, target: container, swap: 'innerHTML',
+    });
 }
 
 function renderConfig() {

@@ -1,0 +1,17 @@
+/* /analytics, the page's own rules for the server-rendered panels. */
+
+/* A figure the stored result did not carry. Deliberately neither of the
+   two staleness states: `days > 7 ? 'danger' : 'warn'` is false for a
+   missing figure, so a row with no number was drawn as the milder one. */
+.an-absent::after {
+    content: "\2014";
+    color: var(--text-muted);
+    opacity: 0.5;
+}
+
+/* .severity-unknown is NOT here. analytics.html already defines it, as
+   `.severity-unknown, .severity-badge.severity-unknown`, in its own
+   in-body <style> block: that block loads after head_css and the second
+   selector is two classes, so a rule here would be present and never win.
+   Measured before adding one. The class name the fragment emits is that
+   existing one. */
