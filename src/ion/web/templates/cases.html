@@ -4013,105 +4013,26 @@ function drawAttackPathEdges(graph, edges, cardMap) {
 }
 
 // ── v0.10.20: Load Attack Story Timeline ─────────────────
-async function loadCaseTimeline(caseId) {
+// GET /ui/cases/{id}/timeline renders the feed, the counts strip and Bob's
+// narrative header. Fetched with htmx.ajax because the container is built
+// by renderPanelContent as a string, so htmx has never processed it.
+//
+// What moved to the server, beyond the markup: a payload that is not the
+// expected shape reads "Timeline unavailable" rather than "No events yet";
+// a count the payload did not carry says unknown instead of 0; the
+// timestamp is formatted from the naive UTC column and labelled UTC, where
+// `new Date(iso).toLocaleString()` silently presented it in the viewer's
+// zone; an event of an unrecognised kind says UNKNOWN instead of SYSTEM; a
+// verdict the build does not know is no longer painted "inconclusive"; and
+// a citation value of 0 survives `(c.value || '')`.
+function loadCaseTimeline(caseId) {
     const container = document.getElementById('case-timeline-container');
-    if (!container) return;
-    try {
-        const resp = await fetch('/api/cases/' + caseId + '/timeline');
-        if (!resp.ok) {
-            container.innerHTML = '<div class="cpanel-empty-hint">Timeline unavailable</div>';
-            return;
-        }
-        const data = await resp.json();
-        const events = data.events || [];
-        const narrative = data.narrative;
-        const counts = data.counts || {};
-
-        let html = '';
-
-        // Narrative header — Bob's latest verdict at a glance
-        if (narrative) {
-            const verdict = narrative.verdict || '';
-            const verdictColors = {
-                true_positive: { bg: 'rgba(239,68,68,.14)', color: '#fca5a5' },
-                false_positive: { bg: 'rgba(34,197,94,.14)', color: '#86efac' },
-                benign_true_positive: { bg: 'rgba(245,158,11,.14)', color: '#fbbf24' },
-                inconclusive: { bg: 'rgba(148,163,184,.14)', color: '#cbd5e1' },
-            };
-            const vc = verdictColors[verdict] || verdictColors.inconclusive;
-            html += '<div class="py-[0.6rem] px-3 mb-[0.6rem] bg-[rgba(109,228,255,0.06)] border border-[rgba(109,228,255,0.2)] rounded-[0.4rem]">'
-                +     '<div class="flex items-center gap-[0.4rem] mb-[0.35rem] flex-wrap">'
-                +       '<span class="text-[0.6rem] font-bold tracking-[0.04em] uppercase text-[#6de4ff]">🤖 Bob\'s take</span>';
-            if (verdict) {
-                html +=   '<span class="cpanel-alert-badge" data-ion-style="background:' + vc.bg + ';color:' + vc.color + '">' + esc(verdict.replace(/_/g, ' ')) + '</span>';
-            }
-            html +=     '</div>'
-                +     '<div class="text-[0.78rem] text-[var(--text-primary)] leading-[1.45]">' + esc((narrative.summary || '').slice(0, 600)) + '</div>';
-            if ((narrative.citations || []).length > 0) {
-                html += '<div class="mt-[0.45rem] flex flex-col gap-1">';
-                narrative.citations.forEach(function(c) {
-                    if (!c || typeof c !== 'object') return;
-                    const f = c.field || '';
-                    const v = (c.value || '').toString().slice(0, 80);
-                    const sig = c.significance || '';
-                    html += '<div class="text-[0.7rem] text-[var(--text-muted)] pl-2 border-l-[2px] border-l-[rgba(109,228,255,0.4)]">'
-                          +   '<code class="text-[#6de4ff] text-[0.68rem]">' + esc(f) + '</code> = '
-                          +   '<code class="text-[0.68rem]">' + esc(v) + '</code>'
-                          +   (sig ? ' <span class="italic">— ' + esc(sig) + '</span>' : '')
-                          + '</div>';
-                });
-                html += '</div>';
-            }
-            html += '</div>';
-        }
-
-        // Counts strip
-        html += '<div class="flex gap-[0.4rem] mb-2 flex-wrap text-[0.65rem] text-[var(--text-muted)]">'
-              +   '<span><strong>' + (counts.total || 0) + '</strong> events</span>'
-              +   '<span class="text-[rgba(109,228,255,0.8)]"><strong>' + (counts.bob || 0) + '</strong> Bob</span>'
-              +   '<span class="text-[rgba(245,158,11,0.8)]"><strong>' + (counts.analyst || 0) + '</strong> analyst</span>'
-              +   '<span class="text-[rgba(148,163,184,0.8)]"><strong>' + (counts.system || 0) + '</strong> system</span>'
-              + '</div>';
-
-        if (events.length === 0) {
-            html += '<div class="cpanel-empty-hint">No events yet</div>';
-            container.innerHTML = html;
-            return;
-        }
-
-        // Vertical timeline. Kind drives the marker colour + lane indent
-        // so analyst/Bob/system are visually scannable.
-        const kindMeta = {
-            bob:     { color: '#6de4ff', label: 'BOB',     bg: 'rgba(109,228,255,0.06)' },
-            analyst: { color: '#fbbf24', label: 'ANALYST', bg: 'rgba(245,158,11,0.05)' },
-            system:  { color: '#94a3b8', label: 'SYSTEM',  bg: 'rgba(148,163,184,0.04)' },
-        };
-
-        html += '<div class="relative pl-2 border-l-[2px] border-l-[var(--ion-border)]">';
-        events.forEach(function(e, idx) {
-            const km = kindMeta[e.kind] || kindMeta.system;
-            const ts = e.ts ? new Date(e.ts).toLocaleString() : '';
-            html += '<div class="_ion-s-0a1c7436f5" data-ion-style="background:' + km.bg + '">'
-                  +   '<div class="_ion-s-e080dc03bc" data-ion-style="background:' + km.color + '"></div>'
-                  +   '<div class="flex items-center gap-[0.4rem] mb-[0.2rem] flex-wrap">'
-                  +     '<span class="_ion-s-e62e34ae9b" data-ion-style="color:' + km.color + '">' + km.label + '</span>'
-                  +     '<span class="text-[0.65rem] text-[var(--text-muted)] font-mono">' + esc(ts) + '</span>'
-                  +   '</div>'
-                  +   '<div class="text-[0.78rem] text-[var(--text-primary)] font-medium">' + esc(e.title || '') + '</div>';
-            if (e.detail) {
-                const truncated = String(e.detail).length > 220;
-                const shown = String(e.detail).slice(0, 220);
-                html += '<div class="text-[0.7rem] text-[var(--text-muted)] mt-[0.2rem] leading-[1.4] whitespace-pre-wrap">' + esc(shown) + (truncated ? '…' : '') + '</div>';
-            }
-            html += '</div>';
-        });
-        html += '</div>';
-
-        container.innerHTML = html;
-    } catch (e) {
-        container.innerHTML = '<div class="cpanel-empty-hint">Timeline unavailable</div>';
-    }
+    if (!container) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/cases/' + encodeURIComponent(caseId) + '/timeline', {
+        source: container, target: container, swap: 'innerHTML',
+    });
 }
+
 
 // ── v0.10.19: Load Cross-Case Observable Sightings ────────
 async function loadSimilarObservables(caseId) {

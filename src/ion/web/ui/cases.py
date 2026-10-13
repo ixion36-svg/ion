@@ -835,3 +835,249 @@ def cases_similar_fragment(
         payload = None
 
     return render_view(request, SIMILAR_FRAGMENT, similar_view(payload))
+
+
+# ---------------------------------------------------------------------------
+# Attack Story Timeline
+# ---------------------------------------------------------------------------
+#
+# GET /api/cases/{id}/timeline (case:read) unions the case's lifecycle
+# events, analyst notes and Bob investigations into one sorted feed, with a
+# narrative header carrying Bob's latest verdict and its citations.
+#
+# loadCaseTimeline told a failed request from an empty one, so two of the
+# three outcomes were distinct. The rest of this is defects:
+#
+#   * `data.counts || {}` then `counts.total || 0` four times. A payload
+#     that stopped carrying counts printed four confident zeros, and the
+#     `|| 0` could not tell a real zero from a missing key.
+#   * `new Date(e.ts).toLocaleString()` on `isoformat()` of a naive UTC
+#     column, which JavaScript reads in the viewer's zone. Every timestamp
+#     on the timeline was wrong by the viewer's offset, and nothing on the
+#     page said which zone it was claiming.
+#   * `kindMeta[e.kind] || kindMeta.system` labelled an unrecognised event
+#     SYSTEM, which is a claim about where it came from.
+#   * `verdictColors[verdict] || verdictColors.inconclusive`. The server
+#     derives the verdict by splitting a title on an arrow, so it is an
+#     arbitrary string, and "inconclusive" is a verdict rather than the
+#     absence of one.
+#   * `(c.value || '').toString()` dropped a citation value of 0 or false,
+#     and a count of zero is a finding.
+
+TIMELINE_FRAGMENT = "_fragments/cases_timeline.html"
+
+#: How much of an event's detail the card shows, as the page sliced it.
+TIMELINE_DETAIL_CHARS = 220
+
+#: How much of Bob's summary the narrative header shows.
+TIMELINE_SUMMARY_CHARS = 600
+
+#: How much of a citation's value fits on its line.
+TIMELINE_CITATION_CHARS = 80
+
+#: The event kinds the timeline has a lane for, from `kindMeta`. One
+#: outside this set is `unknown`, which the page called `system`.
+TIMELINE_KINDS: dict[str, str] = {
+    "bob": "BOB",
+    "analyst": "ANALYST",
+    "system": "SYSTEM",
+}
+TIMELINE_KIND_FALLBACK = "unknown"
+
+#: The verdicts the narrative badge has a colour for, from `verdictColors`.
+#: The colours are in static/css/cases-page.css, keyed by these names.
+TIMELINE_VERDICTS: tuple[str, ...] = (
+    "true_positive",
+    "false_positive",
+    "benign_true_positive",
+    "inconclusive",
+)
+TIMELINE_VERDICT_FALLBACK = "unknown"
+
+
+class TimelineCitation(TypedDict):
+    """One of Bob's citations. `value` is formatted rather than tested for
+    truth, so a measured zero survives."""
+
+    field: Optional[str]
+    value: Optional[str]
+    significance: Optional[str]
+
+
+class TimelineNarrative(TypedDict):
+    """`verdict_label` is None when the investigation recorded no verdict,
+    which is different from a verdict this build does not recognise."""
+
+    summary: Optional[str]
+    verdict_key: Optional[str]
+    verdict_label: Optional[str]
+    citations: list[TimelineCitation]
+
+
+class TimelineEvent(TypedDict):
+    """`when` is None for a timestamp we could not read. The page rendered
+    `new Date(undefined)` as an empty string, so this is the same picture
+    arrived at honestly."""
+
+    kind_key: str
+    kind_label: str
+    when: Optional[str]
+    title: Optional[str]
+    detail: Optional[str]
+    truncated: bool
+
+
+class TimelineCounts(TypedDict):
+    """Each figure is None when the payload did not carry a readable one."""
+
+    total: Optional[int]
+    bob: Optional[int]
+    analyst: Optional[int]
+    system: Optional[int]
+
+
+class TimelineView(TypedDict):
+    events: Optional[list[TimelineEvent]]
+    narrative: Optional[TimelineNarrative]
+    counts: TimelineCounts
+
+
+def instant_label(value: Any) -> Optional[str]:
+    """An absolute timestamp as `2026-09-01 10:30 UTC`, or None.
+
+    The zone is named because the column is naive UTC and the page was
+    presenting it as local time. An aware value is converted rather than
+    relabelled, so a row that does carry an offset still reads correctly.
+    """
+    parsed = parse_instant(value)
+    if parsed is None:
+        return None
+    return parsed.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+
+def citation(raw: Any) -> Optional[TimelineCitation]:
+    """One citation, or None for an entry that is not a mapping.
+
+    The page skipped a non-object entry too (`if (!c || typeof c !==
+    'object') return;`), so a malformed entry has never been fatal here.
+    """
+    if not isinstance(raw, dict):
+        return None
+    field = plain(raw.get("field"))
+    value = raw.get("value")
+    significance = plain(raw.get("significance"))
+    return {
+        "field": str(field) if field is not None else None,
+        # Formatted, not tested for truth: `(c.value || '')` dropped 0.
+        "value": (None if value is None
+                  else str(value)[:TIMELINE_CITATION_CHARS]),
+        "significance": str(significance) if significance else None,
+    }
+
+
+def narrative_view(raw: Any) -> Optional[TimelineNarrative]:
+    """Bob's latest verdict, or None when there is no narrative at all."""
+    if not isinstance(raw, dict):
+        return None
+    verdict = plain(raw.get("verdict"))
+    if verdict is None or str(verdict) == "":
+        verdict_key, verdict_label = None, None
+    elif str(verdict) in TIMELINE_VERDICTS:
+        verdict_key = str(verdict)
+        verdict_label = str(verdict).replace("_", " ")
+    else:
+        verdict_key = TIMELINE_VERDICT_FALLBACK
+        verdict_label = str(verdict).replace("_", " ")
+    summary = plain(raw.get("summary"))
+    raw_citations = raw.get("citations")
+    cited = raw_citations if isinstance(raw_citations, list) else []
+    return {
+        "summary": str(summary)[:TIMELINE_SUMMARY_CHARS] if summary else None,
+        "verdict_key": verdict_key,
+        "verdict_label": verdict_label,
+        "citations": [c for c in (citation(r) for r in cited)
+                      if c is not None],
+    }
+
+
+def timeline_event(raw: Any) -> Optional[TimelineEvent]:
+    """One event of the feed, or None for a row that is not a mapping."""
+    if not isinstance(raw, dict):
+        return None
+    kind = plain(raw.get("kind"))
+    key = (str(kind) if isinstance(kind, str) and kind in TIMELINE_KINDS
+           else TIMELINE_KIND_FALLBACK)
+    detail = plain(raw.get("detail"))
+    text = str(detail) if detail is not None else None
+    title = plain(raw.get("title"))
+    return {
+        "kind_key": key,
+        "kind_label": TIMELINE_KINDS.get(key, "UNKNOWN"),
+        "when": instant_label(raw.get("ts")),
+        "title": str(title) if title is not None else None,
+        "detail": text[:TIMELINE_DETAIL_CHARS] if text else None,
+        "truncated": bool(text) and len(text) > TIMELINE_DETAIL_CHARS,
+    }
+
+
+def timeline_counts(raw: Any) -> TimelineCounts:
+    """The four figures of the counts strip, each None when unreadable."""
+    source = raw if isinstance(raw, dict) else {}
+    return {
+        "total": _count(source.get("total")),
+        "bob": _count(source.get("bob")),
+        "analyst": _count(source.get("analyst")),
+        "system": _count(source.get("system")),
+    }
+
+
+def timeline_view(payload: Any) -> TimelineView:
+    """The endpoint's body as the panel's model.
+
+    `events is None` is the failed outcome and covers both a read that
+    raised and a body that is not this shape. The counts and the narrative
+    are read independently, so a payload whose counts went missing still
+    renders its events.
+    """
+    found = _rows(payload, "events")
+    if found is None:
+        return {"events": None, "narrative": None,
+                "counts": timeline_counts(None)}
+    raw = payload if isinstance(payload, dict) else {}
+    return {
+        "events": [e for e in (timeline_event(r) for r in found)
+                   if e is not None],
+        "narrative": narrative_view(raw.get("narrative")),
+        "counts": timeline_counts(raw.get("counts")),
+    }
+
+
+@router.get(
+    "/cases/{case_id}/timeline",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+def cases_timeline_fragment(
+    request: Request,
+    case_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> Response:
+    """The Attack Story Timeline panel.
+
+    Reads through the endpoint's own handler, which raises 404 for a case
+    that is not there. That is the unavailable outcome and not the empty
+    one: a case we could not read is not a case with no history.
+    """
+    from ion.web.case_lifecycle_api import get_case_timeline
+
+    try:
+        payload = get_case_timeline(
+            case_id, current_user=current_user, session=session)
+    except Exception:
+        logger.exception(
+            "Cases timeline fragment could not read the timeline for %s",
+            case_id)
+        payload = None
+
+    return render_view(request, TIMELINE_FRAGMENT, timeline_view(payload))

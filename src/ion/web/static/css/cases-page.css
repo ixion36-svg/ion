@@ -86,3 +86,159 @@
     background: color-mix(in srgb, var(--primary) 12%, transparent);
     color: var(--primary);
 }
+
+/* Attack Story Timeline ----------------------------------------------
+ *
+ * These were two maps in cases.html's JavaScript, `kindMeta` and
+ * `verdictColors`, read per row and written into data-ion-style, plus the
+ * accent spelled `#6de4ff` and `rgba(109,228,255,...)` in six places. The
+ * values are unchanged except where noted.
+ */
+
+.case-tl-narrative {
+    padding: 0.6rem 0.75rem;
+    margin-bottom: 0.6rem;
+    background: color-mix(in srgb, var(--primary) 6%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+    border-radius: 0.4rem;
+}
+
+.case-tl-narrative-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.35rem;
+    flex-wrap: wrap;
+}
+
+/* Was `#6de4ff` with a robot emoji glued to the label text. The emoji was
+   markup the server would have had to emit, so it is a ::before here. */
+.case-tl-narrative-label {
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--primary);
+}
+.case-tl-narrative-label::before { content: "\1F916\00a0"; }
+
+.case-tl-narrative-body {
+    font-size: 0.78rem;
+    color: var(--text-primary);
+    line-height: 1.45;
+}
+
+.case-tl-citations {
+    margin-top: 0.45rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.case-tl-citation {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    padding-left: 0.5rem;
+    border-left: 2px solid color-mix(in srgb, var(--primary) 40%, transparent);
+}
+
+.case-tl-citation-field { color: var(--primary); font-size: 0.68rem; }
+
+/* Bob's verdict. `unknown` is new: the map's default was its inconclusive
+   entry, so a verdict nobody had added yet was painted as "inconclusive",
+   which is a verdict rather than an absence of one. The server derives it
+   by splitting a title on an arrow, so it is an arbitrary string. */
+.case-tl-verdict-true_positive        { background: rgba(239, 68, 68, .14); color: #fca5a5; }
+.case-tl-verdict-false_positive       { background: rgba(34, 197, 94, .14); color: #86efac; }
+.case-tl-verdict-benign_true_positive { background: rgba(245, 158, 11, .14); color: #fbbf24; }
+.case-tl-verdict-inconclusive         { background: rgba(148, 163, 184, .14); color: #cbd5e1; }
+.case-tl-verdict-unknown              { background: rgba(148, 163, 184, .14); color: #cbd5e1; }
+
+/* Counts strip */
+.case-tl-counts {
+    display: flex;
+    gap: 0.4rem;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+    font-size: 0.65rem;
+    color: var(--text-muted);
+}
+.case-tl-count-bob     { color: color-mix(in srgb, var(--primary) 80%, transparent); }
+.case-tl-count-analyst { color: rgba(245, 158, 11, 0.8); }
+.case-tl-count-system  { color: rgba(148, 163, 184, 0.8); }
+
+/* The rail, and one lane per event kind. `unknown` is new for the same
+   reason: kindMeta's default was its system entry, so an event of an
+   unrecognised kind was labelled SYSTEM, a claim about where it came
+   from. It is drawn in the system grey but says UNKNOWN. */
+.case-tl-rail {
+    position: relative;
+    padding-left: 0.5rem;
+    border-left: 2px solid var(--ion-border);
+}
+
+.case-tl-event {
+    position: relative;
+    padding: 0.4rem 0.5rem;
+    margin-bottom: 0.35rem;
+    border-radius: 0.3rem;
+}
+
+.case-tl-marker {
+    position: absolute;
+    left: -0.95rem;
+    top: 0.65rem;
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 50%;
+}
+
+.case-tl-event-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.2rem;
+    flex-wrap: wrap;
+}
+
+.case-tl-kind {
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+}
+
+.case-tl-when {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.case-tl-title {
+    font-size: 0.78rem;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.case-tl-detail {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.2rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+}
+
+.case-tl-bob     { background: color-mix(in srgb, var(--primary) 6%, transparent); }
+.case-tl-bob     .case-tl-marker { background: var(--primary); }
+.case-tl-bob     .case-tl-kind   { color: var(--primary); }
+
+.case-tl-analyst { background: rgba(245, 158, 11, 0.05); }
+.case-tl-analyst .case-tl-marker { background: #fbbf24; }
+.case-tl-analyst .case-tl-kind   { color: #fbbf24; }
+
+.case-tl-system  { background: rgba(148, 163, 184, 0.04); }
+.case-tl-system  .case-tl-marker { background: #94a3b8; }
+.case-tl-system  .case-tl-kind   { color: #94a3b8; }
+
+.case-tl-unknown { background: rgba(148, 163, 184, 0.04); }
+.case-tl-unknown .case-tl-marker { background: #94a3b8; }
+.case-tl-unknown .case-tl-kind   { color: #94a3b8; }
