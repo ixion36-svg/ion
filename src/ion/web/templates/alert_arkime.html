@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Arkime PCAP · ION{% endblock %}
+{% block head_css %}
+<link rel="stylesheet" href="/static/css/alert-arkime-page.css?v={{ ion_version }}">
+{% endblock %}
+
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
@@ -58,31 +62,6 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* The new/existing switch is a pair of radios so it submits with the form
-   and needs no script. :checked picks the label and which fieldset shows. */
-.arkime-commit .mode-new,
-.arkime-commit .mode-existing {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-.arkime-commit .mode-bar label {
-  color: rgb(148 163 184);
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-.arkime-commit .mode-new:checked ~ .mode-bar label[for="arkime-mode-new"],
-.arkime-commit .mode-existing:checked ~ .mode-bar label[for="arkime-mode-existing"] {
-  background: var(--color-ion-cyan);
-  color: var(--color-ink-950, #0b1220);
-}
-.arkime-commit .mode-new:checked ~ .commit-fields .commit-existing,
-.arkime-commit .mode-existing:checked ~ .commit-fields .commit-new {
-  display: none;
-}
-</style>
 <script nonce="{{ csp_nonce }}">
 // After a successful attach, follow the case the fragment linked. The
 // address is the one the server rendered, and only a site-relative path
