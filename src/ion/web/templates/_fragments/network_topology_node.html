@@ -1,0 +1,31 @@
+<div id="nt-detail" class="nt-detail card bg-base-200 shadow p-4 text-sm">
+{% if state == 'unconfigured' %}
+<p>Arkime is not configured, so this graph was not read.</p>
+{% elif state == 'failed' or state == 'unreadable' %}
+<p>The topology could not be read.</p>
+{% elif state != 'data' %}
+<p>This node is not in this graph.</p>
+{% elif kind == 'subnet' %}
+<h3>{{ title }}</h3>
+<div class="nt-detail-meta"><b>{{ host_count }}</b> host{% if host_count != 1 %}s{% endif %}{% if bytes_label is not none %} · <b>{{ bytes_label }}</b> observed{% else %} · unknown observed{% endif %}</div>
+<button type="button" class="btn btn-secondary nt-mt" data-click-action="ntDrill" data-args='{{ [subnet]|tojson }}'>Drill into subnet</button>
+{% else %}
+<h3>{{ title }}</h3>
+<div class="nt-detail-meta">
+  <div>{% if bytes_label is not none %}<b>{{ bytes_label }}</b>{% else %}unknown{% endif %} · {% if sessions is not none %}<b>{{ sessions }}</b> sessions{% else %}unknown{% endif %}</div>
+  {% if subnet %}<div>Subnet: <b>{{ subnet }}</b>{% if scope == 'internal' %} · internal (RFC-1918){% elif scope == 'external' %} · external{% endif %}</div>{% endif %}
+  {% if asset %}
+  <div>Asset: <b>{{ asset.hostname }}</b> · criticality <b>{{ asset.criticality }}</b> · {{ asset.environment }}</div>
+  {% else %}
+  <div>Not in CMDB</div>
+  {% endif %}
+  {% if threat %}
+  <div>Threat: <b>{{ threat.level }}</b>{% if threat.is_ioc %} · IOC{% endif %}{% if case_count is not none %} · linked to <b>{{ case_count }}</b> case(s){% endif %}</div>
+  {% else %}
+  <div>No observable-ledger hits</div>
+  {% endif %}
+</div>
+<a class="nt-link" href="{{ observables_href|safe_url }}">Observables</a>
+{% if network_map_href %}<a class="nt-link" href="{{ network_map_href|safe_url }}">Network Map</a>{% endif %}
+{% endif %}
+</div>

@@ -1,0 +1,182 @@
+/* Cytoscape injects this exact rule as a nonce-less <style> unless an element
+   with that id already exists, which would violate our strict style-src. Owning
+   the id suppresses the injection — keep both the id and the rule. */
+.__________cytoscape_container { position: relative; }
+/* JS toggles .active on .nt-seg-btn, not daisyUI .btn-active. Bridge the two. */
+#nt-range-tabs .nt-seg-btn.active {
+  background-color: var(--color-primary);
+  color: var(--color-primary-content);
+  font-weight: 600;
+  border-color: var(--color-primary);
+}
+
+/* JS classList toggles .hidden on the warning. ID+class so daisyUI .alert
+   { display: grid } cannot win. */
+#nt-unconfigured.hidden { display: none; }
+
+/* JS innerHTML: #nt-meta hosts / conversations / method / legend. */
+#nt-meta strong {
+  color: var(--color-base-content);
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+/* Ops-console backdrop: dark base + a faint blue glow + a subtle grid, so the
+   graph reads as a surface rather than floating on flat grey. Cytoscape draws on
+   a transparent canvas, so this shows through behind the nodes. */
+#nt-canvas {
+  background-color: #0b0f14;
+  background-image:
+    radial-gradient(1000px circle at 50% 28%, rgba(88, 166, 255, 0.12), transparent 55%),
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 100% 100%, 28px 28px, 28px 28px;
+  border: 1px solid var(--color-base-300);
+}
+.nt-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+.nt-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: .7rem;
+}
+.nt-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  border: 1px solid var(--color-base-300);
+}
+.nt-legend-dot.nt-cat-subnet { background: #388bfd; }
+.nt-legend-dot.nt-cat-internal { background: #1f6feb; }
+.nt-legend-dot.nt-cat-external { background: #bb8009; }
+.nt-legend-dot.nt-cat-threat { background: #da3633; }
+.nt-legend-dot.nt-cat-asset { background: #238636; }
+.nt-method {
+  font-size: .66rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border: 1px solid var(--color-base-300);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+/* JS innerHTML: canvas loading / error / empty states. */
+.nt-loading {
+  text-align: center;
+  padding: 60px;
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+}
+.nt-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--color-base-300);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: nt-spin .8s linear infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+@keyframes nt-spin { to { transform: rotate(360deg); } }
+
+/* JS classList toggles .empty; JS innerHTML injects h3 / .nt-detail-meta / .nt-link. */
+.nt-detail h3 {
+  font-size: 1rem;
+  color: var(--color-base-content);
+  margin: 0 0 6px 0;
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+.nt-detail.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-style: italic;
+  font-size: .82rem;
+}
+.nt-detail-meta {
+  font-size: .76rem;
+  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+  line-height: 1.7;
+}
+.nt-detail-meta b {
+  color: var(--color-base-content);
+  font-weight: 600;
+}
+.nt-mt { margin-top: 14px; }
+.nt-link {
+  display: inline-block;
+  margin-top: 10px;
+  color: var(--color-primary);
+  font-size: .78rem;
+  text-decoration: none;
+}
+.nt-link:hover { text-decoration: underline; }
+
+/* JS innerHTML: #nt-metrics kv list. */
+.nt-kv {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: .8rem;
+}
+.nt-kv strong {
+  color: var(--color-base-content);
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+/* JS innerHTML: port volume bars. Width is set via data-ion-style. */
+.nt-port-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: .76rem;
+  margin-bottom: 4px;
+}
+.nt-port-name {
+  width: 64px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  color: var(--color-base-content);
+}
+.nt-port-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-primary);
+  opacity: .75;
+  min-width: 2px;
+}
+.nt-port-val {
+  font-size: .7rem;
+  opacity: .7;
+}
+
+/* JS innerHTML: unavailable metric rows. */
+.nt-unavail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px dashed var(--color-base-300);
+  font-size: .78rem;
+}
+.nt-unavail-row:last-of-type { border-bottom: none; }
+.nt-unavail-name { color: var(--color-base-content); }
+.nt-unavail-req {
+  font-size: .7rem;
+  white-space: nowrap;
+  opacity: .7;
+}
+.nt-tag {
+  display: inline-block;
+  font-size: .64rem;
+  border: 1px solid var(--color-base-300);
+  border-radius: 999px;
+  padding: 1px 7px;
+  margin-left: 6px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
