@@ -570,6 +570,7 @@
 </div>
 
 {% include '_fragments/training_client.html' %}
+{% include '_fragments/training_assessment_client.html' %}
 <script nonce="{{ csp_nonce }}">
 function cloneTemplate(id) {
     const template = document.getElementById(id);
@@ -600,50 +601,66 @@ let rmDefinitions = null;
 let rmCurrentRole = null;
 let rmResponses = {};
 
-function rmEsc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
-
 function rmPctColor(pct) {
-    if (pct >= 85) return 'var(--mitre-covered,#3fb950)';
-    if (pct >= 70) return 'var(--primary,#58a6ff)';
-    if (pct >= 55) return 'var(--sev-medium,#d29922)';
-    if (pct >= 40) return 'var(--sev-high,#f0883e)';
-    return 'var(--sev-critical,#f85149)';
+    if (pct >= 85) return 'var(--mitre-covered)';
+    if (pct >= 70) return 'var(--primary)';
+    if (pct >= 55) return 'var(--sev-medium)';
+    if (pct >= 40) return 'var(--sev-high)';
+    return 'var(--sev-critical)';
 }
 
 async function rmInit() {
-    const c = document.getElementById('rm-content');
-    c.innerHTML = '<div class="rm-loading">Loading...</div>';
+    rmMessage('Loading...');
     try {
         const r = await fetch(RM_API + '/me', {credentials: 'include'});
+        if (!r.ok) throw new Error('Assessment read failed');
         const d = await r.json();
+        if (!d || !Object.hasOwn(d, 'assessment') || (d.assessment !== null && typeof d.assessment !== 'object')) throw new Error('Invalid assessment');
         if (d.assessment) {
             rmRenderResult(d.assessment);
         } else {
             rmShowRolePicker();
         }
     } catch (e) {
-        rmShowRolePicker();
+        rmMessage('Failed to load assessment. Please try again.');
     }
+}
+
+function rmMessage(message) {
+    const fragment = rmTemplate('training-rm-message');
+    fragment.querySelector('.rm-loading').textContent = message;
+    document.getElementById('rm-content').replaceChildren(fragment);
+}
+
+function rmTemplate(id) {
+    const fragment = document.createDocumentFragment();
+    fragment.append(cloneTemplate(id));
+    return fragment;
 }
 
 async function rmShowRolePicker() {
     const c = document.getElementById('rm-content');
-    c.innerHTML = '<div class="rm-loading">Loading roles...</div>';
+    rmMessage('Loading roles...');
     try {
         const r = await fetch(RM_API + '/definitions', {credentials: 'include'});
+        if (!r.ok) throw new Error('Roles read failed');
         rmDefinitions = await r.json();
-        let html = '<div class="rm-role-grid">';
+        if (!rmDefinitions || !Array.isArray(rmDefinitions.roles)) throw new Error('Invalid roles');
+        if (!rmDefinitions.roles.length) { rmMessage('No roles available.'); return; }
+        const fragment = rmTemplate('training-rm-grid');
+        const grid = fragment.querySelector('.rm-role-grid');
         for (const role of rmDefinitions.roles) {
-            html += '<div class="rm-role-card" data-click-action="rmStartAssessment" data-args=\'["' + rmEsc(role.id) + '"]\'>'
-                + '<div class="rm-role-name"><span class="rm-role-tier">' + rmEsc(role.tier) + '</span>' + rmEsc(role.name) + '</div>'
-                + '<div class="rm-role-desc">' + rmEsc(role.description) + '</div>'
-                + '<div class="rm-role-meta">' + role.area_count + ' sections · ' + role.question_count + ' questions</div>'
-                + '</div>';
+            const item = rmTemplate('training-rm-role');
+            item.querySelector('.rm-role-card').dataset.args = JSON.stringify([role.id]);
+            item.querySelector('.rm-role-tier').textContent = role.tier ?? '';
+            item.querySelector('[data-field="name"]').textContent = role.name ?? '';
+            item.querySelector('.rm-role-desc').textContent = role.description ?? '';
+            item.querySelector('.rm-role-meta').textContent = `${role.area_count ?? 'Unknown'} sections · ${role.question_count ?? 'Unknown'} questions`;
+            grid.append(item);
         }
-        html += '</div>';
-        c.innerHTML = html;
+        c.replaceChildren(fragment);
     } catch (e) {
-        c.innerHTML = '<div class="rm-loading">Failed to load roles</div>';
+        rmMessage('Failed to load roles');
     }
 }
 
@@ -656,35 +673,37 @@ function rmStartAssessment(roleId) {
 
 function rmRenderQuestionnaire() {
     const role = rmCurrentRole;
-    const c = document.getElementById('rm-content');
-    let html = '<div class="rm-header"><h2>' + rmEsc(role.name) + '</h2>'
-        + '<p class="rm-sub">' + rmEsc(role.description) + '</p>'
-        + '<div class="rm-rating-legend">';
-    for (const r of (rmDefinitions.rating_scale || [])) {
-        html += '<span><strong>' + r.value + '</strong> ' + rmEsc(r.label) + '</span>';
+    const fragment = rmTemplate('training-rm-questionnaire');
+    fragment.querySelector('h2').textContent = role.name ?? '';
+    fragment.querySelector('.rm-sub').textContent = role.description ?? '';
+    for (const rating of (rmDefinitions.rating_scale || [])) {
+        const item = rmTemplate('training-rm-rating');
+        item.querySelector('strong').textContent = rating.value;
+        item.querySelector('span span').textContent = rating.label;
+        fragment.querySelector('.rm-rating-legend').append(item);
     }
-    html += '</div></div>';
-
     for (const area of role.areas) {
-        html += '<div class="rm-area"><div class="rm-area-name">' + rmEsc(area.name) + '</div>';
-        for (const q of area.questions) {
-            html += '<div class="rm-question">'
-                + '<div class="rm-q-text">' + rmEsc(q.text) + '</div>'
-                + '<div class="rm-q-guidance">' + rmEsc(q.guidance) + '</div>'
-                + '<div class="rm-q-rate" data-area="' + rmEsc(area.id) + '" data-q="' + rmEsc(q.id) + '">';
-            for (const v of [1,2,3,4,5]) {
-                html += '<button data-click-action="rmRate" data-args=\'["' + rmEsc(area.id) + '","' + rmEsc(q.id) + '",' + v + ',"$target"]\'>' + v + '</button>';
+        const item = rmTemplate('training-rm-area');
+        item.querySelector('.rm-area-name').textContent = area.name;
+        for (const question of area.questions) {
+            const row = rmTemplate('training-rm-question');
+            row.querySelector('.rm-q-text').textContent = question.text;
+            row.querySelector('.rm-q-guidance').textContent = question.guidance ?? '';
+            const buttons = row.querySelector('.rm-q-rate');
+            buttons.dataset.area = area.id;
+            buttons.dataset.q = question.id;
+            for (const value of [1,2,3,4,5]) {
+                const choice = rmTemplate('training-rm-rate');
+                const button = choice.querySelector('button');
+                button.textContent = value;
+                button.dataset.args = JSON.stringify([area.id, question.id, value, '$target']);
+                buttons.append(choice);
             }
-            html += '</div></div>';
+            item.querySelector('[data-field="questions"]').append(row);
         }
-        html += '</div>';
+        fragment.querySelector('[data-field="areas"]').append(item);
     }
-
-    html += '<div class="rm-submit">'
-        + '<button class="btn btn-secondary" data-click-action="rmShowRolePicker">Cancel</button>'
-        + '<button class="btn btn-primary" id="rm-submit-btn" data-click-action="rmSubmit">Submit</button>'
-        + '</div>';
-    c.innerHTML = html;
+    document.getElementById('rm-content').replaceChildren(fragment);
 }
 
 function rmRate(areaId, qId, value, btn) {
@@ -724,102 +743,80 @@ async function rmSubmit() {
 }
 
 function rmRenderResult(a) {
-    const c = document.getElementById('rm-content');
+    const fragment = rmTemplate('training-rm-result');
     const pct = a.overall_match_pct;
     const color = rmPctColor(pct);
-    const scores = a.scores || {};
-    const areas = scores.areas || {};
-    const rec = a.recommendations || {};
-
-    let html = '<div class="rm-result-overall">'
-        + '<div class="rm-result-ring" data-ion-style="background:conic-gradient(' + color + ' ' + pct + '%, rgba(99,110,123,.2) ' + pct + '%)">'
-        + '<div class="rm-result-inner"><div class="rm-result-pct" data-ion-style="color:' + color + '">' + pct + '%</div><div class="rm-result-label">Match</div></div>'
-        + '</div>'
-        + '<div class="rm-result-text"><h3>' + rmEsc(a.overall_level) + ' — ' + rmEsc(a.role_name) + '</h3>'
-        + '<p>Taken ' + (a.taken_at ? new Date(a.taken_at).toLocaleString() : '-') + ' · saved as your target role</p></div>'
-        + '</div>';
-
-    html += '<div class="rm-areas-grid">';
-    for (const [aid, aScore] of Object.entries(areas)) {
-        const aColor = rmPctColor(aScore.pct);
-        html += '<div class="rm-area-bar"><div class="rm-area-bar-head">'
-            + '<span class="rm-area-bar-name">' + rmEsc(aScore.name || aid) + '</span>'
-            + '<span class="rm-area-bar-pct" data-ion-style="color:' + aColor + '">' + aScore.pct + '%</span>'
-            + '</div><div class="rm-bar"><div class="rm-bar-fill" data-ion-style="width:' + aScore.pct + '%;background:' + aColor + '"></div></div></div>';
+    const measured = typeof pct === 'number' && Number.isFinite(pct);
+    fragment.querySelector('.rm-result-pct').textContent = measured ? pct + '%' : 'Unknown';
+    if (measured) {
+        fragment.querySelector('.rm-result-ring').dataset.ionStyle = 'background:conic-gradient(' + color + ' ' + pct + '%, var(--ion-border) ' + pct + '%)';
+        fragment.querySelector('.rm-result-pct').dataset.ionStyle = 'color:' + color;
     }
-    html += '</div>';
-
-    if ((rec.gaps || []).length > 0) {
-        html += '<div class="rm-rec-block"><h4>Focus areas <span class="badge">' + rec.gaps.length + '</span></h4>'
-            + '<div class="rm-rec-list">';
-        for (const g of rec.gaps) {
-            html += '<div class="rm-rec-item"><strong>' + rmEsc(g.name) + '</strong><div class="rm-rec-meta">' + g.pct + '%</div></div>';
+    fragment.querySelector('h3').textContent = (a.overall_level ?? 'Unknown level') + ' — ' + (a.role_name ?? 'Unknown role');
+    fragment.querySelector('.rm-result-text p').textContent = 'Taken ' + (a.taken_at ? new Date(a.taken_at).toLocaleString() : 'Unknown') + ' · saved as your target role';
+    for (const [id, score] of Object.entries(a.scores?.areas || {})) {
+        const row = rmTemplate('training-rm-bar');
+        const known = typeof score.pct === 'number' && Number.isFinite(score.pct);
+        row.querySelector('.rm-area-bar-name').textContent = score.name ?? id;
+        row.querySelector('.rm-area-bar-pct').textContent = known ? score.pct + '%' : 'Unknown';
+        if (known) {
+            row.querySelector('.rm-area-bar-pct').dataset.ionStyle = 'color:' + rmPctColor(score.pct);
+            row.querySelector('.rm-bar-fill').dataset.ionStyle = 'width:' + score.pct + '%;background:' + rmPctColor(score.pct);
         }
-        html += '</div></div>';
+        fragment.querySelector('.rm-areas-grid').append(row);
     }
-
-    if ((rec.kb_articles || []).length > 0) {
-        html += '<div class="rm-rec-block"><h4>Knowledge base articles <span class="badge">' + rec.kb_articles.length + '</span></h4>'
-            + '<div class="rm-rec-list">';
-        for (const k of rec.kb_articles) {
-            html += '<div class="rm-rec-item"><strong>' + rmEsc(k.capability_key) + '</strong>'
-                + '<div class="rm-rec-meta">' + rmEsc(k.doc_status) + (k.has_runbooks ? ' · runbooks' : '') + (k.has_procedures ? ' · procedures' : '') + '</div>'
-                + '</div>';
+    const recommendations = a.recommendations || {};
+    const groups = [
+        ['Focus areas', recommendations.gaps, x => [x.name, x.pct == null ? 'Unknown' : x.pct + '%']],
+        ['Knowledge base articles', recommendations.kb_articles, x => [x.capability_key, (x.doc_status ?? '') + (x.has_runbooks ? ' · runbooks' : '') + (x.has_procedures ? ' · procedures' : '')]],
+        ['Training sim scenarios', recommendations.sim_scenarios, x => [x.name, (x.tier ?? '') + (x.duration_min == null ? '' : ' · ' + x.duration_min + ' min')]],
+    ];
+    const container = fragment.querySelector('[data-field="recommendations"]');
+    for (const [title, items, values] of groups) {
+        if (!Array.isArray(items) || !items.length) continue;
+        const block = rmTemplate('training-rm-block');
+        block.querySelector('[data-field="title"]').textContent = title;
+        block.querySelector('.badge').textContent = items.length;
+        for (const data of items) {
+            const row = rmTemplate('training-rm-recommendation');
+            const [name, meta] = values(data);
+            row.querySelector('strong').textContent = name ?? '';
+            row.querySelector('.rm-rec-meta').textContent = meta;
+            block.querySelector('.rm-rec-list').append(row);
         }
-        html += '</div></div>';
+        container.append(block);
     }
-
-    if ((rec.sim_scenarios || []).length > 0) {
-        html += '<div class="rm-rec-block"><h4>Training sim scenarios <span class="badge">' + rec.sim_scenarios.length + '</span></h4>'
-            + '<div class="rm-rec-list">';
-        for (const s of rec.sim_scenarios) {
-            html += '<div class="rm-rec-item"><strong>' + rmEsc(s.name) + '</strong>'
-                + '<div class="rm-rec-meta">' + rmEsc(s.tier || '') + (s.duration_min ? ' · ' + s.duration_min + ' min' : '') + '</div>'
-                + '</div>';
-        }
-        html += '</div></div>';
+    if (recommendations.ai_summary) {
+        const summary = rmTemplate('training-rm-summary');
+        summary.querySelector('.rm-ai-summary').textContent = recommendations.ai_summary;
+        container.append(summary);
     }
-
-    if (rec.ai_summary) {
-        html += '<div class="rm-rec-block"><h4>AI tutor — your 4-week study plan</h4>'
-            + '<div class="rm-ai-summary">' + rmEsc(rec.ai_summary) + '</div></div>';
-    }
-
-    html += '<div class="rm-submit">'
-        + '<button class="btn btn-secondary" data-click-action="rmShowHistory">View History</button>'
-        + '<button class="btn btn-primary" data-click-action="rmShowRolePicker">New Assessment</button>'
-        + '</div>';
-    c.innerHTML = html;
+    document.getElementById('rm-content').replaceChildren(fragment);
 }
 
 async function rmShowHistory() {
-    const c = document.getElementById('rm-content');
-    c.innerHTML = '<div class="rm-loading">Loading history...</div>';
+    rmMessage('Loading history...');
     try {
         const r = await fetch(RM_API + '/history', {credentials: 'include'});
-        const d = await r.json();
-        const list = d.assessments || [];
-        if (!list.length) {
-            c.innerHTML = '<div class="rm-loading">No assessments yet — click "Start Assessment" above.</div>';
-            return;
+        if (!r.ok) throw new Error('History read failed');
+        const data = await r.json();
+        if (!data || !Array.isArray(data.assessments)) throw new Error('Invalid history');
+        if (!data.assessments.length) { rmMessage('No assessments yet — click "Start Assessment" above.'); return; }
+        const fragment = rmTemplate('training-rm-history');
+        for (const assessment of data.assessments) {
+            const item = rmTemplate('training-rm-history-row');
+            item.querySelector('tr').dataset.args = JSON.stringify([assessment]);
+            item.querySelector('button').dataset.args = JSON.stringify([assessment]);
+            item.querySelector('[data-field="date"]').textContent = assessment.taken_at ? new Date(assessment.taken_at).toLocaleDateString() : 'Unknown';
+            item.querySelector('[data-field="role"]').textContent = assessment.role_name ?? 'Unknown';
+            item.querySelector('[data-field="level"]').textContent = assessment.overall_level ?? 'Unknown';
+            const pct = assessment.overall_match_pct;
+            item.querySelector('strong').textContent = pct == null ? 'Unknown' : pct + '%';
+            if (typeof pct === 'number') item.querySelector('strong').dataset.ionStyle = 'color:' + rmPctColor(pct);
+            fragment.querySelector('tbody').append(item);
         }
-        let html = '<table class="rm-history-table"><thead><tr><th>Date</th><th>Role</th><th>Match</th><th>Level</th><th></th></tr></thead><tbody>';
-        for (const a of list) {
-            const pct = a.overall_match_pct;
-            const color = rmPctColor(pct);
-            html += '<tr data-click-action="rmRenderResult" data-args="[' + JSON.stringify(a).replace(/"/g,'&quot;') + ']">'
-                + '<td>' + (a.taken_at ? new Date(a.taken_at).toLocaleDateString() : '-') + '</td>'
-                + '<td>' + rmEsc(a.role_name) + '</td>'
-                + '<td><strong data-ion-style="color:' + color + '">' + pct + '%</strong></td>'
-                + '<td>' + rmEsc(a.overall_level) + '</td>'
-                + '<td><button class="btn btn-secondary btn-sm" data-click-action="rmRenderResult" data-stop-propagation data-args="[' + JSON.stringify(a).replace(/"/g,'&quot;') + ']">View</button></td>'
-                + '</tr>';
-        }
-        html += '</tbody></table>';
-        c.innerHTML = html;
-    } catch (e) {
-        c.innerHTML = '<div class="rm-loading">Failed to load history</div>';
-    }
+        document.getElementById('rm-content').replaceChildren(fragment);
+    } catch (e) { rmMessage('Failed to load history'); }
 }
 </script>
 
@@ -6479,50 +6476,53 @@ let crActiveFilters = { domain:'all', provider:'all', maxCost:Infinity };
 
 function crInit() {
     const grid = document.getElementById('cr-grid');
-    if (!grid || grid.children.length > 0) return; // already initialized
-
-    // Build domain columns
-    grid.innerHTML = CR_DOMAINS.map(d => `
-        <div class="cr-domain-col" data-domain="${d.id}">
-            <div class="cr-domain-header" data-ion-style="border-bottom-color:${d.color}">
-                <i class="cr-dh-icon ${d.icon}" data-ion-style="color:${d.color}"></i>
-                <span class="cr-dh-name">${d.name}</span>
-            </div>
-            ${CR_LEVELS.map(level => `
-                <div class="cr-level-row" data-level="${level}" data-domain="${d.id}"></div>
-            `).join('')}
-        </div>
-    `).join('');
-
-    // Place certs into cells
-    CR_CERTS.forEach(cert => {
-        const cell = grid.querySelector(`.cr-level-row[data-domain="${cert.domain}"][data-level="${cert.level}"]`);
-        if (!cell) return;
-        const costDisplay = cert.cost === 0 ? 'Free' : `\u00a3${cert.cost.toLocaleString()}`;
-        const chip = document.createElement('div');
-        chip.className = 'cr-cert';
-        chip.dataset.certId = cert.id;
-        chip.dataset.provider = cert.provider;
-        chip.dataset.domain = cert.domain;
-        chip.dataset.level = cert.level;
-        chip.dataset.cost = cert.cost;
-        chip.onclick = () => crShowDetail(cert.id);
-        chip.innerHTML = `<span class="cr-cert-dot" data-ion-style="background:${CR_PROVIDER_COLORS[cert.provider]||'#666'}"></span>${esc(cert.abbr)} <span class="cr-cert-cost">${costDisplay}</span>`;
-        cell.appendChild(chip);
-    });
-
-    // Build legend
-    const providers = [...new Set(CR_CERTS.map(c => c.provider))].sort();
-    const legendEl = document.getElementById('cr-legend');
-    legendEl.innerHTML = providers.map(p =>
-        `<span class="cr-legend-item"><span class="cr-legend-swatch" data-ion-style="background:${CR_PROVIDER_COLORS[p]||'#666'}"></span>${esc(p)}</span>`
-    ).join('');
-
-    // Populate filter dropdowns
-    const domSel = document.getElementById('cr-domain-filter');
-    CR_DOMAINS.forEach(d => { const o = document.createElement('option'); o.value = d.id; o.textContent = d.name; domSel.appendChild(o); });
-    const provSel = document.getElementById('cr-provider-filter');
-    providers.forEach(p => { const o = document.createElement('option'); o.value = p; o.textContent = p; provSel.appendChild(o); });
+    if (!grid || grid.children.length > 0) return;
+    for (const domain of CR_DOMAINS) {
+        const fragment = rmTemplate('training-cr-domain');
+        const column = fragment.querySelector('.cr-domain-col');
+        column.dataset.domain = domain.id;
+        fragment.querySelector('.cr-domain-header').dataset.ionStyle = 'border-bottom-color:' + domain.color;
+        fragment.querySelector('i').classList.add(domain.icon);
+        fragment.querySelector('i').dataset.ionStyle = 'color:' + domain.color;
+        fragment.querySelector('.cr-dh-name').textContent = domain.name;
+        for (const level of CR_LEVELS) {
+            const cell = rmTemplate('training-cr-level');
+            cell.querySelector('div').dataset.level = level;
+            cell.querySelector('div').dataset.domain = domain.id;
+            column.append(cell);
+        }
+        grid.append(fragment);
+    }
+    for (const cert of CR_CERTS) {
+        const cell = Array.from(grid.querySelectorAll('.cr-level-row')).find(row => row.dataset.domain === cert.domain && row.dataset.level === cert.level);
+        if (!cell) continue;
+        const fragment = rmTemplate('training-cr-cert');
+        const chip = fragment.querySelector('.cr-cert');
+        Object.assign(chip.dataset, {certId: cert.id, provider: cert.provider, domain: cert.domain, level: cert.level, cost: cert.cost});
+        chip.dataset.args = JSON.stringify([cert.id]);
+        fragment.querySelector('.cr-cert-dot').dataset.ionStyle = 'background:' + (CR_PROVIDER_COLORS[cert.provider] || 'var(--text-muted)');
+        fragment.querySelector('[data-field="abbr"]').textContent = cert.abbr;
+        fragment.querySelector('.cr-cert-cost').textContent = cert.cost === 0 ? 'Free' : '£' + cert.cost.toLocaleString();
+        cell.append(fragment);
+    }
+    const providers = [...new Set(CR_CERTS.map(cert => cert.provider))].sort();
+    const legend = document.getElementById('cr-legend');
+    legend.replaceChildren();
+    for (const provider of providers) {
+        const fragment = rmTemplate('training-cr-legend');
+        fragment.querySelector('.cr-legend-swatch').dataset.ionStyle = 'background:' + (CR_PROVIDER_COLORS[provider] || 'var(--text-muted)');
+        fragment.querySelector('[data-field="provider"]').textContent = provider;
+        legend.append(fragment);
+    }
+    for (const [id, options] of [['cr-domain-filter', CR_DOMAINS.map(domain => [domain.id, domain.name])], ['cr-provider-filter', providers.map(provider => [provider, provider])]]) {
+        const select = document.getElementById(id);
+        for (const [value, label] of options) {
+            const option = rmTemplate('training-cr-option');
+            option.querySelector('option').value = value;
+            option.querySelector('option').textContent = label;
+            select.append(option);
+        }
+    }
 }
 
 function crFilterDomain(val) { crActiveFilters.domain = val; crApplyFilters(); }
@@ -6553,81 +6553,50 @@ function crApplyFilters() {
     });
     // Dim entire domain columns if domain filter active
     document.querySelectorAll('.cr-domain-col').forEach(col => {
-        if (crActiveFilters.domain !== 'all' && col.dataset.domain !== crActiveFilters.domain) {
-            col.style.opacity = '0.3';
-        } else {
-            col.style.opacity = '1';
-        }
+        col.dataset.ionStyle = 'opacity:' + (crActiveFilters.domain !== 'all' && col.dataset.domain !== crActiveFilters.domain ? '0.3' : '1');
     });
 }
 
 function crShowDetail(certId) {
-    const cert = CR_CERTS.find(c => c.id === certId);
+    const cert = CR_CERTS.find(item => item.id === certId);
     if (!cert) return;
-    const panel = document.getElementById('cr-detail-panel');
-    const overlay = document.getElementById('cr-detail-overlay');
-    const costDisplay = cert.cost === 0 ? 'Free' : (cert.currency === 'GBP' ? `\u00a3${cert.cost.toLocaleString()}` : `$${cert.cost.toLocaleString()}`);
-    const domainInfo = CR_DOMAINS.find(d => d.id === cert.domain);
-    const levelLabels = { foundation:'Foundation', intermediate:'Intermediate', advanced:'Advanced', expert:'Expert' };
-    const levelColors = { foundation:'#06b6d4', intermediate:'#3b82f6', advanced:'#a855f7', expert:'#f59e0b' };
-
-    // Build prereqs HTML
-    let prereqsHtml = '';
-    if (cert.prereqs && cert.prereqs.length > 0) {
-        prereqsHtml = `<div class="cr-d-section"><h4>Prerequisites / Recommended</h4><div>` +
-            cert.prereqs.map(pid => {
-                const pc = CR_CERTS.find(c => c.id === pid);
-                return pc ? `<span class="cr-d-prereq-chip" data-click-action="crShowDetail" data-args='["${pid}"]'>${esc(pc.abbr)}</span>` : '';
-            }).join('') + '</div></div>';
+    const fragment = rmTemplate('training-cr-detail');
+    fragment.querySelector('.cr-d-title').textContent = cert.name;
+    fragment.querySelector('.cr-d-provider').textContent = cert.provider;
+    fragment.querySelector('.cr-d-provider').dataset.ionStyle = 'color:' + (CR_PROVIDER_COLORS[cert.provider] || 'var(--text-muted)');
+    fragment.querySelector('.cr-d-desc').textContent = cert.desc;
+    const domain = CR_DOMAINS.find(item => item.id === cert.domain);
+    const levelLabels = {foundation:'Foundation', intermediate:'Intermediate', advanced:'Advanced', expert:'Expert'};
+    const levelColors = {foundation:'var(--info)', intermediate:'var(--primary)', advanced:'var(--secondary)', expert:'var(--warning)'};
+    const values = [
+        ['Cost', cert.cost === 0 ? 'Free' : (cert.currency === 'GBP' ? '£' : '$') + cert.cost.toLocaleString()],
+        ['Level', levelLabels[cert.level]], ['Domain', domain ? domain.name : cert.domain],
+        ['Duration', cert.duration], ['Questions', cert.questions], ['Passing', cert.passing], ['Renewal', cert.renewal],
+    ];
+    for (const [label, value] of values) {
+        const stat = rmTemplate('training-cr-stat');
+        stat.querySelector('.cr-d-stat-label').textContent = label;
+        stat.querySelector('.cr-d-stat-value').textContent = value ?? 'Unknown';
+        if (label === 'Cost') stat.querySelector('.cr-d-stat-value').classList.add('cr-cost-val');
+        if (label === 'Level') stat.querySelector('.cr-d-stat-value').dataset.ionStyle = 'color:' + levelColors[cert.level];
+        fragment.querySelector('.cr-d-stats').append(stat);
     }
-
-    panel.innerHTML = `
-        <div class="cr-d-header">
-            <div>
-                <div class="cr-d-title">${esc(cert.name)}</div>
-                <div class="cr-d-provider" data-ion-style="color:${CR_PROVIDER_COLORS[cert.provider]||'#888'}">${esc(cert.provider)}</div>
-            </div>
-            <button class="cr-d-close" data-click-action="crCloseDetail">&times;</button>
-        </div>
-        <div class="cr-d-stats">
-            <div class="cr-d-stat">
-                <span class="cr-d-stat-label">Cost</span>
-                <span class="cr-d-stat-value cr-cost-val">${costDisplay}</span>
-            </div>
-            <div class="cr-d-stat">
-                <span class="cr-d-stat-label">Level</span>
-                <span class="cr-d-stat-value" data-ion-style="color:${levelColors[cert.level]}">${levelLabels[cert.level]}</span>
-            </div>
-            <div class="cr-d-stat">
-                <span class="cr-d-stat-label">Domain</span>
-                <span class="cr-d-stat-value">${domainInfo ? `<i class="${domainInfo.icon} mr-[0.3rem]" data-ion-style="color:${domainInfo.color}"></i>${domainInfo.name}` : cert.domain}</span>
-            </div>
-            <div class="cr-d-stat">
-                <span class="cr-d-stat-label">Duration</span>
-                <span class="cr-d-stat-value">${esc(cert.duration)}</span>
-            </div>
-            <div class="cr-d-stat">
-                <span class="cr-d-stat-label">Questions</span>
-                <span class="cr-d-stat-value">${esc(cert.questions)}</span>
-            </div>
-            <div class="cr-d-stat">
-                <span class="cr-d-stat-label">Passing</span>
-                <span class="cr-d-stat-value">${esc(cert.passing)}</span>
-            </div>
-            <div class="cr-d-stat">
-                <span class="cr-d-stat-label">Renewal</span>
-                <span class="cr-d-stat-value">${esc(cert.renewal)}</span>
-            </div>
-        </div>
-        <div class="cr-d-desc">${esc(cert.desc)}</div>
-        ${prereqsHtml}
-        <div class="cr-d-section">
-            <h4>Topics Covered</h4>
-            <div class="cr-d-tags">${cert.topics.map(t => `<span class="cr-d-tag">${esc(t)}</span>`).join('')}</div>
-        </div>
-    `;
-
-    overlay.classList.add('open');
+    const prerequisites = fragment.querySelector('[data-field="prereqs"]');
+    const knownPrerequisites = (cert.prereqs || []).map(id => CR_CERTS.find(item => item.id === id)).filter(Boolean);
+    prerequisites.hidden = knownPrerequisites.length === 0;
+    for (const prerequisite of knownPrerequisites) {
+        const item = rmTemplate('training-cr-prereq');
+        item.querySelector('span').textContent = prerequisite.abbr;
+        item.querySelector('span').dataset.args = JSON.stringify([prerequisite.id]);
+        prerequisites.querySelector('div').append(item);
+    }
+    for (const topic of cert.topics) {
+        const item = rmTemplate('training-cr-topic');
+        item.querySelector('span').textContent = topic;
+        fragment.querySelector('.cr-d-tags').append(item);
+    }
+    document.getElementById('cr-detail-panel').replaceChildren(fragment);
+    document.getElementById('cr-detail-overlay').classList.add('open');
 }
 
 function crCloseDetail() {
