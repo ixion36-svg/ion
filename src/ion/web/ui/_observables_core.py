@@ -124,8 +124,18 @@ def observable_list(
     return render_view(request, "_fragments/observables_list.html", view)
 
 
+@router.get("/observables/watchlist", response_class=HTMLResponse)
+def watchlist(request: Request, session: Session = Depends(get_db_session), user=Depends(PERMISSION)):
+    payload = read(api.get_watchlist, limit=100, offset=0, session=session, user=user)
+    view: CollectionPanel = collection(payload, "items", user, 100)
+    return render_view(request, "_fragments/observables_watchlist.html", view)
 
 
+@router.get("/observables/watchlist/alerts", response_class=HTMLResponse)
+def watchlist_alerts(request: Request, is_read: bool | None = None, session: Session = Depends(get_db_session), user=Depends(PERMISSION)):
+    payload = read(api.get_watchlist_alerts, is_read=is_read, limit=50, offset=0, session=session, user=user)
+    view: CollectionPanel = collection(payload, "items", user)
+    return render_view(request, "_fragments/observables_watchlist_alerts.html", view)
 
 
 @router.get("/observables/stats", response_class=HTMLResponse)

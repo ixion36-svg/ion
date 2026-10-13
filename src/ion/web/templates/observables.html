@@ -1144,37 +1144,7 @@ function closeWatchlistModal() {
 }
 
 async function loadWatchlist() {
-    const tbody = document.getElementById('watchlist-tbody');
-    tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading watchlist...</td></tr>';
-
-    try {
-        const response = await fetch('/api/observables/watchlist?limit=100');
-        if (!response.ok) throw new Error('Failed to load watchlist');
-        const data = await response.json();
-
-        if (data.items.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="empty">No watched observables. Click the eye icon on any observable to add it to the watchlist.</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = data.items.map(obs => `
-            <tr>
-                <td><code>${escapeHtml(obs.value)}</code></td>
-                <td><span class="badge badge-type">${obs.type}</span></td>
-                <td><span class="badge badge-${obs.threat_level}">${obs.threat_level}</span></td>
-                <td>${escapeHtml(obs.watch_reason) || '-'}</td>
-                <td>${escapeHtml(obs.watched_by) || '-'}</td>
-                <td>${obs.watched_at ? formatDate(obs.watched_at) : '-'}</td>
-                <td>
-                    <button class="btn btn-sm btn-secondary" data-click-action="removeFromWatchlist" data-args='[${obs.id}]' title="Remove from watchlist">Remove</button>
-                    <button class="btn btn-sm btn-secondary" data-click-action="showTimeline" data-args='[${obs.id}]' title="View Timeline">Timeline</button>
-                </td>
-            </tr>
-        `).join('');
-    } catch (error) {
-        console.error('Error loading watchlist:', error);
-        tbody.innerHTML = '<tr><td colspan="7" class="error">Error loading watchlist</td></tr>';
-    }
+    await ionLoadFragment('/ui/observables/watchlist', 'watchlist-tbody', 'Loading watchlist...');
 }
 
 function toggleWatchlist(observableId, isWatched) {
@@ -1241,37 +1211,10 @@ function closeWatchlistAlertsModal() {
 }
 
 async function loadWatchlistAlerts() {
-    const container = document.getElementById('watchlist-alerts-list');
-    container.innerHTML = '<div class="loading">Loading alerts...</div>';
-
-    try {
-        const filter = document.getElementById('watchlist-alerts-filter').value;
-        const params = filter ? `?is_read=${filter}` : '';
-
-        const response = await fetch(`/api/observables/watchlist/alerts${params}`);
-        if (!response.ok) throw new Error('Failed to load alerts');
-        const data = await response.json();
-
-        if (data.items.length === 0) {
-            container.innerHTML = '<div class="empty-state">No watchlist alerts</div>';
-            return;
-        }
-
-        container.innerHTML = data.items.map(alert => `
-            <div class="watchlist-alert-item ${alert.is_read ? '' : 'unread'}">
-                <div class="watchlist-alert-header">
-                    <span class="watchlist-alert-type">${alert.alert_type}</span>
-                    <span class="watchlist-alert-time">${formatDate(alert.created_at)}</span>
-                </div>
-                <p><strong>${escapeHtml(alert.observable_type)}:</strong> <code>${escapeHtml(alert.observable_value)}</code></p>
-                <p>${escapeHtml(alert.message)}</p>
-                ${!alert.is_read ? `<button class="btn btn-sm btn-secondary" data-click-action="markAlertRead" data-args='[${alert.id}]'>Mark Read</button>` : ''}
-            </div>
-        `).join('');
-    } catch (error) {
-        console.error('Error loading watchlist alerts:', error);
-        container.innerHTML = '<div class="error">Error loading alerts</div>';
-    }
+    const filter = document.getElementById('watchlist-alerts-filter').value;
+    const params = new URLSearchParams();
+    if (filter) params.set('is_read', filter);
+    await ionLoadFragment('/ui/observables/watchlist/alerts?' + params, 'watchlist-alerts-list', 'Loading alerts...');
 }
 
 async function markAlertRead(alertId) {
