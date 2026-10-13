@@ -57,6 +57,7 @@ from ion.web.ui.pcap import PERMISSION, router
 
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = ROOT / "src/ion/web/templates/pcap.html"
+SHEET = ROOT / "src/ion/web/static/css/pcap-page.css"
 
 SUMMARY = "/ui/pcap/7/summary"
 NETWORK = "/ui/pcap/7/network"
@@ -487,10 +488,17 @@ def test_the_page_no_longer_builds_these_panels():
 
 def test_no_badge_holds_its_palette_in_javascript_any_more():
     """Seventeen sites, one per tab, each with its own copy of a padding,
-    a radius, a font size and a colour."""
+    a radius, a font size and a colour.
+
+    The page's scripts now name no badge at all: each comes back inside
+    its own tab button from a fragment. So this checks the palette is
+    gone from the JavaScript and that the classes exist where the markup
+    is, which the tone test below pins against the stylesheet.
+    """
     body = _scripts()
     assert "style.cssText" not in body
-    assert "pcap-tab-badge" in body
+    assert "badge.className" not in body
+    assert "pcap-tab-badge" in SHEET.read_text(encoding="utf-8")
 
 
 def test_every_badge_tone_anything_asks_for_exists_in_the_stylesheet():
@@ -503,7 +511,7 @@ def test_every_badge_tone_anything_asks_for_exists_in_the_stylesheet():
     """
     import re as _re
 
-    page = PAGE.read_text(encoding="utf-8")
+    page = SHEET.read_text(encoding="utf-8")
     sources = [_scripts(),
                (ROOT / "src/ion/web/ui/pcap.py").read_text(encoding="utf-8")]
     fragments = ROOT / "src/ion/web/templates/_fragments"
@@ -521,3 +529,10 @@ def test_every_badge_tone_anything_asks_for_exists_in_the_stylesheet():
 
 def test_the_page_no_longer_reads_the_verdict_unguarded():
     assert "d.verdict.label" not in _scripts()
+
+
+def test_the_page_links_the_sheet_that_carries_those_rules():
+    """A sheet nobody links is the mistake that left the forensics
+    preview bare, and it is the one these rules now depend on."""
+    assert "pcap-page.css" in PAGE.read_text(encoding="utf-8")
+    assert "<style" not in PAGE.read_text(encoding="utf-8")

@@ -1,0 +1,153 @@
+{% macro fig(value, why) %}
+{%- if value is not none %}{{ value }}
+{%- else %}<span class="an-absent" title="{{ why }}"></span>{% endif %}
+{% endmacro %}
+{# The pcap findings panel and the threat intel table, from ui/pcap.py.
+
+   `(d.findings || []).map(...)` then `if (!items.length)` rendered a
+   shield tick and "No suspicious findings detected" for a findings list
+   that could not be read. On a tool whose job is to say whether a
+   capture is clean, that is the worst available way to be wrong.
+#}
+{%- if state != 'data' %}
+<div class="pcap-empty">
+  {%- if error %}{{ error }}
+  {%- else %}This analysis could not be read, so whether it found
+    anything is unknown.{% endif %}
+</div>
+{%- elif cards is none %}
+<div class="pcap-empty">The findings list is not in a shape this page can
+  read, so whether the capture is clean is unknown.</div>
+{%- elif not cards %}
+<div class="text-center p-10">
+  <div class="text-[2rem] mb-2"><i class="icon-shield-check"></i></div>
+  <p class="text-[var(--text-secondary)] text-[.9rem]">No suspicious
+    findings detected</p>
+</div>
+{%- else %}
+<div class="triage-chips">
+  {%- for c in chips %}
+  {#- A finding whose severity is outside the four incremented nothing,
+      so the chips summed to less than the total. -#}
+  <button type="button" class="triage-chip {{ c.key }}{% if c.zero %} zero{% endif %}"
+          data-sev="{{ c.key }}"{% if c.zero %} disabled{% endif %}>
+    <span class="triage-count">{{ c.count }}</span>
+    <span class="triage-label">{{ c.label }}</span>
+  </button>
+  {%- endfor %}
+</div>
+{%- if techniques is none %}
+<div class="mitre-rollup"><span class="an-absent"
+    title="The technique rollup is not in a readable shape"></span></div>
+{%- elif techniques %}
+<div class="mitre-rollup">
+  {%- for t in techniques %}
+  <span class="mitre-chip">{{ t.id or 'unnamed' }}
+    {%- if t.name %} <span class="tname">{{ t.name }}</span>{% endif %}</span>
+  {%- endfor %}
+</div>
+{%- endif %}
+{%- for f in cards %}
+{#- The class comes from a fixed set. A severity outside it took a class
+    that styles nothing, so the card lost its colour. -#}
+<div class="finding-card {{ f.severity_class or 'uncategorised' }}"
+     data-sev="{{ f.severity_class or 'uncategorised' }}">
+  <div class="finding-header">
+    <label class="pcap-pick" title="Select to attach to a case">
+      {#- The index is the finding's position in the stored result, not
+          its position here: the cards sort by severity, so attaching by
+          display position would pin the wrong finding. -#}
+      <input type="checkbox" class="pcap-finding-pick"
+             data-finding-index="{{ f.index }}">
+    </label>
+    <span class="finding-sev {{ f.severity_class or '' }}">
+      {{- fig(f.severity, 'This finding recorded no severity') -}}</span>
+    <span class="finding-cat">{{ fig(f.category, 'No category recorded') }}</span>
+  </div>
+  <div class="finding-title">{{ fig(f.title, 'This finding recorded no title') }}</div>
+  <div class="finding-detail">{{ fig(f.detail, 'No detail recorded') }}</div>
+  {%- if f.mitre %}
+  <div class="finding-mitre">
+    {%- for m in f.mitre %}<span class="finding-tid">{{ m }}</span>{% endfor %}
+  </div>
+  {%- endif %}
+</div>
+{%- endfor %}
+{%- endif %}
+{#- The threat intel table shares this panel's request because it is the
+    same stored result. -#}
+{%- set ti = threat_intel %}
+<div id="panel-threatintel" class="pcap-panel"
+     hx-swap-oob="innerHTML:#panel-threatintel">
+  {%- if ti.state == 'absent' %}
+  <p class="text-[var(--text-secondary)] text-[.85rem] p-5">This analysis
+    carries no threat intelligence. Enrichment runs when OpenCTI is
+    configured.</p>
+  {%- elif ti.state == 'failed' %}
+  <p class="text-[var(--text-secondary)] text-[.85rem] p-5">Enrichment
+    error: {{ ti.error }}</p>
+  {%- elif ti.state == 'unreadable' %}
+  <p class="text-[var(--text-secondary)] text-[.85rem] p-5">The
+    enrichment result is not in a shape this page can read.</p>
+  {%- elif ti.observables is none %}
+  <p class="text-[var(--text-secondary)] text-[.85rem] p-5">The observable
+    list is not in a shape this page can read.</p>
+  {%- elif not ti.observables %}
+  <p class="text-[var(--text-secondary)] text-[.85rem] p-5">No external
+    IPs or domains found to enrich.</p>
+  {%- else %}
+  <div class="mb-3 flex gap-4 flex-wrap text-[.85rem] text-[var(--text-secondary)]">
+    <span>IPs checked: <strong>{{ fig(ti.ips_checked, 'Not recorded') }}</strong></span>
+    <span>Domains checked: <strong>{{ fig(ti.domains_checked, 'Not recorded') }}</strong></span>
+    <span>Total observables: <strong>{{ fig(ti.total, 'Not recorded') }}</strong></span>
+    <span class="{% if ti.malicious_count %}ti-hits{% else %}ti-nohits{% endif %}">Malicious
+      hits: <strong>{{ fig(ti.malicious_count, 'Not recorded') }}</strong></span>
+  </div>
+  <table class="pcap-table">
+    <thead><tr><th>Type</th><th>Value</th><th>Threat Level</th>
+      <th>Score</th><th>Labels</th><th>Threat Actors</th></tr></thead>
+    <tbody>
+      {%- for o in ti.observables %}
+      <tr class="{% if o.malicious %}ti-row-malicious{% endif %}">
+        <td><span class="text-xs uppercase text-[var(--text-secondary)]">
+          {{- fig(o.kind, 'No type recorded') -}}</span></td>
+        <td class="font-mono break-all">
+          {%- if o.value %}
+          <a class="{{ ti.link_class }}"
+             href="/observables?q={{ o.value | urlencode }}">{{ o.value }}</a>
+          {%- else %}<span class="an-absent" title="No value recorded"></span>
+          {%- endif %}</td>
+        {#- The level picks a class. The page composed a colour and then
+            appended "20" to it for alpha, which produces
+            `var(--sev-low)20` for every level in its own map. -#}
+        <td><span class="font-semibold text-[.8rem] ti-level
+                  {%- if o.level_class %} ti-level-{{ o.level_class }}{% endif %}">
+          {{- o.level -}}</span></td>
+        <td class="text-center">{{ fig(o.score, 'No score recorded') }}</td>
+        <td>
+          {%- if o.labels is none %}<span class="an-absent"
+              title="Not a readable list"></span>
+          {%- elif not o.labels %}&mdash;
+          {%- else %}{% for l in o.labels %}<span
+              class="{{ ti.chip_class }}
+              {%- if o.level_class %} ti-level-{{ o.level_class }}{% endif %}">{{ l }}</span>{% endfor %}
+          {%- endif %}</td>
+        <td>
+          {%- if o.actors is none %}<span class="an-absent"
+              title="Not a readable list"></span>
+          {%- elif not o.actors %}&mdash;
+          {%- else %}{{ o.actors | join(', ') }}{% endif %}</td>
+      </tr>
+      {%- endfor %}
+    </tbody>
+  </table>
+  {%- endif %}
+</div>
+{#- The tab badge counts malicious hits. The page set it only when the
+    count was above zero and never cleared it, so a reopened job with no
+    hits kept the previous job's badge. -#}
+<span id="ti-count-badge"
+      class="badge pcap-tab-badge tone-critical{% if not ti.malicious_count %} is-empty{% endif %}"
+      hx-swap-oob="outerHTML:#ti-count-badge">
+  {%- if ti.malicious_count %}{{ ti.malicious_count }}{% endif %}
+</span>

@@ -2487,6 +2487,10 @@
     "unmapped": []
   },
   "_ion-s-7554583028": {
+    "note": "The threat intel label chip on /pcap. Same move as _ion-s-b17605f04d: the four declarations are .pcap-ti-chip in static/css/pcap-page.css.",
+    "replaced_by": [
+      ".pcap-ti-chip"
+    ],
     "css": "background:' + color + '20;color:' + color + ';padding:1px 6px;border-radius:3px;font-size:.75rem;margin-right:3px;",
     "kind": "manual",
     "partial_do_not_apply": "text-['_+_color_+_'] py-[1px] px-1.5 rounded-[3px] text-xs mr-[3px]",
@@ -3902,6 +3906,10 @@
     "unmapped": []
   },
   "_ion-s-b17605f04d": {
+    "note": "The threat intel observable link on /pcap. After the conversion no template referenced the hashed class and no other page used it, so the same two declarations are .pcap-ti-link in static/css/pcap-page.css, which head_css loads after ion.css.",
+    "replaced_by": [
+      ".pcap-ti-link"
+    ],
     "css": "color:var(--text-primary);text-decoration:underline dotted;",
     "kind": "manual",
     "partial_do_not_apply": "text-[var(--text-primary)]",

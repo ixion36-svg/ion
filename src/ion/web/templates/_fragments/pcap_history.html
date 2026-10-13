@@ -1,0 +1,50 @@
+{% macro fig(value, why) %}
+{%- if value is not none %}{{ value }}
+{%- else %}<span class="an-absent" title="{{ why }}"></span>{% endif %}
+{% endmacro %}
+{# The pcap analysis history, from ui/pcap.py's history_view.
+
+   `fmtBytes(j.file_size || 0)` reported a row with no recorded size as
+   0 B, and `(j.finding_count || 0) + ' findings'` said a capture whose
+   finding count was never recorded had none, which on a history list
+   reads as a clean capture.
+#}
+{%- if state == 'failed' %}
+<div class="p-6 text-[var(--text-secondary)]">Could not load the analysis
+  history.</div>
+{%- elif state == 'unreadable' %}
+<div class="p-6 text-[var(--text-secondary)]">The history is not in a
+  shape this page can read.</div>
+{%- elif state == 'empty' %}
+<div class="text-center p-10">
+  <p class="text-[var(--text-secondary)] text-[.9rem]">No captures
+    analysed yet.</p>
+</div>
+{%- else %}
+{%- for j in rows %}
+<div class="pcap-history-row">
+  <span class="badge {{ j.status_class }}">
+    {{- fig(j.status, 'No status recorded') -}}</span>
+  <span>{{ fig(j.filename, 'No filename recorded') }}</span>
+  <span class="mono">{{ fig(j.digest, 'No content digest recorded') }}</span>
+  <span class="mono">{{ fig(j.size, 'No file size recorded') }}</span>
+  {%- if j.verdict %}<span>{{ j.verdict }}</span>{% endif %}
+  <span>
+    {%- if j.finding_count is not none %}{{ j.finding_count }}
+      finding{% if j.finding_count != 1 %}s{% endif %}
+    {%- else %}<span class="an-absent"
+        title="No finding count was recorded for this analysis"></span>
+      findings{% endif %}
+  </span>
+  {%- if j.reused_from is not none %}
+  <span class="mono">reused from #{{ j.reused_from }}</span>
+  {%- endif %}
+  <span class="mono">parser {{ fig(j.parser_version, 'Not recorded') }}</span>
+  <span class="mono">{{ j.requested_by }}</span>
+  {%- if j.reopenable and j.job_id is not none %}
+  <button type="button" class="btn btn-xs pcap-reopen"
+          data-job-id="{{ j.job_id }}">Reopen</button>
+  {%- endif %}
+</div>
+{%- endfor %}
+{%- endif %}

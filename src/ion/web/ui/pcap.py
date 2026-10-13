@@ -1201,3 +1201,523 @@ def pcap_detail_fragment(
     if refusal is not None:
         view["error"] = refusal
     return render_view(request, DETAIL_FRAGMENT, view)
+
+
+# ---------------------------------------------------------------------------
+# Findings, threat intel, the history list and the case picker
+# ---------------------------------------------------------------------------
+#
+# AN UNREADABLE FINDINGS PAYLOAD SHOWED A SHIELD AND "NO SUSPICIOUS FINDINGS"
+#
+#     const items = (d.findings || []).map(...)
+#     if (!items.length) {
+#         panel.innerHTML = '... <i class="icon-shield-check"></i>
+#                            <p>No suspicious findings detected</p>';
+#
+# On a tool whose job is to say whether a capture is clean, a findings
+# list that could not be read rendered the clean verdict, with a tick.
+# That is the worst available way to be wrong and it is one `|| []`.
+#
+# The severity chips could also sum to less than the total: `counts` is
+# seeded for four severities, a finding outside them increments nothing,
+# and the total chip reads `items.length`. The card's class came from the
+# same value, so such a finding rendered with no severity colour either.
+#
+# THE THREAT INTEL LABEL CHIPS HAD INVALID BACKGROUNDS
+#
+#     const color = threatColors[level] || <a grey hex literal>;
+#     ... 'background:' + color + '20;color:' + color
+#
+# The 20 is an alpha suffix for an eight-digit hex, and every colour in
+# threatColors is a var(--sev-*) reference, so the expression produced
+# background:var(--sev-low)20. That is not a colour and the declaration
+# is discarded. It worked only for the level the map misses and the hex
+# fallback catches, which is the one case nobody styled on purpose.
+#
+# The hex itself is not quoted above on purpose:
+# test_a_converted_module_puts_no_presentation_in_its_models matches a
+# quoted hex anywhere in the module, comments included, and it is right
+# to. A colour literal in here is a colour a reader inherits.
+#
+# A missing threat-intel payload and a failed enrichment shared one
+# message that blamed configuration, and the case picker reported "No open
+# cases" when its read failed, so an analyst with findings to attach was
+# told there was nothing to attach them to.
+
+FINDINGS_FRAGMENT = "_fragments/pcap_findings.html"
+HISTORY_FRAGMENT = "_fragments/pcap_history.html"
+CASE_OPTIONS_FRAGMENT = "_fragments/pcap_case_options.html"
+
+#: Finding severities in triage order, with the class each takes. A
+#: severity outside this set keeps its text and takes no class.
+FINDING_SEVERITIES: tuple[str, ...] = ("critical", "high", "medium", "low")
+
+#: Threat levels the panel has a class for, in place of the colour map it
+#: composed inline.
+THREAT_LEVELS: tuple[str, ...] = (
+    "unknown", "benign", "low", "medium", "high", "critical",
+)
+
+#: The label chip and the observable link. These were
+#: _ion-s-7554583028 and _ion-s-b17605f04d, hashed names from the
+#: v0.31.21 inline-style migration, and after this conversion no template
+#: referenced either: only a constant in this module did, and no other
+#: page used them. A hashed name reached that way is one the rewrite
+#: audit cannot see and a reader cannot place, so both have real names in
+#: pcap-page.css carrying the same declarations, and the map claims them.
+TI_CHIP_CLASS = "pcap-ti-chip"
+TI_LINK_CLASS = "pcap-ti-link"
+
+
+class FindingCard(TypedDict):
+    index: int
+    severity: Optional[str]
+    severity_class: Optional[str]
+    category: Optional[str]
+    title: Optional[str]
+    detail: Optional[str]
+    mitre: Optional[list[str]]
+
+
+def finding_cards(raw: Any) -> Optional[list[FindingCard]]:
+    """The cards, sorted by severity, each keeping its index in the
+    stored result.
+
+    The page's own comment is right and worth keeping: the cards sort by
+    severity, so display order is not stored order, and attaching by
+    display position would pin the wrong finding.
+    """
+    if not isinstance(raw, list):
+        return None
+    cards: list[FindingCard] = []
+    for index, entry in enumerate(raw):
+        if not isinstance(entry, dict):
+            continue
+        severity = _text(entry.get("severity"))
+        cards.append({
+            "index": index,
+            "severity": severity,
+            "severity_class": (severity
+                               if severity in FINDING_SEVERITIES else None),
+            "category": _text(entry.get("category")),
+            "title": _text(entry.get("title")),
+            "detail": _text(entry.get("detail")),
+            "mitre": _strings(entry.get("mitre")),
+        })
+
+    def rank(card: FindingCard) -> int:
+        severity = card["severity_class"]
+        return (FINDING_SEVERITIES.index(severity)
+                if severity is not None else len(FINDING_SEVERITIES))
+
+    cards.sort(key=rank)
+    return cards
+
+
+def finding_chips(cards: list[FindingCard]) -> list[dict]:
+    """The triage chips.
+
+    The four counts and the total disagreed whenever a finding carried a
+    severity outside the four, because nothing incremented for it. The
+    uncategorised chip is the difference, stated.
+    """
+    chips = [{"key": "total", "label": "Total", "count": len(cards),
+              "zero": False}]
+    for severity in FINDING_SEVERITIES:
+        count = sum(1 for c in cards if c["severity_class"] == severity)
+        chips.append({"key": severity, "label": severity.title(),
+                      "count": count, "zero": count == 0})
+    other = sum(1 for c in cards if c["severity_class"] is None)
+    if other:
+        chips.append({"key": "uncategorised", "label": "not categorised",
+                      "count": other, "zero": False})
+    return chips
+
+
+class Technique(TypedDict):
+    id: Optional[str]
+    name: Optional[str]
+
+
+def techniques(raw: Any) -> Optional[list[Technique]]:
+    if not isinstance(raw, list):
+        return None
+    out: list[Technique] = []
+    for entry in raw:
+        if isinstance(entry, dict):
+            out.append({"id": _text(entry.get("id")),
+                        "name": _text(entry.get("name"))})
+        elif isinstance(entry, str):
+            out.append({"id": _text(entry), "name": None})
+    return out
+
+
+class Observable(TypedDict):
+    kind: Optional[str]
+    value: Optional[str]
+    level: Optional[str]
+    level_class: Optional[str]
+    score: Optional[str]
+    labels: Optional[list[str]]
+    actors: Optional[list[str]]
+    malicious: bool
+
+
+def _named(value: Any) -> Optional[str]:
+    """A label or actor, which the payload sends as a string or as an
+    object carrying `value` or `name`."""
+    if isinstance(value, str):
+        return _text(value)
+    if isinstance(value, dict):
+        return _text(value.get("value")) or _text(value.get("name"))
+    return None
+
+
+def observables(raw: Any) -> Optional[list[Observable]]:
+    if not isinstance(raw, list):
+        return None
+    out: list[Observable] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        enrichment = entry.get("enrichment")
+        enrichment = enrichment if isinstance(enrichment, dict) else {}
+        level = _text(entry.get("threat_level")) or "unknown"
+        score = _num(enrichment.get("score"))
+        labels = enrichment.get("labels")
+        actors = enrichment.get("threat_actors")
+        out.append({
+            "kind": _text(entry.get("kind")) or _text(entry.get("type")),
+            "value": _text(entry.get("value")),
+            "level": level,
+            # The level picks a class. The page composed a colour and then
+            # appended "20" to it for alpha, which only works on a hex.
+            "level_class": level if level in THREAT_LEVELS else None,
+            "score": (None if score is None else "%g" % score),
+            "labels": (None if not isinstance(labels, list) else
+                       [t for t in (_named(v) for v in labels) if t]),
+            "actors": (None if not isinstance(actors, list) else
+                       [t for t in (_named(v) for v in actors) if t]),
+            "malicious": enrichment.get("is_malicious") is True,
+        })
+    return out
+
+
+class ThreatIntel(TypedDict):
+    state: str
+    error: Optional[str]
+    ips_checked: Optional[int]
+    domains_checked: Optional[int]
+    total: Optional[int]
+    malicious_count: Optional[int]
+    observables: Optional[list[Observable]]
+    chip_class: str
+    link_class: str
+
+
+def threat_intel_view(raw: Any) -> ThreatIntel:
+    base: ThreatIntel = {
+        "state": "absent", "error": None, "ips_checked": None,
+        "domains_checked": None, "total": None, "malicious_count": None,
+        "observables": None, "chip_class": TI_CHIP_CLASS,
+        "link_class": TI_LINK_CLASS,
+    }
+    if raw is None:
+        return base
+    if not isinstance(raw, dict):
+        return {**base, "state": "unreadable"}
+    error = _text(raw.get("error"))
+    if error:
+        return {**base, "state": "failed", "error": error}
+    return {**base,
+            "state": "data",
+            "ips_checked": _int(raw.get("ips_checked")),
+            "domains_checked": _int(raw.get("domains_checked")),
+            "total": _int(raw.get("total")),
+            "malicious_count": _int(raw.get("malicious_count")),
+            "observables": observables(raw.get("observables"))}
+
+
+class FindingsView(TypedDict):
+    state: str
+    error: Optional[str]
+    cards: Optional[list[FindingCard]]
+    chips: list[dict]
+    techniques: Optional[list[Technique]]
+    threat_intel: ThreatIntel
+
+
+def findings_view(job: Any) -> FindingsView:
+    empty: FindingsView = {
+        "state": "failed",
+        "error": (_text(job.get("error")) if isinstance(job, dict)
+                  else None),
+        "cards": None, "chips": [], "techniques": None,
+        "threat_intel": threat_intel_view(None),
+    }
+    if not isinstance(job, dict) or not isinstance(job.get("result"), dict):
+        return empty
+    result = job["result"]
+    cards = finding_cards(result.get("findings"))
+    return {
+        "state": "data",
+        "error": None,
+        "cards": cards,
+        "chips": finding_chips(cards or []),
+        "techniques": techniques(result.get("mitre_techniques")),
+        "threat_intel": threat_intel_view(result.get("threat_intel")),
+    }
+
+
+class HistoryRow(TypedDict):
+    job_id: Optional[int]
+    status: Optional[str]
+    status_class: str
+    filename: Optional[str]
+    digest: Optional[str]
+    size: Optional[str]
+    verdict: Optional[str]
+    finding_count: Optional[int]
+    reused_from: Optional[int]
+    parser_version: Optional[str]
+    requested_by: str
+    reopenable: bool
+
+
+#: The badge class per job status, from the page's ternary chain.
+HISTORY_TONES: dict[str, str] = {
+    "completed": "badge-success",
+    "failed": "badge-error",
+    "cancelled": "badge-ghost",
+}
+
+
+def history_rows(raw: Any) -> Optional[list[HistoryRow]]:
+    if not isinstance(raw, list):
+        return None
+    out: list[HistoryRow] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        status = _text(entry.get("status"))
+        verdict = entry.get("verdict")
+        if isinstance(verdict, dict):
+            label = _text(verdict.get("label"))
+        else:
+            label = _text(verdict) if isinstance(verdict, str) else None
+        digest = _text(entry.get("content_sha256"))
+        out.append({
+            "job_id": _int(entry.get("id")),
+            "status": status,
+            "status_class": HISTORY_TONES.get(status or "", "badge-warning"),
+            "filename": _text(entry.get("filename")),
+            "digest": (digest[:12] if digest else None),
+            # `fmtBytes(j.file_size || 0)` reported a row with no recorded
+            # size as 0 B.
+            "size": bytes_label(entry.get("file_size")),
+            "verdict": label,
+            # `(j.finding_count || 0) + ' findings'` said a capture whose
+            # count was never recorded had none.
+            "finding_count": _int(entry.get("finding_count")),
+            "reused_from": _int(entry.get("reused_from_id")),
+            "parser_version": _text(entry.get("parser_version")),
+            "requested_by": _text(entry.get("requested_by")) or "unknown",
+            "reopenable": status == "completed",
+        })
+    return out
+
+
+class HistoryView(TypedDict):
+    state: str
+    error: Optional[str]
+    rows: Optional[list[HistoryRow]]
+
+
+def history_view(payload: Any) -> HistoryView:
+    if not isinstance(payload, dict):
+        return {"state": "failed", "error": None, "rows": None}
+    rows = history_rows(payload.get("jobs"))
+    if rows is None:
+        return {"state": "unreadable", "error": None, "rows": None}
+    return {"state": "data" if rows else "empty", "error": None,
+            "rows": rows}
+
+
+class CaseOption(TypedDict):
+    value: str
+    label: str
+
+
+class CaseOptionsView(TypedDict):
+    state: str
+    error: Optional[str]
+    options: Optional[list[CaseOption]]
+
+
+def case_options_view(payload: Any) -> CaseOptionsView:
+    """The attach-to-case picker.
+
+    `_pcapCases = r.ok ? ... : []`, with the same `[]` in its catch, so a
+    failed read told an analyst with findings to attach that there was
+    nothing to attach them to.
+    """
+    if not isinstance(payload, dict):
+        return {"state": "failed", "error": None, "options": None}
+    raw = payload.get("cases")
+    if not isinstance(raw, list):
+        return {"state": "unreadable", "error": None, "options": None}
+    options: list[CaseOption] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        identifier = entry.get("id")
+        if identifier is None:
+            continue
+        number = _text(entry.get("case_number"))
+        title = _text(entry.get("title")) or ("Case %s" % identifier)
+        options.append({
+            "value": str(identifier),
+            "label": ("%s - %s" % (number, title)) if number else title,
+        })
+    return {"state": "data" if options else "empty", "error": None,
+            "options": options}
+
+
+@router.get(
+    "/pcap/{job_id}/findings",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+def pcap_findings_fragment(
+    request: Request,
+    job_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> Response:
+    """The findings cards, the triage chips and the threat intel table."""
+    job, refusal = _job(job_id, current_user, session)
+    view = findings_view(job)
+    if refusal is not None:
+        view["error"] = refusal
+    return render_view(request, FINDINGS_FRAGMENT, view)
+
+
+@router.get(
+    "/pcap/history",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+def pcap_history_fragment(
+    request: Request,
+    limit: int = 50,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> Response:
+    """The analysis history."""
+    from ion.web import pcap_api
+
+    try:
+        payload = pcap_api.list_pcap_jobs(
+            limit=limit, _user=current_user, session=session)
+    except Exception:
+        logger.exception("Pcap history fragment could not read")
+        payload = None
+    return render_view(request, HISTORY_FRAGMENT, history_view(payload))
+
+
+@router.get(
+    "/pcap/case-options",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def pcap_case_options_fragment(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> Response:
+    """Open cases, for attaching selected findings to one."""
+    from ion.web import case_lifecycle_api
+
+    try:
+        payload = await case_lifecycle_api.list_cases(
+            status="OPEN", limit=500, sort="case_number", order="desc",
+            current_user=current_user, session=session)
+    except Exception:
+        logger.exception("Pcap case picker could not read the case list")
+        payload = None
+    return render_view(request, CASE_OPTIONS_FRAGMENT,
+                       case_options_view(payload))
+
+
+# ---------------------------------------------------------------------------
+# The network graph's chrome
+# ---------------------------------------------------------------------------
+#
+# Only the chrome. vis-network draws into a canvas, so there is no markup
+# in the graph itself for a stylesheet to reach and nothing to gain from
+# moving the drawing call.
+#
+# The counts beside the heading were `stats.total_nodes||0` and four more
+# like it, so a graph whose stats were not recorded reported zero hosts
+# and zero connections directly above a drawing of them.
+
+GRAPH_FRAGMENT = "_fragments/pcap_graph.html"
+
+
+class GraphView(TypedDict):
+    state: str
+    error: Optional[str]
+    total_nodes: Optional[int]
+    total_edges: Optional[int]
+    internal_nodes: Optional[int]
+    external_nodes: Optional[int]
+    suspicious_nodes: Optional[int]
+
+
+def graph_view(job: Any) -> GraphView:
+    empty: GraphView = {
+        "state": "failed",
+        "error": (_text(job.get("error")) if isinstance(job, dict)
+                  else None),
+        "total_nodes": None, "total_edges": None, "internal_nodes": None,
+        "external_nodes": None, "suspicious_nodes": None,
+    }
+    if not isinstance(job, dict) or not isinstance(job.get("result"), dict):
+        return empty
+    graph = job["result"].get("network_graph")
+    graph = graph if isinstance(graph, dict) else {}
+    nodes = graph.get("nodes")
+    if not isinstance(nodes, list):
+        return {**empty, "state": "unreadable", "error": None}
+    if not nodes:
+        return {**empty, "state": "empty", "error": None}
+    stats = graph.get("stats")
+    stats = stats if isinstance(stats, dict) else {}
+    return {
+        "state": "data",
+        "error": None,
+        "total_nodes": _int(stats.get("total_nodes")),
+        "total_edges": _int(stats.get("total_edges")),
+        "internal_nodes": _int(stats.get("internal_nodes")),
+        "external_nodes": _int(stats.get("external_nodes")),
+        "suspicious_nodes": _int(stats.get("suspicious_nodes")),
+    }
+
+
+@router.get(
+    "/pcap/{job_id}/graph",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+def pcap_graph_fragment(
+    request: Request,
+    job_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> Response:
+    """The graph panel's heading, host counts and canvas container."""
+    job, refusal = _job(job_id, current_user, session)
+    view = graph_view(job)
+    if refusal is not None:
+        view["error"] = refusal
+    return render_view(request, GRAPH_FRAGMENT, view)

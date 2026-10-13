@@ -1,0 +1,280 @@
+/* ===================================================================
+   The pcap analyser's own rules, moved here from its <style> block.
+
+   It loads from head_css, which is after ion.css, ion-migrated-styles.css
+   and alert-detail.css, and before ion-workspace.css and ion-shell.css.
+   Measured before the move: 138 selectors and one @keyframes
+   (pulse-bar), with zero overlap against ion-workspace.css or
+   ion-shell.css, and base.html no longer carries in-body blocks at all.
+   So nothing here changes winner.
+   =================================================================== */
+
+/* The tab badges. Eighteen sites each held display:inline, a background,
+   color:#fff, a 1px/6px padding, an 8px radius, a .7rem font size and a
+   4px left margin in a JavaScript string, and differed only in the
+   background. The CSP allows programmatic CSSOM so they did apply, but a
+   colour held in JavaScript is a colour no stylesheet sweep reaches and
+   no theme can override. */
+/* The foreground travels with the background in each tone rather than
+   sitting alone in the base rule. A `color: #fff` with no background
+   beside it is white-on-white the moment a tone class is missing, which
+   is what the redesign's `light` column measures. */
+.pcap-tab-badge {
+    display: inline;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    margin-left: 4px;
+}
+.pcap-tab-badge.is-empty { display: none; }
+.pcap-tab-badge.tone-critical { background: var(--sev-critical); color: #fff; }
+.pcap-tab-badge.tone-high { background: var(--sev-high); color: #fff; }
+.pcap-tab-badge.tone-medium { background: var(--sev-medium); color: #fff; }
+.pcap-tab-badge.tone-primary { background: var(--primary); color: #fff; }
+.pcap-tab-badge.tone-info { background: var(--info); color: #fff; }
+.pcap-tab-badge.tone-warning { background: var(--warning); color: #fff; }
+.pcap-empty {
+    padding: 1.25rem;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.pcap-page { max-width: 1400px; margin: 0 auto; }
+
+/* Upload zone */
+.pcap-upload-zone {
+    border: 2px dashed var(--ion-border);
+    border-radius: 12px;
+    padding: 48px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    background: var(--bg-secondary);
+    margin-bottom: 24px;
+}
+.pcap-upload-zone:hover, .pcap-upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(0, 229, 255, .04);
+}
+.pcap-upload-zone .upload-icon { font-size: 2.5rem; color: var(--text-secondary); margin-bottom: 12px; }
+.pcap-upload-zone.drag-over .upload-icon { color: var(--accent); }
+.pcap-upload-zone h3 { margin: 0 0 6px; font-size: 1rem; }
+.pcap-upload-zone p { margin: 0; font-size: .82rem; color: var(--text-secondary); }
+
+/* Progress */
+.pcap-progress { display: none; margin-bottom: 24px; }
+.pcap-progress .progress-bar-outer {
+    height: 6px; border-radius: 3px; background: var(--bg-secondary); overflow: hidden;
+}
+.pcap-progress .progress-bar-inner {
+    height: 100%; width: 0; background: var(--accent); border-radius: 3px;
+    transition: width .3s; animation: pulse-bar 1.5s ease-in-out infinite;
+}
+@keyframes pulse-bar { 0%,100%{opacity:1} 50%{opacity:.6} }
+.pcap-progress .progress-text { font-size: .8rem; color: var(--text-secondary); margin-top: 6px; }
+
+/* Verdict banner */
+.verdict-banner {
+    padding: 20px 24px; border-radius: 10px; margin-bottom: 24px;
+    display: flex; align-items: center; gap: 16px;
+}
+.verdict-banner.benign { background: rgba(63,185,80,.1); border: 1px solid rgba(63,185,80,.3); }
+.verdict-banner.elevated { background: rgba(210,153,34,.12); border: 1px solid rgba(210,153,34,.35); }
+.verdict-banner.investigate { background: rgba(248,81,73,.1); border: 1px solid rgba(248,81,73,.3); }
+.verdict-icon { font-size: 2rem; }
+.verdict-banner.benign .verdict-icon { color: var(--success); }
+.verdict-banner.elevated .verdict-icon { color: var(--warning, #d29922); }
+.verdict-banner.investigate .verdict-icon { color: var(--danger); }
+.verdict-info h2 { margin: 0 0 4px; font-size: 1.15rem; }
+.verdict-info .verdict-confidence { font-size: .82rem; color: var(--text-secondary); }
+.verdict-reasons { margin-top: 8px; padding-left: 18px; }
+.verdict-reasons li { font-size: .82rem; color: var(--text-primary); margin-bottom: 3px; }
+
+/* Summary cards */
+.pcap-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.summary-card {
+    background: var(--bg-secondary); border: 1px solid var(--ion-border);
+    border-radius: var(--ion-radius-lg); padding: 16px;
+}
+.summary-card .card-label { font-size: .72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+.summary-card .card-value { font-size: 1.3rem; font-weight: 700; }
+.summary-card .card-sub { font-size: .75rem; color: var(--text-secondary); margin-top: 2px; }
+
+/* Tabs */
+.pcap-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--ion-border); margin-bottom: 20px; overflow-x: auto; }
+.pcap-tab {
+    padding: 10px 18px; background: transparent; border: none; color: var(--text-secondary);
+    cursor: pointer; font-size: .82rem; font-weight: 600; border-bottom: 2px solid transparent;
+    white-space: nowrap; transition: color .15s, border-color .15s;
+}
+.pcap-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.pcap-attach-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
+    padding: .6rem .75rem; margin-bottom: .75rem; border-radius: .5rem;
+    background: var(--bg-elevated, rgba(255,255,255,.03)); }
+.pcap-attach-hint { flex: 1 1 18rem; font-size: .78rem; color: var(--text-secondary); }
+.pcap-pick { display: inline-flex; align-items: center; margin-right: .4rem; }
+.pcap-history-row { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem;
+    /* --ion-border is ION's border COLOUR. daisyUI 5 claims the bare
+       unprefixed name for its border-WIDTH token, so using that one here
+       would resolve to `1px solid 1px` -- an invalid shorthand the browser
+       discards entirely, making the border vanish rather than change
+       colour. test_ui_rewrite_theme_parity.py guards the distinction, and
+       its regex matches the bare name in comments too, so this one avoids
+       spelling it. */
+    padding: .55rem .7rem; border-bottom: 1px solid var(--ion-border, rgba(255,255,255,.08));
+    font-size: .82rem; }
+.pcap-history-row:last-child { border-bottom: 0; }
+.pcap-history-row .mono { font-family: ui-monospace, monospace; opacity: .65; }
+.pcap-tab:hover { color: var(--text-primary); }
+
+/* Tab panels */
+.pcap-panel { display: none; }
+.pcap-panel.active { display: block; }
+
+/* Table styles */
+.pcap-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.pcap-table th { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--ion-border); color: var(--text-secondary); font-weight: 600; font-size: .75rem; text-transform: uppercase; letter-spacing: .5px; }
+.pcap-table td { padding: 8px 12px; border-bottom: 1px solid rgba(48,54,61,.4); }
+.pcap-table tbody tr:hover { background: rgba(0,229,255,.03); }
+
+/* Findings */
+.finding-card {
+    padding: 12px 16px; border-radius: var(--ion-radius-lg); margin-bottom: 8px;
+    border-left: 4px solid; background: var(--bg-secondary);
+}
+.finding-card.critical { border-left-color: var(--danger); background: rgba(218,54,51,.06); }
+.finding-card.high { border-left-color: var(--danger); }
+.finding-card.medium { border-left-color: var(--warning); }
+.finding-card.low { border-left-color: var(--info); }
+.finding-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.finding-sev {
+    font-size: .68rem; font-weight: 700; text-transform: uppercase; padding: 2px 6px;
+    border-radius: 3px; letter-spacing: .5px;
+}
+.finding-sev.critical { background: rgba(218,54,51,.2); color: var(--danger); }
+.finding-sev.high { background: rgba(248,81,73,.15); color: var(--danger); }
+.finding-sev.medium { background: rgba(210,153,34,.15); color: var(--warning); }
+.finding-sev.low { background: rgba(139,148,158,.15); color: var(--info); }
+.finding-cat { font-size: .75rem; color: var(--text-secondary); }
+.finding-title { font-size: .85rem; font-weight: 600; margin-bottom: 4px; }
+.finding-detail { font-size: .78rem; color: var(--text-secondary); line-height: 1.4; }
+
+/* Findings triage widget */
+.findings-widget-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.findings-widget-head h3 { margin: 0; font-size: 1rem; }
+.findings-hint { font-size: .72rem; color: var(--text-secondary); }
+.findings-triage { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.triage-chip {
+    display: flex; flex-direction: column; gap: 3px; padding: 10px 14px;
+    border-radius: var(--ion-radius-lg); background: var(--bg-secondary);
+    border: 1px solid rgba(48,54,61,.6); border-top: 3px solid var(--chip-color, var(--info));
+    cursor: pointer; transition: opacity .15s ease, box-shadow .15s ease, border-color .15s ease;
+    user-select: none; text-align: left;
+}
+.triage-chip:hover { border-color: var(--chip-color, var(--info)); }
+.triage-chip:focus-visible { outline: 2px solid var(--chip-color, var(--info)); outline-offset: 2px; }
+.triage-chip.zero { opacity: .35; cursor: default; }
+.triage-chip.muted { opacity: .3; }
+.triage-chip.selected { box-shadow: 0 0 0 1px var(--chip-color) inset; border-color: var(--chip-color); }
+.triage-count { font-size: 1.55rem; font-weight: 700; line-height: 1; color: var(--chip-color, var(--info)); font-variant-numeric: tabular-nums; }
+.triage-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .5px; color: var(--text-secondary); }
+.triage-chip.total { --chip-color: var(--accent, #00e5ff); }
+.triage-chip.critical { --chip-color: var(--sev-critical, #da3633); }
+.triage-chip.high { --chip-color: var(--sev-high, #f85149); }
+.triage-chip.medium { --chip-color: var(--sev-medium, #d29922); }
+.triage-chip.low { --chip-color: var(--sev-low, #8b949e); }
+.mitre-rollup { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
+.mitre-chip { font-size: .7rem; padding: 3px 9px; border-radius: 12px; background: rgba(0,229,255,.07); border: 1px solid rgba(0,229,255,.22); color: var(--text-primary); font-family: var(--font-mono, monospace); white-space: nowrap; }
+.mitre-chip .tname { color: var(--text-secondary); }
+.finding-card.hidden { display: none; }
+.finding-mitre { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.finding-tid { font-size: .66rem; padding: 1px 6px; border-radius: 10px; background: rgba(139,148,158,.12); color: var(--text-secondary); font-family: var(--font-mono, monospace); }
+.findings-empty-filter { padding: 24px; text-align: center; color: var(--text-secondary); font-size: .82rem; }
+
+/* Overflow containment — long IPv6 addresses, filenames, paths, and DGA domains
+   must wrap inside their box instead of pushing the panel sideways. */
+.pcap-panel { min-width: 0; }
+.finding-title, .finding-detail { overflow-wrap: anywhere; }
+.pcap-table td { word-break: break-word; }
+.pcap-table th { white-space: nowrap; }
+#panel-network > div, #panel-data > div { min-width: 0; overflow-x: auto; }
+.conv-pair { flex-shrink: 1; min-width: 0; }
+
+/* Data-transfer direction bars (sent vs received per host) */
+.dt-legend { display: flex; gap: 16px; font-size: .72rem; color: var(--text-secondary); margin: 4px 0 12px; }
+.dt-legend span::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.dt-legend .dt-l-sent::before { background: var(--warning); }
+.dt-legend .dt-l-recv::before { background: var(--info); }
+.dt-row { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+.dt-ip { width: 150px; flex-shrink: 0; font-size: .78rem; font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dt-track { flex: 1; min-width: 0; height: 16px; display: flex; background: var(--bg-secondary); border-radius: 3px; overflow: hidden; }
+.dt-sent { background: var(--warning); height: 100%; }
+.dt-recv { background: var(--info); height: 100%; }
+.dt-vals { width: 128px; flex-shrink: 0; text-align: right; font-size: .72rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.dt-vals .dt-exfil { color: var(--danger); font-weight: 600; }
+/* Inline volume bar inside the port/IP count tables */
+.pcap-table .bar-cell { position: relative; }
+.pcap-table .bar-cell .mini-bar { position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 60%; background: rgba(88,166,255,.18); border-radius: 2px; z-index: 0; }
+.pcap-table .bar-cell .mini-val { position: relative; z-index: 1; }
+
+/* Follow-stream + email panels */
+.stream-item { margin-bottom: 6px; background: var(--bg-secondary); border-radius: 6px; padding: 8px 12px; }
+.stream-item summary { cursor: pointer; font-size: .82rem; list-style: none; }
+.stream-item summary::-webkit-details-marker { display: none; }
+.stream-item summary::before { content: '▸ '; color: var(--text-secondary); }
+.stream-item[open] summary::before { content: '▾ '; }
+.stream-size { color: var(--text-secondary); font-size: .75rem; margin-left: 8px; }
+.stream-preview { margin: 8px 0 0; max-height: 340px; overflow: auto; background: var(--bg-tertiary, #0b0f14); padding: 10px; border-radius: 4px; font-size: .72rem; font-family: var(--font-mono, monospace); white-space: pre-wrap; word-break: break-all; color: var(--text-primary); }
+.attach-bad { color: var(--danger); font-weight: 600; }
+
+/* Proto bar chart */
+.proto-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.proto-label { width: 60px; font-size: .8rem; text-align: right; color: var(--text-secondary); }
+.proto-bar-bg { flex: 1; height: 20px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; }
+.proto-bar-fill { height: 100%; border-radius: 4px; transition: width .3s; }
+.proto-bar-fill.tcp { background: var(--info); }
+.proto-bar-fill.udp { background: var(--success); }
+.proto-bar-fill.icmp { background: var(--warning); }
+.proto-bar-fill.other { background: var(--text-secondary); }
+.proto-count { width: 60px; font-size: .78rem; color: var(--text-secondary); }
+
+/* Results area */
+.pcap-results { display: none; }
+.pcap-results.visible { display: block; }
+
+/* Conversation flow bar */
+.conv-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.conv-pair { width: 280px; font-size: .78rem; font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conv-bar-bg { flex: 1; height: 14px; background: var(--bg-secondary); border-radius: 3px; overflow: hidden; }
+.conv-bar-fill { height: 100%; background: var(--info); border-radius: 3px; }
+.conv-bytes { font-size: .75rem; color: var(--text-secondary); width: 80px; text-align: right; }
+
+/* ISAKMP status badges */
+.ike-status {
+    display: inline-block; padding: 2px 8px; border-radius: 3px;
+    font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
+}
+.ike-status.established { background: rgba(63,185,80,.15); color: var(--success); }
+.ike-status.failed { background: rgba(248,81,73,.15); color: var(--danger); }
+.ike-status.no-response { background: rgba(248,81,73,.15); color: var(--danger); }
+.ike-status.incomplete { background: rgba(210,153,34,.15); color: var(--warning); }
+
+/* Reset button */
+.pcap-reset { margin-bottom: 16px; }
+
+/* The threat intel label chip and observable link.
+
+   These were _ion-s-7554583028 and _ion-s-b17605f04d in
+   ion-migrated-styles.css. The declarations are unchanged; only the names
+   are, because after the conversion no template referenced the hashed
+   ones and no other page used them. */
+.pcap-ti-chip {
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: .75rem;
+    margin-right: 3px;
+}
+.pcap-ti-link {
+    color: var(--text-primary);
+    text-decoration: underline dotted;
+}
