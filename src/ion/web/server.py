@@ -1326,7 +1326,10 @@ def _register_pages() -> None:
             user: User = Depends(require_page_permission(_permission)),
             _name: str = _template,
         ):
-            return templates.TemplateResponse(request=request, name=_name)
+            return templates.TemplateResponse(
+                request=request, name=_name,
+                context={"current_user": user} if _name in {"observables.html", "forensics.html"} else {},
+            )
 
         _page.__name__ = "page_" + (_path.strip("/").replace("/", "_").replace("-", "_") or "root")
         app.get(_path, response_class=HTMLResponse)(_page)
