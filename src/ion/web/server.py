@@ -1326,9 +1326,27 @@ def _register_pages() -> None:
             user: User = Depends(require_page_permission(_permission)),
             _name: str = _template,
         ):
+            # Every page gets the request's own authenticated user, so a
+            # template can gate a control on a permission without this
+            # loop having to know which templates those are.
+            #
+            # This was a set of template names, and it had to be: the
+            # conversions that needed `current_user` added themselves to
+            # it one at a time. Two of them did so independently and the
+            # second conflicted with the first here, which is the signal
+            # that the condition was the wrong shape rather than the
+            # wrong contents. A template that does not use the name
+            # ignores it, and the value is the user's own identity, so
+            # passing it everywhere discloses nothing.
+            #
+            # Hiding a control is not authorization. Every action behind
+            # one of these gates is also gated server-side: the database
+            # backup and cleanup endpoints take require_admin, and the
+            # integration endpoints take
+            # require_permission("integration:manage").
             return templates.TemplateResponse(
                 request=request, name=_name,
-                context={"current_user": user} if _name in {"observables.html", "forensics.html"} else {},
+                context={"current_user": user},
             )
 
         _page.__name__ = "page_" + (_path.strip("/").replace("/", "_").replace("-", "_") or "root")
