@@ -1,0 +1,119 @@
+{% macro figure(value, why) %}
+{%- if value is not none %}{{ value }}
+{%- else %}<span class="an-absent" title="{{ why }}"></span>{% endif %}
+{% endmacro %}
+{# The pcap verdict banner, summary cards and overview, from ui/pcap.py.
+
+   renderResults opened with `const label = d.verdict.label`, no guard,
+   as the first statement of the function that rendered all twenty-eight
+   panels. A stored result with no verdict key threw there, so an analysis
+   that had run and whose result was in the database rendered nothing at
+   all.
+
+   The overview target is this fragment's swap; the banner, the cards and
+   the findings badge live above the tab strip and go out of band.
+#}
+{#- The banner is replaced whole, so it carries its own id back: the state
+    lives in its class and a next swap has to find it again. -#}
+<div class="verdict-banner {{ verdict.state }}" id="verdict-banner"
+     hx-swap-oob="outerHTML:#verdict-banner">
+  <div class="verdict-icon" id="verdict-icon">
+    {%- if verdict.state == 'investigate' %}<i class="icon-alert-triangle"></i>
+    {%- elif verdict.state == 'elevated' %}<i class="icon-alert-circle"></i>
+    {%- else %}<i class="icon-shield-check"></i>{% endif %}
+  </div>
+  <div>
+    <h2 id="verdict-label" class="mb-1 text-[1.15rem]">{{ verdict.label }}</h2>
+    <div id="verdict-confidence" class="text-[0.82rem] text-base-content/60">
+      {%- if verdict.confidence is not none %}Confidence: {{ verdict.confidence }}%
+      {%- else %}Confidence not recorded{% endif %}
+      {#- `score != null` was already right, so a recorded 0 still shows. -#}
+      {%- if verdict.score is not none %} &middot; Score: {{ verdict.score }}{% endif %}
+      {%- if verdict.finding_count %} &middot; {{ verdict.finding_count }} finding(s){% endif %}
+    </div>
+    <ul class="verdict-reasons" id="verdict-reasons">
+      {%- if verdict.reasons is none %}
+      <li class="an-absent-text">The reasons are not in a shape this page
+        can read.</li>
+      {%- else %}
+      {%- for r in verdict.reasons %}<li>{{ r }}</li>{% endfor %}
+      {%- endif %}
+    </ul>
+  </div>
+</div>
+<div class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3 mb-6"
+     id="pcap-summary" hx-swap-oob="innerHTML:#pcap-summary">
+  {%- for c in cards %}
+  <div class="summary-card">
+    <div class="card-label">{{ c.label }}</div>
+    <div class="card-value">{{ figure(c.value, c.missing) }}</div>
+    {%- if c.sub %}<div class="card-sub">{{ c.sub }}</div>{% endif %}
+  </div>
+  {%- endfor %}
+</div>
+{#- The badge's palette was `fb.style.cssText = ...` in JavaScript,
+    one of eighteen such sites on this page. That applies, since the CSP
+    allows programmatic CSSOM, but it puts a colour, a padding and a
+    radius somewhere no stylesheet can reach. It is a class now. -#}
+<span id="findings-count-badge"
+      class="badge pcap-findings-badge{% if not finding_count %} is-empty{% endif %}"
+      hx-swap-oob="outerHTML:#findings-count-badge">
+  {%- if finding_count %}{{ finding_count }}{% endif %}
+</span>
+{%- if state != 'data' %}
+<div class="pcap-empty">
+  {%- if error %}{{ error }}
+  {%- elif state == 'no_result' %}This analysis has no stored result.
+  {%- else %}This analysis could not be read.{% endif %}
+</div>
+{%- else %}
+<h3 class="mt-0 mr-0 mb-3 ml-0 text-[.95rem]">Protocol Distribution</h3>
+{%- if protocol_bars is none %}
+<p class="text-[var(--text-secondary)] text-[.85rem]">The protocol
+  breakdown is not in a shape this page can read.</p>
+{%- elif not protocol_bars %}
+<p class="text-[var(--text-secondary)] text-[.85rem]">No protocols
+  recorded.</p>
+{%- else %}
+{%- for b in protocol_bars %}
+<div class="proto-bar-row">
+  <div class="proto-label">{{ b.label }}</div>
+  <div class="proto-bar-bg">
+    {%- if b.pct is not none %}
+    <div class="proto-bar-fill {{ b.css_class }}"
+         data-ion-style="width:{{ b.pct }}%"></div>
+    {%- endif %}
+  </div>
+  <div class="proto-count">
+    {%- if b.count is not none %}{{ b.count }}
+      {%- if b.pct is not none %} ({{ b.pct }}%){% endif %}
+    {%- else %}<span class="an-absent"
+        title="This protocol's packet count is not readable"></span>
+    {%- endif %}
+  </div>
+</div>
+{%- endfor %}
+{%- endif %}
+<h3 class="mt-5 mr-0 mb-3 ml-0 text-[.95rem]">Top Conversations</h3>
+{%- if conversations is none %}
+<p class="text-[var(--text-secondary)] text-[.85rem]">The conversation
+  list is not in a shape this page can read.</p>
+{%- elif not conversations %}
+<p class="text-[var(--text-secondary)] text-[.85rem]">No conversations
+  recorded.</p>
+{%- else %}
+{%- for c in conversations %}
+<div class="conv-bar">
+  <div class="conv-pair" title="{{ c.pair }}">{{ c.pair }}</div>
+  <div class="conv-bar-bg">
+    {%- if c.pct is not none %}
+    <div class="conv-bar-fill" data-ion-style="width:{{ c.pct }}%"></div>
+    {%- endif %}
+  </div>
+  <div class="conv-bytes">
+    {{- figure(c.bytes, 'This conversation carried no byte count') -}}
+  </div>
+</div>
+{%- endfor %}
+{%- endif %}
+{%- endif %}

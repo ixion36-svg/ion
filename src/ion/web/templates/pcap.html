@@ -4,6 +4,36 @@
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 <style nonce="{{ csp_nonce }}">
+/* The tab badges. Eighteen sites each held display:inline, a background,
+   color:#fff, a 1px/6px padding, an 8px radius, a .7rem font size and a
+   4px left margin in a JavaScript string, and differed only in the
+   background. The CSP allows programmatic CSSOM so they did apply, but a
+   colour held in JavaScript is a colour no stylesheet sweep reaches and
+   no theme can override. */
+/* The foreground travels with the background in each tone rather than
+   sitting alone in the base rule. A `color: #fff` with no background
+   beside it is white-on-white the moment a tone class is missing, which
+   is what the redesign's `light` column measures. */
+.pcap-tab-badge {
+    display: inline;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    margin-left: 4px;
+}
+.pcap-tab-badge.is-empty { display: none; }
+.pcap-tab-badge.tone-critical { background: var(--sev-critical); color: #fff; }
+.pcap-tab-badge.tone-high { background: var(--sev-high); color: #fff; }
+.pcap-tab-badge.tone-medium { background: var(--sev-medium); color: #fff; }
+.pcap-tab-badge.tone-primary { background: var(--primary); color: #fff; }
+.pcap-tab-badge.tone-info { background: var(--info); color: #fff; }
+.pcap-tab-badge.tone-warning { background: var(--warning); color: #fff; }
+.pcap-empty {
+    padding: 1.25rem;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
 .pcap-page { max-width: 1400px; margin: 0 auto; }
 
 /* Upload zone */
@@ -449,48 +479,44 @@
         }
     }
 
+    // GET /ui/pcap/{job}/summary renders the verdict banner, the
+    // summary cards, the findings badge and the overview; the banner,
+    // the cards and the badge are swapped out of band because they sit
+    // above the tab strip. GET /ui/pcap/{job}/network renders the four
+    // top-talker tables.
+    //
+    // This function used to open with
+    //
+    //     const label = d.verdict.label;
+    //
+    // with no guard, as the first statement before any of the
+    // twenty-eight render calls below. A stored result with no verdict
+    // key threw there and nothing rendered at all, on an analysis that
+    // had run and whose result was in the database.
+    //
+    // The four network tables and the conversation bars all shared the
+    // NaN defect: `Math.max(...top.map(i => i.count), 1)` is NaN the
+    // moment one count is not a number, so every bar became
+    // `width:NaN%`. The conversation bars were worse, scaling to
+    // `d.conversations[0].bytes` and so trusting the list to be sorted.
+    //
+    // The findings badge carried its palette in a JavaScript string,
+    // `fb.style.cssText = ...`, one of eighteen such sites on this page.
+    // That applies, since the CSP allows programmatic CSSOM, but it puts
+    // a colour, a padding and a radius where no stylesheet can reach
+    // them. It is a class now.
     function renderResults(d) {
-        // Verdict
-        const banner = document.getElementById('verdict-banner');
-        const label = d.verdict.label;
-        const state = label === 'Needs Investigation' ? 'investigate'
-                    : label === 'Elevated' ? 'elevated'
-                    : 'benign';
-        banner.className = 'verdict-banner ' + state;
-        document.getElementById('verdict-icon').innerHTML =
-            state === 'investigate' ? '<i class="icon-alert-triangle"></i>'
-          : state === 'elevated' ? '<i class="icon-alert-circle"></i>'
-          : '<i class="icon-shield-check"></i>';
-        document.getElementById('verdict-label').textContent = d.verdict.label;
-        document.getElementById('verdict-confidence').textContent =
-            `Confidence: ${d.verdict.confidence}%` +
-            (d.verdict.score != null ? ` · Score: ${d.verdict.score}` : '') +
-            (d.verdict.finding_count ? ` · ${d.verdict.finding_count} finding(s)` : '');
-        const reasonsUl = document.getElementById('verdict-reasons');
-        reasonsUl.innerHTML = (d.verdict.reasons || []).map(r => `<li>${esc(r)}</li>`).join('');
-
-        // Summary cards
-        document.getElementById('pcap-summary').innerHTML = [
-            card('File', esc(d.file_name), fmtBytes(d.file_size)),
-            card('Packets', fmtNum(d.packet_count), ''),
-            card('Duration', fmtDuration(d.capture_duration), d.time_start ? new Date(d.time_start).toLocaleString() : ''),
-            card('Protocols', Object.keys(d.protocols || {}).join(', '), ''),
-            card('Unique Src IPs', fmtNum((d.top_src_ips || []).length), ''),
-            card('DNS Queries', fmtNum((d.dns_queries || []).length) + ' unique', ''),
-        ].join('');
-
-        // Findings badge
-        const fb = document.getElementById('findings-count-badge');
-        if ((d.findings || []).length > 0) {
-            fb.style.display = 'inline';
-            fb.textContent = d.findings.length;
-            fb.style.cssText = 'display:inline;background:var(--sev-critical);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
-        } else {
-            fb.style.display = 'none';
+        if (_currentJobId) {
+            htmx.ajax('GET', '/ui/pcap/' + _currentJobId + '/summary', {
+                source: document.getElementById('panel-overview'),
+                target: '#panel-overview', swap: 'innerHTML',
+            });
+            htmx.ajax('GET', '/ui/pcap/' + _currentJobId + '/network', {
+                source: document.getElementById('panel-network'),
+                target: '#panel-network', swap: 'innerHTML',
+            });
         }
 
-        renderOverview(d);
-        renderNetwork(d);
         renderDns(d);
         renderHttp(d);
         renderTls(d);
@@ -515,75 +541,6 @@
         renderNetworkGraph(d);
         renderFindings(d);
         renderThreatIntel(d);
-    }
-
-    function card(label, value, sub) {
-        return `<div class="summary-card"><div class="card-label">${label}</div><div class="card-value">${value}</div>${sub ? `<div class="card-sub">${sub}</div>` : ''}</div>`;
-    }
-
-    function renderOverview(d) {
-        const protos = d.protocols || {};
-        const total = Object.values(protos).reduce((a, b) => a + b, 0) || 1;
-        const colors = { TCP: 'tcp', UDP: 'udp', ICMP: 'icmp' };
-        let bars = '';
-        for (const [proto, count] of Object.entries(protos)) {
-            const pct = (count / total * 100).toFixed(1);
-            const cls = colors[proto] || 'other';
-            bars += `<div class="proto-bar-row">
-                <div class="proto-label">${esc(proto)}</div>
-                <div class="proto-bar-bg"><div class="proto-bar-fill ${cls}" data-ion-style="width:${pct}%"></div></div>
-                <div class="proto-count">${fmtNum(count)} (${pct}%)</div>
-            </div>`;
-        }
-
-        let convBars = '';
-        const convMax = (d.conversations || []).length > 0 ? d.conversations[0].bytes : 1;
-        for (const c of (d.conversations || []).slice(0, 10)) {
-            const pct = (c.bytes / convMax * 100).toFixed(1);
-            convBars += `<div class="conv-bar">
-                <div class="conv-pair" title="${esc(c.pair)}">${esc(c.pair)}</div>
-                <div class="conv-bar-bg"><div class="conv-bar-fill" data-ion-style="width:${pct}%"></div></div>
-                <div class="conv-bytes">${fmtBytes(c.bytes)}</div>
-            </div>`;
-        }
-
-        document.getElementById('panel-overview').innerHTML =
-            `<h3 class="mt-0 mr-0 mb-3 ml-0 text-[.95rem]">Protocol Distribution</h3>${bars}` +
-            `<h3 class="mt-5 mr-0 mb-3 ml-0 text-[.95rem]">Top Conversations</h3>${convBars || '<p class="text-[var(--text-secondary)] text-[.85rem]">No conversations recorded.</p>'}`;
-    }
-
-    function renderNetwork(d) {
-        let html = '<div class="grid grid-cols-2 gap-5">';
-        html += '<div><h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">Top Source IPs</h3>' + ipTable(d.top_src_ips) + '</div>';
-        html += '<div><h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">Top Destination IPs</h3>' + ipTable(d.top_dst_ips) + '</div>';
-        html += '</div>';
-        html += '<div class="grid grid-cols-2 gap-5 mt-5">';
-        html += '<div><h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">Top Source Ports</h3>' + portTable(d.top_src_ports) + '</div>';
-        html += '<div><h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">Top Destination Ports</h3>' + portTable(d.top_dst_ports) + '</div>';
-        html += '</div>';
-        document.getElementById('panel-network').innerHTML = html;
-    }
-
-    function ipTable(items) {
-        if (!items || !items.length) return '<p class="text-[var(--text-secondary)] text-[.85rem]">No data</p>';
-        const top = items.slice(0, 15);
-        const max = Math.max(...top.map(i => i.count), 1);
-        let rows = top.map(i => {
-            const pct = (i.count / max * 100).toFixed(1);
-            return `<tr><td class="font-mono">${esc(i.ip)}</td><td class="text-right bar-cell"><span class="mini-bar" data-ion-style="width:${pct}%"></span><span class="mini-val">${fmtNum(i.count)}</span></td></tr>`;
-        }).join('');
-        return `<table class="pcap-table"><thead><tr><th>IP Address</th><th class="text-right">Packets</th></tr></thead><tbody>${rows}</tbody></table>`;
-    }
-
-    function portTable(items) {
-        if (!items || !items.length) return '<p class="text-[var(--text-secondary)] text-[.85rem]">No data</p>';
-        const top = items.slice(0, 15);
-        const max = Math.max(...top.map(i => i.count), 1);
-        let rows = top.map(i => {
-            const pct = (i.count / max * 100).toFixed(1);
-            return `<tr><td>${i.port}</td><td class="text-right bar-cell"><span class="mini-bar" data-ion-style="width:${pct}%"></span><span class="mini-val">${fmtNum(i.count)}</span></td></tr>`;
-        }).join('');
-        return `<table class="pcap-table"><thead><tr><th>Port</th><th class="text-right">Packets</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     function renderDns(d) {
@@ -722,9 +679,8 @@
         const badge = document.getElementById('files-count-badge');
         if (!files.length) { tab.style.display = 'none'; return; }
         tab.style.display = '';
-        badge.style.display = 'inline';
         badge.textContent = files.length;
-        badge.style.cssText = 'display:inline;background:var(--sev-high);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+        badge.className = 'badge pcap-tab-badge tone-high';
 
         const panel = document.getElementById('panel-files');
         panel.innerHTML = `<h3>Extracted Files (${files.length})</h3>
@@ -750,9 +706,8 @@
         if (!fps.length) { tab.style.display = 'none'; return; }
         tab.style.display = '';
         const badCount = fps.filter(f => f.known_malware).length;
-        badge.style.display = 'inline';
         badge.textContent = fps.length;
-        badge.style.cssText = `display:inline;background:${badCount ? 'var(--sev-critical)' : 'var(--primary)'};color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;`;
+        badge.className = 'badge pcap-tab-badge ' + (badCount ? 'tone-critical' : 'tone-primary');
 
         const panel = document.getElementById('panel-ja3');
         panel.innerHTML = `<h3>JA3 TLS Fingerprints (${fps.length})</h3>
@@ -775,9 +730,8 @@
         const badge = document.getElementById('creds-count-badge');
         if (!creds.length) { tab.style.display = 'none'; return; }
         tab.style.display = '';
-        badge.style.display = 'inline';
         badge.textContent = creds.length;
-        badge.style.cssText = 'display:inline;background:var(--sev-critical);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+        badge.className = 'badge pcap-tab-badge tone-critical';
 
         const panel = document.getElementById('panel-creds');
         panel.innerHTML = `<h3>Captured Credentials (${creds.length})</h3>
@@ -802,9 +756,8 @@
         if (!fps.length) { tab.style.display = 'none'; return; }
         tab.style.display = '';
         const badCount = fps.filter(f => f.known_malware).length;
-        badge.style.display = 'inline';
         badge.textContent = fps.length;
-        badge.style.cssText = `display:inline;background:${badCount ? 'var(--sev-critical)' : 'var(--primary)'};color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;`;
+        badge.className = 'badge pcap-tab-badge ' + (badCount ? 'tone-critical' : 'tone-primary');
         document.getElementById('panel-ja3s').innerHTML = `<h3>JA3S Server Fingerprints (${fps.length})</h3>
         <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">TLS ServerHello fingerprints. Pairs with JA3 for C2 server identification.</p>
         <table class="pcap-table"><thead><tr><th>JA3S Hash</th><th>Server</th><th>Client</th><th>Port</th><th>Malware Match</th></tr></thead><tbody>
@@ -822,9 +775,8 @@
         const badge = document.getElementById('hassh-count-badge');
         if (!fps.length) { tab.style.display = 'none'; return; }
         tab.style.display = '';
-        badge.style.display = 'inline';
         badge.textContent = fps.length;
-        badge.style.cssText = 'display:inline;background:var(--primary);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+        badge.className = 'badge pcap-tab-badge tone-primary';
         document.getElementById('panel-hassh').innerHTML = `<h3>HASSH SSH Fingerprints (${fps.length})</h3>
         <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">SSH KEX_INIT fingerprints for client and server identification.</p>
         <table class="pcap-table"><thead><tr><th>HASSH Hash</th><th>Direction</th><th>Source</th><th>Destination</th><th>SSH Version</th><th>Match</th></tr></thead><tbody>
@@ -846,9 +798,8 @@
         if (!total) { tab.style.display = 'none'; return; }
         tab.style.display = '';
         const badCount = cli.filter(f => f.known_malware).length;
-        badge.style.display = 'inline';
         badge.textContent = total;
-        badge.style.cssText = `display:inline;background:${badCount ? 'var(--sev-critical)' : 'var(--primary)'};color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;`;
+        badge.className = 'badge pcap-tab-badge ' + (badCount ? 'tone-critical' : 'tone-primary');
 
         let html = `<h3>JA4 / JA4S TLS Fingerprints (${total})</h3>
         <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">FoxIO JA4+ fingerprints. JA4 (client) and JA4S (server) are robust to TLS field reordering, unlike JA3. Known-malware matches are highlighted.</p>`;
@@ -884,9 +835,8 @@
         if (!certs.length) { tab.style.display = 'none'; return; }
         tab.style.display = '';
         const flagged = certs.filter(c => c.self_signed).length;
-        badge.style.display = 'inline';
         badge.textContent = certs.length;
-        badge.style.cssText = `display:inline;background:${flagged ? 'var(--sev-medium)' : 'var(--primary)'};color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;`;
+        badge.className = 'badge pcap-tab-badge ' + (flagged ? 'tone-medium' : 'tone-primary');
         document.getElementById('panel-certs').innerHTML = `<h3>TLS Certificates (${certs.length})</h3>
         <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">Leaf X.509 certificates carved from TLS server handshakes. Self-signed and known-malicious (e.g. Cobalt Strike) certs are flagged.</p>
         <table class="pcap-table"><thead><tr><th>Server</th><th>Subject</th><th>Issuer</th><th>Self-signed</th><th>Validity</th><th>Serial</th></tr></thead><tbody>
@@ -908,9 +858,8 @@
         const badge = document.getElementById('hosts-count-badge');
         if (!hosts.length) { tab.style.display = 'none'; return; }
         tab.style.display = '';
-        badge.style.display = 'inline';
         badge.textContent = hosts.length;
-        badge.style.cssText = 'display:inline;background:var(--info);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+        badge.className = 'badge pcap-tab-badge tone-info';
         document.getElementById('panel-hosts').innerHTML = `<h3>Host Profiles (${hosts.length})</h3>
         <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">Per-host rollup: passive OS fingerprint (p0f-style, from TCP SYN), client/server role, fingerprints, SNIs, beacons, and finding count.</p>
         <table class="pcap-table"><thead><tr><th>Host</th><th>OS</th><th>Role</th><th>Sent</th><th>Received</th><th>SNIs</th><th>Beacons</th><th>Findings</th></tr></thead><tbody>
@@ -935,9 +884,8 @@
         if (!beacons.length) { tab.style.display = 'none'; return; }
         tab.style.display = '';
         const strong = beacons.filter(b => b.score >= 0.9).length;
-        badge.style.display = 'inline';
         badge.textContent = beacons.length;
-        badge.style.cssText = `display:inline;background:${strong ? 'var(--sev-high)' : 'var(--sev-medium)'};color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;`;
+        badge.className = 'badge pcap-tab-badge ' + (strong ? 'tone-high' : 'tone-medium');
         document.getElementById('panel-beacons').innerHTML = `<h3>Beaconing Candidates (${beacons.length})</h3>
         <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">RITA-style scoring of connection regularity (interval + payload-size consistency). A near-1.0 score is metronome-regular traffic — a hallmark of automated C2.</p>
         <table class="pcap-table"><thead><tr><th>Source</th><th>Destination</th><th>Port</th><th>Score</th><th>Connections</th><th>Interval</th></tr></thead><tbody>
@@ -957,9 +905,8 @@
         const badge = document.getElementById('smb-count-badge');
         if (!items.length) { tab.style.display = 'none'; return; }
         tab.style.display = '';
-        badge.style.display = 'inline';
         badge.textContent = items.length;
-        badge.style.cssText = 'display:inline;background:var(--warning);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+        badge.className = 'badge pcap-tab-badge tone-warning';
         document.getElementById('panel-smb').innerHTML = `<h3>SMB File Operations (${items.length})</h3>
         <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">SMB/CIFS file operations detected on port 445/139. May indicate lateral movement.</p>
         <table class="pcap-table"><thead><tr><th>Command</th><th>Source</th><th>Destination</th><th>Detail</th></tr></thead><tbody>
@@ -974,9 +921,8 @@
         const badge = document.getElementById('kerberos-count-badge');
         if (!items.length) { tab.style.display = 'none'; return; }
         tab.style.display = '';
-        badge.style.display = 'inline';
         badge.textContent = items.length;
-        badge.style.cssText = 'display:inline;background:var(--info);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+        badge.className = 'badge pcap-tab-badge tone-info';
         document.getElementById('panel-kerberos').innerHTML = `<h3>Kerberos Traffic (${items.length})</h3>
         <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">Kerberos authentication messages on port 88. AS-REP/TGS-REP may contain extractable tickets.</p>
         <table class="pcap-table"><thead><tr><th>Type</th><th>Source</th><th>Destination</th><th>Detail</th></tr></thead><tbody>
@@ -991,9 +937,8 @@
         const badge = document.getElementById('httpfiles-count-badge');
         if (!items.length) { tab.style.display = 'none'; return; }
         tab.style.display = '';
-        badge.style.display = 'inline';
         badge.textContent = items.length;
-        badge.style.cssText = 'display:inline;background:var(--sev-high);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+        badge.className = 'badge pcap-tab-badge tone-high';
         document.getElementById('panel-httpfiles').innerHTML = `<h3>HTTP File Transfers (${items.length})</h3>
         <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">Files reconstructed from HTTP response bodies via Content-Type headers.</p>
         <table class="pcap-table"><thead><tr><th>Filename</th><th>Content-Type</th><th>Size</th><th>MD5</th><th>Source</th><th>Destination</th></tr></thead><tbody>
@@ -1010,9 +955,8 @@
         const badge = document.getElementById('arp-count-badge');
         if (!items.length) { tab.style.display = 'none'; return; }
         tab.style.display = '';
-        badge.style.display = 'inline';
         badge.textContent = items.length;
-        badge.style.cssText = 'display:inline;background:var(--sev-critical);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+        badge.className = 'badge pcap-tab-badge tone-critical';
         document.getElementById('panel-arp').innerHTML = `<h3>ARP Anomalies (${items.length})</h3>
         <p class="text-[var(--sev-critical)] text-[.82rem] mb-3 font-semibold">MAC addresses claiming multiple IPs — possible ARP spoofing / MITM.</p>
         <table class="pcap-table"><thead><tr><th>MAC</th><th>IPs Claimed</th><th>Severity</th><th>Detail</th></tr></thead><tbody>
@@ -1030,9 +974,8 @@
         const badge = document.getElementById('b64-count-badge');
         if (!items.length) { tab.style.display = 'none'; return; }
         tab.style.display = '';
-        badge.style.display = 'inline';
         badge.textContent = items.length;
-        badge.style.cssText = 'display:inline;background:var(--sev-high);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+        badge.className = 'badge pcap-tab-badge tone-high';
         document.getElementById('panel-b64').innerHTML = `<h3>Base64 Encoded Payloads (${items.length})</h3>
         <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">Base64-encoded scripts or binary payloads found in HTTP streams. May indicate obfuscated C2 or malware delivery.</p>
         <table class="pcap-table"><thead><tr><th>Type</th><th>Encoded Size</th><th>Decoded Size</th><th>Source</th><th>Destination</th><th>Preview</th></tr></thead><tbody>
@@ -1050,7 +993,7 @@
         const badge = document.getElementById('streams-count-badge');
         if (!items.length) { tab.style.display = 'none'; return; }
         tab.style.display = '';
-        badge.style.cssText = 'display:inline;background:var(--info);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+        badge.className = 'badge pcap-tab-badge tone-info';
         badge.textContent = items.length;
         const rows = items.map(s => `
             <details class="stream-item">
@@ -1069,7 +1012,7 @@
         const badge = document.getElementById('email-count-badge');
         if (!items.length) { tab.style.display = 'none'; return; }
         tab.style.display = '';
-        badge.style.cssText = 'display:inline;background:var(--info);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+        badge.className = 'badge pcap-tab-badge tone-info';
         badge.textContent = items.length;
         const DANGER = /\.(exe|scr|com|pif|js|jse|vbs|vbe|wsf|hta|jar|lnk|bat|cmd|ps1|docm|xlsm|pptm|iso|img|cpl|msi|dll)$/i;
         const rows = items.map(m => `<tr>
@@ -1376,9 +1319,8 @@
 
         // Badge for malicious hits
         if (ti.malicious_count > 0) {
-            badge.style.display = 'inline';
-            badge.textContent = ti.malicious_count;
-            badge.style.cssText = 'display:inline;background:var(--sev-critical);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+                badge.textContent = ti.malicious_count;
+            badge.className = 'badge pcap-tab-badge tone-critical';
         }
 
         const threatColors = { unknown: 'var(--sev-low)', benign: 'var(--mitre-covered)', low: 'var(--info)', medium: 'var(--sev-medium)', high: 'var(--sev-high)', critical: 'var(--sev-critical)' };
