@@ -52,6 +52,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import get_current_user, require_permission
+from ion.models.analytics import AnalyticsJobType
 from ion.models.user import User
 from ion.storage.database import get_db_session
 from ion.web.ui._shared import age_label, instant_label, plain, render_view
@@ -251,9 +252,293 @@ def analytics_stale_fragment(
 ) -> Response:
     """The stale investigations panel."""
     try:
-        job = _one_job("stale_investigations", current_user, session)
+        job = _one_job(
+            AnalyticsJobType.STALE_INVESTIGATIONS.value, current_user, session)
     except Exception:
         logger.exception("Analytics stale fragment could not read its job")
         job = None
     return render_view(request, "_fragments/analytics_stale.html",
                        stale_view(job))
+
+
+# ---------------------------------------------------------------------------
+# Rule noise, repeat offenders, entity risk
+# ---------------------------------------------------------------------------
+#
+# Three panels sharing the foundation above, and sharing one more defect
+# between two of them: a missing figure falls through a chain of
+# comparisons to the *most reassuring* end of the scale.
+#
+#   * `r.fp_ratio > 0.5 ? 'fp-high' : r.fp_ratio > 0.2 ? 'fp-med' :
+#     'fp-low'`. Both comparisons are false for undefined, so a rule whose
+#     false-positive ratio was missing was painted as a low-FP rule, which
+#     is the one colour that says "leave this one alone".
+#   * `e.risk_score >= 100 ? 'critical' : ... : 'low'`, the same shape, so
+#     an entity with no risk score was drawn as low risk.
+#
+# And one that erases a whole panel rather than one row:
+#
+#   * `Math.max(...rules.map(r => r.alert_count), 1)`. One alert_count that
+#     is not a number makes the maximum NaN, every percentage NaN, and
+#     every bar width the string "NaN%", so the chart renders as nothing.
+#     The same spread-into-Math.max appeared on the discover histogram.
+#   * `entities[0]?.risk_score || 1` takes the scale from the first row, so
+#     a first row with no score silently rescaled every bar to 100%.
+#
+# Smaller: `${o.count_7d}` and five more figures printed "undefined";
+# `(o.rules || []).length` reported "0 rules" for a list that was missing
+# rather than empty; and `<span class="entity-type-badge ${o.type}">` put a
+# server value into a class attribute unescaped.
+#
+# The bars use `data-ion-style`, ION's dynamic-style hook, rather than the
+# page's own `data-pct` plus an applyBarWidths() pass. The hook is applied
+# by static/js/ion-dynamic-styles.js on a MutationObserver, so it lands
+# after an htmx swap without the fragment having to ask.
+
+RULE_NOISE_FRAGMENT = "_fragments/analytics_rule_noise.html"
+OFFENDERS_FRAGMENT = "_fragments/analytics_offenders.html"
+ENTITY_RISK_FRAGMENT = "_fragments/analytics_entity_risk.html"
+
+#: False-positive ratio bands, from the page's own ternary chain.
+FP_HIGH = 0.5
+FP_MEDIUM = 0.2
+
+#: Risk score bands, from the page's own chain.
+RISK_BANDS: tuple[tuple[int, str], ...] = (
+    (100, "critical"), (50, "high"), (20, "medium"), (0, "low"),
+)
+
+#: How many rule names a row lists before the rest go in the tooltip.
+RULES_SHOWN = 2
+
+
+def _num(value: Any) -> Optional[float]:
+    """A real number, or None. bool is excluded: True is 1 in Python and a
+    ratio of 1.0 is not what a boolean means."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if value != value or value in (float("inf"), float("-inf")):
+        return None
+    return float(value)
+
+
+def _names(value: Any) -> Optional[list[str]]:
+    """A list of names, or None when the payload did not carry one.
+
+    `(o.rules || []).length` reported "0 rules" for a missing list, which
+    is a count of a thing we were not told about.
+    """
+    if not isinstance(value, list):
+        return None
+    return [str(v) for v in value]
+
+
+def scale(values: list[Optional[float]]) -> Optional[float]:
+    """The largest readable value, or None when none of them is readable.
+
+    `Math.max(...xs)` over a list containing one non-number is NaN, and
+    every percentage derived from it is NaN, so the whole chart vanishes.
+    """
+    readable = [v for v in values if v is not None]
+    if not readable:
+        return None
+    top = max(readable)
+    return top if top > 0 else None
+
+
+class NoiseRow(TypedDict):
+    """One rule. `fp_band` is None when the ratio is missing, so the
+    template can draw it as unmeasured rather than as a low-FP rule."""
+
+    name: Optional[str]
+    alerts: Optional[int]
+    width: Optional[float]
+    fp_ratio_pct: Optional[int]
+    fp_band: Optional[str]
+
+
+class NoiseView(TypedDict):
+    job: JobState
+    rules: Optional[list[NoiseRow]]
+
+
+def fp_band(ratio: Optional[float]) -> Optional[str]:
+    if ratio is None:
+        return None
+    if ratio > FP_HIGH:
+        return "fp-high"
+    if ratio > FP_MEDIUM:
+        return "fp-med"
+    return "fp-low"
+
+
+def noise_view(job: Any) -> NoiseView:
+    rows = result_rows(job, "rules")
+    if rows is None:
+        return {"job": job_state(job), "rules": None}
+    readable = [r for r in rows if isinstance(r, dict)]
+    top = scale([_num(r.get("alert_count")) for r in readable])
+    out: list[NoiseRow] = []
+    for raw in readable:
+        alerts = _num(raw.get("alert_count"))
+        ratio = _num(raw.get("fp_ratio"))
+        out.append({
+            "name": _text(raw.get("rule_name")),
+            "alerts": _int(raw.get("alert_count")),
+            "width": (round(alerts / top * 100, 2)
+                      if alerts is not None and top else None),
+            "fp_ratio_pct": None if ratio is None else int(round(ratio * 100)),
+            "fp_band": fp_band(ratio),
+        })
+    return {"job": job_state(job), "rules": out}
+
+
+class OffenderRow(TypedDict):
+    entity: Optional[str]
+    kind: Optional[str]
+    kind_key: str
+    count_7d: Optional[int]
+    count_30d: Optional[int]
+    severity_key: str
+    severity_label: Optional[str]
+    rules: Optional[list[str]]
+
+
+class OffendersView(TypedDict):
+    job: JobState
+    offenders: Optional[list[OffenderRow]]
+
+
+def entity_kind(value: Any) -> tuple[str, Optional[str]]:
+    """The class suffix and the words for an entity type.
+
+    `<span class="entity-type-badge ${o.type}">` put the value straight
+    into a class attribute. A type carrying a space becomes two classes and
+    one carrying a quote ends the attribute, so the key is restricted to
+    what a class can safely be and the words are rendered as text.
+    """
+    text = _text(value)
+    if text is None or text == "":
+        return "unknown", None
+    safe = text if text.replace("_", "").replace("-", "").isalnum() else None
+    return (safe or "unknown"), text
+
+
+def offenders_view(job: Any) -> OffendersView:
+    rows = result_rows(job, "offenders")
+    if rows is None:
+        return {"job": job_state(job), "offenders": None}
+    out: list[OffenderRow] = []
+    for raw in rows:
+        if not isinstance(raw, dict):
+            continue
+        key, label = entity_kind(raw.get("type"))
+        severity = raw.get("top_severity")
+        out.append({
+            "entity": _text(raw.get("entity")),
+            "kind": label,
+            "kind_key": key,
+            "count_7d": _int(raw.get("count_7d")),
+            "count_30d": _int(raw.get("count_30d")),
+            "severity_key": severity_key(severity),
+            "severity_label": _text(severity),
+            "rules": _names(raw.get("rules")),
+        })
+    return {"job": job_state(job), "offenders": out}
+
+
+class RiskRow(TypedDict):
+    """`band` is None for an entity with no readable score, where the
+    page's chain of >= comparisons made it low risk."""
+
+    entity: Optional[str]
+    kind: Optional[str]
+    kind_key: str
+    score: Optional[int]
+    width: Optional[float]
+    band: Optional[str]
+    alerts: Optional[int]
+    open_cases: Optional[int]
+    rules: Optional[list[str]]
+
+
+class RiskView(TypedDict):
+    job: JobState
+    entities: Optional[list[RiskRow]]
+
+
+def risk_band(score: Optional[float]) -> Optional[str]:
+    if score is None:
+        return None
+    for threshold, name in RISK_BANDS:
+        if score >= threshold:
+            return name
+    return "low"
+
+
+def risk_view(job: Any) -> RiskView:
+    rows = result_rows(job, "entities")
+    if rows is None:
+        return {"job": job_state(job), "entities": None}
+    readable = [r for r in rows if isinstance(r, dict)]
+    # The page took the scale from entities[0], so a first row without a
+    # score rescaled every bar. The largest readable score is the scale.
+    top = scale([_num(r.get("risk_score")) for r in readable])
+    out: list[RiskRow] = []
+    for raw in readable:
+        score = _num(raw.get("risk_score"))
+        key, label = entity_kind(raw.get("type"))
+        out.append({
+            "entity": _text(raw.get("entity")),
+            "kind": label,
+            "kind_key": key,
+            "score": _int(raw.get("risk_score")),
+            "width": (min(100.0, round(score / top * 100, 2))
+                      if score is not None and top else None),
+            "band": risk_band(score),
+            "alerts": _int(raw.get("alert_count")),
+            "open_cases": _int(raw.get("open_cases")),
+            "rules": _names(raw.get("rules")),
+        })
+    return {"job": job_state(job), "entities": out}
+
+
+def _panel(job_type: str, fragment: str, build):
+    """One panel route. The three differ only in job type and view."""
+
+    def handler(
+        request: Request,
+        current_user: User = Depends(get_current_user),
+        session: Session = Depends(get_db_session),
+    ) -> Response:
+        try:
+            job = _one_job(job_type, current_user, session)
+        except Exception:
+            logger.exception(
+                "Analytics fragment could not read the %s job", job_type)
+            job = None
+        return render_view(request, fragment, build(job))
+
+    return handler
+
+
+router.add_api_route(
+    "/analytics/rule-noise",
+    _panel(AnalyticsJobType.RULE_NOISE.value, RULE_NOISE_FRAGMENT,
+           noise_view),
+    methods=["GET"], response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))])
+
+router.add_api_route(
+    "/analytics/repeat-offenders",
+    _panel(AnalyticsJobType.REPEAT_OFFENDERS.value, OFFENDERS_FRAGMENT,
+           offenders_view),
+    methods=["GET"], response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))])
+
+router.add_api_route(
+    "/analytics/entity-risk",
+    _panel(AnalyticsJobType.ENTITY_RISK_SCORE.value, ENTITY_RISK_FRAGMENT,
+           risk_view),
+    methods=["GET"], response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))])

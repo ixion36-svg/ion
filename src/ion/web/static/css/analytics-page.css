@@ -15,3 +15,29 @@
    selector is two classes, so a rule here would be present and never win.
    Measured before adding one. The class name the fragment emits is that
    existing one. */
+
+/* A bar whose figure the job did not record. Deliberately not one of the
+   bands: `fp_ratio > 0.5 ? ... : 'fp-low'` and `risk_score >= 100 ? ... :
+   'low'` both fall through for a missing number, so an unmeasured row was
+   painted as the most reassuring end of each scale. */
+.fp-unmeasured,
+.risk-unmeasured {
+    background: repeating-linear-gradient(
+        45deg,
+        color-mix(in srgb, var(--text-muted) 30%, transparent) 0 3px,
+        transparent 3px 6px);
+}
+
+/* The rule-noise legend. Its three swatches were text-[#22c55e],
+   text-[#eab308] and text-[#ef4444], arbitrary Tailwind values inside a
+   JavaScript template string, so the page owned them. */
+.noise-legend {
+    margin-bottom: 0.75rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.fp-low-text    { color: var(--neon-green, #22c55e); }
+.fp-med-text    { color: var(--neon-yellow, #eab308); }
+.fp-high-text   { color: var(--neon-red, #ef4444); }
+.an-absent-text { color: var(--text-muted); font-style: italic; }

@@ -949,9 +949,9 @@ function renderDashboard() {
     setText('astat-stale', (s.stale_cases || 0) + (s.stale_alerts || 0));
 
     renderOverview(jobs);
-    renderEntityRisk(jobs.entity_risk_score);
-    renderRepeatOffenders(jobs.repeat_offenders);
-    renderRuleNoise(jobs.rule_noise);
+    renderEntityRisk();
+    renderRepeatOffenders();
+    renderRuleNoise();
     renderObservableVelocity(jobs.observable_velocity);
     renderCaseMetrics(jobs.case_metrics);
     renderStaleInvestigations();
@@ -1011,76 +1011,40 @@ function getOverviewMetric(type, result) {
     }
 }
 
-function renderEntityRisk(job) {
+// GET /ui/analytics/entity-risk renders the panel. The fragment reads its own job, so
+// a job that is missing, has never run, or stored an unreadable
+// result each say which, where this page said "No data yet. Click
+// Run All Jobs" for all three.
+function renderEntityRisk() {
     const container = document.getElementById('entity-risk-content');
-    if (!job || !job.result) { container.innerHTML = '<div class="empty-state">No data yet. Click "Run All Jobs" to generate.</div>'; return; }
-    const entities = job.result.entities || [];
-    if (!entities.length) { container.innerHTML = '<div class="empty-state">No entities with risk scores in the last 30 days</div>'; return; }
-
-    const maxScore = entities[0]?.risk_score || 1;
-
-    container.innerHTML = `<table class="analytics-table">
-        <thead><tr><th>Entity</th><th>Type</th><th>Risk Score</th><th></th><th>Alerts</th><th>Open Cases</th><th>Top Rules</th></tr></thead>
-        <tbody>${entities.map(e => {
-            const pct = Math.min(100, Math.round((e.risk_score / maxScore) * 100));
-            const cls = e.risk_score >= 100 ? 'critical' : e.risk_score >= 50 ? 'high' : e.risk_score >= 20 ? 'medium' : 'low';
-            return `<tr>
-                <td><strong>${esc(e.entity)}</strong></td>
-                <td><span class="entity-type-badge ${e.type}">${e.type}</span></td>
-                <td class="font-bold text-[var(--text)]">${e.risk_score}</td>
-                <td class="w-[120px]"><div class="risk-bar-container"><div class="risk-bar ${cls}" data-pct="${pct}"></div></div></td>
-                <td>${e.alert_count}</td>
-                <td>${e.open_cases}</td>
-                <td class="text-xs max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap" title="${esc((e.rules || []).join(', '))}">${esc((e.rules || []).slice(0, 2).join(', '))}</td>
-            </tr>`;
-        }).join('')}</tbody>
-    </table>`;
-    applyBarWidths();
+    if (!container) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/analytics/entity-risk', {
+        source: container, target: container, swap: 'innerHTML',
+    });
 }
 
-function renderRepeatOffenders(job) {
+// GET /ui/analytics/repeat-offenders renders the panel. The fragment reads its own job, so
+// a job that is missing, has never run, or stored an unreadable
+// result each say which, where this page said "No data yet. Click
+// Run All Jobs" for all three.
+function renderRepeatOffenders() {
     const container = document.getElementById('repeat-offenders-content');
-    if (!job || !job.result) { container.innerHTML = '<div class="empty-state">No data yet. Click "Run All Jobs" to generate.</div>'; return; }
-    const offenders = job.result.offenders || [];
-    if (!offenders.length) { container.innerHTML = '<div class="empty-state">No repeat offenders detected in the last 30 days</div>'; return; }
-
-    container.innerHTML = `<table class="analytics-table">
-        <thead><tr><th>Entity</th><th>Type</th><th>Alerts (7d)</th><th>Alerts (30d)</th><th>Worst Severity</th><th>Distinct Rules</th></tr></thead>
-        <tbody>${offenders.map(o => `<tr>
-            <td><strong>${esc(o.entity)}</strong></td>
-            <td><span class="entity-type-badge ${o.type}">${o.type}</span></td>
-            <td class="font-semibold">${o.count_7d}</td>
-            <td class="font-semibold">${o.count_30d}</td>
-            <td><span class="severity-badge severity-${o.top_severity || 'unknown'}">${o.top_severity || '-'}</span></td>
-            <td class="text-xs" title="${esc((o.rules || []).join(', '))}">${(o.rules || []).length} rules</td>
-        </tr>`).join('')}</tbody>
-    </table>`;
+    if (!container) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/analytics/repeat-offenders', {
+        source: container, target: container, swap: 'innerHTML',
+    });
 }
 
-function renderRuleNoise(job) {
+// GET /ui/analytics/rule-noise renders the panel. The fragment reads its own job, so
+// a job that is missing, has never run, or stored an unreadable
+// result each say which, where this page said "No data yet. Click
+// Run All Jobs" for all three.
+function renderRuleNoise() {
     const container = document.getElementById('rule-noise-content');
-    if (!job || !job.result) { container.innerHTML = '<div class="empty-state">No data yet. Click "Run All Jobs" to generate.</div>'; return; }
-    const rules = job.result.rules || [];
-    if (!rules.length) { container.innerHTML = '<div class="empty-state">No rule data available</div>'; return; }
-
-    const maxCount = Math.max(...rules.map(r => r.alert_count), 1);
-
-    container.innerHTML = `
-        <div class="mb-3 text-xs text-[var(--text-muted)]">
-            Bar color: <span class="text-[#22c55e]">low FP</span> | <span class="text-[#eab308]">medium FP</span> | <span class="text-[#ef4444]">high FP (&gt;50%)</span>
-        </div>
-        ${rules.map(r => {
-            const pct = Math.round((r.alert_count / maxCount) * 100);
-            const fpClass = r.fp_ratio > 0.5 ? 'fp-high' : r.fp_ratio > 0.2 ? 'fp-med' : 'fp-low';
-            return `<div class="noise-bar-row">
-                <span class="noise-bar-label" title="${esc(r.rule_name)}">${esc(r.rule_name)}</span>
-                <div class="noise-bar-track"><div class="noise-bar-fill ${fpClass}" data-pct="${pct}"></div></div>
-                <span class="noise-bar-count">${r.alert_count}</span>
-                <span class="noise-bar-count w-[65px]" title="FP ratio">${Math.round(r.fp_ratio * 100)}% FP</span>
-            </div>`;
-        }).join('')}
-    `;
-    applyBarWidths();
+    if (!container) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/analytics/rule-noise', {
+        source: container, target: container, swap: 'innerHTML',
+    });
 }
 
 function renderObservableVelocity(job) {
