@@ -46,6 +46,14 @@
 <div class="de-panel active" id="de-panel-posture"></div>
 <div class="de-panel" id="de-panel-killchains"></div>
 <div class="de-panel" id="de-panel-rules"></div>
+<template id="de-rules-toolbar-template"><div>
+    <div class="de-rules-toolbar">
+        <input type="text" id="de-rules-search" placeholder="Search rules or MITRE IDs..." data-enter-key-action="deRulesSearch">
+        <select id="de-rules-sev" data-change-action="deRulesSearch"><option value="">All Severities</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
+        <select id="de-rules-enabled" data-change-action="deRulesSearch"><option value="">Enabled &amp; Disabled</option><option value="1">Enabled</option><option value="0">Disabled</option></select>
+        <button class="btn btn-secondary" data-click-action="deRulesSearch">Search</button>
+    </div><div id="de-rules-body"></div>
+</div></template>
 <div class="de-panel" id="de-panel-execution"></div>
 <div class="de-panel" id="de-panel-readiness"></div>
 <div class="de-panel" id="de-panel-progression"></div>
@@ -129,107 +137,23 @@ async function loadPosture() {
 
 /* ── Use Cases tab (TIDE baselines / playbooks) ─── */
 async function loadKillChains() {
-    try {
-        const data = await apiFetch('/tide/de/use-cases');
-        _killChainsData = data;
-        renderKillChains(data);
-        _loaded.killchains = true;
-    } catch(e) {
-        $('de-panel-killchains').innerHTML=`<div class="de-empty">Failed to load: ${esc(e.message)}</div>`;
-    }
-}
-
-function renderKillChains(playbooks) {
-    if (!playbooks.length) {
-        $('de-panel-killchains').innerHTML='<div class="de-empty">No use cases found in TIDE</div>';
-        return;
-    }
-    let html = '';
-    for (const pb of playbooks) {
-        html += `<div class="de-kc">
-            <div class="de-kc-title">${esc(pb.name)}</div>
-            <div class="de-kc-desc">${esc(pb.description||'')}</div>
-            <div class="de-kc-chain">`;
-        const covMap = pb.technique_coverage || {};
-        for (let i = 0; i < pb.steps.length; i++) {
-            const step = pb.steps[i];
-            if (i > 0) html += '<div class="de-kc-arrow">\u2192</div>';
-
-            // Determine coverage state for this step
-            let stepState = 'blind'; // default
-            let ruleInfo = '';
-            if (step.techniques.length) {
-                let totalR = 0, enabledR = 0;
-                for (const tid of step.techniques) {
-                    const c = covMap[tid];
-                    if (c) { totalR += c.rule_count; enabledR += c.enabled_rules; }
-                }
-                if (totalR > 0 && enabledR > 0) {
-                    stepState = 'covered';
-                    ruleInfo = `<span class="ok">${enabledR} enabled</span> / ${totalR} rules`;
-                } else if (totalR > 0) {
-                    stepState = 'partial';
-                    ruleInfo = `<span class="warn">${totalR} rules (0 enabled)</span>`;
-                } else {
-                    ruleInfo = '<span class="bad">No rules</span>';
-                }
-            } else {
-                ruleInfo = '<span class="text-[var(--text-secondary)]">No techniques linked</span>';
-            }
-
-            const techChips = step.techniques.map(t=>`<span class="de-mitre-chip">${esc(t)}</span>`).join(' ');
-            const tacticLabel = step.tactic ? `<div class="text-[.65rem] text-[var(--text-secondary)] mt-0.5 uppercase tracking-[.3px]">${esc(step.tactic)}</div>` : '';
-            const reqRule = step.required_rule ? `<div class="text-[.68rem] text-[var(--text-secondary)] mt-[3px] italic">Req: ${esc(step.required_rule)}</div>` : '';
-            html += `<div class="de-kc-node ${stepState}">
-                <div class="de-kc-node-header">Step ${step.order}</div>
-                <div class="de-kc-node-name">${esc(step.name)}</div>
-                ${tacticLabel}
-                <div class="mt-1">${techChips||''}</div>
-                ${reqRule}
-                <div class="de-kc-node-rules">${ruleInfo}</div>
-            </div>`;
-        }
-        html += '</div></div>';
-    }
-    $('de-panel-killchains').innerHTML = html;
+    _loaded.killchains = await deLoadFragment('/ui/detection-engineering/killchains', 'de-panel-killchains', 'Loading use cases...');
 }
 
 /* ── Rules tab ────────────────────────────────── */
 async function loadRules() {
-    try {
-        renderRulesToolbar();
-        await fetchRules();
-        _loaded.rules = true;
-    } catch(e) {
-        $('de-panel-rules').innerHTML=`<div class="de-empty">Failed to load: ${esc(e.message)}</div>`;
-    }
-}
-
-function renderRulesToolbar() {
-    $('de-panel-rules').innerHTML = `
-        <div class="de-rules-toolbar">
-            <input type="text" id="de-rules-search" placeholder="Search rules or MITRE IDs..." value="${esc(_rulesPage.search)}" data-enter-key-action="deRulesSearch">
-            <select id="de-rules-sev" data-change-action="deRulesSearch">
-                <option value="">All Severities</option>
-                <option value="critical"${_rulesPage.severity==='critical'?' selected':''}>Critical</option>
-                <option value="high"${_rulesPage.severity==='high'?' selected':''}>High</option>
-                <option value="medium"${_rulesPage.severity==='medium'?' selected':''}>Medium</option>
-                <option value="low"${_rulesPage.severity==='low'?' selected':''}>Low</option>
-            </select>
-            <select id="de-rules-enabled" data-change-action="deRulesSearch">
-                <option value="">Enabled & Disabled</option>
-                <option value="1"${_rulesPage.enabled==='1'?' selected':''}>Enabled</option>
-                <option value="0"${_rulesPage.enabled==='0'?' selected':''}>Disabled</option>
-            </select>
-            <button class="btn btn-secondary py-[7px] px-3.5 text-[.82rem]" data-click-action="deRulesSearch">Search</button>
-        </div>
-        <div id="de-rules-body"><div class="de-loading"><div class="de-spinner"></div><div>Loading...</div></div></div>`;
+    const toolbar = cloneTemplate('de-rules-toolbar-template');
+    $('de-panel-rules').replaceChildren(toolbar);
+    $('de-rules-search').value = _rulesPage.search;
+    $('de-rules-sev').value = _rulesPage.severity;
+    $('de-rules-enabled').value = _rulesPage.enabled;
+    await fetchRules();
 }
 
 window.deRulesSearch = function() {
-    _rulesPage.search = ($('de-rules-search')||{}).value || '';
-    _rulesPage.severity = ($('de-rules-sev')||{}).value || '';
-    _rulesPage.enabled = ($('de-rules-enabled')||{}).value || '';
+    _rulesPage.search = $('de-rules-search').value;
+    _rulesPage.severity = $('de-rules-sev').value;
+    _rulesPage.enabled = $('de-rules-enabled').value;
     _rulesPage.offset = 0;
     fetchRules();
 };
@@ -242,57 +166,8 @@ window.deRulesPage = function(dir) {
 
 async function fetchRules() {
     const p = _rulesPage;
-    const params = new URLSearchParams();
-    if (p.search) params.set('search', p.search);
-    if (p.severity) params.set('severity', p.severity);
-    if (p.enabled) params.set('enabled', p.enabled);
-    params.set('offset', p.offset);
-    params.set('limit', p.limit);
-
-    const body = $('de-rules-body');
-    if (body) body.innerHTML = '<div class="de-loading"><div class="de-spinner"></div></div>';
-
-    const data = await apiFetch('/tide/de/rules?' + params.toString());
-    _rulesPage.total = data.total;
-    _rulesPage.rows = data.rows;
-    renderRulesTable();
-}
-
-function renderRulesTable() {
-    const p = _rulesPage;
-    const body = $('de-rules-body');
-    if (!body) return;
-    if (!p.rows.length) {
-        body.innerHTML = '<div class="de-empty">No rules match filters</div>';
-        return;
-    }
-
-    let html = '<table class="de-table"><thead><tr><th>Rule Name</th><th>Severity</th><th>Status</th><th>Quality</th><th>MITRE</th></tr></thead><tbody>';
-    for (const r of p.rows) {
-        const mitre = (r.mitre_ids||[]).map(m=>`<span class="de-mitre-chip">${esc(m)}</span>`).join(' ');
-        const status = r.enabled ? '<span class="de-enabled">Enabled</span>' : '<span class="de-disabled">Disabled</span>';
-        html += `<tr>
-            <td>${esc(r.name)}</td>
-            <td><span class="de-sev ${sevClass(r.severity)}">${esc(r.severity)}</span></td>
-            <td>${status}</td>
-            <td class="mono">${r.quality_score??'-'}</td>
-            <td>${mitre||'-'}</td>
-        </tr>`;
-    }
-    html += '</tbody></table>';
-
-    // Pagination
-    const from = p.offset + 1;
-    const to = Math.min(p.offset + p.limit, p.total);
-    html += `<div class="de-pager">
-        <div class="de-pager-info">Showing ${from}-${to} of ${p.total.toLocaleString()}</div>
-        <div class="de-pager-btns">
-            <button data-click-action="deRulesPage" data-args='["prev"]' ${p.offset===0?'disabled':''}>Prev</button>
-            <button data-click-action="deRulesPage" data-args='["next"]' ${p.offset+p.limit>=p.total?'disabled':''}>Next</button>
-        </div>
-    </div>`;
-
-    body.innerHTML = html;
+    const params = new URLSearchParams({search:p.search, severity:p.severity, enabled:p.enabled, offset:p.offset, limit:p.limit});
+    _loaded.rules = await deLoadFragment('/ui/detection-engineering/rules?' + params.toString(), 'de-rules-body', 'Loading rules...');
 }
 
 /* ── Execution tab ────────────────────────────── */
