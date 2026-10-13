@@ -16,27 +16,7 @@
     document.documentElement.setAttribute('data-mode', mode);
   })();
 </script>
-<style nonce="{{ csp_nonce }}">
-  /* Standalone pre-auth page has no 56px nav; .ion-tw-page subtracts that. */
-  .ion-tw-page { min-height: 100vh; }
-
-  /* Hairline grid overlay. Cannot share background-image with .ion-tw-page radials. */
-  body::before {
-    content: "";
-    position: fixed; inset: 0;
-    background-image:
-      linear-gradient(to right, var(--ion-grid-line) 1px, transparent 1px),
-      linear-gradient(to bottom, var(--ion-grid-line) 1px, transparent 1px);
-    background-size: 56px 56px;
-    pointer-events: none;
-    opacity: 0.5;
-    z-index: 0;
-  }
-
-  /* JS toggles .show on #error-message. daisyUI .alert is visible by default. */
-  #error-message { display: none; }
-  #error-message.show { display: flex; }
-</style>
+<link rel="stylesheet" href="/static/css/login-page.css?v={{ ion_version }}">
 </head>
 
 <body class="ion-tw ion-tw-page grain overflow-hidden">

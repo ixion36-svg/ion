@@ -178,10 +178,11 @@ def test_the_page_links_its_stylesheet_from_head_css():
 
 
 def test_nothing_that_outranks_the_sheet_claims_its_selectors():
-    """head_css loses to ion-workspace.css and base.html's two in-body
-    blocks at equal specificity, so an overlap is a rule that is present and
-    never wins. Measured as empty before the move; asserted so adding one
-    is a failing test rather than a silent restyle."""
+    """head_css loses to ion-workspace.css and to ion-shell.css at equal
+    specificity. ion-shell.css is the two blocks that used to sit in
+    base.html's body, linked after ion-workspace, so an overlap is a rule
+    that is present and never wins. Measured as empty before the move;
+    asserted so adding one is a failing test rather than a silent restyle."""
     sheet = (ROOT / "src/ion/web/static/css/discover-page.css").read_text(
         encoding="utf-8")
     selectors = set()
@@ -193,10 +194,8 @@ def test_nothing_that_outranks_the_sheet_claims_its_selectors():
     assert len(selectors) > 50, len(selectors)
     workspace = (ROOT / "src/ion/web/static/css/ion-workspace.css").read_text(
         encoding="utf-8", errors="replace")
-    base = (ROOT / "src/ion/web/templates/base.html").read_text(
+    shell = (ROOT / "src/ion/web/static/css/ion-shell.css").read_text(
         encoding="utf-8")
-    base_blocks = "\n".join(
-        re.findall(r"<style[^>]*>(.*?)</style>", base, re.S))
     clashes = sorted(s for s in selectors
-                     if s in workspace or s in base_blocks)
+                     if s in workspace or s in shell)
     assert not clashes, clashes

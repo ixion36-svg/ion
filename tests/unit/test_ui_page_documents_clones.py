@@ -208,10 +208,11 @@ def test_the_page_has_no_inline_style_block():
 
 def test_the_sheet_still_beats_what_the_block_beat_that_matters():
     """The block sat at the end of <body> and beat every stylesheet. From
-    head_css it loses to ion-workspace.css and base.html's two in-body
-    blocks, so the move is only safe while none of the block's selectors
-    appears in those three. Measured as zero before the move; asserted here
-    so adding one is a failing test rather than a silent restyle."""
+    head_css it loses to ion-workspace.css and ion-shell.css (the two
+    blocks that used to sit in base.html's body), so the move is only safe
+    while none of the block's selectors appears in those sheets. Measured
+    as zero before the move; asserted here so adding one is a failing test
+    rather than a silent restyle."""
     sheet = SHEET.read_text(encoding="utf-8")
     selectors = set()
     for match in re.finditer(r"(^|\})\s*([^{}@][^{}]*?)\s*\{", sheet, re.M):
@@ -223,12 +224,10 @@ def test_the_sheet_still_beats_what_the_block_beat_that_matters():
 
     workspace = (ROOT / "src/ion/web/static/css/ion-workspace.css").read_text(
         encoding="utf-8", errors="replace")
-    base = (ROOT / "src/ion/web/templates/base.html").read_text(
+    shell = (ROOT / "src/ion/web/static/css/ion-shell.css").read_text(
         encoding="utf-8")
-    base_blocks = "\n".join(
-        re.findall(r"<style[^>]*>(.*?)</style>", base, re.S))
     clashes = sorted(s for s in selectors
-                     if s in workspace or s in base_blocks)
+                     if s in workspace or s in shell)
     assert not clashes, clashes
 
 

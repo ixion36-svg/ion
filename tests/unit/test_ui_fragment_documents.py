@@ -551,16 +551,19 @@ def test_the_page_links_its_stylesheet():
 
 
 def test_nothing_that_outranks_the_sheet_claims_its_selectors():
-    """head_css loses to ion-workspace.css and to base.html's two in-body
-    blocks at equal specificity, so an overlap would mean a rule that is
-    present and never wins."""
+    """head_css loses to ion-workspace.css and to ion-shell.css (the two
+    blocks that used to sit in base.html's body) at equal specificity, so
+    an overlap would mean a rule that is present and never wins."""
     workspace = (ROOT / "src/ion/web/static/css/ion-workspace.css").read_text(
+        encoding="utf-8")
+    shell = (ROOT / "src/ion/web/static/css/ion-shell.css").read_text(
         encoding="utf-8")
     base = (ROOT / "src/ion/web/templates/base.html").read_text(
         encoding="utf-8")
     for cls in ("doc-row", "doc-row-archived", "doc-unmeasured",
                 "doc-filter-notice"):
         assert f".{cls}" not in workspace, cls
+        assert f".{cls}" not in shell, cls
         assert f".{cls}" not in base, cls
 
 

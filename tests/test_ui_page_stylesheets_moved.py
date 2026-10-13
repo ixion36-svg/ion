@@ -22,9 +22,10 @@ by source order alone -- `.modal.active`, `#sch-modal-bg.show` and
 gitlab's `.loading` are each a bridge that only works because of that.
 `{% block head_css %}` is base.html line 50, after ion.css,
 ion-migrated-styles.css and alert-detail.css but *before*
-ion-workspace.css and base.html's own two in-body blocks. So the move is
-only safe while those three share no selector with these sheets, and
-while base.html keeps head_css below the three sheets these rules beat.
+ion-workspace.css and ion-shell.css. ion-shell.css is the two blocks
+that used to sit in base.html's body. So the move is only safe while
+those sheets share no selector with these pages, and while base.html
+keeps head_css below the sheets these rules beat.
 
 **A rule can be dropped in transit.** `tests/test_ui_state_classes_have_rules.py`
 catches a class that JS toggles and nothing paints, but it cannot catch a
@@ -60,10 +61,11 @@ BASE = TPL / "base.html"
 #: ever moves above one of these, every bridge rule in these sheets loses.
 BEATEN_BY_HEAD_CSS = ("ion.css", "ion-migrated-styles.css", "alert-detail.css")
 
-#: Linked by base.html AFTER {% block head_css %}. The inline blocks used to
-#: beat this one and now do not, which is only safe while no selector is
-#: shared. Measured empty on 2026-10-13 for all seven.
-LOADS_AFTER_HEAD_CSS = "ion-workspace.css"
+#: Linked by base.html AFTER {% block head_css %}. The page sheets used to
+#: beat these from an in-body block and now do not, which is only safe
+#: while no selector is shared. ion-shell.css is base.html's two blocks,
+#: linked after ion-workspace. Measured empty on 2026-10-13 for all seven.
+LOADS_AFTER_HEAD_CSS = ("ion-workspace.css", "ion-shell.css")
 
 
 def _strip_comments(src: str) -> str:
@@ -217,10 +219,11 @@ def test_the_link_sits_where_it_still_beats_the_sheets_it_used_to_beat(stem):
         assert base.index(earlier) < at, (
             f"head_css renders before {earlier}, so {sheet} no longer beats it"
         )
-    assert base.index(LOADS_AFTER_HEAD_CSS) > at, (
-        f"{LOADS_AFTER_HEAD_CSS} moved above head_css; the collision check "
-        "below is measuring the wrong direction"
-    )
+    for later in LOADS_AFTER_HEAD_CSS:
+        assert base.index(later) > at, (
+            f"{later} moved above head_css; the collision check "
+            "below is measuring the wrong direction"
+        )
 
 
 @pytest.mark.parametrize("stem", sorted(PAGES))
@@ -234,15 +237,15 @@ def test_the_sheet_still_carries_the_load_bearing_selectors(stem):
 
 @pytest.mark.parametrize("stem", sorted(PAGES))
 def test_the_sheet_shares_no_selector_with_the_sheet_that_now_outranks_it(stem):
-    """ion-workspace.css is linked after head_css, so these rules no longer
-    beat it. Harmless only while the two sheets have nothing in common."""
-    shared = _selectors(_sheet(stem)) & _selectors(
-        (CSS / LOADS_AFTER_HEAD_CSS).read_text(encoding="utf-8")
-    )
-    assert not shared, (
-        f"{PAGES[stem][0]} shares selectors with {LOADS_AFTER_HEAD_CSS}, which "
-        f"now wins the tie it used to lose: {sorted(shared)}"
-    )
+    """Sheets linked after head_css win equal-specificity ties these rules
+    used to win from the end of the body. Harmless only while nothing is shared."""
+    page_sels = _selectors(_sheet(stem))
+    for name in LOADS_AFTER_HEAD_CSS:
+        shared = page_sels & _selectors((CSS / name).read_text(encoding="utf-8"))
+        assert not shared, (
+            f"{PAGES[stem][0]} shares selectors with {name}, which "
+            f"now wins the tie it used to lose: {sorted(shared)}"
+        )
 
 
 @pytest.mark.parametrize("stem", sorted(PAGES))
