@@ -189,9 +189,9 @@ Server-rendered fragments. `render_view` routes also answer the view model as JS
 | GET | `/ui/pcap/{job_id}/network` | `alert:read` | [pcap.py:425](src/ion/web/ui/pcap.py#L425) | `_fragments/pcap_network.html` | `pcap.html` |
 | GET | `/ui/pcap/{job_id}/summary` | `alert:read` | [pcap.py:406](src/ion/web/ui/pcap.py#L406) | `_fragments/pcap_summary.html` | `pcap.html` |
 | GET | `/ui/pcap/{job_id}/tables` | `alert:read` | [pcap.py:753](src/ion/web/ui/pcap.py#L753) | `_fragments/pcap_tables.html` | `pcap.html` |
-| GET | `/ui/playbooks/executions` | `playbook:execute + playbook:read` | [playbooks.py:571](src/ion/web/ui/playbooks.py#L571) | `_fragments/playbooks_executions.html` | `playbooks.html` |
-| GET | `/ui/playbooks/executions/badge` | `playbook:execute + playbook:read` | [playbooks.py:555](src/ion/web/ui/playbooks.py#L555) | `_fragments/playbooks_badge.html` | `playbooks.html` |
-| GET | `/ui/playbooks/executions/{execution_id}` | `playbook:execute + playbook:read` | [playbooks.py:592](src/ion/web/ui/playbooks.py#L592) | `_fragments/playbooks_execution.html` | `playbooks.html` |
+| GET | `/ui/playbooks/executions` | `playbook:execute or playbook:read` | [playbooks.py:571](src/ion/web/ui/playbooks.py#L571) | `_fragments/playbooks_executions.html` | `playbooks.html` |
+| GET | `/ui/playbooks/executions/badge` | `playbook:execute or playbook:read` | [playbooks.py:555](src/ion/web/ui/playbooks.py#L555) | `_fragments/playbooks_badge.html` | `playbooks.html` |
+| GET | `/ui/playbooks/executions/{execution_id}` | `playbook:execute or playbook:read` | [playbooks.py:592](src/ion/web/ui/playbooks.py#L592) | `_fragments/playbooks_execution.html` | `playbooks.html` |
 | GET | `/ui/playbooks/library` | `playbook:read` | [playbooks.py:508](src/ion/web/ui/playbooks.py#L508) | `_fragments/playbooks_library.html` | `playbooks.html` |
 | GET | `/ui/playbooks/step` | `playbook:read` | [playbooks.py:523](src/ion/web/ui/playbooks.py#L523) | `_fragments/playbooks_step.html` | `playbooks.html` |
 | GET | `/ui/playbooks/step-params` | `playbook:read` | [playbooks.py:539](src/ion/web/ui/playbooks.py#L539) | `_fragments/playbooks_step_params.html` | `playbooks.html` |
@@ -366,12 +366,12 @@ JSON endpoints.
 | POST | `/api/alert-cases/{case_id}/query-evidence/{pin_id}/rerun` | `case:update` | [workbench_api.py:294](src/ion/web/workbench_api.py#L294) |  | `cases.html`, `discover.html` |
 | GET | `/api/alert-patterns` | `alert:read` | [alert_pattern_api.py:15](src/ion/web/alert_pattern_api.py#L15) |  |  |
 | GET | `/api/alert-prompts` | `playbook:read` | [alert_prompt_api.py:100](src/ion/web/alert_prompt_api.py#L100) |  | `alert_prompt_templates.html` |
-| POST | `/api/alert-prompts` | `playbook:create + playbook:delete + playbook:update` | [alert_prompt_api.py:258](src/ion/web/alert_prompt_api.py#L258) |  | `alert_prompt_templates.html` |
+| POST | `/api/alert-prompts` | `playbook:create or playbook:delete or playbook:update` | [alert_prompt_api.py:258](src/ion/web/alert_prompt_api.py#L258) |  | `alert_prompt_templates.html` |
 | POST | `/api/alert-prompts/resolve` | `playbook:read` | [alert_prompt_api.py:368](src/ion/web/alert_prompt_api.py#L368) |  | `alert_prompt_templates.html` |
 | GET | `/api/alert-prompts/scorecards` | `playbook:read` | [alert_prompt_api.py:113](src/ion/web/alert_prompt_api.py#L113) |  |  |
-| DELETE | `/api/alert-prompts/{template_id}` | `playbook:create + playbook:delete + playbook:update` | [alert_prompt_api.py:346](src/ion/web/alert_prompt_api.py#L346) |  |  |
+| DELETE | `/api/alert-prompts/{template_id}` | `playbook:create or playbook:delete or playbook:update` | [alert_prompt_api.py:346](src/ion/web/alert_prompt_api.py#L346) |  |  |
 | GET | `/api/alert-prompts/{template_id}` | `playbook:read` | [alert_prompt_api.py:211](src/ion/web/alert_prompt_api.py#L211) |  |  |
-| PUT | `/api/alert-prompts/{template_id}` | `playbook:create + playbook:delete + playbook:update` | [alert_prompt_api.py:303](src/ion/web/alert_prompt_api.py#L303) |  |  |
+| PUT | `/api/alert-prompts/{template_id}` | `playbook:create or playbook:delete or playbook:update` | [alert_prompt_api.py:303](src/ion/web/alert_prompt_api.py#L303) |  |  |
 | GET | `/api/alerts/host-patterns` | `alert:read` | [api.py:5506](src/ion/web/api.py#L5506) |  | `alerts.html` |
 | GET | `/api/alerts/investigation-template` | `alert:read` | [rule_template_api.py:38](src/ion/web/rule_template_api.py#L38) |  | `alert-detail.js` |
 | GET | `/api/alerts/investigation-template/pending` | `alert:read` | [rule_template_api.py:52](src/ion/web/rule_template_api.py#L52) |  |  |
@@ -707,28 +707,28 @@ JSON endpoints.
 | GET | `/api/health` | — | [api.py:2391](src/ion/web/api.py#L2391) |  |  |
 | GET | `/api/health/deep` | — | [api.py:2397](src/ion/web/api.py#L2397) |  |  |
 | GET | `/api/incident-cost` | `alert:read` | [incident_cost_api.py:15](src/ion/web/incident_cost_api.py#L15) |  |  |
-| GET | `/api/integrations/health-history` | `alert:read + integration:read` | [integration_api.py:806](src/ion/web/integration_api.py#L806) |  |  |
-| POST | `/api/integrations/healthcheck` | `alert:read + integration:read` | [integration_api.py:403](src/ion/web/integration_api.py#L403) |  | `integrations.html` |
-| GET | `/api/integrations/logs` | `alert:read + integration:read` | [integration_api.py:738](src/ion/web/integration_api.py#L738) |  |  |
-| GET | `/api/integrations/logs/stats` | `alert:read + integration:read` | [integration_api.py:795](src/ion/web/integration_api.py#L795) |  |  |
-| GET | `/api/integrations/metrics/data-flows` | `alert:read + integration:read` | [integration_api.py:1064](src/ion/web/integration_api.py#L1064) |  |  |
-| GET | `/api/integrations/metrics/elasticsearch` | `alert:read + integration:read` | [integration_api.py:838](src/ion/web/integration_api.py#L838) |  |  |
-| GET | `/api/integrations/metrics/server` | `alert:read + integration:read` | [integration_api.py:879](src/ion/web/integration_api.py#L879) |  |  |
-| GET | `/api/integrations/metrics/server-logs` | `alert:read + integration:read` | [integration_api.py:927](src/ion/web/integration_api.py#L927) |  |  |
-| GET | `/api/integrations/status` | `alert:read + integration:read` | [integration_api.py:172](src/ion/web/integration_api.py#L172) |  | `integrations.html` |
-| GET | `/api/integrations/sync-journal` | `alert:read + integration:read` | [integration_api.py:1119](src/ion/web/integration_api.py#L1119) |  |  |
-| GET | `/api/integrations/sync-journal/cases/{case_id}` | `alert:read + integration:read` | [integration_api.py:1130](src/ion/web/integration_api.py#L1130) |  | `cases.html` |
+| GET | `/api/integrations/health-history` | `alert:read or integration:read` | [integration_api.py:806](src/ion/web/integration_api.py#L806) |  |  |
+| POST | `/api/integrations/healthcheck` | `alert:read or integration:read` | [integration_api.py:403](src/ion/web/integration_api.py#L403) |  | `integrations.html` |
+| GET | `/api/integrations/logs` | `alert:read or integration:read` | [integration_api.py:738](src/ion/web/integration_api.py#L738) |  |  |
+| GET | `/api/integrations/logs/stats` | `alert:read or integration:read` | [integration_api.py:795](src/ion/web/integration_api.py#L795) |  |  |
+| GET | `/api/integrations/metrics/data-flows` | `alert:read or integration:read` | [integration_api.py:1064](src/ion/web/integration_api.py#L1064) |  |  |
+| GET | `/api/integrations/metrics/elasticsearch` | `alert:read or integration:read` | [integration_api.py:838](src/ion/web/integration_api.py#L838) |  |  |
+| GET | `/api/integrations/metrics/server` | `alert:read or integration:read` | [integration_api.py:879](src/ion/web/integration_api.py#L879) |  |  |
+| GET | `/api/integrations/metrics/server-logs` | `alert:read or integration:read` | [integration_api.py:927](src/ion/web/integration_api.py#L927) |  |  |
+| GET | `/api/integrations/status` | `alert:read or integration:read` | [integration_api.py:172](src/ion/web/integration_api.py#L172) |  | `integrations.html` |
+| GET | `/api/integrations/sync-journal` | `alert:read or integration:read` | [integration_api.py:1119](src/ion/web/integration_api.py#L1119) |  |  |
+| GET | `/api/integrations/sync-journal/cases/{case_id}` | `alert:read or integration:read` | [integration_api.py:1130](src/ion/web/integration_api.py#L1130) |  | `cases.html` |
 | POST | `/api/integrations/sync-journal/drain` | `integration:manage` | [integration_api.py:1171](src/ion/web/integration_api.py#L1171) |  |  |
 | POST | `/api/integrations/sync-journal/{attempt_id}/requeue` | `integration:manage` | [integration_api.py:1144](src/ion/web/integration_api.py#L1144) |  |  |
-| GET | `/api/integrations/webhooks` | `alert:read + integration:read` | [integration_api.py:478](src/ion/web/integration_api.py#L478) |  | `integrations.html` |
+| GET | `/api/integrations/webhooks` | `alert:read or integration:read` | [integration_api.py:478](src/ion/web/integration_api.py#L478) |  | `integrations.html` |
 | POST | `/api/integrations/webhooks` | `integration:manage` | [integration_api.py:504](src/ion/web/integration_api.py#L504) |  | `integrations.html` |
 | POST | `/api/integrations/webhooks/receive/{token}` | — | [integration_api.py:620](src/ion/web/integration_api.py#L620) |  |  |
 | DELETE | `/api/integrations/webhooks/{webhook_id}` | `integration:manage` | [integration_api.py:587](src/ion/web/integration_api.py#L587) |  |  |
-| GET | `/api/integrations/webhooks/{webhook_id}` | `alert:read + integration:read` | [integration_api.py:545](src/ion/web/integration_api.py#L545) |  |  |
+| GET | `/api/integrations/webhooks/{webhook_id}` | `alert:read or integration:read` | [integration_api.py:545](src/ion/web/integration_api.py#L545) |  |  |
 | PUT | `/api/integrations/webhooks/{webhook_id}` | `integration:manage` | [integration_api.py:561](src/ion/web/integration_api.py#L561) |  |  |
-| GET | `/api/integrations/webhooks/{webhook_id}/logs` | `alert:read + integration:read` | [integration_api.py:688](src/ion/web/integration_api.py#L688) |  |  |
+| GET | `/api/integrations/webhooks/{webhook_id}/logs` | `alert:read or integration:read` | [integration_api.py:688](src/ion/web/integration_api.py#L688) |  |  |
 | POST | `/api/integrations/webhooks/{webhook_id}/regenerate-token` | `integration:manage` | [integration_api.py:602](src/ion/web/integration_api.py#L602) |  |  |
-| GET | `/api/integrations/{integration_type}/config-schema` | `alert:read + integration:read` | [integration_api.py:459](src/ion/web/integration_api.py#L459) |  |  |
+| GET | `/api/integrations/{integration_type}/config-schema` | `alert:read or integration:read` | [integration_api.py:459](src/ion/web/integration_api.py#L459) |  |  |
 | POST | `/api/investigate` | `alert:triage` | [investigation_api.py:187](src/ion/web/investigation_api.py#L187) |  | `investigation_queue.html` |
 | GET | `/api/investigate/jobs` | `alert:read` | [investigation_api.py:280](src/ion/web/investigation_api.py#L280) |  | `investigation_queue.html` |
 | POST | `/api/investigate/jobs/cancel-pending` | `alert:triage` | [investigation_api.py:393](src/ion/web/investigation_api.py#L393) |  | `investigation_queue.html` |

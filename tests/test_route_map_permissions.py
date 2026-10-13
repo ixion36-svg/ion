@@ -52,10 +52,16 @@ def test_an_api_route_still_reports_require_permission(rows):
 
 def test_integration_access_names_both_permissions_it_accepts(rows):
     """require_integration_access is a gate with no closure cell: the names
-    are literals. Either permission passes, and the map already joins a
-    set with ' + '."""
+    are literals.
+
+    Either permission passes. This asserted ' + ' when it was written,
+    because that was what the map already joined sets with, but ' + '
+    means all-of in that column: the cell then said you need both, which
+    is false and false in the stricter-looking direction. The separator
+    was the thing that needed changing, not this gate.
+    """
     assert _one(rows, "/api/integrations/status", "GET")["permission"] == (
-        "alert:read + integration:read"
+        "alert:read or integration:read"
     )
     # The public health check is not that helper and must stay blank.
     assert _one(rows, "/api/health", "GET")["permission"] == ""

@@ -89,6 +89,17 @@ _CLOSURE_GATES = (
 #: lookup as open.
 _LITERAL_GATES = ("require_integration_access", "_require_enrich")
 
+#: Gates that accept any one of the permissions they carry, rather than
+#: all of them. require_integration_access is
+#: `has_permission("integration:read") or has_permission("alert:read")`,
+#: and require_any_permission is any-of by name.
+#:
+#: This distinction is the whole reason the cell is not a plain join. The
+#: separator in that column means all-of, so flattening an any-of gate
+#: into it states something definite and false, and false in the
+#: direction that looks more tightly held than it is.
+_ANY_OF_GATES = ("require_any_permission", "require_integration_access")
+
 
 def _literal_permissions(call) -> list[str]:
     code = getattr(call, "__code__", None)
@@ -119,30 +130,45 @@ def permission_of(route) -> str:
         if call is not None:
             qual = getattr(call, "__qualname__", "") or ""
             recorded = getattr(call, "_ion_page_permission", None)
+            names: list[str] = []
             if isinstance(recorded, str) and recorded:
-                found.append(recorded)
+                names = [recorded]
             elif getattr(call, "__closure__", None) and any(
                 gate in qual for gate in _CLOSURE_GATES
             ):
                 for cell in call.__closure__:
                     value = cell.cell_contents
                     if isinstance(value, str):
-                        found.append(value)
+                        names.append(value)
                     elif isinstance(value, (list, tuple)):
-                        found.extend(v for v in value if isinstance(v, str))
+                        names.extend(v for v in value if isinstance(v, str))
             elif qual in _LITERAL_GATES:
-                found.extend(_literal_permissions(call))
+                names = _literal_permissions(call)
             elif "require_admin" in qual or qual == "require_admin":
-                found.append("admin")
+                names = ["admin"]
             if getattr(call, "__name__", "") == "require_admin":
-                found.append("admin")
+                names.append("admin")
+            if names:
+                any_of = any(gate in qual for gate in _ANY_OF_GATES)
+                found.append((any_of and len(names) > 1, tuple(sorted(set(names)))))
         for sub in getattr(dep, "dependencies", []) or []:
             walk(sub, depth + 1)
 
     dependant = getattr(route, "dependant", None)
     if dependant is not None:
         walk(dependant)
-    return " + ".join(sorted(set(found))) if found else ""
+    if not found:
+        return ""
+    parts = []
+    for any_of, names in sorted(set(found)):
+        if any_of:
+            # Parenthesised so that a route carrying both kinds reads
+            # unambiguously: "(a or b) + c", not "a or b + c".
+            parts.append(("(%s)" if len(found) > 1 else "%s")
+                         % " or ".join(names))
+        else:
+            parts.extend(names)
+    return " + ".join(parts)
 
 
 def _repo_relative(path: str) -> str:
