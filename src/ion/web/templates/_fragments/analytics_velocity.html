@@ -1,0 +1,45 @@
+{% import '_fragments/analytics_state.html' as st %}
+{% import '_fragments/analytics_spark.html' as sp %}
+{# Observable velocity, from ui/analytics.py's velocity_view.
+
+   The dormant-indicator table carried three of the page's recurring
+   defects at once. `severity-${s.threat_level}` put a server value into a
+   class attribute; `<span class="entity-type-badge host">` hard-coded
+   `host` as the class whatever the type actually was, so every indicator
+   looked like a host; and `s.days_stale > 21 ? 'danger' : 'warn'` is false
+   for a missing figure, so an indicator with no staleness was drawn as the
+   milder state and labelled "undefinedd".
+#}
+{% if job.state != 'ok' %}
+{{ st.job_notice(job) }}
+{% else %}
+<div class="grid grid-cols-2 gap-4 mb-4">
+  {{ sp.sparkline(daily, 'New Observables / Day (30d)') }}
+  {{ sp.share_bars(threat_distribution, 'Threat Distribution', 'severity-') }}
+</div>
+{%- if stale_iocs is none %}
+{{ st.unreadable_list('dormant indicators') }}
+{%- elif not stale_iocs %}
+<div class="empty-state">No dormant indicators.</div>
+{%- else %}
+<table class="analytics-table">
+  <thead><tr>
+    <th>Indicator</th><th>Type</th><th>Threat Level</th><th>Days Dormant</th>
+  </tr></thead>
+  <tbody>
+    {%- for s in stale_iocs %}
+    <tr>
+      <td>{{ s.value or '' }}</td>
+      {#- The class is the type, not a hard-coded `host`. -#}
+      <td><span class="entity-type-badge {{ s.kind_key }}">{{ s.kind or 'unknown' }}</span></td>
+      <td><span class="severity-badge severity-{{ s.threat_key }}">{{ s.threat_label or 'unknown' }}</span></td>
+      <td class="days-stale{% if s.urgent is true %} danger{% elif s.urgent is false %} warn{% endif %}">
+        {%- if s.days is not none %}{{ s.days }}d
+        {%- else %}<span class="an-absent" title="This indicator carried no dormancy figure"></span>{% endif %}
+      </td>
+    </tr>
+    {%- endfor %}
+  </tbody>
+</table>
+{%- endif %}
+{% endif %}

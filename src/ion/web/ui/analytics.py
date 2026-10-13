@@ -542,3 +542,243 @@ router.add_api_route(
            risk_view),
     methods=["GET"], response_class=HTMLResponse,
     dependencies=[Depends(require_permission(PERMISSION))])
+
+
+# ---------------------------------------------------------------------------
+# Case metrics and observable velocity
+# ---------------------------------------------------------------------------
+#
+# The last two job panels, and the last of the same handful of defects:
+#
+#   * `r.total_cases || 0`, `r.open_cases || 0`, `r.closed_cases || 0`.
+#     Three confident zeros for figures the job did not record, on the
+#     cards an analyst reads first.
+#   * `Math.max(...trend.map(d => d.count), 1)` twice, so one unreadable
+#     day flattened a whole sparkline.
+#   * `Object.values(reasons).reduce((a, b) => a + b, 0) || 1`. One
+#     non-numeric value makes the sum NaN, `|| 1` turns that into 1, and
+#     every percentage is then the count itself times 100.
+#   * `s.days_stale > 21 ? 'danger' : 'warn'`, the fall-through again, so
+#     an indicator with no staleness figure was drawn as the milder state
+#     and labelled "undefinedd".
+#   * `severity-${s.threat_level}` and `cl-${reason}` put server values
+#     into class attributes, and `<span class="entity-type-badge host">`
+#     hard-coded `host` as the class whatever the type actually was.
+#   * `title="${d.date}: ${d.count}"` interpolated into an attribute.
+#   * `text-[#eab308]`, `text-[#22c55e]` and `bg-[#8b5cf6]` were arbitrary
+#     Tailwind values in a JavaScript template string.
+
+CASE_METRICS_FRAGMENT = "_fragments/analytics_case_metrics.html"
+VELOCITY_FRAGMENT = "_fragments/analytics_velocity.html"
+
+#: How tall a sparkline bar is at full scale, and its floor, from the
+#: page's `Math.max(2, Math.round((count / max) * 56))`.
+SPARK_HEIGHT = 56
+SPARK_FLOOR = 2
+
+#: Days stale at which a dormant indicator is urgent rather than a
+#: warning, from `s.days_stale > 21`.
+IOC_DANGER_DAYS = 21
+
+
+class SparkBar(TypedDict):
+    """One day. `height` is None for a day whose count is unreadable, so
+    the bar is drawn as unmeasured rather than as the floor, which looks
+    like a quiet day."""
+
+    date: Optional[str]
+    count: Optional[int]
+    height: Optional[int]
+
+
+def spark(points: Any) -> Optional[list[SparkBar]]:
+    """A daily series, or None when the payload did not carry one."""
+    if not isinstance(points, list):
+        return None
+    readable = [p for p in points if isinstance(p, dict)]
+    top = scale([_num(p.get("count")) for p in readable])
+    bars: list[SparkBar] = []
+    for point in readable:
+        count = _num(point.get("count"))
+        bars.append({
+            "date": _text(point.get("date")),
+            "count": _int(point.get("count")),
+            "height": (max(SPARK_FLOOR,
+                           int(round(count / top * SPARK_HEIGHT)))
+                       if count is not None and top else None),
+        })
+    return bars
+
+
+class Share(TypedDict):
+    """One slice of a distribution. `key` is safe for a class attribute;
+    `label` is the words."""
+
+    key: str
+    label: str
+    count: Optional[int]
+    pct: Optional[int]
+
+
+def shares(mapping: Any) -> Optional[list[Share]]:
+    """A name-to-count mapping as sorted shares, or None.
+
+    `Object.values(x).reduce((a, b) => a + b, 0) || 1` is NaN as soon as
+    one value is not a number, and `|| 1` turns that into a denominator of
+    one, so every percentage became the count times a hundred.
+    """
+    if not isinstance(mapping, dict):
+        return None
+    counts = {str(k): _num(v) for k, v in mapping.items()}
+    total = sum(v for v in counts.values() if v is not None)
+    out: list[Share] = []
+    for name, value in counts.items():
+        key, label = entity_kind(name)
+        out.append({
+            "key": key,
+            "label": label or name,
+            "count": None if value is None else int(value),
+            "pct": (int(round(value / total * 100))
+                    if value is not None and total > 0 else None),
+        })
+    out.sort(key=lambda s: (s["count"] is None, -(s["count"] or 0)))
+    return out
+
+
+class StaleIOC(TypedDict):
+    value: Optional[str]
+    kind: Optional[str]
+    kind_key: str
+    threat_key: str
+    threat_label: Optional[str]
+    days: Optional[int]
+    urgent: Optional[bool]
+
+
+#: The order the Cases by Severity table sorts into, from the page's own
+#: list. A severity outside it sorted to index -1 and so to the top, ahead
+#: of critical; it goes last here.
+SEVERITY_ORDER: tuple[str, ...] = (
+    "critical", "high", "medium", "low", "info",
+)
+
+
+def severity_breakdown(mapping: Any) -> Optional[list[SeverityRow]]:
+    """The Cases by Severity table, or None when the payload is not a
+    mapping.
+
+    `data.open || 0`, `data.closed || 0` and `data.total || 0` printed a
+    zero for each figure the job did not record.
+    """
+    if not isinstance(mapping, dict):
+        return None
+    rows: list[SeverityRow] = []
+    for name, figures in mapping.items():
+        counts = figures if isinstance(figures, dict) else {}
+        label = str(name)
+        rows.append({
+            "key": severity_key(label),
+            "label": label,
+            "open": _int(counts.get("open")),
+            "closed": _int(counts.get("closed")),
+            "total": _int(counts.get("total")),
+        })
+    order = {name: i for i, name in enumerate(SEVERITY_ORDER)}
+    rows.sort(key=lambda r: order.get(r["label"], len(order)))
+    return rows
+
+class SeverityRow(TypedDict):
+    """One row of the Cases by Severity table. Each figure is None when
+    the job did not record it, where `data.open || 0` printed a zero."""
+
+    key: str
+    label: str
+    open: Optional[int]
+    closed: Optional[int]
+    total: Optional[int]
+
+
+class CaseMetricsView(TypedDict):
+    job: JobState
+    mttr_hours: Optional[float]
+    total_cases: Optional[int]
+    open_cases: Optional[int]
+    closed_cases: Optional[int]
+    trend: Optional[list[SparkBar]]
+    closure_reasons: Optional[list[Share]]
+    by_severity: Optional[list[SeverityRow]]
+
+
+class VelocityView(TypedDict):
+    job: JobState
+    daily: Optional[list[SparkBar]]
+    threat_distribution: Optional[list[Share]]
+    stale_iocs: Optional[list[StaleIOC]]
+
+
+def case_metrics_view(job: Any) -> CaseMetricsView:
+    state = job_state(job)
+    result = job.get("result") if isinstance(job, dict) else None
+    if not isinstance(result, dict):
+        return {"job": state, "mttr_hours": None, "total_cases": None,
+                "open_cases": None, "closed_cases": None, "trend": None,
+                "closure_reasons": None, "by_severity": None}
+    return {
+        "job": state,
+        "mttr_hours": _num(result.get("mttr_hours")),
+        "total_cases": _int(result.get("total_cases")),
+        "open_cases": _int(result.get("open_cases")),
+        "closed_cases": _int(result.get("closed_cases")),
+        "trend": spark(result.get("daily_trend")),
+        "closure_reasons": shares(result.get("closure_reasons")),
+        "by_severity": severity_breakdown(result.get("by_severity")),
+    }
+
+
+def stale_ioc(raw: Any) -> Optional[StaleIOC]:
+    if not isinstance(raw, dict):
+        return None
+    days = _int(raw.get("days_stale"))
+    kind_key, kind = entity_kind(raw.get("type"))
+    threat = raw.get("threat_level")
+    return {
+        "value": _text(raw.get("value")),
+        "kind": kind,
+        "kind_key": kind_key,
+        "threat_key": severity_key(threat),
+        "threat_label": _text(threat),
+        "days": days,
+        "urgent": None if days is None else days > IOC_DANGER_DAYS,
+    }
+
+
+def velocity_view(job: Any) -> VelocityView:
+    state = job_state(job)
+    result = job.get("result") if isinstance(job, dict) else None
+    if not isinstance(result, dict):
+        return {"job": state, "daily": None, "threat_distribution": None,
+                "stale_iocs": None}
+    raw_iocs = result.get("stale_iocs")
+    return {
+        "job": state,
+        "daily": spark(result.get("daily_counts")),
+        "threat_distribution": shares(result.get("threat_distribution")),
+        "stale_iocs": (None if not isinstance(raw_iocs, list) else
+                       [i for i in (stale_ioc(r) for r in raw_iocs)
+                        if i is not None]),
+    }
+
+
+router.add_api_route(
+    "/analytics/case-metrics",
+    _panel(AnalyticsJobType.CASE_METRICS.value, CASE_METRICS_FRAGMENT,
+           case_metrics_view),
+    methods=["GET"], response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))])
+
+router.add_api_route(
+    "/analytics/observable-velocity",
+    _panel(AnalyticsJobType.OBSERVABLE_VELOCITY.value, VELOCITY_FRAGMENT,
+           velocity_view),
+    methods=["GET"], response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))])

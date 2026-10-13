@@ -952,8 +952,8 @@ function renderDashboard() {
     renderEntityRisk();
     renderRepeatOffenders();
     renderRuleNoise();
-    renderObservableVelocity(jobs.observable_velocity);
-    renderCaseMetrics(jobs.case_metrics);
+    renderObservableVelocity();
+    renderCaseMetrics();
     renderStaleInvestigations();
     renderConfig();
 }
@@ -1047,130 +1047,24 @@ function renderRuleNoise() {
     });
 }
 
-function renderObservableVelocity(job) {
+// GET /ui/analytics/observable-velocity renders the panel.
+function renderObservableVelocity() {
     const container = document.getElementById('observable-velocity-content');
-    if (!job || !job.result) { container.innerHTML = '<div class="empty-state">No data yet. Click "Run All Jobs" to generate.</div>'; return; }
-    const r = job.result;
-
-    // Sparkline
-    const dailyCounts = r.daily_counts || [];
-    const maxDay = Math.max(...dailyCounts.map(d => d.count), 1);
-
-    // Threat distribution
-    const dist = r.threat_distribution || {};
-    const totalObs = Object.values(dist).reduce((a, b) => a + b, 0) || 1;
-
-    const staleList = (r.stale_iocs || []).map(s => `<tr>
-        <td>${esc(s.value)}</td>
-        <td><span class="entity-type-badge host">${s.type}</span></td>
-        <td><span class="severity-badge severity-${s.threat_level}">${s.threat_level}</span></td>
-        <td class="days-stale ${s.days_stale > 21 ? 'danger' : 'warn'}">${s.days_stale}d</td>
-    </tr>`).join('');
-
-    container.innerHTML = `
-        <div class="grid grid-cols-2 gap-4 mb-4">
-            <div class="velocity-chart-container">
-                <div class="velocity-chart-title">New Observables / Day (30d)</div>
-                <div class="sparkline">${dailyCounts.map(d => {
-                    const h = Math.max(2, Math.round((d.count / maxDay) * 56));
-                    return `<div class="sparkline-bar" data-ion-style="height:${h}px" title="${d.date}: ${d.count}"></div>`;
-                }).join('')}</div>
-                <div class="flex justify-between text-[0.6875rem] text-[var(--text-muted)] mt-1.5">
-                    <span>${dailyCounts[0]?.date || ''}</span><span>${dailyCounts[dailyCounts.length - 1]?.date || ''}</span>
-                </div>
-            </div>
-            <div class="velocity-chart-container">
-                <div class="velocity-chart-title">Threat Level Distribution</div>
-                ${['critical','high','medium','low','benign','unknown'].map(level => {
-                    const count = dist[level] || 0;
-                    const pct = Math.round((count / totalObs) * 100);
-                    return `<div class="threat-dist-row">
-                        <span class="threat-dist-label">${level}</span>
-                        <div class="_ion-s-8bc7ebe99c">
-                            <div class="threat-dist-bar tl-${level} h-full" data-ion-style="width:${pct}%"></div>
-                        </div>
-                        <span class="threat-dist-count">${count}</span>
-                    </div>`;
-                }).join('')}
-                <div class="mt-2 text-xs text-[var(--text-muted)]">Total: ${r.total_observables || 0} | Watched: ${r.total_watched || 0}</div>
-            </div>
-        </div>
-        <div class="flex gap-4 mb-4">
-            <div class="metric-card flex-1"><div class="metric-value">${r.velocity_7d || 0}</div><div class="metric-label">New IOCs (7d)</div></div>
-            <div class="metric-card flex-1"><div class="metric-value">${r.velocity_prev_7d || 0}</div><div class="metric-label">Previous 7d</div></div>
-            <div class="metric-card flex-1"><div class="metric-value" data-ion-style="color:${(r.velocity_change || 0) > 0 ? '#ef4444' : '#22c55e'}">${(r.velocity_change || 0) > 0 ? '+' : ''}${r.velocity_change || 0}</div><div class="metric-label">Change</div></div>
-        </div>
-        ${staleList ? `<h3 class="text-[0.9375rem] mb-2">Stale Watched IOCs</h3>
-        <table class="analytics-table"><thead><tr><th>Value</th><th>Type</th><th>Threat Level</th><th>Days Stale</th></tr></thead>
-        <tbody>${staleList}</tbody></table>` : ''}
-    `;
+    if (!container) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/analytics/observable-velocity', {
+        source: container, target: container, swap: 'innerHTML',
+    });
 }
 
-function renderCaseMetrics(job) {
+// GET /ui/analytics/case-metrics renders the panel.
+function renderCaseMetrics() {
     const container = document.getElementById('case-metrics-content');
-    if (!job || !job.result) { container.innerHTML = '<div class="empty-state">No data yet. Click "Run All Jobs" to generate.</div>'; return; }
-    const r = job.result;
-
-    // Closure reasons
-    const reasons = r.closure_reasons || {};
-    const totalClosed = Object.values(reasons).reduce((a, b) => a + b, 0) || 1;
-
-    // Daily trend sparkline
-    const trend = r.daily_trend || [];
-    const maxTrend = Math.max(...trend.map(d => d.count), 1);
-
-    container.innerHTML = `
-        <div class="metrics-grid">
-            <div class="metric-card"><div class="metric-value">${r.mttr_hours != null ? r.mttr_hours : '-'}</div><div class="metric-label">MTTR (hours)</div></div>
-            <div class="metric-card"><div class="metric-value">${r.total_cases || 0}</div><div class="metric-label">Total Cases (30d)</div></div>
-            <div class="metric-card"><div class="metric-value text-[#eab308]">${r.open_cases || 0}</div><div class="metric-label">Open</div></div>
-            <div class="metric-card"><div class="metric-value text-[#22c55e]">${r.closed_cases || 0}</div><div class="metric-label">Closed</div></div>
-        </div>
-        <div class="grid grid-cols-2 gap-4">
-            <div class="velocity-chart-container">
-                <div class="velocity-chart-title">Cases Created / Day</div>
-                <div class="sparkline">${trend.map(d => {
-                    const h = Math.max(2, Math.round((d.count / maxTrend) * 56));
-                    return `<div class="sparkline-bar bg-[#8b5cf6]" data-ion-style="height:${h}px" title="${d.date}: ${d.count}"></div>`;
-                }).join('')}</div>
-                <div class="flex justify-between text-[0.6875rem] text-[var(--text-muted)] mt-1.5">
-                    <span>${trend[0]?.date || ''}</span><span>${trend[trend.length - 1]?.date || ''}</span>
-                </div>
-            </div>
-            <div class="velocity-chart-container">
-                <div class="velocity-chart-title">Closure Reasons</div>
-                <div class="closure-bars">${Object.entries(reasons).sort((a, b) => b[1] - a[1]).map(([reason, count]) => {
-                    const pct = Math.round((count / totalClosed) * 100);
-                    return `<div class="closure-row">
-                        <span class="closure-label">${formatReason(reason)}</span>
-                        <div class="closure-bar-track"><div class="closure-bar-fill cl-${reason}" data-pct="${pct}"></div></div>
-                        <span class="closure-count">${count}</span>
-                    </div>`;
-                }).join('')}</div>
-            </div>
-        </div>
-        ${renderSeverityBreakdown(r.by_severity || {})}
-    `;
-    applyBarWidths();
+    if (!container) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/analytics/case-metrics', {
+        source: container, target: container, swap: 'innerHTML',
+    });
 }
 
-function renderSeverityBreakdown(bySev) {
-    const entries = Object.entries(bySev);
-    if (!entries.length) return '';
-    return `<div class="mt-4">
-        <h3 class="text-[0.9375rem] mb-2">Cases by Severity</h3>
-        <table class="analytics-table"><thead><tr><th>Severity</th><th>Open</th><th>Closed</th><th>Total</th></tr></thead>
-        <tbody>${entries.sort((a, b) => {
-            const order = ['critical','high','medium','low','info'];
-            return order.indexOf(a[0]) - order.indexOf(b[0]);
-        }).map(([sev, data]) => `<tr>
-            <td><span class="severity-badge severity-${sev}">${sev}</span></td>
-            <td>${data.open || 0}</td>
-            <td>${data.closed || 0}</td>
-            <td class="font-semibold">${data.total || 0}</td>
-        </tr>`).join('')}</tbody></table>
-    </div>`;
-}
 
 // GET /ui/analytics/stale renders the panel. The argument is ignored:
 // the fragment reads its own job, so a panel whose job is missing or

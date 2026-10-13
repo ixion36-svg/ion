@@ -1,0 +1,67 @@
+{# A daily sparkline and a share bar, shared by the two panels that draw
+   them.
+
+   `Math.max(...series.map(d => d.count), 1)` is NaN as soon as one count
+   is not a number, so a single unreadable day flattened the whole chart.
+   A day we cannot read is drawn as unmeasured here, not at the floor
+   height, because a floor-height bar looks like a quiet day.
+#}
+{% macro sparkline(bars, title) %}
+<div class="velocity-chart-container">
+  <div class="velocity-chart-title">{{ title }}</div>
+  {%- if bars is none %}
+  <div class="empty-state">This series is not in a shape this page can
+    read, so it is not drawn. That is not the same as a quiet period.</div>
+  {%- elif not bars %}
+  <div class="empty-state">No days recorded yet.</div>
+  {%- else %}
+  <div class="sparkline">
+    {%- for b in bars %}
+    {%- if b.height is not none %}
+    <div class="sparkline-bar an-spark" data-ion-style="height:{{ b.height }}px"
+         title="{{ b.date or 'undated' }}: {{ b.count }}"></div>
+    {%- else %}
+    <div class="sparkline-bar an-spark-unmeasured"
+         title="{{ b.date or 'undated' }}: this day carried no readable count"></div>
+    {%- endif %}
+    {%- endfor %}
+  </div>
+  <div class="an-spark-axis">
+    <span>{{ bars[0].date or '' }}</span><span>{{ bars[-1].date or '' }}</span>
+  </div>
+  {%- endif %}
+</div>
+{% endmacro %}
+{# A distribution as labelled bars. The percentage denominator was
+   `Object.values(x).reduce((a, b) => a + b, 0) || 1`, which is NaN as soon
+   as one value is not a number and then 1, so every percentage became the
+   count times a hundred. #}
+{% macro share_bars(items, title, prefix) %}
+<div class="velocity-chart-container">
+  <div class="velocity-chart-title">{{ title }}</div>
+  {%- if items is none %}
+  <div class="empty-state">This breakdown is not in a shape this page can
+    read.</div>
+  {%- elif not items %}
+  <div class="empty-state">Nothing recorded yet.</div>
+  {%- else %}
+  <div class="closure-bars">
+    {%- for s in items %}
+    <div class="closure-row">
+      <span class="closure-label">{{ s.label }}</span>
+      <div class="closure-bar-track">
+        {%- if s.pct is not none %}
+        <div class="closure-bar-fill {{ prefix }}{{ s.key }}"
+             data-ion-style="width: {{ s.pct }}%"></div>
+        {%- endif %}
+      </div>
+      <span class="closure-count">
+        {%- if s.count is not none %}{{ s.count }}
+        {%- else %}<span class="an-absent" title="This entry carried no readable count"></span>{% endif %}
+      </span>
+    </div>
+    {%- endfor %}
+  </div>
+  {%- endif %}
+</div>
+{% endmacro %}

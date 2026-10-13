@@ -41,3 +41,35 @@
 .fp-med-text    { color: var(--neon-yellow, #eab308); }
 .fp-high-text   { color: var(--neon-red, #ef4444); }
 .an-absent-text { color: var(--text-muted); font-style: italic; }
+
+/* Sparkline bars. The page's own .sparkline-bar carries the geometry; the
+   colour was bg-[#8b5cf6] in one of the two charts and absent in the
+   other, so they disagreed for no reason. */
+.an-spark { background: var(--neon-purple, #8b5cf6); }
+
+/* A day whose count the job did not record. Not the floor height, which
+   on a sparkline reads as a quiet day. */
+.an-spark-unmeasured {
+    height: 100%;
+    background: repeating-linear-gradient(
+        45deg,
+        color-mix(in srgb, var(--text-muted) 30%, transparent) 0 2px,
+        transparent 2px 4px);
+}
+
+.an-spark-axis {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    margin-top: 0.375rem;
+}
+
+/* The two case-metric cards that carried their colour as an arbitrary
+   Tailwind value, text-[#eab308] and text-[#22c55e]. */
+.an-open-cases   { color: var(--neon-yellow, #eab308); }
+.an-closed-cases { color: var(--neon-green, #22c55e); }
+
+/* The Cases by Severity heading. Was text-[0.9375rem] inside a JavaScript
+   template string. */
+.an-breakdown-title { font-size: 0.9375rem; margin-bottom: 0.5rem; }
