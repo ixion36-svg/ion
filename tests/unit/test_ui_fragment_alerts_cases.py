@@ -1147,8 +1147,12 @@ def test_the_five_modal_refreshes_go_through_the_fragment():
 #: 93 before it; this stage removed 13 (openCasePanel 3, renderCasesSummary
 #: 2, aiSummarizeCase 3, and one each in closeCaseWithAlerts,
 #: addToExistingCase, showCreateCaseForm, showCreateCaseFromSelected and
-#: renderCaseManagementModal). This number may only go down.
-WRITES_REMAINING = 80
+#: renderCaseManagementModal). This number may only go down. Stage 3, the
+#: playbook region, removed 11 more (loadCasePlaybookExecutions 3,
+#: renderPlaybooksSection 2, togglePlaybookLibrary 2,
+#: renderPlaybookLibraryPanel 2, showCasePlaybookPicker 1,
+#: loadPlaybooksForAlert 1): 80 to 69.
+WRITES_REMAINING = 69
 
 
 def test_the_dom_writes_in_the_page_do_not_increase():

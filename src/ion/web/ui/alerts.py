@@ -1,11 +1,44 @@
-"""Alerts: the case side of the page, as server-rendered fragments.
+"""Alerts: the case side and the playbook region, as server-rendered fragments.
 
 alerts.html is converted a region at a time, in the order scratchpad
 alerts_plan.md sets out, and this module grows a route per region. Stage 2
 is the case side: the Cases card in the side panel, the slide-out case
 panel, the Add-to-Case picker, the case management modal and the AI case
-summary. The alert queue, the analytics panels, the alert detail modal and
-the playbook library are later stages and are not in here.
+summary. Stage 3 is the playbook region: the executions list in the case
+management modal, the Start Playbook picker, the Investigation Playbooks
+section of the alert detail modal and its Browse Playbook Library panel.
+The alert queue, the analytics panels and the rest of the alert detail
+modal are later stages and are not in here.
+
+What the playbook region did, measured against the tree before stage 3:
+
+  * `loadPlaybooksForAlert` fetched recommended playbooks and executions
+    in parallel and wrote `recommendedRes.ok ? json : { playbooks: [] }`.
+    A 403, a 400 from an instance with no Elasticsearch and an alert with
+    no matching playbook all rendered "No matching playbooks for this
+    alert". The executions read did the same, so a failed read hid an
+    execution that was in progress.
+
+  * `loadCasePlaybookExecutions` wrote `data.executions || []` and said
+    "No playbook executions" for a refusal. Its catch did name the failure,
+    which is the one place the region told the two apart.
+
+  * `showCasePlaybookPicker` showed a toast and no dialog when the list
+    was empty, and offered Start to every reader; POST
+    /api/cases/{id}/playbook/{pid}/start carries playbook:execute.
+
+  * The step checkbox in `renderActiveExecution` carried
+    `data-args='[..., this.checked ? 'completed' : 'pending']'`, which is
+    not JSON. event-delegation.js logs it and returns, so ticking a step
+    never reached the server. The fragment passes `$checked`.
+
+  * `togglePlaybookLibrary` tested `panel.style.display !== 'none'` on a
+    panel hidden by a class, so the first click hid an already hidden panel
+    and the second opened it. The panel uses the `hidden` attribute here.
+
+  * `renderPlaybooksSection` rendered `${p.step_count} steps` and
+    `${e.progress_pct}%` as given, "undefined steps" for a row without the
+    field. Guarded with `is not none` here.
 
 What the page did, and why each of these is not a cosmetic port:
 
@@ -87,6 +120,10 @@ PANEL_FRAGMENT = "_fragments/alerts_case_panel.html"
 PICKER_FRAGMENT = "_fragments/alerts_case_picker.html"
 MANAGE_FRAGMENT = "_fragments/alerts_case_manage.html"
 AI_SUMMARY_FRAGMENT = "_fragments/alerts_case_ai_summary.html"
+CASE_EXECUTIONS_FRAGMENT = "_fragments/alerts_playbook_case_executions.html"
+CASE_PLAYBOOK_PICKER_FRAGMENT = "_fragments/alerts_playbook_case_picker.html"
+ALERT_PLAYBOOKS_FRAGMENT = "_fragments/alerts_playbooks.html"
+PLAYBOOK_LIBRARY_FRAGMENT = "_fragments/alerts_playbook_library.html"
 
 #: What GET /api/cases, GET /api/cases/facets and GET /api/cases/{id} name.
 #: Spelled once so these fragments cannot drift into being a softer way in
@@ -110,15 +147,40 @@ CREATE_PERMISSION = "case:create"
 #: closure buttons and, for a case with linked alerts, Close Case As.
 TRIAGE_PERMISSION = "alert:triage"
 
-#: What GET /api/cases/{id}/playbook-executions carries. Not playbook:read:
-#: the plan's route table shows the read-shaped executions endpoint demands
-#: execute, so the executions section mirrors that or it offers a panel
-#: that loads a 403.
+#: What GET /api/cases/{id}/playbook-executions and GET
+#: /api/elasticsearch/alerts/{id}/playbook-executions carry. Not
+#: playbook:read: the plan's route table shows the two read-shaped
+#: executions endpoints demand execute, so the executions fragment and the
+#: executions half of the alert section mirror that or they offer a panel
+#: that loads a 403. Also what every playbook mutation carries (start, step
+#: update, complete), so it decides whether Start and the step controls are
+#: offered at all.
 PLAYBOOK_EXECUTE_PERMISSION = "playbook:execute"
 
-#: What GET /api/playbooks carries. Start Playbook opens the picker (this)
+#: What GET /api/playbooks, GET .../recommended-playbooks and GET
+#: .../suggested-playbooks carry. The picker, the alert section and the
+#: library panel are gated on it; Start Playbook opens the picker (this)
 #: and then starts one (execute), so it needs both.
 PLAYBOOK_READ_PERMISSION = "playbook:read"
+
+#: Recommended playbooks the alert section shows, from the page's
+#: `.slice(0, 3)`.
+RECOMMENDED_SHOWN = 3
+
+#: Characters of a playbook description the library panel shows, from the
+#: page's `substring(0, 80)`.
+LIBRARY_DESCRIPTION_CHARS = 80
+
+#: ExecutionStatus values this region keys styling and controls on. Spelled
+#: here rather than imported so a template cannot drift from the strings
+#: the model stores.
+EXEC_IN_PROGRESS = "in_progress"
+EXEC_COMPLETED = "completed"
+EXEC_FAILED = "failed"
+
+#: Step statuses that count as done for the progress figure, as
+#: get_case_playbook_executions and PlaybookExecution count them.
+STEP_DONE = ("completed", "skipped")
 
 #: Rows the Cases card shows. The page fetched 50 and sliced to 10.
 SUMMARY_LIMIT = 10
@@ -751,3 +813,419 @@ async def alerts_case_ai_summary_fragment(
         "analysis": format_ai_content(analysis) if analysis else None,
         "model": model,
     })
+
+
+# ---------------------------------------------------------------------------
+# Playbooks
+# ---------------------------------------------------------------------------
+
+
+def _count(value: Any) -> Optional[int]:
+    """An int, or None for anything that is not one.
+
+    bool is excluded on purpose: `True` is an int in Python and a count of
+    1 is not what a flag means. `${e.progress_pct}%` rendered "undefined%"
+    for a row without the field; None here renders as not counted.
+    """
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
+def execution_progress(execution: dict) -> dict:
+    """completed, total and pct for an execution, computed the way
+    get_case_playbook_executions computes them: a step is done when its
+    status is completed or skipped, and pct is None, not 0, for a playbook
+    with no steps. `renderActiveExecution` wrote 0% for that, which is a
+    confident claim about a playbook that cannot progress."""
+    playbook = execution.get("playbook")
+    steps = playbook.get("steps") if isinstance(playbook, dict) else None
+    steps = steps if isinstance(steps, list) else []
+    statuses = execution.get("step_statuses")
+    statuses = statuses if isinstance(statuses, dict) else {}
+    completed = sum(
+        1 for s in statuses.values()
+        if isinstance(s, dict) and s.get("status") in STEP_DONE
+    )
+    total = len(steps)
+    return {
+        "completed": completed,
+        "total": total,
+        "pct": round(completed / total * 100) if total else None,
+    }
+
+
+def pending_step_ids(execution: dict) -> list:
+    """Ids of the steps not yet completed or skipped, in step order.
+
+    `skipRemainingSteps` computed this from a client cache of the last
+    executions read. The fragment carries it on the execution block so the
+    function reads it off the DOM instead and the cache goes.
+    """
+    playbook = execution.get("playbook")
+    steps = playbook.get("steps") if isinstance(playbook, dict) else None
+    statuses = execution.get("step_statuses")
+    statuses = statuses if isinstance(statuses, dict) else {}
+    out = []
+    for step in steps if isinstance(steps, list) else []:
+        if not isinstance(step, dict) or step.get("id") is None:
+            continue
+        state = statuses.get(str(step.get("id")))
+        if isinstance(state, dict) and state.get("status") in STEP_DONE:
+            continue
+        out.append(step.get("id"))
+    return out
+
+
+def execution_view(execution: dict) -> dict:
+    """What the active-execution block needs, derived from the endpoint's
+    dict. The dict itself is passed through; these are derivations."""
+    playbook = execution.get("playbook")
+    playbook = playbook if isinstance(playbook, dict) else None
+    steps = playbook.get("steps") if playbook else None
+    statuses = execution.get("step_statuses")
+    statuses = statuses if isinstance(statuses, dict) else {}
+    rows = []
+    for step in steps if isinstance(steps, list) else []:
+        if not isinstance(step, dict):
+            continue
+        state = statuses.get(str(step.get("id")))
+        status = state.get("status") if isinstance(state, dict) else None
+        rows.append({
+            "id": step.get("id"),
+            "title": step.get("title"),
+            "is_required": bool(step.get("is_required")),
+            "status": status,
+            "done": status in STEP_DONE,
+            "skipped": status == "skipped",
+        })
+    return {
+        "id": execution.get("id"),
+        "playbook_id": execution.get("playbook_id"),
+        "playbook": playbook,
+        "status": plain(execution.get("status")),
+        "steps": rows,
+        "progress": execution_progress(execution),
+        "pending_step_ids": pending_step_ids(execution),
+    }
+
+
+def active_execution(executions: list) -> Optional[dict]:
+    """The first in-progress execution, as `.find(e => e.status ===
+    'in_progress')` chose it, or None."""
+    for e in executions:
+        if isinstance(e, dict) and plain(e.get("status")) == EXEC_IN_PROGRESS:
+            return e
+    return None
+
+
+def completed_count(executions: list) -> int:
+    return sum(
+        1 for e in executions
+        if isinstance(e, dict) and plain(e.get("status")) == EXEC_COMPLETED
+    )
+
+
+def recommended_rows(playbooks: list, active: Optional[dict]) -> list:
+    """The recommendations the section shows: the active execution's own
+    playbook left out (it is shown above as the execution), the first
+    RECOMMENDED_SHOWN of the rest."""
+    active_id = active.get("playbook_id") if isinstance(active, dict) else None
+    rows = [p for p in playbooks if isinstance(p, dict) and p.get("id") != active_id]
+    return rows[:RECOMMENDED_SHOWN]
+
+
+def short_description(text: Any) -> Optional[str]:
+    """The first LIBRARY_DESCRIPTION_CHARS of a description with an
+    ellipsis when it was cut, None for none."""
+    if not text:
+        return None
+    text = str(text)
+    if len(text) > LIBRARY_DESCRIPTION_CHARS:
+        return text[:LIBRARY_DESCRIPTION_CHARS] + "..."
+    return text
+
+
+def case_execution_rows(executions: list) -> list:
+    """The case executions endpoint's rows with the three counts it adds
+    guarded, so a row missing one renders as not counted rather than as
+    "undefined/undefined"."""
+    rows = []
+    for e in executions:
+        if not isinstance(e, dict):
+            continue
+        playbook = e.get("playbook")
+        rows.append({
+            **e,
+            "status_value": plain(e.get("status")),
+            "outcome_value": plain(e.get("outcome")),
+            "playbook_name": playbook.get("name") if isinstance(playbook, dict) else None,
+            "progress_pct": _count(e.get("progress_pct")),
+            "completed_steps": _count(e.get("completed_steps")),
+            "total_steps": _count(e.get("total_steps")),
+        })
+    return rows
+
+
+def library_groups(playbooks: list) -> dict:
+    """Recommended (active) and library (inactive) suggestions, as
+    `renderPlaybookLibraryPanel` split them. A recommended playbook with an
+    execution in progress is left out of its group because the section
+    above shows that execution; a library one keeps its row with Start
+    disabled, as the page did."""
+    recommended, library = [], []
+    for p in playbooks:
+        if not isinstance(p, dict):
+            continue
+        row = {**p, "short_description": short_description(p.get("description")),
+               "step_count": _count(p.get("step_count"))}
+        kind = p.get("suggestion_type")
+        if kind == "recommended" and not p.get("has_active_execution"):
+            recommended.append(row)
+        elif kind == "library":
+            library.append(row)
+    return {"recommended": recommended, "library": library}
+
+
+@router.get(
+    "/alerts/case-playbook-executions/{case_id}",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PLAYBOOK_EXECUTE_PERMISSION))],
+)
+def alerts_case_playbook_executions_fragment(
+    request: Request,
+    case_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    """The Playbook Executions list in the case management modal.
+
+    Calls the handler GET /api/cases/{id}/playbook-executions runs, which
+    also back-fills executions discovered through the case's alerts, so
+    the rows here are the rows the JSON reports, including that side
+    effect.
+
+    Outcomes: the case is gone (the handler's 404); the read failed; no
+    executions; rows. `loadCasePlaybookExecutions` had the last two and
+    its catch, and `data.executions || []` folded a refusal into the
+    third.
+    """
+    from ion.web.case_lifecycle_api import get_case_playbook_executions
+
+    def answer(ctx: dict) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request=request, name=CASE_EXECUTIONS_FRAGMENT,
+            context={"case_id": case_id, **ctx}, status_code=200,
+        )
+
+    try:
+        payload = get_case_playbook_executions(case_id, current_user=current_user, session=session)
+    except HTTPException as exc:
+        if exc.status_code == 404:
+            return answer({"missing": True, "failed": False, "executions": None})
+        logger.exception("Case playbook executions fragment refused for case %s", case_id)
+        return answer({"missing": False, "failed": True, "executions": None})
+    except Exception:
+        logger.exception("Case playbook executions fragment could not read case %s", case_id)
+        return answer({"missing": False, "failed": True, "executions": None})
+
+    executions = _rows(payload, "executions")
+    if executions is None:
+        logger.error("Case playbook executions for case %s came back without a list", case_id)
+        return answer({"missing": False, "failed": True, "executions": None})
+    return answer({"missing": False, "failed": False,
+                   "executions": case_execution_rows(executions)})
+
+
+@router.get(
+    "/alerts/case-playbook-picker/{case_id}",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PLAYBOOK_READ_PERMISSION))],
+)
+def alerts_case_playbook_picker_fragment(
+    request: Request,
+    case_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    """The Start Playbook picker for a case, the overlay included.
+
+    Lists through the handler GET /api/playbooks?active_only=true runs.
+    Start is offered only with playbook:execute, which POST
+    /api/cases/{id}/playbook/{pid}/start carries; the page offered it to
+    every reader. An empty list is a dialog that says so, where the page
+    showed a toast and no dialog.
+    """
+    from ion.web.api import list_playbooks
+
+    can_start = _can(current_user, PLAYBOOK_EXECUTE_PERMISSION)
+
+    def answer(ctx: dict) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request=request, name=CASE_PLAYBOOK_PICKER_FRAGMENT,
+            context={"case_id": case_id, "can_start": can_start, **ctx},
+            status_code=200,
+        )
+
+    try:
+        payload = list_playbooks(active_only=True, current_user=current_user, session=session)
+        playbooks = _rows(payload, "playbooks")
+    except Exception:
+        logger.exception("Case playbook picker fragment could not list playbooks")
+        playbooks = None
+    if playbooks is None:
+        return answer({"failed": True, "playbooks": None})
+    rows = [{**p, "step_count": _count(p.get("step_count"))}
+            for p in playbooks if isinstance(p, dict)]
+    return answer({"failed": False, "playbooks": rows})
+
+
+async def _recommended(alert_id: str, current_user: User, session: Session) -> dict:
+    """The recommended-playbooks read as one of four outcomes.
+
+    `missing` is the handler's 404 (the alert is not in Elasticsearch);
+    `failed` is any other refusal, with the handler's detail as `error`
+    when it gave one (400 "Elasticsearch is not configured" is the usual
+    reason on an instance without it), or any other exception with no
+    detail; otherwise `playbooks` is the list, possibly empty.
+    """
+    from ion.web.api import get_recommended_playbooks
+
+    try:
+        payload = await get_recommended_playbooks(alert_id, current_user=current_user, session=session)
+    except HTTPException as exc:
+        if exc.status_code == 404:
+            return {"missing": True, "failed": False, "error": None, "playbooks": None}
+        return {"missing": False, "failed": True, "error": str(exc.detail or ""), "playbooks": None}
+    except Exception:
+        logger.exception("Recommended playbooks could not be read for alert %s", alert_id)
+        return {"missing": False, "failed": True, "error": None, "playbooks": None}
+    playbooks = _rows(payload, "playbooks")
+    if playbooks is None:
+        return {"missing": False, "failed": True, "error": None, "playbooks": None}
+    return {"missing": False, "failed": False, "error": None,
+            "playbooks": [p for p in playbooks if isinstance(p, dict)]}
+
+
+def _alert_executions(alert_id: str, current_user: User, session: Session) -> Optional[list]:
+    """The alert's executions, or None when they could not be read."""
+    from ion.web.api import get_alert_playbook_executions
+
+    try:
+        payload = get_alert_playbook_executions(alert_id, current_user=current_user, session=session)
+    except Exception:
+        logger.exception("Playbook executions could not be read for alert %s", alert_id)
+        return None
+    return _rows(payload, "executions")
+
+
+@router.get(
+    "/alerts/playbooks/{alert_id}",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PLAYBOOK_READ_PERMISSION))],
+)
+async def alerts_playbooks_fragment(
+    request: Request,
+    alert_id: str,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    """The Investigation Playbooks section of the alert detail modal.
+
+    Two reads, as `loadPlaybooksForAlert` made them, each with its own
+    outcome rather than `res.ok ? json : { playbooks: [] }`:
+
+      recommended    GET .../recommended-playbooks, playbook:read, which
+                     this route is gated on. Missing alert, failed read
+                     (with the reason when the handler gave one), no
+                     match, or rows.
+      executions     GET .../playbook-executions, playbook:execute. Read
+                     only when the viewer has it, and withheld, not
+                     empty, when they do not: the active execution and
+                     the completed count are then unknown, and the
+                     section says so instead of showing nothing.
+
+    Start and the step controls are offered only with playbook:execute,
+    which every playbook mutation carries.
+    """
+    can_execute = _can(current_user, PLAYBOOK_EXECUTE_PERMISSION)
+    recommended = await _recommended(alert_id, current_user, session)
+
+    executions: Optional[list] = None
+    executions_failed = False
+    if can_execute:
+        executions = _alert_executions(alert_id, current_user, session)
+        executions_failed = executions is None
+
+    active = active_execution(executions) if executions is not None else None
+    rows = (recommended_rows(recommended["playbooks"], active)
+            if recommended["playbooks"] is not None else None)
+    if rows is not None:
+        rows = [{**p, "step_count": _count(p.get("step_count"))} for p in rows]
+
+    return templates.TemplateResponse(
+        request=request, name=ALERT_PLAYBOOKS_FRAGMENT,
+        context={
+            "alert_id": alert_id,
+            "can_execute": can_execute,
+            "alert_missing": recommended["missing"],
+            "recommended_failed": recommended["failed"],
+            "recommended_error": recommended["error"],
+            "recommended": rows,
+            "executions_withheld": not can_execute,
+            "executions_failed": executions_failed,
+            "active": execution_view(active) if active else None,
+            "completed_count": completed_count(executions) if executions is not None else None,
+        },
+        status_code=200,
+    )
+
+
+@router.get(
+    "/alerts/playbook-library/{alert_id}",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PLAYBOOK_READ_PERMISSION))],
+)
+async def alerts_playbook_library_fragment(
+    request: Request,
+    alert_id: str,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    """The Browse Playbook Library panel under the alert's section.
+
+    Lists through the handler GET .../suggested-playbooks runs. Same four
+    outcomes as the recommendations: missing alert, failed read with the
+    reason, nothing in the library that matches, or the two groups.
+    `togglePlaybookLibrary` had a failure string and `data.playbooks || []`.
+    """
+    from ion.web.api import get_suggested_playbooks
+
+    can_start = _can(current_user, PLAYBOOK_EXECUTE_PERMISSION)
+
+    def answer(ctx: dict) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request=request, name=PLAYBOOK_LIBRARY_FRAGMENT,
+            context={"alert_id": alert_id, "can_start": can_start, **ctx},
+            status_code=200,
+        )
+
+    try:
+        payload = await get_suggested_playbooks(alert_id, current_user=current_user, session=session)
+    except HTTPException as exc:
+        if exc.status_code == 404:
+            return answer({"missing": True, "failed": False, "error": None,
+                           "recommended": None, "library": None})
+        return answer({"missing": False, "failed": True, "error": str(exc.detail or ""),
+                       "recommended": None, "library": None})
+    except Exception:
+        logger.exception("Suggested playbooks could not be read for alert %s", alert_id)
+        return answer({"missing": False, "failed": True, "error": None,
+                       "recommended": None, "library": None})
+
+    playbooks = _rows(payload, "playbooks")
+    if playbooks is None:
+        return answer({"missing": False, "failed": True, "error": None,
+                       "recommended": None, "library": None})
+    return answer({"missing": False, "failed": False, "error": None,
+                   **library_groups(playbooks)})

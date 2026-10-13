@@ -1888,6 +1888,21 @@ kbd {
 .playbook-type-badge.recommended { background: rgba(76,175,80,0.12); color: var(--success); }
 .playbook-type-badge.library { background: rgba(33,150,243,0.12); color: var(--info); }
 
+/* Case playbook executions (fragment alerts_playbook_case_executions.html).
+   The status and outcome colours were fixed values the script wrote into
+   data-ion-style; only the progress width is data-driven and keeps that
+   attribute. */
+.playbook-progress-fill { background: #ffc107; }
+.playbook-progress-fill.completed { background: #4caf50; }
+.playbook-progress-fill.failed { background: #f44336; }
+.playbook-outcome-badge { background: rgba(158,158,158,0.2); color: #9e9e9e; }
+.playbook-outcome-badge.outcome-true_positive { background: rgba(244,67,54,0.2); color: #f44336; }
+.playbook-outcome-badge.outcome-false_positive { background: rgba(76,175,80,0.2); color: #4caf50; }
+.playbook-outcome-badge.outcome-benign_true_positive { background: rgba(33,150,243,0.2); color: #2196f3; }
+.playbook-outcome-badge.outcome-risk_accepted { background: rgba(255,193,7,0.2); color: #ffc107; }
+.playbook-outcome-badge.outcome-inconclusive { background: rgba(158,158,158,0.2); color: #9e9e9e; }
+.playbook-outcome-badge.outcome-escalated { background: rgba(255,152,0,0.2); color: #ff9800; }
+
 /* ============================================= */
 /* Comments tab                                  */
 /* ============================================= */

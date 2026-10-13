@@ -1510,6 +1510,12 @@ async def alerts_page(request: Request, user: User = Depends(require_page_permis
     `can_create_case` is what POST /api/cases requires, passed as a fact
     about the viewer so the page does not open a create-case form whose
     submit would answer 403. The page's own alert:read does not imply it.
+
+    `can_read_playbooks` is what GET .../recommended-playbooks requires and
+    what the /ui/alerts/playbooks fragment is gated on, so the detail
+    modal's playbook section says it is withheld instead of requesting a
+    fragment that answers 403, which htmx would not swap, leaving
+    "Loading playbooks..." on screen for the life of the modal.
     """
     return templates.TemplateResponse(
         request=request,
@@ -1519,6 +1525,7 @@ async def alerts_page(request: Request, user: User = Depends(require_page_permis
             "alert_field_pins": get_config().alert_field_pins,
             "bob_custom_templates": get_config().bob_custom_templates,
             "can_create_case": user.has_permission("case:create"),
+            "can_read_playbooks": user.has_permission("playbook:read"),
         },
     )
 

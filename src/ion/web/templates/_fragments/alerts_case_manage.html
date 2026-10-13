@@ -181,11 +181,26 @@
       {# GET /api/cases/{id}/playbook-executions carries playbook:execute,
          so the section that loads it is withheld without it rather than
          rendered to show a 403. Start Playbook also lists playbooks
-         (playbook:read) before starting one. #}
+         (playbook:read) before starting one.
+
+         The list is /ui/alerts/case-playbook-executions/{id}, pulled on
+         `load` (this modal is swapped in by htmx, so the attribute is
+         processed) and again on `case-playbooks-refresh from:body`, which
+         startCasePlaybook dispatches. Both triggers are native parsing.
+         The reload control is in the heading, outside the target. #}
       {% if can_execute_playbooks %}
         <div class="case-mgmt-section">
-          <h5>Playbook Executions</h5>
-          <div id="case-playbook-executions-{{ case.id }}" class="case-playbook-list">
+          <h5 class="flex items-center justify-between">
+            <span>Playbook Executions</span>
+            <button class="btn btn-sm btn-secondary text-xs" title="Reload playbook executions"
+                    hx-get="/ui/alerts/case-playbook-executions/{{ case.id }}"
+                    hx-target="#case-playbook-executions-{{ case.id }}"
+                    hx-swap="innerHTML">&#8635;</button>
+          </h5>
+          <div id="case-playbook-executions-{{ case.id }}" class="case-playbook-list"
+               hx-get="/ui/alerts/case-playbook-executions/{{ case.id }}"
+               hx-trigger="load, case-playbooks-refresh from:body"
+               hx-swap="innerHTML">
             <span class="text-[0.8125rem] text-[var(--text-muted)]">Loading...</span>
           </div>
           {% if can_start_playbook %}

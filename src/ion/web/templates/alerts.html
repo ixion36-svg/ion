@@ -13,8 +13,13 @@
    way the other three attributes carry config. POST /api/cases requires it,
    so the create-case forms are not opened for someone whose submit would
    answer 403. A data attribute rather than Jinja inside the <script>
-   block, so `node --check` stays usable on the script. #}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden" data-alert-detail-v2="{{ '1' if alert_detail_v2 else '0' }}" data-alert-field-pins="{{ '1' if alert_field_pins else '0' }}" data-bob-templates="{{ '1' if bob_custom_templates else '0' }}" data-can-create-case="{{ 'true' if can_create_case else 'false' }}">
+   block, so `node --check` stays usable on the script.
+
+   data-can-read-playbooks is the same for playbook:read, which the
+   /ui/alerts/playbooks fragment is gated on: loadPlaybooksForAlert says
+   the section is withheld rather than requesting a 403 that htmx would
+   not swap over "Loading playbooks...". #}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden" data-alert-detail-v2="{{ '1' if alert_detail_v2 else '0' }}" data-alert-field-pins="{{ '1' if alert_field_pins else '0' }}" data-bob-templates="{{ '1' if bob_custom_templates else '0' }}" data-can-create-case="{{ 'true' if can_create_case else 'false' }}" data-can-read-playbooks="{{ 'true' if can_read_playbooks else 'false' }}">
 <div class="relative z-10 w-full px-4 sm:px-6 lg:px-8 py-10 md:py-12">
 
   <!-- ── Header row ── -->
@@ -597,6 +602,9 @@
    open. Both were appended to document.body by the script before. #}
 <div id="add-to-case-host"></div>
 <div id="case-mgmt-host"></div>
+{# The Start Playbook picker, /ui/alerts/case-playbook-picker/{id}, lands
+   here. Its overlay removes itself; startCasePlaybook empties the host. #}
+<div id="case-playbook-picker-host"></div>
 
 {# The three case dialogs whose markup needs no server data: the single and
    bulk create-case forms and the quick closure confirm. The script clones
@@ -1302,10 +1310,11 @@ async function loadCases() {
 }
 
 // The case management modal is server-rendered from
-// /ui/alerts/case-manage/{id} into #case-mgmt-host. The two things the
-// page did after building the markup still run once the swap settles:
-// the playbook executions list and the known-FP match, both from data
-// the fragment carries on the overlay, so nothing re-reads the case.
+// /ui/alerts/case-manage/{id} into #case-mgmt-host. The known-FP match
+// still runs once the swap settles, from data the fragment carries on the
+// overlay, so nothing re-reads the case. The playbook executions list
+// inside the modal is its own fragment and pulls itself on load
+// (hx-trigger="load" on its container, processed with the swap).
 function showCaseDetail(caseId) {
     const host = document.getElementById('case-mgmt-host');
     if (!host) return Promise.resolve();
@@ -1314,9 +1323,6 @@ function showCaseDetail(caseId) {
     }).then(function () {
         const overlay = document.getElementById('case-mgmt-overlay');
         if (!overlay) return;
-        if (document.getElementById('case-playbook-executions-' + caseId)) {
-            loadCasePlaybookExecutions(caseId);
-        }
         if (overlay.dataset.caseStatus !== 'closed' && overlay.dataset.kfpContext) {
             try {
                 checkKFPMatches(JSON.parse(overlay.dataset.kfpContext));
@@ -2068,105 +2074,29 @@ async function escalateToDFIRIRIS(caseId) {
 }
 
 // ==================== Case Playbook Integration ====================
-
-async function loadCasePlaybookExecutions(caseId) {
-    const container = document.getElementById(`case-playbook-executions-${caseId}`);
-    if (!container) return;
-
-    try {
-        const response = await fetch(`/api/cases/${caseId}/playbook-executions`);
-        if (!response.ok) throw new Error('Failed to load');
-        const data = await response.json();
-        const executions = data.executions || [];
-
-        if (executions.length === 0) {
-            container.innerHTML = '<span class="text-[0.8125rem] text-[var(--text-muted)]">No playbook executions</span>';
-            return;
-        }
-
-        const outcomeColors = {
-            true_positive: 'rgba(244,67,54,0.2);color:#f44336',
-            false_positive: 'rgba(76,175,80,0.2);color:#4caf50',
-            benign_true_positive: 'rgba(33,150,243,0.2);color:#2196f3',
-            risk_accepted: 'rgba(255,193,7,0.2);color:#ffc107',
-            inconclusive: 'rgba(158,158,158,0.2);color:#9e9e9e',
-            escalated: 'rgba(255,152,0,0.2);color:#ff9800',
-        };
-
-        container.innerHTML = executions.map(e => {
-            const playbook = e.playbook || {};
-            const statusClass = e.status === 'completed' ? 'status-active' : e.status === 'failed' ? 'status-inactive' : '';
-            const outcomeBadge = e.outcome ? `<span class="py-0.5 px-1.5 rounded-[3px] text-[0.625rem] font-semibold uppercase" data-ion-style="background:${outcomeColors[e.outcome] || 'rgba(158,158,158,0.2);color:#9e9e9e'}">${e.outcome.replace(/_/g, ' ')}</span>` : '';
-            const reportLink = e.report_document_id ? `<a class="text-[0.675rem] text-[var(--accent-color)]" href="/documents">View Report</a>` : '';
-            return `
-                <div class="flex items-center gap-2 p-2 bg-[var(--bg-secondary)] rounded-[4px] mb-1.5">
-                    <div class="flex-1">
-                        <div class="text-[0.8125rem] font-semibold">${escapeHtml(playbook.name || 'Unknown')}</div>
-                        <div class="flex items-center gap-2 mt-1">
-                            <div class="flex-1 bg-[var(--bg-tertiary)] rounded-[3px] h-[6px] overflow-hidden">
-                                <div class="h-full rounded-[3px]" data-ion-style="width:${e.progress_pct}%; background:${e.status === 'completed' ? '#4caf50' : e.status === 'failed' ? '#f44336' : '#ffc107'}"></div>
-                            </div>
-                            <span class="text-xs text-[var(--text-muted)]">${e.completed_steps}/${e.total_steps}</span>
-                            <span class="status-badge ${statusClass} text-[0.675rem]">${e.status.replace('_', ' ')}</span>
-                            ${outcomeBadge}
-                            ${reportLink}
-                        </div>
-                    </div>
-                    ${e.status === 'in_progress' ? `<a href="/playbooks?execution=${e.id}" class="btn btn-sm text-xs">Work</a>` : ''}
-                </div>
-            `;
-        }).join('');
-    } catch (error) {
-        console.error('loadCasePlaybookExecutions failed:', error);
-        container.innerHTML = `<span class="text-[0.8125rem] text-[var(--text-muted)]">Failed to load executions: ${escapeHtml(String((error && error.message) || error))}</span>`;
-    }
+//
+// The executions list in the case management modal is
+// /ui/alerts/case-playbook-executions/{id}. Its container, rendered by the
+// modal fragment, carries hx-trigger="load, case-playbooks-refresh
+// from:body", so it loads with the modal and again when a playbook is
+// started from it. The reload control is in the section heading, outside
+// the target. The outcomes (gone, failed read, no executions, rows) are the
+// fragment's; nothing is assembled here.
+function refreshCasePlaybookExecutions() {
+    document.body.dispatchEvent(new CustomEvent('case-playbooks-refresh'));
 }
 
-async function showCasePlaybookPicker(caseId) {
-    try {
-        const response = await fetch('/api/playbooks?active_only=true');
-        if (!response.ok) throw new Error('Failed to load playbooks');
-        const data = await response.json();
-        const activePlaybooks = data.playbooks || [];
-
-        if (activePlaybooks.length === 0) {
-            showNotification('No active playbooks available', 'info');
-            return;
-        }
-
-        // Simple picker overlay
-        const existing = document.getElementById('case-playbook-picker');
-        if (existing) existing.remove();
-
-        const picker = document.createElement('div');
-        picker.className = 'case-mgmt-overlay';
-        picker.id = 'case-playbook-picker';
-        picker.onclick = function(e) { if (e.target === picker) picker.remove(); };
-
-        picker.innerHTML = `
-            <div class="case-mgmt-modal max-w-[500px]">
-                <h3>
-                    <span>Start Playbook for Case</span>
-                    <button class="close-btn" data-remove-target="case-playbook-picker">&times;</button>
-                </h3>
-                <div class="p-4">
-                    ${activePlaybooks.map(p => `
-                        <div class="flex items-center gap-2 p-2.5 bg-[var(--bg-secondary)] rounded-[4px] mb-2">
-                            <div class="flex-1">
-                                <div class="font-semibold text-sm">${escapeHtml(p.name)}</div>
-                                <div class="text-xs text-[var(--text-muted)]">${p.step_count} steps | Priority: ${p.priority}</div>
-                            </div>
-                            <button class="btn btn-sm btn-primary" data-click-action="startCasePlaybook" data-args='[${caseId}, ${p.id}]'>Start</button>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(picker);
-    } catch (error) {
-        showNotification('Failed to load playbooks: ' + error.message, 'error');
-    }
+// The Start Playbook picker is /ui/alerts/case-playbook-picker/{id}, into
+// #case-playbook-picker-host. Start is offered by the fragment only with
+// playbook:execute, which the start POST carries. An empty list and a
+// failed read are both a dialog that says so, where the page showed a toast
+// and no dialog.
+function showCasePlaybookPicker(caseId) {
+    const host = document.getElementById('case-playbook-picker-host');
+    if (!host) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/alerts/case-playbook-picker/' + encodeURIComponent(caseId), {
+        source: host, target: host, swap: 'innerHTML',
+    });
 }
 
 async function startCasePlaybook(caseId, playbookId) {
@@ -2181,11 +2111,10 @@ async function startCasePlaybook(caseId, playbookId) {
         const result = await response.json();
         showNotification(result.already_started ? 'Playbook already in progress' : 'Playbook started for case', 'success');
 
-        // Close picker and refresh
-        const picker = document.getElementById('case-playbook-picker');
-        if (picker) picker.remove();
-
-        loadCasePlaybookExecutions(caseId);
+        // Close the picker and re-request the executions list
+        const host = document.getElementById('case-playbook-picker-host');
+        if (host) host.replaceChildren();
+        refreshCasePlaybookExecutions();
     } catch (error) {
         showNotification('Failed to start playbook: ' + error.message, 'error');
     }
@@ -2507,14 +2436,18 @@ function renderTriageBar(alertId, triage) {
         </div>
         ${renderMitreSection(alertId, allMitreTechniques)}
         <div class="playbooks-section" id="playbooks-section">
-            <label>Investigation Playbooks</label>
+            <div class="flex items-center justify-between">
+                <label>Investigation Playbooks</label>
+                <button class="btn btn-sm btn-secondary text-xs" title="Reload playbooks" data-click-action="loadPlaybooksForAlert" data-args='["${escapeHtml(alertId)}"]'>&#8635;</button>
+            </div>
             <div id="playbooks-content">
                 <span class="text-[var(--text-muted)] text-[0.8125rem]">Loading playbooks...</span>
             </div>
         </div>
     `;
 
-    // Load playbook recommendations after rendering
+    // The section is /ui/alerts/playbooks/{id}, requested once this markup
+    // has landed; the reload control above is outside the target it fills.
     setTimeout(() => loadPlaybooksForAlert(alertId), 100);
 }
 
@@ -2979,202 +2912,53 @@ function filterByMitreTechnique(techId) {
 // =========================================================================
 // Playbooks
 // =========================================================================
-let playbookCache = {};  // alertId -> { recommendations: [], activeExecution: null }
+// The Investigation Playbooks section of the detail modal is
+// /ui/alerts/playbooks/{alertId}, rendered into #playbooks-content, and the
+// Browse Playbook Library panel under it is /ui/alerts/playbook-library/
+// {alertId}, rendered into #playbook-library-panel. Both are gated on
+// playbook:read; the fragments derive playbook:execute from the viewer and
+// offer Start and the step controls only with it. The four outcomes of each
+// read (missing alert, failed read, no match, rows) are the fragments'. The
+// mutations below stay on fetch, because their routes take JSON bodies, and
+// re-request the section afterwards.
 
-async function loadPlaybooksForAlert(alertId) {
+// GET .../recommended-playbooks requires playbook:read; the fact is on the
+// page root. Without it the fragment answers 403, which htmx does not swap,
+// so the section would say "Loading playbooks..." for the life of the modal.
+function canReadPlaybooks() {
+    const root = document.querySelector('[data-can-read-playbooks]');
+    return !!root && root.dataset.canReadPlaybooks === 'true';
+}
+
+function loadPlaybooksForAlert(alertId) {
     const container = document.getElementById('playbooks-content');
-    if (!container) return;
-
-    try {
-        // Load recommended playbooks and existing executions in parallel
-        const [recommendedRes, executionsRes] = await Promise.all([
-            fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/recommended-playbooks`),
-            fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/playbook-executions`)
-        ]);
-
-        const recommended = recommendedRes.ok ? await recommendedRes.json() : { playbooks: [] };
-        const executions = executionsRes.ok ? await executionsRes.json() : { executions: [] };
-
-        // Find active execution
-        const activeExecution = executions.executions.find(e => e.status === 'in_progress');
-
-        playbookCache[alertId] = {
-            recommendations: recommended.playbooks || [],
-            activeExecution: activeExecution || null,
-            allExecutions: executions.executions || []
-        };
-
-        renderPlaybooksSection(alertId);
-    } catch (error) {
-        console.error('Failed to load playbooks:', error);
-        container.innerHTML = '<span class="text-[var(--text-muted)] text-[0.8125rem]">Failed to load playbooks</span>';
+    if (!container) return Promise.resolve();
+    if (!canReadPlaybooks()) {
+        container.textContent = 'Playbooks are not shown: reading them requires the playbook:read permission.';
+        return Promise.resolve();
     }
+    return htmx.ajax('GET', '/ui/alerts/playbooks/' + encodeURIComponent(alertId), {
+        source: container, target: container, swap: 'innerHTML',
+    });
 }
 
-function renderPlaybooksSection(alertId) {
-    const container = document.getElementById('playbooks-content');
-    if (!container) return;
-
-    const cached = playbookCache[alertId];
-    if (!cached) {
-        container.innerHTML = '<span class="text-[var(--text-muted)] text-[0.8125rem]">No playbooks available</span>';
-        return;
+// The toggle is outside the panel it fills, so a second click hides the
+// panel and a third requests it again: that is the retry for a failed read.
+// The `hidden` attribute, not a class or style.display, because the page
+// tested style.display on a panel hidden by a class and the first click
+// did nothing.
+function togglePlaybookLibrary(alertId) {
+    const panel = document.getElementById('playbook-library-panel');
+    if (!panel) return Promise.resolve();
+    if (!panel.hidden) {
+        panel.hidden = true;
+        return Promise.resolve();
     }
-
-    let html = '';
-
-    // Show active execution if any
-    if (cached.activeExecution) {
-        html += renderActiveExecution(alertId, cached.activeExecution);
-    }
-
-    // Show recommendations (excluding any with active execution)
-    const activePlaybookId = cached.activeExecution ? cached.activeExecution.playbook_id : null;
-    const availablePlaybooks = cached.recommendations.filter(p => p.id !== activePlaybookId);
-
-    if (availablePlaybooks.length > 0) {
-        html += '<div class="playbook-recommendations">';
-        html += availablePlaybooks.slice(0, 3).map(p => `
-            <div class="playbook-item">
-                <div class="playbook-item-info">
-                    <div class="playbook-item-name">${escapeHtml(p.name)}</div>
-                    <div class="playbook-item-meta">${p.step_count} steps | Priority: ${p.priority}</div>
-                </div>
-                <button class="btn btn-sm btn-primary" data-click-action="startPlaybook" data-args='["${escapeHtml(alertId)}", ${p.id}]'>Start</button>
-            </div>
-        `).join('');
-        html += '</div>';
-    } else if (!cached.activeExecution) {
-        html += '<span class="text-[var(--text-muted)] text-[0.8125rem]">No matching playbooks for this alert</span>';
-    }
-
-    // Browse Playbook Library link
-    html += `<span class="playbook-library-toggle" data-click-action="togglePlaybookLibrary" data-args='["${escapeHtml(alertId)}"]'>Browse Playbook Library <i class="icon-chevron-down"></i></span>`;
-    html += `<div class="hidden" id="playbook-library-panel-${CSS.escape(alertId)}"></div>`;
-
-    // Show completed executions count
-    const completedCount = cached.allExecutions.filter(e => e.status === 'completed').length;
-    if (completedCount > 0) {
-        html += `<div class="text-xs text-[var(--text-muted)] mt-2">${completedCount} playbook(s) completed previously</div>`;
-    }
-
-    container.innerHTML = html;
-}
-
-async function togglePlaybookLibrary(alertId) {
-    const panelId = `playbook-library-panel-${CSS.escape(alertId)}`;
-    const panel = document.getElementById(panelId);
-    if (!panel) return;
-
-    if (panel.style.display !== 'none') {
-        panel.style.display = 'none';
-        return;
-    }
-
-    panel.innerHTML = '<div class="p-2 text-[0.8125rem] text-[var(--text-muted)]">Loading library...</div>';
-    panel.style.display = 'block';
-
-    try {
-        const resp = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/suggested-playbooks`);
-        if (!resp.ok) throw new Error('Failed to load');
-        const data = await resp.json();
-        renderPlaybookLibraryPanel(alertId, panel, data.playbooks || []);
-    } catch (err) {
-        console.error('togglePlaybookLibrary failed:', err);
-        panel.innerHTML = '<div class="p-2 text-[0.8125rem] text-[#f44336]">Failed to load playbook library: '
-            + escapeHtml(String((err && err.message) || err)) + '</div>';
-    }
-}
-
-function renderPlaybookLibraryPanel(alertId, panel, playbooks) {
-    if (!playbooks.length) {
-        panel.innerHTML = '<div class="p-2 text-[0.8125rem] text-[var(--text-muted)]">No matching playbooks in library</div>';
-        return;
-    }
-
-    const activePlaybookId = playbookCache[alertId]?.activeExecution?.playbook_id;
-    const recommended = playbooks.filter(p => p.suggestion_type === 'recommended' && p.id !== activePlaybookId);
-    const library = playbooks.filter(p => p.suggestion_type === 'library');
-
-    let html = '<div class="playbook-library-panel">';
-
-    if (recommended.length > 0) {
-        html += '<div class="playbook-library-group-header">Recommended (Active)</div>';
-        html += recommended.map(p => renderLibraryItem(alertId, p, 'recommended')).join('');
-    }
-
-    if (library.length > 0) {
-        html += '<div class="playbook-library-group-header">From Library</div>';
-        html += library.map(p => renderLibraryItem(alertId, p, 'library')).join('');
-    }
-
-    html += '</div>';
-    panel.innerHTML = html;
-}
-
-function renderLibraryItem(alertId, p, type) {
-    const desc = p.description ? escapeHtml(p.description.substring(0, 80)) + (p.description.length > 80 ? '...' : '') : '';
-    const badgeClass = type === 'recommended' ? 'recommended' : 'library';
-    const badgeLabel = type === 'recommended' ? 'Active' : 'Library';
-    const disabled = p.has_active_execution ? 'disabled title="Already running"' : '';
-    const btnLabel = p.has_active_execution ? 'Running' : 'Start';
-    return `
-        <div class="playbook-library-item">
-            <div class="playbook-library-item-info">
-                <div class="playbook-library-item-name">${escapeHtml(p.name)}</div>
-                <div class="playbook-library-item-desc">${desc} &middot; ${p.step_count} steps</div>
-            </div>
-            <span class="playbook-type-badge ${badgeClass}">${badgeLabel}</span>
-            <button class="btn btn-sm btn-primary" ${disabled} data-click-action="startPlaybook" data-args='["${escapeHtml(alertId)}", ${p.id}]'>${btnLabel}</button>
-        </div>`;
-}
-
-function renderActiveExecution(alertId, execution) {
-    const playbook = execution.playbook;
-    if (!playbook) return '';
-
-    const steps = playbook.steps || [];
-    const stepStatuses = execution.step_statuses || {};
-
-    const stepsHtml = steps.map(step => {
-        const status = stepStatuses[step.id] || {};
-        const isCompleted = status.status === 'completed';
-        const isSkipped = status.status === 'skipped';
-        const isDone = isCompleted || isSkipped;
-
-        return `
-            <div class="playbook-step ${isDone ? 'completed' : ''}">
-                <input type="checkbox" class="playbook-step-checkbox"
-                       ${isDone ? 'checked' : ''}
-                       data-change-action="updateStepStatus" data-args='["${escapeHtml(alertId)}", ${execution.id}, ${step.id}, this.checked ? 'completed' : 'pending']'>
-                <span class="playbook-step-title">${escapeHtml(step.title)}</span>
-                ${step.is_required ? '<span class="playbook-step-required">Required</span>' : ''}
-                ${isSkipped ? '<span class="text-[0.625rem] text-[var(--text-muted)]">(skipped)</span>' : ''}
-            </div>
-        `;
-    }).join('');
-
-    const completedSteps = Object.values(stepStatuses).filter(s => s.status === 'completed' || s.status === 'skipped').length;
-    const progress = steps.length > 0 ? Math.round((completedSteps / steps.length) * 100) : 0;
-
-    return `
-        <div class="playbook-execution">
-            <div class="playbook-execution-header">
-                <span class="playbook-execution-title">${escapeHtml(playbook.name)}</span>
-                <span class="playbook-execution-status ${execution.status}">${execution.status.replace('_', ' ')}</span>
-            </div>
-            <div class="text-xs text-[var(--text-muted)] mb-2">
-                Progress: ${progress}% (${completedSteps}/${steps.length} steps)
-            </div>
-            <div class="playbook-steps-list">
-                ${stepsHtml}
-            </div>
-            <div class="flex gap-2 mt-2">
-                <button class="btn btn-sm" data-click-action="completePlaybookExecution" data-args='["${escapeHtml(alertId)}", ${execution.id}]'>Complete</button>
-                <button class="btn btn-sm" data-click-action="skipRemainingSteps" data-args='["${escapeHtml(alertId)}", ${execution.id}]'>Skip Remaining</button>
-            </div>
-        </div>
-    `;
+    panel.textContent = 'Loading library...';
+    panel.hidden = false;
+    return htmx.ajax('GET', '/ui/alerts/playbook-library/' + encodeURIComponent(alertId), {
+        source: panel, target: panel, swap: 'innerHTML',
+    });
 }
 
 async function startPlaybook(alertId, playbookId) {
@@ -3200,6 +2984,11 @@ async function startPlaybook(alertId, playbookId) {
 }
 
 async function updateStepStatus(alertId, executionId, stepId, status) {
+    // The fragment's step checkbox passes "$checked", which the dispatcher
+    // turns into the box's state: ticked is completed, cleared is pending.
+    // A string status passes through unchanged.
+    if (status === true) status = 'completed';
+    else if (status === false) status = 'pending';
     try {
         const response = await fetch(`/api/playbook-executions/${executionId}/steps/${stepId}`, {
             method: 'PUT',
@@ -3240,36 +3029,39 @@ async function completePlaybookExecution(alertId, executionId) {
 }
 
 async function skipRemainingSteps(alertId, executionId) {
-    const cached = playbookCache[alertId];
-    if (!cached || !cached.activeExecution) return;
+    // The pending step ids ride on the execution block the fragment rendered,
+    // so this reads the same data the viewer is looking at, not a cache of an
+    // earlier read.
+    const block = document.getElementById('playbook-execution-' + executionId);
+    if (!block) return;
+    let pendingSteps = [];
+    try {
+        pendingSteps = JSON.parse(block.dataset.pendingStepIds || '[]');
+    } catch (e) {
+        console.error('Pending step ids on the execution block were not readable:', e);
+        return;
+    }
 
-    const execution = cached.activeExecution;
-    const playbook = execution.playbook;
-    if (!playbook) return;
-
-    const steps = playbook.steps || [];
-    const stepStatuses = execution.step_statuses || {};
-
-    // Find steps that are not completed
-    const pendingSteps = steps.filter(step => {
-        const status = stepStatuses[step.id];
-        return !status || (status.status !== 'completed' && status.status !== 'skipped');
-    });
-
-    // Skip each pending step
-    for (const step of pendingSteps) {
+    let failed = 0;
+    for (const stepId of pendingSteps) {
         try {
-            await fetch(`/api/playbook-executions/${executionId}/steps/${step.id}`, {
+            const resp = await fetch(`/api/playbook-executions/${executionId}/steps/${stepId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: 'skipped' })
             });
+            if (!resp.ok) failed += 1;
         } catch (e) {
             console.error('Failed to skip step:', e);
+            failed += 1;
         }
     }
 
-    showNotification('Remaining steps skipped', 'info');
+    if (failed) {
+        showNotification(`${failed} of ${pendingSteps.length} steps could not be skipped`, 'error');
+    } else {
+        showNotification('Remaining steps skipped', 'info');
+    }
     loadPlaybooksForAlert(alertId);
 }
 
