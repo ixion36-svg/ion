@@ -54,14 +54,44 @@
       <svg class="w-5 h-5 text-ion-coral"><use href="#i-shield-alert"/></svg>
       <span class="threat-text text-[14px] text-white font-medium">Loading threat assessment…</span>
     </div>
-    <div id="alerts-threat-stats" class="flex items-center gap-4 text-[12px] text-slate-400"></div>
+    <div id="alerts-threat-stats" class="flex items-center gap-4 text-[12px] text-slate-400">
+        <div class="threat-stat">
+            <div class="threat-stat-value" id="threat-stat-total">&hellip;</div>
+            <div class="threat-stat-label">Total</div>
+        </div>
+        <div class="threat-stat">
+            <div class="threat-stat-value" id="threat-stat-critical">&hellip;</div>
+            <div class="threat-stat-label">Critical</div>
+        </div>
+        <div class="threat-stat">
+            <div class="threat-stat-value" id="threat-stat-high">&hellip;</div>
+            <div class="threat-stat-label">High</div>
+        </div>
+        <div class="threat-stat">
+            <div class="threat-stat-value" id="threat-stat-open">&hellip;</div>
+            <div class="threat-stat-label">Open</div>
+        </div>
+    </div>
   </div>
 
   <!-- ── Attention Banner (JS-populated) ── -->
   <div id="alert-attn-banner" class="mb-4 rounded-[12px] border border-ion-amber/30 bg-ion-amber/5 px-5 py-3 flex items-center gap-3 hidden">
     <svg class="w-4 h-4 text-ion-amber shrink-0"><use href="#i-alert-triangle"/></svg>
     <span class="label-tiny text-ion-amber">Needs attention:</span>
-    <div id="alert-attn-chips" class="flex items-center gap-2 flex-wrap flex-1"></div>
+    <div id="alert-attn-chips" class="flex items-center gap-2 flex-wrap flex-1">
+      {# Three fixed chips. Only their counts and whether they show vary, so
+         the markup is here and the script sets two things per chip. The
+         data-args are literal because the thresholds are. #}
+      <button class="alert-attn-chip alert-attn-chip-critical" id="attn-chip-critical" hidden
+              data-click-action="filterToAttention" data-args='["critical", 2]'
+              title="Critical alerts open >2h"><span class="chip-count"></span> Critical Stale</button>
+      <button class="alert-attn-chip alert-attn-chip-high" id="attn-chip-high" hidden
+              data-click-action="filterToAttention" data-args='["high", 4]'
+              title="High alerts open >4h"><span class="chip-count"></span> High Stale</button>
+      <button class="alert-attn-chip alert-attn-chip-unassigned" id="attn-chip-unassigned" hidden
+              data-click-action="filterToAttentionUnassigned"
+              title="Critical/High with no assignee"><span class="chip-count"></span> Unassigned</button>
+    </div>
     <button data-click-action="dismissAlertAttention" class="text-slate-400 hover:text-white transition" aria-label="Dismiss">
       <svg class="w-4 h-4"><use href="#i-x"/></svg>
     </button>
@@ -679,6 +709,258 @@
    here. Its overlay removes itself; startCasePlaybook empties the host. #}
 <div id="case-playbook-picker-host"></div>
 
+<template id="mitre-empty-template">
+<div class="empty-state text-center p-4 text-[var(--text-muted)]">No MITRE ATT&amp;CK data in current alerts</div>
+</template>
+
+<template id="mitre-legend-template">
+<div class="mitre-legend-body">
+    <div class="mitre-legend-item">
+        <div class="mitre-legend-swatch bg-[rgba(255,87,34,0.45)]"></div>
+        <span>Firing</span>
+    </div>
+    <div class="mitre-legend-item">
+        <div class="mitre-legend-swatch bg-[rgba(0,200,83,0.15)] border border-[rgba(0,200,83,0.3)]"></div>
+        <span>Covered (silent)</span>
+    </div>
+    <div class="mitre-legend-item">
+        <div class="mitre-legend-swatch bg-[rgba(210,153,34,0.12)] border border-dotted border-[rgba(210,153,34,0.55)]"></div>
+        <span>Written, not enabled</span>
+    </div>
+    <div class="mitre-legend-item">
+        <div class="mitre-legend-swatch _ion-s-170c9817b7"></div>
+        <span>Blind spot</span>
+    </div>
+    <div class="mitre-tide-summary">
+        <span><strong class="ml-covered"></strong><span class="ml-total"></span> covered</span>
+        <span><strong class="ml-inactive"></strong> written, not enabled</span>
+        <span><strong class="ml-blind"></strong> blind spots</span>
+        <span><strong class="ml-rules"></strong> rules</span>
+    </div>
+</div>
+</template>
+
+<template id="mitre-col-template">
+<div class="mitre-heatmap-col">
+    <div class="mitre-heatmap-header"></div>
+</div>
+</template>
+
+<template id="mitre-cell-template">
+<div class="mitre-heatmap-cell">
+    <span class="tech-id"></span>
+    <span class="tech-count"></span>
+</div>
+</template>
+
+<template id="mitre-cell-empty-template">
+<div class="mitre-heatmap-cell heat-0 flex-1">-</div>
+</template>
+
+<template id="pattern-empty-template">
+<div class="empty-state">No patterns detected</div>
+</template>
+
+<template id="pattern-wrap-template">
+<div class="pattern-cards-container"></div>
+</template>
+
+<template id="pattern-card-template">
+<div class="pattern-card">
+    <div class="pattern-card-header">
+        <span class="pattern-card-title"></span>
+        <span class="pattern-card-severity"></span>
+    </div>
+    <div class="pattern-card-meta">
+        <span><span class="pc-group-label"></span>: <strong class="pc-group-key"></strong></span>
+        <span class="pc-alerts"></span>
+        <span class="pc-rules"></span>
+        <span class="pc-tactics" hidden></span>
+    </div>
+    <div class="pattern-card-desc"></div>
+    <div class="pattern-card-actions">
+        <button class="btn btn-secondary pc-view-exec" data-click-action="viewPatternExecution" hidden>View Execution</button>
+        <button class="btn btn-primary pc-start-playbook" data-click-action="startPatternPlaybook" hidden>Start Playbook</button>
+        <button class="btn btn-secondary pc-show-alerts" data-click-action="filterByPatternGroup">Show Alerts</button>
+        <span class="text-[0.6875rem] text-[#22c55e] self-center pc-auto" hidden>Auto-started</span>
+    </div>
+</div>
+</template>
+
+<template id="timeline-wrap-template">
+<div class="timeline"></div>
+</template>
+
+<template id="timeline-empty-template">
+<div class="empty-state">No timeline data</div>
+</template>
+
+<template id="timeline-item-template">
+<div class="timeline-item">
+    <div class="timeline-time"></div>
+    <div class="timeline-title">
+        <span class="severity-badge text-[0.65rem] tl-sev"></span>
+        <span class="tl-title"></span>
+        <span class="badge ml-2 text-[0.65rem] tl-current" hidden>CURRENT</span>
+    </div>
+    <div class="timeline-host"></div>
+</div>
+</template>
+
+<template id="alert-closure-template">
+<div class="closure-modal">
+    <h4 class="alert-closure-heading"></h4>
+    <label>Reason / Notes</label>
+    <textarea id="alert-closure-notes"></textarea>
+
+    <div class="kfp-section mt-3 alert-closure-kfp" hidden>
+        <label class="flex items-center gap-2 cursor-pointer mt-0">
+            <input type="checkbox" id="alert-kfp-checkbox" checked data-change-action="toggleAlertKFPFields">
+            <span>Add to Known False Positives Registry</span>
+        </label>
+        <div id="alert-kfp-fields">
+            <label>KFP Title</label>
+            <input type="text" id="alert-kfp-title" value="">
+
+            <label>Description / Reasoning</label>
+            <textarea id="alert-kfp-description" placeholder="Why is this a false positive?"></textarea>
+
+            <label>Match Hosts</label>
+            <div class="tag-input-group" id="alert-kfp-hosts-tags"></div>
+
+            <label>Match Users</label>
+            <div class="tag-input-group" id="alert-kfp-users-tags"></div>
+
+            <label>Match IPs</label>
+            <div class="tag-input-group" id="alert-kfp-ips-tags"></div>
+
+            <label>Match Rules</label>
+            <div class="tag-input-group" id="alert-kfp-rules-tags"></div>
+        </div>
+    </div>
+
+    <div class="closure-actions">
+        <button class="btn btn-secondary" data-remove-target="alert-closure-modal-overlay">Cancel</button>
+        <button class="btn btn-primary alert-closure-confirm" data-click-action="confirmAlertClosure">Confirm Close</button>
+    </div>
+</div>
+</template>
+
+<template id="case-closure-reason-template">
+<div class="closure-modal">
+    <h4>Close Case &mdash; Select Reason</h4>
+    <label>Closure Reason <span class="text-[#ef4444]">*</span></label>
+    <select id="closure-reason-select" data-change-action="toggleKFPSection">
+        <option value="">Select reason...</option>
+        <option value="true_positive">True Positive</option>
+        <option value="false_positive">False Positive</option>
+        <option value="benign_true_positive">Benign True Positive</option>
+        <option value="duplicate">Duplicate</option>
+        <option value="insufficient_data">Insufficient Data</option>
+        <option value="not_applicable">Not Applicable</option>
+    </select>
+
+    <label>Closure Notes</label>
+    <textarea id="closure-notes-input" placeholder="Optional notes about why this case is being closed..."></textarea>
+
+    <div class="hidden" id="kfp-add-section">
+        <div class="kfp-section">
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="kfp-add-checkbox" data-change-action="toggleKFPFields">
+                <span>Add to Known False Positives Registry</span>
+            </label>
+            <div class="hidden" id="kfp-fields">
+                <label>KFP Title</label>
+                <input type="text" id="kfp-title" value="">
+
+                <label>Description / Reasoning <span class="text-[#ef4444]">*</span></label>
+                <textarea id="kfp-description" placeholder="Why is this a false positive? What should analysts know?"></textarea>
+
+                <label>Match Hosts</label>
+                <div class="tag-input-group" id="kfp-hosts-tags"></div>
+
+                <label>Match Users</label>
+                <div class="tag-input-group" id="kfp-users-tags"></div>
+
+                <label>Match IPs</label>
+                <div class="tag-input-group" id="kfp-ips-tags"></div>
+
+                <label>Match Rules</label>
+                <div class="tag-input-group" id="kfp-rules-tags"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="closure-actions">
+        <button class="btn btn-secondary case-closure-cancel" data-click-action="cancelClosureModal">Cancel</button>
+        <button class="btn btn-primary case-closure-confirm" data-click-action="confirmCaseClosure">Confirm Close</button>
+    </div>
+</div>
+</template>
+
+<template id="aq-view-template">
+<button type="button" class="aq-view"><span class="aq-view-label"></span><span class="n"></span></button>
+</template>
+
+<template id="aq-view-saved-template">
+<button type="button" class="aq-view aq-view-saved"></button>
+</template>
+
+<template id="aq-view-add-template">
+<button type="button" class="aq-view aq-view-add" data-click-action="saveCurrentFilter">+ Save current</button>
+</template>
+
+<template id="saved-filters-modal-template">
+<div id="saved-filters-modal" class="saved-filters-modal" data-remove-self-on-self-click>
+    <div class="saved-filters-content">
+        <div class="modal-header mb-4">
+            <h3>Manage Saved Views</h3>
+            <button class="modal-close" data-remove-target="saved-filters-modal">&times;</button>
+        </div>
+        <div class="saved-filters-list"></div>
+        <div class="modal-footer mt-4 text-right">
+            <button class="btn btn-secondary" data-remove-target="saved-filters-modal">Close</button>
+        </div>
+    </div>
+</div>
+</template>
+
+<template id="saved-filter-item-template">
+<div class="saved-filter-item">
+    <div>
+        <div class="saved-filter-name"></div>
+        <div class="saved-filter-desc"></div>
+    </div>
+    <div class="saved-filter-actions">
+        <button class="btn btn-sm btn-primary saved-filter-load">Load</button>
+        <button class="btn btn-sm btn-danger saved-filter-delete">Delete</button>
+    </div>
+</div>
+</template>
+
+<template id="tag-chip-template">
+<span class="tag-chip"><span class="tag-chip-text"></span><button data-click-action="__tagChipRemove">&times;</button></span>
+</template>
+
+<template id="tag-input-template">
+<input type="text" placeholder="Type and press Enter..." data-keydown-action="__tagInputEnter" />
+</template>
+
+<template id="globe-tooltip-template">
+<span><strong class="globe-tip-place"></strong><br><span class="globe-tip-count"></span> <span class="globe-tip-sev"></span></span>
+</template>
+
+<template id="aq-colrow-template">
+<label class="aq-colrow"><input type="checkbox"><span class="aq-colrow-label"></span></label>
+</template>
+
+<template id="notification-toast-template">
+<div class="notification-toast">
+    <span class="notification-text"></span>
+    <button class="bg-transparent border-0 text-[inherit] cursor-pointer text-[1.2rem]" data-remove-parent>&times;</button>
+</div>
+</template>
+
 <template id="keyboard-help-template">
 <div id="keyboard-help-modal" class="saved-filters-modal" data-remove-self-on-self-click>
     <div class="saved-filters-content max-w-[400px]">
@@ -977,12 +1259,14 @@ function showNotification(message, type = 'info') {
     const existing = document.querySelector('.notification-toast');
     if (existing) existing.remove();
 
-    const toast = document.createElement('div');
-    toast.className = `notification-toast notification-${type}`;
-    toast.innerHTML = `
-        <span>${escapeHtml(message)}</span>
-        <button class="bg-transparent border-0 text-[inherit] cursor-pointer text-[1.2rem]" data-remove-parent>&times;</button>
-    `;
+    // The markup is the <template id="notification-toast-template"> in this
+    // page; the message is the caller's text and goes in as textContent, so
+    // there is nothing to escape and nothing to assemble.
+    const toast = cloneTemplate('notification-toast-template');
+    if (!toast) return;
+    toast.classList.add(`notification-${type}`);
+    const slot = toast.querySelector('.notification-text');
+    if (slot) slot.textContent = message == null ? '' : String(message);
     document.body.appendChild(toast);
 
     // Auto-remove after 5 seconds
@@ -1126,43 +1410,69 @@ async function loadPatternDetections() {
 
 function renderPatternCards() {
     const container = document.getElementById('pattern-cards-container');
+    if (!container) return;
+    container.replaceChildren();
     if (!detectedPatterns.length) {
-        container.innerHTML = '<div class="empty-state">No patterns detected</div>';
+        const empty = cloneTemplate('pattern-empty-template');
+        if (empty) container.appendChild(empty);
         return;
     }
 
-    container.innerHTML = '<div class="pattern-cards-container">' + detectedPatterns.map(p => {
-        const groupLabel = p.group_by === 'host' ? 'Host' : 'User';
-        const hasExec = p.execution && p.execution.id;
-
-        let actionBtn = '';
-        if (hasExec) {
-            actionBtn = `<button class="btn btn-secondary" data-click-action="viewPatternExecution" data-args='[${p.execution.id}]'>View Execution</button>`;
-        } else if (p.playbook) {
-            actionBtn = `<button class="btn btn-primary" data-click-action="startPatternPlaybook" data-args='["${p.pattern_id}", ${p.playbook.id}, "${p.alert_ids[0]}"]'>Start Playbook</button>`;
+    // The patterns are client state, detected in the browser from the loaded
+    // alerts, so there is no server-side list to render. The markup is in
+    // templates and every value goes in as textContent.
+    const wrap = cloneTemplate('pattern-wrap-template');
+    if (!wrap) return;
+    detectedPatterns.forEach(p => {
+        const card = cloneTemplate('pattern-card-template');
+        if (!card) return;
+        const set = (sel, value) => {
+            const el = card.querySelector(sel);
+            if (el) el.textContent = value;
+            return el;
+        };
+        set('.pattern-card-title', p.pattern_name);
+        const sev = set('.pattern-card-severity', p.severity);
+        if (sev && p.severity) sev.classList.add(p.severity);
+        set('.pc-group-label', p.group_by === 'host' ? 'Host' : 'User');
+        set('.pc-group-key', p.group_key);
+        set('.pc-alerts', `${p.alert_count} alert${p.alert_count !== 1 ? 's' : ''}`);
+        set('.pc-rules', `${p.rule_count} rule${p.rule_count !== 1 ? 's' : ''}`);
+        const tactics = card.querySelector('.pc-tactics');
+        if (tactics) {
+            tactics.hidden = !p.tactic_count;
+            if (p.tactic_count) {
+                tactics.textContent = `${p.tactic_count} tactic${p.tactic_count !== 1 ? 's' : ''}`;
+            }
         }
+        set('.pattern-card-desc', p.description || '');
 
-        return `
-            <div class="pattern-card">
-                <div class="pattern-card-header">
-                    <span class="pattern-card-title">${escapeHtml(p.pattern_name)}</span>
-                    <span class="pattern-card-severity ${p.severity}">${p.severity}</span>
-                </div>
-                <div class="pattern-card-meta">
-                    <span>${groupLabel}: <strong>${escapeHtml(p.group_key)}</strong></span>
-                    <span>${p.alert_count} alert${p.alert_count !== 1 ? 's' : ''}</span>
-                    <span>${p.rule_count} rule${p.rule_count !== 1 ? 's' : ''}</span>
-                    ${p.tactic_count ? `<span>${p.tactic_count} tactic${p.tactic_count !== 1 ? 's' : ''}</span>` : ''}
-                </div>
-                <div class="pattern-card-desc">${escapeHtml(p.description || '')}</div>
-                <div class="pattern-card-actions">
-                    ${actionBtn}
-                    <button class="btn btn-secondary" data-click-action="filterByPatternGroup" data-args='["${p.group_by}", "${escapeHtml(p.group_key)}"]'>Show Alerts</button>
-                    ${p.auto_started ? '<span class="text-[0.6875rem] text-[#22c55e] self-center">Auto-started</span>' : ''}
-                </div>
-            </div>
-        `;
-    }).join('') + '</div>';
+        // JSON.stringify on every argument. The group key is a hostname or a
+        // username out of alert data, and one holding a double quote broke
+        // Show Alerts at the dispatcher.
+        const hasExec = p.execution && p.execution.id;
+        const viewExec = card.querySelector('.pc-view-exec');
+        if (viewExec) {
+            viewExec.hidden = !hasExec;
+            if (hasExec) viewExec.dataset.args = JSON.stringify([p.execution.id]);
+        }
+        const start = card.querySelector('.pc-start-playbook');
+        if (start) {
+            const canStart = !hasExec && p.playbook;
+            start.hidden = !canStart;
+            if (canStart) {
+                start.dataset.args = JSON.stringify(
+                    [p.pattern_id, p.playbook.id, p.alert_ids[0]]);
+            }
+        }
+        const show = card.querySelector('.pc-show-alerts');
+        if (show) show.dataset.args = JSON.stringify([p.group_by, p.group_key]);
+        const auto = card.querySelector('.pc-auto');
+        if (auto) auto.hidden = !p.auto_started;
+
+        wrap.appendChild(card);
+    });
+    container.appendChild(wrap);
 }
 
 function togglePatternPanel() {
@@ -1297,15 +1607,17 @@ function computeAlertAttention() {
         return;
     }
 
-    let html = '';
-    if (critStale > 0)
-        html += `<button class="alert-attn-chip alert-attn-chip-critical" data-click-action="filterToAttention" data-args='["critical", 2]' title="Critical alerts open >2h"><span class="chip-count">${critStale}</span> Critical Stale</button>`;
-    if (highStale > 0)
-        html += `<button class="alert-attn-chip alert-attn-chip-high" data-click-action="filterToAttention" data-args='["high", 4]' title="High alerts open >4h"><span class="chip-count">${highStale}</span> High Stale</button>`;
-    if (unassigned > 0)
-        html += `<button class="alert-attn-chip alert-attn-chip-unassigned" data-click-action="filterToAttentionUnassigned" title="Critical/High with no assignee"><span class="chip-count">${unassigned}</span> Unassigned</button>`;
-
-    chips.innerHTML = html;
+    // Two things per chip: its count and whether it shows. The markup is
+    // in the shell, because the three chips and their thresholds are fixed.
+    [['attn-chip-critical', critStale],
+     ['attn-chip-high', highStale],
+     ['attn-chip-unassigned', unassigned]].forEach(([id, n]) => {
+        const chip = document.getElementById(id);
+        if (!chip) return;
+        chip.hidden = n === 0;
+        const slot = chip.querySelector('.chip-count');
+        if (slot) slot.textContent = n;
+    });
     banner.style.display = 'flex';
 }
 
@@ -1572,46 +1884,27 @@ function showAlertClosureModal(alertId, closureType) {
 
     const isFP = closureType === 'false_positive';
 
-    overlay.innerHTML = `
-        <div class="closure-modal">
-            <h4 data-ion-style="color:${color}">Close Alert as ${label}</h4>
-            <label>Reason / Notes</label>
-            <textarea id="alert-closure-notes" placeholder="Why is this alert being closed as ${label.toLowerCase()}?"></textarea>
-
-            ${isFP ? `
-            <div class="kfp-section mt-3">
-                <label class="flex items-center gap-2 cursor-pointer mt-0">
-                    <input type="checkbox" id="alert-kfp-checkbox" checked data-change-action="toggleAlertKFPFields">
-                    <span>Add to Known False Positives Registry</span>
-                </label>
-                <div id="alert-kfp-fields">
-                    <label>KFP Title</label>
-                    <input type="text" id="alert-kfp-title" value="">
-
-                    <label>Description / Reasoning</label>
-                    <textarea id="alert-kfp-description" placeholder="Why is this a false positive?"></textarea>
-
-                    <label>Match Hosts</label>
-                    <div class="tag-input-group" id="alert-kfp-hosts-tags"></div>
-
-                    <label>Match Users</label>
-                    <div class="tag-input-group" id="alert-kfp-users-tags"></div>
-
-                    <label>Match IPs</label>
-                    <div class="tag-input-group" id="alert-kfp-ips-tags"></div>
-
-                    <label>Match Rules</label>
-                    <div class="tag-input-group" id="alert-kfp-rules-tags"></div>
-                </div>
-            </div>
-            ` : ''}
-
-            <div class="closure-actions">
-                <button class="btn btn-secondary" data-remove-target="alert-closure-modal-overlay">Cancel</button>
-                <button class="btn btn-primary" data-click-action="confirmAlertClosure" data-args='["${escapeHtml(alertId)}", "${closureType}"]'>Confirm Close</button>
-            </div>
-        </div>
-    `;
+    // The dialog's markup is the <template id="alert-closure-template">.
+    // Three things vary: the heading's colour and label, the placeholder,
+    // and whether the false-positive section shows.
+    const body = cloneTemplate('alert-closure-template');
+    if (!body) return;
+    const heading = body.querySelector('.alert-closure-heading');
+    if (heading) {
+        heading.setAttribute('data-ion-style', `color:${color}`);
+        heading.textContent = `Close Alert as ${label}`;
+    }
+    const notes = body.querySelector('#alert-closure-notes');
+    if (notes) {
+        notes.placeholder = `Why is this alert being closed as ${label.toLowerCase()}?`;
+    }
+    const kfp = body.querySelector('.alert-closure-kfp');
+    if (kfp) kfp.hidden = !isFP;
+    const confirm = body.querySelector('.alert-closure-confirm');
+    // JSON.stringify, not interpolation: the dispatcher parses data-args
+    // with JSON.parse and a quote in the id made this button do nothing.
+    if (confirm) confirm.dataset.args = JSON.stringify([alertId, closureType]);
+    overlay.replaceChildren(body);
 
     document.body.appendChild(overlay);
 
@@ -1744,59 +2037,16 @@ function showClosureReasonModal(caseId, newStatus, selectEl) {
         }
     };
 
-    const reasonOptions = [
-        { value: '', label: 'Select reason...' },
-        { value: 'true_positive', label: 'True Positive' },
-        { value: 'false_positive', label: 'False Positive' },
-        { value: 'benign_true_positive', label: 'Benign True Positive' },
-        { value: 'duplicate', label: 'Duplicate' },
-        { value: 'insufficient_data', label: 'Insufficient Data' },
-        { value: 'not_applicable', label: 'Not Applicable' },
-    ].map(o => `<option value="${o.value}">${o.label}</option>`).join('');
-
-    overlay.innerHTML = `
-        <div class="closure-modal">
-            <h4>Close Case — Select Reason</h4>
-            <label>Closure Reason <span class="text-[#ef4444]">*</span></label>
-            <select id="closure-reason-select" data-change-action="toggleKFPSection">${reasonOptions}</select>
-
-            <label>Closure Notes</label>
-            <textarea id="closure-notes-input" placeholder="Optional notes about why this case is being closed..."></textarea>
-
-            <div class="hidden" id="kfp-add-section">
-                <div class="kfp-section">
-                    <label class="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" id="kfp-add-checkbox" data-change-action="toggleKFPFields">
-                        <span>Add to Known False Positives Registry</span>
-                    </label>
-                    <div class="hidden" id="kfp-fields">
-                        <label>KFP Title</label>
-                        <input type="text" id="kfp-title" value="">
-
-                        <label>Description / Reasoning <span class="text-[#ef4444]">*</span></label>
-                        <textarea id="kfp-description" placeholder="Why is this a false positive? What should analysts know?"></textarea>
-
-                        <label>Match Hosts</label>
-                        <div class="tag-input-group" id="kfp-hosts-tags"></div>
-
-                        <label>Match Users</label>
-                        <div class="tag-input-group" id="kfp-users-tags"></div>
-
-                        <label>Match IPs</label>
-                        <div class="tag-input-group" id="kfp-ips-tags"></div>
-
-                        <label>Match Rules</label>
-                        <div class="tag-input-group" id="kfp-rules-tags"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="closure-actions">
-                <button class="btn btn-secondary" data-click-action="cancelClosureModal" data-args='[${caseId}]'>Cancel</button>
-                <button class="btn btn-primary" data-click-action="confirmCaseClosure" data-args='[${caseId}, "${newStatus}"]'>Confirm Close</button>
-            </div>
-        </div>
-    `;
+    // The dialog's markup is the <template id="case-closure-reason-template">,
+    // including its seven fixed reason options, which were rebuilt from an
+    // array on every open. Only the two data-args vary.
+    const body = cloneTemplate('case-closure-reason-template');
+    if (!body) return;
+    const cancel = body.querySelector('.case-closure-cancel');
+    if (cancel) cancel.dataset.args = JSON.stringify([caseId]);
+    const confirm = body.querySelector('.case-closure-confirm');
+    if (confirm) confirm.dataset.args = JSON.stringify([caseId, newStatus]);
+    overlay.replaceChildren(body);
 
     document.body.appendChild(overlay);
 
@@ -1829,9 +2079,21 @@ function _initTagInput(containerId, initialValues) {
     container._tags = [...initialValues];
 
     function render() {
-        container.innerHTML = container._tags.map((t, i) =>
-            `<span class="tag-chip">${escapeHtml(t)}<button data-click-action="__tagChipRemove" data-idx="${i}">&times;</button></span>`
-        ).join('') + `<input type="text" placeholder="Type and press Enter..." data-keydown-action="__tagInputEnter" />`;
+        // Chips from the <template id="tag-chip-template">, with the tag as
+        // textContent: the value is being typed by the reader, so there is
+        // no server-side list to render and nothing to escape by hand.
+        container.replaceChildren();
+        container._tags.forEach((t, i) => {
+            const chip = cloneTemplate('tag-chip-template');
+            if (!chip) return;
+            const slot = chip.querySelector('.tag-chip-text');
+            if (slot) slot.textContent = t;
+            const remove = chip.querySelector('button');
+            if (remove) remove.dataset.idx = i;
+            container.appendChild(chip);
+        });
+        const input = cloneTemplate('tag-input-template');
+        if (input) container.appendChild(input);
     }
     container._addTag = function(val) {
         val = val.trim();
@@ -3323,14 +3585,32 @@ function renderQueueViews() {
     const el = document.getElementById('aq-views');
     if (!el) return;
     const count = (v) => allAlerts.filter(a => v.f(a, triageCache[a.id] || {})).length;
-    const builtins = AQ_VIEWS.map(v =>
-        `<button type="button" class="aq-view${queueView === v.k ? ' is-on' : ''}" data-aq-view="${v.k}">`
-        + `${escapeHtml(v.label)}<span class="n">${count(v)}</span></button>`).join('');
-    const saved = getSavedFilters().map(f =>
-        `<button type="button" class="aq-view aq-view-saved" data-aq-view="${escapeHtml(f.id)}"`
-        + ` title="${escapeHtml(f.description || '')}">${escapeHtml(f.name)}</button>`).join('');
-    el.innerHTML = builtins + saved
-        + '<button type="button" class="aq-view aq-view-add" data-click-action="saveCurrentFilter">+ Save current</button>';
+    // The built-in views' predicates are JavaScript and the saved ones live
+    // in localStorage, which the server never sees, so this list has no
+    // server-side definition. The markup is in templates and the labels go
+    // in as textContent.
+    el.replaceChildren();
+    AQ_VIEWS.forEach(v => {
+        const btn = cloneTemplate('aq-view-template');
+        if (!btn) return;
+        if (queueView === v.k) btn.classList.add('is-on');
+        btn.dataset.aqView = v.k;
+        const label = btn.querySelector('.aq-view-label');
+        if (label) label.textContent = v.label;
+        const n = btn.querySelector('.n');
+        if (n) n.textContent = count(v);
+        el.appendChild(btn);
+    });
+    getSavedFilters().forEach(f => {
+        const btn = cloneTemplate('aq-view-saved-template');
+        if (!btn) return;
+        btn.dataset.aqView = f.id;
+        btn.title = f.description || '';
+        btn.textContent = f.name;
+        el.appendChild(btn);
+    });
+    const add = cloneTemplate('aq-view-add-template');
+    if (add) el.appendChild(add);
 }
 
 // ── Active-filter chips ───────────────────────────────────────────────────
@@ -3463,9 +3743,21 @@ function _aqBindToolbar() {
 
     const menu = document.getElementById('aq-cols');
     const paint = () => {
-        menu.innerHTML = q.columns().filter(c => !c.fixed).map(c =>
-            `<label class="aq-colrow"><input type="checkbox" data-aq-col="${c.k}"${c.on ? ' checked' : ''}>`
-            + `<span>${escapeHtml(c.label)}</span></label>`).join('');
+        // The column choice is the reader's, held client side. Rows come
+        // from the <template id="aq-colrow-template">.
+        menu.replaceChildren();
+        q.columns().filter(c => !c.fixed).forEach(c => {
+            const row = cloneTemplate('aq-colrow-template');
+            if (!row) return;
+            const box = row.querySelector('input');
+            if (box) {
+                box.dataset.aqCol = c.k;
+                box.checked = !!c.on;
+            }
+            const label = row.querySelector('.aq-colrow-label');
+            if (label) label.textContent = c.label;
+            menu.appendChild(row);
+        });
     };
     paint();
     document.getElementById('aq-cols-btn').addEventListener('click', (e) => {
@@ -3708,24 +4000,18 @@ function renderThreatBanner() {
     levelEl.className = `threat-level ${level}`;
     levelEl.querySelector('.threat-text').textContent = `Threat Level: ${level.toUpperCase()}`;
 
-    document.getElementById('alerts-threat-stats').innerHTML = `
-        <div class="threat-stat">
-            <div class="threat-stat-value">${total}</div>
-            <div class="threat-stat-label">Total</div>
-        </div>
-        <div class="threat-stat">
-            <div class="threat-stat-value">${criticalCount}</div>
-            <div class="threat-stat-label">Critical</div>
-        </div>
-        <div class="threat-stat">
-            <div class="threat-stat-value">${highCount}</div>
-            <div class="threat-stat-label">High</div>
-        </div>
-        <div class="threat-stat">
-            <div class="threat-stat-value">${openCount}</div>
-            <div class="threat-stat-label">Open</div>
-        </div>
-    `;
+    // Four textContent fills, not one markup build. The labels are fixed
+    // and live in the shell; only the numbers change.
+    const fills = {
+        'threat-stat-total': total,
+        'threat-stat-critical': criticalCount,
+        'threat-stat-high': highCount,
+        'threat-stat-open': openCount,
+    };
+    Object.keys(fills).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = fills[id];
+    });
 }
 
 // =========================================================================
@@ -3856,7 +4142,9 @@ function renderMitreHeatmap() {
 
     // If no alert data AND no TIDE data, show empty state
     if (Object.keys(techCounts).length === 0 && !tideTechs) {
-        container.innerHTML = '<div class="empty-state text-center p-4 text-[var(--text-muted)]">No MITRE ATT&CK data in current alerts</div>';
+        container.replaceChildren();
+        const empty = cloneTemplate('mitre-empty-template');
+        if (empty) container.appendChild(empty);
         const legendEl = document.getElementById('mitre-heatmap-legend');
         if (legendEl) legendEl.style.display = 'none';
         return;
@@ -3929,36 +4217,29 @@ function renderMitreHeatmap() {
     if (legendEl && tideTechs) {
         const cov = _tideMitreCoverage;
         legendEl.style.display = 'flex';
-        legendEl.innerHTML = `
-            <div class="mitre-legend-item">
-                <div class="mitre-legend-swatch bg-[rgba(255,87,34,0.45)]"></div>
-                <span>Firing</span>
-            </div>
-            <div class="mitre-legend-item">
-                <div class="mitre-legend-swatch bg-[rgba(0,200,83,0.15)] border border-[rgba(0,200,83,0.3)]"></div>
-                <span>Covered (silent)</span>
-            </div>
-            <div class="mitre-legend-item">
-                <div class="mitre-legend-swatch bg-[rgba(210,153,34,0.12)] border border-dotted border-[rgba(210,153,34,0.55)]"></div>
-                <span>Written, not enabled</span>
-            </div>
-            <div class="mitre-legend-item">
-                <div class="mitre-legend-swatch _ion-s-170c9817b7"></div>
-                <span>Blind spot</span>
-            </div>
-            <div class="mitre-tide-summary">
-                <span><strong>${cov.covered_techniques}</strong>${(cov.total_techniques != null && cov.total_techniques > 0) ? `/${cov.total_techniques}` : ''} covered</span>
-                <span><strong>${(cov.inactive_techniques || []).length}</strong> written, not enabled</span>
-                <span><strong>${(cov.blind_spots || []).length}</strong> blind spots</span>
-                <span><strong>${cov.total_rules}</strong> rules</span>
-            </div>
-        `;
+        // The swatches and their wording are fixed, so the legend is a
+        // template; only the four summary figures vary.
+        legendEl.replaceChildren();
+        const legend = cloneTemplate('mitre-legend-template');
+        if (legend) {
+            const put = (sel, value) => {
+                const el = legend.querySelector(sel);
+                if (el) el.textContent = value;
+            };
+            put('.ml-covered', cov.covered_techniques);
+            put('.ml-total', (cov.total_techniques != null && cov.total_techniques > 0)
+                ? `/${cov.total_techniques}` : '');
+            put('.ml-inactive', (cov.inactive_techniques || []).length);
+            put('.ml-blind', (cov.blind_spots || []).length);
+            put('.ml-rules', cov.total_rules);
+            legendEl.appendChild(legend);
+        }
     } else if (legendEl) {
         legendEl.style.display = 'none';
     }
 
     // Render heatmap columns
-    let html = '';
+    container.replaceChildren();
     MITRE_TACTICS.forEach(tactic => {
         // Sort: firing first, then covered, then blind spots
         const techniques = tacticData[tactic]
@@ -3984,11 +4265,17 @@ function renderMitreHeatmap() {
                                    .replace('Command and Control', 'C2')
                                    .replace('Exfiltration', 'Exfil');
 
-        html += `<div class="mitre-heatmap-col">
-            <div class="mitre-heatmap-header" title="${escapeHtml(tactic)}">${escapeHtml(shortTactic)}</div>`;
+        const col = cloneTemplate('mitre-col-template');
+        if (!col) return;
+        const header = col.querySelector('.mitre-heatmap-header');
+        if (header) {
+            header.title = tactic;
+            header.textContent = shortTactic;
+        }
 
         if (techniques.length === 0) {
-            html += `<div class="mitre-heatmap-cell heat-0 flex-1">-</div>`;
+            const blank = cloneTemplate('mitre-cell-empty-template');
+            if (blank) col.appendChild(blank);
         } else {
             techniques.forEach(tech => {
                 let cellClass, countDisplay, titleParts = [tech.name || tech.id];
@@ -4032,18 +4319,29 @@ function renderMitreHeatmap() {
                     titleParts.push('BLIND SPOT: No detection rules');
                 }
 
-                const onclick = tech.count > 0 ? `data-click-action="filterByMitreTechnique" data-args='["${escapeHtml(tech.id)}"]'` : '';
-                html += `<div class="mitre-heatmap-cell ${cellClass}" ${onclick} title="${escapeHtml(titleParts.join('\n'))}">
-                    <span class="tech-id">${escapeHtml(tech.id)}</span>
-                    <span class="tech-count">${countDisplay}</span>
-                </div>`;
+                const cell = cloneTemplate('mitre-cell-template');
+                if (!cell) return;
+                if (cellClass) cell.classList.add(cellClass);
+                // The title holds newlines, so it is set as a property
+                // rather than built into an attribute string.
+                cell.title = titleParts.join('\n');
+                if (tech.count > 0) {
+                    cell.dataset.clickAction = 'filterByMitreTechnique';
+                    // JSON.stringify, not interpolation: the dispatcher
+                    // parses data-args with JSON.parse and a technique id
+                    // holding a quote made the cell unclickable in silence.
+                    cell.dataset.args = JSON.stringify([tech.id]);
+                }
+                const idSlot = cell.querySelector('.tech-id');
+                if (idSlot) idSlot.textContent = tech.id;
+                const countSlot = cell.querySelector('.tech-count');
+                if (countSlot) countSlot.textContent = countDisplay;
+                col.appendChild(cell);
             });
         }
 
-        html += `</div>`;
+        container.appendChild(col);
     });
-
-    container.innerHTML = html;
 }
 
 // --- Trend chart: alert volume over time buckets ---
@@ -4587,7 +4885,23 @@ function handleMapHover(e) {
         const sevColor = closest.severity === 'critical' ? '#ff6c6c'
                        : closest.severity === 'high'     ? '#f8b33a'
                                                          : '#6de4ff';
-        tooltip.innerHTML = `<strong>${escapeHtml(loc)}</strong><br>${closest.count} alert${closest.count > 1 ? 's' : ''} <span data-ion-style="color:${sevColor}">${closest.severity}</span>`;
+        // The tooltip follows the pointer, so it is client state by
+        // definition. Its markup is a template and the place, count and
+        // severity go in as textContent.
+        tooltip.replaceChildren();
+        const tip = cloneTemplate('globe-tooltip-template');
+        if (tip) {
+            const place = tip.querySelector('.globe-tip-place');
+            if (place) place.textContent = loc;
+            const count = tip.querySelector('.globe-tip-count');
+            if (count) count.textContent = `${closest.count} alert${closest.count > 1 ? 's' : ''}`;
+            const sev = tip.querySelector('.globe-tip-sev');
+            if (sev) {
+                sev.textContent = closest.severity;
+                sev.setAttribute('data-ion-style', `color:${sevColor}`);
+            }
+            tooltip.appendChild(tip);
+        }
         tooltip.style.display = 'block';
         tooltip.style.left = (mx + 14) + 'px';
         tooltip.style.top = (my - 10) + 'px';
@@ -4978,26 +5292,42 @@ async function linkAllToCase(matchType, caseId) {
 }
 
 function renderTimeline(container, alerts) {
-    if (alerts.length === 0) {
-        container.innerHTML = '<div class="empty-state">No timeline data</div>';
+    if (!container) return;
+    container.replaceChildren();
+    if (!alerts || alerts.length === 0) {
+        const empty = cloneTemplate('timeline-empty-template');
+        if (empty) container.appendChild(empty);
         return;
     }
 
-    container.innerHTML = `
-        <div class="timeline">
-            ${alerts.map(a => `
-                <div class="timeline-item ${a._isCurrent ? 'current' : ''} severity-${a.severity}">
-                    <div class="timeline-time">${new Date(a.timestamp).toLocaleString()}</div>
-                    <div class="timeline-title">
-                        <span class="severity-badge severity-${a.severity} text-[0.65rem]">${a.severity}</span>
-                        ${escapeHtml(a.title)}
-                        ${a._isCurrent ? '<span class="badge ml-2 text-[0.65rem]">CURRENT</span>' : ''}
-                    </div>
-                    <div class="timeline-host">${[a.host, a.user].filter(Boolean).join(' / ')}</div>
-                </div>
-            `).join('')}
-        </div>
-    `;
+    // Called by alert-detail.js's _timelineInto as host(container, alerts),
+    // which falls back to its own markup when this is absent, so it keeps
+    // its name and signature. The alerts are the page's own array and
+    // `_isCurrent` is a marker the caller sets, so this is client state with
+    // no server-side answer.
+    const wrap = cloneTemplate('timeline-wrap-template');
+    if (!wrap) return;
+    alerts.forEach(a => {
+        const item = cloneTemplate('timeline-item-template');
+        if (!item) return;
+        if (a._isCurrent) item.classList.add('current');
+        if (a.severity) item.classList.add(`severity-${a.severity}`);
+        const time = item.querySelector('.timeline-time');
+        if (time) time.textContent = new Date(a.timestamp).toLocaleString();
+        const sev = item.querySelector('.tl-sev');
+        if (sev) {
+            sev.textContent = a.severity || '';
+            if (a.severity) sev.classList.add(`severity-${a.severity}`);
+        }
+        const title = item.querySelector('.tl-title');
+        if (title) title.textContent = a.title || '';
+        const current = item.querySelector('.tl-current');
+        if (current) current.hidden = !a._isCurrent;
+        const host = item.querySelector('.timeline-host');
+        if (host) host.textContent = [a.host, a.user].filter(Boolean).join(' / ');
+        wrap.appendChild(item);
+    });
+    container.appendChild(wrap);
 }
 
 // =========================================================================
@@ -5236,8 +5566,14 @@ function populateSavedFiltersDropdown() {
     const select = document.getElementById('saved-filters-select');
     const filters = getSavedFilters();
 
-    // Clear existing options except the first
-    select.innerHTML = '<option value="">Saved Views...</option>';
+    // replaceChildren and a created option, not innerHTML. The saved views
+    // are in localStorage, which the server never sees, so this list has no
+    // server-side definition to come from.
+    select.replaceChildren();
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = 'Saved Views...';
+    select.appendChild(placeholder);
 
     filters.forEach(f => {
         const opt = document.createElement('option');
@@ -5256,41 +5592,37 @@ function manageSavedFilters() {
         return;
     }
 
-    const filterItems = filters.map(f => `
-        <div class="saved-filter-item" data-id="${f.id}">
-            <div>
-                <div class="saved-filter-name">${escapeHtml(f.name)}</div>
-                <div class="saved-filter-desc">${escapeHtml(f.description)}</div>
-            </div>
-            <div class="saved-filter-actions">
-                <button class="btn btn-sm btn-primary" data-click-action="loadFilterById" data-args='["${f.id}"]'>Load</button>
-                <button class="btn btn-sm btn-danger" data-click-action="deleteFilter" data-args='["${f.id}"]'>Delete</button>
-            </div>
-        </div>
-    `).join('');
-
-    const modalHtml = `
-        <div id="saved-filters-modal" class="saved-filters-modal" data-remove-self-on-self-click>
-            <div class="saved-filters-content">
-                <div class="modal-header mb-4">
-                    <h3>Manage Saved Views</h3>
-                    <button class="modal-close" data-remove-target="saved-filters-modal">&times;</button>
-                </div>
-                <div class="saved-filters-list">
-                    ${filterItems}
-                </div>
-                <div class="modal-footer mt-4 text-right">
-                    <button class="btn btn-secondary" data-remove-target="saved-filters-modal">Close</button>
-                </div>
-            </div>
-        </div>
-    `;
-
-    // Remove existing modal
     const existing = document.getElementById('saved-filters-modal');
     if (existing) existing.remove();
 
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const modal = cloneTemplate('saved-filters-modal-template');
+    if (!modal) return;
+    const list = modal.querySelector('.saved-filters-list');
+    filters.forEach(f => {
+        const item = cloneTemplate('saved-filter-item-template');
+        if (!item || !list) return;
+        item.dataset.id = f.id;
+        const name = item.querySelector('.saved-filter-name');
+        if (name) name.textContent = f.name;
+        const desc = item.querySelector('.saved-filter-desc');
+        if (desc) desc.textContent = f.description || '';
+        // JSON.stringify, not interpolation. The dispatcher parses data-args
+        // with JSON.parse and on a throw it logs and returns, so an id
+        // holding a double quote made Load and Delete look like working
+        // controls that did nothing.
+        const load = item.querySelector('.saved-filter-load');
+        if (load) {
+            load.dataset.clickAction = 'loadFilterById';
+            load.dataset.args = JSON.stringify([f.id]);
+        }
+        const del = item.querySelector('.saved-filter-delete');
+        if (del) {
+            del.dataset.clickAction = 'deleteFilter';
+            del.dataset.args = JSON.stringify([f.id]);
+        }
+        list.appendChild(item);
+    });
+    document.body.appendChild(modal);
 }
 
 function loadFilterById(filterId) {
