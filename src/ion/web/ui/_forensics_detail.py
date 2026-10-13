@@ -76,12 +76,21 @@ def sections(request:Request,case_id:int,user=Depends(read_user),session:Session
     view:CollectionPanel=_collection(_read(forensics_api.get_case_steps,case_id=case_id,user=user,session=session),user,case_id=case_id)
     return render_view(request,'_fragments/forensics_sections.html',view)
 
+@router.get('/forensics/cases/{case_id}/timeline',response_class=HTMLResponse)
+def timeline(request:Request,case_id:int,user=Depends(read_user),session:Session=Depends(get_db_session)):
+    view:CollectionPanel=_collection(_read(forensics_api.get_timeline,case_id=case_id,user=user,session=session),user,case_id=case_id)
+    return render_view(request,'_fragments/forensics_timeline.html',view)
 
 @router.get('/forensics/cases/{case_id}/evidence',response_class=HTMLResponse)
 def evidence(request:Request,case_id:int,table:bool=False,user=Depends(read_user),session:Session=Depends(get_db_session)):
     view:CollectionPanel=_collection(_read(forensics_api.list_evidence,case_id=case_id,user=user,session=session),user,case_id=case_id,table=table)
     return render_view(request,'_fragments/forensics_evidence.html',view)
 
+@router.get('/forensics/cases/{case_id}/annotations',response_class=HTMLResponse)
+def annotations(request:Request,case_id:int,user=Depends(read_user),session:Session=Depends(get_db_session)):
+    payload=_read(forensic_workbench_api.list_annotations_endpoint,case_id=case_id,user=user,session=session)
+    view:CollectionPanel=_collection(rows(payload,'annotations'),user,case_id=case_id)
+    return render_view(request,'_fragments/forensics_annotations.html',view)
 
 @router.get('/forensics/evidence/{evidence_id}/custody',response_class=HTMLResponse)
 def custody(request:Request,evidence_id:int,user=Depends(read_user),session:Session=Depends(get_db_session)):

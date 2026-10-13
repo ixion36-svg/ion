@@ -1005,11 +1005,7 @@ function getSelectedIOCs(type) {
     return selected;
 }
 
-function renderTimeline(entries){
-    const d=document.getElementById('cd-timeline');
-    if(!entries.length){d.innerHTML='<div class="empty-state">No timeline entries</div>';return}
-    d.innerHTML=entries.map(e=>`<div class="tl-entry ${e.entry_type}"><div class="tl-meta">${esc(e.username||'System')} &middot; ${fmtDateTime(e.timestamp)} &middot; <em>${fmtLabel(e.entry_type)}</em></div><div class="tl-content">${esc(e.content)}</div></div>`).join('');
-}
+function renderTimeline(){return ionLoadFragment('/ui/forensics/cases/'+encodeURIComponent(currentCaseId)+'/timeline','cd-timeline','Loading timeline…');}
 function renderDetailEvidence(){return ionLoadFragment('/ui/forensics/cases/'+encodeURIComponent(currentCaseId)+'/evidence','cd-evidence-list','Loading evidence…');}
 
 // ======== CASE ACTIONS ========
@@ -1181,47 +1177,17 @@ init();
 
 var _forensicAnnCaseId = null;
 
-async function loadForensicAnnotations(caseId) {
-    _forensicAnnCaseId = caseId;
-    var body = document.getElementById('forensic-annotations-body');
-    if (!body) return;
-    try {
-        var resp = await fetch('/api/forensics/cases/' + caseId + '/annotations');
-        if (!resp.ok) { body.innerHTML = '<div class="text-[var(--text-secondary)] text-[.8rem]">Failed to load annotations</div>'; return; }
-        var data = await resp.json();
-        var annotations = data.annotations || [];
-        renderForensicAnnotations(annotations);
-    } catch (e) { }
+function loadForensicAnnotations(caseId){
+ _forensicAnnCaseId=caseId;
+ return ionLoadFragment('/ui/forensics/cases/'+encodeURIComponent(caseId)+'/annotations','forensic-annotations-body','Loading annotations…');
 }
 
-function renderForensicAnnotations(annotations) {
-    var body = document.getElementById('forensic-annotations-body');
-    if (!body) return;
-    if (!annotations.length) {
-        body.innerHTML = '<div class="text-[var(--text-secondary)] text-[.8rem]">No annotations yet.</div>';
-        return;
-    }
-    var html = annotations.map(function(a) {
-        var ts = a.timeline_ts ? new Date(a.timeline_ts).toLocaleString() : '';
-        var author = a.created_by_username || 'unknown';
-        return '<div class="border-l-[3px] border-l-[#6366f1] pt-1.5 pr-1.5 pb-1.5 pl-2.5 mb-2 bg-[rgba(99,102,241,0.06)] rounded-[0_4px_4px_0]" id="fann-' + a.id + '">'
-            + '<div class="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] mb-1">'
-            + '<span class="text-[#818cf8] font-semibold">' + (ts||'') + '</span>'
-            + '<span>&middot;</span><span>' + (author||'') + '</span>'
-            + '<span class="ml-[auto] flex gap-1">'
-            + `<button class="bg-transparent border-0 text-[#94a3b8] cursor-pointer py-0 px-[3px] text-[.8rem]" type="button" data-click-action="editForensicAnnotation" data-args='[${a.id}, ${JSON.stringify(a.body || '')}]'>&#9998;</button>`
-            + `<button class="bg-transparent border-0 text-[#94a3b8] cursor-pointer py-0 px-[3px] text-[.8rem]" type="button" data-click-action="deleteForensicAnnotation" data-args='[${a.id}]'>&times;</button>`
-            + '</span></div>'
-            + '<div class="text-[.8rem] text-[var(--text-primary)] whitespace-pre-wrap">' + (a.body||'') + '</div>'
-            + '</div>';
-    }).join('');
-    body.innerHTML = html;
-}
+
 
 function toggleForensicAnnotationForm() {
     var form = document.getElementById('forensic-ann-form');
     if (!form) return;
-    form.style.display = form.style.display === 'none' ? '' : 'none';
+    form.style.display = getComputedStyle(form).display === 'none' ? 'block' : 'none';
     if (form.style.display !== 'none') {
         var tsEl = document.getElementById('forensic-ann-ts');
         if (tsEl && !tsEl.value) {

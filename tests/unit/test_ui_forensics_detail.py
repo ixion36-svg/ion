@@ -23,7 +23,7 @@ def client():
     app.dependency_overrides[get_db_session] = lambda: None
     return TestClient(app)
 
-@pytest.mark.parametrize('path,service,module,key', [('cases/1/sections', 'get_case_steps', forensics_api, None), ('cases/1/evidence', 'list_evidence', forensics_api, None), ('evidence/1/custody', 'get_custody_log', forensics_api, None)])
+@pytest.mark.parametrize('path,service,module,key', [('cases/1/sections', 'get_case_steps', forensics_api, None), ('cases/1/timeline', 'get_timeline', forensics_api, None), ('cases/1/evidence', 'list_evidence', forensics_api, None), ('cases/1/annotations', 'list_annotations_endpoint', forensic_workbench_api, 'annotations'), ('evidence/1/custody', 'get_custody_log', forensics_api, None)])
 @pytest.mark.parametrize('payload,state', [(None, 'failed'), ({}, 'failed'), ([], 'empty'), ([{'id': 1, 'title': '<attack>', 'name': 'Example', 'content': 'Text'}], 'data')])
 def test_collection_outcomes(client, monkeypatch, path, service, module, key, payload, state):
     result = {key: payload} if key else payload
@@ -55,7 +55,7 @@ def test_figures_keep_unknown(client, monkeypatch, field, value):
     html = client.get('/ui/forensics/' + path).text
     assert ('Unknown' if value is None else str(value)) in html
 
-@pytest.mark.parametrize('path,service,module', [('cases/1/sections', 'get_case_steps', forensics_api), ('cases/1/evidence', 'list_evidence', forensics_api), ('evidence/1/custody', 'get_custody_log', forensics_api)])
+@pytest.mark.parametrize('path,service,module', [('cases/1/sections', 'get_case_steps', forensics_api), ('cases/1/timeline', 'get_timeline', forensics_api), ('cases/1/evidence', 'list_evidence', forensics_api), ('evidence/1/custody', 'get_custody_log', forensics_api), ('cases/1/annotations', 'list_annotations_endpoint', forensic_workbench_api)])
 def test_refusal_never_looks_empty(client, monkeypatch, path, service, module):
 
     def refused(**kwargs):
@@ -133,7 +133,7 @@ def test_fragment_read_permission_is_enforced(monkeypatch):
     assert response.status_code == 403 and calls == []
 
 @pytest.mark.parametrize('payload', [[None], [4], ['bad']])
-@pytest.mark.parametrize('path,service', [('cases/1/sections', 'get_case_steps'), ('cases/1/evidence', 'list_evidence'), ('evidence/1/custody', 'get_custody_log')])
+@pytest.mark.parametrize('path,service', [('cases/1/sections', 'get_case_steps'), ('cases/1/timeline', 'get_timeline'), ('cases/1/evidence', 'list_evidence'), ('evidence/1/custody', 'get_custody_log')])
 def test_malformed_record_lists_are_failed_reads(client, monkeypatch, payload, path, service):
     monkeypatch.setattr(forensics_api, service, lambda **kw: payload)
     response = client.get('/ui/forensics/' + path, headers={'Accept': 'application/json'})
