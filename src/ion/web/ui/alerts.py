@@ -100,8 +100,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -1278,6 +1279,9 @@ async def alerts_playbook_library_fragment(
 
 QUEUE_FRAGMENT = "_fragments/alerts_queue.html"
 
+#: Stage 6, the analytics drawer.
+ANALYTICS_FRAGMENT = "_fragments/alerts_analytics.html"
+
 #: What GET /api/elasticsearch/alerts and POST
 #: /api/elasticsearch/alerts-triage/batch carry.
 QUEUE_PERMISSION = "alert:read"
@@ -2314,3 +2318,358 @@ async def alerts_enrich_fragment(
         "observables": observable_rows(observables, enrichment_map(results)),
         "ai_available": await _ai_available(),
     })
+
+
+# ---------------------------------------------------------------------------
+# The analytics drawer: key metrics, the trend chart, two donuts and the
+# three top-N bar lists
+# ---------------------------------------------------------------------------
+#
+# Stage 6. These all aggregated `allAlerts`, the array loadAlerts filled, and
+# renderAnalytics is not called from applyFilters, so the drawer reflects the
+# fetched set rather than the reader's narrowing. That is why this route
+# takes the same six control values the queue takes and does the same read
+# through the same helpers: one definition of the window, one definition of
+# which alerts are in it, and no second filter to disagree with the queue.
+#
+# What the writers did, measured against the tree before this stage:
+#
+#   * renderTrendChart opened with
+#
+#         if (!container || allAlerts.length === 0) {
+#             container.innerHTML = '<div class="empty-state">No data</div>';
+#
+#     which dereferences `container` on the branch that tests it for null.
+#     It never fired because the container is in the shell, but the guard is
+#     backwards and is not carried over.
+#
+#   * Every one of the five said "No data" for an empty set, and `allAlerts`
+#     stays empty after a failed read, so a window with no alerts in it and
+#     a window nobody could read were one picture in every chart at once.
+#     That is the whole drawer agreeing on a wrong answer.
+#
+#   * The trend chart's x-axis labels came from toLocaleTimeString, so the
+#     buckets were computed as absolute instants and then labelled on the
+#     reader's clock. Two analysts in different zones read different hours
+#     off the same bars. The labels are UTC now and the axis says so.
+#
+#   * renderTopCountries read `a.raw_data.source?.geo` and counted
+#     `geo.country_name || geo.country_iso_code`, so an alert whose geo
+#     block carries neither was skipped silently rather than counted as
+#     unattributed.
+#
+# The donut geometry is reproduced rather than borrowed from cases.py, which
+# grew a `donut()` of its own. That one draws with stroke-dasharray on a
+# circle and this one draws path arcs, and the port is meant to be invisible,
+# so the arcs are the ones that were on screen.
+
+#: `.slice(0, 7)` in all three bar lists.
+ANALYTICS_TOP_N = 7
+
+#: The severity donut's keys and colours, in the order the page listed them.
+SEVERITY_SLICES = (("Critical", "critical"), ("High", "high"),
+                   ("Medium", "medium"), ("Low", "low"), ("Info", "info"))
+SEVERITY_COLOURS = ("#f44336", "#ff9800", "#ffc107", "#4caf50", "#2196f3")
+
+#: The triage donut's, likewise.
+TRIAGE_SLICES = (("Open", "open"), ("Acknowledged", "acknowledged"),
+                 ("Closed", "closed"))
+TRIAGE_COLOURS = ("#1976d2", "#ff9800", "#78909c")
+
+#: The host and rule bar colours the page passed to renderHBarChart.
+HOST_BAR_COLOUR = "#4fc3f7"
+RULE_BAR_COLOUR = "#ba68c8"
+
+#: The donut's geometry, from the page: cx 70, r 58, inner 34, h 190.
+DONUT_W, DONUT_H = 200, 190
+DONUT_CX, DONUT_R, DONUT_INNER = 70, 58, 34
+DONUT_LEGEND_X = 145
+
+#: The trend chart's, from the page.
+TREND_W, TREND_H = 600, 180
+
+
+def _bucket_plan(hours: int) -> dict:
+    """Bucket width, count and label format for a window, as the page's
+    four-way branch chose them. The label is a strftime pattern rather than
+    a closure, because it is applied on the server and in UTC."""
+    if hours <= 1:
+        return {"ms": 5 * 60, "count": 12, "fmt": "%H:%M"}
+    if hours <= 24:
+        return {"ms": 60 * 60, "count": 24, "fmt": "%H:%M"}
+    if hours <= 168:
+        return {"ms": 6 * 60 * 60, "count": -(-hours // 6), "fmt": "%d %b %H"}
+    return {"ms": 24 * 60 * 60, "count": -(-hours // 24), "fmt": "%d %b"}
+
+
+def trend_buckets(alerts: list, hours: int, now: Optional[datetime] = None) -> dict:
+    """The trend chart's bars: one per bucket, each with its total and its
+    critical and high counts, plus the labels for the axis.
+
+    `count` is a measured zero for a bucket nothing landed in, which is the
+    point of a trend chart and is not the same as the window being
+    unreadable.
+    """
+    now = now or datetime.now(timezone.utc)
+    plan = _bucket_plan(hours)
+    start = now - timedelta(hours=hours)
+    buckets = [
+        {"start": start + timedelta(seconds=i * plan["ms"]),
+         "count": 0, "critical": 0, "high": 0}
+        for i in range(plan["count"])
+    ]
+    for a in alerts if isinstance(alerts, list) else []:
+        if not isinstance(a, dict):
+            continue
+        when = _parse_instant(a.get("timestamp") or a.get("@timestamp"))
+        if when is None:
+            continue
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=timezone.utc)
+        index = int((when - start).total_seconds() // plan["ms"])
+        if 0 <= index < len(buckets):
+            buckets[index]["count"] += 1
+            severity = str(plain(a.get("severity")) or "")
+            if severity == "critical":
+                buckets[index]["critical"] += 1
+            elif severity == "high":
+                buckets[index]["high"] += 1
+    peak = max((b["count"] for b in buckets), default=0)
+    every = max(1, -(-len(buckets) // 6))
+    for i, b in enumerate(buckets):
+        b["label"] = b["start"].strftime(plan["fmt"]) if i % every == 0 else None
+        b["pct"] = round(b["count"] / peak * 100, 2) if peak else 0.0
+        b["iso"] = b["start"].isoformat().replace("+00:00", "Z")
+    return {"buckets": buckets, "peak": peak, "total": sum(b["count"] for b in buckets)}
+
+
+def top_counts(alerts: list, field: str, limit: int = ANALYTICS_TOP_N) -> list:
+    """The top `limit` values of one field, with the share of the largest so
+    the bar widths need no arithmetic in the template."""
+    counts: dict = {}
+    for a in alerts if isinstance(alerts, list) else []:
+        if not isinstance(a, dict):
+            continue
+        value = a.get(field)
+        if value in (None, ""):
+            continue
+        key = str(value)
+        counts[key] = counts.get(key, 0) + 1
+    rows = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:limit]
+    peak = rows[0][1] if rows else 0
+    return [{"name": name, "count": count,
+             "pct": round(count / peak * 100) if peak else 0}
+            for name, count in rows]
+
+
+def country_counts(alerts: list, limit: int = ANALYTICS_TOP_N) -> dict:
+    """Alerts by source country, plus how many carried a geo block with no
+    country in it. The page skipped those silently, so a window of alerts
+    that were all geolocated to nowhere read as a window with no geo data
+    at all.
+    """
+    counts: dict = {}
+    unattributed = 0
+    for a in alerts if isinstance(alerts, list) else []:
+        if not isinstance(a, dict):
+            continue
+        raw = a.get("raw_data")
+        source = raw.get("source") if isinstance(raw, dict) else None
+        geo = source.get("geo") if isinstance(source, dict) else None
+        if not isinstance(geo, dict):
+            continue
+        name = geo.get("country_name") or geo.get("country_iso_code")
+        if not name:
+            unattributed += 1
+            continue
+        key = str(name)
+        counts[key] = counts.get(key, 0) + 1
+    rows = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:limit]
+    peak = rows[0][1] if rows else 0
+    return {
+        "rows": [{"name": name, "count": count,
+                  "pct": round(count / peak * 100) if peak else 0,
+                  "hue": 200 + i * 25}
+                 for i, (name, count) in enumerate(rows)],
+        "unattributed": unattributed,
+    }
+
+
+def donut_arcs(slices: list, colours: tuple) -> Optional[dict]:
+    """The path arcs and legend for a donut, or None when there is nothing
+    to draw from.
+
+    Three outcomes, as the cases donut has: None in means the source could
+    not be read and None comes out. A total of zero is a measurement, every
+    slice counted and every count zero, and renders as an empty ring rather
+    than as "No data", which the page could not tell from a failed read.
+    """
+    if slices is None:
+        return None
+    total = sum(s["value"] for s in slices)
+    arcs, legend = [], []
+    angle = -math.pi / 2
+    for i, s in enumerate(slices):
+        colour = colours[i % len(colours)]
+        if s["value"]:
+            share = s["value"] / total
+            sweep = share * 2 * math.pi
+            large = 1 if sweep > math.pi else 0
+            cy = DONUT_H / 2
+            x1 = DONUT_CX + DONUT_R * math.cos(angle)
+            y1 = cy + DONUT_R * math.sin(angle)
+            x2 = DONUT_CX + DONUT_R * math.cos(angle + sweep)
+            y2 = cy + DONUT_R * math.sin(angle + sweep)
+            ix1 = DONUT_CX + DONUT_INNER * math.cos(angle)
+            iy1 = cy + DONUT_INNER * math.sin(angle)
+            ix2 = DONUT_CX + DONUT_INNER * math.cos(angle + sweep)
+            iy2 = cy + DONUT_INNER * math.sin(angle + sweep)
+            arcs.append({
+                "colour": colour,
+                "d": (f"M{x1:.2f},{y1:.2f} A{DONUT_R},{DONUT_R} 0 {large},1 "
+                      f"{x2:.2f},{y2:.2f} L{ix2:.2f},{iy2:.2f} "
+                      f"A{DONUT_INNER},{DONUT_INNER} 0 {large},0 {ix1:.2f},{iy1:.2f} Z"),
+                "label": s["label"], "value": s["value"],
+                "pct": round(s["value"] / total * 100),
+            })
+            legend.append({"colour": colour, "label": s["label"],
+                           "value": s["value"],
+                           "pct": round(s["value"] / total * 100),
+                           "y": 16 + len(legend) * 18})
+            angle += sweep
+    return {"total": total, "arcs": arcs, "legend": legend,
+            "cy": DONUT_H / 2, "w": DONUT_W, "h": DONUT_H,
+            "cx": DONUT_CX, "r": DONUT_R, "inner": DONUT_INNER,
+            "legend_x": DONUT_LEGEND_X}
+
+
+def _slice_counts(alerts: list, field: str, spec: tuple) -> Optional[list]:
+    """Counts for a donut's named buckets, or None when there is no list to
+    count. Every named bucket is present with its zero, because the page
+    pre-seeded them and a severity nothing arrived under is a measured zero
+    rather than a missing category."""
+    if not isinstance(alerts, list):
+        return None
+    counts = {key: 0 for _label, key in spec}
+    for a in alerts:
+        if not isinstance(a, dict):
+            continue
+        value = str(plain(a.get(field)) or "")
+        if value in counts:
+            counts[value] += 1
+    return [{"label": label, "value": counts[key]} for label, key in spec]
+
+
+def triage_slice_counts(alerts: list, triage: Optional[dict]) -> Optional[list]:
+    """The triage donut's three counts, from the batch read rather than from
+    the alert rows, which do not carry a triage status.
+
+    `triageCache[a.id]?.status || 'open'` is the rule the page used, so an
+    alert with no triage record counts as open: it is an alert nobody has
+    triaged, which is what open means here. A batch read that failed is a
+    different thing, and None comes back for it so the donut says it was not
+    counted instead of reporting every alert as open.
+    """
+    if not isinstance(alerts, list) or triage is None:
+        return None
+    counts = {key: 0 for _label, key in TRIAGE_SLICES}
+    for a in alerts:
+        if not isinstance(a, dict):
+            continue
+        record = triage.get(str(a.get("id")))
+        status = str(plain(record.get("status")) or "") if isinstance(record, dict) else ""
+        if not status:
+            status = "open"
+        if status in counts:
+            counts[status] += 1
+    return [{"label": label, "value": counts[key]} for label, key in TRIAGE_SLICES]
+
+
+@router.get(
+    "/alerts/analytics",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(QUEUE_PERMISSION))],
+)
+async def alerts_analytics_fragment(
+    request: Request,
+    time_range: str = Query("24"),
+    custom_from: str = Query(""),
+    custom_to: str = Query(""),
+    tz_offset: str = Query(""),
+    status: str = Query(""),
+    system: str = Query(""),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    """The analytics drawer, over the same window the queue reads.
+
+    The same six raw control values, through queue_window and
+    include_closed, so the drawer and the table cannot disagree about which
+    alerts are in the window. The read is the same handler at the same
+    limit, which means the drawer is also capped at QUEUE_LIMIT and says so.
+
+    Outcomes: failed, degraded (the read answered with a message and some
+    rows), and read. Every chart derives from one list, so a failed read is
+    one sentence here rather than the same wrong "No data" in five places.
+    """
+    from ion.web import elasticsearch_api as es_api
+
+    window = queue_window(time_range, custom_from, custom_to, tz_offset)
+    try:
+        payload = await es_api.get_es_alerts(
+            hours=window["hours"],
+            limit=QUEUE_LIMIT,
+            include_closed=include_closed(status),
+            time_from=window["time_from"],
+            time_to=window["time_to"],
+            system=system or None,
+            current_user=current_user,
+            session=session,
+        )
+        outcome = queue_outcome(payload)
+    except Exception:
+        logger.exception("Alert analytics fragment could not read alerts")
+        outcome = {"failed": True, "degraded": False, "reason": None,
+                   "connection_error": False, "alerts": None,
+                   "arkime_enabled": False}
+
+    alerts = outcome["alerts"]
+    # The triage statuses come from the same batch handler the queue uses,
+    # because the alert rows do not carry one. Read as a read: no
+    # es_statuses, so its Kibana-to-ION sync does not run.
+    triage_map: Optional[dict] = None
+    if alerts:
+        ids = [str(a.get("id")) for a in alerts if isinstance(a, dict) and a.get("id")]
+        triage_map = await _triage_map(ids, current_user, session) if ids else {}
+    elif alerts is not None:
+        triage_map = {}
+    severity = _slice_counts(alerts, "severity", SEVERITY_SLICES)
+    triage = triage_slice_counts(alerts, triage_map)
+    return templates.TemplateResponse(
+        request=request,
+        name=ANALYTICS_FRAGMENT,
+        context={
+            "failed": outcome["failed"],
+            "degraded": outcome["degraded"],
+            "reason": outcome["reason"],
+            "connection_error": outcome["connection_error"],
+            # The key metric cards are filled by the page with textContent,
+            # not innerHTML, and read triageCache, which is client state. They
+            # are not this stage's and nothing is rendered for them here.
+            "trend": trend_buckets(alerts, window["hours"]) if alerts is not None else None,
+            "hours": window["hours"],
+            "defaulted": window["defaulted"],
+            "truncated": alerts is not None and len(alerts) >= QUEUE_LIMIT,
+            "limit": QUEUE_LIMIT,
+            "severity_donut": donut_arcs(severity, SEVERITY_COLOURS),
+            "triage_donut": donut_arcs(triage, TRIAGE_COLOURS),
+            "countries": country_counts(alerts) if alerts is not None else None,
+            "hosts": top_counts(alerts, "host") if alerts is not None else None,
+            "rules": top_counts(alerts, "rule_name") if alerts is not None else None,
+            "host_colour": HOST_BAR_COLOUR,
+            "rule_colour": RULE_BAR_COLOUR,
+            "trend_w": TREND_W,
+            "trend_h": TREND_H,
+        },
+        status_code=200,
+    )

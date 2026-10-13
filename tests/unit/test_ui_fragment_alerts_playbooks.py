@@ -902,4 +902,4 @@ def test_the_region_removed_eleven_write_sites():
     """80 before stage 3, measured by the status tool's expression; the six
     writers held 11 between them. Stage 4, the alert queue, took 15 more,
     so the page reads 54; this equality is lowered by every later stage."""
-    assert len(WRITES.findall(_page())) == 36
+    assert len(WRITES.findall(_page())) == 26

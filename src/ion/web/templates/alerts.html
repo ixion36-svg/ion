@@ -167,7 +167,11 @@
         <div class="grid grid-cols-[2fr_1fr_1fr] gap-4 mb-4">
             <div class="bg-white/5 border border-white/10 rounded-md px-5 py-4 ad-card-trend">
                 <div class="text-xs uppercase text-slate-400 mb-2.5 tracking-[0.5px] font-semibold flex items-center gap-2"><span class="text-sm">&#9650;</span> Alert Trend</div>
-                <div id="chart-trend" class="min-h-[200px] relative"></div>
+                <div id="chart-trend" class="min-h-[200px] relative"
+                     hx-get="/ui/alerts/analytics"
+                     hx-trigger="alerts-analytics from:body"
+                     hx-include="#alert-time-range, #custom-time-from, #custom-time-to, #aq-tz-offset, #alert-status-filter, #alert-system-filter"
+                     hx-swap="innerHTML"></div>
             </div>
             <div class="bg-white/5 border border-white/10 rounded-md px-5 py-4">
                 <div class="text-xs uppercase text-slate-400 mb-2.5 tracking-[0.5px] font-semibold flex items-center gap-2"><span class="text-sm text-[var(--danger)]">&#9679;</span> Severity</div>
@@ -1214,7 +1218,7 @@ async function loadTriageBatch() {
         // Refresh triage-dependent analytics panels
         if (analyticsIsOpen()) {
             renderKeyMetrics();
-            renderTriageStatusDonut();
+            renderAnalytics();
         }
     } catch (e) {
         console.error('Error loading batch triage:', e);
@@ -3712,26 +3716,31 @@ function analyticsIsOpen() {
 function toggleAnalytics() {
     const dash = document.getElementById('analytics-dashboard');
     const icon = document.getElementById('analytics-toggle-icon');
+    const chevron = icon ? icon.querySelector('i') : null;
     if (!analyticsIsOpen()) {
         dash.style.display = 'block';
-        icon.innerHTML = '<i class="icon-chevron-down"></i>';
+        // The class on the existing <i>, not a rebuilt one. The chevron is
+        // the control's state and there is no markup to assemble for it.
+        if (chevron) chevron.className = 'icon-chevron-down';
         renderAnalytics();
     } else {
         dash.style.display = 'none';
-        icon.innerHTML = '<i class="icon-chevron-right"></i>';
+        if (chevron) chevron.className = 'icon-chevron-right';
         stopMap();
     }
 }
 
 function renderAnalytics() {
     if (!analyticsIsOpen()) return;
+    // The key metric cards stay here: they use textContent and read
+    // triageCache, which is client state.
     renderAdKeyMetrics();
-    renderTrendChart();
-    renderSeverityDonut();
-    renderTriageStatusDonut();
-    renderTopCountries();
-    renderHBarChart('chart-top-hosts', allAlerts, 'host', '#4fc3f7');
-    renderHBarChart('chart-top-rules', allAlerts, 'rule_name', '#ba68c8');
+    // The trend chart, both donuts and the three bar lists come from
+    // /ui/alerts/analytics in one request, which carries the same six filter
+    // controls the queue carries through hx-include. Dispatching the event
+    // rather than building a query string here keeps one definition of the
+    // window, the same way loadAlerts dispatches alerts-refresh.
+    document.body.dispatchEvent(new CustomEvent('alerts-analytics'));
     // Lazy-load active tab content
     if (_adActiveTab === 'mitre') { loadTideMitreCoverage(); renderMitreHeatmap(); }
     if (_adActiveTab === 'geo') { startMap(); initMapInteraction(); }
@@ -4103,178 +4112,10 @@ function renderMitreHeatmap() {
 }
 
 // --- Trend chart: alert volume over time buckets ---
-function renderTrendChart() {
-    const container = document.getElementById('chart-trend');
-    if (!container || allAlerts.length === 0) {
-        container.innerHTML = '<div class="empty-state">No data</div>';
-        return;
-    }
-
-    // Determine bucket size based on time range
-    const hours = getEffectiveHours();
-    let bucketMs, bucketCount, labelFn;
-    if (hours <= 1) {
-        bucketMs = 5 * 60 * 1000; bucketCount = 12;
-        labelFn = d => d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-    } else if (hours <= 24) {
-        bucketMs = 60 * 60 * 1000; bucketCount = 24;
-        labelFn = d => d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-    } else if (hours <= 168) {
-        bucketMs = 6 * 60 * 60 * 1000; bucketCount = Math.ceil(hours / 6);
-        labelFn = d => d.toLocaleDateString([], {month:'short',day:'numeric'}) + ' ' + d.toLocaleTimeString([], {hour:'2-digit'});
-    } else {
-        bucketMs = 24 * 60 * 60 * 1000; bucketCount = Math.ceil(hours / 24);
-        labelFn = d => d.toLocaleDateString([], {month:'short',day:'numeric'});
-    }
-
-    const now = Date.now();
-    const start = now - hours * 3600000;
-    const buckets = [];
-    for (let i = 0; i < bucketCount; i++) {
-        buckets.push({ start: start + i * bucketMs, count: 0, critical: 0, high: 0 });
-    }
-
-    allAlerts.forEach(a => {
-        const t = new Date(a.timestamp).getTime();
-        const idx = Math.floor((t - start) / bucketMs);
-        if (idx >= 0 && idx < bucketCount) {
-            buckets[idx].count++;
-            if (a.severity === 'critical') buckets[idx].critical++;
-            else if (a.severity === 'high') buckets[idx].high++;
-        }
-    });
-
-    const maxCount = Math.max(1, ...buckets.map(b => b.count));
-    const w = container.clientWidth || 400;
-    const h = container.clientHeight || 190;
-    const pad = { top: 10, right: 10, bottom: 28, left: 32 };
-    const chartW = w - pad.left - pad.right;
-    const chartH = h - pad.top - pad.bottom;
-    const barW = Math.max(2, (chartW / bucketCount) - 2);
-
-    let svg = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">`;
-
-    // Y-axis grid
-    for (let i = 0; i <= 4; i++) {
-        const y = pad.top + (chartH * i / 4);
-        svg += `<line x1="${pad.left}" y1="${y}" x2="${w - pad.right}" y2="${y}" class="chart-grid"/>`;
-        if (i % 2 === 0) {
-            const val = Math.round(maxCount * (1 - i / 4));
-            svg += `<text x="${pad.left - 4}" y="${y + 3}" class="chart-value" text-anchor="end">${val}</text>`;
-        }
-    }
-
-    // Bars
-    buckets.forEach((b, i) => {
-        const x = pad.left + (i * (chartW / bucketCount)) + 1;
-        const barH = (b.count / maxCount) * chartH;
-        const y = pad.top + chartH - barH;
-
-        // Stacked: critical (bottom), high, rest
-        const critH = (b.critical / maxCount) * chartH;
-        const highH = (b.high / maxCount) * chartH;
-        const restH = barH - critH - highH;
-
-        let cy = y;
-        if (restH > 0) {
-            svg += `<rect x="${x}" y="${cy}" width="${barW}" height="${restH}" fill="#4fc3f7" rx="1" class="chart-bar"><title>${labelFn(new Date(b.start))}: ${b.count} alerts</title></rect>`;
-            cy += restH;
-        }
-        if (highH > 0) {
-            svg += `<rect x="${x}" y="${cy}" width="${barW}" height="${highH}" fill="#ff9800" rx="1" class="chart-bar"><title>${b.high} high</title></rect>`;
-            cy += highH;
-        }
-        if (critH > 0) {
-            svg += `<rect x="${x}" y="${cy}" width="${barW}" height="${critH}" fill="#f44336" rx="1" class="chart-bar"><title>${b.critical} critical</title></rect>`;
-        }
-
-        // X-axis labels (show ~6 labels max)
-        if (bucketCount <= 6 || i % Math.ceil(bucketCount / 6) === 0) {
-            svg += `<text x="${x + barW / 2}" y="${h - 4}" class="chart-value" text-anchor="middle">${labelFn(new Date(b.start))}</text>`;
-        }
-    });
-
-    svg += '</svg>';
-    container.innerHTML = svg;
-}
 
 // --- Donut chart helper ---
-function renderDonut(containerId, data, colors) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
 
-    const total = data.reduce((s, d) => s + d.value, 0);
-    if (total === 0) {
-        container.innerHTML = '<div class="empty-state">No data</div>';
-        return;
-    }
 
-    const w = container.clientWidth || 200;
-    const h = container.clientHeight || 190;
-    const cx = 70, cy = h / 2, r = 58, inner = 34;
-    let svg = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">`;
-
-    let angle = -Math.PI / 2;
-    data.forEach((d, i) => {
-        if (d.value === 0) return;
-        const sliceAngle = (d.value / total) * 2 * Math.PI;
-        const x1 = cx + r * Math.cos(angle);
-        const y1 = cy + r * Math.sin(angle);
-        const x2 = cx + r * Math.cos(angle + sliceAngle);
-        const y2 = cy + r * Math.sin(angle + sliceAngle);
-        const ix1 = cx + inner * Math.cos(angle);
-        const iy1 = cy + inner * Math.sin(angle);
-        const ix2 = cx + inner * Math.cos(angle + sliceAngle);
-        const iy2 = cy + inner * Math.sin(angle + sliceAngle);
-        const largeArc = sliceAngle > Math.PI ? 1 : 0;
-
-        svg += `<path d="M${x1},${y1} A${r},${r} 0 ${largeArc},1 ${x2},${y2} L${ix2},${iy2} A${inner},${inner} 0 ${largeArc},0 ${ix1},${iy1} Z" fill="${colors[i % colors.length]}" class="donut-segment"><title>${d.label}: ${d.value} (${Math.round(d.value/total*100)}%)</title></path>`;
-        angle += sliceAngle;
-    });
-
-    // Center total
-    svg += `<text x="${cx}" y="${cy - 4}" text-anchor="middle" class="chart-value text-base font-bold fill-[currentColor]">${total}</text>`;
-    svg += `<text x="${cx}" y="${cy + 10}" text-anchor="middle" class="chart-value">total</text>`;
-
-    // Legend
-    const legendX = 145;
-    data.forEach((d, i) => {
-        if (d.value === 0) return;
-        const ly = 16 + i * 18;
-        svg += `<rect x="${legendX}" y="${ly - 8}" width="10" height="10" rx="2" fill="${colors[i % colors.length]}"/>`;
-        svg += `<text x="${legendX + 16}" y="${ly}" class="donut-legend">${d.label}</text>`;
-        svg += `<text x="${legendX + 16}" y="${ly + 12}" class="donut-legend-value">${d.value} (${Math.round(d.value/total*100)}%)</text>`;
-    });
-
-    svg += '</svg>';
-    container.innerHTML = svg;
-}
-
-function renderSeverityDonut() {
-    const counts = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-    allAlerts.forEach(a => { if (counts.hasOwnProperty(a.severity)) counts[a.severity]++; });
-    renderDonut('chart-severity', [
-        { label: 'Critical', value: counts.critical },
-        { label: 'High', value: counts.high },
-        { label: 'Medium', value: counts.medium },
-        { label: 'Low', value: counts.low },
-        { label: 'Info', value: counts.info },
-    ], ['#f44336', '#ff9800', '#ffc107', '#4caf50', '#2196f3']);
-}
-
-function renderTriageStatusDonut() {
-    const counts = { open: 0, acknowledged: 0, closed: 0 };
-    allAlerts.forEach(a => {
-        const triage = triageCache[a.id];
-        const status = triage?.status || 'open';
-        if (counts.hasOwnProperty(status)) counts[status]++;
-    });
-    renderDonut('chart-triage-status', [
-        { label: 'Open', value: counts.open },
-        { label: 'Acknowledged', value: counts.acknowledged },
-        { label: 'Closed', value: counts.closed },
-    ], ['#1976d2', '#ff9800', '#78909c']);
-}
 
 // --- Geo points extraction (cached) ---
 function extractGeoPoints() {
@@ -4907,68 +4748,8 @@ function renderAdKeyMetrics() {
 // =========================================================================
 // Top Source Countries
 // =========================================================================
-function renderTopCountries() {
-    const container = document.getElementById('chart-top-countries');
-    if (!container) return;
-
-    const countryCounts = {};
-    allAlerts.forEach(a => {
-        if (!a.raw_data) return;
-        const geo = a.raw_data.source?.geo;
-        if (!geo) return;
-        const country = geo.country_name || geo.country_iso_code;
-        if (country) countryCounts[country] = (countryCounts[country] || 0) + 1;
-    });
-
-    const entries = Object.entries(countryCounts).sort((a, b) => b[1] - a[1]).slice(0, 7);
-    if (entries.length === 0) {
-        container.innerHTML = '<div class="empty-state">No country data</div>';
-        return;
-    }
-
-    const maxVal = entries[0][1];
-    container.innerHTML = entries.map(([name, count], i) => {
-        const pct = (count / maxVal * 100).toFixed(0);
-        const hue = 200 + i * 25;
-        return `
-            <div class="hbar-row">
-                <span class="hbar-label" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
-                <span class="hbar-track"><span class="hbar-fill" data-ion-style="width:${pct}%; background:hsl(${hue},65%,55%)"></span></span>
-                <span class="hbar-count">${count}</span>
-            </div>
-        `;
-    }).join('');
-}
 
 // --- Horizontal bar chart ---
-function renderHBarChart(containerId, alerts, field, color) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-
-    const counts = {};
-    alerts.forEach(a => {
-        const val = a[field];
-        if (val) counts[val] = (counts[val] || 0) + 1;
-    });
-
-    const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 7);
-    if (entries.length === 0) {
-        container.innerHTML = '<div class="empty-state">No data</div>';
-        return;
-    }
-
-    const maxVal = entries[0][1];
-    container.innerHTML = entries.map(([name, count]) => {
-        const pct = (count / maxVal * 100).toFixed(0);
-        return `
-            <div class="hbar-row">
-                <span class="hbar-label" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
-                <span class="hbar-track"><span class="hbar-fill" data-ion-style="width:${pct}%; background:${color}"></span></span>
-                <span class="hbar-count">${count}</span>
-            </div>
-        `;
-    }).join('');
-}
 
 // =========================================================================
 // Alert Detail Modal
