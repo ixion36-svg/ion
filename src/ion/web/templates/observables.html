@@ -37,6 +37,7 @@
     <button data-click-action="dismissWatchlistBanner" class="text-slate-400 hover:text-white transition"><svg class="w-4 h-4"><use href="#i-x"/></svg></button>
   </div>
 
+  <div id="observables-stats-read" hidden></div>
   <!-- Stats -->
   <div id="stats-banner" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-8 rise d-2">
     <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
@@ -455,71 +456,24 @@ function showToast(message, type = 'info') {
 
 // Load Stats
 async function loadStats() {
-    try {
-        const response = await fetch('/api/observables/stats');
-        if (!response.ok) throw new Error('Failed to load stats');
-        const data = await response.json();
-
-        document.getElementById('stat-total').textContent = data.total.toLocaleString();
-
-        const ipCount = (data.by_type.ipv4 || 0) + (data.by_type.ipv6 || 0);
-        document.getElementById('stat-ips').textContent = ipCount.toLocaleString();
-
-        const domainCount = (data.by_type.domain || 0) + (data.by_type.hostname || 0);
-        document.getElementById('stat-domains').textContent = domainCount.toLocaleString();
-
-        document.getElementById('stat-enriched').textContent = data.enriched.toLocaleString();
-
-        const criticalHigh = (data.by_threat_level.critical || 0) + (data.by_threat_level.high || 0);
-        document.getElementById('stat-critical').textContent = criticalHigh.toLocaleString();
-
-        // Load watched count
-        loadWatchedCount();
-        // Check for unread watchlist alerts
-        checkWatchlistAlerts();
-    } catch (error) {
-        console.error('Error loading stats:', error);
-    }
+    for (const key of ['total', 'ips', 'domains', 'enriched', 'critical']) document.getElementById('stat-' + key).textContent = 'Unknown';
+    await ionLoadFragment('/ui/observables/stats', 'observables-stats-read', 'Loading statistics...');
+    loadWatchedCount(); checkWatchlistAlerts();
 }
 
 // Load watched count
 async function loadWatchedCount() {
-    try {
-        const response = await fetch('/api/observables/watchlist?limit=1');
-        if (response.ok) {
-            const data = await response.json();
-            document.getElementById('stat-watched').textContent = data.total.toLocaleString();
-            const badge = document.getElementById('watchlist-count');
-            if (data.total > 0) {
-                badge.textContent = data.total;
-                badge.style.display = 'inline';
-            } else {
-                badge.style.display = 'none';
-            }
-        }
-    } catch (error) {
-        console.error('Error loading watched count:', error);
-    }
+    document.getElementById('watchlist-count').textContent = '?';
+    await ionLoadFragment('/ui/observables/watched-count', 'stat-watched', 'Loading...');
+    document.getElementById('watchlist-count').classList.remove('hidden');
 }
 
 // Check for unread watchlist alerts
 async function checkWatchlistAlerts() {
-    try {
-        const response = await fetch('/api/observables/watchlist/alerts?is_read=false&limit=1');
-        if (response.ok) {
-            const data = await response.json();
-            const banner = document.getElementById('watchlist-banner');
-            if (data.total > 0) {
-                document.getElementById('watchlist-alert-text').textContent =
-                    `You have ${data.total} unread watchlist alert${data.total > 1 ? 's' : ''}`;
-                banner.style.display = 'flex';
-            } else {
-                banner.style.display = 'none';
-            }
-        }
-    } catch (error) {
-        console.error('Error checking watchlist alerts:', error);
-    }
+    const banner = document.getElementById('watchlist-banner');
+    banner.classList.remove('hidden');
+    await ionLoadFragment('/ui/observables/watchlist/banner', 'watchlist-banner', 'Checking alerts...');
+    banner.classList.toggle('hidden', !banner.textContent.trim());
 }
 
 function dismissWatchlistBanner() {

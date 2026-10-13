@@ -128,10 +128,33 @@ def observable_list(
 
 
 
+@router.get("/observables/stats", response_class=HTMLResponse)
+def stats(request: Request, session: Session = Depends(get_db_session), user=Depends(PERMISSION)):
+    payload = read(api.get_observable_stats, session=session, user=user)
+    data = payload if isinstance(payload, dict) else {}
+    figures = {key: number(data.get(key)) for key in ("total", "enriched")}
+    for name, group, keys in [("ips", "by_type", ("ipv4", "ipv6")), ("domains", "by_type", ("domain", "hostname")), ("critical", "by_threat_level", ("critical", "high"))]:
+        values = data.get(group)
+        counts = [number(values.get(key)) for key in keys] if isinstance(values, dict) else [None]
+        figures[name] = sum(counts) if all(v is not None for v in counts) else None
+    view: StatsPanel = {"state": "data" if isinstance(payload, dict) else "failed", "figures": figures}
+    return render_view(request, "_fragments/observables_stats.html", view)
 
 
+@router.get("/observables/watched-count", response_class=HTMLResponse)
+def watched_count(request: Request, session: Session = Depends(get_db_session), user=Depends(PERMISSION)):
+    payload = read(api.get_watchlist, limit=1, offset=0, session=session, user=user)
+    total = number(payload.get("total")) if isinstance(payload, dict) else None
+    view: CountPanel = {"state": "failed" if total is None else "data" if total else "empty", "total": total}
+    return render_view(request, "_fragments/observables_watched_count.html", view)
 
 
+@router.get("/observables/watchlist/banner", response_class=HTMLResponse)
+def watchlist_banner(request: Request, session: Session = Depends(get_db_session), user=Depends(PERMISSION)):
+    payload = read(api.get_watchlist_alerts, is_read=False, limit=1, offset=0, session=session, user=user)
+    total = number(payload.get("total")) if isinstance(payload, dict) else None
+    view: CountPanel = {"state": "failed" if total is None else "data" if total else "empty", "total": total}
+    return render_view(request, "_fragments/observables_watchlist_banner.html", view)
 
 
 @router.get("/observables/{observable_id}/detail", response_class=HTMLResponse)

@@ -40,6 +40,14 @@ def test_collection_outcomes(client, monkeypatch, route, handler, key, payload, 
     assert 'markAlertRead' not in response.text
     assert 'enrichObservable' not in response.text
 
+@pytest.mark.parametrize('field', ['total', 'enriched'])
+@pytest.mark.parametrize('value', [None, 0, 8])
+def test_stats_unknown_and_zero(client, monkeypatch, field, value):
+    monkeypatch.setattr(api, 'get_observable_stats', lambda **kw: {field: value})
+    response = client.get('/ui/observables/stats', headers={'Accept': 'application/json'})
+    assert response.status_code == 200
+    assert response.json()['figures'][field] == value
+
 @pytest.mark.parametrize('key', ['alerts', 'cases', 'co_occurring'])
 @pytest.mark.parametrize('present', [False, True])
 def test_detail_secondary_keys(client, monkeypatch, key, present):
@@ -61,6 +69,25 @@ def test_failure_is_not_empty(client, monkeypatch, name, method, key):
     response = client.get('/ui/observables/' + name)
     assert response.status_code == 200 and 'Failed to load' in response.text
     assert 'private service failure' not in response.text
+
+@pytest.mark.parametrize('endpoint,method', [('watched-count', 'get_watchlist'), ('watchlist/banner', 'get_watchlist_alerts')])
+@pytest.mark.parametrize('payload,state,total', [(None, 'failed', None), ({}, 'failed', None), ({'total': 0}, 'empty', 0), ({'total': 3}, 'data', 3)])
+def test_count_outcomes(client, monkeypatch, endpoint, method, payload, state, total):
+    monkeypatch.setattr(api, method, lambda **kw: payload)
+    response = client.get('/ui/observables/' + endpoint, headers={'Accept': 'application/json'})
+    assert response.status_code == 200
+    assert response.json() == {'state': state, 'total': total}
+
+@pytest.mark.parametrize('name,group,keys', [('ips', 'by_type', ('ipv4', 'ipv6')), ('domains', 'by_type', ('domain', 'hostname')), ('critical', 'by_threat_level', ('critical', 'high'))])
+@pytest.mark.parametrize('missing', [True, False])
+def test_stats_missing_bucket_is_unknown(client, monkeypatch, name, group, keys, missing):
+    payload = {group: {key: 0 for key in keys}}
+    if missing:
+        del payload[group][keys[0]]
+    monkeypatch.setattr(api, 'get_observable_stats', lambda **kw: payload)
+    result = client.get('/ui/observables/stats', headers={'Accept': 'application/json'})
+    assert result.status_code == 200
+    assert result.json()['figures'][name] == (None if missing else 0)
 
 @pytest.mark.parametrize('permission,action', [('observable:update', 'toggleWatchlist'), ('observable:enrich', 'enrichObservable')])
 def test_list_mutation_controls_follow_exact_permission(client, monkeypatch, permission, action):
@@ -100,7 +127,7 @@ def test_detail_enrichment_score_and_escaped_tags(client, monkeypatch, score):
     assert json.loads(soup.select_one('[data-click-action="removeTag"]')['data-args']) == [7, 'a"b\'c']
     assert ('Score: Unknown' if score is None else 'Score: ' + str(score) + '/100') in response.text
 
-@pytest.mark.parametrize('endpoint', ['list', '7/detail'])
+@pytest.mark.parametrize('endpoint', ['list', 'stats', 'watched-count', 'watchlist/banner', '7/detail'])
 def test_core_requires_observable_read(client, endpoint):
     from fastapi import HTTPException
     from ion.web.ui import _observables_core as ui
@@ -162,3 +189,17 @@ def test_real_list_api_with_stubbed_service(client, monkeypatch, state):
     assert response.status_code == 200 and response.json()['state'] == state
     if state == 'data':
         assert response.json()['items'][0]['sighting_count'] == 0
+
+def test_real_stats_api_with_stubbed_service(client, monkeypatch):
+
+    class Service:
+
+        def __init__(self, session):
+            pass
+
+        def get_stats(self):
+            return {'total': 0, 'enriched': 0, 'whitelisted': 0, 'by_type': {'ipv4': 0, 'ipv6': 0, 'domain': 0, 'hostname': 0}, 'by_threat_level': {'critical': 0, 'high': 0}}
+    monkeypatch.setattr(api, 'ObservableService', Service)
+    response = client.get('/ui/observables/stats', headers={'Accept': 'application/json'})
+    assert response.status_code == 200
+    assert response.json()['figures'] == {'total': 0, 'enriched': 0, 'ips': 0, 'domains': 0, 'critical': 0}
