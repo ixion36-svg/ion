@@ -92,3 +92,75 @@ def test_the_option_label_is_text_not_escaped_markup():
     textContent does by definition."""
     body = fn("dscLoadCaseOptions", code_only=True)
     assert "escapeHtml" not in body
+
+
+# ---------------------------------------------------------------------------
+# The provenance block and the AI query modal
+# ---------------------------------------------------------------------------
+
+
+def test_the_provenance_block_is_text_not_escaped_markup():
+    """It is a plain-text block and its container carries
+    whitespace-pre-wrap, so the page was escaping each half by hand and
+    then writing the result as innerHTML: escaping for a string that was
+    never going to be parsed as markup."""
+    body = fn("dscRenderProvenance", code_only=True)
+    assert not re.search(r"\.innerHTML\s*=", body)
+    assert "textContent" in body
+    assert "escapeHtml" not in body
+
+
+def test_the_provenance_container_still_renders_newlines():
+    """textContent only works here because the container preserves them."""
+    page_text = page()
+    container = re.search(r'id="pin-query-provenance"[^>]*', page_text)
+    assert container, "the container"
+    assert "whitespace-pre-wrap" in container.group(0)
+
+
+def test_the_ai_query_modal_is_in_the_page_not_built_from_a_string():
+    body = fn("openNlQueryModal", code_only=True)
+    assert not re.search(r"\.innerHTML\s*=", body)
+    assert "createElement" not in body
+    assert 'id="nl-query-modal"' in page(), "it lives in the markup"
+
+
+def test_the_modal_markup_is_inside_the_content_block():
+    """Outside a block it would not render at all, and the first
+    `{% endblock %}` on this page closes the title."""
+    body = page()
+    modal = body.index('id="nl-query-modal"')
+    content = body.index("{% block content %}")
+    scripts = body.index("{% block scripts %}")
+    assert content < modal < scripts
+
+
+def test_the_modal_colours_are_in_the_stylesheet():
+    """They were text-[#f87171], bg-[#1e293b] and text-[#e2e8f0] inside a
+    JavaScript template string."""
+    sheet = (ROOT / "src/ion/web/static/css/discover-page.css").read_text(
+        encoding="utf-8")
+    assert ".dsc-nl-error" in sheet
+    assert ".dsc-nl-output" in sheet
+    body = page()
+    for gone in ("text-[#f87171]", "bg-[#1e293b]", "text-[#e2e8f0]"):
+        assert gone not in body, gone
+
+
+def test_the_modal_is_shown_and_hidden_by_one_mechanism():
+    """Its inner elements already carry `hidden` in the markup, so
+    style.display was a second opinion on the same question."""
+    body = page()
+    for name in ("openNlQueryModal", "closeNlQueryModal"):
+        assert "style.display" not in fn(name), name
+    assert "classList.remove('hidden')" in fn("openNlQueryModal")
+    assert "classList.add('hidden')" in fn("closeNlQueryModal")
+
+
+def test_the_enter_listener_is_bound_at_load_not_at_first_open():
+    """It was attached inside the builder, so it existed only after the
+    first open and only on that one element."""
+    body = page()
+    assert "e.target.id === 'nl-question'" in body
+    opener = fn("openNlQueryModal")
+    assert "addEventListener" not in opener

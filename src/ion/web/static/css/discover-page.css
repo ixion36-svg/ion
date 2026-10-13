@@ -19,3 +19,16 @@
     color: var(--text-muted);
     opacity: 0.5;
 }
+
+/* The AI query builder modal. These were arbitrary Tailwind values inside
+   a JavaScript template string, so the page owned them: text-[#f87171],
+   bg-[#1e293b] and text-[#e2e8f0]. */
+.dsc-nl-error {
+    color: var(--danger, #f87171);
+    font-size: 13px;
+}
+
+.dsc-nl-output {
+    background: var(--bg-tertiary, #1e293b);
+    color: var(--text-primary, #e2e8f0);
+}
