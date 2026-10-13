@@ -328,16 +328,24 @@ def test_the_absent_marker_has_a_rule_and_nothing_outranks_it():
         "the page's in-body block loads after head_css and would win")
 
 
-def test_the_sheet_does_not_restate_a_rule_the_page_already_wins():
-    """analytics.html defines .severity-unknown in its own in-body block,
-    with `.severity-badge.severity-unknown` among the selectors. That block
-    loads after head_css and two classes beat one, so a rule in the page
-    stylesheet would be present and never win. Caught by measuring before
-    adding one."""
+def test_the_severity_unknown_rule_is_declared_exactly_once():
+    """This used to assert the rule was absent from analytics-page.css.
+
+    Its premise was that analytics.html carried an in-body <style> block,
+    which loaded after head_css, so a copy in the page sheet would be
+    present and never win. That block has since moved into
+    analytics-page.css whole, so there is nothing left to lose to and the
+    rule legitimately lives there now.
+
+    What still matters is that it is declared once. Two copies in one
+    sheet is the duplicate the original was really guarding against, and
+    the later one would quietly win.
+    """
     sheet = (ROOT / "src/ion/web/static/css/analytics-page.css").read_text(
         encoding="utf-8")
     rules = re.sub(r"/\*.*?\*/", "", sheet, flags=re.S)
-    assert ".severity-unknown" not in rules
-    page = PAGE.read_text(encoding="utf-8")
-    assert ".severity-badge.severity-unknown" in page, (
-        "the page's own rule, which the fragment relies on")
+    assert ".severity-unknown" in rules, (
+        "the rule the fragment relies on")
+    hits = re.findall(r"\.severity-badge\.severity-unknown", rules)
+    assert len(hits) == 1, hits
+    assert "<style" not in PAGE.read_text(encoding="utf-8")

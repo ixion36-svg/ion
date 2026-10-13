@@ -103,7 +103,18 @@ def test_the_job_types_come_from_the_enum_not_a_literal():
     for member in ("ENTITY_RISK_SCORE", "RULE_NOISE", "REPEAT_OFFENDERS",
                    "STALE_INVESTIGATIONS"):
         assert "AnalyticsJobType." + member + ".value" in module, member
-    assert '"entity_risk"' not in module
+    # The bare-string ban this used to carry has gone. OVERVIEW_TABS maps
+    # ENTITY_RISK_SCORE.value to the *tab* named "entity_risk", which is a
+    # different thing from the job type and the only job type the page
+    # renames, so the literal has a legitimate second meaning now. What
+    # must not happen is it standing in for a job type, which is what this
+    # checks instead.
+    assert "OVERVIEW_TABS" in module
+    for line in module.splitlines():
+        if '"entity_risk"' not in line:
+            continue
+        assert "job_type ==" not in line, line
+        assert "_one_job(" not in line, line
 
 
 # ---------------------------------------------------------------------------
