@@ -1911,7 +1911,11 @@
   "_ion-s-56b5cc5749": {
     "css": "flex:1;background:var(--bg-secondary);border:1px solid var(--ion-border);color:var(--text-primary);padding:8px 12px;border-radius:var(--radius);font:inherit;font-size:.85rem;",
     "kind": "manual",
+    "note": "The assessment title input, #mat-title. The control survived the conversion on daisyUI's .input, which is a different chrome. The eight declarations are body[data-page=\"maturity\"] .mat-title in static/css/maturity-page.css. The notes inputs on the same form were never this rule.",
     "partial_do_not_apply": "flex-1 bg-[var(--bg-secondary)] border border-[var(--ion-border)] text-[var(--text-primary)] py-2 px-3 rounded-[var(--radius)] text-[.85rem]",
+    "replaced_by": [
+      "body[data-page=\"maturity\"] .mat-title"
+    ],
     "tailwind": "",
     "unmapped": [
       "font:inherit"
@@ -3179,6 +3183,10 @@
   "_ion-s-92fb99917f": {
     "css": "font-weight:900;",
     "kind": "manual",
+    "note": "Event ID in the data-flow source mock-up. The hashed class lost to body[data-page=data_flow] .df-winlog-row .val {font-weight:600} on specificity, so 900 never painted. The winning rule is body[data-page=\"data_flow\"] .df-winlog-row .df-event-id in static/css/data-flow-page.css, which loads from head_css after ion.css. The other .val cells stay at 600.",
+    "replaced_by": [
+      "body[data-page=\"data_flow\"] .df-winlog-row .df-event-id"
+    ],
     "tailwind": "",
     "unmapped": [
       "font-weight:900"
@@ -3366,6 +3374,15 @@
     "kind": "arbitrary",
     "tailwind": "text-[var(--text-secondary)] text-[0.8rem]",
     "unmapped": []
+  },
+  "_ion-s-9ce2eb0cde": {
+    "css": "height:${pct}%;",
+    "kind": "manual",
+    "note": "Dropped from ion-migrated-styles.css in c21d790c because the body is the literal JavaScript from an inline style, which no browser applies. The bar height survived as data-ion-style=\"height:{{ row.pct }}%\" on .ae-activity-bar in _fragments/executive_report_team.html. There is no static selector to claim: a stylesheet rule containing ${pct} would be the original defect.",
+    "tailwind": "",
+    "unmapped": [
+      "JS-concatenated value \u2014 not real CSS"
+    ]
   },
   "_ion-s-9d185facbd": {
     "css": "font-size:.78rem;color:var(--text-secondary);margin-bottom:12px;",

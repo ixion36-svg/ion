@@ -106,7 +106,7 @@
   {% endfor %}
 
   <div class="flex flex-wrap justify-end items-center gap-2.5 mt-6">
-    <input class="input input-bordered flex-1 min-w-[16rem]" id="mat-title" type="text"
+    <input class="input input-bordered mat-title flex-1 min-w-[16rem]" id="mat-title" type="text"
            placeholder="Assessment title (optional)">
     {# Still a fetch rather than hx-post: POST /api/maturity/assessments takes
        the scores as nested JSON and is gated on alert:triage, a stricter
