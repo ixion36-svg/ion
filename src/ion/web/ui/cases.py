@@ -93,6 +93,7 @@ from ion.auth.dependencies import get_current_user, require_permission
 from ion.models.alert_triage import AlertCase, AlertCaseStatus
 from ion.models.user import User
 from ion.storage.database import get_db_session
+from ion.web.ui._cases_board import router as board_router
 from ion.web.ui._shared import (
     age_label,
     closure_label,
@@ -100,6 +101,8 @@ from ion.web.ui._shared import (
     parse_instant,
     plain,
     render_view,
+)
+from ion.web.ui._shared import (
     rows as _rows,
 )
 
@@ -1261,3 +1264,5 @@ def cases_observables_fragment(
 
     return render_view(request, OBSERVABLES_FRAGMENT,
                        observables_view(payload))
+
+router.include_router(board_router)

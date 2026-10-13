@@ -22,20 +22,25 @@ async function ionLoadFragment(url,targetId,loading='Loading...',options={}) {
     if(!target) return false;
     const token={};
     ionFragmentRequests.set(target,token);
+    target.toggleAttribute('data-ion-fragment-append',options.swap==='beforeend');
+    target.querySelectorAll('[data-ion-append-error]').forEach(node=>node.remove());
     target.setAttribute('hx-sync','this:replace');
-    ionMessage(target,loading,true);
+    if(options.swap !== 'beforeend')ionMessage(target,loading,true);
     let status=0;
     const outcome=event=>{if(event.detail.target===target)status=event.detail.xhr.status;};
     document.addEventListener('htmx:afterRequest',outcome);
     const failed=()=>{
-        if(ionFragmentRequests.get(target)!==token)return;
+        if(ionFragmentRequests.get(target)!==token || options.swap==='beforeend')return;
         if(target.tagName==='SELECT')ionMessage(target,status===403 ? 'Options withheld: permission required' : 'Options unavailable');
         else if(!target.querySelector('[data-error-message]'))ionMessage(target,options.failure||'Unable to load this information. Nothing has been measured.');
     };
     try {
-        await htmx.ajax(options.method||'GET',url,{source:target,target,swap:'innerHTML',values:options.values});
+        await htmx.ajax(options.method||'GET',url,{source:target,target,swap:options.swap||'innerHTML',values:options.values});
         if(status<200||status>=300){failed();return false;}
         return true;
     }catch(error){failed();return false;}
-    finally{document.removeEventListener('htmx:afterRequest',outcome);}
+    finally{
+        document.removeEventListener('htmx:afterRequest',outcome);
+        if(ionFragmentRequests.get(target)===token)target.removeAttribute('data-ion-fragment-append');
+    }
 }

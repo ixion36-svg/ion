@@ -56,9 +56,14 @@
     var slot = node.querySelector('[data-error-message]');
     if (slot) slot.textContent = messageFor(status);
 
-    // replaceChildren, so the spinner goes. Appending would leave the page
-    // spinning next to its own error message.
-    target.replaceChildren(node);
+    // Append failures keep the already loaded page; replacement failures
+    // remove the loading placeholder.
+    if (target.hasAttribute('data-ion-fragment-append')) {
+      node.setAttribute('data-ion-append-error', '');
+      target.append(node);
+    } else {
+      target.replaceChildren(node);
+    }
   }
 
   function handle(evt) {

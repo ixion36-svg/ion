@@ -20,6 +20,14 @@
 
 ## Executive Summary
 
+### Unreleased cases board UI conversion, 2026-10-13
+
+The new `GET /ui/cases/board` and `GET /ui/cases/assignees` read fragments
+require `case:read` for HTML and JSON views. Assignee options additionally require
+`alert:read` before querying their existing source. Escaped HTML and JSON action
+carriers retain CSP protections; mutation APIs retain their existing permissions.
+No credential, permission grant, external sink or dependency is added.
+
 ### Unreleased observables and forensics UI conversion, 2026-10-13
 
 Authenticated read fragments retain `observable:read` or `forensic:read`, matching

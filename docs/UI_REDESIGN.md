@@ -17,15 +17,15 @@ page cannot be forgotten. Status is measured, never set by hand.
 | styled | no inline `<style>` block at all | appearance comes from the compiled sheet, so it is themed, cached and swept once |
 | server | no `innerHTML` / `insertAdjacentHTML` | one partial renders a thing, so a restyle reaches every instance of it |
 
-**77 of 80 templates complete.**
+**74 of 80 templates complete.**
 
 | measure | remaining |
 |---|---|
 | templates | 80 |
-| total lines | 48,906 |
-| inline `<style>` lines | 2,163 |
-| runtime DOM writes | 50 |
-| literal light-on-dark colours | 2 |
+| total lines | 49,403 |
+| inline `<style>` lines | 2,769 |
+| runtime DOM writes | 63 |
+| literal light-on-dark colours | 4 |
 
 ## Shell and partials
 
@@ -33,12 +33,12 @@ Rendered by or into every page, so these move first or last, never mid-tranche.
 
 | template | lines | css | js | writes | light | styled | server | done |
 |---|--:|--:|--:|--:|:--:|:--:|:--:|:--:|
-| `base.html` | 449 | 0 | 116 | 0 | yes | yes | yes | **done** |
-| `login.html` | 203 | 0 | 117 | 0 | yes | yes | yes | **done** |
+| `base.html` | 599 | 333 | 116 | 0 | no | no | yes |  |
+| `login.html` | 223 | 20 | 117 | 0 | yes | no | yes |  |
 | `_icons.html` | 69 | 0 | 0 | 0 | yes | yes | yes | **done** |
 | `_nav_tabs.html` | 33 | 0 | 0 | 0 | yes | yes | yes | **done** |
 
-Subtotal: 4 templates, 754 lines, 0 inline css lines, 0 runtime writes, 0 light-mode literals.
+Subtotal: 4 templates, 924 lines, 353 inline css lines, 0 runtime writes, 2 light-mode literals.
 
 ## Tier A, no runtime DOM building
 
@@ -61,7 +61,6 @@ A restyle here is a markup edit and is fully visible in a screenshot.
 | `workforce_orbat.html` | 724 | 0 | 634 | 0 | yes | yes | yes | **done** |
 | `network_map.html` | 588 | 0 | 395 | 0 | yes | yes | yes | **done** |
 | `daily_standup.html` | 566 | 0 | 525 | 0 | yes | yes | yes | **done** |
-| `pcap.html` | 537 | 0 | 410 | 0 | yes | yes | yes | **done** |
 | `analytics.html` | 522 | 0 | 342 | 0 | yes | yes | yes | **done** |
 | `template_render.html` | 470 | 0 | 300 | 0 | yes | yes | yes | **done** |
 | `users.html` | 463 | 0 | 232 | 0 | yes | yes | yes | **done** |
@@ -90,7 +89,7 @@ A restyle here is a markup edit and is fully visible in a screenshot.
 | `bob_eval.html` | 208 | 0 | 50 | 0 | yes | yes | yes | **done** |
 | `investigation_queue.html` | 208 | 0 | 120 | 0 | yes | yes | yes | **done** |
 | `template_view.html` | 204 | 0 | 87 | 0 | yes | yes | yes | **done** |
-| `maturity.html` | 194 | 0 | 135 | 0 | yes | yes | yes | **done** |
+| `maturity.html` | 191 | 0 | 135 | 0 | yes | yes | yes | **done** |
 | `de_quirks.html` | 184 | 0 | 66 | 0 | yes | yes | yes | **done** |
 | `daily_work.html` | 178 | 0 | 131 | 0 | yes | yes | yes | **done** |
 | `de_bob.html` | 178 | 0 | 77 | 0 | yes | yes | yes | **done** |
@@ -113,14 +112,14 @@ A restyle here is a markup edit and is fully visible in a screenshot.
 | `entity_timeline.html` | 89 | 0 | 0 | 0 | yes | yes | yes | **done** |
 | `response_approvals.html` | 89 | 0 | 40 | 0 | yes | yes | yes | **done** |
 | `alert_arkime.html` | 81 | 0 | 15 | 0 | yes | yes | yes | **done** |
-| `data_flow.html` | 58 | 0 | 0 | 0 | yes | yes | yes | **done** |
 | `soc_roles.html` | 56 | 0 | 0 | 0 | yes | yes | yes | **done** |
+| `data_flow.html` | 55 | 0 | 0 | 0 | yes | yes | yes | **done** |
 | `compliance.html` | 54 | 0 | 0 | 0 | yes | yes | yes | **done** |
 | `soc_health.html` | 51 | 0 | 0 | 0 | yes | yes | yes | **done** |
 | `service_accounts.html` | 50 | 0 | 0 | 0 | yes | yes | yes | **done** |
 | `threat_intel_actor.html` | 44 | 0 | 0 | 0 | yes | yes | yes | **done** |
 
-Subtotal: 73 templates, 40,196 lines, 0 inline css lines, 0 runtime writes, 0 light-mode literals.
+Subtotal: 72 templates, 39,653 lines, 0 inline css lines, 0 runtime writes, 0 light-mode literals.
 
 ## Tier B, 1 to 10 runtime writes
 
@@ -139,9 +138,10 @@ Needs the server-rendered fragment work first; a markup-only restyle cannot reac
 
 | template | lines | css | js | writes | light | styled | server | done |
 |---|--:|--:|--:|--:|:--:|:--:|:--:|:--:|
-| `cases.html` | 5347 | 2163 | 3169 | 43 | no | no | no |  |
+| `cases.html` | 5087 | 2163 | 2906 | 37 | no | no | no |  |
+| `pcap.html` | 1130 | 253 | 757 | 19 | yes | no | no |  |
 
-Subtotal: 1 templates, 5,347 lines, 2,163 inline css lines, 43 runtime writes, 2 light-mode literals.
+Subtotal: 2 templates, 6,217 lines, 2,416 inline css lines, 56 runtime writes, 2 light-mode literals.
 
 ## Cleanup, so nothing is left behind
 

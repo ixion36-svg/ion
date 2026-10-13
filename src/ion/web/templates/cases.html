@@ -34,7 +34,7 @@
     <div class="attn-banner-header flex items-center justify-between">
       <span class="flex items-center gap-2 text-[13px] text-ion-amber font-medium">
         <svg class="w-4 h-4"><use href="#i-alert-triangle"/></svg>
-        <span id="attn-count">0</span> cases need attention
+        <span id="attn-count">—</span> attention reasons in displayed cases
       </span>
       <button data-click-action="dismissAttentionBanner" class="text-slate-400 hover:text-white transition" title="Dismiss">
         <svg class="w-4 h-4"><use href="#i-x"/></svg>
@@ -82,7 +82,7 @@
 <!-- Filters Bar -->
 <div class="flex flex-col sm:flex-row gap-3 mb-4">
     <input type="text" id="filter-search" class="flex-1 px-3 py-2 bg-base-200 border border-base-300 rounded text-[0.85rem] text-base-content placeholder:text-base-content/50 focus:outline-none focus:border-primary" placeholder="Search case number or title..." data-input-action="debouncedFilter">
-    <select id="filter-severity" class="min-w-[150px] px-3 py-2 bg-base-200 border border-base-300 rounded text-[0.85rem] text-base-content focus:outline-none focus:border-primary" data-change-action="filterCases">
+    <select id="filter-severity" class="min-w-[150px] px-3 py-2 bg-base-200 border border-base-300 rounded text-[0.85rem] text-base-content focus:outline-none focus:border-primary" data-change-action="reloadCaseBoard">
         <option value="">All Severities</option>
         <option value="critical">Critical</option>
         <option value="high">High</option>
@@ -92,20 +92,20 @@
     {# status filter. /api/cases already returns open, acknowledged
        AND closed — the board just had no way to narrow to one of them, so a
        closed case could only be found by scrolling past the live ones. #}
-    <select id="filter-status" class="min-w-[150px] px-3 py-2 bg-base-200 border border-base-300 rounded text-[0.85rem] text-base-content focus:outline-none focus:border-primary" data-change-action="filterCases">
+    <select id="filter-status" class="min-w-[150px] px-3 py-2 bg-base-200 border border-base-300 rounded text-[0.85rem] text-base-content focus:outline-none focus:border-primary" data-change-action="reloadCaseBoard">
         <option value="">All Statuses</option>
         <option value="open">Open</option>
         <option value="acknowledged">Acknowledged</option>
         <option value="closed">Closed</option>
     </select>
-    <select id="filter-assignee" class="min-w-[150px] px-3 py-2 bg-base-200 border border-base-300 rounded text-[0.85rem] text-base-content focus:outline-none focus:border-primary" data-change-action="filterCases">
+    <select id="filter-assignee" class="min-w-[150px] px-3 py-2 bg-base-200 border border-base-300 rounded text-[0.85rem] text-base-content focus:outline-none focus:border-primary" data-change-action="reloadCaseBoard">
         <option value="">All Assignees</option>
     </select>
 </div>
 
 <!-- Board toolbar (sort + page-size + showing count) -->
 <div class="flex flex-wrap items-center gap-3 mb-4">
-    <div class="text-xs text-base-content/60 tabular-nums">Showing <b id="cases-shown" class="text-base-content font-mono">0</b> of <b id="cases-total" class="text-base-content font-mono">0</b> cases</div>
+    <div class="text-xs text-base-content/60 tabular-nums">Showing <b id="cases-shown" class="text-base-content font-mono">—</b> of <b id="cases-total" class="text-base-content font-mono">—</b> cases</div>
     <span class="flex-1"></span>
     <label class="flex items-center gap-2 text-xs text-base-content/60">
         <span>Sort</span>
@@ -2167,19 +2167,21 @@
 .apg-mk-auth_presence     { fill: var(--success); }
 .apg-mk-shared_observable { fill: var(--sev-medium); }
 </style>
+<div id="case-assignees-read" hidden></div>
 
 </div><!-- /ion-tw inner -->
 </div><!-- /ion-tw -->
 {% endblock %}
 
 {% block scripts %}
+{% include "_fragments/ion_fragment_client.html" %}
+<script src="/static/js/ion-fragments.js?v={{ ion_version }}"></script>
 {% if initial_case_id %}<script nonce="{{ csp_nonce }}">window.__initialCaseId = {{ initial_case_id }};</script>{% endif %}
 <script nonce="{{ csp_nonce }}">
 // =============================================================================
 // Cases Board — State
 // =============================================================================
 let allCases = [];
-let filteredCases = [];
 let usersCache = [];
 let pendingClosure = null; // { caseId, targetStatus }
 let attentionDismissed = false;
@@ -2188,7 +2190,9 @@ let casesLoaded = false;
 // widget-grid board: sort + page-size + progressive load-more cap.
 let boardSort = 'newest';
 let boardPageSize = 24;
-let boardShown = 24;
+let boardShown = 0;
+let boardReadFailed = false;
+let boardRequestSequence = 0;
 
 const closureReasonLabels = {
     true_positive: 'TP',
@@ -2237,81 +2241,47 @@ function fmtDate(dateStr) {
     return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-const _filterDebounce = debounce(() => filterCases(), 200);
+const _filterDebounce = debounce(() => reloadCaseBoard(), 200);
 function debouncedFilter() { _filterDebounce(); }
 
 // =============================================================================
 // Data Loading
 // =============================================================================
-/* The case list is paginated server side since the 2026-10-08 review
-   (stage 5): the endpoint used to return every case with three
-   relationships eager-loaded on each, and this page then filtered and
-   sorted the whole set in the browser.
-
-   The board still wants the working set in memory -- its columns, stats
-   and attention panel all read it -- so this walks pages rather than
-   demanding one unbounded response, and stops at a ceiling. When it
-   stops, it says so, because a board silently showing a third of the
-   cases is worse than one that admits it. */
-const CASES_PAGE_SIZE = 500;   // the endpoint's own MAX_LIMIT
-const CASES_LOAD_CEILING = 2000;
-
-let casesTruncated = false;
-let casesTotal = 0;
+async function reloadCaseBoard() {
+    boardShown = 0;
+    allCases = [];
+    boardReadFailed = false;
+    document.getElementById('attn-list').replaceChildren();
+    document.getElementById('attn-banner').style.display = 'none';
+    return renderBoard();
+}
 
 async function loadAllCases() {
     const wasLoaded = casesLoaded;
-    const collected = [];
-    casesTruncated = false;
-    casesTotal = 0;
-
-    try {
-        let offset = 0;
-        for (;;) {
-            const resp = await fetch('/api/cases?limit=' + CASES_PAGE_SIZE
-                                     + '&offset=' + offset);
-            if (!resp.ok) throw new Error('Failed to load cases');
-            const data = await resp.json();
-            const page = data.cases || [];
-            collected.push(...page);
-            casesTotal = (data.total != null) ? data.total : collected.length;
-
-            if (!data.has_more || page.length === 0) break;
-            offset += page.length;
-            if (collected.length >= CASES_LOAD_CEILING) {
-                casesTruncated = true;
-                break;
+    const loaded = await reloadCaseBoard();
+    // Later closure/deep-link/navigation code still uses allCases. It is a
+    // cache of requested board rows plus the explicitly selected case,
+    // never a second client-side copy of the whole case table.
+    const selected = window.__initialCaseId || new URLSearchParams(location.search).get('selected');
+    if (selected && !allCases.some(c => String(c.id) === String(selected) || c.case_number === selected)) {
+        try {
+            const url = /^\d+$/.test(String(selected)) ? '/api/cases/' + selected
+                : '/api/cases?' + new URLSearchParams({q:selected,limit:24,offset:0});
+            const response = await fetch(url);
+            if (response.ok) {
+                const payload = await response.json();
+                const rows = Array.isArray(payload.cases) ? payload.cases : [payload];
+                const row = rows.find(c => String(c.id) === String(selected) || c.case_number === selected);
+                if (row) allCases.push(row);
             }
-        }
-        allCases = collected;
-        casesLoaded = true;
-    } catch (e) {
-        console.error('Error loading cases:', e);
-        allCases = [];
-        casesLoaded = true;
+        } catch (error) { console.log('Selected case could not be cached', error); }
     }
-    renderCaseLoadNotice();
-    filterCases();
-    // The stat tiles and the analytics panel are rendered by
-    // /ui/cases/summary, whose hx-trigger listens for this on the body.
-    // Only on a reload: the first load is the fragment's own `load`.
+    casesLoaded = true;
     if (wasLoaded) document.body.dispatchEvent(new CustomEvent('cases-changed'));
+    return loaded;
 }
 
-function renderCaseLoadNotice() {
-    const host = document.getElementById('cases-load-notice');
-    if (!host) return;
-    if (!casesTruncated) {
-        host.replaceChildren();
-        return;
-    }
-    host.innerHTML = '<div class="alert alert-warning"><div>'
-        + 'Showing the ' + allCases.length.toLocaleString() + ' most recent of '
-        + casesTotal.toLocaleString() + ' cases. Counts above are for all '
-        + 'cases; the board and filters below cover the loaded set only. '
-        + 'Narrow by status or severity to work on the rest.'
-        + '</div></div>';
-}
+
 
 /* Counts come from the server's aggregate queries, not from the loaded
    array. Deriving them client side only worked while the array was the
@@ -2328,257 +2298,78 @@ async function loadCaseFacets() {
 }
 
 async function loadUsers() {
-    // /api/users/assignable is the picker-friendly endpoint (gated by alert:read
-    // so every analyst can populate their dropdown). /api/users requires
-    // user:read which analyst roles don't have, so the dropdown was silently
-    // empty for them.
-    try {
-        const resp = await fetch('/api/users/assignable');
-        if (!resp.ok) {
-            console.log('assignable users endpoint returned', resp.status);
-            usersCache = [];
-            populateAssigneeDropdowns();
-            return;
-        }
-        const data = await resp.json();
-        usersCache = data.users || [];
-    } catch (e) {
-        console.log('Could not load assignable users', e);
-        usersCache = [];
-    }
-    populateAssigneeDropdowns();
+    return populateAssigneeDropdowns();
 }
 
-function populateAssigneeDropdowns() {
-    const filterSelect = document.getElementById('filter-assignee');
-    const createSelect = document.getElementById('new-case-assignee');
-
-    // Filter dropdown matches against the response field `assigned_to`
-    // (a username string returned by the case GET endpoint), so it stays
-    // username-keyed. Create/picker dropdowns are id-keyed because the
-    // POST/PATCH endpoints expect assigned_to_id: int.
-    const filterOptions = usersCache.map(u =>
-        '<option value="' + esc(u.username) + '">' + esc(u.display_name || u.username) + '</option>'
-    ).join('');
-    const idOptions = usersCache.map(u =>
-        '<option value="' + u.id + '">'
-        + esc(u.display_name || u.username)
-        + (u.has_elastic_profile ? '' : ' (no Kibana profile)')
-        + '</option>'
-    ).join('');
-
-    if (filterSelect) {
-        filterSelect.innerHTML = '<option value="">All Assignees</option>' + filterOptions;
-    }
-    if (createSelect) {
-        createSelect.innerHTML = '<option value="">Unassigned</option>' + idOptions;
+async function populateAssigneeDropdowns() {
+    const loaded = await ionLoadFragment('/ui/cases/assignees', 'case-assignees-read', 'Loading assignees...');
+    const carrier = document.querySelector('#case-assignees-read [data-case-users]');
+    usersCache = loaded && carrier ? JSON.parse(carrier.dataset.caseUsers) || [] : [];
+    if (!loaded) for (const id of ['filter-assignee','new-case-assignee']) {
+        const select = document.getElementById(id);
+        select.disabled = true;
+        ionMessage(select, 'Assignees unavailable');
     }
 }
 
 // =============================================================================
 // Filtering & Rendering
 // =============================================================================
-function filterCases() {
-    const search = (document.getElementById('filter-search').value || '').toLowerCase().trim();
-    const severity = document.getElementById('filter-severity').value;
-    const assignee = document.getElementById('filter-assignee').value;
-    const statusEl = document.getElementById('filter-status');
-    const status = statusEl ? statusEl.value : '';
 
-    filteredCases = allCases.filter(c => {
-        if (search) {
-            const matchNum = (c.case_number || '').toLowerCase().includes(search);
-            const matchTitle = (c.title || '').toLowerCase().includes(search);
-            if (!matchNum && !matchTitle) return false;
-        }
-        if (severity && c.severity !== severity) return false;
-        if (assignee && c.assigned_to !== assignee) return false;
-        // The API serialises the enum to its VALUE, so these are lowercase
-        // ('open'), not the uppercase NAME stored in Postgres ('OPEN').
-        if (status && c.status !== status) return false;
-        return true;
-    });
 
-    renderBoard();
-    computeAttentionAlerts();
-}
-
-// Sort the filtered cases per the board's current sort mode.
-function sortCases(list) {
-    const arr = list.slice();
-    if (boardSort === 'oldest') {
-        arr.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
-    } else if (boardSort === 'severity') {
-        arr.sort((a, b) =>
-            ((_sevRank[a.severity] ?? 9) - (_sevRank[b.severity] ?? 9))
-            || (new Date(b.created_at || 0) - new Date(a.created_at || 0)));
-    } else if (boardSort === 'alerts') {
-        arr.sort((a, b) => (b.alert_count || 0) - (a.alert_count || 0));
-    } else { // newest (default)
-        arr.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+// Read one server-filtered page; load more appends only on request.
+async function renderBoard(append = false) {
+    const sequence = ++boardRequestSequence;
+    const parameters = new URLSearchParams({mode:boardSort,limit:boardPageSize,offset:append ? boardShown : 0});
+    for (const [id,key] of [['filter-search','q'],['filter-severity','severity'],['filter-status','status'],['filter-assignee','assigned_to_id']]) {
+        const element = document.getElementById(id);
+        const value = element && !element.disabled ? element.value.trim() : "";
+        if (value) parameters.set(key,value);
     }
-    return arr;
-}
-
-// render the responsive grid of case widgets (replaces the 3-column
-// drag-drop Kanban). Progressive cap: render up to boardShown widgets; the
-// rest stay virtualized behind the load-more button so a queue of hundreds of
-// cases paints instantly.
-function renderBoard() {
-    const board = document.getElementById('cases-board');
-    if (!board) return;
-
-    const sorted = sortCases(filteredCases);
-    const total = sorted.length;
-    const shown = Math.min(boardShown, total);
-
-    const totalEl = document.getElementById('cases-total');
-    const shownEl = document.getElementById('cases-shown');
-    if (totalEl) totalEl.textContent = total;
-    if (shownEl) shownEl.textContent = shown;
-
-    if (!total) {
-        board.innerHTML = '<div class="cases-empty">No cases match the current filters.</div>';
+    document.querySelectorAll('#cases-loadmore button').forEach(button => button.disabled = true);
+    const loaded = await ionLoadFragment('/ui/cases/board' + '?' + parameters, 'cases-board', 'Loading cases...', {swap:append ? 'beforeend' : 'innerHTML'});
+    if (sequence !== boardRequestSequence) return false;
+    const carriers = document.querySelectorAll('#cases-board [data-case-page]');
+    const carrier = carriers[carriers.length-1];
+    const view = loaded && carrier ? JSON.parse(carrier.dataset.casePage) : null;
+    boardReadFailed = !view || view.state === 'failed';
+    if (!boardReadFailed) {
+        document.querySelectorAll('[data-case-board-failed], [data-attention-failed]').forEach(node => node.remove());
+        for (const row of view.cache) {
+            const index = allCases.findIndex(c => c.id === row.id);
+            if (index < 0) allCases.push(row); else allCases[index] = row;
+        }
+        boardShown = view.next_offset;
     } else {
-        board.innerHTML = sorted.slice(0, shown).map(renderCaseWidget).join('');
+        if (!append) boardShown = 0;
+        for (const id of ['cases-total','cases-shown']) document.getElementById(id).textContent = '—';
+        if (!append) document.getElementById('attn-list').textContent = 'Attention could not be read.';
+        const more = document.getElementById('cases-loadmore');
+        more.hidden = false;
+        const retry = more.querySelector('button');
+        retry.disabled = false;
+        retry.textContent = append ? 'Retry next page' : 'Retry cases';
+        more.querySelector('p').textContent = append ? 'The next page could not be read. Previously loaded cases are retained.' : 'The cases could not be read.';
     }
-
-    const lm = document.getElementById('cases-loadmore');
-    if (lm) {
-        if (shown < total) {
-            lm.hidden = false;
-            const btn = lm.querySelector('button');
-            if (btn) btn.textContent = 'Load ' + Math.min(boardPageSize, total - shown) + ' more cases';
-        } else {
-            lm.hidden = true;
-        }
-    }
+    computeAttentionAlerts();
+    return !boardReadFailed;
 }
 
 function changeSort() {
-    const sel = document.getElementById('cases-sort');
-    boardSort = sel ? sel.value : 'newest';
-    boardShown = boardPageSize;
-    renderBoard();
+    boardSort = document.getElementById('cases-sort').value;
+    reloadCaseBoard();
 }
 
 function changePageSize() {
-    const sel = document.getElementById('cases-pagesize');
-    boardPageSize = sel ? (parseInt(sel.value, 10) || 24) : 24;
-    boardShown = boardPageSize;
-    renderBoard();
+    boardPageSize = parseInt(document.getElementById('cases-pagesize').value, 10);
+    reloadCaseBoard();
 }
 
 function loadMoreCases() {
-    boardShown += boardPageSize;
-    renderBoard();
+    return boardShown ? renderBoard(true) : reloadCaseBoard();
 }
 
-function getAgeClass(dateStr) {
-    if (!dateStr) return 'age-normal';
-    const hrs = (Date.now() - new Date(dateStr).getTime()) / 3600000;
-    if (hrs < 24) return 'age-fresh';
-    if (hrs < 72) return 'age-normal';
-    if (hrs < 168) return 'age-stale';
-    return 'age-old';
-}
 
-// Two-letter monogram for an assignee avatar.
-function initials(name) {
-    if (!name) return '?';
-    const parts = String(name).split(/[ ._@-]/).filter(Boolean).slice(0, 2);
-    const s = parts.map(w => w[0]).join('').toUpperCase();
-    return s || '?';
-}
-
-// Array → length, number → itself, else 0. The list endpoint returns
-// affected_hosts/users as arrays; observables_count arrives pre-counted.
-function asCount(v) {
-    if (Array.isArray(v)) return v.length;
-    if (typeof v === 'number') return v;
-    return 0;
-}
-
-// a single case widget. Every region maps to a real AlertCase field
-// from /api/cases; blocks render only when their data is
-// present so the widget degrades gracefully on lighter rows.
-function renderCaseWidget(c) {
-    const sev = c.severity || 'medium';
-    const status = c.status || 'open';
-    const alertCount = c.alert_count || 0;
-    const hostCount = asCount(c.affected_hosts);
-    const userCount = asCount(c.affected_users);
-    const obsCount = c.observables_count || asCount(c.observables);
-    const ageClass = getAgeClass(c.created_at);
-    const stale = ageClass === 'age-stale' || ageClass === 'age-old';
-
-    // closure badge (closed cases)
-    let closure = '';
-    if (c.closure_reason) {
-        closure = '<span class="cw-closure reason-' + esc(c.closure_reason) + '">'
-            + esc(closureReasonLabels[c.closure_reason] || c.closure_reason) + '</span>';
-    }
-
-    // chips: alerts / hosts / users / observables
-    const shieldSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 3 7v6c0 5 4 8 9 9 5-1 9-4 9-9V7z"/></svg>';
-    const hostSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>';
-    const userSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>';
-    let chips = '<span class="cw-chip cw-chip-acc">' + shieldSvg + '<span class="cw-mono">' + alertCount + '</span> alerts</span>';
-    if (hostCount) chips += '<span class="cw-chip">' + hostSvg + hostCount + ' host' + (hostCount !== 1 ? 's' : '') + '</span>';
-    if (userCount) chips += '<span class="cw-chip">' + userSvg + userCount + ' user' + (userCount !== 1 ? 's' : '') + '</span>';
-    if (obsCount) chips += '<span class="cw-chip"><span class="cw-mono">' + obsCount + '</span> obs</span>';
-
-    // triggered rules (mapped in the mock to the tcode row)
-    const rules = Array.isArray(c.triggered_rules) ? c.triggered_rules.filter(Boolean).slice(0, 6) : [];
-    const mitre = rules.length
-        ? '<div class="cw-mitre">' + rules.map(r => '<span class="cw-tcode" title="' + esc(r) + '">' + esc(r) + '</span>').join('') + '</div>'
-        : '';
-
-    // integration sync chips
-    let sync = '';
-    if (c.kibana_case_id || c.kibana_url) sync += '<span class="cw-syncchip kibana"><span class="cw-sb"></span>Kibana</span>';
-    if (c.dfir_iris_case_id) sync += '<span class="cw-syncchip iris"><span class="cw-sb"></span>DFIR-IRIS</span>';
-    const syncblk = sync ? '<div class="cw-sync">' + sync + '</div>' : '';
-
-    // per-widget status control — reuses panelUpdateField (routes 'closed' to
-    // the closure modal, other statuses PATCH directly), the SAME path the
-    // Kanban drop fired. data-stop-propagation keeps the <select> click from
-    // bubbling up to the card's openCaseDetail action.
-    const statusCtl = '<select class="cw-status-select" title="Change status" data-stop-propagation '
-        + 'data-change-action="panelUpdateField" data-args=\'[' + c.id + ',"status","$value"]\'>'
-        + ['open', 'acknowledged', 'closed'].map(s =>
-            '<option value="' + s + '"' + (status === s ? ' selected' : '') + '>' + statusLabels[s] + '</option>').join('')
-        + '</select>';
-
-    const desc = c.description || c.evidence_summary || '';
-
-    return '<article class="cw sev-' + esc(sev) + '" tabindex="0" role="button" '
-        + 'data-click-action="openCaseDetail" data-click-args=\'[' + c.id + ']\' '
-        + 'data-case-id="' + c.id + '" aria-label="Open case ' + esc(c.case_number || '') + '">'
-        + '<span class="cw-rail sev-' + esc(sev) + '"></span>'
-        + '<div class="cw-body">'
-        +   '<div class="cw-top">'
-        +     '<div class="cw-idwrap">'
-        +       '<div class="cw-num">' + esc(c.case_number || '') + '</div>'
-        +       '<h3 class="cw-title">' + esc(c.title || 'Untitled case') + '</h3>'
-        +     '</div>'
-        +     '<span class="cw-pill status-' + esc(status) + '"><span class="cw-pd"></span>' + (statusLabels[status] || esc(status)) + '</span>'
-        +   '</div>'
-        +   (desc ? '<div class="cw-desc">' + esc(desc) + '</div>' : '')
-        +   '<div class="cw-meta">'
-        +     '<span class="cw-sevtag sev-' + esc(sev) + '">' + esc(sev) + '</span>'
-        +     closure + chips
-        +   '</div>'
-        +   mitre + syncblk
-        + '</div>'
-        + '<div class="cw-foot">'
-        +   '<div class="cw-who"><span class="cw-av">' + esc(initials(c.assigned_to)) + '</span>'
-        +     (c.assigned_to ? '<span>' + esc(c.assigned_to) + '</span>' : '<span class="cw-unassigned">Unassigned</span>') + '</div>'
-        +   '<div class="cw-foot-right">' + statusCtl
-        +     '<span class="cw-age' + (stale ? ' stale' : '') + '">' + ageLabel(c.created_at) + '</span></div>'
-        + '</div>'
-        + '</article>';
-}
 
 // =============================================================================
 // Case Status Updates
@@ -4849,63 +4640,12 @@ async function submitCreateCase() {
 // =============================================================================
 function computeAttentionAlerts() {
     const banner = document.getElementById('attn-banner');
-    if (!banner || attentionDismissed) return;
-    // The banner force-shows itself with style.display='flex', which would
-    // resurrect it over the hidden list chrome on /cases/{id}.
-    if (document.getElementById('case-panel').classList.contains('page-mode')) return;
-
-    const now = Date.now();
-    const alerts = [];
-
-    allCases.forEach(c => {
-        if (c.status === 'closed') return;
-
-        const updatedMs = c.updated_at ? new Date(c.updated_at).getTime() : 0;
-        const createdMs = c.created_at ? new Date(c.created_at).getTime() : 0;
-        const ageSinceUpdate = now - updatedMs;
-        const ageSinceCreate = now - createdMs;
-
-        if (updatedMs && ageSinceUpdate > 24 * 3600000) {
-            alerts.push({ type: 'stale', label: 'Stale', case: c });
-        }
-        if (!c.assigned_to && (c.status === 'open' || c.status === 'acknowledged')) {
-            alerts.push({ type: 'unassigned', label: 'Unassigned', case: c });
-        }
-        if ((c.severity === 'critical' || c.severity === 'high') && c.status === 'open') {
-            alerts.push({ type: 'not-picked-up', label: 'Not Picked Up', case: c });
-        }
-        if (createdMs && ageSinceCreate > 7 * 24 * 3600000 && (c.status === 'open' || c.status === 'acknowledged')) {
-            alerts.push({ type: 'aged', label: 'Aged >7d', case: c });
-        }
-    });
-
-    if (!alerts.length) {
-        banner.style.display = 'none';
-        return;
-    }
-
-    const seen = new Set();
-    const unique = alerts.filter(a => {
-        const key = a.case.id + '-' + a.type;
-        if (seen.has(key)) return false;
-        seen.add(key);
-        return true;
-    });
-
-    // Explicit 'flex' (not '') — #attn-banner carries the migrated
-    // _ion-s-c8be1ccba6 (display:none) class; clearing the inline style let the
-    // class re-hide it, so the attention banner never appeared. Banner is flex.
-    banner.style.display = 'flex';
-    document.getElementById('attn-count').textContent = unique.length;
-
-    const list = document.getElementById('attn-list');
-    list.innerHTML = unique.map(a =>
-        '<div class="attn-item" data-click-action="openCaseDetail" data-args=\'[' + a.case.id + ']\'>'
-        + '<span class="attn-reason attn-reason-' + a.type + '">' + esc(a.label) + '</span>'
-        + '<span class="attn-case-num">' + esc(a.case.case_number) + '</span>'
-        + '<span class="attn-case-title">' + esc(a.case.title) + '</span>'
-        + '</div>'
-    ).join('');
+    if (!banner || attentionDismissed || document.getElementById('case-panel').classList.contains('page-mode')) return;
+    // Reasons are rendered by the server for each requested page. Count the
+    // rendered reasons rather than reclassifying case data in the browser.
+    const count = document.querySelectorAll('#attn-list .attn-item').length;
+    document.getElementById('attn-count').textContent = boardReadFailed ? '—' : count;
+    banner.style.display = boardReadFailed || count ? 'flex' : 'none';
 }
 
 function dismissAttentionBanner() {
