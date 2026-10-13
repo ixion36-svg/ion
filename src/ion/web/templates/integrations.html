@@ -547,221 +547,23 @@ function refreshMetrics() {
 }
 
 async function loadServerMetrics() {
-    const container = document.querySelector('#server-metrics .metrics-content');
-
-    try {
-        const data = await ionFetchJson('/api/integrations/metrics/server', 'server metrics');
-
-        if (data.error) {
-            container.innerHTML = `<p class="error">${data.error}</p>`;
-            return;
-        }
-
-        const cpuClass = data.cpu.percent > 80 ? 'error' : data.cpu.percent > 60 ? 'warning' : 'good';
-        const memClass = data.memory.used_percent > 80 ? 'error' : data.memory.used_percent > 60 ? 'warning' : 'good';
-        const diskClass = data.disk.used_percent > 80 ? 'error' : data.disk.used_percent > 60 ? 'warning' : 'good';
-
-        container.innerHTML = `
-            <div class="metric-row">
-                <span class="metric-label">CPU</span>
-                <span class="metric-value ${cpuClass}">${data.cpu.percent.toFixed(1)}%</span>
-            </div>
-            <div class="metric-bar"><div class="metric-bar-fill ${cpuClass}" data-ion-style="width: ${data.cpu.percent}%"></div></div>
-
-            <div class="metric-row">
-                <span class="metric-label">Memory</span>
-                <span class="metric-value ${memClass}">${data.memory.used_percent.toFixed(1)}%</span>
-            </div>
-            <div class="metric-bar"><div class="metric-bar-fill ${memClass}" data-ion-style="width: ${data.memory.used_percent}%"></div></div>
-
-            <div class="metric-row">
-                <span class="metric-label">Disk</span>
-                <span class="metric-value ${diskClass}">${data.disk.used_percent.toFixed(1)}%</span>
-            </div>
-            <div class="metric-bar"><div class="metric-bar-fill ${diskClass}" data-ion-style="width: ${data.disk.used_percent}%"></div></div>
-
-            <div class="metric-row">
-                <span class="metric-label">Process</span>
-                <span class="metric-value">${data.process.memory_mb} MB / ${data.process.threads} threads</span>
-            </div>
-        `;
-    } catch (error) {
-        container.innerHTML = `<p class="error">Error: ${escapeHtml(error.message)}</p>`;
-    }
+    const loaded = await ionLoadFragment('/ui/integrations/metrics/server', 'server-metrics-content', 'Loading metrics...');
 }
 
 async function loadElasticsearchMetrics() {
-    const clusterContainer = document.querySelector('#es-cluster-metrics .metrics-content');
-    const ingestContainer = document.querySelector('#es-ingest-metrics .metrics-content');
-
-    try {
-        const data = await ionFetchJson('/api/integrations/metrics/elasticsearch', 'Elasticsearch metrics');
-
-        if (!data.configured) {
-            clusterContainer.innerHTML = '<p class="error">Not configured</p>';
-            ingestContainer.innerHTML = '<p class="error">Not configured</p>';
-            return;
-        }
-
-        // Cluster health
-        if (data.cluster.error) {
-            clusterContainer.innerHTML = `<p class="error">${data.cluster.error}</p>`;
-        } else {
-            const statusClass = data.cluster.status || 'yellow';
-            clusterContainer.innerHTML = `
-                <div class="metric-row">
-                    <span class="metric-label">Status</span>
-                    <span class="cluster-status ${statusClass}">${statusClass}</span>
-                </div>
-                <div class="metric-row">
-                    <span class="metric-label">Cluster</span>
-                    <span class="metric-value">${data.cluster.cluster_name || 'N/A'}</span>
-                </div>
-                <div class="metric-row">
-                    <span class="metric-label">Nodes</span>
-                    <span class="metric-value">${data.cluster.number_of_nodes || 0}</span>
-                </div>
-                <div class="metric-row">
-                    <span class="metric-label">Shards</span>
-                    <span class="metric-value">${data.cluster.active_shards || 0} active</span>
-                </div>
-            `;
-        }
-
-        // Ingestion stats
-        if (data.indices.error) {
-            ingestContainer.innerHTML = `<p class="error">${data.indices.error}</p>`;
-        } else {
-            ingestContainer.innerHTML = `
-                <div class="metric-row">
-                    <span class="metric-label">Documents</span>
-                    <span class="metric-value">${formatNumber(data.indices.total_docs || 0)}</span>
-                </div>
-                <div class="metric-row">
-                    <span class="metric-label">Size</span>
-                    <span class="metric-value">${data.indices.total_size_mb || 0} MB</span>
-                </div>
-                <div class="metric-row">
-                    <span class="metric-label">Indexed</span>
-                    <span class="metric-value">${formatNumber(data.indices.index_total || 0)}</span>
-                </div>
-                <div class="metric-row">
-                    <span class="metric-label">Searches</span>
-                    <span class="metric-value">${formatNumber(data.indices.search_total || 0)}</span>
-                </div>
-            `;
-        }
-    } catch (error) {
-        clusterContainer.innerHTML = `<p class="error">Error: ${escapeHtml(error.message)}</p>`;
-        ingestContainer.innerHTML = `<p class="error">Error: ${escapeHtml(error.message)}</p>`;
-    }
+    ionMessage('es-ingest-metrics-content', 'Loading ingestion metrics...', true);
+    const loaded = await ionLoadFragment('/ui/integrations/metrics/elasticsearch', 'es-cluster-metrics-content', 'Loading metrics...');
+    if (!loaded) ionMessage('es-ingest-metrics-content', 'Ingestion metrics unavailable');
 }
 
 async function loadDataFlowMetrics() {
-    const container = document.querySelector('#data-flow-metrics .metrics-content');
-
-    try {
-        const data = await ionFetchJson('/api/integrations/metrics/data-flows?hours=24', 'data-flow metrics');
-
-        const logsByLevel = data.integration_activity?.by_level || {};
-        const webhooks = data.webhooks || {};
-        const es = data.elasticsearch || {};
-
-        container.innerHTML = `
-            <div class="metric-row">
-                <span class="metric-label">Integration Logs</span>
-                <span class="metric-value">${data.integration_activity?.total || 0}</span>
-            </div>
-            <div class="metric-row">
-                <span class="metric-label">Errors</span>
-                <span class="metric-value ${(logsByLevel.error || 0) > 0 ? 'error' : ''}">${logsByLevel.error || 0}</span>
-            </div>
-            <div class="metric-row">
-                <span class="metric-label">Webhooks</span>
-                <span class="metric-value">${webhooks.active_webhooks || 0} / ${webhooks.total_webhooks || 0}</span>
-            </div>
-            <div class="metric-row">
-                <span class="metric-label">Triggers</span>
-                <span class="metric-value">${webhooks.total_triggers || 0}</span>
-            </div>
-        `;
-    } catch (error) {
-        container.innerHTML = `<p class="error">Error: ${escapeHtml(error.message)}</p>`;
-    }
+    const loaded = await ionLoadFragment('/ui/integrations/metrics/data-flows', 'data-flow-metrics-content', 'Loading metrics...');
 }
 
-function formatNumber(num) {
-    if (num >= 1000000) {
-        return (num / 1000000).toFixed(1) + 'M';
-    } else if (num >= 1000) {
-        return (num / 1000).toFixed(1) + 'K';
-    }
-    return num.toString();
-}
+
 
 async function loadServerLogsMetrics() {
-    const container = document.querySelector('#server-logs-metrics .metrics-content');
-
-    try {
-        const data = await ionFetchJson('/api/integrations/metrics/server-logs?hours=24', 'server-log metrics');
-
-        if (!data.configured) {
-            container.innerHTML = '<p class="error">Elasticsearch not configured</p>';
-            return;
-        }
-
-        if (data.error) {
-            container.innerHTML = `<p class="error">${data.error}</p>`;
-            return;
-        }
-
-        const byLevel = data.by_level || {};
-        const byStatus = data.by_status || {};
-
-        // Calculate success rate
-        const statusCodes = Object.keys(byStatus).map(Number);
-        const successCount = statusCodes.filter(s => s < 400).reduce((sum, s) => sum + (byStatus[s] || 0), 0);
-        const errorCount = statusCodes.filter(s => s >= 400).reduce((sum, s) => sum + (byStatus[s] || 0), 0);
-        const totalRequests = successCount + errorCount;
-        const successRate = totalRequests > 0 ? ((successCount / totalRequests) * 100).toFixed(1) : 'N/A';
-
-        // Calculate 4xx and 5xx totals
-        const client4xx = statusCodes.filter(s => s >= 400 && s < 500).reduce((sum, s) => sum + (byStatus[s] || 0), 0);
-        const server5xx = statusCodes.filter(s => s >= 500).reduce((sum, s) => sum + (byStatus[s] || 0), 0);
-
-        container.innerHTML = `
-            <div class="server-logs-grid">
-                <div class="server-logs-stat">
-                    <div class="server-logs-stat-value">${formatNumber(data.total || 0)}</div>
-                    <div class="server-logs-stat-label">Total Logs</div>
-                </div>
-                <div class="server-logs-stat">
-                    <div class="server-logs-stat-value ${successRate !== 'N/A' && parseFloat(successRate) >= 95 ? 'good' : 'warning'}">${successRate}%</div>
-                    <div class="server-logs-stat-label">Success Rate</div>
-                </div>
-                <div class="server-logs-stat">
-                    <div class="server-logs-stat-value ${(byLevel.error || 0) > 0 ? 'error' : ''}">${byLevel.error || 0}</div>
-                    <div class="server-logs-stat-label">Errors</div>
-                </div>
-            </div>
-            <div class="mt-4">
-                <div class="metric-row">
-                    <span class="metric-label">HTTP 2xx/3xx</span>
-                    <span class="metric-value good">${successCount}</span>
-                </div>
-                <div class="metric-row">
-                    <span class="metric-label">HTTP 4xx</span>
-                    <span class="metric-value ${client4xx > 0 ? 'warning' : ''}">${client4xx}</span>
-                </div>
-                <div class="metric-row">
-                    <span class="metric-label">HTTP 5xx</span>
-                    <span class="metric-value ${server5xx > 0 ? 'error' : ''}">${server5xx}</span>
-                </div>
-            </div>
-        `;
-    } catch (error) {
-        container.innerHTML = `<p class="error">Error: ${escapeHtml(error.message)}</p>`;
-    }
+    const loaded = await ionLoadFragment('/ui/integrations/metrics/server-logs', 'server-logs-metrics-content', 'Loading metrics...');
 }
 
 // =============================================================================

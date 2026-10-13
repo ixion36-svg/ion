@@ -1,0 +1,15 @@
+{% if configured is sameas false %}<p>Elasticsearch not configured</p>
+{% elif state == 'failed' %}<p class="error">Server log metrics unavailable</p>
+{% else %}
+{% if state == 'empty' %}<p>No logs in this window</p>{% endif %}
+<div class="server-logs-grid">
+{% for metric in metrics[:3] %}
+{% set tone = {'normal': 'good', 'elevated': 'warning', 'high': 'error'}[metric.level] %}
+<div class="server-logs-stat" data-metric="{{ metric.key }}">
+  <div class="server-logs-stat-value{% if metric.value is not none and (metric.level != 'normal' or metric.key == 'success_rate') %} {{ tone }}{% endif %}">{% if metric.value is not none %}{% if metric.unit == '%' %}{{ '%.1f'|format(metric.value) }}{% else %}{{ metric.value }}{% endif %}{{ metric.unit }}{% else %}Unknown{% endif %}</div>
+  <div class="server-logs-stat-label">{{ metric.label }}</div>
+</div>
+{% endfor %}
+</div>
+<div class="mt-4">{% with metrics=metrics[3:] %}{% include '_fragments/integrations_metrics_rows.html' %}{% endwith %}</div>
+{% endif %}
