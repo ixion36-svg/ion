@@ -48,6 +48,13 @@ def module_css() -> str:
 
 
 @pytest.fixture(scope="module")
+def alerts_page_css() -> str:
+    """Where /alerts' own rules live since the UI redesign moved them out of
+    the template's <style> block."""
+    return (STATIC / "css" / "alerts-page.css").read_text(encoding="utf-8")
+
+
+@pytest.fixture(scope="module")
 def alerts() -> str:
     return (TEMPLATES / "alerts.html").read_text(encoding="utf-8")
 
@@ -189,12 +196,28 @@ def test_component_css_moved_out_of_alerts_page(alerts, module_css):
         assert re.search(rf"\.{cls}\s*[,{{]", module_css), f".{cls} missing from the component"
 
 
-def test_alerts_style_block_is_not_corrupted(alerts):
+def test_the_alerts_page_has_no_inline_style_block_left(alerts):
+    """The half of the test above that looks at the page is vacuous now, and
+    a vacuous assertion is worth replacing with the stronger one it became.
+
+    The UI redesign moved every rule out of the template, so the question is
+    no longer whether four classes left the <style> block but whether the
+    block exists at all. It does not, and a new one would be a page-local
+    rule that /cases could not see, which is the regression the test above
+    was written for."""
+    assert _style(alerts) == ""
+
+
+def test_the_alerts_page_stylesheet_is_not_corrupted(alerts_page_css):
     """Moving rules out with a regex that cannot see nesting tore the closing
-    braces off @media wrappers the first time. Guard the invariant."""
-    style = _style(alerts)
-    assert style.count("{") == style.count("}")
-    assert "@media" in style, "the @media blocks must be left where they were"
+    braces off @media wrappers the first time. Guard the invariant.
+
+    This guarded the template's <style> block until the redesign moved those
+    rules to alerts-page.css, at which point it asserted @media inside a
+    block that no longer existed and failed for a move it should have
+    followed. The invariant belongs to wherever the rules live."""
+    assert alerts_page_css.count("{") == alerts_page_css.count("}")
+    assert "@media" in alerts_page_css, "the @media blocks must survive the move"
 
 
 def test_component_css_is_balanced(module_css):
