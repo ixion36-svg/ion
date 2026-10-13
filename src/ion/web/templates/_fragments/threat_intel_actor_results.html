@@ -1,0 +1,104 @@
+{# Threat Intel: threat-actor search results from OpenCTI.
+
+   Replaces six innerHTML sites in searchActors plus its hand-rolled esc()
+   and formatDate().
+
+   Four outcomes where the page had a muddle of three:
+
+     not configured  OpenCTI is not wired up, so a search cannot be run at
+                     all. The page did not have this state: it read with
+                     `fetch(...).then(r => r.json())` and no r.ok, so a 503
+                     arrived as {"detail": ...} and was rendered through the
+                     `data.detail` branch into the ti-empty class, which is
+                     the no-results styling. A reader searching an
+                     unconfigured estate was told their search found
+                     nothing.
+     read failed     OpenCTI is configured and the search did not complete.
+     no actors       OpenCTI answered and matched nothing. The only case
+                     where "No threat actors found" is true.
+     actors          the table.
+
+   Dates go through the ts macro. The page used
+   `new Date(iso).toLocaleDateString()`, which is the viewer's clock, and
+   the macro is where the decision about naive versus aware timestamps has
+   one definition. #}
+
+{% from "_fragments/_time.html" import ts %}
+{% from "_fragments/_threat_intel_cells.html" import origin, aliases, confidence, labels, watch_cell %}
+
+{# The resting state, before anything has been searched for. It is a
+   branch rather than markup left in the page shell, because the shell's
+   copy would survive a search and sit above the results. #}
+{% if prompt %}
+  <div class="ti-empty">Enter a search term to query OpenCTI for threat actors.</div>
+{% elif not configured %}
+  <div class="ti-empty">
+    OpenCTI is not configured, so threat actors cannot be searched. This is
+    a deployment setting rather than a fault, and the search will work once
+    OpenCTI is wired up.
+  </div>
+{% elif failed %}
+  <div class="ti-empty text-[var(--danger)]" role="alert">
+    The search for {{ q }} did not complete. OpenCTI is configured, so this
+    is a fault rather than an absence of matches, and searching again may
+    succeed.
+    {% if error %}<span class="font-mono text-[10px] opacity-80 ml-1">({{ error }})</span>{% endif %}
+  </div>
+{% elif actors is none %}
+  <div class="ti-empty text-[var(--danger)]" role="alert">
+    OpenCTI answered the search for {{ q }} with something this table
+    cannot read, so it cannot say whether anything matched.
+  </div>
+{% elif not actors %}
+  <div class="ti-empty">No threat actors found for {{ q }}.</div>
+{% else %}
+<table class="ti-table">
+  <thead>
+    <tr>
+      <th>Name</th><th>Origin</th><th>Types</th><th>Aliases</th>
+      <th>Confidence</th><th>First Seen</th><th>Last Seen</th>
+      <th>Labels</th><th>Watch</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for a in actors %}
+      <tr>
+        {# Clicking the name opens the detail row below it. The row fetches
+           itself from /ui/threat-intel/actor-detail, so the page no longer
+           keeps the whole result set on a DOM property (container._actors)
+           and index into it. #}
+        <td class="ti-name-cell"
+            hx-get="/ui/threat-intel/actor-detail?entity_id={{ a.id|urlencode }}&amp;entity_class={{ (a.entity_class or 'threat_actor')|urlencode }}"
+            hx-target="#actor-detail-{{ loop.index0 }}"
+            hx-swap="innerHTML"
+            data-click-action="tiToggleDetailRow"
+            data-args='["actor-detail-{{ loop.index0 }}"]'
+            title="Show detail">{{ a.name }}</td>
+        <td>{{ origin(a.country_flag, a.country_name) }}</td>
+        <td>
+          {%- set types = (a.threat_actor_types or [])|map('replace', 'intrusion-set', 'Intrusion Set')|list -%}
+          {%- if types %}{{ types|join(', ') }}{% else %}<span class="text-[var(--text-muted)]">-</span>{% endif -%}
+        </td>
+        <td>{{ aliases(a.aliases) }}</td>
+        <td>{{ confidence(a.confidence) }}</td>
+        <td>{{ ts(a.first_seen, 'date', fallback='-') }}</td>
+        <td>{{ ts(a.last_seen, 'date', fallback='-') }}</td>
+        <td>{{ labels(a.labels) }}</td>
+        <td>
+          {{ watch_cell('threat_actor', a, can_manage, watched_ids) }}
+          {# The deep-dive profile page. entity_class tells that endpoint
+             which OpenCTI lookup path to use, and most APTs are modelled as
+             intrusion sets rather than threat actors. #}
+          {%- set klass = 'intrusion_set' if 'intrusion-set' in (a.threat_actor_types or []) else 'threat_actor' -%}
+          <a href="/threat-intel/actors/{{ a.id|urlencode }}?entity_class={{ klass }}"
+             class="ti-btn-outline ti-btn-sm ml-1.5"
+             title="Open deep-dive profile">&#8599; Profile</a>
+        </td>
+      </tr>
+      <tr class="ti-detail-row" id="actor-detail-{{ loop.index0 }}">
+        <td colspan="9"><div class="ti-loading"><span class="ti-spinner"></span> Loading detail...</div></td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}

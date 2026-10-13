@@ -654,29 +654,27 @@ def test_the_write_controls_read_the_permission_from_the_server():
     page = _page()
     assert 'data-can-manage-watches="{{' in page
     assert "canManageWatches" in page
-    # Both builders, counted. There is a Watch button in the actor results
-    # and another in the campaign results, and asserting the guard appears
-    # somewhere let a mutation that ungated one of them through.
-    assert page.count("!canManageWatches") == 2, (
-        "both the actor and the campaign Watch buttons must be gated"
-    )
-    for builder in ("watchActor", "watchCampaign"):
-        before = page[:page.index(builder)]
-        assert "!canManageWatches" in before[-700:], (
-            f"the {builder} button is not behind the permission check"
-        )
+    # The gate itself moved server-side when the actor and campaign tables
+    # became fragments: watch_cell in _threat_intel_cells.html withholds the
+    # button, so there is no client-side branch left to count. The page still
+    # carries the flag because the script needs to know whether it may offer
+    # a write at all.
+    cells = (ROOT / "src/ion/web/templates/_fragments/_threat_intel_cells.html"
+             ).read_text(encoding="utf-8")
+    assert "{%- if not can_manage -%}" in cells
+    assert "Read only" in cells
 
 
 #: Reads still using `fetch(url).then(r => r.json())`, which discards the
 #: status so a refusal body gets destructured for a key it does not carry.
-#: Two in the actor search and its row detail, two in the campaign
-#: equivalents. Both panels are converted by a later stage and each read
-#: goes with its panel. loadOverview's two are gone as of the Overview
-#: stage, which took this count from 6 to 4.
+#: Zero. Every read on this page now goes through a fragment that checks
+#: its own outcome, or through a handler that reads r.ok. The count went
+#: 6 after the watchlist stage, 4 after the Overview stage, and 0 after the
+#: actors and campaigns stage. It may only stay there.
 #:
 #: Pinned rather than left unmeasured. This number may only go down: a new
 #: one is the defect this whole conversion exists to remove, reappearing.
-UNCHECKED_READS_REMAINING = 4
+UNCHECKED_READS_REMAINING = 0
 
 
 def test_the_unchecked_reads_this_page_still_has_do_not_increase():
@@ -1153,7 +1151,8 @@ def test_the_matches_route_honours_show_type(session):
 DELETED_FUNCTIONS = [
     "loadWatches", "loadMatches", "tiLoadStories", "loadOverview",
     "loadOverviewActors", "loadOverviewIOCs", "loadRecentlyActive",
-    "renderMatchRows",
+    "renderMatchRows", "searchActors", "searchCampaigns",
+    "toggleActorDetail", "toggleCampaignDetail", "refreshWatchedIds",
 ]
 
 
@@ -1215,3 +1214,538 @@ def test_every_delegated_action_on_the_page_resolves_to_something():
         and f"{a} = async function" not in script
     )
     assert not missing, f"delegated actions with no definition: {missing}"
+
+
+# ---------------------------------------------------------------------------
+# The Actors and Campaigns tabs
+#
+# searchActors and searchCampaigns read with `fetch(url).then(r => r.json())`
+# and no r.ok check, then branched on data.detail and rendered it in the
+# ti-empty class, which is the no-results styling. So a 503 from an
+# unconfigured OpenCTI, a refusal, and a genuine zero-match search were
+# three different facts in one voice.
+#
+# The detail rows were sharper: they tested four sections for content and
+# fell through to "No additional detail available." A refusal body carries
+# none of those sections, so a failed read claimed OpenCTI holds nothing on
+# the actor in front of you.
+# ---------------------------------------------------------------------------
+
+ACTOR_RESULTS = "_fragments/threat_intel_actor_results.html"
+CAMPAIGN_RESULTS = "_fragments/threat_intel_campaign_results.html"
+ENTITY_DETAIL = "_fragments/threat_intel_entity_detail.html"
+
+
+def _actor(**over):
+    base = {
+        "id": "intrusion-set--abc",
+        "name": "APT29",
+        "description": "A Russian state actor.",
+        "aliases": ["Cozy Bear", "Nobelium", "YTTRIUM", "UNC2452"],
+        "labels": [{"value": "apt", "color": "#ff0000"}],
+        "threat_actor_types": ["intrusion-set"],
+        "confidence": 85,
+        "country_flag": "\U0001F1F7\U0001F1FA",
+        "country_name": "Russia",
+        "first_seen": "2020-01-01T00:00:00+00:00",
+        "last_seen": "2026-10-01T00:00:00+00:00",
+    }
+    base.update(over)
+    return base
+
+
+def _results(fragment, key, rows, **over):
+    ctx = {"q": "apt", "configured": True, "failed": False, "error": None,
+           "can_manage": True, "watched_ids": set(), "prompt": False,
+           key: rows}
+    ctx.update(over)
+    return render(fragment, **ctx)
+
+
+@pytest.mark.parametrize("fragment,key", [
+    (ACTOR_RESULTS, "actors"), (CAMPAIGN_RESULTS, "campaigns"),
+])
+def test_an_unconfigured_opencti_is_not_reported_as_a_search_with_no_matches(
+        fragment, key):
+    """The defect. A 503 arrived as {"detail": ...} through a read with no
+    r.ok check, and the data.detail branch rendered it in the ti-empty
+    class, so a reader searching an unconfigured estate was told their
+    search found nothing."""
+    html = _results(fragment, key, None, configured=False)
+    assert "not configured" in html
+    assert "cannot be searched" in html
+    assert "No threat actors found" not in html
+    assert "No campaigns found" not in html
+
+
+@pytest.mark.parametrize("fragment,key", [
+    (ACTOR_RESULTS, "actors"), (CAMPAIGN_RESULTS, "campaigns"),
+])
+def test_a_failed_search_is_a_fault_not_an_absence_of_matches(fragment, key):
+    html = _results(fragment, key, None, failed=True, error="OpenCTIError")
+    assert "did not complete" in html
+    assert "rather than an absence of matches" in html
+    assert "OpenCTIError" in html
+    assert 'role="alert"' in html
+
+
+@pytest.mark.parametrize("fragment,key,empty", [
+    (ACTOR_RESULTS, "actors", "No threat actors found for apt"),
+    (CAMPAIGN_RESULTS, "campaigns", "No campaigns found for apt"),
+])
+def test_a_search_that_matched_nothing_says_so_with_the_term_in_it(
+        fragment, key, empty):
+    html = _results(fragment, key, [])
+    assert empty in html
+    assert "not configured" not in html
+    assert "did not complete" not in html
+
+
+@pytest.mark.parametrize("fragment,key", [
+    (ACTOR_RESULTS, "actors"), (CAMPAIGN_RESULTS, "campaigns"),
+])
+def test_the_resting_state_is_a_branch_not_markup_left_in_the_shell(
+        fragment, key):
+    """A copy left in the page shell would survive a search and sit above
+    the results."""
+    html = _results(fragment, key, [], prompt=True, q="")
+    assert "Enter a search term" in html
+    assert "No threat actors found" not in html
+    assert "No campaigns found" not in html
+
+
+def test_an_actor_row_carries_every_column_the_table_declares():
+    html = _results(ACTOR_RESULTS, "actors", [_actor()])
+    assert "APT29" in html
+    assert "Russia" in html
+    assert "Intrusion Set" in html, "the intrusion-set type is relabelled"
+    assert "Cozy Bear" in html
+    assert "ti-confidence high" in html
+    assert "/threat-intel/actors/" in html, "the profile deep link"
+    assert "entity_class=intrusion_set" in html
+
+
+def test_an_entity_with_no_confidence_is_not_painted_as_unreliable():
+    """`conf >= 70 ? 'high' : conf >= 40 ? 'medium' : 'low'` after
+    defaulting a missing confidence to a dash meant an unassessed entity
+    rendered a dash in the `low` colour: it looked as though OpenCTI had
+    assessed it and found it unreliable."""
+    low = _results(ACTOR_RESULTS, "actors", [_actor(confidence=10)])
+    missing = _results(ACTOR_RESULTS, "actors", [_actor(confidence=None)])
+    assert "ti-confidence low" in low
+    assert "ti-confidence" not in missing
+    assert "not assessed" in missing
+
+
+def test_both_tables_show_how_many_aliases_they_truncated():
+    """The actor table had a "+N" indicator and the campaign table silently
+    truncated at three, so an entity with twelve aliases was reported as
+    having three. One macro now, so they cannot disagree again."""
+    for fragment, key in ((ACTOR_RESULTS, "actors"),
+                          (CAMPAIGN_RESULTS, "campaigns")):
+        html = _results(fragment, key, [_actor()])
+        assert "Cozy Bear, Nobelium, YTTRIUM" in html
+        assert "+1" in html, f"{key} must say an alias was hidden"
+
+
+def test_a_label_colour_travels_as_data_ion_style_not_a_style_attribute():
+    """The CSP sets style-src-attr 'none', so an inline style is blocked.
+    The colour is OpenCTI's own per-label value, so it cannot be a class."""
+    html = _results(ACTOR_RESULTS, "actors", [_actor()])
+    assert "data-ion-style=" in html
+    assert "#ff0000" in html
+    # A leading space, because data-ion-style="background:..." contains
+    # the substring this would otherwise match: the guard would have
+    # failed on the very attribute it exists to require.
+    assert ' style="background' not in html
+
+
+def test_the_watch_button_carries_its_whole_payload():
+    """The page looked the entity up by index in container._actors, which
+    the server does not have. event-delegation.js JSON-parses data-args and
+    applies it, so a one-element array hands the payload over."""
+    html = _results(ACTOR_RESULTS, "actors", [_actor()])
+    raw = re.search(r"data-args='(\[\{.*?\}\])'", html, re.S).group(1)
+    decoded = (raw.replace("&quot;", '"').replace("&#34;", '"')
+                  .replace("&amp;", "&").replace("&lt;", "<")
+                  .replace("&gt;", ">").replace("\\u0022", '"')
+                  .replace("\\u0027", "'").replace("&#39;", "'"))
+    payload = json.loads(decoded)[0]
+    assert payload["entity_type"] == "threat_actor"
+    assert payload["opencti_id"] == "intrusion-set--abc"
+    assert payload["name"] == "APT29"
+    assert payload["labels"] == ["apt"], "labels are flattened to their values"
+    assert "Cozy Bear" in payload["aliases"]
+
+
+def test_an_already_watched_entity_offers_no_watch_button():
+    watched = _results(ACTOR_RESULTS, "actors", [_actor()],
+                       watched_ids={"intrusion-set--abc"})
+    assert "Watched" in watched
+    assert "watchActor" not in watched
+
+
+def test_the_watch_button_is_withheld_without_observable_enrich():
+    html = _results(ACTOR_RESULTS, "actors", [_actor()], can_manage=False)
+    assert "watchActor" not in html
+    assert "Read only" in html
+
+
+@pytest.mark.parametrize("columns", [9, 7])
+def test_a_failed_detail_read_does_not_claim_opencti_holds_nothing(columns):
+    """The sharpest version of the defect. The page tested four sections for
+    content and fell through to "No additional detail available", and a
+    refusal body carries none of them."""
+    html = render(ENTITY_DETAIL, columns=columns, configured=True,
+                  failed=True, detail=None)
+    assert "could not be read" in html
+    assert "No additional detail available" not in html
+    assert f'colspan="{columns}"' in html
+
+
+def test_a_detail_payload_that_is_not_a_mapping_is_a_failure():
+    html = render(ENTITY_DETAIL, columns=9, configured=True, failed=False,
+                  detail=None)
+    assert "cannot read" in html
+    assert "No additional detail available" not in html
+
+
+def test_an_entity_opencti_genuinely_holds_nothing_on_says_so():
+    html = render(ENTITY_DETAIL, columns=9, configured=True, failed=False,
+                  detail={"description": None, "campaigns": [], "ttps": [],
+                          "indicators": []})
+    assert "No additional detail available" in html
+    assert "could not be read" not in html
+
+
+def test_a_detail_row_renders_every_section_opencti_returned():
+    html = render(ENTITY_DETAIL, columns=9, configured=True, failed=False,
+                  detail={
+                      "description": "A Russian state actor.",
+                      "campaigns": [{"name": "SolarWinds"}],
+                      "ttps": [{"mitre_id": "T1059", "name": "Command Line",
+                                "description": "runs commands"}],
+                      "indicators": [{"name": "1.2.3.4"}],
+                  })
+    assert "A Russian state actor." in html
+    assert "SolarWinds" in html
+    assert "T1059: Command Line" in html
+    assert "1.2.3.4" in html
+    assert "Related Campaigns (1)" in html
+    assert "MITRE ATT&amp;CK TTPs (1)" in html
+
+
+def test_a_ttp_with_no_mitre_id_still_renders_its_name():
+    html = render(ENTITY_DETAIL, columns=9, configured=True, failed=False,
+                  detail={"ttps": [{"name": "Unmapped Technique"}]})
+    assert "Unmapped Technique" in html
+    assert "None:" not in html
+
+
+SEARCH_PATHS = [
+    "/ui/threat-intel/actor-search",
+    "/ui/threat-intel/campaign-search",
+]
+DETAIL_PATHS = [
+    "/ui/threat-intel/actor-detail?entity_id=x",
+    "/ui/threat-intel/campaign-detail?entity_id=x",
+]
+
+
+@pytest.mark.parametrize("path", SEARCH_PATHS + DETAIL_PATHS)
+def test_a_search_or_detail_fragment_refuses_a_caller_with_no_permissions(
+        session, path):
+    app = _client(session, _User())
+    with TestClient(app) as client:
+        assert client.get(path).status_code == 403
+
+
+@pytest.mark.parametrize("path", SEARCH_PATHS)
+def test_an_empty_search_renders_the_prompt_rather_than_searching(session, path):
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get(path).text
+    assert "Enter a search term" in body
+    assert "found for" not in body
+
+
+@pytest.mark.parametrize("path", SEARCH_PATHS)
+def test_a_search_on_this_deployment_reports_opencti_unconfigured(session, path):
+    """Measured: OpenCTI is not configured here, so this is the outcome a
+    live page on this machine shows, and it must not read as no matches."""
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get(f"{path}?q=apt").text
+    assert "not configured" in body
+    assert "found for apt" not in body
+
+
+@pytest.mark.parametrize("path", DETAIL_PATHS)
+def test_a_detail_row_requires_an_entity_id(session, path):
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        bare = path.split("?")[0]
+        assert client.get(bare).status_code == 422
+
+
+def test_the_actor_detail_entity_class_default_matches_the_json_endpoint():
+    """entity_class decides which OpenCTI lookup path is used, so a
+    different default here would make the fragment answer about a different
+    entity than the API does for the same id."""
+    import inspect
+    from ion.web.threat_intel_api import get_actor_detail
+    from ion.web.ui.threat_intel import threat_intel_actor_detail_fragment
+
+    api = inspect.signature(get_actor_detail).parameters["entity_class"].default
+    frag = inspect.signature(
+        threat_intel_actor_detail_fragment).parameters["entity_class"].default
+    assert frag.default == api.default == "threat_actor"
+
+
+def test_the_search_size_is_within_what_the_endpoint_accepts(session):
+    import inspect
+    from ion.web.threat_intel_api import search_actors
+    from ion.web.ui.threat_intel import SEARCH_FIRST
+
+    bound = inspect.signature(search_actors).parameters["first"].default
+    ceiling = next(m.le for m in bound.metadata if hasattr(m, "le"))
+    assert SEARCH_FIRST <= ceiling
+
+
+def test_the_detail_column_counts_match_the_tables_that_hold_them():
+    """A detail row is one cell spanning its parent table, so a wrong count
+    breaks the table layout rather than failing loudly."""
+    from ion.web.ui.threat_intel import ACTOR_COLUMNS, CAMPAIGN_COLUMNS
+
+    page = _page()
+    for fragment, count in ((ACTOR_RESULTS, ACTOR_COLUMNS),
+                            (CAMPAIGN_RESULTS, CAMPAIGN_COLUMNS)):
+        src = (ROOT / "src/ion/web/templates" / fragment).read_text(
+            encoding="utf-8")
+        assert src.count("<th>") == count, fragment
+        assert f'colspan="{count}"' in src, fragment
+
+
+def test_the_search_boxes_are_forms_so_enter_needs_no_event_filter():
+    """hx-trigger cannot express Enter here: an event filter like
+    [key=='Enter'] is compiled with Function() and this CSP carries no
+    unsafe-eval. A form submits on Enter natively."""
+    page = _page()
+    for panel, url in (("panel-actors", "/ui/threat-intel/actor-search"),
+                       ("panel-campaigns", "/ui/threat-intel/campaign-search")):
+        block = page[page.index(f'id="{panel}"'):]
+        block = block[:block.index("</div>\n\n") if "</div>\n\n" in block else 1400]
+        assert "<form" in block, panel
+        assert url in block, panel
+        assert 'name="q"' in block, panel
+    # The attribute values, not the file text. An hx-trigger event filter
+    # is the thing that cannot work here, and a prose comment saying so
+    # contains the same characters: checking the text failed on the comment
+    # that documents the rule, which is the fifth time in this project a
+    # guard has matched its own explanation.
+    triggers = re.findall(r'hx-trigger="([^"]*)"', page)
+    assert triggers, "the page should carry hx-trigger attributes"
+    for value in triggers:
+        assert "[" not in value, (
+            f"hx-trigger={value!r} carries an event filter, which htmx "
+            "compiles with Function() and this CSP has no unsafe-eval for"
+        )
+
+
+def test_the_page_no_longer_searches_or_expands_rows_in_javascript():
+    page = _page()
+    for gone in ("window.searchActors", "window.searchCampaigns",
+                 "window.toggleActorDetail", "window.toggleCampaignDetail",
+                 "async function refreshWatchedIds", "container._actors"):
+        assert gone not in _script(), f"{gone} should have been removed"
+    # `_actors` on its own is a substring of `related_actors`, which belongs
+    # to the report drill panel and is not this stage's to remove.
+    assert "related_actors" in _script(), "the report drill is untouched"
+
+
+def test_the_client_side_watched_set_is_gone():
+    """It asked for `?limit=1000` against an endpoint bounded at le=500 and
+    so answered 422 on every call, measured live, leaving the set empty
+    permanently and every result rendered as not-watched. The fragments read
+    the watchlist per request instead."""
+    # _script() strips comments, which is where both of these names still
+    # legitimately appear explaining what was removed and why.
+    assert "watchedIds" not in _script()
+    assert "limit=1000" not in _script()
+
+
+def test_the_watch_handler_checks_the_response_before_claiming_success():
+    script = _script()
+    watch = script[script.index("window.watchActor = async function"):]
+    watch = watch[:watch.index("window.watchCampaign")]
+    assert "if (!r.ok)" in watch
+    assert "403" in watch, "a refusal is worded, not reported as success"
+
+
+# ---------------------------------------------------------------------------
+# The search and detail paths past the is_configured gate
+#
+# OpenCTI is not configured on this deployment, so every test above
+# short-circuits at `if not service.is_configured` and nothing past it runs.
+# Four mutations survived the first pass for exactly that reason: dropping
+# `_rows`, accepting a non-mapping detail payload, and never reading the
+# watchlist all went unnoticed because no test reached those lines. These
+# drive them with a configured stub.
+# ---------------------------------------------------------------------------
+
+
+class _ConfiguredOpenCTI:
+    """A configured service whose reads return whatever a test hands it."""
+
+    is_configured = True
+
+    def __init__(self, payload):
+        self._payload = payload
+
+    async def _answer(self, *a, **k):
+        if isinstance(self._payload, Exception):
+            raise self._payload
+        return self._payload
+
+
+def _stub_opencti(monkeypatch, payload):
+    import ion.services.opencti_service as octi
+    monkeypatch.setattr(octi, "get_opencti_service",
+                        lambda: _ConfiguredOpenCTI(payload))
+
+
+def _stub_search(monkeypatch, payload):
+    """The search routes call the JSON handler, not the service, so both are
+    stubbed: the service decides `configured` and the handler the payload."""
+    import ion.web.threat_intel_api as api
+
+    async def answer(**kw):
+        if isinstance(payload, Exception):
+            raise payload
+        return payload
+
+    monkeypatch.setattr(api, "search_actors", answer)
+    monkeypatch.setattr(api, "search_campaigns", answer)
+    monkeypatch.setattr(api, "get_actor_detail", answer)
+    monkeypatch.setattr(api, "get_campaign_detail", answer)
+    _stub_opencti(monkeypatch, {})
+
+
+def test_a_search_payload_with_no_actor_list_is_a_failure_not_an_absence(
+        session, monkeypatch):
+    """Closes a survivor. Replacing `_rows` with `.get(...) or []` turned a
+    payload carrying no `actors` key into an empty list, and the table then
+    said the search matched nothing."""
+    _stub_search(monkeypatch, {"detail": "Not authenticated"})
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/actor-search?q=apt").text
+    assert "cannot read" in body
+    assert "No threat actors found" not in body
+
+
+def test_a_search_that_matched_nothing_still_reads_as_nothing_matched(
+        session, monkeypatch):
+    """The other side of the same branch, so the pair pins `_rows` from both
+    directions: an empty list is an empty result, a missing key is not."""
+    _stub_search(monkeypatch, {"actors": []})
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/actor-search?q=apt").text
+    assert "No threat actors found for apt" in body
+    assert "cannot read" not in body
+
+
+def test_a_search_renders_its_rows_and_marks_the_ones_already_watched(
+        session, monkeypatch):
+    """Closes a survivor. `watched_ids` was never read by any test, so
+    hardcoding it to an empty set went unnoticed, which is the same defect
+    the client-side watchedIds set had: every result rendered as
+    not-watched whatever the watchlist held."""
+    from ion.services.threat_intel_service import ThreatIntelService
+
+    ThreatIntelService(session).add_watch(
+        entity_type="threat_actor",
+        opencti_id="intrusion-set--watched",
+        name="Already Watched",
+        watched_by="ti-tester",
+    )
+    session.commit()
+
+    _stub_search(monkeypatch, {"actors": [
+        {"id": "intrusion-set--watched", "name": "Already Watched"},
+        {"id": "intrusion-set--new", "name": "Not Watched Yet"},
+    ]})
+
+    app = _client(session, _User(PERMISSION, MANAGE_PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/actor-search?q=w").text
+
+    assert "Already Watched" in body
+    assert "Not Watched Yet" in body
+    # One Watch button, for the entity that is not watched. The other row
+    # shows the disabled Watched state.
+    assert body.count("watchActor") == 1
+    assert "ti-btn-watched" in body
+
+
+def test_a_detail_payload_that_is_not_a_mapping_is_rejected_by_the_route(
+        session, monkeypatch):
+    """Closes a survivor. Dropping the isinstance check let a list or a
+    string reach the template, where `detail.description` on a list is
+    undefined and every section skipped, so the row said OpenCTI holds
+    nothing on the entity."""
+    _stub_search(monkeypatch, ["not", "a", "mapping"])
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/actor-detail?entity_id=x").text
+    assert "cannot read" in body
+    assert "No additional detail available" not in body
+
+
+def test_a_detail_route_renders_the_sections_opencti_returned(session, monkeypatch):
+    _stub_search(monkeypatch, {
+        "description": "A Russian state actor.",
+        "ttps": [{"mitre_id": "T1059", "name": "Command Line"}],
+    })
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/actor-detail?entity_id=x").text
+    assert "A Russian state actor." in body
+    assert "T1059: Command Line" in body
+    assert "No additional detail available" not in body
+
+
+def test_a_null_actor_list_in_the_template_is_not_an_empty_one():
+    """Closes a survivor. The failed branch was tested and this one was not,
+    so dropping `actors is none` from its guard left no test red: a payload
+    the table cannot read would have rendered as a search that matched
+    nothing."""
+    html = _results(ACTOR_RESULTS, "actors", None)
+    assert "cannot read" in html
+    assert "No threat actors found" not in html
+
+
+def test_a_null_campaign_list_in_the_template_is_not_an_empty_one():
+    html = _results(CAMPAIGN_RESULTS, "campaigns", None)
+    assert "cannot read" in html
+    assert "No campaigns found" not in html
+
+
+def test_a_search_that_raises_is_reported_without_the_services_own_message(
+        session, monkeypatch):
+    """The service's messages can carry estate detail and this renders for
+    anyone with observable:read, so only the exception class reaches the
+    page."""
+    _stub_search(monkeypatch, RuntimeError("opencti at https://cti.internal said no"))
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/actor-search?q=apt").text
+    assert "did not complete" in body
+    assert "RuntimeError" in body
+    assert "cti.internal" not in body

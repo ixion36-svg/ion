@@ -199,10 +199,22 @@
 
     <!-- Threat Actors Panel -->
     <div class="ti-panel" id="panel-actors">
-        <div class="flex items-center gap-2.5 mb-5">
-            <input type="text" class="input flex-1" id="actor-search" placeholder="Search threat actors in OpenCTI (e.g. APT, Lazarus, FIN7)...">
-            <button class="btn btn-primary" id="actor-search-btn" data-click-action="searchActors">Search</button>
-        </div>
+        {# A real form, so Enter submits natively. The page bound a keydown
+           listener, which works, but hx-trigger cannot express the same
+           thing: an event filter like [key=='Enter'] is compiled with
+           Function() and this CSP carries no unsafe-eval, so it would
+           throw silently. A form needs neither.
+
+           The form sits outside #actor-results, so a failed search cannot
+           remove the box that would retry it. #}
+        <form class="flex items-center gap-2.5 mb-5"
+              hx-get="/ui/threat-intel/actor-search"
+              hx-target="#actor-results"
+              hx-swap="innerHTML">
+            <input type="text" class="input flex-1" id="actor-search" name="q"
+                   placeholder="Search threat actors in OpenCTI (e.g. APT, Lazarus, FIN7)...">
+            <button type="submit" class="btn btn-primary" id="actor-search-btn">Search</button>
+        </form>
         <div id="actor-results">
             <div class="ti-empty">Enter a search term to query OpenCTI for threat actors.</div>
         </div>
@@ -210,10 +222,14 @@
 
     <!-- Campaigns Panel -->
     <div class="ti-panel" id="panel-campaigns">
-        <div class="flex items-center gap-2.5 mb-5">
-            <input type="text" class="input flex-1" id="campaign-search" placeholder="Search campaigns in OpenCTI (e.g. SolarWinds, NotPetya)...">
-            <button class="btn btn-primary" id="campaign-search-btn" data-click-action="searchCampaigns">Search</button>
-        </div>
+        <form class="flex items-center gap-2.5 mb-5"
+              hx-get="/ui/threat-intel/campaign-search"
+              hx-target="#campaign-results"
+              hx-swap="innerHTML">
+            <input type="text" class="input flex-1" id="campaign-search" name="q"
+                   placeholder="Search campaigns in OpenCTI (e.g. SolarWinds, NotPetya)...">
+            <button type="submit" class="btn btn-primary" id="campaign-search-btn">Search</button>
+        </form>
         <div id="campaign-results">
             <div class="ti-empty">Enter a search term to query OpenCTI for campaigns.</div>
         </div>
@@ -386,7 +402,6 @@ data-click-action="tiCloseReport"></div>
 <script nonce="{{ csp_nonce }}">
 (function(){
     const API = '/api/threat-intel';
-    let watchedIds = new Set();
     let matchUnreadOnly = false;
 
     // The viewer's observable:enrich, decided on the server and read off
@@ -552,8 +567,6 @@ data-click-action="tiCloseReport"></div>
     window.kevSearch = kevSearch;
 
     // ── Enter key on search ──────────────────
-    document.getElementById('actor-search').addEventListener('keydown', function(e) { if (e.key === 'Enter') searchActors(); });
-    document.getElementById('campaign-search').addEventListener('keydown', function(e) { if (e.key === 'Enter') searchCampaigns(); });
     document.getElementById('kev-search').addEventListener('keydown', function(e) { if (e.key === 'Enter') kevSearch(); });
     document.getElementById('kev-ransomware-only').addEventListener('change', kevSearch);
 
@@ -1051,255 +1064,81 @@ data-click-action="tiCloseReport"></div>
     };
 
     // ── Actors ────────────────────────────────
-    window.searchActors = async function() {
-        const q = document.getElementById('actor-search').value.trim();
-        if (!q) return;
-        const container = document.getElementById('actor-results');
-        container.innerHTML = '<div class="ti-loading"><span class="ti-spinner"></span> Searching OpenCTI...</div>';
+    // ── Actors and Campaigns ──────────────────
+    // searchActors, searchCampaigns, toggleActorDetail and
+    // toggleCampaignDetail are gone. Both result tables come from
+    // /ui/threat-intel/actor-search and campaign-search, and each detail
+    // row fetches itself from actor-detail or campaign-detail.
+    //
+    // All four read with `fetch(url).then(r => r.json())` and no r.ok
+    // check, then branched on data.detail and rendered it in the ti-empty
+    // class, which is the no-results styling. So an unconfigured OpenCTI,
+    // a refusal, and a genuine zero-match search were three different
+    // facts in one voice. The detail rows were worse: they tested four
+    // sections for content and fell through to "No additional detail
+    // available", so a failed read claimed OpenCTI holds nothing on the
+    // actor in front of you.
+    //
+    // The tables also kept the result set on container._actors and
+    // addressed rows by index into it. Each row carries its own entity id
+    // now, so nothing has to stay in step with a re-run search.
 
-        try {
-            const data = await fetch(API + '/actors?search=' + encodeURIComponent(q) + '&first=30').then(r => r.json());
-            if (data.detail) { container.innerHTML = `<div class="ti-empty">${esc(data.detail)}</div>`; return; }
-            const actors = data.actors || [];
-            if (!actors.length) { container.innerHTML = '<div class="ti-empty">No threat actors found.</div>'; return; }
-
-            // Refresh watched IDs
-            await refreshWatchedIds();
-
-            let html = '<table class="ti-table"><thead><tr><th>Name</th><th>Origin</th><th>Types</th><th>Aliases</th><th>Confidence</th><th>First Seen</th><th>Last Seen</th><th>Labels</th><th>Watch</th></tr></thead><tbody>';
-            actors.forEach((a, idx) => {
-                const aliases = (a.aliases || []).slice(0, 3).join(', ');
-                const moreAliases = (a.aliases || []).length > 3 ? ` +${a.aliases.length - 3}` : '';
-                const labels = (a.labels || []).map(l => `<span class="ti-label" data-ion-style="background:${l.color || '#30363d'}22; color:${l.color || '#8b949e'}">${esc(l.value)}</span>`).join('');
-                const types = (a.threat_actor_types || []).map(t => t === 'intrusion-set' ? 'Intrusion Set' : t).join(', ') || '-';
-                const conf = a.confidence != null ? a.confidence : '-';
-                const confCls = conf >= 70 ? 'high' : conf >= 40 ? 'medium' : 'low';
-                const flag = a.country_flag || '';
-                const countryName = a.country_name || '';
-                const isWatched = watchedIds.has(a.id);
-                // Withheld without observable:enrich, which is what POST
-                // /api/threat-intel/watches requires. The page is gated on
-                // observable:read and never checked, so a read-only analyst
-                // was offered a Watch button that answers 403 on click.
-                const watchBtn = !canManageWatches
-                    ? ''
-                    : isWatched
-                    ? `<button class="ti-btn-outline ti-btn-sm ti-btn-watched" disabled>Watched</button>`
-                    : `<button class="ti-btn ti-btn-sm ti-btn-watch" data-click-action="watchActor" data-args='[${idx}]'>Watch</button>`;
-                // open the deep-dive profile page for this actor.
-                // entity_class param tells the profile endpoint which
-                // OpenCTI lookup path to use (most APTs are intrusion sets).
-                const klass = (a.threat_actor_types || []).includes('intrusion-set') ? 'intrusion_set' : 'threat_actor';
-                const profileLink = `<a href="/threat-intel/actors/${encodeURIComponent(a.id)}?entity_class=${klass}" class="ti-btn-outline ti-btn-sm ml-1.5" title="Open deep-dive profile">↗ Profile</a>`;
-                html += `<tr>
-                    <td class="ti-name-cell" data-click-action="toggleActorDetail" data-args='[${idx}]'>${esc(a.name)}</td>
-                    <td>${flag ? `<span class="country-flag" title="${esc(countryName)}">${flag}</span> ${esc(countryName)}` : '<span class="text-[var(--text-muted)]">-</span>'}</td>
-                    <td>${esc(types)}</td>
-                    <td>${esc(aliases)}${moreAliases ? `<span class="text-[var(--text-secondary)]">${moreAliases}</span>` : ''}</td>
-                    <td><span class="ti-confidence ${confCls}">${conf}</span></td>
-                    <td>${formatDate(a.first_seen)}</td>
-                    <td>${formatDate(a.last_seen)}</td>
-                    <td>${labels || '-'}</td>
-                    <td>${watchBtn}${profileLink}</td>
-                </tr>`;
-                html += `<tr class="ti-detail-row" id="actor-detail-${idx}"><td colspan="9"><div class="ti-loading"><span class="ti-spinner"></span> Loading detail...</div></td></tr>`;
-            });
-            html += '</tbody></table>';
-            container.innerHTML = html;
-            container._actors = actors;
-        } catch(e) {
-            container.innerHTML = `<div class="ti-empty">Error: ${esc(e.message)}</div>`;
-        }
+    // Open or close a detail row. htmx does the fetch on the same click;
+    // this only decides whether the row is shown, and re-opening a row
+    // re-fetches, which is what the old handler did too.
+    window.tiToggleDetailRow = function(rowId) {
+        const row = document.getElementById(rowId);
+        if (row) row.classList.toggle('open');
     };
 
-    window.toggleActorDetail = async function(idx) {
-        const row = document.getElementById('actor-detail-' + idx);
-        if (!row) return;
-        if (row.classList.contains('open')) { row.classList.remove('open'); return; }
-        row.classList.add('open');
-
-        const actors = document.getElementById('actor-results')._actors;
-        if (!actors || !actors[idx]) return;
-        const a = actors[idx];
-
-        try {
-            const ec = a.entity_class || 'threat_actor';
-            const detail = await fetch(API + '/actors/' + encodeURIComponent(a.id) + '?entity_class=' + ec).then(r => r.json());
-            let html = '<td colspan="9">';
-
-            if (detail.description) {
-                html += `<div class="ti-detail-section"><h4>Description</h4><p>${esc(detail.description)}</p></div>`;
-            }
-            if (detail.campaigns && detail.campaigns.length) {
-                html += `<div class="ti-detail-section"><h4>Related Campaigns (${detail.campaigns.length})</h4><div class="ti-detail-tags">`;
-                detail.campaigns.forEach(c => { html += `<span class="ti-tag">${esc(c.name)}</span>`; });
-                html += '</div></div>';
-            }
-            if (detail.ttps && detail.ttps.length) {
-                html += `<div class="ti-detail-section"><h4>MITRE ATT&CK TTPs (${detail.ttps.length})</h4><div class="ti-ttp-list">`;
-                detail.ttps.forEach(t => {
-                    const label = t.mitre_id ? `${t.mitre_id}: ${t.name}` : t.name;
-                    html += `<span class="ti-ttp" title="${esc(t.description || '')}">${esc(label)}</span>`;
-                });
-                html += '</div></div>';
-            }
-            if (detail.indicators && detail.indicators.length) {
-                html += `<div class="ti-detail-section"><h4>Indicators (${detail.indicators.length})</h4><div class="ti-detail-tags">`;
-                detail.indicators.forEach(i => { html += `<span class="ti-tag">${esc(i.name)}</span>`; });
-                html += '</div></div>';
-            }
-            if (!detail.description && !(detail.campaigns||[]).length && !(detail.ttps||[]).length && !(detail.indicators||[]).length) {
-                html += '<div class="ti-empty p-2.5">No additional detail available.</div>';
-            }
-            html += '</td>';
-            row.innerHTML = html;
-        } catch(e) {
-            row.innerHTML = `<td colspan="9"><div class="ti-empty">Failed to load detail.</div></td>`;
-        }
-    };
-
-    window.watchActor = async function(idx) {
-        const actors = document.getElementById('actor-results')._actors;
-        if (!actors || !actors[idx]) return;
-        const a = actors[idx];
-        const reason = prompt('Why are you watching this actor? (optional)');
+    // One handler for both kinds. The payload arrives on the button as
+    // data-args rather than being looked up by index, so it does not
+    // depend on a JavaScript array the server never built.
+    window.watchActor = async function(payload) {
+        if (!payload || !payload.opencti_id) return;
+        const reason = prompt('Why are you watching this? (optional)');
         if (reason === null) return; // cancelled
-
         try {
-            await fetch(API + '/watches', {
+            // r.ok, because POST /watches answers 403 without
+            // observable:enrich and 400 for an entity_type it does not
+            // accept. The old handler awaited the response, ignored it,
+            // and reported "Added to watchlist" either way.
+            const r = await fetch(API + '/watches', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    entity_type: 'threat_actor',
-                    opencti_id: a.id,
-                    name: a.name,
-                    description: a.description,
-                    aliases: a.aliases,
-                    labels: (a.labels || []).map(l => l.value),
+                body: JSON.stringify(Object.assign({}, payload, {
                     reason: reason || null,
-                }),
+                })),
             });
-            watchedIds.add(a.id);
-            searchActors(); // refresh
-            if (typeof showToast === 'function') showToast('Added to watchlist: ' + a.name, 'success');
+            if (!r.ok) {
+                const what = r.status === 403
+                    ? 'You do not have permission to add a watch'
+                    : 'Failed to add watch: HTTP ' + r.status;
+                if (typeof showToast === 'function') showToast(what, 'error');
+                return;
+            }
+            // Re-run whichever search produced this row, so the button
+            // becomes Watched from the server's own view of the watchlist
+            // rather than from a set the page keeps separately.
+            const form = this.closest('.ti-panel').querySelector('form');
+            if (form && window.htmx) window.htmx.trigger(form, 'submit');
+            tiRefresh('#ti-overview-stats');
+            if (typeof showToast === 'function') {
+                showToast('Added to watchlist: ' + payload.name, 'success');
+            }
         } catch(e) {
             if (typeof showToast === 'function') showToast('Failed to add watch', 'error');
         }
     };
+    // The campaign table used a separate handler that differed only in the
+    // entity_type it sent, and that now travels in the payload.
+    window.watchCampaign = window.watchActor;
+
+
 
     // ── Campaigns ─────────────────────────────
-    window.searchCampaigns = async function() {
-        const q = document.getElementById('campaign-search').value.trim();
-        if (!q) return;
-        const container = document.getElementById('campaign-results');
-        container.innerHTML = '<div class="ti-loading"><span class="ti-spinner"></span> Searching OpenCTI...</div>';
 
-        try {
-            const data = await fetch(API + '/campaigns?search=' + encodeURIComponent(q) + '&first=30').then(r => r.json());
-            if (data.detail) { container.innerHTML = `<div class="ti-empty">${esc(data.detail)}</div>`; return; }
-            const campaigns = data.campaigns || [];
-            if (!campaigns.length) { container.innerHTML = '<div class="ti-empty">No campaigns found.</div>'; return; }
 
-            await refreshWatchedIds();
-
-            let html = '<table class="ti-table"><thead><tr><th>Name</th><th>Aliases</th><th>Confidence</th><th>First Seen</th><th>Last Seen</th><th>Labels</th><th>Watch</th></tr></thead><tbody>';
-            campaigns.forEach((c, idx) => {
-                const aliases = (c.aliases || []).slice(0, 3).join(', ');
-                const labels = (c.labels || []).map(l => `<span class="ti-label" data-ion-style="background:${l.color || '#30363d'}22; color:${l.color || '#8b949e'}">${esc(l.value)}</span>`).join('');
-                const conf = c.confidence != null ? c.confidence : '-';
-                const confCls = conf >= 70 ? 'high' : conf >= 40 ? 'medium' : 'low';
-                const isWatched = watchedIds.has(c.id);
-                // Same gate as the actor table: POST /watches needs
-                // observable:enrich.
-                const watchBtn = !canManageWatches
-                    ? ''
-                    : isWatched
-                    ? `<button class="ti-btn-outline ti-btn-sm ti-btn-watched" disabled>Watched</button>`
-                    : `<button class="ti-btn ti-btn-sm ti-btn-watch" data-click-action="watchCampaign" data-args='[${idx}]'>Watch</button>`;
-                html += `<tr>
-                    <td class="ti-name-cell" data-click-action="toggleCampaignDetail" data-args='[${idx}]'>${esc(c.name)}</td>
-                    <td>${esc(aliases)}</td>
-                    <td><span class="ti-confidence ${confCls}">${conf}</span></td>
-                    <td>${formatDate(c.first_seen)}</td>
-                    <td>${formatDate(c.last_seen)}</td>
-                    <td>${labels || '-'}</td>
-                    <td>${watchBtn}</td>
-                </tr>`;
-                html += `<tr class="ti-detail-row" id="campaign-detail-${idx}"><td colspan="7"><div class="ti-loading"><span class="ti-spinner"></span> Loading detail...</div></td></tr>`;
-            });
-            html += '</tbody></table>';
-            container.innerHTML = html;
-            container._campaigns = campaigns;
-        } catch(e) {
-            container.innerHTML = `<div class="ti-empty">Error: ${esc(e.message)}</div>`;
-        }
-    };
-
-    window.toggleCampaignDetail = async function(idx) {
-        const row = document.getElementById('campaign-detail-' + idx);
-        if (!row) return;
-        if (row.classList.contains('open')) { row.classList.remove('open'); return; }
-        row.classList.add('open');
-
-        const campaigns = document.getElementById('campaign-results')._campaigns;
-        if (!campaigns || !campaigns[idx]) return;
-        const c = campaigns[idx];
-
-        try {
-            const detail = await fetch(API + '/campaigns/' + encodeURIComponent(c.id)).then(r => r.json());
-            let html = '<td colspan="7">';
-
-            if (detail.description) {
-                html += `<div class="ti-detail-section"><h4>Description</h4><p>${esc(detail.description)}</p></div>`;
-            }
-            if (detail.threat_actors && detail.threat_actors.length) {
-                html += `<div class="ti-detail-section"><h4>Related Threat Actors (${detail.threat_actors.length})</h4><div class="ti-detail-tags">`;
-                detail.threat_actors.forEach(a => { html += `<span class="ti-tag">${esc(a.name)}</span>`; });
-                html += '</div></div>';
-            }
-            if (detail.indicators && detail.indicators.length) {
-                html += `<div class="ti-detail-section"><h4>Indicators (${detail.indicators.length})</h4><div class="ti-detail-tags">`;
-                detail.indicators.forEach(i => { html += `<span class="ti-tag">${esc(i.name)}</span>`; });
-                html += '</div></div>';
-            }
-            if (!detail.description && !(detail.threat_actors||[]).length && !(detail.indicators||[]).length) {
-                html += '<div class="ti-empty p-2.5">No additional detail available.</div>';
-            }
-            html += '</td>';
-            row.innerHTML = html;
-        } catch(e) {
-            row.innerHTML = `<td colspan="7"><div class="ti-empty">Failed to load detail.</div></td>`;
-        }
-    };
-
-    window.watchCampaign = async function(idx) {
-        const campaigns = document.getElementById('campaign-results')._campaigns;
-        if (!campaigns || !campaigns[idx]) return;
-        const c = campaigns[idx];
-        const reason = prompt('Why are you watching this campaign? (optional)');
-        if (reason === null) return;
-
-        try {
-            await fetch(API + '/watches', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    entity_type: 'campaign',
-                    opencti_id: c.id,
-                    name: c.name,
-                    description: c.description,
-                    aliases: c.aliases,
-                    labels: (c.labels || []).map(l => l.value),
-                    reason: reason || null,
-                }),
-            });
-            watchedIds.add(c.id);
-            searchCampaigns();
-            if (typeof showToast === 'function') showToast('Added to watchlist: ' + c.name, 'success');
-        } catch(e) {
-            if (typeof showToast === 'function') showToast('Failed to add watch', 'error');
-        }
-    };
 
     // ── Watchlist ─────────────────────────────
     // loadWatches and loadMatches are gone. Both tables are rendered by
@@ -1353,23 +1192,16 @@ data-click-action="tiCloseReport"></div>
     };
 
     // ── Helpers ───────────────────────────────
-    async function refreshWatchedIds() {
-        try {
-            // 500, not 1000. GET /watches bounds limit at le=500, so the old
-            // request answered 422 on every call. The body was still JSON so
-            // nothing threw, data.watches was undefined, and watchedIds was
-            // permanently empty: the watched state on every actor and
-            // campaign result was always wrong. Measured live.
-            //
-            // 500 is the endpoint's own maximum, which is the honest way to
-            // ask for all of them. If an estate ever holds more watches than
-            // that, the fix is paging rather than a bigger number.
-            const r = await fetch(API + '/watches?limit=500');
-            if (!r.ok) return;
-            const data = await r.json();
-            watchedIds = new Set((data.watches || []).map(w => w.opencti_id));
-        } catch(e) { /* ignore */ }
-    }
+    // refreshWatchedIds is gone, and so is the watchedIds set it fed.
+    // It asked for `?limit=1000` against an endpoint bounded at le=500, so
+    // it answered 422 on every call. The body was still JSON, nothing
+    // threw, data.watches was undefined, and the set was empty
+    // permanently: every actor and campaign result rendered as
+    // not-watched whatever the watchlist held. Measured live.
+    //
+    // The search fragments read the watchlist themselves, per request,
+    // through the same service the watchlist table uses, so there is no
+    // client-side copy to go stale or to be silently empty.
 
     function formatDate(iso) {
         if (!iso) return '-';

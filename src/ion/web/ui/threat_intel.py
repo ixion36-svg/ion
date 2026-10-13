@@ -505,3 +505,254 @@ async def threat_intel_landscape_iocs_fragment(
         )
 
     return await _landscape(request, IOCS_FRAGMENT, "indicators", fetch, "iocs")
+
+
+# ---------------------------------------------------------------------------
+# The Actors and Campaigns tabs
+#
+# searchActors and searchCampaigns both read with
+# `fetch(url).then(r => r.json())` and no r.ok check, then branched on
+# `data.detail` and rendered it into the ti-empty class, which is the
+# no-results styling. So a 503 from an unconfigured OpenCTI, a 403, and a
+# genuine zero-match search were three different facts rendered in one
+# voice. A reader searching an unconfigured estate was told their search
+# found nothing.
+#
+# toggleActorDetail and toggleCampaignDetail had the sharper version of the
+# same bug. They tested each of four sections for content and fell through
+# to "No additional detail available." A refusal body carries none of those
+# sections, so a failed detail read claimed OpenCTI holds nothing on the
+# actor in front of you.
+#
+# watchActor did not read r.ok either, and reported "Added to watchlist"
+# after a 403.
+#
+# The result tables also kept the whole result set on a DOM property,
+# container._actors, and addressed rows by index into it. Each detail row
+# now fetches itself by entity id, so there is no array to stay in step
+# with and no index to go stale when a search is re-run.
+# ---------------------------------------------------------------------------
+
+ACTOR_RESULTS_FRAGMENT = "_fragments/threat_intel_actor_results.html"
+CAMPAIGN_RESULTS_FRAGMENT = "_fragments/threat_intel_campaign_results.html"
+ENTITY_DETAIL_FRAGMENT = "_fragments/threat_intel_entity_detail.html"
+
+#: Results a search asks OpenCTI for, from the page's `&first=30`.
+SEARCH_FIRST = 30
+
+#: Columns each result table declares, so a detail row spans its parent.
+#: Actors carry an origin and a type list that campaigns do not.
+ACTOR_COLUMNS = 9
+CAMPAIGN_COLUMNS = 7
+
+
+def _watched_ids(session) -> set:
+    """OpenCTI ids already on the watchlist.
+
+    The page kept this in a module-level `watchedIds` set refreshed by
+    refreshWatchedIds, which asked for `?limit=1000` against an endpoint
+    bounded at 500 and so answered 422 on every call. The set was therefore
+    always empty and every result rendered as not-watched. Read here
+    instead, per request, from the same service the watch list uses.
+
+    A failure returns an empty set rather than raising, because not knowing
+    which entities are watched must not take the search results away. The
+    cost of being wrong is a Watch button on an entity already watched,
+    which the POST answers with the existing row.
+    """
+    from ion.services.threat_intel_service import ThreatIntelService
+
+    try:
+        items, _ = ThreatIntelService(session).get_watches(limit=WATCH_LIMIT)
+        return {w.opencti_id for w in items if w.opencti_id}
+    except Exception:
+        logger.exception("Could not read the watchlist for search results")
+        return set()
+
+
+async def _entity_search(request: Request, fragment: str, rows_key: str,
+                         q: str, session: Session, current_user: User,
+                         search):
+    """Shared body for the actor and campaign searches.
+
+    Four outcomes. `configured` comes from the same is_configured property
+    /api/threat-intel/actors checks through get_opencti_service, so an
+    unconfigured estate is reported as a deployment fact rather than as a
+    search that matched nothing.
+    """
+    from ion.services.opencti_service import get_opencti_service
+
+    can_manage = bool(
+        current_user and current_user.has_permission(MANAGE_PERMISSION)
+    )
+
+    def answer(ctx: dict) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request=request, name=fragment,
+            context={"q": q, "configured": True, "failed": False,
+                     "error": None, rows_key: None, "can_manage": can_manage,
+                     "watched_ids": set(), **ctx},
+            status_code=200,
+        )
+
+    service = get_opencti_service()
+    if not service.is_configured:
+        return answer({"configured": False})
+
+    try:
+        payload = await search(service)
+    except Exception as exc:
+        logger.exception("Threat intel %s search could not be rendered", rows_key)
+        # The class name only: the service's messages can carry estate
+        # detail and this renders for anyone with observable:read.
+        return answer({"failed": True, "error": type(exc).__name__})
+
+    return answer({
+        rows_key: _rows(payload, rows_key),
+        "watched_ids": _watched_ids(session),
+    })
+
+
+@router.get(
+    "/threat-intel/actor-search",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def threat_intel_actor_search_fragment(
+    request: Request,
+    q: str = Query("", max_length=200),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    """Threat-actor search results.
+
+    An empty `q` renders the resting prompt rather than searching for
+    nothing, which is what `if (!q) return;` did, except that the page then
+    left whatever was already on screen in place.
+    """
+    from ion.web.threat_intel_api import search_actors
+
+    if not q.strip():
+        return templates.TemplateResponse(
+            request=request, name=ACTOR_RESULTS_FRAGMENT,
+            context={"q": "", "configured": True, "failed": False,
+                     "error": None, "actors": [], "can_manage": False,
+                     "watched_ids": set(), "prompt": True},
+        )
+
+    async def search(_service):
+        return await search_actors(search=q, first=SEARCH_FIRST, user=None)
+
+    return await _entity_search(
+        request, ACTOR_RESULTS_FRAGMENT, "actors", q.strip(), session,
+        current_user, search,
+    )
+
+
+@router.get(
+    "/threat-intel/campaign-search",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def threat_intel_campaign_search_fragment(
+    request: Request,
+    q: str = Query("", max_length=200),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    """Campaign search results."""
+    from ion.web.threat_intel_api import search_campaigns
+
+    if not q.strip():
+        return templates.TemplateResponse(
+            request=request, name=CAMPAIGN_RESULTS_FRAGMENT,
+            context={"q": "", "configured": True, "failed": False,
+                     "error": None, "campaigns": [], "can_manage": False,
+                     "watched_ids": set(), "prompt": True},
+        )
+
+    async def search(_service):
+        return await search_campaigns(search=q, first=SEARCH_FIRST, user=None)
+
+    return await _entity_search(
+        request, CAMPAIGN_RESULTS_FRAGMENT, "campaigns", q.strip(), session,
+        current_user, search,
+    )
+
+
+async def _entity_detail(request: Request, columns: int, fetch) -> HTMLResponse:
+    """Shared body for both detail rows.
+
+    Four outcomes, where the page had two and the second was a lie: a
+    refusal body carries no description, campaigns, ttps or indicators, so
+    every section was skipped and the row said "No additional detail
+    available."
+    """
+    from ion.services.opencti_service import get_opencti_service
+
+    def answer(ctx: dict) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request=request, name=ENTITY_DETAIL_FRAGMENT,
+            context={"columns": columns, "configured": True, "failed": False,
+                     "detail": None, **ctx},
+            status_code=200,
+        )
+
+    service = get_opencti_service()
+    if not service.is_configured:
+        return answer({"configured": False})
+
+    try:
+        detail = await fetch(service)
+    except Exception:
+        logger.exception("Threat intel entity detail could not be rendered")
+        return answer({"failed": True})
+
+    # A dict or nothing. `_rows` is for lists; here the shape itself is the
+    # payload, and anything that is not a mapping cannot be read as detail.
+    return answer({"detail": detail if isinstance(detail, dict) else None})
+
+
+@router.get(
+    "/threat-intel/actor-detail",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def threat_intel_actor_detail_fragment(
+    request: Request,
+    entity_id: str = Query(..., min_length=1, max_length=400),
+    entity_class: str = Query("threat_actor", max_length=64),
+) -> HTMLResponse:
+    """One actor's detail row.
+
+    `entity_class` is the same parameter GET
+    /api/threat-intel/actors/{entity_id} takes, with the same default, and
+    it decides which OpenCTI lookup path is used. The page read it off the
+    entity it had in its own array; it travels in the URL now.
+    """
+    from ion.web.threat_intel_api import get_actor_detail
+
+    async def fetch(_service):
+        return await get_actor_detail(
+            entity_id=entity_id, entity_class=entity_class, user=None
+        )
+
+    return await _entity_detail(request, ACTOR_COLUMNS, fetch)
+
+
+@router.get(
+    "/threat-intel/campaign-detail",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def threat_intel_campaign_detail_fragment(
+    request: Request,
+    entity_id: str = Query(..., min_length=1, max_length=400),
+) -> HTMLResponse:
+    """One campaign's detail row."""
+    from ion.web.threat_intel_api import get_campaign_detail
+
+    async def fetch(_service):
+        return await get_campaign_detail(entity_id=entity_id, user=None)
+
+    return await _entity_detail(request, CAMPAIGN_COLUMNS, fetch)
