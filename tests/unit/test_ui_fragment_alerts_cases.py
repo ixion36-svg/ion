@@ -1160,7 +1160,7 @@ def test_the_five_modal_refreshes_go_through_the_fragment():
 #: loadPlaybooksForAlert 1): 80 to 69. Stage 4, the alert queue, removed
 #: 15 more (loadAlerts 9, _renderAlertsFallback 2, renderSideList 2,
 #: renderFilterChips 1, populateSystemFilterFromAlerts 1): 69 to 54.
-WRITES_REMAINING = 22
+WRITES_REMAINING = 18
 
 
 def test_the_dom_writes_in_the_page_do_not_increase():

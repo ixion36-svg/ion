@@ -490,6 +490,14 @@
     color: var(--primary);
 }
 
+/* The pause bars are the button's own content and the play glyph is the
+   ::before below, so exactly one icon shows in each state. The page used
+   to write an icon element in as well, which drew a second play glyph
+   beside this one whenever the timer was paused. */
+.timer-btn.playing .timer-icon-pause {
+    display: none;
+}
+
 .timer-btn.playing::before {
     content: "▶";
     letter-spacing: normal;

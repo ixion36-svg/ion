@@ -488,3 +488,60 @@ def test_a_system_counted_at_zero_sorts_ahead_of_one_not_counted(overview):
         {"system": "counted-zero", "mapped": True, "alert_count": 0},
     ]})["rows"]
     assert [r["name"] for r in rows] == ["counted-zero", "not-counted"]
+
+
+# ---------------------------------------------------------------------------
+# Stage 8: the writes a CSS class or static markup already covered
+# ---------------------------------------------------------------------------
+
+
+def test_the_timer_button_writes_no_icon_markup():
+    """alerts-page.css has `.timer-btn.playing::before { content: "▶" }` and
+    the Lucide sheet gives `.icon-play` a glyph too, so while the timer was
+    paused the button rendered both: the CSS triangle and the injected icon
+    element, side by side. The class was already the state."""
+    page = PAGE.read_text(encoding="utf-8")
+    assert "btn.innerHTML" not in page
+    assert 'class="timer-icon-pause"' in page
+
+    css = (ROOT / "src/ion/web/static/css/alerts-page.css").read_text(encoding="utf-8")
+    assert ".timer-btn.playing .timer-icon-pause" in css, (
+        "the bars have to be hidden when the ::before triangle shows, or the "
+        "paused button draws two icons again")
+    assert '.timer-btn.playing::before' in css
+
+
+def test_the_timer_still_toggles_the_class_that_is_the_state():
+    page = PAGE.read_text(encoding="utf-8")
+    body = page[page.index("function toggleInvestigationTimer("):].replace("\r\n", "\n")
+    body = body[:body.index("\n}")]
+    assert "classList.add('playing')" in body
+    assert "classList.remove('playing')" in body
+
+
+def test_the_keyboard_help_markup_lives_in_the_shell():
+    """Thirty-four lines with no interpolation and no escapeHtml call in
+    them, assembled and inserted on the body each time it was opened."""
+    page = PAGE.read_text(encoding="utf-8")
+    assert '<template id="keyboard-help-template">' in page
+    body = page[page.index("function showKeyboardShortcutsHelp("):].replace("\r\n", "\n")
+    body = body[:body.index("\n}")]
+    assert "insertAdjacentHTML" not in body
+    assert "innerHTML" not in body
+    assert "cloneTemplate('keyboard-help-template')" in body
+
+
+def test_the_help_template_is_outside_the_script_block():
+    """A <template> inside <script> is text, not markup, and cloneTemplate
+    would find no content to clone."""
+    page = PAGE.read_text(encoding="utf-8")
+    script = page.rindex('<script nonce="{{ csp_nonce }}">')
+    assert page.index('<template id="keyboard-help-template">') < script
+
+
+def test_the_help_modal_keeps_its_close_controls():
+    page = PAGE.read_text(encoding="utf-8")
+    tpl = page[page.index('<template id="keyboard-help-template">'):]
+    tpl = tpl[:tpl.index("</template>")]
+    assert tpl.count('data-remove-target="keyboard-help-modal"') == 2
+    assert "data-remove-self-on-self-click" in tpl

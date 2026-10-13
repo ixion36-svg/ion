@@ -598,7 +598,7 @@
             <div class="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-md font-mono text-[0.9rem] ml-auto mr-4" id="investigation-timer">
                 <span class="text-base">&#9201;</span>
                 <span class="timer-display" id="timer-display">00:00</span>
-                <button class="timer-btn" id="timer-toggle-btn" data-click-action="toggleInvestigationTimer" title="Pause/Resume timer">&#10074;&#10074;</button>
+            <button class="timer-btn" id="timer-toggle-btn" data-click-action="toggleInvestigationTimer" title="Pause/Resume timer"><span class="timer-icon-pause">&#10074;&#10074;</span></button>
             </div>
             <button class="modal-close" data-click-action="closeAlertModal">&times;</button>
         </div>
@@ -678,6 +678,34 @@
 {# The Start Playbook picker, /ui/alerts/case-playbook-picker/{id}, lands
    here. Its overlay removes itself; startCasePlaybook empties the host. #}
 <div id="case-playbook-picker-host"></div>
+
+<template id="keyboard-help-template">
+<div id="keyboard-help-modal" class="saved-filters-modal" data-remove-self-on-self-click>
+    <div class="saved-filters-content max-w-[400px]">
+        <div class="modal-header mb-4">
+            <h3>Keyboard Shortcuts</h3>
+            <button class="modal-close" data-remove-target="keyboard-help-modal">&times;</button>
+        </div>
+        <div class="grid grid-cols-[auto_1fr] gap-[0.5rem_1rem]">
+            <kbd>j</kbd><span>Next alert</span>
+            <kbd>k</kbd><span>Previous alert</span>
+            <kbd>Enter</kbd><span>Open alert details</span>
+            <kbd>Space</kbd><span>Toggle alert selection</span>
+            <kbd>Esc</kbd><span>Close modal / Clear selection</span>
+            <kbd>r</kbd><span>Refresh alerts</span>
+            <kbd>?</kbd><span>Show this help</span>
+            <div class="col-span-2 border-t-[1px] border-t-[var(--ion-border)] my-2 mx-0"></div>
+            <strong class="col-span-2">When viewing alert details:</strong>
+            <kbd>a</kbd><span>Assign to me</span>
+            <kbd>s</kbd><span>Change status</span>
+            <kbd>c</kbd><span>Create case</span>
+        </div>
+        <div class="modal-footer mt-4 text-right">
+            <button class="btn btn-secondary" data-remove-target="keyboard-help-modal">Close</button>
+        </div>
+    </div>
+</div>
+</template>
 
 {# The three case dialogs whose markup needs no server data: the single and
    bulk create-case forms and the quick closure confirm. The script clones
@@ -5019,7 +5047,7 @@ function startInvestigationTimer(alertId) {
     // Update button state
     const btn = document.getElementById('timer-toggle-btn');
     if (btn) {
-        btn.innerHTML = '&#10074;&#10074;'; // Pause icon
+        // As above: the bars are in the shell.
         btn.classList.remove('playing');
     }
 }
@@ -5051,7 +5079,8 @@ function toggleInvestigationTimer() {
         investigationTimerPaused = false;
         investigationStartTime = Date.now();
         investigationTimerInterval = setInterval(updateTimerDisplay, 1000);
-        btn.innerHTML = '&#10074;&#10074;'; // Pause icon
+        // The pause bars are the button's own content, hidden by the
+        // playing class. Nothing to write.
         btn.classList.remove('playing');
         display.classList.remove('paused');
     } else {
@@ -5065,7 +5094,8 @@ function toggleInvestigationTimer() {
         if (investigationStartTime) {
             investigationElapsedTime += Math.floor((Date.now() - investigationStartTime) / 1000);
         }
-        btn.innerHTML = '<i class="icon-play"></i>'; // Play icon
+        // The play glyph comes from .timer-btn.playing::before. Writing
+        // an icon element here as well drew two.
         btn.classList.add('playing');
         display.classList.add('paused');
     }
@@ -6037,38 +6067,15 @@ function showStatusQuickPicker() {
 }
 
 function showKeyboardShortcutsHelp() {
-    const helpHtml = `
-        <div id="keyboard-help-modal" class="saved-filters-modal" data-remove-self-on-self-click>
-            <div class="saved-filters-content max-w-[400px]">
-                <div class="modal-header mb-4">
-                    <h3>Keyboard Shortcuts</h3>
-                    <button class="modal-close" data-remove-target="keyboard-help-modal">&times;</button>
-                </div>
-                <div class="grid grid-cols-[auto_1fr] gap-[0.5rem_1rem]">
-                    <kbd>j</kbd><span>Next alert</span>
-                    <kbd>k</kbd><span>Previous alert</span>
-                    <kbd>Enter</kbd><span>Open alert details</span>
-                    <kbd>Space</kbd><span>Toggle alert selection</span>
-                    <kbd>Esc</kbd><span>Close modal / Clear selection</span>
-                    <kbd>r</kbd><span>Refresh alerts</span>
-                    <kbd>?</kbd><span>Show this help</span>
-                    <div class="col-span-2 border-t-[1px] border-t-[var(--ion-border)] my-2 mx-0"></div>
-                    <strong class="col-span-2">When viewing alert details:</strong>
-                    <kbd>a</kbd><span>Assign to me</span>
-                    <kbd>s</kbd><span>Change status</span>
-                    <kbd>c</kbd><span>Create case</span>
-                </div>
-                <div class="modal-footer mt-4 text-right">
-                    <button class="btn btn-secondary" data-remove-target="keyboard-help-modal">Close</button>
-                </div>
-            </div>
-        </div>
-    `;
-
+    // The markup is a <template> in the shell: thirty-four lines with no
+    // interpolation anywhere in them, so there was nothing to assemble. A
+    // clone rather than a persistent hidden element, because the dispatcher
+    // offers only remove-actions and removing a shell element would delete
+    // it for good.
     const existing = document.getElementById('keyboard-help-modal');
     if (existing) existing.remove();
-
-    document.body.insertAdjacentHTML('beforeend', helpHtml);
+    const modal = cloneTemplate('keyboard-help-template');
+    if (modal) document.body.appendChild(modal);
 }
 
 // Initialize keyboard shortcuts
