@@ -15,23 +15,23 @@ Server-rendered fragments. `render_view` routes also answer the view model as JS
 | method | path | permission | handler | renders | called from |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/ui/alert-prompts` | `playbook:read` | [alert_prompt_templates.py:41](src/ion/web/ui/alert_prompt_templates.py#L41) | `_fragments/alert_prompt_templates.html` | `alert_prompt_templates.html` |
-| GET | `/ui/alerts/analytics` | `alert:read` | [alerts.py:2588](src/ion/web/ui/alerts.py#L2588) | `_fragments/alerts_analytics.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/case-manage/{case_id}` | `case:read` | [alerts.py:661](src/ion/web/ui/alerts.py#L661) | `_fragments/alerts_case_manage.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/case-panel/{case_id}` | `case:read` | [alerts.py:531](src/ion/web/ui/alerts.py#L531) | `_fragments/alerts_case_panel.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/case-picker` | `case:read` | [alerts.py:615](src/ion/web/ui/alerts.py#L615) | `_fragments/alerts_case_picker.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/case-playbook-executions/{case_id}` | `playbook:execute` | [alerts.py:999](src/ion/web/ui/alerts.py#L999) | `_fragments/alerts_playbook_case_executions.html` | `alert_arkime.html`, `alerts_case_manage.html`, `alert_arkime.html` |
-| GET | `/ui/alerts/case-playbook-picker/{case_id}` | `playbook:read` | [alerts.py:1047](src/ion/web/ui/alerts.py#L1047) | `_fragments/alerts_playbook_case_picker.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| POST | `/ui/alerts/case-summary/{case_id}` | `case:read` | [alerts.py:745](src/ion/web/ui/alerts.py#L745) | `_fragments/alerts_case_ai_summary.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/case-tab/{case_id}` | `alert:read + case:read` | [alerts.py:2183](src/ion/web/ui/alerts.py#L2183) | `_fragments/alerts_case_tab.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/analytics` | `alert:read` | [alerts.py:2560](src/ion/web/ui/alerts.py#L2560) | `_fragments/alerts_analytics.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/case-manage/{case_id}` | `case:read` | [alerts.py:651](src/ion/web/ui/alerts.py#L651) | `_fragments/alerts_case_manage.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/case-panel/{case_id}` | `case:read` | [alerts.py:527](src/ion/web/ui/alerts.py#L527) | `_fragments/alerts_case_panel.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/case-picker` | `case:read` | [alerts.py:611](src/ion/web/ui/alerts.py#L611) | `_fragments/alerts_case_picker.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/case-playbook-executions/{case_id}` | `playbook:execute` | [alerts.py:989](src/ion/web/ui/alerts.py#L989) | `_fragments/alerts_playbook_case_executions.html` | `alert_arkime.html`, `alerts_case_manage.html`, `alert_arkime.html` |
+| GET | `/ui/alerts/case-playbook-picker/{case_id}` | `playbook:read` | [alerts.py:1037](src/ion/web/ui/alerts.py#L1037) | `_fragments/alerts_playbook_case_picker.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| POST | `/ui/alerts/case-summary/{case_id}` | `case:read` | [alerts.py:735](src/ion/web/ui/alerts.py#L735) | `_fragments/alerts_case_ai_summary.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/case-tab/{case_id}` | `alert:read + case:read` | [alerts.py:2160](src/ion/web/ui/alerts.py#L2160) | `_fragments/alerts_case_tab.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
 | GET | `/ui/alerts/cases-summary` | `case:read` | [alerts.py:432](src/ion/web/ui/alerts.py#L432) | `_fragments/alerts_cases_summary.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/comments/{alert_id}` | `alert:read` | [alerts.py:2156](src/ion/web/ui/alerts.py#L2156) | `_fragments/alerts_comments.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/enrich/{alert_id}` | `alert:read` | [alerts.py:2248](src/ion/web/ui/alerts.py#L2248) | `_fragments/alerts_enrich.html` | `alert_arkime.html`, `alerts_triage_bar.html`, `alert_arkime.html` |
-| GET | `/ui/alerts/kfp-banner/{case_id}` | `alert:read + case:read` | [alerts.py:2207](src/ion/web/ui/alerts.py#L2207) | `_fragments/alerts_kfp_banner.html` | `alert_arkime.html`, `alerts_case_manage.html`, `alert_arkime.html` |
-| GET | `/ui/alerts/playbook-library/{alert_id}` | `playbook:read` | [alerts.py:1188](src/ion/web/ui/alerts.py#L1188) | `_fragments/alerts_playbook_library.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/playbooks/{alert_id}` | `playbook:read` | [alerts.py:1126](src/ion/web/ui/alerts.py#L1126) | `_fragments/alerts_playbooks.html` | `alert_arkime.html`, `alerts_triage_bar.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/queue` | `alert:read` | [alerts.py:1546](src/ion/web/ui/alerts.py#L1546) | `_fragments/alerts_queue.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/systems` | `alert:read` | [alerts.py:2948](src/ion/web/ui/alerts.py#L2948) | `_fragments/alerts_systems.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/triage/{alert_id}` | `alert:read` | [alerts.py:2088](src/ion/web/ui/alerts.py#L2088) | `_fragments/alerts_triage_bar.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/comments/{alert_id}` | `alert:read` | [alerts.py:2136](src/ion/web/ui/alerts.py#L2136) | `_fragments/alerts_comments.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/enrich/{alert_id}` | `alert:read` | [alerts.py:2223](src/ion/web/ui/alerts.py#L2223) | `_fragments/alerts_enrich.html` | `alert_arkime.html`, `alerts_triage_bar.html`, `alert_arkime.html` |
+| GET | `/ui/alerts/kfp-banner/{case_id}` | `alert:read + case:read` | [alerts.py:2184](src/ion/web/ui/alerts.py#L2184) | `_fragments/alerts_kfp_banner.html` | `alert_arkime.html`, `alerts_case_manage.html`, `alert_arkime.html` |
+| GET | `/ui/alerts/playbook-library/{alert_id}` | `playbook:read` | [alerts.py:1175](src/ion/web/ui/alerts.py#L1175) | `_fragments/alerts_playbook_library.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/playbooks/{alert_id}` | `playbook:read` | [alerts.py:1116](src/ion/web/ui/alerts.py#L1116) | `_fragments/alerts_playbooks.html` | `alert_arkime.html`, `alerts_triage_bar.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/queue` | `alert:read` | [alerts.py:1533](src/ion/web/ui/alerts.py#L1533) | `_fragments/alerts_queue.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/systems` | `alert:read` | [alerts.py:2916](src/ion/web/ui/alerts.py#L2916) | `_fragments/alerts_systems.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/triage/{alert_id}` | `alert:read` | [alerts.py:2071](src/ion/web/ui/alerts.py#L2071) | `_fragments/alerts_triage_bar.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
 | POST | `/ui/alerts/{alert_id}/arkime` | `alert:read` | [alert_arkime.py:570](src/ion/web/ui/alert_arkime.py#L570) |  | `alert_arkime.html`, `alert_arkime.html` |
 | POST | `/ui/alerts/{alert_id}/arkime/commit` | `alert:read` | [alert_arkime.py:719](src/ion/web/ui/alert_arkime.py#L719) |  | `alert_arkime.html`, `alert_arkime.html` |
 | GET | `/ui/architecture/diagram` | `security:read` | [architecture.py:251](src/ion/web/ui/architecture.py#L251) | `_fragments/architecture_diagram.html` | `architecture_diagram.html`, `architecture.html` |

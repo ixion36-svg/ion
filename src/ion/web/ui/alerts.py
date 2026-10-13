@@ -113,7 +113,7 @@ from sqlalchemy.orm import Session
 from ion.auth.dependencies import get_current_user, require_permission
 from ion.models.user import User
 from ion.storage.database import get_db_session
-from ion.web.ui._shared import plain, render_view, templates
+from ion.web.ui._shared import plain, render_view
 
 logger = logging.getLogger(__name__)
 
@@ -437,7 +437,7 @@ async def _read_case(case_id: int, current_user: User, session: Session) -> dict
 def alerts_cases_summary_fragment(
     request: Request,
     session: Session = Depends(get_db_session),
-) -> HTMLResponse:
+) -> Response:
     """The Cases card rows plus, out of band, the badge in its header.
 
     Reads through case_query_service.list_cases_page and case_facets, the
@@ -479,18 +479,14 @@ def alerts_cases_summary_fragment(
             for c in cases if isinstance(c, dict)
         ]
 
-    return templates.TemplateResponse(
-        request=request,
-        name=SUMMARY_FRAGMENT,
-        context={
-            "failed": failed,
-            "cases": rows,
-            "active_total": total,
-            "facets_failed": facets_failed,
-            "limit": SUMMARY_LIMIT,
-        },
-        status_code=200,
-    )
+    view = {
+        "failed": failed,
+        "cases": rows,
+        "active_total": total,
+        "facets_failed": facets_failed,
+        "limit": SUMMARY_LIMIT,
+    }
+    return render_view(request, SUMMARY_FRAGMENT, view)
 
 
 # ---------------------------------------------------------------------------
@@ -538,7 +534,7 @@ async def alerts_case_panel_fragment(
     case_id: int,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
-) -> HTMLResponse:
+) -> Response:
     """The slide-out panel body, plus its header out of band.
 
     Three outcomes, where openCasePanel had a loading string, a body and a
@@ -622,7 +618,7 @@ def alerts_case_picker_fragment(
     selected: int = Query(0, ge=0, description="How many alerts are selected"),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
-) -> HTMLResponse:
+) -> Response:
     """The Add Alerts to Case modal.
 
     `selected` is the page's selection count, client state passed as a
@@ -638,19 +634,13 @@ def alerts_case_picker_fragment(
         listing = open_cases(session)
     except Exception:
         logger.exception("Alerts case picker fragment could not list open cases")
-        return templates.TemplateResponse(
-            request=request, name=PICKER_FRAGMENT,
-            context={"failed": True, "cases": None, "total": None,
-                     "truncated": False, "selected": selected,
-                     "can_add": can_add},
-            status_code=200,
-        )
-    return templates.TemplateResponse(
-        request=request, name=PICKER_FRAGMENT,
-        context={"failed": False, "selected": selected, "can_add": can_add,
-                 **listing},
-        status_code=200,
-    )
+        view = {"failed": True, "cases": None, "total": None,
+                 "truncated": False, "selected": selected,
+                 "can_add": can_add}
+        return render_view(request, PICKER_FRAGMENT, view)
+    view = {"failed": False, "selected": selected, "can_add": can_add,
+             **listing}
+    return render_view(request, PICKER_FRAGMENT, view)
 
 
 # ---------------------------------------------------------------------------
@@ -668,7 +658,7 @@ async def alerts_case_manage_fragment(
     case_id: int,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
-) -> HTMLResponse:
+) -> Response:
     """The case management modal, the overlay included.
 
     Every control is gated on the permission its endpoint carries:
@@ -752,7 +742,7 @@ async def alerts_case_ai_summary_fragment(
     case_id: int,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
-) -> HTMLResponse:
+) -> Response:
     """The AI case summary, rendered into #ai-case-summary-{id}.
 
     Calls the same handler POST /api/ai/analyze/alert runs, with the same
@@ -1006,7 +996,7 @@ def alerts_case_playbook_executions_fragment(
     case_id: int,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
-) -> HTMLResponse:
+) -> Response:
     """The Playbook Executions list in the case management modal.
 
     Calls the handler GET /api/cases/{id}/playbook-executions runs, which
@@ -1054,7 +1044,7 @@ def alerts_case_playbook_picker_fragment(
     case_id: int,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
-) -> HTMLResponse:
+) -> Response:
     """The Start Playbook picker for a case, the overlay included.
 
     Lists through the handler GET /api/playbooks?active_only=true runs.
@@ -1133,7 +1123,7 @@ async def alerts_playbooks_fragment(
     alert_id: str,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
-) -> HTMLResponse:
+) -> Response:
     """The Investigation Playbooks section of the alert detail modal.
 
     Two reads, as `loadPlaybooksForAlert` made them, each with its own
@@ -1167,22 +1157,19 @@ async def alerts_playbooks_fragment(
     if rows is not None:
         rows = [{**p, "step_count": _count(p.get("step_count"))} for p in rows]
 
-    return templates.TemplateResponse(
-        request=request, name=ALERT_PLAYBOOKS_FRAGMENT,
-        context={
-            "alert_id": alert_id,
-            "can_execute": can_execute,
-            "alert_missing": recommended["missing"],
-            "recommended_failed": recommended["failed"],
-            "recommended_error": recommended["error"],
-            "recommended": rows,
-            "executions_withheld": not can_execute,
-            "executions_failed": executions_failed,
-            "active": execution_view(active) if active else None,
-            "completed_count": completed_count(executions) if executions is not None else None,
-        },
-        status_code=200,
-    )
+    view = {
+        "alert_id": alert_id,
+        "can_execute": can_execute,
+        "alert_missing": recommended["missing"],
+        "recommended_failed": recommended["failed"],
+        "recommended_error": recommended["error"],
+        "recommended": rows,
+        "executions_withheld": not can_execute,
+        "executions_failed": executions_failed,
+        "active": execution_view(active) if active else None,
+        "completed_count": completed_count(executions) if executions is not None else None,
+    }
+    return render_view(request, ALERT_PLAYBOOKS_FRAGMENT, view)
 
 
 @router.get(
@@ -1195,7 +1182,7 @@ async def alerts_playbook_library_fragment(
     alert_id: str,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
-) -> HTMLResponse:
+) -> Response:
     """The Browse Playbook Library panel under the alert's section.
 
     Lists through the handler GET .../suggested-playbooks runs. Same four
@@ -1558,7 +1545,7 @@ async def alerts_queue_fragment(
     system: str = Query("", description="The alert-system-filter control's value"),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
-) -> HTMLResponse:
+) -> Response:
     """The alert queue: the fallback rows for #alerts-tbody, and out of
     band the data block the page's pipeline reads, the system select, the
     notice line, and on a failed read the three side lists.
@@ -1606,30 +1593,26 @@ async def alerts_queue_fragment(
         triage = await _triage_map([a.get("id") for a in alerts if a.get("id") is not None],
                                    current_user, session)
 
-    return templates.TemplateResponse(
-        request=request,
-        name=QUEUE_FRAGMENT,
-        context={
-            **outcome,
-            "rows": queue_rows(alerts, triage, outcome["arkime_enabled"]) if alerts is not None else None,
-            "triage_failed": alerts is not None and len(alerts) > 0 and triage is None,
-            "total": len(alerts) if alerts is not None else None,
-            "limit": QUEUE_LIMIT,
-            "truncated": alerts is not None and len(alerts) >= QUEUE_LIMIT,
-            "window": window,
-            "include_closed": closed,
-            "systems": system_options(alerts, _known_systems(session), system),
-            "system": system,
-            "colspan": QUEUE_FALLBACK_COLUMNS,
-            "can_triage": _can(current_user, TRIAGE_PERMISSION),
-            "can_create_case": _can(current_user, CREATE_PERMISSION),
-            # The spine. Only the keys the page reads; the rows above carry
-            # everything else the fallback needs.
-            "data": {"alerts": alerts, "arkime_enabled": outcome["arkime_enabled"]}
-                    if alerts is not None else None,
-        },
-        status_code=200,
-    )
+    view = {
+        **outcome,
+        "rows": queue_rows(alerts, triage, outcome["arkime_enabled"]) if alerts is not None else None,
+        "triage_failed": alerts is not None and len(alerts) > 0 and triage is None,
+        "total": len(alerts) if alerts is not None else None,
+        "limit": QUEUE_LIMIT,
+        "truncated": alerts is not None and len(alerts) >= QUEUE_LIMIT,
+        "window": window,
+        "include_closed": closed,
+        "systems": system_options(alerts, _known_systems(session), system),
+        "system": system,
+        "colspan": QUEUE_FALLBACK_COLUMNS,
+        "can_triage": _can(current_user, TRIAGE_PERMISSION),
+        "can_create_case": _can(current_user, CREATE_PERMISSION),
+        # The spine. Only the keys the page reads; the rows above carry
+        # everything else the fallback needs.
+        "data": {"alerts": alerts, "arkime_enabled": outcome["arkime_enabled"]}
+                if alerts is not None else None,
+    }
+    return render_view(request, QUEUE_FRAGMENT, view)
 
 
 # ---------------------------------------------------------------------------
@@ -2098,7 +2081,7 @@ async def alerts_triage_fragment(
     mitre_tactic_name: str = Query(""),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
-) -> HTMLResponse:
+) -> Response:
     """The triage bar, and out of band the comments tab and the case tab,
     from one call to the handler GET .../triage runs.
 
@@ -2130,27 +2113,24 @@ async def alerts_triage_fragment(
         case_link = "read"
         case_tab = await _case_tab(int(view["case_id"]), current_user, session, flags, ai_available)
 
-    return templates.TemplateResponse(
-        request=request, name=TRIAGE_BAR_FRAGMENT,
-        context={
-            "alert_id": alert_id,
-            "failed": read["failed"],
-            "triage": read["triage"],
-            "view": view,
-            "comments": comment_rows(read["comments"]) if read["comments"] is not None else None,
-            "comments_failed": read["comments"] is None,
-            "case_link": case_link,
-            "case_tab": case_tab,
-            "ai_available": ai_available,
-            "statuses": TRIAGE_STATUSES,
-            "priorities": PRIORITIES,
-            "observable_types": OBSERVABLE_TYPES,
-            "tactics": MITRE_TACTICS,
-            "case_read_permission": PERMISSION,
-            **flags,
-        },
-        status_code=200,
-    )
+    view = {
+        "alert_id": alert_id,
+        "failed": read["failed"],
+        "triage": read["triage"],
+        "view": view,
+        "comments": comment_rows(read["comments"]) if read["comments"] is not None else None,
+        "comments_failed": read["comments"] is None,
+        "case_link": case_link,
+        "case_tab": case_tab,
+        "ai_available": ai_available,
+        "statuses": TRIAGE_STATUSES,
+        "priorities": PRIORITIES,
+        "observable_types": OBSERVABLE_TYPES,
+        "tactics": MITRE_TACTICS,
+        "case_read_permission": PERMISSION,
+        **flags,
+    }
+    return render_view(request, TRIAGE_BAR_FRAGMENT, view)
 
 
 @router.get(
@@ -2163,21 +2143,18 @@ async def alerts_comments_fragment(
     alert_id: str,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
-) -> HTMLResponse:
+) -> Response:
     """The comments tab alone, for the page's renderCommentsTab, which the
     shared detail module calls and addComment calls after posting. The bar
     is not re-rendered, so an analyst's unsaved notes stay in the box."""
     read = await _read_triage(alert_id, current_user, session)
-    return templates.TemplateResponse(
-        request=request, name=COMMENTS_FRAGMENT,
-        context={
-            "alert_id": alert_id,
-            "comments": comment_rows(read["comments"]) if read["comments"] is not None else None,
-            "comments_failed": read["comments"] is None,
-            "can_triage": _can(current_user, TRIAGE_PERMISSION),
-        },
-        status_code=200,
-    )
+    view = {
+        "alert_id": alert_id,
+        "comments": comment_rows(read["comments"]) if read["comments"] is not None else None,
+        "comments_failed": read["comments"] is None,
+        "can_triage": _can(current_user, TRIAGE_PERMISSION),
+    }
+    return render_view(request, COMMENTS_FRAGMENT, view)
 
 
 @router.get(
@@ -2191,7 +2168,7 @@ async def alerts_case_tab_fragment(
     case_id: int,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
-) -> HTMLResponse:
+) -> Response:
     """The case tab alone, for renderCaseTab's callers after a mutation.
 
     Two guards: case:read for GET /api/cases/{id}, and alert:read for the
@@ -2200,8 +2177,8 @@ async def alerts_case_tab_fragment(
     """
     flags = _detail_flags(current_user)
     ctx = await _case_tab(case_id, current_user, session, flags, await _ai_available())
-    return templates.TemplateResponse(request=request, name=CASE_TAB_FRAGMENT,
-                                      context=ctx, status_code=200)
+    view = ctx
+    return render_view(request, CASE_TAB_FRAGMENT, view)
 
 
 @router.get(
@@ -2215,7 +2192,7 @@ async def alerts_kfp_banner_fragment(
     case_id: int,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
-) -> HTMLResponse:
+) -> Response:
     """The known-false-positive banner for the case management modal.
 
     Reads the case through GET /api/cases/{id}'s handler and runs the match
@@ -2224,11 +2201,9 @@ async def alerts_kfp_banner_fragment(
     """
     can_triage = _can(current_user, TRIAGE_PERMISSION)
 
-    def answer(ctx: dict) -> HTMLResponse:
-        return templates.TemplateResponse(
-            request=request, name=KFP_BANNER_FRAGMENT,
-            context={"case_id": case_id, "can_triage": can_triage, **ctx}, status_code=200,
-        )
+    def answer(ctx: dict) -> Response:
+        view = {"case_id": case_id, "can_triage": can_triage, **ctx}
+        return render_view(request, KFP_BANNER_FRAGMENT, view)
 
     try:
         case = await _read_case(case_id, current_user, session)
@@ -2255,7 +2230,7 @@ async def alerts_enrich_fragment(
     alert_id: str,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
-) -> HTMLResponse:
+) -> Response:
     """OpenCTI enrichment of the alert's triage observables, into
     #enrich-results, with the observables list re-rendered out of band so
     each row carries its found or not-found dot.
@@ -2276,15 +2251,12 @@ async def alerts_enrich_fragment(
 
     can_triage = _can(current_user, TRIAGE_PERMISSION)
 
-    def answer(ctx: dict) -> HTMLResponse:
-        return templates.TemplateResponse(
-            request=request, name=ENRICH_FRAGMENT,
-            context={"alert_id": alert_id, "can_triage": can_triage,
-                     "no_observables": False, "enrichable": None, "unavailable": None,
-                     "failed": False, "results": None, "observables": None,
-                     "found_count": None, "ai_available": False, **ctx},
-            status_code=200,
-        )
+    def answer(ctx: dict) -> Response:
+        view = {"alert_id": alert_id, "can_triage": can_triage,
+                 "no_observables": False, "enrichable": None, "unavailable": None,
+                 "failed": False, "results": None, "observables": None,
+                 "found_count": None, "ai_available": False, **ctx}
+        return render_view(request, ENRICH_FRAGMENT, view)
 
     try:
         triage = session.query(AlertTriage).filter_by(es_alert_id=alert_id).first()
@@ -2600,7 +2572,7 @@ async def alerts_analytics_fragment(
     system: str = Query(""),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
-) -> HTMLResponse:
+) -> Response:
     """The analytics drawer, over the same window the queue reads.
 
     The same six raw control values, through queue_window and
@@ -2645,34 +2617,30 @@ async def alerts_analytics_fragment(
         triage_map = {}
     severity = _slice_counts(alerts, "severity", SEVERITY_SLICES)
     triage = triage_slice_counts(alerts, triage_map)
-    return templates.TemplateResponse(
-        request=request,
-        name=ANALYTICS_FRAGMENT,
-        context={
-            "failed": outcome["failed"],
-            "degraded": outcome["degraded"],
-            "reason": outcome["reason"],
-            "connection_error": outcome["connection_error"],
-            # The key metric cards are filled by the page with textContent,
-            # not innerHTML, and read triageCache, which is client state. They
-            # are not this stage's and nothing is rendered for them here.
-            "trend": trend_buckets(alerts, window["hours"]) if alerts is not None else None,
-            "hours": window["hours"],
-            "defaulted": window["defaulted"],
-            "truncated": alerts is not None and len(alerts) >= QUEUE_LIMIT,
-            "limit": QUEUE_LIMIT,
-            "severity_donut": donut_arcs(severity, SEVERITY_COLOURS),
-            "triage_donut": donut_arcs(triage, TRIAGE_COLOURS),
-            "countries": country_counts(alerts) if alerts is not None else None,
-            "hosts": top_counts(alerts, "host") if alerts is not None else None,
-            "rules": top_counts(alerts, "rule_name") if alerts is not None else None,
-            "host_colour": HOST_BAR_COLOUR,
-            "rule_colour": RULE_BAR_COLOUR,
-            "trend_w": TREND_W,
-            "trend_h": TREND_H,
-        },
-        status_code=200,
-    )
+    view = {
+        "failed": outcome["failed"],
+        "degraded": outcome["degraded"],
+        "reason": outcome["reason"],
+        "connection_error": outcome["connection_error"],
+        # The key metric cards are filled by the page with textContent,
+        # not innerHTML, and read triageCache, which is client state. They
+        # are not this stage's and nothing is rendered for them here.
+        "trend": trend_buckets(alerts, window["hours"]) if alerts is not None else None,
+        "hours": window["hours"],
+        "defaulted": window["defaulted"],
+        "truncated": alerts is not None and len(alerts) >= QUEUE_LIMIT,
+        "limit": QUEUE_LIMIT,
+        "severity_donut": donut_arcs(severity, SEVERITY_COLOURS),
+        "triage_donut": donut_arcs(triage, TRIAGE_COLOURS),
+        "countries": country_counts(alerts) if alerts is not None else None,
+        "hosts": top_counts(alerts, "host") if alerts is not None else None,
+        "rules": top_counts(alerts, "rule_name") if alerts is not None else None,
+        "host_colour": HOST_BAR_COLOUR,
+        "rule_colour": RULE_BAR_COLOUR,
+        "trend_w": TREND_W,
+        "trend_h": TREND_H,
+    }
+    return render_view(request, ANALYTICS_FRAGMENT, view)
 
 
 # ---------------------------------------------------------------------------
