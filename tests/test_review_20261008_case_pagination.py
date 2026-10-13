@@ -499,7 +499,18 @@ class TestNoUnboundedCallers:
         )
 
     def test_the_alerts_summary_counts_from_the_server(self):
+        """The Cases card is a server-rendered fragment now
+        (ion/web/ui/alerts.py), so the aggregate comes from case_facets in
+        the fragment route rather than from a facets fetch in the page. The
+        page must pull that fragment and the fragment must read the facets;
+        a count taken from the capped page is the defect either way."""
         page = (_SRC / "ion" / "web" / "templates" / "alerts.html"
                 ).read_text(encoding="utf-8")
-        assert "/api/cases/facets" in page
-        assert "casesActiveTotal" in page
+        assert 'hx-get="/ui/alerts/cases-summary"' in page
+        assert "/api/cases/facets" not in page, "the page no longer counts for itself"
+
+        fragment = (_SRC / "ion" / "web" / "ui" / "alerts.py").read_text(encoding="utf-8")
+        route = fragment[fragment.index("def alerts_cases_summary_fragment"):]
+        route = route[:route.index("\n@router.")]
+        assert "cq.case_facets(session)" in route
+        assert "active_total(" in route

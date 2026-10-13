@@ -1,0 +1,55 @@
+{# Alerts: the Cases card in the side panel, rows plus the badge.
+
+   Replaces the two innerHTML sites in renderCasesSummary (the "No cases"
+   state and the row build) and the per-row `el.style.background`
+   assignment that coloured the count by status after the markup landed.
+   The markup is what that JavaScript produced, so the card looks unchanged
+   and the move stays checkable.
+
+   The badge in the card header is outside the swap target, so it is
+   swapped out of band by id. It carries the server's aggregate, which is
+   right whatever the page size; the JavaScript fell back to counting the
+   fetched page when the facets read failed, and the page's own comment
+   says that undercounts on any SOC with more than fifty cases.
+
+   Three outcomes, where the JavaScript had one and a half. `loadCases`
+   returned early on `!response.ok`, so a failed read left "Loading..." in
+   the card for the life of the page, and `data.cases || []` turned a 403
+   or a fault into "No cases". #}
+
+<span id="cases-count" class="badge" hx-swap-oob="true"
+      {%- if active_total is not none %} title="Open and acknowledged cases, counted on the server"
+      {%- else %} title="The active case count could not be read"{% endif %}>
+  {%- if active_total is not none %}{{ active_total }}{% else %}?{% endif -%}
+</span>
+
+{% if failed %}
+  <div class="empty-state text-[var(--danger)]" role="alert">
+    The case list could not be read. This is not an empty list: any cases
+    that exist still exist and their alerts are still linked. Use the
+    refresh control in this card's header to try again.
+  </div>
+{% elif not cases %}
+  <div class="empty-state">No cases</div>
+{% else %}
+  {% for c in cases %}
+    <div class="list-item cursor-pointer" data-click-action="openCasePanel"
+         data-args='[{{ c.id }}]' title="{{ c.title }}">
+      <span class="overflow-hidden text-ellipsis whitespace-nowrap">
+        <strong>{{ c.case_number }}</strong> {{ c.title }}
+        {#- The closure badge. The JavaScript keyed this on
+            `c.closure_reason`, a field the compact list row did not carry
+            until this change, so it had never rendered. #}
+        {%- if c.closure_short %} <span class="closure-reason-badge reason-{{ c.closure_reason }} text-[0.625rem] py-[0.0625rem] px-[0.3rem] ml-1">{{ c.closure_short }}</span>{% endif -%}
+      </span>
+      {# The status colour is a class with a rule in alerts-page.css, not a
+         style attribute (style-src-attr 'none') and not a JS property
+         assignment after the swap. `is not none` on the count: the service
+         emits an integer for every row today, and if that ever stops the
+         cell must not read as zero alerts. #}
+      <span class="list-item-count case-status-{{ c.status_value }}" data-case-count="{{ c.id }}">
+        {%- if c.alert_count is not none %}{{ c.alert_count }}{% else %}?{% endif -%}
+      </span>
+    </div>
+  {% endfor %}
+{% endif %}

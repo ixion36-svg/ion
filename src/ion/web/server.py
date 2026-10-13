@@ -1505,7 +1505,12 @@ async def profile_page(request: Request, user: User = Depends(require_page_auth)
 
 @app.get("/alerts", response_class=HTMLResponse)
 async def alerts_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the alerts investigation page."""
+    """Render the alerts investigation page.
+
+    `can_create_case` is what POST /api/cases requires, passed as a fact
+    about the viewer so the page does not open a create-case form whose
+    submit would answer 403. The page's own alert:read does not imply it.
+    """
     return templates.TemplateResponse(
         request=request,
         name="alerts.html",
@@ -1513,6 +1518,7 @@ async def alerts_page(request: Request, user: User = Depends(require_page_permis
             "alert_detail_v2": get_config().alert_detail_v2,
             "alert_field_pins": get_config().alert_field_pins,
             "bob_custom_templates": get_config().bob_custom_templates,
+            "can_create_case": user.has_permission("case:create"),
         },
     )
 

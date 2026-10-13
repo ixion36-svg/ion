@@ -9,7 +9,12 @@
 {% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden" data-alert-detail-v2="{{ '1' if alert_detail_v2 else '0' }}" data-alert-field-pins="{{ '1' if alert_field_pins else '0' }}" data-bob-templates="{{ '1' if bob_custom_templates else '0' }}">
+{# data-can-create-case carries the viewer's case:create to the script, the
+   way the other three attributes carry config. POST /api/cases requires it,
+   so the create-case forms are not opened for someone whose submit would
+   answer 403. A data attribute rather than Jinja inside the <script>
+   block, so `node --check` stays usable on the script. #}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden" data-alert-detail-v2="{{ '1' if alert_detail_v2 else '0' }}" data-alert-field-pins="{{ '1' if alert_field_pins else '0' }}" data-bob-templates="{{ '1' if bob_custom_templates else '0' }}" data-can-create-case="{{ 'true' if can_create_case else 'false' }}">
 <div class="relative z-10 w-full px-4 sm:px-6 lg:px-8 py-10 md:py-12">
 
   <!-- ── Header row ── -->
@@ -454,9 +459,26 @@
         <div class="ion-card mb-4">
             <div class="flex items-center justify-between mb-3 pb-3 border-b border-white/10">
                 <h3 class="text-[13px] font-medium text-base-content">Cases</h3>
-                <span class="badge" id="cases-count">0</span>
+                <div class="flex items-center gap-2">
+                    {# The refresh control lives outside #cases-summary, so a
+                       failed render of the card cannot remove the one control
+                       that would retry it. #}
+                    <button type="button" class="btn btn-ghost btn-xs" title="Refresh the case list"
+                            hx-get="/ui/alerts/cases-summary" hx-target="#cases-summary" hx-swap="innerHTML">&#8635;</button>
+                    {# The badge is swapped out of band by the fragment. It
+                       starts blank rather than at 0: zero is a count, and
+                       nothing has been counted yet. #}
+                    <span class="badge" id="cases-count" title="Not counted yet">&hellip;</span>
+                </div>
             </div>
-            <div id="cases-summary" class="flex flex-col gap-2 max-h-[240px] overflow-y-auto">
+            {# Rows from /ui/alerts/cases-summary. `load` paints them once;
+               `cases-refresh from:body` is dispatched by loadCases() after
+               every mutation the page makes to a case. Both triggers are
+               native htmx parsing, nothing is evaluated. #}
+            <div id="cases-summary" class="flex flex-col gap-2 max-h-[240px] overflow-y-auto"
+                 hx-get="/ui/alerts/cases-summary"
+                 hx-trigger="load, cases-refresh from:body"
+                 hx-swap="innerHTML">
                 <div class="loading">Loading...</div>
             </div>
         </div>
@@ -517,7 +539,13 @@
   v0.31.0: Case Detail Slide-out Panel
   ====================================================================== -->
 <div class="acp-overlay" id="acp-overlay" data-click-action="closeCasePanel"></div>
-<div class="acp-panel" id="acp-panel" data-case-id="">
+{# The body is filled from /ui/alerts/case-panel/{id} by openCasePanel().
+   hx-indicator names the loading line below, which sits outside #acp-body
+   so no render can remove it; htmx toggles it with the htmx-request class
+   and the rule for that is in the stylesheet. The header spans are swapped
+   out of band by the fragment, so the Close button beside them is never
+   inside a swap target. #}
+<div class="acp-panel" id="acp-panel" data-case-id="" hx-indicator="#acp-loading">
   <div class="flex justify-between items-start px-5 py-4 border-b border-white/10 shrink-0">
     <div class="min-w-[0] flex-1">
       <span class="acp-number" id="acp-number"></span>
@@ -525,9 +553,8 @@
     </div>
     <button class="bg-transparent border-none text-slate-400 text-2xl cursor-pointer p-0 leading-none shrink-0 hover:text-slate-200" data-click-action="closeCasePanel" title="Close (Esc)">&times;</button>
   </div>
-  <div class="acp-body" id="acp-body">
-    <p class="text-[var(--text-secondary)] text-center p-8">Loading...</p>
-  </div>
+  <p id="acp-loading" class="htmx-indicator text-[var(--text-secondary)] text-center p-4 m-0">Loading case...</p>
+  <div class="acp-body" id="acp-body"></div>
 </div>
 
 <!-- Closure modal — full CaseClosureReason enum -->
@@ -562,6 +589,89 @@
     </div>
   </div>
 </div>
+
+{# Swap targets for the two case dialogs that are fetched on demand. The
+   Add-to-Case picker (/ui/alerts/case-picker) and the case management modal
+   (/ui/alerts/case-manage/{id}) render their own overlay inside these, and
+   their Close controls remove that overlay, so the host stays for the next
+   open. Both were appended to document.body by the script before. #}
+<div id="add-to-case-host"></div>
+<div id="case-mgmt-host"></div>
+
+{# The three case dialogs whose markup needs no server data: the single and
+   bulk create-case forms and the quick closure confirm. The script clones
+   the template and sets field values and data attributes; it assembles no
+   markup. The dialogs are removed from the DOM on Cancel, Escape and
+   outside-click (data-remove-target, data-remove-self-on-self-click), so a
+   <template> rather than a hidden element, which `.remove()` would take
+   away for good.
+
+   The submit buttons are offered only with case:create, which POST
+   /api/cases requires; the script also refuses to open the dialog without
+   it, so the fact is checked in both places it is read. #}
+{# `evidence_id` is a parameter because the two submit handlers read
+   different ids for it (case-evidence-summary and bulk-case-evidence) while
+   sharing the prefix for the other three fields. #}
+{% macro create_case_form(prefix, overlay_id, heading, submit_action, evidence_id) %}
+<div class="case-create-overlay" id="{{ overlay_id }}" data-remove-self-on-self-click>
+  <div class="case-create-form">
+    <h3>{{ heading }}</h3>
+    <div class="form-group">
+      <label for="{{ prefix }}title">Title</label>
+      <input type="text" id="{{ prefix }}title" placeholder="Case title...">
+    </div>
+    <div class="form-group">
+      <label for="{{ prefix }}description">Description</label>
+      <textarea id="{{ prefix }}description" rows="4" placeholder="Describe the investigation..."></textarea>
+    </div>
+    <div class="form-group">
+      <label for="{{ prefix }}severity">Severity</label>
+      <select id="{{ prefix }}severity">
+        <option value="">Select severity</option>
+        <option value="critical">critical</option>
+        <option value="high">high</option>
+        <option value="medium">medium</option>
+        <option value="low">low</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="{{ evidence_id }}">Evidence Summary</label>
+      <textarea id="{{ evidence_id }}" rows="4" placeholder="Auto-generated evidence narrative (editable)..."></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-secondary" data-remove-target="{{ overlay_id }}">Cancel</button>
+      {% if can_create_case %}
+        <button class="btn btn-primary" data-click-action="{{ submit_action }}">Create Case</button>
+      {% else %}
+        <span class="text-xs text-[var(--text-muted)]" title="Requires the case:create permission">Read only</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+<template id="case-create-template">
+  {{ create_case_form('case-', 'case-create-overlay', 'Create Investigation Case', 'submitCreateCase', 'case-evidence-summary') }}
+</template>
+<template id="bulk-case-create-template">
+  {{ create_case_form('bulk-case-', 'bulk-case-create-overlay', 'Create Case from Selected Alerts', 'submitBulkCreateCase', 'bulk-case-evidence') }}
+</template>
+<template id="case-closure-quick-template">
+  <div id="case-closure-quick-overlay" class="closure-modal-overlay" data-remove-self-on-self-click>
+    <div class="closure-modal">
+      <h4>Close Case</h4>
+      <p class="text-[0.8125rem] text-[var(--text-muted)] my-2 mx-0">This will close the case and all linked alerts.</p>
+      <div class="form-group my-3 mx-0">
+        <label class="text-[0.8125rem]" for="case-closure-quick-notes">Reason / Notes</label>
+        <textarea class="w-full bg-[var(--bg-tertiary)] border border-[var(--ion-border)] rounded-[4px] text-[var(--text-primary)] p-2 text-[0.8125rem]" id="case-closure-quick-notes" rows="3" placeholder="Enter closure reason..."></textarea>
+      </div>
+      <div class="closure-actions">
+        <button class="btn btn-secondary" data-remove-target="case-closure-quick-overlay">Cancel</button>
+        <button class="btn btn-primary" data-click-action="confirmCloseCaseWithAlerts" data-args="[]">Close Case</button>
+      </div>
+    </div>
+  </div>
+</template>
 
 {% endblock %}
 
@@ -774,7 +884,9 @@ function showNotification(message, type = 'info') {
 // =========================================================================
 document.addEventListener('DOMContentLoaded', function() {
     loadAlerts();
-    loadCases();
+    // The Cases card loads itself (hx-trigger="load"); this fills the JSON
+    // index the detail modal and analytics still read.
+    loadCasesIndex();
     startAutoRefresh();
     checkAIAvailability();
 });
@@ -1159,288 +1271,62 @@ function dismissAlertAttention() {
 // =========================================================================
 // Cases
 // =========================================================================
-/* The case list is paginated server side (review 2026-10-08, stage 5), so
-   this asks for an explicit window instead of relying on the old unbounded
-   response. The panel only ever shows the first ten, but the badge counts
-   active cases -- and counting a capped array would undercount it on any
-   SOC with more cases than the page size. So the badge comes from the
-   server's aggregate, which is right whatever the window. */
-let casesActiveTotal = null;
+// The Cases card is server-rendered: #cases-summary pulls
+// /ui/alerts/cases-summary on load and whenever `cases-refresh` is
+// dispatched on the body. The rows, the badge (out of band) and the three
+// outcomes (failed read, no cases, rows) live in the fragment.
+//
+// `casesData` is still filled here, from the JSON list, because three
+// functions in regions that convert later read it: linkAlertToCase and
+// _prepopulateKFPFields in the detail modal, and the FP-rate metric in
+// analytics. The fragment and this index are two requests where there was
+// one; the index goes with the last of those three.
+function refreshCasesSummary() {
+    document.body.dispatchEvent(new CustomEvent('cases-refresh'));
+}
 
-async function loadCases() {
+async function loadCasesIndex() {
     try {
         const response = await fetch('/api/cases?limit=50&sort=created_at&order=desc');
         if (!response.ok) return;
         const data = await response.json();
-        casesData = data.cases || [];
-
-        try {
-            const facets = await fetch('/api/cases/facets');
-            if (facets.ok) {
-                const f = await facets.json();
-                const byStatus = f.by_status || {};
-                casesActiveTotal = (byStatus.open || 0) + (byStatus.acknowledged || 0);
-            }
-        } catch (e) {
-            // Fall back to counting what we have; the list is still correct,
-            // the badge is just the page's view of it.
-            casesActiveTotal = null;
-        }
-
-        renderCasesSummary();
+        if (Array.isArray(data.cases)) casesData = data.cases;
     } catch (e) {
-        console.error('Error loading cases:', e);
+        console.error('Error loading cases index:', e);
     }
 }
 
-function renderCasesSummary() {
-    const container = document.getElementById('cases-summary');
-    const badge = document.getElementById('cases-count');
-    const activeCases = casesData.filter(c => c.status === 'open' || c.status === 'acknowledged');
-    badge.textContent = (casesActiveTotal === null) ? activeCases.length : casesActiveTotal;
+async function loadCases() {
+    refreshCasesSummary();
+    await loadCasesIndex();
+}
 
-    if (casesData.length === 0) {
-        container.innerHTML = '<div class="empty-state">No cases</div>';
-        return;
-    }
-
-    const closureLabels = {
-        true_positive: 'TP', false_positive: 'FP', benign_true_positive: 'BTP',
-        duplicate: 'DUP', insufficient_data: 'N/D', not_applicable: 'N/A',
-    };
-    container.innerHTML = casesData.slice(0, 10).map(c => {
-        const statusColor = c.status === 'open' ? '#1976d2' : c.status === 'acknowledged' ? '#f57c00' : '#616161';
-        const closureBadge = c.closure_reason ? `<span class="closure-reason-badge reason-${c.closure_reason} text-[0.625rem] py-[0.0625rem] px-[0.3rem] ml-1">${closureLabels[c.closure_reason] || c.closure_reason}</span>` : '';
-        // open the slide-out case panel on /alerts so the
-        // analyst can work the case without leaving the alerts page.
-        return `
-            <div class="list-item cursor-pointer" data-click-action="openCasePanel" data-args='[${c.id}]' title="${escapeHtml(c.title)}">
-                <span class="overflow-hidden text-ellipsis whitespace-nowrap">
-                    <strong>${escapeHtml(c.case_number)}</strong> ${escapeHtml(c.title)}${closureBadge}
-                </span>
-                <span class="list-item-count" data-case-count="${c.id}">${c.alert_count}</span>
-            </div>
-        `;
-    }).join('');
-    // The status colour was lost when the style→class migration hashed the
-    // dynamic `background:${statusColor}` inline style into an (invalid, dead)
-    // CSS class. Re-apply it as a JS property (CSP style-src-attr 'none' allows
-    // element.style.* assignment, just not a style="" attribute in markup).
-    casesData.slice(0, 10).forEach(c => {
-        const el = container.querySelector(`[data-case-count="${c.id}"]`);
-        if (el) el.style.background = c.status === 'open' ? '#1976d2'
-            : c.status === 'acknowledged' ? '#f57c00' : '#616161';
+// The case management modal is server-rendered from
+// /ui/alerts/case-manage/{id} into #case-mgmt-host. The two things the
+// page did after building the markup still run once the swap settles:
+// the playbook executions list and the known-FP match, both from data
+// the fragment carries on the overlay, so nothing re-reads the case.
+function showCaseDetail(caseId) {
+    const host = document.getElementById('case-mgmt-host');
+    if (!host) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/alerts/case-manage/' + encodeURIComponent(caseId), {
+        source: host, target: host, swap: 'innerHTML',
+    }).then(function () {
+        const overlay = document.getElementById('case-mgmt-overlay');
+        if (!overlay) return;
+        if (document.getElementById('case-playbook-executions-' + caseId)) {
+            loadCasePlaybookExecutions(caseId);
+        }
+        if (overlay.dataset.caseStatus !== 'closed' && overlay.dataset.kfpContext) {
+            try {
+                checkKFPMatches(JSON.parse(overlay.dataset.kfpContext));
+            } catch (e) {
+                console.error('KFP context on the case modal was not readable:', e);
+            }
+        }
     });
 }
 
-async function showCaseDetail(caseId) {
-    try {
-        const response = await fetch(`/api/cases/${caseId}`);
-        if (!response.ok) throw new Error('Failed to load case');
-        const caseData = await response.json();
-        renderCaseManagementModal(caseData);
-    } catch (e) {
-        console.error('Error loading case:', e);
-    }
-}
-
-function renderCaseManagementModal(caseData) {
-    // Remove any existing modal
-    const existing = document.getElementById('case-mgmt-overlay');
-    if (existing) existing.remove();
-
-    const overlay = document.createElement('div');
-    overlay.className = 'case-mgmt-overlay';
-    overlay.id = 'case-mgmt-overlay';
-    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
-
-    const statusOptions = ['open', 'acknowledged', 'closed'].map(s =>
-        `<option value="${s}" ${s === caseData.status ? 'selected' : ''}>${s.replace('_', ' ')}</option>`
-    ).join('');
-
-    const severityOptions = ['critical', 'high', 'medium', 'low'].map(s =>
-        `<option value="${s}" ${s === caseData.severity ? 'selected' : ''}>${s}</option>`
-    ).join('');
-
-    // Closure info display for closed/resolved cases
-    const closureReasonLabels = {
-        true_positive: 'True Positive', false_positive: 'False Positive',
-        benign_true_positive: 'Benign True Positive', duplicate: 'Duplicate',
-        insufficient_data: 'Insufficient Data', not_applicable: 'Not Applicable',
-    };
-    let closureInfoHtml = '';
-    if (caseData.status === 'closed' && caseData.closure_reason) {
-        closureInfoHtml = `
-            <div class="closure-info-block">
-                <div class="closure-info-header">
-                    <span class="closure-reason-badge reason-${caseData.closure_reason}">${closureReasonLabels[caseData.closure_reason] || caseData.closure_reason}</span>
-                </div>
-                ${caseData.closure_notes ? `<div class="closure-info-notes">${escapeHtml(caseData.closure_notes)}</div>` : ''}
-                <div class="closure-info-meta">
-                    Closed by ${escapeHtml(caseData.closed_by || 'unknown')}${caseData.closed_at ? ' on ' + new Date(caseData.closed_at).toLocaleString() : ''}
-                </div>
-            </div>`;
-    }
-
-    // Context tags
-    function renderTags(items, label, colorClass) {
-        if (!items || items.length === 0) return '';
-        const badges = items.map(i => `<span class="context-tag ${colorClass}">${escapeHtml(i)}</span>`).join('');
-        return `<div class="case-context-group"><span class="case-context-label">${label}:</span> ${badges}</div>`;
-    }
-
-    const contextHtml = [
-        renderTags(caseData.affected_hosts, 'Hosts', 'tag-host'),
-        renderTags(caseData.affected_users, 'Users', 'tag-user'),
-        renderTags(caseData.triggered_rules, 'Rules', 'tag-rule'),
-    ].filter(Boolean).join('');
-
-    // Evidence summary
-    const evidenceHtml = caseData.evidence_summary
-        ? `<div class="case-mgmt-section"><h5>Evidence Summary</h5><p class="text-[0.8125rem] leading-[1.5] m-0">${escapeHtml(caseData.evidence_summary)}</p></div>`
-        : '';
-
-    // Description
-    const descHtml = caseData.description
-        ? `<div class="case-mgmt-section"><h5>Description</h5><div class="case-description-md text-[0.8125rem] leading-[1.5] m-0">${safeMarkdown(caseData.description)}</div></div>`
-        : '';
-
-    // Linked alerts
-    const alerts = caseData.alerts || [];
-    const alertsHtml = `
-        <div class="case-mgmt-section">
-            <h5>Linked Alerts (${alerts.length})</h5>
-            ${alerts.length > 0 ? alerts.map(a => `
-                <div class="related-alert-item flex-wrap">
-                    <span class="triage-dot triage-${a.status}"></span>
-                    <span class="text-[0.8125rem] flex-1 cursor-pointer" data-click-action="showAlertDetail" data-args='["${escapeHtml(a.es_alert_id)}"]'>${escapeHtml(a.es_alert_id)}</span>
-                    <span class="text-xs text-[var(--text-muted)]">${escapeHtml(a.priority || '')}</span>
-                    <div class="flex gap-1 ml-[auto]">
-                        <button class="alert-closure-btn benign py-[0.2rem] px-2 text-[0.6875rem]" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "benign"]'>&#10003;</button>
-                        <button class="alert-closure-btn escalated py-[0.2rem] px-2 text-[0.6875rem]" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "escalated"]'>&#9650;</button>
-                        <button class="alert-closure-btn false-positive py-[0.2rem] px-2 text-[0.6875rem]" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "false_positive"]'>&#10007;</button>
-                    </div>
-                </div>
-            `).join('') : '<div class="empty-state">No linked alerts</div>'}
-        </div>
-    `;
-
-    // Playbook Executions section (loaded async)
-    const playbookExecHtml = `
-        <div class="case-mgmt-section">
-            <h5>Playbook Executions</h5>
-            <div id="case-playbook-executions-${caseData.id}" class="case-playbook-list">
-                <span class="text-[0.8125rem] text-[var(--text-muted)]">Loading...</span>
-            </div>
-            <div class="mt-2">
-                <button class="btn btn-sm btn-primary" data-click-action="showCasePlaybookPicker" data-args='[${caseData.id}]'>Start Playbook</button>
-            </div>
-        </div>
-    `;
-
-    // Notes journal
-    const notes = caseData.notes || [];
-    let notesHtml = '<div class="case-mgmt-section"><h5>Investigation Notes</h5>';
-    if (notes.length === 0) {
-        notesHtml += '<div class="empty-state">No notes yet</div>';
-    } else {
-        notes.forEach(n => {
-            notesHtml += `
-                <div class="comment-item">
-                    <div class="comment-header">
-                        <span class="comment-user">${escapeHtml(n.user)}</span>
-                        <span class="comment-time">${n.created_at ? new Date(n.created_at).toLocaleString() : ''}</span>
-                    </div>
-                    <div class="comment-body">${escapeHtml(n.content)}</div>
-                </div>
-            `;
-        });
-    }
-    notesHtml += `
-        <div class="comment-form mt-3">
-            <textarea id="case-mgmt-note-input" placeholder="Add investigation note..."></textarea>
-            <button class="btn btn-primary" data-click-action="addCaseNoteFromModal" data-args='[${caseData.id}]'>Add Note</button>
-        </div>
-    </div>`;
-
-    overlay.innerHTML = `
-        <div class="case-mgmt-modal">
-            <h3>
-                <span>${escapeHtml(caseData.case_number)}: ${escapeHtml(caseData.title)}</span>
-                <div class="flex items-center gap-2">
-                    ${aiAvailable ? `<button class="ai-micro-btn" data-click-action="aiSummarizeCase" data-args='[${caseData.id}]' title="AI case summary">AI Summary</button>` : ''}
-                    <button class="close-btn" data-remove-target="case-mgmt-overlay" title="Close">&times;</button>
-                </div>
-            </h3>
-            <div class="ai-case-summary" id="ai-case-summary-${caseData.id}"></div>
-            ${caseData.status !== 'closed' ? `
-            <div class="alert-closure-actions my-3 mx-0 p-3 bg-[rgba(255,255,255,0.03)] border border-[var(--ion-border)] rounded-[6px] flex flex-wrap gap-1.5 items-center">
-                <span class="text-xs text-[var(--text-muted)] mr-2">Close Case As:</span>
-                <button class="alert-closure-btn true-positive" data-click-action="closeCaseWithAlerts" data-args='[${caseData.id}, "true_positive"]'>&#9650; True Positive</button>
-                <button class="alert-closure-btn benign-true-positive" data-click-action="closeCaseWithAlerts" data-args='[${caseData.id}, "benign_true_positive"]'>&#10003; Benign True Positive</button>
-                <button class="alert-closure-btn false-positive" data-click-action="closeCaseWithAlerts" data-args='[${caseData.id}, "false_positive"]'>&#10007; False Positive</button>
-                <button class="alert-closure-btn duplicate" data-click-action="closeCaseWithAlerts" data-args='[${caseData.id}, "duplicate"]'>&#9866; Duplicate</button>
-                <button class="alert-closure-btn insufficient-data" data-click-action="closeCaseWithAlerts" data-args='[${caseData.id}, "insufficient_data"]'>? Insufficient Data</button>
-                <button class="alert-closure-btn not-applicable" data-click-action="closeCaseWithAlerts" data-args='[${caseData.id}, "not_applicable"]'>&#8709; Not Applicable</button>
-            </div>
-            ` : ''}
-            ${closureInfoHtml}
-            <div id="case-fp-banner-${caseData.id}"></div>
-            <div class="case-meta-editable">
-                <div class="meta-field">
-                    <label>Status</label>
-                    <select data-change-action="handleCaseStatusChange" data-args='[${caseData.id}, "$target", "${caseData.status}"]' id="case-status-select-${caseData.id}">${statusOptions}</select>
-                </div>
-                <div class="meta-field">
-                    <label>Severity</label>
-                    <select data-change-action="updateCaseField" data-args='[${caseData.id}, "severity", "$value"]'>${severityOptions}</select>
-                </div>
-                <div class="meta-field">
-                    <label>Created By</label>
-                    <div class="meta-value">${escapeHtml(caseData.created_by || '-')}</div>
-                </div>
-                <div class="meta-field">
-                    <label>Assigned To</label>
-                    <div class="meta-value">${escapeHtml(caseData.assigned_to || 'Unassigned')}</div>
-                </div>
-                <div class="meta-field">
-                    <label>Created</label>
-                    <div class="meta-value">${caseData.created_at ? new Date(caseData.created_at).toLocaleString() : '-'}</div>
-                </div>
-                <div class="meta-field">
-                    <label>Updated</label>
-                    <div class="meta-value">${caseData.updated_at ? new Date(caseData.updated_at).toLocaleString() : '-'}</div>
-                </div>
-            </div>
-            ${contextHtml ? `<div class="flex flex-col gap-1.5">${contextHtml}</div>` : ''}
-            ${evidenceHtml}
-            ${descHtml}
-            ${alertsHtml}
-            ${playbookExecHtml}
-            ${notesHtml}
-            <div class="case-mgmt-footer flex justify-between items-center">
-                <div class="flex gap-2 items-center">
-                    ${caseData.dfir_iris_case_id
-                        ? `<a href="${escapeHtml(caseData.dfir_iris_url)}" target="_blank" class="btn btn-success text-xs">View in DFIR-IRIS #${caseData.dfir_iris_case_id}</a>`
-                        : `<button class="btn btn-warning text-xs" data-click-action="escalateToDFIRIRIS" data-args='[${caseData.id}]' id="escalate-iris-btn-${caseData.id}">Escalate to DFIR-IRIS</button>`
-                    }
-                    ${caseData.kibana_url ? `<a href="${escapeHtml(caseData.kibana_url)}" target="_blank" class="btn btn-secondary text-xs">View in Kibana</a>` : ''}
-                </div>
-                <button class="btn btn-secondary" data-remove-target="case-mgmt-overlay">Close</button>
-            </div>
-        </div>
-    `;
-
-    document.body.appendChild(overlay);
-
-    // Async-load playbook executions for this case
-    loadCasePlaybookExecutions(caseData.id);
-
-    // Check for known false positive matches (only for non-closed cases)
-    if (caseData.status !== 'closed') {
-        checkKFPMatches(caseData);
-    }
-}
 
 function closeCaseWithAlerts(caseId, closureType) {
     // closureType is now a CaseClosureReason enum value directly
@@ -1460,31 +1346,31 @@ function closeCaseWithAlerts(caseId, closureType) {
     };
     const label = labels[closureType] || closureType;
 
-    // Build a simple closure modal
+    // The dialog's markup is the <template id="case-closure-quick-template">
+    // in this page; only the heading text and the confirm arguments are
+    // set here, as text and as a data attribute.
     const existing = document.getElementById('case-closure-quick-overlay');
     if (existing) existing.remove();
-
-    const overlay = document.createElement('div');
-    overlay.id = 'case-closure-quick-overlay';
-    overlay.className = 'closure-modal-overlay';
-    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
-
-    overlay.innerHTML = `
-        <div class="closure-modal">
-            <h4>Close Case as ${label}</h4>
-            <p class="text-[0.8125rem] text-[var(--text-muted)] my-2 mx-0">This will close the case and all linked alerts.</p>
-            <div class="form-group my-3 mx-0">
-                <label class="text-[0.8125rem]">Reason / Notes</label>
-                <textarea class="w-full bg-[var(--bg-tertiary)] border border-[var(--ion-border)] rounded-[4px] text-[var(--text-primary)] p-2 text-[0.8125rem]" id="case-closure-quick-notes" rows="3" placeholder="Enter closure reason..."></textarea>
-            </div>
-            <div class="closure-actions">
-                <button class="btn btn-secondary" data-remove-target="case-closure-quick-overlay">Cancel</button>
-                <button class="btn btn-primary" data-click-action="confirmCloseCaseWithAlerts" data-args='[${caseId}, "${closureType}"]'>Close Case</button>
-            </div>
-        </div>
-    `;
+    const overlay = cloneTemplate('case-closure-quick-template');
+    if (!overlay) return;
+    overlay.querySelector('h4').textContent = 'Close Case as ' + label;
+    overlay.querySelector('[data-click-action="confirmCloseCaseWithAlerts"]')
+        .dataset.args = JSON.stringify([caseId, closureType]);
     document.body.appendChild(overlay);
     document.getElementById('case-closure-quick-notes').focus();
+}
+
+// A copy of a <template>'s first element. The markup is Jinja's; nothing
+// here assembles it. Null when the template is not on the page.
+function cloneTemplate(id) {
+    const tpl = document.getElementById(id);
+    if (!tpl || !tpl.content || !tpl.content.firstElementChild) return null;
+    return tpl.content.firstElementChild.cloneNode(true);
+}
+
+function canCreateCase() {
+    const root = document.querySelector('[data-can-create-case]');
+    return !!root && root.dataset.canCreateCase === 'true';
 }
 
 async function confirmCloseCaseWithAlerts(caseId, closureType) {
@@ -1956,11 +1842,7 @@ async function confirmCaseClosure(caseId, newStatus) {
         await loadCases();
 
         // Refresh the case management modal
-        const caseResp = await fetch(`/api/cases/${caseId}`);
-        if (caseResp.ok) {
-            const caseData = await caseResp.json();
-            renderCaseManagementModal(caseData);
-        }
+        await showCaseDetail(caseId);
 
         // Refresh case tab in alert detail if visible
         if (currentDetailAlert) {
@@ -1996,11 +1878,7 @@ async function updateCaseField(caseId, field, value) {
         await loadCases();
 
         // Refresh the case management modal
-        const caseResp = await fetch(`/api/cases/${caseId}`);
-        if (caseResp.ok) {
-            const caseData = await caseResp.json();
-            renderCaseManagementModal(caseData);
-        }
+        await showCaseDetail(caseId);
 
         // If alert detail modal is showing this case's tab, refresh it
         if (currentDetailAlert) {
@@ -2079,11 +1957,7 @@ async function closeAsKnownFP(caseId, kfpId) {
         await loadCases();
 
         // Refresh case management modal
-        const caseResp = await fetch(`/api/cases/${caseId}`);
-        if (caseResp.ok) {
-            const caseData = await caseResp.json();
-            renderCaseManagementModal(caseData);
-        }
+        await showCaseDetail(caseId);
 
         // Refresh case tab if visible
         if (currentDetailAlert) {
@@ -2152,12 +2026,8 @@ async function addCaseNoteFromModal(caseId) {
         });
         if (!response.ok) throw new Error('Failed to add note');
 
-        // Re-fetch case and re-render modal
-        const caseResp = await fetch(`/api/cases/${caseId}`);
-        if (caseResp.ok) {
-            const caseData = await caseResp.json();
-            renderCaseManagementModal(caseData);
-        }
+        // Re-render the modal from the server
+        await showCaseDetail(caseId);
     } catch (e) {
         console.error('Error adding case note:', e);
     }
@@ -2187,11 +2057,7 @@ async function escalateToDFIRIRIS(caseId) {
             window.open(data.iris_url, '_blank');
         }
         // Refresh the modal
-        const caseResp = await fetch(`/api/cases/${caseId}`);
-        if (caseResp.ok) {
-            const caseData = await caseResp.json();
-            renderCaseManagementModal(caseData);
-        }
+        await showCaseDetail(caseId);
     } catch (e) {
         showNotification(`DFIR-IRIS escalation failed: ${e.message}`, 'error');
         if (btn) {
@@ -2326,10 +2192,14 @@ async function startCasePlaybook(caseId, playbookId) {
 }
 
 function showCreateCaseForm(alertId) {
-    const overlay = document.createElement('div');
-    overlay.className = 'case-create-overlay';
-    overlay.id = 'case-create-overlay';
-    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+    // POST /api/cases requires case:create; the fact is on the page root.
+    if (!canCreateCase()) {
+        showNotification('Creating a case requires the case:create permission', 'warning');
+        return;
+    }
+    document.getElementById('case-create-overlay')?.remove();
+    const overlay = cloneTemplate('case-create-template');
+    if (!overlay) return;
 
     // Auto-populate from alert data
     const alert = allAlerts.find(a => a.id === alertId);
@@ -2360,35 +2230,14 @@ function showCreateCaseForm(alertId) {
         prefillEvidence = evidenceLines.join(' ');
     }
 
-    const severityOptions = ['', 'critical', 'high', 'medium', 'low'].map(s =>
-        `<option value="${s}" ${s === prefillSeverity ? 'selected' : ''}>${s || 'Select severity'}</option>`
-    ).join('');
-
-    overlay.innerHTML = `
-        <div class="case-create-form">
-            <h3>Create Investigation Case</h3>
-            <div class="form-group">
-                <label>Title</label>
-                <input type="text" id="case-title" placeholder="Case title..." value="${escapeHtml(prefillTitle)}">
-            </div>
-            <div class="form-group">
-                <label>Description</label>
-                <textarea id="case-description" placeholder="Describe the investigation...">${escapeHtml(prefillDesc)}</textarea>
-            </div>
-            <div class="form-group">
-                <label>Severity</label>
-                <select id="case-severity">${severityOptions}</select>
-            </div>
-            <div class="form-group">
-                <label>Evidence Summary</label>
-                <textarea id="case-evidence-summary" placeholder="Auto-generated evidence narrative (editable)..." rows="4">${escapeHtml(prefillEvidence)}</textarea>
-            </div>
-            <div class="form-actions">
-                <button class="btn btn-secondary" data-remove-target="case-create-overlay">Cancel</button>
-                <button class="btn btn-primary" data-click-action="submitCreateCase" data-args='["${escapeHtml(alertId)}"]'>Create Case</button>
-            </div>
-        </div>
-    `;
+    // The form is the <template id="case-create-template"> in this page.
+    // Field values are set as values, not interpolated into markup.
+    overlay.querySelector('#case-title').value = prefillTitle;
+    overlay.querySelector('#case-description').value = prefillDesc;
+    overlay.querySelector('#case-severity').value = prefillSeverity;
+    overlay.querySelector('#case-evidence-summary').value = prefillEvidence;
+    const submit = overlay.querySelector('[data-click-action="submitCreateCase"]');
+    if (submit) submit.dataset.args = JSON.stringify([alertId]);
 
     document.body.appendChild(overlay);
     document.getElementById('case-title').focus();
@@ -2989,48 +2838,18 @@ async function aiGenerateCase(alertId) {
     }
 }
 
-async function aiSummarizeCase(caseId) {
+// The summary is server-rendered by POST /ui/alerts/case-summary/{id},
+// which reads the case and runs the same AI handler the JSON route does.
+// The loading state is a stylesheet rule on the container while
+// htmx-busy.js marks it in flight; the result and every failure are the
+// fragment's. csrf.js attaches the token to the htmx POST.
+function aiSummarizeCase(caseId) {
     const container = document.getElementById(`ai-case-summary-${caseId}`);
-    if (!container) return;
-
-    container.className = 'ai-case-summary visible';
-    container.innerHTML = '<div class="ai-loading"><div class="ai-spinner"></div>Generating case summary...</div>';
-
-    try {
-        const resp = await fetch(`/api/cases/${caseId}`);
-        if (!resp.ok) throw new Error('Failed to load case');
-        const caseData = await resp.json();
-
-        const aiResp = await fetch('/api/ai/analyze/alert', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                type: 'case_summary',
-                case_number: caseData.case_number,
-                title: caseData.title,
-                description: caseData.description,
-                status: caseData.status,
-                severity: caseData.severity,
-                evidence_summary: caseData.evidence_summary,
-                alerts_count: (caseData.alerts || []).length,
-                affected_hosts: caseData.affected_hosts,
-                affected_users: caseData.affected_users,
-                triggered_rules: caseData.triggered_rules,
-            }),
-        });
-        if (!aiResp.ok) throw new Error('AI service unavailable');
-        const data = await aiResp.json();
-
-        container.innerHTML = `
-            <div class="ai-result-header">
-                <span>AI Case Summary</span>
-                <span class="ai-model-tag">${escapeHtml(data.model || '')}</span>
-            </div>
-            <div class="ai-result-body">${formatAIContent(escapeHtml(data.analysis || ''))}</div>
-        `;
-    } catch (e) {
-        container.innerHTML = `<div class="ai-error">AI summary failed: ${escapeHtml(e.message)}</div>`;
-    }
+    if (!container) return Promise.resolve();
+    container.classList.add('visible');
+    return htmx.ajax('POST', '/ui/alerts/case-summary/' + encodeURIComponent(caseId), {
+        source: container, target: container, swap: 'innerHTML',
+    });
 }
 
 
@@ -7078,6 +6897,11 @@ function showCreateCaseFromSelected() {
         showNotification('No alerts selected', 'warning');
         return;
     }
+    // POST /api/cases requires case:create; the fact is on the page root.
+    if (!canCreateCase()) {
+        showNotification('Creating a case requires the case:create permission', 'warning');
+        return;
+    }
 
     // Get selected alerts data
     const selectedAlerts = allAlerts.filter(a => selectedAlertIds.has(a.id));
@@ -7116,37 +6940,16 @@ function showCreateCaseFromSelected() {
     if (rules.length) evidenceLines.push(`Triggered rules: ${rules.join(', ')}.`);
     const prefillEvidence = evidenceLines.join(' ');
 
-    const severityOptions = ['', 'critical', 'high', 'medium', 'low'].map(s =>
-        `<option value="${s}" ${s === highestSeverity ? 'selected' : ''}>${s || 'Select severity'}</option>`
-    ).join('');
-
-    // Create overlay similar to single-alert case creation
-    const overlay = document.createElement('div');
-    overlay.className = 'case-create-overlay';
-    overlay.id = 'bulk-case-create-overlay';
-    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
-
-    overlay.innerHTML = `
-        <div class="case-create-form">
-            <h3>Create Case from ${selectedAlerts.length} Alert(s)</h3>
-            <label>Title *</label>
-            <input type="text" id="bulk-case-title" value="${escapeHtml(prefillTitle)}" />
-
-            <label>Description</label>
-            <textarea id="bulk-case-description" rows="4">${escapeHtml(prefillDesc)}</textarea>
-
-            <label>Severity</label>
-            <select id="bulk-case-severity">${severityOptions}</select>
-
-            <label>Evidence Summary</label>
-            <textarea id="bulk-case-evidence" rows="3">${escapeHtml(prefillEvidence)}</textarea>
-
-            <div class="case-form-actions">
-                <button class="btn btn-secondary" data-remove-target="bulk-case-create-overlay">Cancel</button>
-                <button class="btn btn-primary" data-click-action="submitBulkCreateCase">Create Case</button>
-            </div>
-        </div>
-    `;
+    // The form is the <template id="bulk-case-create-template"> in this
+    // page. Field values are set as values, not interpolated into markup.
+    document.getElementById('bulk-case-create-overlay')?.remove();
+    const overlay = cloneTemplate('bulk-case-create-template');
+    if (!overlay) return;
+    overlay.querySelector('h3').textContent = 'Create Case from ' + selectedAlerts.length + ' Alert(s)';
+    overlay.querySelector('#bulk-case-title').value = prefillTitle;
+    overlay.querySelector('#bulk-case-description').value = prefillDesc;
+    overlay.querySelector('#bulk-case-severity').value = highestSeverity;
+    overlay.querySelector('#bulk-case-evidence').value = prefillEvidence;
 
     document.body.appendChild(overlay);
 }
@@ -7252,62 +7055,21 @@ async function submitBulkCreateCase() {
     }
 }
 
-async function addToExistingCase() {
+// The picker is server-rendered by /ui/alerts/case-picker into
+// #add-to-case-host: the open and acknowledged cases come from the same
+// list function GET /api/cases uses, not from the page's cache. Only the
+// selection count travels, as a query parameter; the ids stay with
+// confirmAddToCase, whose POST is a JSON body and stays on fetch.
+function addToExistingCase() {
     if (selectedAlertIds.size === 0) {
         showNotification('No alerts selected', 'warning');
-        return;
+        return Promise.resolve();
     }
-
-    // Fetch available cases
-    if (casesData.length === 0) {
-        try {
-            const resp = await fetch('/api/cases/');
-            if (resp.ok) {
-                casesData = await resp.json();
-            }
-        } catch (err) {
-            console.error('Failed to load cases:', err);
-        }
-    }
-
-    const openCases = casesData.filter(c => c.status === 'open' || c.status === 'acknowledged');
-
-    if (openCases.length === 0) {
-        showNotification('No open cases available. Create a new case instead.', 'warning');
-        return;
-    }
-
-    // Create a simple case picker modal
-    const caseOptions = openCases.map(c =>
-        `<option value="${c.id}">${escapeHtml(c.case_number)} - ${escapeHtml(c.title)}</option>`
-    ).join('');
-
-    const modalHtml = `
-        <div id="add-to-case-modal" class="modal flex">
-            <div class="modal-content max-w-[500px]">
-                <div class="modal-header">
-                    <h3>Add Alerts to Case</h3>
-                    <button class="modal-close" data-click-action="closeAddToCaseModal">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <p>Adding ${selectedAlertIds.size} alert(s) to case:</p>
-                    <select id="target-case-id" class="form-control w-full my-4 mx-0">
-                        ${caseOptions}
-                    </select>
-                </div>
-                <div class="modal-footer">
-                    <button class="btn btn-secondary" data-click-action="closeAddToCaseModal">Cancel</button>
-                    <button class="btn btn-primary" data-click-action="confirmAddToCase">Add to Case</button>
-                </div>
-            </div>
-        </div>
-    `;
-
-    // Remove any existing modal
-    const existing = document.getElementById('add-to-case-modal');
-    if (existing) existing.remove();
-
-    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    const host = document.getElementById('add-to-case-host');
+    if (!host) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/alerts/case-picker?selected=' + encodeURIComponent(selectedAlertIds.size), {
+        source: host, target: host, swap: 'innerHTML',
+    });
 }
 
 function closeAddToCaseModal() {
@@ -7544,39 +7306,28 @@ document.addEventListener('DOMContentLoaded', initKeyboardShortcuts);
 let _acpAssigneesCache = null;          // {id, display_name, username}[]; lazy-loaded
 let _acpClosurePending = null;          // { caseId } while the closure modal is open
 
-const _ACP_CLOSURE_LABELS = {
-    true_positive: 'True Positive',
-    false_positive: 'False Positive',
-    benign_true_positive: 'Benign True Positive',
-    duplicate: 'Duplicate',
-    insufficient_data: 'Insufficient Data',
-    not_applicable: 'Not Applicable',
-};
 
-async function openCasePanel(caseId) {
+// The panel body is server-rendered by /ui/alerts/case-panel/{id}. The
+// header spans are swapped out of band by the fragment, so they are
+// cleared here and never show the previous case over this one's body. The
+// loading line is #acp-loading, toggled by htmx through hx-indicator on
+// the panel. The three outcomes (missing, failed, data) are the fragment's.
+function openCasePanel(caseId) {
     const panel = document.getElementById('acp-panel');
     const overlay = document.getElementById('acp-overlay');
     const body = document.getElementById('acp-body');
-    if (!panel) return;
+    if (!panel) return Promise.resolve();
 
     panel.classList.add('open');
     overlay.classList.add('open');
     panel.dataset.caseId = String(caseId);
-    body.innerHTML = '<p class="text-[var(--text-secondary)] text-center p-8">Loading...</p>';
+    document.getElementById('acp-number').textContent = '';
+    document.getElementById('acp-title').textContent = '';
+    body.replaceChildren();
 
-    try {
-        const resp = await fetch('/api/cases/' + caseId);
-        if (!resp.ok) throw new Error('Failed to load case');
-        const c = await resp.json();
-        document.getElementById('acp-number').textContent = c.case_number || '';
-        document.getElementById('acp-title').textContent = c.title || '';
-        body.innerHTML = _renderAcpContent(c);
-    } catch (e) {
-        console.error('openCasePanel(' + caseId + ') failed:', e);
-        body.innerHTML =
-            '<p class="text-[#ef4444] text-center p-8">Failed to load case details'
-            + '<br><small>' + escapeHtml(String((e && e.message) || e)) + '</small></p>';
-    }
+    return htmx.ajax('GET', '/ui/alerts/case-panel/' + encodeURIComponent(caseId), {
+        source: panel, target: body, swap: 'innerHTML',
+    });
 }
 
 function closeCasePanel() {
@@ -7598,121 +7349,6 @@ async function _acpLoadAssignees() {
     return _acpAssigneesCache;
 }
 
-function _renderAcpContent(c) {
-    const sev = c.severity || 'medium';
-    const alertCount = (c.alerts || []).length;
-    const obsCount = (c.observables || []).length;
-    const ageMs = c.created_at ? (Date.now() - new Date(c.created_at).getTime()) : 0;
-    const ageLabel = ageMs > 86400000
-        ? Math.floor(ageMs / 86400000) + 'd'
-        : (ageMs > 3600000 ? Math.floor(ageMs / 3600000) + 'h' : Math.floor(ageMs / 60000) + 'm');
-
-    let html = `<div class="acp-sev-strip sev-${escapeHtml(sev)}">
-        <strong>${escapeHtml(sev)}</strong>
-        <span class="acp-sev-detail">${alertCount} alert${alertCount !== 1 ? 's' : ''}
-          &middot; ${obsCount} observable${obsCount !== 1 ? 's' : ''}
-          &middot; ${ageLabel} old</span>
-    </div>`;
-
-    // Closed-info banner
-    if (c.status === 'closed' && c.closure_reason) {
-        html += `<div class="acp-closure-info">
-            <div><strong>Closed:</strong> ${escapeHtml(_ACP_CLOSURE_LABELS[c.closure_reason] || c.closure_reason)}</div>
-            ${c.closure_notes ? `<div class="mt-1 text-[var(--text-secondary)]">${escapeHtml(c.closure_notes)}</div>` : ''}
-            <div class="mt-1 text-[var(--text-muted)] text-[0.7rem]">
-                Closed by ${escapeHtml(c.closed_by || 'unknown')}${c.closed_at ? ' on ' + new Date(c.closed_at).toLocaleString() : ''}
-            </div>
-        </div>`;
-    }
-
-    // Metadata
-    html += `<div class="acp-section"><div class="acp-section-title">Metadata</div>
-        <div class="acp-meta-grid">
-            <div class="acp-meta-item"><label>Status</label>
-                <select data-change-action="acpUpdateField" data-args='[${c.id}, "status", "$value", "${escapeHtml(c.status || 'open')}"]'>
-                    ${['open','acknowledged','closed'].map(s =>
-                        `<option value="${s}"${c.status === s ? ' selected' : ''}>${s}</option>`).join('')}
-                </select>
-            </div>
-            <div class="acp-meta-item"><label>Severity</label>
-                <select data-change-action="acpUpdateField" data-args='[${c.id}, "severity", "$value"]'>
-                    ${['critical','high','medium','low'].map(s =>
-                        `<option value="${s}"${c.severity === s ? ' selected' : ''}>${s}</option>`).join('')}
-                </select>
-            </div>
-            <div class="acp-meta-item"><label>Created</label>
-                <div class="acp-meta-value">${c.created_at ? new Date(c.created_at).toLocaleString() : '-'}</div>
-            </div>
-            <div class="acp-meta-item"><label>Updated</label>
-                <div class="acp-meta-value">${c.updated_at ? new Date(c.updated_at).toLocaleString() : '-'}</div>
-            </div>
-        </div>
-    </div>`;
-
-    // Alerts linked
-    const alerts = c.alerts || [];
-    html += `<div class="acp-section"><div class="acp-section-title">Linked alerts (${alerts.length})</div>
-        <div class="acp-alerts-list">`;
-    if (alerts.length === 0) {
-        html += '<div class="text-[var(--text-muted)] text-[0.8rem]">No alerts linked.</div>';
-    } else {
-        alerts.slice(0, 25).forEach(a => {
-            html += `<div class="acp-item">
-                <div class="acp-item-title">${escapeHtml(a.rule_name || a.es_alert_id || 'unknown')}</div>
-                <div class="acp-item-meta">${escapeHtml(a.status || '')} &middot; ${escapeHtml(a.es_alert_id || '')}</div>
-            </div>`;
-        });
-    }
-    html += '</div></div>';
-
-    // Observables
-    const obs = c.observables || [];
-    html += `<div class="acp-section"><div class="acp-section-title">Observables (${obs.length})</div>
-        <div class="acp-obs-list">`;
-    if (obs.length === 0) {
-        html += '<div class="text-[var(--text-muted)] text-[0.8rem]">No observables.</div>';
-    } else {
-        obs.slice(0, 50).forEach(o => {
-            const v = o.value || o.normalized_value || JSON.stringify(o);
-            const t = o.type || '';
-            html += `<div class="acp-item"><div class="acp-item-title">${escapeHtml(v)}</div>
-                <div class="acp-item-meta">${escapeHtml(t)}${o.context ? ' &middot; ' + escapeHtml(o.context) : ''}</div></div>`;
-        });
-    }
-    html += '</div></div>';
-
-    // Notes
-    const notes = c.notes || [];
-    html += `<div class="acp-section"><div class="acp-section-title">Notes (${notes.length})</div>
-        <div class="acp-notes-list">`;
-    if (notes.length === 0) {
-        html += '<div class="text-[var(--text-muted)] text-[0.8rem]">No notes yet.</div>';
-    } else {
-        notes.forEach(n => {
-            html += `<div class="acp-item">
-                <div class="acp-item-meta">${escapeHtml(n.user || 'unknown')}
-                  &middot; ${n.created_at ? new Date(n.created_at).toLocaleString() : ''}</div>
-                <div class="mt-1 whitespace-pre-wrap">${escapeHtml(n.content || '')}</div>
-            </div>`;
-        });
-    }
-    html += `<div class="mt-2 flex gap-1.5">
-        <textarea class="flex-1 p-1.5 bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--ion-border)] rounded-[4px] resize-y text-[0.8rem]" id="acp-note-input" rows="2" placeholder="Add note..."
-></textarea>
-        <button class="btn btn-primary text-xs self-start" data-click-action="acpAddNote" data-args='[${c.id}]'>Add</button>
-    </div>`;
-    html += '</div></div>';
-
-    // Footer — link to /cases panel for heavy features
-    html += `<div class="acp-footer-link">
-        <a href="/cases?selected=${encodeURIComponent(c.case_number)}" target="_blank">
-            Open full case view (Workbench / Annotations / Similar) ↗
-        </a>
-        ${c.kibana_url ? `<a href="${escapeHtml(c.kibana_url)}" target="_blank">View in Kibana ↗</a>` : ''}
-    </div>`;
-
-    return html;
-}
 
 async function acpUpdateField(caseId, field, value, oldStatus) {
     // Status → closed: open the closure modal (full CaseClosureReason picker).

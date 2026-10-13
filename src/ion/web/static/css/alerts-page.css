@@ -2844,3 +2844,23 @@ kbd {
     padding: 0.875rem 1.25rem;
     border-top: 1px solid var(--ion-border);
 }
+
+/* Cases card: the alert count's background by case status. These were the
+ * three literals renderCasesSummary assigned to el.style.background after
+ * the markup landed, because the style-to-class migration had hashed the
+ * dynamic inline style into a dead class. The fragment emits the class. */
+.side-panel .list-item-count.case-status-open { background: #1976d2; }
+.side-panel .list-item-count.case-status-acknowledged { background: #f57c00; }
+.side-panel .list-item-count.case-status-closed { background: #616161; }
+
+/* AI case summary: the in-flight state. htmx-busy.js puts ion-busy on the
+ * swap target for the duration of the request; an empty container has
+ * nothing to dim, so it says what is happening instead. The script wrote a
+ * spinner div for this before. */
+.ai-case-summary.visible.ion-busy:empty::before {
+    content: "Generating case summary...";
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+    padding: 0.5rem 0;
+}

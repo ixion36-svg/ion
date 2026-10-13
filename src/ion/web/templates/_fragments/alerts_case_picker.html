@@ -1,0 +1,52 @@
+{# Alerts: the Add Alerts to Case picker.
+
+   Replaces the insertAdjacentHTML site in addToExistingCase. That function
+   listed open and acknowledged cases from the page's `casesData` cache and,
+   when the cache was empty, fell back to GET /api/cases/ with a trailing
+   slash, a path no route matches (measured against the live route table),
+   then assigned the object it got back to an array variable. The list
+   comes from the server here, through the same function GET /api/cases
+   uses.
+
+   Three outcomes. The JavaScript showed a toast "No open cases available"
+   for both an empty list and a list it could not read. #}
+
+<div id="add-to-case-modal" class="modal flex">
+  <div class="modal-content max-w-[500px]">
+    <div class="modal-header">
+      <h3>Add Alerts to Case</h3>
+      <button class="modal-close" data-click-action="closeAddToCaseModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      {% if failed %}
+        <div class="text-[var(--danger)]" role="alert">
+          The open cases could not be listed. This is not a SOC with no open
+          cases: any that exist are still open. Close this and try again.
+        </div>
+      {% elif not cases %}
+        <p>No open cases available. Create a new case instead.</p>
+      {% else %}
+        <p>Adding {{ selected }} alert(s) to case:</p>
+        <select id="target-case-id" class="form-control w-full my-4 mx-0">
+          {% for c in cases %}
+            <option value="{{ c.id }}">{{ c.case_number }} - {{ c.title }}</option>
+          {% endfor %}
+        </select>
+        {% if truncated %}
+          <p class="text-xs text-[var(--text-muted)]">Showing the newest {{ cases|length }} of {{ total }} open and acknowledged cases.</p>
+        {% endif %}
+        {# Withheld without alert:triage, which POST
+           /api/alerts/triage/bulk-update requires. #}
+        {% if not can_add %}
+          <p class="text-xs text-[var(--text-muted)]">Adding alerts to a case requires the alert:triage permission.</p>
+        {% endif %}
+      {% endif %}
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" data-click-action="closeAddToCaseModal">Cancel</button>
+      {% if not failed and cases and can_add %}
+        <button class="btn btn-primary" data-click-action="confirmAddToCase">Add to Case</button>
+      {% endif %}
+    </div>
+  </div>
+</div>
