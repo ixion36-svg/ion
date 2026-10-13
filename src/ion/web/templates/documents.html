@@ -675,6 +675,36 @@ async function loadCollections() {
     }
 }
 
+// GET /ui/documents/folders and .../folders/manage render the two trees.
+// Both read the hierarchy, which needs template:read while this page is
+// gated on document:read, so an account can hold the documents and not
+// the folders. The page asked anyway, logged the refusal to the console
+// and carried on, so that account saw an empty sidebar and no reason.
+// The fragments report the refusal instead.
+//
+// Delete, in the manage tree, now needs template:delete, and its
+// argument goes through tojson: it was JSON.stringify inside a
+// single-quoted attribute, so a folder called "Bob's folder" closed the
+// attribute early and the button did nothing.
+function renderFolderTree() {
+    const container = document.getElementById('folder-list');
+    if (!container) return Promise.resolve();
+    // selectedFolderId is the tree's own state: null, an id, or the
+    // string 'uncategorized'. The server decides which row is active.
+    const selected = (selectedFolderId === null || selectedFolderId === undefined)
+        ? '' : String(selectedFolderId);
+    return htmx.ajax('GET', '/ui/documents/folders?selected=' + encodeURIComponent(selected), {
+        source: container, target: container, swap: 'innerHTML',
+    });
+}
+
+function renderFoldersManageTree() {
+    const container = document.getElementById('folders-tree-manage');
+    if (!container) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/documents/folders/manage', {
+        source: container, target: container, swap: 'innerHTML',
+    });
+}
 function buildFolderTree(collections, parentId = null) {
     return collections
         .filter(c => c.parent_id === parentId)
@@ -684,34 +714,7 @@ function buildFolderTree(collections, parentId = null) {
         }));
 }
 
-function renderFolderTree() {
-    const container = document.getElementById('folder-list');
-    const tree = buildFolderTree(allCollections);
-    container.innerHTML = renderFolderItems(tree, 0);
-}
 
-function renderFolderItems(folders, depth) {
-    if (!folders.length) return '';
-
-    let html = '';
-    folders.forEach(f => {
-        const isActive = selectedFolderId === f.id;
-        const indent = depth > 0 ? 'folder-children' : '';
-
-        html += '<div class="' + indent + '">';
-        html += `<div class="folder-item${isActive ? ' active' : ''}" data-id="${f.id}" data-click-action="selectFolder" data-args='[${f.id}]'>`;
-        html += '<span class="folder-icon">' + (f.children.length > 0 ? '<i class="icon-folder-open"></i>' : '<i class="icon-folder"></i>') + '</span>';
-        html += '<span class="folder-name">' + escapeHtml(f.name) + '</span>';
-        html += '<span class="folder-manage-counts">(' + (f.document_count || 0) + ')</span>';
-        html += '</div>';
-
-        if (f.children.length > 0) {
-            html += renderFolderItems(f.children, depth + 1);
-        }
-        html += '</div>';
-    });
-    return html;
-}
 
 function selectFolder(folderId) {
     selectedFolderId = folderId;
@@ -1200,42 +1203,7 @@ function updateFolderSelects() {
     addOptions(tree);
 }
 
-function renderFoldersManageTree() {
-    const container = document.getElementById('folders-tree-manage');
-    const tree = buildFolderTree(allCollections);
 
-    if (tree.length === 0) {
-        container.innerHTML = '<p class="empty-state">No folders yet. Create one above!</p>';
-        return;
-    }
-
-    container.innerHTML = renderFolderManageItems(tree);
-}
-
-function renderFolderManageItems(folders, depth = 0) {
-    let html = '';
-    folders.forEach(f => {
-        const indent = depth > 0 ? 'folder-manage-children' : '';
-
-        html += '<div class="' + indent + '">';
-        html += '<div class="folder-manage-item">';
-        html += '<div class="folder-manage-info">';
-        html += '<span>' + (f.children.length > 0 ? '<i class="icon-folder-open"></i>' : '<i class="icon-folder"></i>') + '</span>';
-        html += '<span>' + escapeHtml(f.name) + '</span>';
-        html += '<span class="folder-manage-counts">' + (f.template_count || 0) + ' templates, ' + (f.document_count || 0) + ' docs</span>';
-        html += '</div>';
-        html += '<div>';
-        html += `<button class="btn btn-sm btn-danger" data-click-action="deleteFolder" data-args='[${f.id}, ${JSON.stringify(f.name)}]'>Delete</button>`;
-        html += '</div>';
-        html += '</div>';
-
-        if (f.children.length > 0) {
-            html += renderFolderManageItems(f.children, depth + 1);
-        }
-        html += '</div>';
-    });
-    return html;
-}
 
 async function createFolder() {
     const parentId = document.getElementById('new-folder-parent').value || null;

@@ -689,3 +689,168 @@ def documents_version_header_fragment(
                           may_revert=may_revert)
         view = {"failed": False, **(row or {})}  # type: ignore[typeddict-item]
     return render_view(request, VERSION_HEADER_FRAGMENT, view)
+
+
+# ---------------------------------------------------------------------------
+# The folder trees
+# ---------------------------------------------------------------------------
+#
+# Two containers, one hierarchy: the sidebar tree you browse with and the
+# manage panel you rename and delete from. Both were built from
+# `allCollections`, the `/api/collections?flat=true` read, by four
+# JavaScript functions.
+#
+# This read needs a permission the page does not. GET /api/collections
+# requires template:read, and the page is gated on document:read. The page
+# asked anyway, logged the refusal to the console and carried on, so an
+# account with documents and no templates got an empty sidebar with no
+# folders in it and nothing saying why. Both routes below are gated on the
+# page's own permission and report the refusal, rather than being gated on
+# template:read and answering 403 into a container htmx will not swap.
+#
+# The Delete control needs a third permission, template:delete, and was
+# offered to everyone. Its argument was built with
+# `JSON.stringify(f.name)` inside a single-quoted attribute, so a folder
+# called "Bob's folder" closed the attribute early and the button did
+# nothing, exactly as on the document list.
+
+FOLDERS_FRAGMENT = "_fragments/documents_folders.html"
+FOLDERS_MANAGE_FRAGMENT = "_fragments/documents_folders_manage.html"
+
+#: What DELETE /api/collections/{id} requires.
+FOLDER_DELETE = "template:delete"
+
+
+class FolderNode(TypedDict):
+    """One folder. `documents` is None where the schema cannot count them,
+    which `len(c.documents) if hasattr(...) else 0` reported as zero."""
+
+    id: Any
+    name: Optional[str]
+    full_path: Optional[str]
+    documents: Optional[int]
+    templates: Optional[int]
+    children: list
+    selected: bool
+
+
+class FoldersView(TypedDict):
+    """`state` is the four answers this read has, not three.
+
+    "data"      the hierarchy was read and has folders
+    "empty"     it was read and there are none
+    "withheld"  this account may not read collections
+    "failed"    the read was attempted and did not answer
+    """
+
+    state: str
+    nodes: list[FolderNode]
+    may_delete: bool
+
+
+def folder_node(collection: Any, selected: Any) -> Optional[FolderNode]:
+    """One folder and its subtree, or None for a row with no id."""
+    ident = getattr(collection, "id", None)
+    if ident is None:
+        return None
+    name = plain(getattr(collection, "name", None))
+    path = plain(getattr(collection, "full_path", None))
+    # `len(c.documents) if hasattr(c, 'documents') else 0` made a schema
+    # that cannot count documents indistinguishable from a folder holding
+    # none. The count is absent here when we cannot take it.
+    docs = getattr(collection, "documents", None)
+    templates = getattr(collection, "templates", None)
+    children = []
+    for child in (getattr(collection, "children", None) or []):
+        node = folder_node(child, selected)
+        if node is not None:
+            children.append(node)
+    return {
+        "id": ident,
+        "name": str(name) if name is not None else None,
+        "full_path": str(path) if path is not None else None,
+        "documents": len(docs) if isinstance(docs, (list, tuple)) else None,
+        "templates": (len(templates)
+                      if isinstance(templates, (list, tuple)) else None),
+        "children": children,
+        "selected": selected is not None and ident == selected,
+    }
+
+
+def folders_view(collections: Any, *, selected: Any, may_read: bool,
+                 may_delete: bool) -> FoldersView:
+    """The hierarchy as the trees' model."""
+    if not may_read:
+        return {"state": "withheld", "nodes": [], "may_delete": False}
+    if not isinstance(collections, list):
+        return {"state": "failed", "nodes": [], "may_delete": may_delete}
+    roots = [c for c in collections
+             if getattr(c, "parent_id", None) is None]
+    nodes = [n for n in (folder_node(c, selected) for c in roots)
+             if n is not None]
+    if collections and not nodes:
+        return {"state": "failed", "nodes": [], "may_delete": may_delete}
+    return {
+        "state": "data" if nodes else "empty",
+        "nodes": nodes,
+        "may_delete": may_delete,
+    }
+
+
+def _folders(session: Session, user: Any, selected: Any) -> FoldersView:
+    may_read = bool(user and user.has_permission(FOLDER_PERMISSION))
+    may_delete = bool(user and user.has_permission(FOLDER_DELETE))
+    collections: Any = None
+    if may_read:
+        try:
+            from ion.services.template_service import TemplateService
+
+            collections = TemplateService(session).list_collections()
+        except Exception:
+            logger.exception(
+                "Documents fragment could not read the folder hierarchy")
+            collections = None
+    return folders_view(collections, selected=selected, may_read=may_read,
+                        may_delete=may_delete)
+
+
+def _selected(value: str) -> Any:
+    """The tree's own selection, which is an id, the string the page uses
+    for "no folder", or nothing."""
+    if not value or value == UNFILED:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+@router.get(
+    "/documents/folders",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+def documents_folders_fragment(
+    request: Request,
+    selected: str = "",
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> Response:
+    """The sidebar folder tree."""
+    return render_view(request, FOLDERS_FRAGMENT,
+                       _folders(session, current_user, _selected(selected)))
+
+
+@router.get(
+    "/documents/folders/manage",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+def documents_folders_manage_fragment(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> Response:
+    """The manage panel's tree, which carries the Delete controls."""
+    return render_view(request, FOLDERS_MANAGE_FRAGMENT,
+                       _folders(session, current_user, None))
