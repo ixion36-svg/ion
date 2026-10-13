@@ -1081,3 +1081,183 @@ def cases_timeline_fragment(
         payload = None
 
     return render_view(request, TIMELINE_FRAGMENT, timeline_view(payload))
+
+
+# ---------------------------------------------------------------------------
+# Cross-case observable sightings
+# ---------------------------------------------------------------------------
+#
+# GET /api/cases/{id}/similar-observables (case:read) is the deterministic
+# sibling of the pgvector panel above: other cases that share an exact
+# (type, normalized_value) with one of this case's observables.
+#
+# loadSimilarObservables told a failed request from an empty one, and the
+# rest was defects:
+#
+#   * `const o = row.observable;` then `o.tlp`, with no guard. One row
+#     arriving without its observable threw into the function's single
+#     catch, so the whole panel read "Cross-case lookup unavailable"
+#     because of one bad row among good ones. A row we cannot read is
+#     skipped here, and a panel where no row could be read is the failed
+#     outcome rather than the empty one.
+#   * `o.sighting_count || 1` printed "1x" for an observable whose count
+#     was missing, and could not tell that from a genuine 1.
+#   * `esc(o.value)` with no guard printed the word "undefined".
+#   * data-args by interpolation, and a `javascript:` href this CSP blocks.
+#
+# On the TLP fallback: `tlpColors[o.tlp] || tlpColors.amber` looks like it
+# invents a marking and it does not. Observable.tlp is nullable=False with
+# default="amber", so amber is what the schema means by an unset TLP. What
+# it could not do is tell amber from a value outside the five it knew,
+# because the column is a plain String(8), and such a value was painted
+# amber while its own text showed in the pill.
+
+OBSERVABLES_FRAGMENT = "_fragments/cases_observables.html"
+
+#: How many sightings each indicator lists before "N more".
+SIGHTINGS_SHOWN = 6
+
+#: How much of a sighting's case title fits on its card.
+SIGHTING_TITLE_CHARS = 100
+
+#: The TLP markings the pill has a colour for, from `tlpColors`. The
+#: colours are in static/css/cases-page.css, keyed by these names.
+TLP_KEYS: tuple[str, ...] = ("red", "amber", "green", "clear", "white")
+
+#: What the column means by an unset TLP, per Observable.tlp's own default.
+TLP_DEFAULT = "amber"
+
+#: A TLP outside TLP_KEYS. Its own text is still shown, so the pill and its
+#: colour agree about not knowing.
+TLP_FALLBACK = "unknown"
+
+
+class Sighting(TypedDict):
+    case_id: Any
+    label: str
+    title: Optional[str]
+    status: Optional[str]
+
+
+class SharedObservable(TypedDict):
+    """One indicator and the other cases carrying it.
+
+    `sighting_count` is None when the payload had no readable one, where
+    `|| 1` claimed a single sighting.
+    """
+
+    type: Optional[str]
+    value: Optional[str]
+    is_ioc: bool
+    tlp_key: str
+    tlp_label: str
+    sighting_count: Optional[int]
+    sightings: list[Sighting]
+    hidden: int
+
+
+class ObservablesView(TypedDict):
+    rows: Optional[list[SharedObservable]]
+
+
+def tlp_parts(value: Any) -> tuple[str, str]:
+    """The stylesheet key and the pill's words for a TLP marking.
+
+    An absent marking is the column's own default, so it reads AMBER and is
+    painted amber. A marking outside the five keeps its own text under the
+    `unknown` key, because a pill saying PURPLE in amber disagrees with
+    itself.
+    """
+    marking = plain(value)
+    if marking is None or str(marking) == "":
+        return TLP_DEFAULT, TLP_DEFAULT.upper()
+    text = str(marking)
+    if text in TLP_KEYS:
+        return text, text.upper()
+    return TLP_FALLBACK, text.upper()
+
+
+def sighting(raw: Any) -> Optional[Sighting]:
+    """One other case carrying the indicator, or None for a bad entry."""
+    if not isinstance(raw, dict):
+        return None
+    case_id = plain(raw.get("case_id"))
+    number = plain(raw.get("case_number"))
+    title = plain(raw.get("title"))
+    status = plain(raw.get("status"))
+    return {
+        "case_id": case_id,
+        "label": str(number) if number else f"#{case_id}",
+        "title": str(title)[:SIGHTING_TITLE_CHARS] if title else None,
+        "status": str(status) if status else None,
+    }
+
+
+def shared_observable(raw: Any) -> Optional[SharedObservable]:
+    """One row of the endpoint's `shared` list, or None when it has no
+    readable observable. The page let that throw and lost the whole panel."""
+    if not isinstance(raw, dict):
+        return None
+    obs = raw.get("observable")
+    if not isinstance(obs, dict):
+        return None
+    tlp_key, tlp_label = tlp_parts(obs.get("tlp"))
+    raw_sightings = raw.get("sightings")
+    entries = raw_sightings if isinstance(raw_sightings, list) else []
+    seen = [s for s in (sighting(r) for r in entries) if s is not None]
+    kind = plain(obs.get("type"))
+    value = plain(obs.get("value"))
+    return {
+        "type": str(kind) if kind is not None else None,
+        "value": str(value) if value is not None else None,
+        "is_ioc": obs.get("is_ioc") is True,
+        "tlp_key": tlp_key,
+        "tlp_label": tlp_label,
+        "sighting_count": _count(obs.get("sighting_count")),
+        "sightings": seen[:SIGHTINGS_SHOWN],
+        "hidden": max(0, len(seen) - SIGHTINGS_SHOWN),
+    }
+
+
+def observables_view(payload: Any) -> ObservablesView:
+    """The endpoint's body as the panel's model.
+
+    `rows is None` is the failed outcome. A list we were given but could
+    read nothing from is also that outcome: we were told there were matches
+    and could not read any of them, which is not the same as none.
+    """
+    found = _rows(payload, "shared")
+    if found is None:
+        return {"rows": None}
+    rows = [r for r in (shared_observable(raw) for raw in found)
+            if r is not None]
+    if found and not rows:
+        return {"rows": None}
+    return {"rows": rows}
+
+
+@router.get(
+    "/cases/{case_id}/similar-observables",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+def cases_observables_fragment(
+    request: Request,
+    case_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> Response:
+    """The cross-case observable sightings panel."""
+    from ion.web.case_lifecycle_api import get_case_similar_observables
+
+    try:
+        payload = get_case_similar_observables(
+            case_id, current_user=current_user, session=session)
+    except Exception:
+        logger.exception(
+            "Cases observables fragment could not read sightings for %s",
+            case_id)
+        payload = None
+
+    return render_view(request, OBSERVABLES_FRAGMENT,
+                       observables_view(payload))

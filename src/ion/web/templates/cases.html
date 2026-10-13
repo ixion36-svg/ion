@@ -4035,62 +4035,22 @@ function loadCaseTimeline(caseId) {
 
 
 // ── v0.10.19: Load Cross-Case Observable Sightings ────────
-async function loadSimilarObservables(caseId) {
+// GET /ui/cases/{id}/similar-observables renders the indicators and the
+// other cases carrying them. htmx.ajax because renderPanelContent builds
+// the container as a string, so htmx has never processed it.
+//
+// What moved to the server, beyond the markup: a payload that is not the
+// expected shape reads unavailable rather than "no matches"; one row
+// without a readable observable is skipped instead of throwing into the
+// single catch and taking the whole panel with it; a missing sighting
+// count says so rather than claiming 1x; data-args goes through tojson;
+// and the case number is no longer a javascript: href the CSP blocks.
+function loadSimilarObservables(caseId) {
     const container = document.getElementById('similar-observables-container');
-    if (!container) return;
-    try {
-        const resp = await fetch('/api/cases/' + caseId + '/similar-observables');
-        if (!resp.ok) {
-            container.innerHTML = '<div class="cpanel-empty-hint">Cross-case lookup unavailable</div>';
-            return;
-        }
-        const data = await resp.json();
-        const shared = data.shared || [];
-        if (!shared.length) {
-            container.innerHTML = '<div class="cpanel-empty-hint">No observables in this case match other cases</div>';
-            return;
-        }
-        // TLP/PAP colour pills — standard FIRST.org colours
-        const tlpColors = {
-            red: { bg: 'rgba(239,68,68,.18)', color: '#fca5a5' },
-            amber: { bg: 'rgba(245,158,11,.18)', color: '#fbbf24' },
-            green: { bg: 'rgba(34,197,94,.18)', color: '#86efac' },
-            clear: { bg: 'rgba(148,163,184,.14)', color: '#cbd5e1' },
-            white: { bg: 'rgba(148,163,184,.14)', color: '#cbd5e1' },
-        };
-        container.innerHTML = shared.map(row => {
-            const o = row.observable;
-            const tlp = tlpColors[o.tlp] || tlpColors.amber;
-            const iocBadge = o.is_ioc
-                ? '<span class="cpanel-alert-badge bg-[rgba(239,68,68,.14)] text-[#fca5a5]" title="Marked as IOC">IOC</span>'
-                : '';
-            const sightingsList = (row.sightings || []).slice(0, 6).map(s => {
-                return '<div class="cpanel-alert-card cursor-pointer mt-[0.3rem]" data-click-action="openCaseDetail" data-args=\'[' + s.case_id + ']\'>'
-                    +   '<div class="cpanel-alert-card-header">'
-                    +     '<a class="cpanel-alert-id" href="javascript:openCaseDetail(' + s.case_id + ')">' + esc(s.case_number || ('#' + s.case_id)) + '</a>'
-                    +     '<span class="cpanel-alert-badge bg-[rgba(148,163,184,.14)] text-[#cbd5e1]">' + esc(s.status || '?') + '</span>'
-                    +   '</div>'
-                    +   '<div class="cpanel-alert-card-meta">' + esc((s.title || '').slice(0, 100)) + '</div>'
-                    + '</div>';
-            }).join('');
-            const more = (row.sightings || []).length > 6
-                ? '<div class="text-[0.7rem] text-[var(--text-muted)] mt-[0.3rem]">' + ((row.sightings || []).length - 6) + ' more…</div>'
-                : '';
-            return '<div class="mb-[0.85rem] pb-[0.65rem] border-b-[1px] border-b-[var(--ion-border)]">'
-                +   '<div class="flex items-center gap-[0.4rem] flex-wrap mb-[0.35rem]">'
-                +     '<span class="cpanel-alert-badge" data-ion-style="background:' + tlp.bg + ';color:' + tlp.color + '" title="TLP">' + esc((o.tlp || '').toUpperCase()) + '</span>'
-                +     iocBadge
-                +     '<code class="text-[0.7rem] text-[var(--text-muted)]">' + esc(o.type) + '</code>'
-                +     '<code class="text-xs text-[var(--text-primary)] break-all flex-1">' + esc(o.value) + '</code>'
-                +     '<span class="cpanel-alert-badge bg-[rgba(109,228,255,.12)] text-[#6de4ff]" title="Total sightings">' + (o.sighting_count || 1) + 'x</span>'
-                +   '</div>'
-                +   sightingsList
-                +   more
-                + '</div>';
-        }).join('');
-    } catch (e) {
-        container.innerHTML = '<div class="cpanel-empty-hint">Cross-case lookup unavailable</div>';
-    }
+    if (!container) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/cases/' + encodeURIComponent(caseId) + '/similar-observables', {
+        source: container, target: container, swap: 'innerHTML',
+    });
 }
 
 // ── Load Kibana Comments ───────────────────────────────────

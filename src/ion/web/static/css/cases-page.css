@@ -242,3 +242,62 @@
 .case-tl-unknown { background: rgba(148, 163, 184, 0.04); }
 .case-tl-unknown .case-tl-marker { background: #94a3b8; }
 .case-tl-unknown .case-tl-kind   { color: #94a3b8; }
+
+/* Cross-case observable sightings --------------------------------------
+ *
+ * The TLP pill was a `tlpColors` map in the page's JavaScript, and the IOC
+ * pill, the sighting status pill and the sightings count were hard-coded
+ * arbitrary Tailwind values (`text-[#fca5a5]`, `text-[#cbd5e1]`,
+ * `text-[#6de4ff]`). Values unchanged except where noted.
+ *
+ * `unknown` is new. Observable.tlp is nullable=False default="amber", so
+ * amber genuinely is what an unset TLP means and the old fallback agreed
+ * with the schema there. What it could not do is tell amber from a value
+ * outside these five, because the column is a plain String(8): such a
+ * value was painted amber while its own text showed in the pill. It gets
+ * its own colour so the pill and the paint agree about not knowing.
+ */
+.case-tlp-red    { background: rgba(239, 68, 68, .18); color: #fca5a5; }
+.case-tlp-amber  { background: rgba(245, 158, 11, .18); color: #fbbf24; }
+.case-tlp-green  { background: rgba(34, 197, 94, .18); color: #86efac; }
+.case-tlp-clear  { background: rgba(148, 163, 184, .14); color: #cbd5e1; }
+.case-tlp-white  { background: rgba(148, 163, 184, .14); color: #cbd5e1; }
+.case-tlp-unknown {
+    background: rgba(148, 163, 184, .14);
+    color: #cbd5e1;
+    border: 1px dashed rgba(203, 213, 225, .5);
+}
+
+.case-ioc-badge        { background: rgba(239, 68, 68, .14); color: #fca5a5; }
+.case-sighting-status  { background: rgba(148, 163, 184, .14); color: #cbd5e1; }
+
+.case-obs-row {
+    margin-bottom: 0.85rem;
+    padding-bottom: 0.65rem;
+    border-bottom: 1px solid var(--ion-border);
+}
+
+.case-obs-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.35rem;
+}
+
+.case-obs-type  { font-size: 0.7rem; color: var(--text-muted); }
+
+.case-obs-value {
+    font-size: 0.75rem;
+    color: var(--text-primary);
+    word-break: break-all;
+    flex: 1;
+}
+
+.case-obs-sighting { margin-top: 0.3rem; }
+
+.case-obs-more {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 0.3rem;
+}
