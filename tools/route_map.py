@@ -70,13 +70,45 @@ def strip_comments(text: str) -> str:
     return text
 
 
+#: A permission name, as require_permission takes it. Used for the gates
+#: whose names are literals in the function body rather than closure cells.
+_PERMISSION_NAME = re.compile(r"^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$")
+
+#: Factories whose qualname carries the permission in a closure cell.
+#: require_page_permission is not a substring of the other two, and the
+#: other two are not substrings of it: "require_permission" does not occur
+#: inside "require_page_permission".
+_CLOSURE_GATES = (
+    "require_page_permission",
+    "require_any_permission",
+    "require_permission",
+)
+
+#: Gates that are not factories. The names sit in co_consts. Leaving them
+#: unrecognised recorded fifteen integration routes and the enrichment
+#: lookup as open.
+_LITERAL_GATES = ("require_integration_access", "_require_enrich")
+
+
+def _literal_permissions(call) -> list[str]:
+    code = getattr(call, "__code__", None)
+    consts = getattr(code, "co_consts", ()) or ()
+    return [v for v in consts if isinstance(v, str) and _PERMISSION_NAME.fullmatch(v)]
+
+
 def permission_of(route) -> str:
     """The permission a route requires, read out of its dependency tree.
 
     require_permission builds a closure over the name, so the name is in
-    the closure cell. Walking the built dependant catches the gate wherever
-    it was declared: the decorator's `dependencies`, the signature, or the
+    the closure cell. require_page_permission does the same, and also
+    records the name on the function as `_ion_page_permission` for the
+    navigation. Walking the built dependant catches the gate wherever it
+    was declared: the decorator's `dependencies`, the signature, or the
     router.
+
+    require_page_auth is not a permission. It means signed in, and a blank
+    cell is what this function returns for it. require_de_module and
+    require_workforce_module are feature gates, not permissions.
     """
     found: list[str] = []
 
@@ -84,19 +116,26 @@ def permission_of(route) -> str:
         if depth > 4:
             return
         call = getattr(dep, "call", None)
-        if call is not None and getattr(call, "__closure__", None):
-            qual = getattr(call, "__qualname__", "")
-            if "require_permission" in qual or "require_any_permission" in qual:
+        if call is not None:
+            qual = getattr(call, "__qualname__", "") or ""
+            recorded = getattr(call, "_ion_page_permission", None)
+            if isinstance(recorded, str) and recorded:
+                found.append(recorded)
+            elif getattr(call, "__closure__", None) and any(
+                gate in qual for gate in _CLOSURE_GATES
+            ):
                 for cell in call.__closure__:
                     value = cell.cell_contents
                     if isinstance(value, str):
                         found.append(value)
                     elif isinstance(value, (list, tuple)):
                         found.extend(v for v in value if isinstance(v, str))
+            elif qual in _LITERAL_GATES:
+                found.extend(_literal_permissions(call))
             elif "require_admin" in qual or qual == "require_admin":
                 found.append("admin")
-        if call is not None and getattr(call, "__name__", "") == "require_admin":
-            found.append("admin")
+            if getattr(call, "__name__", "") == "require_admin":
+                found.append("admin")
         for sub in getattr(dep, "dependencies", []) or []:
             walk(sub, depth + 1)
 
@@ -106,6 +145,28 @@ def permission_of(route) -> str:
     return " + ".join(sorted(set(found))) if found else ""
 
 
+def _repo_relative(path: str) -> str:
+    """A source path relative to the repo.
+
+    ``Path.resolve()`` follows a junction. A worktree whose ``.venv`` is a
+    junction to another checkout then fails ``relative_to`` and the map
+    drops the handler site, which is how the slowapi limiter lines went
+    blank. The ``.venv`` suffix is the same path the map already records.
+    """
+    raw = pathlib.Path(path)
+    for candidate in (raw, raw.resolve()):
+        try:
+            return str(candidate.relative_to(ROOT)).replace("\\", "/")
+        except ValueError:
+            continue
+    resolved = str(raw.resolve())
+    marker = f"{os.sep}.venv{os.sep}"
+    idx = resolved.lower().find(marker.lower())
+    if idx != -1:
+        return resolved[idx + 1:].replace("\\", "/")
+    raise ValueError(path)
+
+
 def handler_site(endpoint) -> tuple[str, int]:
     """Where the handler is written, relative to the repo."""
     try:
@@ -113,8 +174,7 @@ def handler_site(endpoint) -> tuple[str, int]:
 
         f = inspect.getsourcefile(endpoint) or ""
         _, line = inspect.getsourcelines(endpoint)
-        return (str(pathlib.Path(f).resolve().relative_to(ROOT)).replace("\\", "/"),
-                line)
+        return (_repo_relative(f), line)
     except Exception:
         return ("", 0)
 
