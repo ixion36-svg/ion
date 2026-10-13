@@ -37,8 +37,6 @@ from ion.web.ui import alerts as mod
 from ion.web.ui.alerts import (
     ANALYTICS_TOP_N,
     QUEUE_LIMIT,
-    SEVERITY_COLOURS,
-    TRIAGE_COLOURS,
     country_counts,
     donut_arcs,
     router,
@@ -49,6 +47,7 @@ from ion.web.ui.alerts import (
 
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = ROOT / "src/ion/web/templates/alerts.html"
+PAGE_CSS = ROOT / "src/ion/web/static/css/alerts-page.css"
 FRAGMENTS = ROOT / "src/ion/web/templates/_fragments"
 URL = "/ui/alerts/analytics"
 
@@ -230,12 +229,12 @@ def test_the_bar_title_names_the_bucket_and_its_severities(read):
 def test_a_donut_with_no_list_is_none_rather_than_an_empty_one():
     """None in, None out, so the template can say it was not counted. A
     total of zero is a different thing and the next test pins it."""
-    assert donut_arcs(None, SEVERITY_COLOURS) is None
+    assert donut_arcs(None) is None
 
 
 def test_a_donut_of_all_zeroes_is_a_measurement():
-    out = donut_arcs([{"label": "Critical", "value": 0},
-                      {"label": "High", "value": 0}], SEVERITY_COLOURS)
+    out = donut_arcs([{"label": "Critical", "key": "critical", "value": 0},
+                      {"label": "High", "key": "high", "value": 0}])
     assert out is not None
     assert out["total"] == 0
     assert out["arcs"] == [] and out["legend"] == []
@@ -253,15 +252,39 @@ def test_a_zero_slice_is_left_out_of_the_drawing(read):
     assert "Medium" not in severity
 
 
-def test_the_donut_colours_are_the_ones_that_were_on_screen(read):
+def test_the_donut_colours_are_the_ones_that_were_on_screen():
     """The port is meant to be invisible, so these are the page's hexes and
-    not ones that merely look similar."""
+    not ones that merely look similar.
+
+    They moved out of the view model and into alerts-page.css, keyed by the
+    slice name, for the reason tide_band's band moved: which colour paints
+    "critical" is the stylesheet's answer, and a model carrying it makes
+    every reader of this route inherit ION's palette. The values are
+    unchanged, which is what this asserts."""
+    css = PAGE_CSS.read_text(encoding="utf-8")
+    for key, hexval in (("critical", "#f44336"), ("high", "#ff9800"),
+                        ("medium", "#ffc107"), ("low", "#4caf50"),
+                        ("info", "#2196f3"), ("open", "#1976d2"),
+                        ("acknowledged", "#ff9800"), ("closed", "#78909c")):
+        assert f".donut-{key}" in css, key
+        block = css[css.index(f".donut-{key}"):]
+        assert hexval in block[:block.index("}")], (key, hexval)
+    assert ".hbar-fill.hbar-host" in css and "#4fc3f7" in css
+    assert ".hbar-fill.hbar-rule" in css and "#ba68c8" in css
+
+
+def test_the_donut_carries_a_slice_name_and_no_colour(read):
+    """What the move is for. An arc that names #f44336 has put this
+    stylesheet's palette in the contract every reader is built on."""
     read["payload"] = {"alerts": [_alert(severity="critical")]}
     read["triage"] = {}
+    out = donut_arcs([{"label": "Critical", "key": "critical", "value": 1}])
+    assert out["arcs"][0]["key"] == "critical"
+    assert "colour" not in out["arcs"][0]
+    assert "colour" not in out["legend"][0]
     body = get().text
-    assert SEVERITY_COLOURS[0] == "#f44336"
-    assert TRIAGE_COLOURS[0] == "#1976d2"
-    assert "#f44336" in body
+    assert "donut-critical" in body
+    assert "#f44336" not in body, "the colour belongs to the stylesheet"
 
 
 def test_the_centre_total_and_the_legend_percentages_are_rendered(read):
@@ -317,7 +340,7 @@ def test_a_failed_triage_batch_blames_the_triage_read_not_the_alert_read(read):
 
 def test_a_non_mapping_triage_record_is_treated_as_untriaged():
     out = triage_slice_counts([{"id": "a1"}], {"a1": "not a dict"})
-    assert out[0] == {"label": "Open", "value": 1}
+    assert out[0] == {"label": "Open", "key": "open", "value": 1}
 
 
 # ---------------------------------------------------------------------------
@@ -491,7 +514,7 @@ def test_only_a_mapping_is_read_as_a_triage_record():
     for value in ("a string", ["a", "list"], 7, 7.5, True, None):
         assert not hasattr(value, "get"), value
         out = triage_slice_counts([{"id": "a1"}], {"a1": value})
-        assert out[0] == {"label": "Open", "value": 1}, value
+        assert out[0] == {"label": "Open", "key": "open", "value": 1}, value
 
 
 def test_the_bucket_count_rounds_up_for_a_partial_bucket():
@@ -527,8 +550,8 @@ def test_the_donut_geometry_is_the_arc_that_was_on_screen():
     180 degrees, so its large-arc flag is 1, and the second must start where
     the first ended rather than back at the top.
     """
-    out = donut_arcs([{"label": "A", "value": 3}, {"label": "B", "value": 1}],
-                     SEVERITY_COLOURS)
+    out = donut_arcs([{"label": "A", "key": "critical", "value": 3},
+                      {"label": "B", "key": "high", "value": 1}])
     assert len(out["arcs"]) == 2
 
     first, second = out["arcs"][0]["d"], out["arcs"][1]["d"]

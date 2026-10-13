@@ -2922,3 +2922,21 @@ kbd {
 .tide-good-bg { background: var(--success); }
 .tide-fair-bg { background: var(--warning); }
 .tide-poor-bg { background: var(--danger); }
+
+/* Donut and bar colours for the analytics drawer.
+ *
+ * These were tuples in ui/alerts.py travelling into every arc and every
+ * legend swatch of the view model, so the Python decided what "critical"
+ * looks like and /ui/alerts/analytics published ION's palette as part of
+ * its contract. The values are unchanged, deliberately: the port is meant
+ * to be invisible. What changed is where the decision lives. */
+.donut-critical      { fill: #f44336; }
+.donut-high          { fill: #ff9800; }
+.donut-medium        { fill: #ffc107; }
+.donut-low           { fill: #4caf50; }
+.donut-info          { fill: #2196f3; }
+.donut-open          { fill: #1976d2; }
+.donut-acknowledged  { fill: #ff9800; }
+.donut-closed        { fill: #78909c; }
+.hbar-fill.hbar-host { background: #4fc3f7; }
+.hbar-fill.hbar-rule { background: #ba68c8; }

@@ -2338,19 +2338,18 @@ async def alerts_enrich_fragment(
 #: `.slice(0, 7)` in all three bar lists.
 ANALYTICS_TOP_N = 7
 
-#: The severity donut's keys and colours, in the order the page listed them.
+#: The severity donut's buckets, in the order the page listed them. The
+#: colours used to live here too, as a tuple travelling into every arc of
+#: the view model. They are in alerts-page.css now, keyed by these names,
+#: for the reason tide_band's band moved: which colour paints "critical"
+#: is this stylesheet's answer, and a model that carries it makes every
+#: reader of /ui/alerts/analytics inherit ION's palette.
 SEVERITY_SLICES = (("Critical", "critical"), ("High", "high"),
                    ("Medium", "medium"), ("Low", "low"), ("Info", "info"))
-SEVERITY_COLOURS = ("#f44336", "#ff9800", "#ffc107", "#4caf50", "#2196f3")
 
 #: The triage donut's, likewise.
 TRIAGE_SLICES = (("Open", "open"), ("Acknowledged", "acknowledged"),
                  ("Closed", "closed"))
-TRIAGE_COLOURS = ("#1976d2", "#ff9800", "#78909c")
-
-#: The host and rule bar colours the page passed to renderHBarChart.
-HOST_BAR_COLOUR = "#4fc3f7"
-RULE_BAR_COLOUR = "#ba68c8"
 
 #: The donut's geometry, from the page: cx 70, r 58, inner 34, h 190.
 DONUT_W, DONUT_H = 200, 190
@@ -2467,7 +2466,7 @@ def country_counts(alerts: list, limit: int = ANALYTICS_TOP_N) -> dict:
     }
 
 
-def donut_arcs(slices: list, colours: tuple) -> Optional[dict]:
+def donut_arcs(slices: list) -> Optional[dict]:
     """The path arcs and legend for a donut, or None when there is nothing
     to draw from.
 
@@ -2481,8 +2480,7 @@ def donut_arcs(slices: list, colours: tuple) -> Optional[dict]:
     total = sum(s["value"] for s in slices)
     arcs, legend = [], []
     angle = -math.pi / 2
-    for i, s in enumerate(slices):
-        colour = colours[i % len(colours)]
+    for s in slices:
         if s["value"]:
             share = s["value"] / total
             sweep = share * 2 * math.pi
@@ -2497,14 +2495,14 @@ def donut_arcs(slices: list, colours: tuple) -> Optional[dict]:
             ix2 = DONUT_CX + DONUT_INNER * math.cos(angle + sweep)
             iy2 = cy + DONUT_INNER * math.sin(angle + sweep)
             arcs.append({
-                "colour": colour,
+                "key": s["key"],
                 "d": (f"M{x1:.2f},{y1:.2f} A{DONUT_R},{DONUT_R} 0 {large},1 "
                       f"{x2:.2f},{y2:.2f} L{ix2:.2f},{iy2:.2f} "
                       f"A{DONUT_INNER},{DONUT_INNER} 0 {large},0 {ix1:.2f},{iy1:.2f} Z"),
                 "label": s["label"], "value": s["value"],
                 "pct": round(s["value"] / total * 100),
             })
-            legend.append({"colour": colour, "label": s["label"],
+            legend.append({"key": s["key"], "label": s["label"],
                            "value": s["value"],
                            "pct": round(s["value"] / total * 100),
                            "y": 16 + len(legend) * 18})
@@ -2529,7 +2527,8 @@ def _slice_counts(alerts: list, field: str, spec: tuple) -> Optional[list]:
         value = str(plain(a.get(field)) or "")
         if value in counts:
             counts[value] += 1
-    return [{"label": label, "value": counts[key]} for label, key in spec]
+    return [{"label": label, "key": key, "value": counts[key]}
+            for label, key in spec]
 
 
 def triage_slice_counts(alerts: list, triage: Optional[dict]) -> Optional[list]:
@@ -2554,7 +2553,8 @@ def triage_slice_counts(alerts: list, triage: Optional[dict]) -> Optional[list]:
             status = "open"
         if status in counts:
             counts[status] += 1
-    return [{"label": label, "value": counts[key]} for label, key in TRIAGE_SLICES]
+    return [{"label": label, "key": key, "value": counts[key]}
+            for label, key in TRIAGE_SLICES]
 
 
 @router.get(
@@ -2630,13 +2630,11 @@ async def alerts_analytics_fragment(
         "defaulted": window["defaulted"],
         "truncated": alerts is not None and len(alerts) >= QUEUE_LIMIT,
         "limit": QUEUE_LIMIT,
-        "severity_donut": donut_arcs(severity, SEVERITY_COLOURS),
-        "triage_donut": donut_arcs(triage, TRIAGE_COLOURS),
+        "severity_donut": donut_arcs(severity),
+        "triage_donut": donut_arcs(triage),
         "countries": country_counts(alerts) if alerts is not None else None,
         "hosts": top_counts(alerts, "host") if alerts is not None else None,
         "rules": top_counts(alerts, "rule_name") if alerts is not None else None,
-        "host_colour": HOST_BAR_COLOUR,
-        "rule_colour": RULE_BAR_COLOUR,
         "trend_w": TREND_W,
         "trend_h": TREND_H,
     }

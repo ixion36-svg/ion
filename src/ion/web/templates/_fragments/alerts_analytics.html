@@ -22,7 +22,11 @@
    A bucket with nothing in it is a measured zero and renders as a zero-height
    bar, which is the point of a trend chart. #}
 
-{%- macro bars(rows, colour, empty_text, failed) -%}
+{#- `kind` is "host", "rule" or none, not a colour. The bar's colour is
+    alerts-page.css's answer now; the width is genuinely per row and stays
+    an attribute. The country list passes none and keeps its generated
+    hue, which is a spread across rows rather than a theme decision. -#}
+{%- macro bars(rows, kind, empty_text, failed) -%}
   {%- if failed -%}
     <div class="empty-state text-[var(--danger)]" role="alert">Not counted: the alerts could not be read.</div>
   {%- elif rows is none -%}
@@ -33,7 +37,7 @@
     {%- for r in rows %}
       <div class="hbar-row">
         <span class="hbar-label" title="{{ r.name }}">{{ r.name }}</span>
-        <span class="hbar-track"><span class="hbar-fill" data-ion-style="width:{{ r.pct }}%; background:{{ colour if colour else 'hsl(' ~ r.hue ~ ',65%,55%)' }}"></span></span>
+        <span class="hbar-track"><span class="hbar-fill{{ ' hbar-' ~ kind if kind }}" data-ion-style="width:{{ r.pct }}%{{ '; background:hsl(' ~ r.hue ~ ',65%,55%)' if not kind }}"></span></span>
         <span class="hbar-count">{{ r.count }}</span>
       </div>
     {%- endfor -%}
@@ -56,12 +60,12 @@
   {%- else -%}
     <svg width="{{ d.w }}" height="{{ d.h }}" viewBox="0 0 {{ d.w }} {{ d.h }}" xmlns="http://www.w3.org/2000/svg">
       {%- for a in d.arcs %}
-        <path d="{{ a.d }}" fill="{{ a.colour }}" class="donut-segment"><title>{{ a.label }}: {{ a.value }} ({{ a.pct }}%)</title></path>
+        <path d="{{ a.d }}" class="donut-segment donut-{{ a.key }}"><title>{{ a.label }}: {{ a.value }} ({{ a.pct }}%)</title></path>
       {%- endfor %}
       <text x="{{ d.cx }}" y="{{ d.cy - 4 }}" text-anchor="middle" class="chart-value text-base font-bold fill-[currentColor]">{{ d.total }}</text>
       <text x="{{ d.cx }}" y="{{ d.cy + 10 }}" text-anchor="middle" class="chart-value">total</text>
       {%- for l in d.legend %}
-        <rect x="{{ d.legend_x }}" y="{{ l.y - 8 }}" width="10" height="10" rx="2" fill="{{ l.colour }}"/>
+        <rect x="{{ d.legend_x }}" y="{{ l.y - 8 }}" width="10" height="10" rx="2" class="donut-{{ l.key }}"/>
         <text x="{{ d.legend_x + 16 }}" y="{{ l.y }}" class="donut-legend">{{ l.label }}</text>
         <text x="{{ d.legend_x + 16 }}" y="{{ l.y + 12 }}" class="donut-legend-value">{{ l.value }} ({{ l.pct }}%)</text>
       {%- endfor %}
@@ -146,9 +150,9 @@
 </div>
 
 <div id="chart-top-hosts" class="min-h-[200px] relative" hx-swap-oob="innerHTML">
-  {{ bars(hosts, host_colour, 'No host data.', failed) }}
+  {{ bars(hosts, 'host', 'No host data.', failed) }}
 </div>
 
 <div id="chart-top-rules" class="min-h-[200px] relative" hx-swap-oob="innerHTML">
-  {{ bars(rules, rule_colour, 'No rule data.', failed) }}
+  {{ bars(rules, 'rule', 'No rule data.', failed) }}
 </div>
