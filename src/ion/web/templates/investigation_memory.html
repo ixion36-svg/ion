@@ -26,9 +26,9 @@
     </div>
   </section>
 
-  <!-- Tabs. JS toggles .im-tab-active / .hidden — keep those class names. -->
+  <!-- Tabs. JS toggles .tab-active / .hidden — keep those class names. -->
   <div role="tablist" class="tabs tabs-border mb-6">
-    <button role="tab" id="im-tab-inv" class="tab im-tab im-tab-active" data-click-action="imSwitchTab" data-args='["inv"]'>Investigations</button>
+    <button role="tab" id="im-tab-inv" class="tab im-tab tab-active" data-click-action="imSwitchTab" data-args='["inv"]'>Investigations</button>
     <button role="tab" id="im-tab-iocs" class="tab im-tab" data-click-action="imSwitchTab" data-args='["iocs"]'>IOC Sightings</button>
     <button role="tab" id="im-tab-fps" class="tab im-tab" data-click-action="imSwitchTab" data-args='["fps"]'>False Positives</button>
     <button role="tab" id="im-tab-review" class="tab im-tab" data-click-action="imSwitchTab" data-args='["review"]'>Review Inbox <span id="im-review-badge" class="badge badge-sm ml-1 hidden"></span></button>
@@ -285,13 +285,17 @@
   const loaders = {inv:imLoadInvestigations, iocs:imLoadIocs, fps:imLoadFps, review:imLoadReviewInbox};
   window.imSwitchTab = function(name) {
     tabs.forEach(t => {
-      document.getElementById('im-tab-' + t).classList.toggle('im-tab-active',t === name);
+      // tab-active, not im-tab-active: these are DaisyUI .tab buttons and
+      // tab-active is the class its stylesheet paints. im-tab-active had no
+      // rule anywhere, so the selected tab looked exactly like the other
+      // three while the code was correctly marking it.
+      document.getElementById('im-tab-' + t).classList.toggle('tab-active',t === name);
       document.getElementById('im-pane-' + t).classList.toggle('hidden',t !== name);
     });
     loaders[name]();
   };
   window.imRefresh = function() {
-    const active = document.querySelector('.im-tab-active');
+    const active = document.querySelector('.im-tab.tab-active');
     loaders[active ? active.id.replace('im-tab-','') : 'inv']();
   };
   let debounce;

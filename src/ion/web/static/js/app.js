@@ -450,30 +450,19 @@ function syncIonModeLabel() {
     label.textContent = mode === 'dark' ? 'Dark' : 'Light';
 }
 
-// Mobile nav hamburger toggle
-function toggleNavMenu() {
-    const hamburger = document.getElementById('nav-hamburger');
-    const navLinks = document.getElementById('nav-links');
-    if (hamburger && navLinks) {
-        hamburger.classList.toggle('open');
-        navLinks.classList.toggle('mobile-open');
-    }
-}
+// The mobile nav hamburger is gone. toggleNavMenu toggled .open on
+// #nav-hamburger and .mobile-open on #nav-links; no template defines either
+// id, nothing called the function, and neither class has a rule in any
+// stylesheet, the Tailwind build included. It is removed rather than left
+// as three dead references that read like a working mobile menu.
 
-// Close dropdown and mobile nav when clicking outside
+// Close the user dropdown when clicking outside
 document.addEventListener('click', function(event) {
     const userMenu = document.getElementById('user-menu');
     const dropdown = document.getElementById('user-dropdown');
     if (userMenu && dropdown && !userMenu.contains(event.target)) {
         dropdown.style.display = 'none';
         dropdown.classList.remove('show');
-    }
-    // Close mobile nav when clicking outside
-    const hamburger = document.getElementById('nav-hamburger');
-    const navLinks = document.getElementById('nav-links');
-    if (hamburger && navLinks && !hamburger.contains(event.target) && !navLinks.contains(event.target)) {
-        hamburger.classList.remove('open');
-        navLinks.classList.remove('mobile-open');
     }
 });
 
