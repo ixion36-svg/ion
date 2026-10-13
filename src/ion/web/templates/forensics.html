@@ -202,7 +202,7 @@
 <div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm hidden" id="modal-case-detail">
     <div class="bg-base-200 border border-base-300 rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-md max-w-[960px] max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-center px-5 py-4 border-b border-base-300 bg-base-100 rounded-t-xl">
-            <h2 id="cd-title" class="text-[1.1rem] m-0 cursor-pointer border-b border-dashed border-transparent hover:border-primary transition-colors duration-200" data-click-action="startEditTitle" title="Click to edit title">Investigation Detail</h2>
+            <h2 id="cd-title" class="text-[1.1rem] m-0 cursor-pointer border-b border-dashed border-transparent hover:border-primary transition-colors duration-200" title="Click to edit title">Investigation Detail</h2>
             <input type="text" id="cd-title-input" class="input w-full hidden text-[1.3rem] font-bold flex-1" data-blur-action="saveTitle" data-enter-key-action="saveTitle" data-escape-key-action="cancelEditTitle">
             <button class="bg-transparent border-0 text-2xl cursor-pointer text-base-content/60 hover:text-error transition-colors" data-click-action="closeModal" data-args='["modal-case-detail"]'>&times;</button>
         </div>
@@ -213,28 +213,16 @@
                 <span class="text-[var(--text-secondary)] text-[.85rem]" id="cd-case-number"></span>
                 <span class="text-[var(--text-secondary)] text-[.85rem]" id="cd-type"></span>
                 <span class="text-[var(--accent,#00e5ff)] text-[.8rem]" id="cd-playbook-name"></span>
-                <span class="text-[.8rem]" id="cd-lock-indicator"></span>
                 <div class="ml-[auto] flex gap-1.5 flex-wrap">
-                    <select id="cd-status-select" class="select w-full w-[auto] py-1 px-2" data-change-action="updateCaseStatus"></select>
-                    <button class="btn btn-secondary py-1 px-2.5" id="cd-lock-btn" data-click-action="toggleLock">Lock</button>
-                    <button class="btn btn-secondary py-1 px-2.5" data-click-action="showCloseModal">Close</button>
+                    <select id="cd-status-select" class="select w-full w-[auto] py-1 px-2" data-change-action="updateCaseStatus" data-forensic-permission="forensic:update" hidden disabled></select>
+                    <button class="btn btn-secondary py-1 px-2.5" id="cd-lock-btn" data-click-action="toggleLock" data-forensic-permission="forensic:update" hidden disabled>Lock</button>
+                    <button class="btn btn-secondary py-1 px-2.5" data-click-action="showCloseModal" data-forensic-permission="forensic:close" hidden disabled>Close</button>
                     <button class="btn btn-secondary py-1 px-2.5" data-click-action="generateReport">Report</button>
                 </div>
             </div>
-            <!-- SLA Badges -->
-            <div class="flex gap-2 mb-3 flex-wrap" id="cd-sla-badges"></div>
-            <!-- Progress bar -->
-            <div class="mb-4 hidden" id="cd-progress-bar">
-                <div class="flex justify-between text-[.8rem] text-[var(--text-secondary)] mb-1">
-                    <span id="cd-progress-label">Sections: 0/0</span>
-                    <span id="cd-progress-pct">0%</span>
-                </div>
-                <div class="_ion-s-e26f061ab9">
-                    <div class="_ion-s-b76ce82a4d" id="cd-progress-fill"></div>
-                </div>
-            </div>
-            <div id="cd-description" class="editable-desc mb-4 text-[var(--text-secondary)] text-[.85rem] min-h-[20px] cursor-pointer" data-click-action="startEditDesc" title="Click to edit description"></div>
-            <textarea id="cd-desc-input" class="textarea w-full resize-y hidden mb-4 text-[.85rem]" rows="3" data-blur-action="saveDesc" data-escape-key-action="cancelEditDesc"></textarea>
+            <div id="cd-summary"></div>
+            <div id="cd-description" class="editable-desc mb-4" title="Click to edit description"></div>
+            <textarea id="cd-desc-input" class="textarea w-full resize-y hidden mb-4" rows="3" data-blur-action="saveDesc" data-escape-key-action="cancelEditDesc"></textarea>
             <!-- Sub-tabs: Sections is now the primary tab -->
             <div class="fr-tabs mb-3 flex border-b border-base-300 mb-1 overflow-x-auto w-full">
                 <button class="fr-tab active" data-click-action="switchDetailTab" data-args='["sections"]'>Sections</button>
@@ -246,16 +234,16 @@
             <!-- Sections Tab (fillable investigation steps) -->
             <div id="cd-tab-sections">
                 <div id="cd-sections-list"></div>
-                <button class="btn btn-secondary mt-2" data-click-action="showAddStepModal">+ Add Section</button>
+                <button class="btn btn-secondary mt-2" data-click-action="showAddStepModal" data-forensic-permission="forensic:update" hidden disabled>+ Add Section</button>
             </div>
             <div class="hidden" id="cd-tab-evidence">
-                <button class="btn btn-primary mb-3" data-click-action="showAddEvidenceModal">+ Add Evidence</button>
+                <button class="btn btn-primary mb-3" data-click-action="showAddEvidenceModal" data-forensic-permission="forensic:create" hidden disabled>+ Add Evidence</button>
                 <div id="cd-evidence-list"></div>
             </div>
             <div class="hidden" id="cd-tab-timeline">
                 <div class="flex gap-2 mb-3">
                     <input type="text" id="cd-note-input" class="input w-full flex-1" placeholder="Add a timeline note...">
-                    <button class="btn btn-primary" data-click-action="addTimelineNote">Add</button>
+                    <button class="btn btn-primary" data-click-action="addTimelineNote" data-forensic-permission="forensic:update" hidden disabled>Add</button>
                 </div>
                 <div class="max-h-[400px] overflow-y-auto" id="cd-timeline"></div>
             </div>
@@ -271,11 +259,11 @@
                     <input class="w-full mb-1.5 bg-[var(--bg-secondary)] border border-[rgba(255,255,255,.12)] rounded-[4px] py-1 px-2 text-[var(--text-primary)] text-[.85rem]" type="datetime-local" id="forensic-ann-ts">
                     <textarea class="w-full bg-[var(--bg-secondary)] border border-[rgba(255,255,255,.12)] rounded-[4px] py-1.5 px-2 text-[var(--text-primary)] text-[.85rem] resize-y box-border" id="forensic-ann-body" rows="3" placeholder="Add a timeline annotation..."></textarea>
                     <div class="flex gap-1.5 mt-1.5">
-                        <button class="btn btn-primary text-[.8rem] py-1 px-3" data-click-action="submitForensicAnnotation">Save</button>
-                        <button class="btn btn-secondary text-[.8rem] py-1 px-3" data-click-action="toggleForensicAnnotationForm">Cancel</button>
+                        <button class="btn btn-primary text-[.8rem] py-1 px-3" data-click-action="submitForensicAnnotation" data-forensic-permission="forensic:update" hidden disabled>Save</button>
+                        <button class="btn btn-secondary text-[.8rem] py-1 px-3" data-click-action="toggleForensicAnnotationForm" data-forensic-permission="forensic:update" hidden disabled>Cancel</button>
                     </div>
                 </div>
-                <button class="btn btn-secondary text-[.8rem] py-1 px-3" data-click-action="toggleForensicAnnotationForm">+ Add annotation</button>
+                <button class="btn btn-secondary text-[.8rem] py-1 px-3" data-click-action="toggleForensicAnnotationForm" data-forensic-permission="forensic:update" hidden disabled>+ Add annotation</button>
             </div>
         </div>
     </div>
@@ -576,46 +564,34 @@ async function loadOverdueCount() {
 
 // ======== CASE DETAIL ========
 async function openCaseDetail(id){
-    currentCaseId=id;
-    try{const r=await fetch(API+'/cases/'+id);if(!r.ok)throw 0;currentCaseData=await r.json();renderCaseDetail(currentCaseData);document.getElementById('modal-case-detail').style.display='flex'}catch(e){showToast('Failed to load',true)}
+ currentCaseId=id; currentCaseData=null;
+ document.getElementById('cd-title').textContent='Loading investigation…';
+ for(const key of ['cd-case-number','cd-type','cd-playbook-name','cd-status-badge','cd-priority-badge','cd-description'])document.getElementById(key).textContent='';
+ for(const key of ['cd-summary','cd-sections-list','cd-timeline','cd-evidence-list','forensic-annotations-body'])ionMessage(document.getElementById(key),'Loading investigation…',true);
+ document.getElementById('modal-case-detail').style.display='flex';
+ try {
+  const r=await fetch(API+'/cases/'+encodeURIComponent(id));if(!r.ok)throw new Error('Investigation unavailable');
+  const c=await r.json();if(!c || typeof c!=='object' || Array.isArray(c) || c.id===undefined)throw new Error('Investigation unavailable');
+  if(currentCaseId!==id)return;currentCaseData=c;renderCaseDetail(c);
+ }catch(e){
+  if(currentCaseId!==id)return;
+  document.getElementById('cd-title').textContent='Investigation unavailable';
+  for(const key of ['cd-summary','cd-sections-list','cd-timeline','cd-evidence-list','forensic-annotations-body'])ionMessage(document.getElementById(key),'Investigation unavailable');
+  showToast('Investigation unavailable',true);
+ }
 }
 function renderCaseDetail(c){
-    document.getElementById('cd-title').textContent=c.title;
-    document.getElementById('cd-case-number').textContent=c.case_number;
-    document.getElementById('cd-type').textContent=fmtLabel(c.investigation_type);
-    document.getElementById('cd-playbook-name').textContent=c.playbook_name?('Playbook: '+c.playbook_name):'';
-    document.getElementById('cd-status-badge').className='badge badge-'+c.status;
-    document.getElementById('cd-status-badge').textContent=fmtLabel(c.status);
-    document.getElementById('cd-priority-badge').className='badge badge-'+c.priority;
-    document.getElementById('cd-priority-badge').textContent=c.priority;
-    document.getElementById('cd-status-select').value=c.status;
-    document.getElementById('cd-description').textContent=c.description||'';
-    // Lock
-    const lockInd=document.getElementById('cd-lock-indicator');
-    const lockBtn=document.getElementById('cd-lock-btn');
-    if(c.is_locked){lockInd.innerHTML='<span class="text-[#f0c000]">Locked by '+esc(c.locked_by_username||'unknown')+' ('+fmtDateTime(c.locked_at)+')</span>';lockBtn.textContent='Unlock';lockBtn.style.color='#f0c000'}
-    else{lockInd.replaceChildren();lockBtn.textContent='Lock';lockBtn.style.color=''}
-    // SLA
-    const slaDiv=document.getElementById('cd-sla-badges');slaDiv.replaceChildren();
-    if(c.sla_status&&c.sla_status.milestones){c.sla_status.milestones.forEach(m=>{const cls={met:'sla-met',on_track:'sla-on-track',at_risk:'sla-at-risk',breached:'sla-breached',breached_met:'sla-breached-met',not_set:''}[m.status]||'';slaDiv.innerHTML+=`<span class="sla-badge ${cls}" title="${m.due||''}">${fmtLabel(m.name)}: ${fmtLabel(m.status)}</span>`})}
-    // Progress bar
-    const steps = c.case_steps || [];
-    const progBar = document.getElementById('cd-progress-bar');
-    if (steps.length) {
-        progBar.style.display = '';
-        const done = steps.filter(s => s.is_completed).length;
-        const pct = Math.round((done / steps.length) * 100);
-        document.getElementById('cd-progress-label').textContent = `Sections: ${done}/${steps.length} complete`;
-        document.getElementById('cd-progress-pct').textContent = pct + '%';
-        document.getElementById('cd-progress-fill').style.width = pct + '%';
-        document.getElementById('cd-progress-fill').style.background = pct === 100 ? 'var(--mitre-covered)' : 'var(--accent,#00e5ff)';
-    } else { progBar.style.display = 'none'; }
-    // Render sections, timeline, evidence
-    renderSections(steps);
-    renderTimeline(c.timeline_entries||[]);
-    renderDetailEvidence(c.evidence_items||[]);
-    switchDetailTab('sections');
-    loadForensicAnnotations(c.id);
+ document.getElementById('cd-title').textContent=c.title ?? 'Unknown';
+ document.getElementById('cd-case-number').textContent=c.case_number ?? 'Unknown';
+ document.getElementById('cd-type').textContent=fmtLabel(c.investigation_type);
+ document.getElementById('cd-playbook-name').textContent=c.playbook_name?'Playbook: '+c.playbook_name:'';
+ document.getElementById('cd-status-badge').textContent=fmtLabel(c.status);
+ document.getElementById('cd-priority-badge').textContent=c.priority ?? 'Unknown';
+ document.getElementById('cd-status-select').value=c.status ?? '';
+ document.getElementById('cd-description').textContent=c.description ?? '';
+ document.getElementById('cd-lock-btn').textContent=c.is_locked?'Unlock':'Lock';
+ ionLoadFragment('/ui/forensics/cases/'+encodeURIComponent(c.id)+'/summary','cd-summary','Loading summary…');
+ renderSections();renderTimeline();renderDetailEvidence();switchDetailTab('sections');loadForensicAnnotations(c.id);
 }
 
 // ======== SECTIONS (fillable steps) ========
@@ -660,22 +636,15 @@ function renderFieldInput(field, value, stepId) {
 }
 
 function addListItem(containerId, placeholder) {
-    const c = document.getElementById(containerId);
-    const row = document.createElement('div');
-    row.className = 'sf-list-row';
-    row.innerHTML = `<input class="form-input sf-input" placeholder="${placeholder||''}"><button type="button" class="btn-icon sf-list-remove" data-remove-parent title="Remove">&times;</button>`;
-    c.appendChild(row);
-    row.querySelector('input').focus();
+ const c=document.getElementById(containerId),row=cloneTemplate('forensic-list-row');
+ row.querySelector('input').placeholder=placeholder ?? ''; c.appendChild(row);row.querySelector('input').focus();
 }
 
 function addTableRow(containerId) {
-    const wrap = document.getElementById(containerId);
-    const cols = JSON.parse(wrap.dataset.cols || '[]');
-    const tbody = wrap.querySelector('tbody');
-    const tr = document.createElement('tr');
-    tr.innerHTML = cols.map(c => `<td><input class="form-input sf-input" data-col="${esc(c)}"></td>`).join('') + `<td><button type="button" class="btn-icon sf-list-remove" data-remove-closest="tr" title="Remove">&times;</button></td>`;
-    tbody.appendChild(tr);
-    tr.querySelector('input').focus();
+ const wrap=document.getElementById(containerId),cols=JSON.parse(wrap.dataset.cols),tr=cloneTemplate('forensic-table-row');
+ const remove=tr.firstElementChild;
+ cols.forEach(col=>{const cell=cloneTemplate('forensic-table-cell');cell.querySelector('input').dataset.col=col;tr.insertBefore(cell,remove);});
+ wrap.querySelector('tbody').appendChild(tr);tr.querySelector('input')?.focus();
 }
 
 function collectFieldsData(stepId, fields) {
@@ -709,47 +678,9 @@ function collectFieldsData(stepId, fields) {
 // Store fields definitions per step for save/complete
 const _stepFields = {};
 
-function renderSections(steps) {
-    const container = document.getElementById('cd-sections-list');
-    if (!steps.length) {
-        container.innerHTML = '<div class="empty-state">No sections. Add a section or create the investigation with a playbook.</div>';
-        return;
-    }
-    steps.forEach(s => { _stepFields[s.id] = s.fields || []; });
-    container.innerHTML = steps.map(s => {
-        const statusCls = s.is_completed ? 'done' : (s.is_required ? 'required' : 'pending');
-        const statusLabel = s.is_completed ? 'Complete' : (s.is_required ? 'Required' : 'Pending');
-        const fields = s.fields || [];
-        const fd = s.fields_data || {};
-        const hasFields = fields.length > 0;
-        return `<div class="section-card ${s.is_completed ? 'completed' : ''}" id="section-${s.id}">
-            <div class="section-card-header" data-click-action="toggleSection" data-args='[${s.id}]'>
-                <span class="section-num">${s.is_completed ? '&#10003;' : s.step_order}</span>
-                <div class="section-card-title">
-                    ${esc(s.title)}
-                    ${s.completed_by_username ? '<small>Completed by ' + esc(s.completed_by_username) + ' on ' + fmtDate(s.completed_at) + '</small>' : ''}
-                </div>
-                <span class="section-card-status ${statusCls}">${statusLabel}</span>
-            </div>
-            <div class="section-card-body">
-                ${s.description ? '<div class="section-guidance">' + esc(s.description) + '</div>' : ''}
-                ${hasFields ? '<div class="sf-fields">' + fields.map(f => renderFieldInput(f, fd[f.key], s.id)).join('') + '</div>' : ''}
-                <div class="sf-notes-group">
-                    <label class="sf-label" data-ion-style="margin-top:${hasFields ? '12px' : '0'}">${hasFields ? 'Additional Notes' : 'Findings & Analysis'}</label>
-                    <textarea class="form-input sf-input" id="section-content-${s.id}" rows="${hasFields ? 3 : 6}" placeholder="Enter your findings, analysis, and documentation...">${esc(s.content || '')}</textarea>
-                </div>
-                <div class="section-card-actions">
-                    <button class="btn btn-primary py-1.5 px-4" data-click-action="saveSection" data-args='[${s.id}]'>Save</button>
-                    ${!s.is_completed
-                        ? `<button class="btn btn-secondary py-1.5 px-4 text-[var(--mitre-covered)]" data-click-action="completeSection" data-args='[${s.id}]'>Mark Complete</button>`
-                        : `<button class="btn btn-secondary py-1.5 px-4 text-[#f0c000]" data-click-action="reopenSection" data-args='[${s.id}]'>Reopen</button>`
-                    }
-                    <button class="btn-extract-ioc" data-click-action="showIOCExtractModal" data-args='[${s.id}]'>&#128269; Extract IOCs</button>
-                    ${!s.playbook_step_id ? `<button class="btn btn-secondary py-1.5 px-4 text-[var(--sev-critical)] ml-[auto]" data-click-action="deleteSection" data-args='[${s.id}]'>Delete</button>` : ''}
-                </div>
-            </div>
-        </div>`;
-    }).join('');
+async function renderSections() {
+ const loaded=await ionLoadFragment('/ui/forensics/cases/'+encodeURIComponent(currentCaseId)+'/sections','cd-sections-list','Loading sections…');
+ if(loaded)document.querySelectorAll('#cd-sections-list [data-step-fields]').forEach(el=>{_stepFields[JSON.parse(el.dataset.stepId)]=JSON.parse(el.dataset.stepFields);});
 }
 
 function toggleSection(stepId) {
@@ -894,7 +825,7 @@ function showFileName(name) {
     document.getElementById('ioc-upload-prompt').style.display = 'none';
     const fn = document.getElementById('ioc-file-name');
     fn.textContent = name;
-    fn.style.display = '';
+    fn.style.display = 'block';
 }
 
 async function runIOCExtraction() {
@@ -912,45 +843,31 @@ async function runIOCExtraction() {
         formData.append('text', text);
     }
 
+    document.getElementById('ioc-results').style.display='block';
+    ionMessage(document.getElementById('ioc-results-body'),'Extracting IOCs…',true);
+    iocExtractedData={};
     try {
         const r = await fetch(API + '/extract-iocs', { method: 'POST', body: formData });
         if (!r.ok) { const e = await r.json(); throw new Error(e.detail || 'Extraction failed'); }
         iocExtractedData = await r.json();
         renderIOCResults(iocExtractedData);
-    } catch(e) { showToast(e.message, true); }
+    } catch(e) { ionMessage(document.getElementById('ioc-results-body'),'IOC results unavailable');document.getElementById('ioc-total-badge').textContent='Unknown';showToast(e.message,true); }
 }
 
 function renderIOCResults(data) {
-    const total = data._total || 0;
-    const resultsDiv = document.getElementById('ioc-results');
-    const body = document.getElementById('ioc-results-body');
-    const badge = document.getElementById('ioc-total-badge');
-    badge.textContent = total + ' found';
-    badge.style.background = total > 0 ? 'var(--mitre-covered-dim)' : 'var(--sev-critical-dim)';
-    badge.style.color = total > 0 ? 'var(--mitre-covered)' : 'var(--sev-critical)';
-
-    if (total === 0) {
-        body.innerHTML = '<div class="empty-state p-4">No IOCs found in the provided content.</div>';
-        resultsDiv.style.display = '';
-        return;
-    }
-
-    let html = '';
-    for (const [type, label] of Object.entries(IOC_LABELS)) {
-        const items = data[type];
-        if (!items || !items.length) continue;
-        html += `<div class="ioc-category">
-            <div class="ioc-category-header">
-                <span class="ioc-category-title">${label}</span>
-                <span class="ioc-category-count">${items.length}</span>
-            </div>
-            <div class="ioc-items">
-                ${items.map((v, i) => `<label class="ioc-chip selected"><input type="checkbox" checked data-ioc-type="${type}" data-ioc-index="${i}"> ${esc(v)}</label>`).join('')}
-            </div>
-        </div>`;
-    }
-    body.innerHTML = html;
-    resultsDiv.style.display = '';
+ const results=document.getElementById('ioc-results'),body=document.getElementById('ioc-results-body'); results.style.display='block';body.replaceChildren();
+ const total=Number.isInteger(data?._total) && data._total>=0?data._total:null;
+ document.getElementById('ioc-total-badge').textContent=total===null?'Unknown':total+' found';
+ if(total===null){ionMessage(body,'IOC results unavailable');return;}
+ if(total===0){ionMessage(body,'No IOCs found in the provided content.');return;}
+ if(!Object.keys(IOC_LABELS).some(type=>Array.isArray(data[type]) && data[type].some(value=>typeof value==='string' && value.length))){ionMessage(body,'IOC results unavailable');document.getElementById('ioc-total-badge').textContent='Unknown';return;}
+ for(const [type,label] of Object.entries(IOC_LABELS)){
+  const items=data[type];if(!Array.isArray(items))continue;if(!items.length)continue;
+  if(items.some(value=>typeof value!=='string')){ionMessage(body,'IOC results unavailable');document.getElementById('ioc-total-badge').textContent='Unknown';return;}
+  const category=cloneTemplate('forensic-ioc-category');category.querySelector('.ioc-category-title').textContent=label;category.querySelector('.ioc-category-count').textContent=items.length;
+  items.forEach((value,index)=>{const chip=cloneTemplate('forensic-ioc-chip');const check=chip.querySelector('input');check.dataset.iocType=type;check.dataset.iocIndex=index;chip.querySelector('span').textContent=value;category.querySelector('.ioc-items').appendChild(chip);});
+  body.appendChild(category);
+ }
 }
 
 function applyIOCsToStep() {
@@ -1103,7 +1020,7 @@ function renderDetailEvidence(items){
 // ======== INLINE EDIT: Title & Description ========
 function startEditTitle(){
     const h2=document.getElementById('cd-title'),inp=document.getElementById('cd-title-input');
-    inp.value=h2.textContent;h2.style.display='none';inp.style.display='';inp.focus();inp.select();
+    inp.value=h2.textContent;h2.style.display='none';inp.style.display='block';inp.focus();inp.select();
 }
 function cancelEditTitle(){
     document.getElementById('cd-title').style.display='';document.getElementById('cd-title-input').style.display='none';
@@ -1118,7 +1035,7 @@ async function saveTitle(){
 }
 function startEditDesc(){
     const div=document.getElementById('cd-description'),ta=document.getElementById('cd-desc-input');
-    ta.value=div.textContent;div.style.display='none';ta.style.display='';ta.focus();
+    ta.value=div.textContent;div.style.display='none';ta.style.display='block';ta.focus();
 }
 function cancelEditDesc(){
     document.getElementById('cd-description').style.display='';document.getElementById('cd-desc-input').style.display='none';

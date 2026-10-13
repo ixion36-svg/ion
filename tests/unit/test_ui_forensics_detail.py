@@ -1,0 +1,149 @@
+import importlib
+from types import SimpleNamespace
+import pytest
+from fastapi import APIRouter, FastAPI
+from fastapi.testclient import TestClient
+from ion.storage.database import get_db_session
+from ion.web import forensics_api, forensic_workbench_api
+
+@pytest.fixture
+def client():
+    try:
+        ui = importlib.import_module('ion.web.ui._forensics_detail')
+    except ModuleNotFoundError as error:
+        if error.name != 'ion.web.ui._forensics_detail':
+            raise
+        ui = SimpleNamespace(router=APIRouter())
+    app = FastAPI()
+    app.include_router(ui.router, prefix='/ui')
+    for route in ui.router.routes:
+        for dep in route.dependant.dependencies:
+            if dep.call is not get_db_session:
+                app.dependency_overrides[dep.call] = lambda: SimpleNamespace(has_permission=lambda p: True)
+    app.dependency_overrides[get_db_session] = lambda: None
+    return TestClient(app)
+
+@pytest.mark.parametrize('path,service,module,key', [('cases/1/sections', 'get_case_steps', forensics_api, None)])
+@pytest.mark.parametrize('payload,state', [(None, 'failed'), ({}, 'failed'), ([], 'empty'), ([{'id': 1, 'title': '<attack>', 'name': 'Example', 'content': 'Text'}], 'data')])
+def test_collection_outcomes(client, monkeypatch, path, service, module, key, payload, state):
+    result = {key: payload} if key else payload
+    monkeypatch.setattr(module, service, lambda **kw: result)
+    response = client.get('/ui/forensics/' + path, headers={'Accept': 'application/json'})
+    assert response.status_code == 200
+    assert response.json()['state'] == state
+    html = client.get('/ui/forensics/' + path)
+    assert html.status_code == 200
+    assert '<attack>' not in html.text
+    if state == 'failed':
+        assert 'unavailable' in html.text.lower()
+
+@pytest.mark.parametrize('field', ['id', 'title', 'description', 'content', 'fields', 'fields_data', 'step_order', 'is_completed', 'is_required', 'completed_by_username', 'completed_at'])
+@pytest.mark.parametrize('value', [None, 0, '', []])
+def test_sections_missing_and_zero(client, monkeypatch, field, value):
+    row = {'id': 2, 'title': 'Step', 'fields': [], 'fields_data': {}, field: value}
+    monkeypatch.setattr(forensics_api, 'get_case_steps', lambda **kw: [row])
+    response = client.get('/ui/forensics/cases/1/sections')
+    assert response.status_code == 200
+    assert 'undefined' not in response.text
+
+@pytest.mark.parametrize('path,service,module', [('cases/1/sections', 'get_case_steps', forensics_api)])
+def test_refusal_never_looks_empty(client, monkeypatch, path, service, module):
+
+    def refused(**kwargs):
+        raise RuntimeError('private backend detail')
+    monkeypatch.setattr(module, service, refused)
+    response = client.get('/ui/forensics/' + path)
+    assert response.status_code == 200
+    assert 'unavailable' in response.text.lower()
+    assert 'private backend detail' not in response.text
+
+@pytest.mark.parametrize('kind,value', [('text', 0), ('text', '<script>'), ('textarea', '"quoted"'), ('list', ['a', '<img>']), ('table', [{'Col': '<img>'}]), ('select', 'Option'), ('checkbox', True), ('checkbox', False)])
+def test_structured_section_fields(client, monkeypatch, kind, value):
+    from bs4 import BeautifulSoup
+    field = {'key': 'field', 'type': kind, 'label': 'Field', 'placeholder': '"input"', 'columns': ['Col'], 'options': ['Option']}
+    monkeypatch.setattr(forensics_api, 'get_case_steps', lambda **kw: [{'id': 2, 'title': 'Step', 'fields': [field], 'fields_data': {'field': value}}])
+    response = client.get('/ui/forensics/cases/1/sections')
+    assert response.status_code == 200
+    soup = BeautifulSoup(response.text, 'html.parser')
+    el = soup.select_one('#sf-2-field')
+    assert el is not None
+    assert soup.find('script') is None and soup.find('img') is None
+    if kind == 'text':
+        assert el['value'] == str(value)
+    elif kind == 'textarea':
+        assert el.text == value
+    elif kind == 'checkbox':
+        assert el.has_attr('checked') == value
+    elif kind == 'select':
+        assert el.select_one('option[selected]')['value'] == value
+    elif kind == 'list':
+        assert [x['value'] for x in el.select('input')] == value
+    elif kind == 'table':
+        assert el.select_one('input')['value'] == value[0]['Col']
+
+@pytest.mark.parametrize('steps,expected', [(None, None), ([], 0), ([{'is_completed': False}], 0), ([{'is_completed': True}], 100)])
+def test_summary_zero_unknown(client, monkeypatch, steps, expected):
+    monkeypatch.setattr(forensics_api, 'get_case', lambda **kw: {'id': 1, 'case_steps': steps})
+    response = client.get('/ui/forensics/cases/1/summary', headers={'Accept': 'application/json'})
+    assert response.status_code == 200
+    assert response.json()['progress'] == expected
+    html = client.get('/ui/forensics/cases/1/summary').text
+    assert ('Section progress unavailable' if expected is None else str(expected) + '%') in html
+
+@pytest.mark.parametrize('payload', [None, {}, []])
+def test_missing_summary_fields_are_unavailable(client, monkeypatch, payload):
+    monkeypatch.setattr(forensics_api, 'get_case', lambda **kw: payload)
+    html = client.get('/ui/forensics/cases/1/summary').text
+    assert 'unavailable' in html
+    assert '0%' not in html
+
+@pytest.mark.parametrize('path,service,payload', [('cases/1/sections', 'get_case_steps', [{'id': 1, 'title': 'Readonly', 'fields': [], 'fields_data': {}}])])
+def test_readonly_view_withholds_write_controls(monkeypatch, path, service, payload):
+    ui = importlib.import_module('ion.web.ui._forensics_detail')
+    from ion.auth.dependencies import get_current_user
+    app = FastAPI()
+    app.include_router(ui.router, prefix='/ui')
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(has_permission=lambda p: p == 'forensic:read')
+    app.dependency_overrides[get_db_session] = lambda: None
+    monkeypatch.setattr(forensics_api, service, lambda **kw: payload)
+    response = TestClient(app).get('/ui/forensics/' + path)
+    assert response.status_code == 200
+    for action in ['saveSection', 'completeSection', 'deleteSection', 'showCustodyModal', 'editPlaybook', 'deletePlaybook']:
+        assert 'data-click-action="' + action + '"' not in response.text
+
+def test_fragment_read_permission_is_enforced(monkeypatch):
+    ui = importlib.import_module('ion.web.ui._forensics_detail')
+    from ion.auth.dependencies import get_current_user
+    app = FastAPI()
+    app.include_router(ui.router, prefix='/ui')
+    app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(has_permission=lambda p: False)
+    app.dependency_overrides[get_db_session] = lambda: None
+    calls = []
+    monkeypatch.setattr(forensics_api, 'get_case_steps', lambda **kw: calls.append(1))
+    response = TestClient(app).get('/ui/forensics/cases/1/sections')
+    assert response.status_code == 403 and calls == []
+
+@pytest.mark.parametrize('payload', [[None], [4], ['bad']])
+@pytest.mark.parametrize('path,service', [('cases/1/sections', 'get_case_steps')])
+def test_malformed_record_lists_are_failed_reads(client, monkeypatch, payload, path, service):
+    monkeypatch.setattr(forensics_api, service, lambda **kw: payload)
+    response = client.get('/ui/forensics/' + path, headers={'Accept': 'application/json'})
+    assert response.status_code == 200
+    assert response.json()['state'] == 'failed'
+
+def test_section_missing_fields_does_not_offer_save(client, monkeypatch):
+    monkeypatch.setattr(forensics_api, 'get_case_steps', lambda **kw: [{'id': 1, 'title': 'Section'}])
+    response = client.get('/ui/forensics/cases/1/sections')
+    assert response.status_code == 200
+    assert 'Structured fields unavailable' in response.text
+    assert 'data-click-action="saveSection"' not in response.text
+
+@pytest.mark.parametrize('step', [{}, {'is_completed': None}, {'is_completed': 0}, {'is_completed': ''}])
+def test_summary_unmeasured_completion_is_unknown(client, monkeypatch, step):
+    monkeypatch.setattr(forensics_api, 'get_case', lambda **kw: {'id': 1, 'case_steps': [step]})
+    response = client.get('/ui/forensics/cases/1/summary', headers={'Accept': 'application/json'})
+    assert response.json()['done'] is None
+    assert response.json()['progress'] is None
+    assert response.json()['total'] == 1
+    html = client.get('/ui/forensics/cases/1/summary').text
+    assert 'Section progress unavailable' in html and '0%' not in html
