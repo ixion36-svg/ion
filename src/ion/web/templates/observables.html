@@ -528,127 +528,21 @@ function dismissWatchlistBanner() {
 
 // Load Observables
 async function loadObservables() {
-    const tbody = document.getElementById('observables-tbody');
-    tbody.innerHTML = '<tr><td colspan="8" class="loading">Loading observables...</td></tr>';
-
-    try {
-        const params = new URLSearchParams();
-        const query = document.getElementById('search-input').value.trim();
-        const type = document.getElementById('type-filter').value;
-        const threat = document.getElementById('threat-filter').value;
-        const whitelist = document.getElementById('whitelist-filter').value;
-        const enriched = document.getElementById('enriched-filter').value;
-        const ignored = document.getElementById('ignored-filter').value;
-
-        if (query) params.set('query', query);
-        if (type) params.set('type', type);
-        if (threat) params.set('threat_level', threat);
-        if (whitelist) params.set('is_whitelisted', whitelist);
-        if (enriched) params.set('is_enriched', enriched);
-        if (ignored === 'include') params.set('include_ignored', 'true');
-        else if (ignored === 'only') params.set('only_ignored', 'true');
-        params.set('limit', pageSize);
-        params.set('offset', (currentPage - 1) * pageSize);
-
-        const response = await fetch(`/api/observables?${params}`);
-        if (!response.ok) {
-            if (response.status === 401) {
-                window.location.href = '/login?redirect=/observables';
-                return;
-            }
-            throw new Error('Failed to load observables');
-        }
-
-        const data = await response.json();
-        observables = data.observables;
-        totalCount = data.total;
-
-        renderObservables();
-        renderPagination();
-    } catch (error) {
-        console.error('Error loading observables:', error);
-        tbody.innerHTML = '<tr><td colspan="8" class="error">Error loading observables.</td></tr>';
+    const params = new URLSearchParams();
+    for (const [field, key] of [['search-input','query'], ['type-filter','type'], ['threat-filter','threat_level'], ['whitelist-filter','is_whitelisted'], ['enriched-filter','is_enriched']]) {
+        const value = document.getElementById(field).value.trim();
+        if (value) params.set(key, value);
     }
+    const ignored = document.getElementById('ignored-filter').value;
+    if (ignored === 'include') params.set('include_ignored', 'true');
+    else if (ignored === 'only') params.set('only_ignored', 'true');
+    params.set('limit', pageSize); params.set('offset', (currentPage - 1) * pageSize);
+    if (!await ionLoadFragment('/ui/observables/list?' + params, 'observables-tbody', 'Loading observables...')) document.getElementById('pagination').replaceChildren();
 }
 
-function renderObservables() {
-    const tbody = document.getElementById('observables-tbody');
 
-    if (observables.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No observables found</td></tr>';
-        return;
-    }
 
-    tbody.innerHTML = observables.map(obs => `
-        <tr class="cursor-pointer" data-click-action="showObservableDetail" data-args='[${obs.id}]'>
-            <td>
-                <span class="obs-value ${obs.is_whitelisted ? 'whitelisted' : ''} ${obs.is_watched ? 'watched' : ''} ${obs.is_ignored ? 'ignored' : ''}" title="${escapeHtml(obs.value)}">
-                    ${obs.is_watched ? '<span class="watched-icon" title="Watched">&#128065;</span>' : ''}
-                    ${escapeHtml(obs.value)}
-                </span>
-            </td>
-            <td><span class="obs-type-badge ${obs.type}">${obs.type}</span></td>
-            <td><span class="threat-badge ${obs.threat_level}">${obs.threat_level}</span></td>
-            <td>${obs.sighting_count}</td>
-            <td title="${obs.first_seen}">${timeAgo(obs.first_seen)}</td>
-            <td title="${obs.last_seen}">${timeAgo(obs.last_seen)}</td>
-            <td>
-                <span class="enriched-indicator">
-                    <span class="enriched-dot ${obs.has_enrichment ? 'yes' : 'no'}"></span>
-                    ${obs.has_enrichment ? timeAgo(obs.latest_enrichment_at) : '-'}
-                </span>
-            </td>
-            <td class="actions-cell" data-stop-propagation>
-                <button class="btn btn-sm ${obs.is_watched ? 'btn-warning' : ''}" data-click-action="toggleWatchlist" data-args='[${obs.id}, ${obs.is_watched}]' title="${obs.is_watched ? 'Remove from watchlist' : 'Add to watchlist'}">
-                    <i class="icon-eye"></i>
-                </button>
-                <button class="btn btn-sm" data-click-action="enrichObservable" data-args='[${obs.id}]' title="Enrich">
-                    <i class="icon-search"></i>
-                </button>
-                <button class="btn btn-sm" data-click-action="showTimeline" data-args='[${obs.id}]' title="View Timeline">
-                    <i class="icon-clock"></i>
-                </button>
-                <button class="btn btn-sm ${obs.is_ignored ? 'btn-warning' : ''}" data-click-action="toggleIgnore" data-args='[${obs.id}, ${!obs.is_ignored}]' title="${obs.is_ignored ? 'Restore (un-ignore)' : 'Ignore — suppress from investigation guide & case observable lists'}">
-                    <i class="icon-ban"></i>
-                </button>
-            </td>
-        </tr>
-    `).join('');
-}
 
-function renderPagination() {
-    const container = document.getElementById('pagination');
-    const totalPages = Math.ceil(totalCount / pageSize);
-
-    if (totalPages <= 1) {
-        container.replaceChildren();
-        return;
-    }
-
-    let html = '';
-    html += `<button ${currentPage === 1 ? 'disabled' : ''} data-click-action="goToPage" data-args='[${currentPage - 1}]'>Prev</button>`;
-
-    // Show first page
-    if (currentPage > 3) {
-        html += `<button data-click-action="goToPage" data-args='[1]'>1</button>`;
-        if (currentPage > 4) html += `<span class="py-0 px-2">...</span>`;
-    }
-
-    // Show pages around current
-    for (let i = Math.max(1, currentPage - 2); i <= Math.min(totalPages, currentPage + 2); i++) {
-        html += `<button class="${i === currentPage ? 'active' : ''}" data-click-action="goToPage" data-args='[${i}]'>${i}</button>`;
-    }
-
-    // Show last page
-    if (currentPage < totalPages - 2) {
-        if (currentPage < totalPages - 3) html += `<span class="py-0 px-2">...</span>`;
-        html += `<button data-click-action="goToPage" data-args='[${totalPages}]'>${totalPages}</button>`;
-    }
-
-    html += `<button ${currentPage === totalPages ? 'disabled' : ''} data-click-action="goToPage" data-args='[${currentPage + 1}]'>Next</button>`;
-
-    container.innerHTML = html;
-}
 
 function goToPage(page) {
     currentPage = page;
@@ -668,208 +562,15 @@ function clearFilters() {
 
 // Observable Detail
 async function showObservableDetail(id) {
-    const modal = document.getElementById('observable-detail-modal');
-    const body = document.getElementById('detail-body');
-    body.innerHTML = '<div class="loading">Loading...</div>';
-    modal.style.display = 'flex';
-
-    try {
-        // Fetch observable detail, alerts, cases, and co-occurring in parallel
-        const [detailRes, alertsRes, casesRes, coRes] = await Promise.all([
-            fetch(`/api/observables/${id}`),
-            fetch(`/api/observables/${id}/alerts?limit=10`),
-            fetch(`/api/observables/${id}/cases?limit=10`),
-            fetch(`/api/observables/${id}/co-occurring?limit=10`),
-        ]);
-
-        if (!detailRes.ok) throw new Error('Failed to load observable');
-
-        const detail = await detailRes.json();
-        const alerts = alertsRes.ok ? await alertsRes.json() : { alerts: [] };
-        const cases = casesRes.ok ? await casesRes.json() : { cases: [] };
-        const coOccurring = coRes.ok ? await coRes.json() : { co_occurring: [] };
-
-        currentObservable = detail;
-        renderObservableDetail(detail, alerts.alerts, cases.cases, coOccurring.co_occurring);
-    } catch (error) {
-        console.error('Error loading observable:', error);
-        body.innerHTML = '<div class="error">Error loading observable details.</div>';
+    document.getElementById('observable-detail-modal').style.display = 'flex';
+    currentObservable = null;
+    if (await ionLoadFragment('/ui/observables/' + encodeURIComponent(id) + '/detail', 'detail-body', 'Loading observable...')) {
+        const state = document.querySelector('#detail-body [data-observable-state]');
+        if (state) currentObservable = JSON.parse(state.textContent);
     }
 }
 
-function renderObservableDetail(obs, alerts, cases, coOccurring) {
-    const body = document.getElementById('detail-body');
 
-    // Build enrichment section
-    let enrichmentHtml = '';
-    if (obs.enrichment) {
-        const e = obs.enrichment;
-        const scoreClass = e.score >= 80 ? 'critical' : e.score >= 60 ? 'high' : e.score >= 40 ? 'medium' : e.score >= 20 ? 'low' : 'benign';
-
-        enrichmentHtml = `
-            <div class="detail-enrichment">
-                <div class="enrichment-header">
-                    <span class="enrichment-source">${e.source}</span>
-                    <span class="enrichment-time">Last enriched: ${timeAgo(e.enriched_at)}</span>
-                </div>
-                ${e.score !== null ? `
-                <div class="enrichment-score">
-                    <span>Score: ${e.score}/100</span>
-                    <div class="score-bar">
-                        <div class="score-fill ${scoreClass}" data-ion-style="width: ${e.score}%"></div>
-                    </div>
-                    <span class="threat-badge ${e.is_malicious ? 'high' : 'benign'}">${e.is_malicious ? 'Malicious' : 'Clean'}</span>
-                </div>
-                ` : ''}
-                ${e.labels && e.labels.length ? `
-                <div class="enrichment-labels">
-                    ${e.labels.map(l => `<span class="enrichment-label">${escapeHtml(l)}</span>`).join('')}
-                </div>
-                ` : ''}
-                ${e.threat_actors && e.threat_actors.length ? `
-                <div class="mb-2">
-                    <strong class="text-xs text-[var(--text-muted)]">Threat Actors:</strong><br>
-                    ${e.threat_actors.map(ta => `<span class="threat-actor-tag">${escapeHtml(ta.name)}</span>`).join('')}
-                </div>
-                ` : ''}
-                ${e.indicators && e.indicators.length ? `
-                <div class="text-xs text-[var(--text-muted)]">
-                    ${e.indicators.length} indicator(s) found
-                </div>
-                ` : ''}
-            </div>
-        `;
-    } else {
-        enrichmentHtml = `
-            <div class="text-center p-4 text-[var(--text-muted)]">
-                No enrichment data available.
-                <button class="btn btn-sm btn-primary ml-2" data-click-action="enrichObservable" data-args='[${obs.id}]'>Enrich Now</button>
-            </div>
-        `;
-    }
-
-    // Build related alerts section
-    let alertsHtml = '';
-    if (alerts.length > 0) {
-        alertsHtml = `
-            <div class="related-list">
-                ${alerts.map(a => `
-                    <div class="related-item">
-                        <div>
-                            <span class="font-mono text-xs">${escapeHtml(a.es_alert_id.substring(0, 20))}...</span>
-                            ${a.context ? formatContext(a.context) : ''}
-                        </div>
-                        <div>
-                            <span class="threat-badge ${a.priority || 'unknown'}">${a.priority || 'N/A'}</span>
-                            <span class="text-xs text-[var(--text-muted)] ml-2">${timeAgo(a.created_at)}</span>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-            ${obs.alert_count > alerts.length ? `<div class="text-xs text-[var(--text-muted)] mt-2">+ ${obs.alert_count - alerts.length} more alerts</div>` : ''}
-        `;
-    } else {
-        alertsHtml = '<div class="empty-state">No related alerts</div>';
-    }
-
-    // Build related cases section
-    let casesHtml = '';
-    if (cases.length > 0) {
-        casesHtml = `
-            <div class="related-list">
-                ${cases.map(c => `
-                    <div class="related-item">
-                        <div>
-                            <strong>${escapeHtml(c.case_number)}</strong>
-                            <span class="text-xs text-[var(--text-muted)] ml-2">${escapeHtml(c.title)}</span>
-                        </div>
-                        <span class="threat-badge ${c.severity || 'unknown'}">${c.severity || 'N/A'}</span>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-    } else {
-        casesHtml = '<div class="empty-state">No related cases</div>';
-    }
-
-    // Build co-occurring section
-    let coHtml = '';
-    if (coOccurring.length > 0) {
-        coHtml = coOccurring.map(co => `
-            <span class="co-occur-badge" data-click-action="showObservableDetail" data-args='[${co.id}]'>
-                <span class="obs-type-badge ${co.type} min-w-[auto] py-[0.0625rem] px-1">${co.type}</span>
-                ${escapeHtml(co.value.substring(0, 30))}${co.value.length > 30 ? '...' : ''}
-                <span class="text-[var(--text-muted)]">(${co.co_occurrence_count})</span>
-            </span>
-        `).join('');
-    } else {
-        coHtml = '<div class="empty-state">No co-occurring observables</div>';
-    }
-
-    body.innerHTML = `
-        <div class="detail-header">
-            <div>
-                <div class="detail-value">${escapeHtml(obs.value)}</div>
-                <div class="detail-meta">
-                    <span class="obs-type-badge ${obs.type}">${obs.type}</span>
-                    <span class="threat-badge ${obs.threat_level}">${obs.threat_level}</span>
-                    ${obs.is_whitelisted ? '<span class="text-[#22c55e]">Whitelisted</span>' : ''}
-                    <span>First seen: ${timeAgo(obs.first_seen)}</span>
-                    <span>Sightings: ${obs.sighting_count}</span>
-                </div>
-            </div>
-            <div class="detail-actions">
-                <button class="btn btn-sm" data-click-action="enrichObservable" data-args='[${obs.id}]'>Enrich</button>
-                <button class="btn btn-sm" data-click-action="viewObservableGraph" data-args='[${obs.id}]'>View Relationships</button>
-                <button class="btn btn-sm ${obs.is_whitelisted ? 'btn-secondary' : ''}" data-click-action="toggleWhitelist" data-args='[${obs.id}, ${!obs.is_whitelisted}]'>
-                    ${obs.is_whitelisted ? 'Remove from Whitelist' : 'Whitelist'}
-                </button>
-            </div>
-        </div>
-
-        <div class="detail-section">
-            <h4>Enrichment</h4>
-            ${enrichmentHtml}
-        </div>
-
-        <div class="detail-section">
-            <h4>Related Cases (${obs.case_count})</h4>
-            ${casesHtml}
-        </div>
-
-        <div class="detail-section">
-            <h4>Related Alerts (${obs.alert_count})</h4>
-            ${alertsHtml}
-        </div>
-
-        <div class="detail-section">
-            <h4>Co-occurring Observables</h4>
-            <div class="flex flex-wrap">
-                ${coHtml}
-            </div>
-        </div>
-
-        <div class="detail-section">
-            <h4>Notes</h4>
-            <textarea class="notes-textarea" id="detail-notes" placeholder="Add analyst notes...">${escapeHtml(obs.notes || '')}</textarea>
-            <button class="btn btn-sm btn-primary mt-2" data-click-action="saveNotes" data-args='[${obs.id}]'>Save Notes</button>
-        </div>
-
-        <div class="detail-section">
-            <h4>Tags</h4>
-            <div class="tags-input-container" id="tags-container">
-                ${(obs.tags || []).map(t => `
-                    <span class="tag-chip">
-                        ${escapeHtml(t)}
-                        <span class="remove" data-click-action="removeTag" data-args='[${obs.id}, "${escapeHtml(t)}"]'>&times;</span>
-                    </span>
-                `).join('')}
-                <input type="text" id="tag-input" placeholder="Add tag..."
-                       data-enter-key-action="handleTagInput" data-args='["$event", ${obs.id}]'>
-            </div>
-        </div>
-    `;
-}
 
 function closeDetailModal() {
     document.getElementById('observable-detail-modal').style.display = 'none';

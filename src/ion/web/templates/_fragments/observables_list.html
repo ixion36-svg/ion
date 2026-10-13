@@ -1,0 +1,21 @@
+{% if state == 'failed' %}<tr><td colspan="8" class="error">Failed to load observables.</td></tr>
+{% elif state == 'empty' %}<tr><td colspan="8" class="empty-state">No observables found</td></tr>
+{% else %}{% for obs in items %}
+<tr class="cursor-pointer" data-click-action="showObservableDetail" data-args='{{ [obs.id]|tojson }}'>
+<td><span class="obs-value{% if obs.is_whitelisted %} whitelisted{% endif %}{% if obs.is_watched %} watched{% endif %}{% if obs.is_ignored %} ignored{% endif %}" title="{{ obs.value }}">{% if obs.is_watched %}<span class="watched-icon" title="Watched">&#128065;</span>{% endif %}{{ obs.value|default('Unknown') }}</span></td>
+<td><span class="obs-type-badge {{ obs.type }}">{{ obs.type|default('Unknown') }}</span></td>
+<td><span class="threat-badge {{ obs.threat_level }}">{{ obs.threat_level|default('Unknown') }}</span></td>
+<td>{{ obs.sighting_count if obs.sighting_count is defined and obs.sighting_count is not none else 'Unknown' }}</td>
+<td>{{ obs.first_seen|default('Unknown',true) }}</td><td>{{ obs.last_seen|default('Unknown',true) }}</td>
+<td><span class="enriched-indicator"><span class="enriched-dot {{ 'yes' if obs.has_enrichment else 'no' }}"></span>{{ obs.latest_enrichment_at|default('Unknown',true) if obs.has_enrichment else '—' }}</span></td>
+<td class="actions-cell" data-stop-propagation>{% if can_update %}<button class="btn btn-sm" data-click-action="toggleWatchlist" data-args='{{ [obs.id, obs.is_watched|default(false)]|tojson }}' title="Toggle watchlist"><i class="icon-eye"></i></button>{% endif %}
+{% if can_enrich %}<button class="btn btn-sm" data-click-action="enrichObservable" data-args='{{ [obs.id]|tojson }}' title="Enrich"><i class="icon-search"></i></button>{% endif %}
+<button class="btn btn-sm" data-click-action="showTimeline" data-args='{{ [obs.id]|tojson }}' title="View Timeline"><i class="icon-clock"></i></button>
+{% if can_update %}<button class="btn btn-sm" data-click-action="toggleIgnore" data-args='{{ [obs.id, not obs.is_ignored]|tojson }}' title="{{ 'Restore' if obs.is_ignored else 'Ignore' }}"><i class="icon-ban"></i></button>{% endif %}</td></tr>
+{% endfor %}{% endif %}
+<div id="pagination" hx-swap-oob="innerHTML">
+{% if state != 'failed' and pages is not none and pages > 1 %}<button data-click-action="goToPage" data-args='{{ [page-1]|tojson }}' {% if page==1 %}disabled{% endif %}>Prev</button>
+{% if page>3 %}<button data-click-action="goToPage" data-args='{{ [1]|tojson }}'>1</button>{% if page>4 %}<span>…</span>{% endif %}{% endif %}
+{% for p in range([1,page-2]|max,[pages,page+2]|min+1) %}<button class="{{ 'active' if p==page else '' }}" data-click-action="goToPage" data-args='{{ [p]|tojson }}'>{{ p }}</button>{% endfor %}
+{% if page<pages-2 %}{% if page<pages-3 %}<span>…</span>{% endif %}<button data-click-action="goToPage" data-args='{{ [pages]|tojson }}'>{{ pages }}</button>{% endif %}
+<button data-click-action="goToPage" data-args='{{ [page+1]|tojson }}' {% if page==pages %}disabled{% endif %}>Next</button>{% endif %}</div>
