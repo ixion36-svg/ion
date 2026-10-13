@@ -41,14 +41,14 @@ Server-rendered fragments. `render_view` routes also answer the view model as JS
 | GET | `/ui/analyst/mttr` | `alert:read` | [analyst.py:584](src/ion/web/ui/analyst.py#L584) |  | `analyst.html` |
 | GET | `/ui/analyst/watched` | `observable:read` | [analyst.py:616](src/ion/web/ui/analyst.py#L616) |  | `analyst.html` |
 | GET | `/ui/analytics/case-metrics` | `alert:read` | [analytics.py:510](src/ion/web/ui/analytics.py#L510) |  | `analytics.html` |
-| GET | `/ui/analytics/config` | `alert:read` | [analytics.py:1416](src/ion/web/ui/analytics.py#L1416) | `_fragments/analytics_config.html` | `analytics.html` |
-| GET | `/ui/analytics/dashboard` | `alert:read` | [analytics.py:1393](src/ion/web/ui/analytics.py#L1393) | `_fragments/analytics_dashboard.html` | `analytics.html` |
+| GET | `/ui/analytics/config` | `alert:read` | [analytics.py:1683](src/ion/web/ui/analytics.py#L1683) | `_fragments/analytics_config.html` | `analytics.html` |
+| GET | `/ui/analytics/dashboard` | `alert:read` | [analytics.py:1660](src/ion/web/ui/analytics.py#L1660) | `_fragments/analytics_dashboard.html` | `analytics.html` |
 | GET | `/ui/analytics/entity-risk` | `alert:read` | [analytics.py:510](src/ion/web/ui/analytics.py#L510) |  | `analytics.html` |
 | GET | `/ui/analytics/observable-velocity` | `alert:read` | [analytics.py:510](src/ion/web/ui/analytics.py#L510) |  | `analytics.html` |
 | GET | `/ui/analytics/repeat-offenders` | `alert:read` | [analytics.py:510](src/ion/web/ui/analytics.py#L510) |  | `analytics.html` |
 | GET | `/ui/analytics/rule-noise` | `alert:read` | [analytics.py:510](src/ion/web/ui/analytics.py#L510) |  | `analytics.html` |
 | GET | `/ui/analytics/stale` | `alert:read` | [analytics.py:244](src/ion/web/ui/analytics.py#L244) | `_fragments/analytics_stale.html` | `analytics.html` |
-| GET | `/ui/analytics/system` | `alert:read` | [analytics.py:1017](src/ion/web/ui/analytics.py#L1017) | `_fragments/analytics_system.html` | `analytics.html` |
+| GET | `/ui/analytics/system` | `alert:read` | [analytics.py:1284](src/ion/web/ui/analytics.py#L1284) | `_fragments/analytics_system.html` | `analytics.html` |
 | GET | `/ui/architecture/diagram` | `security:read` | [architecture.py:251](src/ion/web/ui/architecture.py#L251) | `_fragments/architecture_diagram.html` | `architecture_diagram.html`, `architecture.html` |
 | POST | `/ui/arkime-traffic/ai-review` | `alert:read` | [arkime_traffic.py:712](src/ion/web/ui/arkime_traffic.py#L712) | `_fragments/arkime_traffic_review.html` | `arkime_traffic.html` |
 | GET | `/ui/arkime-traffic/exclusions` | `alert:read` | [arkime_traffic.py:673](src/ion/web/ui/arkime_traffic.py#L673) | `_fragments/arkime_traffic_exclusions.html` | `arkime_traffic.html` |
@@ -367,7 +367,7 @@ JSON endpoints.
 | PATCH | `/api/analytics/jobs/{job_type}` | — | [analytics_api.py:93](src/ion/web/analytics_api.py#L93) |  |  |
 | POST | `/api/analytics/jobs/{job_type}/run` | — | [analytics_api.py:78](src/ion/web/analytics_api.py#L78) |  |  |
 | GET | `/api/analytics/snapshots/{job_type}` | — | [analytics_api.py:119](src/ion/web/analytics_api.py#L119) |  |  |
-| GET | `/api/analytics/system-overview` | — | [analytics_api.py:198](src/ion/web/analytics_api.py#L198) |  | `analytics.html` |
+| GET | `/api/analytics/system-overview` | — | [analytics_api.py:198](src/ion/web/analytics_api.py#L198) |  |  |
 | GET | `/api/arkime/hunts` | `alert:read` | [arkime_api.py:778](src/ion/web/arkime_api.py#L778) |  | `arkime_traffic.html` |
 | POST | `/api/arkime/hunts` | `security:read` | [arkime_api.py:722](src/ion/web/arkime_api.py#L722) |  | `arkime_traffic.html` |
 | GET | `/api/arkime/hunts/{hunt_id}` | `alert:read` | [arkime_api.py:792](src/ion/web/arkime_api.py#L792) |  |  |

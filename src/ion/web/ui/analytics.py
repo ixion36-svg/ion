@@ -876,13 +876,21 @@ SYSTEM_FRAGMENT = "_fragments/analytics_system.html"
 
 #: The severity pills a system or index card shows, in this order, with the
 #: single letter the page used.
-SEVERITY_PILLS: tuple[tuple[str, str], ...] = (
-    ("critical", "C"), ("high", "H"), ("medium", "M"), ("low", "L"),
+#: Each severity's payload key, its pill letter, and the class the pill
+#: CSS actually keys on. The short form is not cosmetic: the rules are
+#: `.sev-pill.crit` and `.sev-pill.med`, so emitting the payload key left
+#: the critical and medium pills uncoloured. I shipped that in the first
+#: system-tab conversion and the rewrite audit did not catch it, because
+#: it tracks the hashed `_ion-s-*` classes rather than semantic ones.
+SEVERITY_PILLS: tuple[tuple[str, str, str], ...] = (
+    ("critical", "C", "crit"), ("high", "H", "high"),
+    ("medium", "M", "med"), ("low", "L", "low"),
 )
 
 
 class Pill(TypedDict):
     key: str
+    short: str
     letter: str
     count: int
 
@@ -898,18 +906,30 @@ def pills(mapping: Any) -> Optional[list[Pill]]:
     if not isinstance(mapping, dict):
         return None
     out: list[Pill] = []
-    for key, letter in SEVERITY_PILLS:
+    for key, letter, short in SEVERITY_PILLS:
         count = _int(mapping.get(key))
         if count:
-            out.append({"key": key, "letter": letter, "count": count})
+            out.append({"key": key, "short": short, "letter": letter,
+                        "count": count})
     return out
 
 
 class SystemCard(TypedDict):
     name: Optional[str]
+    display_name: str
+    letter: str
+    kind: str
     mapped: bool
     alert_count: Optional[int]
+    logs_ingested: Optional[int]
+    unique_hosts: Optional[int]
+    unique_users: Optional[int]
     pills: Optional[list[Pill]]
+    status: Optional[str]
+    spark: Optional[dict]
+    rules: Optional[list[dict]]
+    tide: Optional["TideBar"]
+    cyab: Optional["CyabLine"]
     coverage: Optional[int]
 
 
@@ -933,31 +953,272 @@ class SystemView(TypedDict):
     total_logs: Optional[int]
     total_pills: Optional[list[Pill]]
     indices: Optional[list[IndexRow]]
-    # From ION's own database. The systems list stays in the model because
-    # the page still builds the card grid itself: buildSysCard is a hundred
-    # lines of structure, with a per-namespace icon and colour, a
-    # sparkline, a top-rules table, a TIDE coverage bar carrying its own
-    # threshold colours, a CyAB readiness line and an unmapped badge. A
-    # simplified card here would have dropped most of that, which is the
-    # regression this project keeps catching in conversions. The grid is a
-    # later pass, so renderSysCards stays a write site on purpose.
+    timeline: Optional[dict]
+    timeline_readable: bool
+    interval: str
+    # From ION's own database. buildSysCard was a hundred lines of
+    # structure: a per-namespace icon and colour, a sparkline, a top-rules
+    # table, a TIDE coverage bar carrying its own threshold colours, a
+    # CyAB readiness line and an unmapped badge. It was deferred on the
+    # first pass for exactly that reason, since a simplified card here
+    # would have dropped most of it, which is the regression this project
+    # keeps catching in conversions. All of it is in SystemCard now.
     total_systems: Optional[int]
     mapped_systems: Optional[int]
     avg_coverage: Optional[int]
     systems: Optional[list[SystemCard]]
 
 
+#: The namespace letter, from getSysIcon's ladder, in its order.
+NAMESPACE_LETTERS: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("windows",), "W"),
+    (("linux",), "L"),
+    (("network", "firewall", "fw"), "N"),
+    (("cloud", "aws", "azure", "gcp"), "C"),
+    (("endpoint", "edr"), "E"),
+    (("mail", "email", "exchange"), "M"),
+    (("dns",), "D"),
+    (("web", "http", "proxy"), "P"),
+    (("auth", "identity", "ad"), "A"),
+    (("db", "sql", "database"), "B"),
+)
+
+#: The namespace kind, from getSysColor's ladder. The kind names a class;
+#: analytics-page.css gives that class its --ns-color, so the colour is
+#: somewhere the theme can reach and no hex is composed at render time.
+#:
+#: It is a second table because the two ladders in the page did not agree:
+#: getSysIcon grouped the three clouds under one letter while getSysColor
+#: gave each its own colour, and five of getSysIcon's substrings ("fw",
+#: "exchange", "http", "ad", and the whole database row) had no colour
+#: entry at all, so those namespaces fell through to the hash. Merging the
+#: tables would quietly recolour them.
+NAMESPACE_KINDS: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("windows",), "ns-windows"),
+    (("linux",), "ns-linux"),
+    (("network", "firewall"), "ns-network"),
+    (("cloud", "aws"), "ns-aws"),
+    (("azure",), "ns-azure"),
+    (("gcp",), "ns-gcp"),
+    (("endpoint", "edr"), "ns-endpoint"),
+    (("mail", "email"), "ns-mail"),
+    (("dns",), "ns-dns"),
+    (("web", "proxy"), "ns-web"),
+    (("auth", "identity"), "ns-auth"),
+)
+
+#: How many fallback kinds the sheet defines, for a namespace no row
+#: matches. The page composed an `hsl(...)` literal from a JS string hash.
+NAMESPACE_FALLBACKS = 12
+
+
+def namespace_letter(name: Optional[str]) -> str:
+    lowered = (name or "").lower()
+    if lowered == "default":
+        return "W"
+    for needles, letter in NAMESPACE_LETTERS:
+        if any(needle in lowered for needle in needles):
+            return letter
+    return name[0].upper() if name else "?"
+
+
+def namespace_kind(name: Optional[str]) -> str:
+    lowered = (name or "").lower()
+    if lowered == "default":
+        return "ns-windows"
+    for needles, kind in NAMESPACE_KINDS:
+        if any(needle in lowered for needle in needles):
+            return kind
+    # hashlib, not hash(): Python salts str hashing per process, so the
+    # same namespace would change colour on every restart.
+    import hashlib
+
+    digest = hashlib.sha1(lowered.encode("utf-8")).digest()
+    return "ns-p%d" % (digest[0] % NAMESPACE_FALLBACKS)
+
+
+def cov_band(pct: Optional[float]) -> Optional[str]:
+    """The coverage colour as a class.
+
+    It was three thresholds over `t.coverage_pct || 0`, so a system whose
+    coverage was never recorded was drawn in the red band at 0%, which on
+    a coverage bar states that nothing is covered.
+    """
+    if pct is None:
+        return None
+    if pct >= 70:
+        return "an-cov-good"
+    if pct >= 40:
+        return "an-cov-fair"
+    return "an-cov-poor"
+
+
+def _first_recorded(raw: dict, *keys: str) -> Optional[int]:
+    """The first key that carries a number.
+
+    `sys.unique_hosts || sys.logs_unique_hosts || 0` sent a recorded zero
+    through to the next field and then to the literal, so a namespace with
+    no unique hosts and one with neither field recorded read alike.
+    """
+    for key in keys:
+        if key in raw:
+            value = _int(raw.get(key))
+            if value is not None:
+                return value
+    return None
+
+
+def status_label(raw: Any) -> Optional[str]:
+    if not isinstance(raw, dict):
+        return None
+    parts = []
+    for key, word in (("open", "open"), ("acknowledged", "ack"),
+                      ("closed", "closed")):
+        count = _int(raw.get(key))
+        if count:
+            parts.append("%d %s" % (count, word))
+    return ", ".join(parts) or None
+
+
+def rule_rows(raw: Any) -> Optional[list[dict]]:
+    """The card's top rules, at most four as the page sliced them."""
+    if not isinstance(raw, list):
+        return None
+    rows = []
+    for entry in raw[:4]:
+        if not isinstance(entry, dict):
+            continue
+        rows.append({"name": _text(entry.get("rule")),
+                     "count": _int(entry.get("count"))})
+    return rows
+
+
+def area_spark(points: Any, width: int, height: int,
+               pad: int = 0) -> Optional[dict]:
+    """The two SVG paths for an area sparkline.
+
+    `Math.max(...timeline.map(t => t.count), 1)` is NaN the moment one
+    count is not a number, and every coordinate derived from it is then
+    NaN, so the path attribute was unparseable and the chart silently
+    vanished. Unreadable points are dropped here and the rest still draw.
+    """
+    if not isinstance(points, list) or not points:
+        return None
+    counts = [_num(p.get("count")) if isinstance(p, dict) else None
+              for p in points]
+    readable = [c for c in counts if c is not None]
+    if not readable:
+        return None
+    top = max(max(readable), 1.0)
+    span = max(len(counts) - 1, 1)
+    plotted = []
+    for index, count in enumerate(counts):
+        if count is None:
+            continue
+        x = pad + (index / span) * (width - 2 * pad)
+        y = height - (pad + 4) - ((count / top) * (height - (2 * pad) - 15))
+        plotted.append((x, y))
+    if len(plotted) < 2:
+        return None
+    line = " ".join(
+        "%s%.1f,%.1f" % ("M" if i == 0 else "L", x, y)
+        for i, (x, y) in enumerate(plotted))
+    floor = height - (pad + 4)
+    area = "%s L%.1f,%.1f L%.1f,%.1f Z" % (
+        line, plotted[-1][0], floor, plotted[0][0], floor)
+    return {"line": line, "area": area, "top": "%g" % top,
+            "width": width, "height": height}
+
+
+class TideBar(TypedDict):
+    name: Optional[str]
+    coverage: Optional[int]
+    band: Optional[str]
+    applied: Optional[int]
+    total: Optional[int]
+    enabled: Optional[int]
+    disabled: Optional[int]
+    critical: Optional[int]
+    high: Optional[int]
+
+
+def tide_bar(raw: Any) -> Optional[TideBar]:
+    if not isinstance(raw, dict):
+        return None
+    coverage = _int(raw.get("coverage_pct"))
+    severity = raw.get("severity_breakdown")
+    severity = severity if isinstance(severity, dict) else {}
+    return {
+        "name": _text(raw.get("name")),
+        "coverage": coverage,
+        "band": cov_band(coverage),
+        "applied": _int(raw.get("applied_rules")),
+        "total": _int(raw.get("total_rules")),
+        "enabled": _int(raw.get("enabled_rules")),
+        "disabled": _int(raw.get("disabled_rules")),
+        "critical": _int(severity.get("critical")),
+        "high": _int(severity.get("high")),
+    }
+
+
+class CyabLine(TypedDict):
+    name: Optional[str]
+    source_name: Optional[str]
+    readiness: Optional[int]
+    band: Optional[str]
+    use_case_status: Optional[str]
+
+
+def cyab_line(raw: Any) -> Optional[CyabLine]:
+    if not isinstance(raw, dict):
+        return None
+    readiness = _int(raw.get("readiness_score"))
+    return {
+        "name": (_text(raw.get("cyab_system_name"))
+                 or _text(raw.get("cyab_source_name"))),
+        "source_name": _text(raw.get("cyab_source_name")),
+        "readiness": readiness,
+        "band": cov_band(readiness),
+        "use_case_status": (_text(raw.get("use_case_status"))
+                            or "Not reviewed"),
+    }
+
+
 def system_card(raw: Any, *, es_failed: bool) -> Optional[SystemCard]:
+    """One namespace card.
+
+    Every count on it was `|| 0` over a payload whose Elasticsearch half
+    may not have happened. The stats bar above the grid reads es_failed;
+    the cards did not, so a namespace reported zero alerts and zero logs
+    where nothing had been measured.
+    """
     if not isinstance(raw, dict):
         return None
     name = _text(raw.get("system"))
+    mapped = raw.get("mapped") is True
+    cyab = cyab_line(raw.get("cyab"))
     return {
         "name": name,
-        "mapped": raw.get("mapped") is True,
+        "display_name": name or "unknown",
+        "letter": namespace_letter(name),
+        "kind": namespace_kind(name),
+        "mapped": mapped,
         # Withheld rather than zero when the half that counts them failed.
         "alert_count": (None if es_failed
                         else _int(raw.get("alert_count"))),
+        "logs_ingested": (None if es_failed
+                          else _int(raw.get("logs_ingested"))),
+        "unique_hosts": (None if es_failed else _first_recorded(
+            raw, "unique_hosts", "logs_unique_hosts")),
+        "unique_users": (None if es_failed else _first_recorded(
+            raw, "unique_users", "logs_unique_users")),
         "pills": None if es_failed else pills(raw.get("severity")),
+        "status": None if es_failed else status_label(raw.get("status")),
+        "spark": (None if es_failed
+                  else area_spark(raw.get("timeline"), 360, 36)),
+        "rules": rule_rows(raw.get("top_rules")),
+        "tide": tide_bar(raw.get("tide")) if mapped else None,
+        "cyab": cyab if mapped else None,
         "coverage": _int(raw.get("tide_coverage")),
     }
 
@@ -1005,6 +1266,12 @@ def system_view(payload: Any) -> SystemView:
                     else [r for r in (index_row(i, top)
                                       for i in readable_indices)
                           if r is not None]),
+        "timeline": (None if es_failed
+                     else area_spark(payload.get("total_timeline"),
+                                     800, 70, pad=20)),
+        "timeline_readable": (
+            es_failed or isinstance(payload.get("total_timeline"), list)),
+        "interval": _text(payload.get("interval")) or "auto",
         "total_systems": _int(payload.get("total_systems")),
         "mapped_systems": _int(payload.get("mapped_systems")),
         "avg_coverage": _int(payload.get("avg_tide_coverage")),

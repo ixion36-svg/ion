@@ -22,9 +22,9 @@ page cannot be forgotten. Status is measured, never set by hand.
 | measure | remaining |
 |---|---|
 | templates | 80 |
-| total lines | 55,208 |
+| total lines | 55,000 |
 | inline `<style>` lines | 6,844 |
-| runtime DOM writes | 175 |
+| runtime DOM writes | 171 |
 | literal light-on-dark colours | 4 |
 
 ## Shell and partials
@@ -50,6 +50,7 @@ A restyle here is a markup edit and is fully visible in a screenshot.
 | `training.html` | 6526 | 0 | 5715 | 0 | yes | yes | yes | **done** |
 | `tools.html` | 1503 | 0 | 1055 | 0 | yes | yes | yes | **done** |
 | `discover.html` | 1380 | 0 | 929 | 0 | yes | yes | yes | **done** |
+| `analytics.html` | 1242 | 719 | 342 | 0 | yes | no | yes |  |
 | `forensics.html` | 1209 | 0 | 769 | 0 | yes | yes | yes | **done** |
 | `arkime_traffic.html` | 1202 | 0 | 1162 | 0 | yes | yes | yes | **done** |
 | `observables.html` | 1132 | 0 | 757 | 0 | yes | yes | yes | **done** |
@@ -116,7 +117,7 @@ A restyle here is a markup edit and is fully visible in a screenshot.
 | `service_accounts.html` | 50 | 0 | 0 | 0 | yes | yes | yes | **done** |
 | `threat_intel_actor.html` | 44 | 0 | 0 | 0 | yes | yes | yes | **done** |
 
-Subtotal: 69 templates, 36,236 lines, 0 inline css lines, 0 runtime writes, 0 light-mode literals.
+Subtotal: 70 templates, 37,478 lines, 719 inline css lines, 0 runtime writes, 0 light-mode literals.
 
 ## Tier B, 1 to 10 runtime writes
 
@@ -125,9 +126,8 @@ Markup plus a short list of class strings in inline JS.
 | template | lines | css | js | writes | light | styled | server | done |
 |---|--:|--:|--:|--:|:--:|:--:|:--:|:--:|
 | `documents.html` | 1524 | 0 | 1197 | 3 | yes | yes | no |  |
-| `analytics.html` | 1450 | 719 | 550 | 4 | yes | no | no |  |
 
-Subtotal: 2 templates, 2,974 lines, 719 inline css lines, 7 runtime writes, 0 light-mode literals.
+Subtotal: 1 templates, 1,524 lines, 0 inline css lines, 3 runtime writes, 0 light-mode literals.
 
 ## Tier C, more than 10 runtime writes
 

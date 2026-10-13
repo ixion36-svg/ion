@@ -328,14 +328,22 @@ def test_the_card_grid_messages_are_built_rather_than_parsed():
     assert not re.search(r"\.innerHTML\s*=", helper.group(0))
 
 
-def test_the_card_grid_is_still_the_pages_own_and_says_why():
-    """buildSysCard is a hundred lines of structure: a mapped indicator, a
+def test_the_card_grid_moved_with_its_structure_intact():
+    """buildSysCard was a hundred lines: a mapped indicator, a
     per-namespace icon and colour, a sparkline, a top-rules table, a TIDE
     coverage bar with its own thresholds, a CyAB readiness line and an
-    unmapped badge. A simplified card in the fragment would have dropped
-    most of it, so the grid is a later pass and the module says so."""
+    unmapped badge. It was deferred on the first pass precisely because a
+    simplified card would have dropped most of it, so what this checks is
+    that every piece came across.
+    """
     body = PAGE.read_text(encoding="utf-8")
-    assert "function buildSysCard" in body
-    module = (ROOT / "src/ion/web/ui/analytics.py").read_text(
-        encoding="utf-8")
-    assert "renderSysCards stays a write site on purpose" in module
+    assert "function buildSysCard" not in body
+    fragment = (ROOT / "src/ion/web/templates/_fragments"
+                / "analytics_system.html").read_text(encoding="utf-8")
+    for piece in ("sys-card-header", "sys-icon", "sys-card-alerts",
+                  "sys-sev-row", "sys-sparkline", "sys-meta",
+                  "sys-rules-section", "sys-rule-row", "sys-rule-count",
+                  "sys-tide-bar", "sys-tide-progress-fill",
+                  "sys-tide-stats", "sys-unmapped-badge",
+                  "tide-label-left", "tide-label-right"):
+        assert piece in fragment, piece

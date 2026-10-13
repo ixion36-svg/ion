@@ -123,3 +123,37 @@
 .config-status-ok { color: var(--neon-green); }
 .config-status-pending { color: var(--text-muted); }
 .config-job-type { font-size: 0.6875rem; color: var(--text-muted); }
+
+/* The per-namespace colour. getSysColor was a ladder of hex
+   literals in JavaScript, with an hsl() string composed from a JS
+   string hash for anything it missed. Each kind sets one custom
+   property here and the icon and both sparkline paths read it, so
+   a theme can override any of them. */
+.sys-card.ns-windows { --ns-color: #00a4ef; }
+.sys-card.ns-linux { --ns-color: #fcc624; }
+.sys-card.ns-network { --ns-color: #00d4ff; }
+.sys-card.ns-aws { --ns-color: #ff9900; }
+.sys-card.ns-azure { --ns-color: #0078d4; }
+.sys-card.ns-gcp { --ns-color: #4285f4; }
+.sys-card.ns-endpoint { --ns-color: #9b59b6; }
+.sys-card.ns-mail { --ns-color: #e74c3c; }
+.sys-card.ns-dns { --ns-color: #2ecc71; }
+.sys-card.ns-web { --ns-color: #f39c12; }
+.sys-card.ns-auth { --ns-color: #e91e63; }
+/* Fallbacks for a namespace no row above matches, picked by a
+   stable hash of its name. */
+.sys-card.ns-p0 { --ns-color: #60a5fa; }
+.sys-card.ns-p1 { --ns-color: #f472b6; }
+.sys-card.ns-p2 { --ns-color: #34d399; }
+.sys-card.ns-p3 { --ns-color: #fbbf24; }
+.sys-card.ns-p4 { --ns-color: #a78bfa; }
+.sys-card.ns-p5 { --ns-color: #fb923c; }
+.sys-card.ns-p6 { --ns-color: #22d3ee; }
+.sys-card.ns-p7 { --ns-color: #c084fc; }
+.sys-card.ns-p8 { --ns-color: #4ade80; }
+.sys-card.ns-p9 { --ns-color: #f87171; }
+.sys-card.ns-p10 { --ns-color: #2dd4bf; }
+.sys-card.ns-p11 { --ns-color: #facc15; }
+.sys-card .sys-icon { background: var(--ns-color, var(--neon-cyan)); }
+.sys-card .sys-spark-area { fill: var(--ns-color, var(--neon-cyan)); fill-opacity: 0.25; }
+.sys-card .sys-spark-line { stroke: var(--ns-color, var(--neon-cyan)); }
