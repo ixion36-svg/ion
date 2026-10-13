@@ -392,6 +392,42 @@
   border: 1px solid rgba(245, 158, 11, .25);
 }
 
+/* ── Rows and bars that would otherwise need new Tailwind utilities ──
+ *
+ * These three are page rules rather than markup utilities on purpose.
+ * `bg-base-300/30`, `bg-base-100/90` and `hover:bg-base-300/40` are not in
+ * the compiled ion.css, and that file is resolved centrally, so adding a
+ * utility to this page's markup would mean either a rebuild of a shared
+ * artefact or a row that silently loses its hover. One class each, here.
+ */
+
+.ds-check-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background .15s;
+}
+
+.ds-check-row:hover { background: rgba(255, 255, 255, .04); }
+
+.ds-duty-line {
+  border-radius: 8px;
+  border: 1px solid var(--ion-border);
+  background: rgba(255, 255, 255, .03);
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.ds-action-bar {
+  border-top: 1px solid var(--ion-border);
+  background: var(--bg-primary);
+  backdrop-filter: blur(12px);
+}
+
 /* ── Duty line ────────────────────────────────────────────────────────── */
 
 .ds-duty-who { color: var(--text-primary); }

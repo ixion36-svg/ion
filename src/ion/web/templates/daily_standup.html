@@ -203,7 +203,7 @@
               ('threat_intel', 'Threat intel briefing reviewed'),
               ('action_items', 'Action items from previous day checked')
           ] %}
-          <label class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-base-300/40 transition cursor-pointer text-[13px]">
+          <label class="ds-check-row">
             <input type="checkbox" class="ds-meeting-cb checkbox checkbox-sm checkbox-primary" data-item="{{ value }}"> {{ label }}
           </label>
           {% endfor %}
@@ -238,7 +238,7 @@
              box on purpose: the question "should I be doing this?" is
              answered before somebody types their name, not after.
              Loads on its own, and /checks refreshes it out of band. -->
-        <div id="duty-line" class="mb-4 rounded-lg border border-base-300 bg-base-300/30 px-3 py-2 text-[13px]"
+        <div id="duty-line" class="ds-duty-line mb-4"
              hx-get="/ui/daily-standup/duty" hx-trigger="load" hx-swap="innerHTML">
           <span class="text-base-content/50">Checking the duty rota&hellip;</span>
         </div>
@@ -255,7 +255,7 @@
             <div id="signoff-time" class="input input-sm flex items-center text-[13px] text-base-content/60">Not signed off</div>
           </div>
         </div>
-        <label class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-base-300/40 transition cursor-pointer text-[13px]">
+        <label class="ds-check-row">
           <input type="checkbox" id="signoff-confirm" class="checkbox checkbox-sm checkbox-primary"> I confirm all daily checks have been completed
         </label>
       </div>
@@ -281,7 +281,7 @@
 data-click-action="dsCloseReport"></div>
 
 <!-- ── Sticky Action Bar ── -->
-<div class="ion-tw fixed bottom-0 left-0 right-0 z-30 border-t border-base-300 bg-base-100/90 backdrop-blur-md">
+<div class="ion-tw ds-action-bar fixed bottom-0 left-0 right-0 z-30">
   <div class="mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 h-14 flex items-center justify-between">
     <div class="flex items-center gap-2 text-[12px]">
       <span id="save-status" class="text-base-content/50"></span>
