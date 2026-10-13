@@ -136,8 +136,21 @@ def _markup() -> str:
     )
 
 
+def _strip_js_comments(body: str) -> str:
+    """Drop whole-line JS comments.
+
+    A template id named in a comment otherwise reads as a cloned id, and
+    this page's comments name both of them. Four separate checks in this
+    project have passed against their own explanatory prose.
+    """
+    return "\n".join(
+        line for line in body.split("\n")
+        if not line.lstrip().startswith(("//", "*", "/*"))
+    )
+
+
 def _scripts() -> str:
-    return "\n".join(SCRIPT.findall(_page()))
+    return _strip_js_comments("\n".join(SCRIPT.findall(_page())))
 
 
 def _route(path):

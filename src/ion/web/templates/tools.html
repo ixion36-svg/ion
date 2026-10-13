@@ -43,20 +43,16 @@
 
   <!-- Controls bar -->
   <section class="rounded-2xl border border-white/5 bg-ink-900/50 p-5 mb-6 flex flex-wrap items-end gap-4 rise d-2">
-    <div class="flex flex-col gap-1.5 min-w-[180px]">
-      <label class="label-tiny text-slate-500">From</label>
-      <select id="t-source"
-        class="h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[13px] text-white focus:border-ion-cyan/50">
-      </select>
-    </div>
-    <div class="flex items-end pb-2 text-slate-500">
-      <svg class="w-4 h-4"><use href="#i-arrow-right"/></svg>
-    </div>
-    <div class="flex flex-col gap-1.5 min-w-[180px]">
-      <label class="label-tiny text-slate-500">To</label>
-      <select id="t-target"
-        class="h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[13px] text-white focus:border-ion-cyan/50">
-      </select>
+    <!-- The language list is data ION holds, so both pickers come from a
+         fragment rather than being assembled with createElement in a loop.
+         Requested on first activation of this tab, not on every /tools
+         visit: as a standalone page the translator bootstrapped on parse,
+         and keeping that would fire a round trip for a tab nobody opened. -->
+    <div id="t-language-pickers" class="flex flex-wrap items-end gap-4"
+         hx-get="/ui/tools/translator-languages"
+         hx-trigger="ionTranslatorInit from:body"
+         hx-swap="innerHTML">
+      <span class="text-sm opacity-60">Languages load when this tab opens.</span>
     </div>
 
     <div class="flex-1"></div>
@@ -127,7 +123,7 @@
                         <button class="btn btn-sm" data-click-action="loadFile">Load File</button>
                     </div>
                 </div>
-                <textarea id="input-text" class="textarea textarea-bordered w-full h-[300px] font-mono text-[13px]" placeholder="Paste or type text here..." data-input-action="processText"></textarea>
+                <textarea id="input-text" class="textarea w-full h-[300px] font-mono text-[13px]" placeholder="Paste or type text here..." data-input-action="processText"></textarea>
             </div>
         </div>
 
@@ -140,7 +136,7 @@
                         <button class="btn btn-sm" data-click-action="downloadOutput">Download</button>
                     </div>
                 </div>
-                <textarea id="output-text" class="textarea textarea-bordered w-full h-[300px] font-mono text-[13px]" readonly placeholder="Processed output will appear here..."></textarea>
+                <textarea id="output-text" class="textarea w-full h-[300px] font-mono text-[13px]" readonly placeholder="Processed output will appear here..."></textarea>
             </div>
         </div>
     </div>
@@ -161,8 +157,13 @@
                 <span class="badge badge-outline gap-1">SHA1 <strong id="ioc-sha1">0</strong></span>
                 <span class="badge badge-outline gap-1">SHA256 <strong id="ioc-sha256">0</strong></span>
             </div>
-            <div class="ioc-details hidden mt-4" id="ioc-details">
-                <div class="ioc-details-content" id="ioc-details-content"></div>
+            <!-- `hidden` rather than an inline display, which is what made
+                 this panel take two clicks to open: the class hid it, the
+                 toggle read `style.display === 'none'` on an empty inline
+                 value, so the first click set display:none on something
+                 already hidden and only the second showed it. -->
+            <div class="hidden mt-4" id="ioc-details">
+                <div id="ioc-details-content"></div>
             </div>
         </div>
     </div>
@@ -197,7 +198,7 @@
                 <h3 class="card-title text-base basis-full md:basis-auto">Custom Find/Replace Rules</h3>
                 <button class="btn btn-sm btn-primary" data-click-action="addRule">+ Add</button>
             </div>
-            <div class="rules-list flex flex-col gap-2" id="rules-list"></div>
+            <div class="flex flex-col gap-2" id="rules-list"></div>
             <div class="flex flex-wrap gap-2 mt-2">
                 <button class="btn btn-sm" data-click-action="saveRules">Save Rules</button>
                 <button class="btn btn-sm" data-click-action="loadRules">Load Rules</button>
@@ -242,7 +243,7 @@
                 <button class="btn btn-primary" data-click-action="setCurrentTime">Now</button>
                 <button class="btn" data-click-action="clearTimestamps">Clear</button>
             </div>
-            <div class="timestamp-info mt-4 text-sm" id="timestamp-info"></div>
+            <div class="mt-4" id="timestamp-info"></div>
         </div>
     </div>
 </div>
@@ -254,11 +255,11 @@
             <h3 class="card-title text-base">Hash Identifier</h3>
             <fieldset class="fieldset p-0">
                 <legend class="fieldset-legend">Enter Hash(es) - one per line</legend>
-                <textarea id="hash-input" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="6" placeholder="Enter hashes to identify...
+                <textarea id="hash-input" class="textarea w-full font-mono text-[13px]" rows="6" placeholder="Enter hashes to identify...
 e.g., d41d8cd98f00b204e9800998ecf8427e
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" data-input-action="identifyHashes"></textarea>
             </fieldset>
-            <div class="hash-results mt-4 overflow-x-auto" id="hash-results"></div>
+            <div class="mt-4" id="hash-results"></div>
         </div>
     </div>
 </div>
@@ -272,7 +273,7 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" data-input-act
                 <legend class="fieldset-legend">Enter URL</legend>
                 <input type="text" class="input w-full" id="url-input" placeholder="https://example.com:8080/path/to/page?query=value&foo=bar#section" data-input-action="parseUrl">
             </fieldset>
-            <div class="url-results mt-4 overflow-x-auto" id="url-results"></div>
+            <div class="mt-4" id="url-results"></div>
         </div>
     </div>
 </div>
@@ -293,9 +294,9 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" data-input-act
             </fieldset>
             <fieldset class="fieldset p-0">
                 <legend class="fieldset-legend">Test String</legend>
-                <textarea id="regex-test" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="6" placeholder="Enter text to test against..." data-input-action="testRegex"></textarea>
+                <textarea id="regex-test" class="textarea w-full font-mono text-[13px]" rows="6" placeholder="Enter text to test against..." data-input-action="testRegex"></textarea>
             </fieldset>
-            <div class="regex-results mt-4 overflow-x-auto" id="regex-results"></div>
+            <div class="mt-4" id="regex-results"></div>
         </div>
     </div>
 </div>
@@ -307,7 +308,7 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" data-input-act
             <h3 class="card-title text-base">Email Header Analyzer</h3>
             <fieldset class="fieldset p-0">
                 <legend class="fieldset-legend">Paste Email Headers</legend>
-                <textarea id="email-headers" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="10" placeholder="Paste raw email headers here...
+                <textarea id="email-headers" class="textarea w-full font-mono text-[13px]" rows="10" placeholder="Paste raw email headers here...
 Return-Path: <sender@example.com>
 Received: from mail.example.com...
 From: Sender Name <sender@example.com>
@@ -316,7 +317,7 @@ Subject: Test Email
 Date: Mon, 28 Jan 2024 10:00:00 +0000
 ..." data-input-action="parseEmailHeaders"></textarea>
             </fieldset>
-            <div class="email-results mt-4 overflow-x-auto" id="email-results"></div>
+            <div class="mt-4" id="email-results"></div>
         </div>
     </div>
 </div>
@@ -340,9 +341,9 @@ Date: Mon, 28 Jan 2024 10:00:00 +0000
             </fieldset>
             <fieldset class="fieldset p-0">
                 <legend class="fieldset-legend">Log Entry</legend>
-                <textarea id="log-input" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="8" placeholder="Paste log entry here..." data-input-action="parseLog"></textarea>
+                <textarea id="log-input" class="textarea w-full font-mono text-[13px]" rows="8" placeholder="Paste log entry here..." data-input-action="parseLog"></textarea>
             </fieldset>
-            <div class="log-results mt-4 overflow-x-auto" id="log-results"></div>
+            <div class="mt-4" id="log-results"></div>
         </div>
     </div>
 </div>
@@ -355,35 +356,35 @@ Date: Mon, 28 Jan 2024 10:00:00 +0000
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                 <div>
                     <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60 mb-2">Text Input</h4>
-                    <textarea id="enc-text" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="4" placeholder="Enter text..." data-input-action="updateEncodings"></textarea>
+                    <textarea id="enc-text" class="textarea w-full font-mono text-[13px]" rows="4" placeholder="Enter text..." data-input-action="updateEncodings"></textarea>
                 </div>
                 <div>
                     <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60 mb-2">Base64</h4>
-                    <textarea id="enc-base64" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="3" placeholder="Base64..." data-input-action="decodeFromBase64"></textarea>
+                    <textarea id="enc-base64" class="textarea w-full font-mono text-[13px]" rows="3" placeholder="Base64..." data-input-action="decodeFromBase64"></textarea>
                 </div>
                 <div>
                     <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60 mb-2">Hex</h4>
-                    <textarea id="enc-hex" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="3" placeholder="48 65 6c 6c 6f..." data-input-action="decodeFromHex"></textarea>
+                    <textarea id="enc-hex" class="textarea w-full font-mono text-[13px]" rows="3" placeholder="48 65 6c 6c 6f..." data-input-action="decodeFromHex"></textarea>
                 </div>
                 <div>
                     <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60 mb-2">URL Encoded</h4>
-                    <textarea id="enc-url" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="3" placeholder="Hello%20World..." data-input-action="decodeFromUrl"></textarea>
+                    <textarea id="enc-url" class="textarea w-full font-mono text-[13px]" rows="3" placeholder="Hello%20World..." data-input-action="decodeFromUrl"></textarea>
                 </div>
                 <div>
                     <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60 mb-2">HTML Entities</h4>
-                    <textarea id="enc-html" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="3" placeholder="&lt;script&gt;..." data-input-action="decodeFromHtml"></textarea>
+                    <textarea id="enc-html" class="textarea w-full font-mono text-[13px]" rows="3" placeholder="&lt;script&gt;..." data-input-action="decodeFromHtml"></textarea>
                 </div>
                 <div>
                     <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60 mb-2">Binary</h4>
-                    <textarea id="enc-binary" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="3" placeholder="01001000 01100101..." readonly></textarea>
+                    <textarea id="enc-binary" class="textarea w-full font-mono text-[13px]" rows="3" placeholder="01001000 01100101..." readonly></textarea>
                 </div>
                 <div>
                     <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60 mb-2">ROT13</h4>
-                    <textarea id="enc-rot13" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="3" placeholder="ROT13..." data-input-action="decodeFromRot13"></textarea>
+                    <textarea id="enc-rot13" class="textarea w-full font-mono text-[13px]" rows="3" placeholder="ROT13..." data-input-action="decodeFromRot13"></textarea>
                 </div>
                 <div>
                     <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60 mb-2">ASCII Decimal</h4>
-                    <textarea id="enc-decimal" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="3" placeholder="72 101 108 108 111..." readonly></textarea>
+                    <textarea id="enc-decimal" class="textarea w-full font-mono text-[13px]" rows="3" placeholder="72 101 108 108 111..." readonly></textarea>
                 </div>
             </div>
         </div>
@@ -395,14 +396,20 @@ Date: Mon, 28 Jan 2024 10:00:00 +0000
     <div class="card bg-base-200 shadow mb-4">
         <div class="card-body">
             <h3 class="card-title text-base">IOC Lookup (via OpenCTI)</h3>
-            <fieldset class="fieldset p-0">
-                <legend class="fieldset-legend">Enter IOC (IP, Domain, Hash, URL)</legend>
-                <div class="flex flex-wrap gap-2">
-                    <input type="text" class="input flex-1 min-w-[240px]" id="lookup-ioc" placeholder="e.g., 8.8.8.8, evil.com, d41d8cd98f00b204e9800998ecf8427e">
-                    <button class="btn btn-primary" data-click-action="lookupIOC">Lookup</button>
-                </div>
-            </fieldset>
-            <div class="lookup-results mt-4 overflow-x-auto" id="lookup-results">
+            <!-- A form, so Enter submits and the value is serialised under
+                 the name the route takes. The old button posted
+                 `{value: ioc}` with no `type`, which the endpoint's request
+                 model rejects, so this feature had never returned a result. -->
+            <form id="lookup-form" class="flex flex-wrap gap-2"
+                  hx-post="/ui/tools/ioc"
+                  hx-target="#lookup-results"
+                  hx-swap="innerHTML">
+                <label class="fieldset-legend basis-full" for="lookup-ioc">Enter IOC (IP, Domain, Hash, URL)</label>
+                <input type="text" class="input flex-1 min-w-[240px]" id="lookup-ioc" name="value"
+                       placeholder="e.g., 8.8.8.8, evil.com, d41d8cd98f00b204e9800998ecf8427e">
+                <button type="submit" class="btn btn-primary">Lookup</button>
+            </form>
+            <div class="mt-4" id="lookup-results">
                 <p class="text-sm opacity-60">Enter an IOC and click Lookup to query OpenCTI for threat intelligence.</p>
             </div>
         </div>
@@ -411,17 +418,23 @@ Date: Mon, 28 Jan 2024 10:00:00 +0000
     <div class="card bg-base-200 shadow">
         <div class="card-body">
             <h3 class="card-title text-base">Bulk IOC Lookup</h3>
-            <fieldset class="fieldset p-0">
-                <legend class="fieldset-legend">Enter IOCs (one per line)</legend>
-                <textarea id="bulk-lookup-input" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="6" placeholder="8.8.8.8
+            <!-- One request for the whole list, through
+                 /api/opencti/enrich/batch. The page issued one fetch per
+                 pasted line, sequentially and with no cap. -->
+            <form id="bulk-lookup-form"
+                  hx-post="/ui/tools/ioc-bulk"
+                  hx-target="#bulk-lookup-results"
+                  hx-swap="innerHTML">
+                <label class="fieldset-legend" for="bulk-lookup-input">Enter IOCs (one per line)</label>
+                <textarea id="bulk-lookup-input" name="values" class="textarea w-full font-mono text-[13px]" rows="6" placeholder="8.8.8.8
 evil.com
 d41d8cd98f00b204e9800998ecf8427e"></textarea>
-            </fieldset>
-            <div class="flex flex-wrap gap-2 mt-2">
-                <button class="btn btn-primary" data-click-action="bulkLookupIOCs">Lookup All</button>
-                <button class="btn" data-click-action="exportLookupResults">Export Results</button>
-            </div>
-            <div class="bulk-lookup-results mt-4 overflow-x-auto" id="bulk-lookup-results"></div>
+                <div class="flex flex-wrap gap-2 mt-2">
+                    <button type="submit" class="btn btn-primary">Lookup All</button>
+                    <button type="button" class="btn" data-click-action="exportLookupResults">Export Results</button>
+                </div>
+            </form>
+            <div class="mt-4" id="bulk-lookup-results"></div>
         </div>
     </div>
 </div>
@@ -429,11 +442,94 @@ d41d8cd98f00b204e9800998ecf8427e"></textarea>
 
 </div><!-- /ion-tw inner -->
 </div><!-- /ion-tw -->
+
+{# Every render this page builds from text the analyst typed into the
+   browser. Included outside the <script> block below, because a <template>
+   inside a <script> is inert text and cloneTemplate would return null for
+   all of them. #}
+{% include "_fragments/tools_client.html" %}
 {% endblock %}
 
 {% block scripts %}
 
 <script nonce="{{ csp_nonce }}">
+// ==================== TEMPLATE PLUMBING ====================
+// A copy of a <template>'s first element. The markup is Jinja's; nothing
+// here assembles it. Null when the template is not on the page, which is
+// what a template element smuggled inside a script block looks like.
+function cloneTemplate(id) {
+    const tpl = document.getElementById(id);
+    if (!tpl || !tpl.content || !tpl.content.firstElementChild) return null;
+    return tpl.content.firstElementChild.cloneNode(true);
+}
+
+function tplText(id, text) {
+    const node = cloneTemplate(id);
+    // String(null) is the word "null" and String(undefined) is "undefined".
+    // Both have been rendered into this page's tables as data.
+    if (node) node.textContent = text == null ? '' : String(text);
+    return node;
+}
+
+// A table and its tbody. Seven renders on this page were a table of
+// label/value pairs built from seven separate string literals that had
+// drifted: three emitted a header row and four did not.
+function buildTable(headers) {
+    const root = cloneTemplate('tools-table');
+    if (!root) return null;
+    const head = root.querySelector('[data-head]');
+    const body = root.querySelector('[data-body]');
+    if (!head || !body) return null;
+    if (!headers || !headers.length) {
+        head.parentElement.remove();
+    } else {
+        headers.forEach(h => { const th = tplText('tools-th', h); if (th) head.appendChild(th); });
+    }
+    return { root, body };
+}
+
+// One row. A cell is a string, or {text, kind} with kind 'code' or
+// 'strong', or {node} to put an element in the cell.
+function addRow(body, cells) {
+    const tr = cloneTemplate('tools-tr');
+    if (!tr) return null;
+    cells.forEach(cell => {
+        const spec = (cell && typeof cell === 'object' && !(cell instanceof Node))
+            ? cell : { text: cell };
+        let td = null;
+        if (spec.node) {
+            td = cloneTemplate('tools-td');
+            if (td) td.appendChild(spec.node);
+        } else if (spec.kind === 'code') {
+            td = cloneTemplate('tools-td-code');
+            if (td) td.querySelector('code').textContent = spec.text == null ? '' : String(spec.text);
+        } else if (spec.kind === 'strong') {
+            td = cloneTemplate('tools-td-strong');
+            if (td) td.querySelector('strong').textContent = spec.text == null ? '' : String(spec.text);
+        } else {
+            td = tplText('tools-td', spec.text);
+        }
+        if (td) tr.appendChild(td);
+    });
+    body.appendChild(tr);
+    return tr;
+}
+
+// Replace a panel's contents with these nodes. Nulls are skipped, so a
+// missing template degrades to a shorter panel rather than throwing
+// halfway through and leaving the previous result on screen.
+function showIn(id, nodes) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const frag = document.createDocumentFragment();
+    (Array.isArray(nodes) ? nodes : [nodes]).forEach(n => { if (n) frag.appendChild(n); });
+    el.replaceChildren(frag);
+}
+
+function showError(id, message) {
+    showIn(id, tplText('tools-bad', message));
+}
+
 // ==================== TAB SWITCHING ====================
 function switchToolTab(tabName) {
     // was `event.target.classList.add('active')`, which relies on the
@@ -482,6 +578,12 @@ const IOC_PATTERNS = {
     sha256: /\b[a-fA-F0-9]{64}\b/g,
 };
 
+const IOC_TYPE_LABELS = {
+    url: 'URLs', ip: 'IP Addresses', email: 'Email Addresses',
+    domain: 'Domains', md5: 'MD5 Hashes', sha1: 'SHA1 Hashes',
+    sha256: 'SHA256 Hashes',
+};
+
 let customRules = [];
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -499,38 +601,55 @@ function detectIOCs(text) {
 }
 
 function updateIOCStats(iocs) {
-    document.getElementById('ioc-urls').textContent = iocs.url.length;
-    document.getElementById('ioc-ips').textContent = iocs.ip.length;
-    document.getElementById('ioc-emails').textContent = iocs.email.length;
-    document.getElementById('ioc-domains').textContent = iocs.domain.length;
-    document.getElementById('ioc-md5').textContent = iocs.md5.length;
-    document.getElementById('ioc-sha1').textContent = iocs.sha1.length;
-    document.getElementById('ioc-sha256').textContent = iocs.sha256.length;
-
-    const typeLabels = {
-        url: 'URLs', ip: 'IP Addresses', email: 'Email Addresses',
-        domain: 'Domains', md5: 'MD5 Hashes', sha1: 'SHA1 Hashes', sha256: 'SHA256 Hashes'
+    const put = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
     };
+    put('ioc-urls', iocs.url.length);
+    put('ioc-ips', iocs.ip.length);
+    put('ioc-emails', iocs.email.length);
+    put('ioc-domains', iocs.domain.length);
+    put('ioc-md5', iocs.md5.length);
+    put('ioc-sha1', iocs.sha1.length);
+    put('ioc-sha256', iocs.sha256.length);
 
-    let detailsHtml = '';
+    const sections = [];
     for (const [type, matches] of Object.entries(iocs)) {
-        if (matches.length > 0) {
-            detailsHtml += `<div class="ioc-type-section">
-                <h4>${typeLabels[type]} (${matches.length})</h4>
-                <ul class="ioc-list">
-                    ${matches.map(m => `<li><code>${escapeHtml(m)}</code> <button class="btn btn-sm" data-click-action="lookupFromList" data-args='["${escapeHtml(m)}"]'>Lookup</button></li>`).join('')}
-                </ul>
-            </div>`;
-        }
+        if (!matches.length) continue;
+        const section = cloneTemplate('tools-ioc-section');
+        if (!section) continue;
+        section.querySelector('[data-title]').textContent =
+            `${IOC_TYPE_LABELS[type] || type} (${matches.length})`;
+        const list = section.querySelector('[data-list]');
+        matches.forEach(match => {
+            const item = cloneTemplate('tools-ioc-item');
+            if (!item) return;
+            item.querySelector('[data-value]').textContent = match;
+            // JSON.stringify, not interpolation. An IOC is arbitrary text
+            // and the old attribute was built with escapeHtml, which turns
+            // a double quote into &quot;; the browser decodes that back to
+            // a bare quote inside the JSON string, JSON.parse throws, and
+            // event-delegation.js logs and returns. The button looked live
+            // and did nothing.
+            item.querySelector('button').dataset.args = JSON.stringify([match]);
+            list.appendChild(item);
+        });
+        sections.push(section);
     }
-    document.getElementById('ioc-details-content').innerHTML = detailsHtml || '<p class="muted">No IOCs detected</p>';
+    if (!sections.length) sections.push(cloneTemplate('tools-ioc-empty'));
+    showIn('ioc-details-content', sections);
 }
 
 function toggleIocDetails() {
     const details = document.getElementById('ioc-details');
     const btn = document.getElementById('ioc-toggle-btn');
-    details.style.display = details.style.display === 'none' ? 'block' : 'none';
-    btn.textContent = details.style.display === 'none' ? 'Show Details' : 'Hide Details';
+    if (!details) return;
+    // The class is the state. Reading `style.display === 'none'` on an
+    // empty inline value made the first click a no-op: it set display:none
+    // on a panel the `hidden` class already hid, so the panel took two
+    // clicks to open and the button's label was a click behind.
+    const hidden = details.classList.toggle('hidden');
+    if (btn) btn.textContent = hidden ? 'Show Details' : 'Hide Details';
 }
 
 function defangAll(text) {
@@ -593,21 +712,27 @@ function toggleRule(index) { if (customRules[index]) { customRules[index].enable
 function deleteRule(index) { customRules.splice(index, 1); renderRules(); processText(); }
 
 function renderRules() {
-    const container = document.getElementById('rules-list');
-    if (customRules.length === 0) {
-        container.innerHTML = '<p class="muted p-2">No custom rules. Click "+ Add" to create one.</p>';
+    if (!customRules.length) {
+        showIn('rules-list', cloneTemplate('tools-rules-empty'));
         return;
     }
-    container.innerHTML = customRules.map((rule, i) => `
-        <div class="rule-item">
-            <input type="checkbox" ${rule.enabled ? 'checked' : ''} data-change-action="toggleRule" data-args='[${i}]'>
-            <span class="rule-label">Find:</span>
-            <input type="text" class="rule-input" value="${escapeHtml(rule.find)}" data-change-action="updateRule" data-args='[${i}, "find", "$value"]'>
-            <span class="rule-label">Replace:</span>
-            <input type="text" class="rule-input" value="${escapeHtml(rule.replace)}" data-change-action="updateRule" data-args='[${i}, "replace", "$value"]'>
-            <button class="btn btn-sm btn-danger" data-click-action="deleteRule" data-args='[${i}]'>X</button>
-        </div>
-    `).join('');
+    const rows = [];
+    customRules.forEach((rule, i) => {
+        const row = cloneTemplate('tools-rule-item');
+        if (!row) return;
+        const box = row.querySelector('input[type="checkbox"]');
+        box.checked = !!rule.enabled;
+        box.dataset.args = JSON.stringify([i]);
+        const find = row.querySelector('[data-find]');
+        find.value = rule.find == null ? '' : String(rule.find);
+        find.dataset.args = JSON.stringify([i, 'find', '$value']);
+        const replace = row.querySelector('[data-replace]');
+        replace.value = rule.replace == null ? '' : String(rule.replace);
+        replace.dataset.args = JSON.stringify([i, 'replace', '$value']);
+        row.querySelector('button').dataset.args = JSON.stringify([i]);
+        rows.push(row);
+    });
+    showIn('rules-list', rows);
 }
 
 function applyCustomRules(text) {
@@ -681,7 +806,7 @@ function convertTimestamp(source) {
         if (isNaN(date.getTime())) throw new Error('Invalid date');
         updateTimestampFields(date, source);
     } catch(e) {
-        document.getElementById('timestamp-info').innerHTML = '<span class="error">Invalid timestamp format</span>';
+        showError('timestamp-info', 'Invalid timestamp format');
     }
 }
 
@@ -699,7 +824,14 @@ function updateTimestampFields(date, exclude) {
     const now = new Date();
     const diff = now - date;
     const diffStr = diff > 0 ? formatTimeDiff(diff) + ' ago' : 'in ' + formatTimeDiff(-diff);
-    document.getElementById('timestamp-info').innerHTML = `<strong>Relative:</strong> ${diffStr}<br><strong>Day:</strong> ${date.toLocaleDateString('en-US', { weekday: 'long' })}<br><strong>Week:</strong> ${getWeekNumber(date)}`;
+    const info = cloneTemplate('tools-ts-info');
+    if (info) {
+        info.querySelector('[data-relative]').textContent = diffStr;
+        info.querySelector('[data-day]').textContent =
+            date.toLocaleDateString('en-US', { weekday: 'long' });
+        info.querySelector('[data-week]').textContent = getWeekNumber(date);
+    }
+    showIn('timestamp-info', info);
 }
 
 function formatTimeDiff(ms) {
@@ -744,16 +876,25 @@ function identifyHashes() {
     if (!input) { document.getElementById('hash-results').replaceChildren(); return; }
 
     const lines = input.split('\n').filter(l => l.trim());
-    let html = '<table class="data-table"><tr><th>Hash</th><th>Possible Types</th><th>Length</th></tr>';
+    const table = buildTable(['Hash', 'Possible Types', 'Length']);
+    if (!table) return;
 
     for (const line of lines) {
         const hash = line.trim();
         const types = HASH_TYPES.filter(t => t.regex.test(hash)).map(t => t.name);
-        const typeStr = types.length ? types.join(', ') : '<span class="error">Unknown</span>';
-        html += `<tr><td><code>${escapeHtml(hash.substring(0, 40))}${hash.length > 40 ? '...' : ''}</code></td><td>${typeStr}</td><td>${hash.length}</td></tr>`;
+        // The hash is shown whole. Truncating at 40 characters with an
+        // ellipsis made two different SHA-256 digests with a shared prefix
+        // render identically in a table whose whole job is telling hashes
+        // apart.
+        addRow(table.body, [
+            { text: hash, kind: 'code' },
+            types.length
+                ? types.join(', ')
+                : { node: tplText('tools-bad', 'Unrecognised') },
+            hash.length,
+        ]);
     }
-
-    document.getElementById('hash-results').innerHTML = html + '</table>';
+    showIn('hash-results', table.root);
 }
 
 // ==================== URL PARSER ====================
@@ -761,37 +902,41 @@ function parseUrl() {
     const input = document.getElementById('url-input').value.trim();
     if (!input) { document.getElementById('url-results').replaceChildren(); return; }
 
+    let url;
     try {
-        const url = new URL(input);
-        const params = [...url.searchParams.entries()];
-
-        let html = '<table class="data-table">';
-        html += `<tr><td><strong>Protocol</strong></td><td>${escapeHtml(url.protocol)}</td></tr>`;
-        html += `<tr><td><strong>Host</strong></td><td>${escapeHtml(url.host)}</td></tr>`;
-        html += `<tr><td><strong>Hostname</strong></td><td>${escapeHtml(url.hostname)}</td></tr>`;
-        if (url.port) html += `<tr><td><strong>Port</strong></td><td>${escapeHtml(url.port)}</td></tr>`;
-        html += `<tr><td><strong>Path</strong></td><td>${escapeHtml(url.pathname)}</td></tr>`;
-        if (url.search) html += `<tr><td><strong>Query String</strong></td><td>${escapeHtml(url.search)}</td></tr>`;
-        if (url.hash) html += `<tr><td><strong>Fragment</strong></td><td>${escapeHtml(url.hash)}</td></tr>`;
-        if (url.username) html += `<tr><td><strong>Username</strong></td><td>${escapeHtml(url.username)}</td></tr>`;
-        html += '</table>';
-
-        if (params.length) {
-            html += '<h4 class="mt-4">Query Parameters</h4><table class="data-table"><tr><th>Key</th><th>Value</th></tr>';
-            for (const [k, v] of params) {
-                html += `<tr><td><code>${escapeHtml(k)}</code></td><td><code>${escapeHtml(v)}</code></td></tr>`;
-            }
-            html += '</table>';
-        }
-
-        // Defanged version
-        const defanged = input.replace(/^http/i, 'hxxp').replace(/\./g, '[.]');
-        html += `<h4 class="mt-4">Defanged</h4><code>${escapeHtml(defanged)}</code>`;
-
-        document.getElementById('url-results').innerHTML = html;
+        url = new URL(input);
     } catch(e) {
-        document.getElementById('url-results').innerHTML = '<span class="error">Invalid URL</span>';
+        showError('url-results', 'Not a URL this browser can parse');
+        return;
     }
+
+    const nodes = [];
+    const fields = buildTable([]);
+    if (!fields) return;
+    addRow(fields.body, [{ text: 'Protocol', kind: 'strong' }, url.protocol]);
+    addRow(fields.body, [{ text: 'Host', kind: 'strong' }, url.host]);
+    addRow(fields.body, [{ text: 'Hostname', kind: 'strong' }, url.hostname]);
+    if (url.port) addRow(fields.body, [{ text: 'Port', kind: 'strong' }, url.port]);
+    addRow(fields.body, [{ text: 'Path', kind: 'strong' }, url.pathname]);
+    if (url.search) addRow(fields.body, [{ text: 'Query String', kind: 'strong' }, url.search]);
+    if (url.hash) addRow(fields.body, [{ text: 'Fragment', kind: 'strong' }, url.hash]);
+    if (url.username) addRow(fields.body, [{ text: 'Username', kind: 'strong' }, url.username]);
+    nodes.push(fields.root);
+
+    const params = [...url.searchParams.entries()];
+    if (params.length) {
+        const table = buildTable(['Key', 'Value']);
+        if (table) {
+            params.forEach(([k, v]) => addRow(table.body, [
+                { text: k, kind: 'code' }, { text: v, kind: 'code' },
+            ]));
+            nodes.push(tplText('tools-heading', 'Query Parameters'), table.root);
+        }
+    }
+
+    const defanged = input.replace(/^http/i, 'hxxp').replace(/\./g, '[.]');
+    nodes.push(tplText('tools-heading', 'Defanged'), tplText('tools-code', defanged));
+    showIn('url-results', nodes);
 }
 
 // ==================== REGEX TESTER ====================
@@ -802,44 +947,61 @@ function testRegex() {
 
     if (!pattern || !test) { document.getElementById('regex-results').replaceChildren(); return; }
 
+    let regex;
     try {
-        const regex = new RegExp(pattern, flags);
-        const matches = [...test.matchAll(regex)];
-
-        let html = `<p><strong>Matches found:</strong> ${matches.length}</p>`;
-
-        if (matches.length > 0) {
-            html += '<table class="data-table"><tr><th>#</th><th>Match</th><th>Index</th><th>Groups</th></tr>';
-            matches.slice(0, 100).forEach((m, i) => {
-                // Escape each capture group value before joining into HTML.
-                const groups = m.slice(1).map((g, gi) => `$${gi+1}: ${escapeHtml(g || '(empty)')}`).join(', ');
-                html += `<tr><td>${i+1}</td><td><code>${escapeHtml(m[0])}</code></td><td>${m.index}</td><td>${groups || '-'}</td></tr>`;
-            });
-            html += '</table>';
-            if (matches.length > 100) html += '<p class="muted">Showing first 100 matches...</p>';
-        }
-
-        // Highlighted text — escape each segment of the user input separately,
-        // then wrap matched ranges in <mark>. Never let raw user text reach innerHTML.
-        const parts = [];
-        let lastIndex = 0;
-        // Use a fresh regex with the global flag so we can iterate all matches.
-        const highlightRegex = new RegExp(pattern, flags.includes('g') ? flags : flags + 'g');
-        let mh;
-        while ((mh = highlightRegex.exec(test)) !== null) {
-            parts.push(escapeHtml(test.slice(lastIndex, mh.index)));
-            parts.push('<mark>' + escapeHtml(mh[0]) + '</mark>');
-            lastIndex = mh.index + mh[0].length;
-            if (mh[0].length === 0) highlightRegex.lastIndex++;  // avoid zero-width loop
-        }
-        parts.push(escapeHtml(test.slice(lastIndex)));
-        const highlighted = parts.join('');
-        html += `<h4 class="mt-4">Highlighted</h4><pre class="code-block">${highlighted}</pre>`;
-
-        document.getElementById('regex-results').innerHTML = html;
+        regex = new RegExp(pattern, flags);
     } catch(e) {
-        document.getElementById('regex-results').innerHTML = `<span class="error">Invalid regex: ${escapeHtml(e.message)}</span>`;
+        showError('regex-results', 'Invalid regex: ' + (e.message || e));
+        return;
     }
+
+    const matches = [...test.matchAll(regex)];
+    const nodes = [tplText('tools-line', `Matches found: ${matches.length}`)];
+
+    if (matches.length > 0) {
+        const table = buildTable(['#', 'Match', 'Index', 'Groups']);
+        if (table) {
+            matches.slice(0, 100).forEach((m, i) => {
+                const groups = m.slice(1)
+                    .map((g, gi) => `$${gi + 1}: ${g == null ? '(unmatched)' : g}`)
+                    .join(', ');
+                addRow(table.body, [
+                    i + 1,
+                    { text: m[0], kind: 'code' },
+                    m.index,
+                    // A group that matched the empty string and a group that
+                    // did not participate are different results. `g ||
+                    // '(empty)'` reported both as empty.
+                    groups || '-',
+                ]);
+            });
+            nodes.push(table.root);
+            if (matches.length > 100) {
+                nodes.push(tplText('tools-note', 'Showing the first 100 matches.'));
+            }
+        }
+    }
+
+    // The highlighted view. Every segment of the analyst's own text is a
+    // text node and every match is a <mark> clone, so no part of it is
+    // ever parsed as markup.
+    const pre = cloneTemplate('tools-code-block');
+    if (pre) {
+        let lastIndex = 0;
+        const highlighter = new RegExp(pattern, flags.includes('g') ? flags : flags + 'g');
+        let hit;
+        while ((hit = highlighter.exec(test)) !== null) {
+            pre.appendChild(document.createTextNode(test.slice(lastIndex, hit.index)));
+            const mark = tplText('tools-mark', hit[0]);
+            if (mark) pre.appendChild(mark);
+            lastIndex = hit.index + hit[0].length;
+            if (hit[0].length === 0) highlighter.lastIndex++;  // avoid zero-width loop
+        }
+        pre.appendChild(document.createTextNode(test.slice(lastIndex)));
+        nodes.push(tplText('tools-heading', 'Highlighted'), pre);
+    }
+
+    showIn('regex-results', nodes);
 }
 
 // ==================== EMAIL HEADER ANALYZER ====================
@@ -873,45 +1035,84 @@ function parseEmailHeaders() {
         else headers[currentHeader] = currentValue.trim();
     }
 
-    let html = '<h4>Key Headers</h4><table class="data-table">';
+    const nodes = [];
+
     const keyHeaders = ['From', 'To', 'Subject', 'Date', 'Reply-To', 'Return-Path', 'Message-ID', 'X-Mailer', 'X-Originating-IP'];
-    for (const h of keyHeaders) {
-        const val = headers[h] || headers[h.toLowerCase()];
-        if (val) html += `<tr><td><strong>${h}</strong></td><td>${escapeHtml(val)}</td></tr>`;
+    const keyTable = buildTable([]);
+    if (keyTable) {
+        let any = false;
+        for (const name of keyHeaders) {
+            const val = headers[name] || headers[name.toLowerCase()];
+            if (!val) continue;
+            any = true;
+            addRow(keyTable.body, [{ text: name, kind: 'strong' }, val]);
+        }
+        nodes.push(tplText('tools-heading', 'Key Headers'));
+        nodes.push(any ? keyTable.root
+                       : tplText('tools-note', 'None of the key headers are present.'));
     }
-    html += '</table>';
 
-    // Authentication results
     const authHeaders = ['Authentication-Results', 'DKIM-Signature', 'ARC-Authentication-Results'];
-    let authHtml = '';
-    for (const h of authHeaders) {
-        if (headers[h]) authHtml += `<tr><td><strong>${h}</strong></td><td class="break-all">${escapeHtml(headers[h])}</td></tr>`;
+    const authTable = buildTable([]);
+    if (authTable) {
+        let any = false;
+        for (const name of authHeaders) {
+            if (!headers[name]) continue;
+            any = true;
+            addRow(authTable.body, [{ text: name, kind: 'strong' }, headers[name]]);
+        }
+        nodes.push(tplText('tools-heading', 'Authentication'));
+        // Said rather than omitted. The string version appended nothing at
+        // all when no auth header was present, so a message with no SPF,
+        // DKIM or ARC result looked the same as one whose section the
+        // reader had simply not scrolled to.
+        nodes.push(any ? authTable.root
+                       : tplText('tools-note', 'No SPF, DKIM or ARC result in these headers.'));
     }
-    if (authHtml) html += `<h4 class="mt-4">Authentication</h4><table class="data-table">${authHtml}</table>`;
 
-    // Received chain (mail path)
     if (receivedChain.length) {
-        html += '<h4 class="mt-4">Mail Path (Received Headers)</h4><ol class="received-chain">';
-        receivedChain.reverse().forEach((r, i) => {
-            const fromMatch = r.match(/from\s+([^\s]+)/i);
-            const byMatch = r.match(/by\s+([^\s]+)/i);
-            const dateMatch = r.match(/;\s*(.+)$/);
-            html += `<li><strong>Hop ${i+1}:</strong> ${fromMatch ? 'From: ' + escapeHtml(fromMatch[1]) : ''} ${byMatch ? '→ By: ' + escapeHtml(byMatch[1]) : ''}<br><small class="muted">${dateMatch ? escapeHtml(dateMatch[1]) : ''}</small></li>`;
-        });
-        html += '</ol>';
+        const chain = cloneTemplate('tools-chain');
+        if (chain) {
+            receivedChain.slice().reverse().forEach((received, i) => {
+                const item = cloneTemplate('tools-chain-item');
+                if (!item) return;
+                const from = received.match(/from\s+([^\s]+)/i);
+                const by = received.match(/by\s+([^\s]+)/i);
+                const when = received.match(/;\s*(.+)$/);
+                item.querySelector('[data-hop]').textContent = `Hop ${i + 1}:`;
+                const path = [];
+                if (from) path.push('from ' + from[1]);
+                if (by) path.push('by ' + by[1]);
+                item.querySelector('[data-path]').textContent =
+                    path.length ? path.join(' → ') : 'no host named in this header';
+                item.querySelector('[data-when]').textContent =
+                    when ? when[1] : 'no time stamped on this hop';
+                chain.appendChild(item);
+            });
+            nodes.push(tplText('tools-heading', 'Mail Path (Received Headers)'), chain);
+        }
+    } else {
+        nodes.push(tplText('tools-heading', 'Mail Path (Received Headers)'),
+                   tplText('tools-note', 'No Received header in this paste.'));
     }
 
-    // Extract IOCs
     const allText = Object.values(headers).join(' ') + ' ' + receivedChain.join(' ');
     const iocs = detectIOCs(allText);
-    const allIOCs = [...iocs.ip, ...iocs.domain, ...iocs.email].filter((v, i, a) => a.indexOf(v) === i);
+    const allIOCs = [...new Set([...iocs.ip, ...iocs.domain, ...iocs.email])];
     if (allIOCs.length) {
-        html += '<h4 class="mt-4">Extracted IOCs</h4><ul class="ioc-list">';
-        allIOCs.forEach(ioc => html += `<li><code>${escapeHtml(ioc)}</code></li>`);
-        html += '</ul>';
+        const list = cloneTemplate('tools-list');
+        if (list) {
+            allIOCs.forEach(ioc => {
+                const item = cloneTemplate('tools-li-code');
+                if (!item) return;
+                item.querySelector('code').textContent = ioc;
+                list.appendChild(item);
+            });
+            nodes.push(tplText('tools-heading', 'Extracted IOCs'), list);
+        }
     }
 
-    document.getElementById('email-results').innerHTML = html;
+    showIn('email-results', nodes);
 }
 
 // ==================== LOG PARSER ====================
@@ -954,25 +1155,44 @@ function parseLog() {
                 break;
         }
     } catch(e) {
-        document.getElementById('log-results').innerHTML = `<span class="error">Parse error: ${escapeHtml(e.message)}</span>`;
+        showError('log-results', 'Parse error: ' + (e.message || e));
         return;
     }
 
-    if (parsed) {
-        let html = `<p><strong>Detected Format:</strong> ${escapeHtml(detectedFormat.toUpperCase())}</p>`;
-        html += '<table class="data-table"><tr><th>Field</th><th>Value</th></tr>';
-        for (const [k, v] of Object.entries(parsed)) {
-            const val = typeof v === 'object' ? JSON.stringify(v, null, 2) : v;
-            html += `<tr><td><strong>${escapeHtml(k)}</strong></td><td><code>${escapeHtml(String(val))}</code></td></tr>`;
-        }
-        html += '</table>';
-        document.getElementById('log-results').innerHTML = html;
+    if (!parsed) {
+        // Auto-detect matched no format. Saying so is not the same as a
+        // parse error, and the string version showed neither: it fell off
+        // the end of the `if (parsed)` and left the previous result on
+        // screen.
+        showIn('log-results',
+               tplText('tools-note', 'No known log format matched this entry.'));
+        return;
     }
+
+    const table = buildTable(['Field', 'Value']);
+    if (!table) return;
+    for (const [k, v] of Object.entries(parsed)) {
+        const val = (v !== null && typeof v === 'object') ? JSON.stringify(v, null, 2) : v;
+        addRow(table.body, [
+            { text: k, kind: 'strong' },
+            { text: val == null ? '' : String(val), kind: 'code' },
+        ]);
+    }
+    showIn('log-results', [
+        tplText('tools-line', `Detected format: ${detectedFormat.toUpperCase()}`),
+        table.root,
+    ]);
 }
 
 function parseCEF(input) {
     const parts = input.split('|');
-    const result = { version: parts[0], vendor: parts[1], product: parts[2], version: parts[3], signatureId: parts[4], name: parts[5], severity: parts[6] };
+    // The object literal had `version` twice — parts[0] was overwritten by
+    // parts[3] and the CEF header version was never shown.
+    const result = {
+        cef_version: parts[0], vendor: parts[1], product: parts[2],
+        product_version: parts[3], signatureId: parts[4], name: parts[5],
+        severity: parts[6],
+    };
     if (parts[7]) {
         const ext = parts[7].match(/(\w+)=([^\s]+(?:\s+(?!\w+=)[^\s]+)*)/g) || [];
         ext.forEach(e => { const [k, ...v] = e.split('='); result[k] = v.join('='); });
@@ -994,8 +1214,7 @@ function parseApache(input) {
 
 function parseWindowsXML(input) {
     // Extract leaf <Tag ...>text</Tag> pairs with a regex rather than feeding
-    // untrusted input to DOMParser (avoids a DOM-based XSS sink). Values are
-    // still HTML-escaped when rendered below.
+    // untrusted input to DOMParser (avoids a DOM-based XSS sink).
     const result = {};
     const re = /<([\w.:-]+)(?:\s[^>]*)?>([^<]*)<\/\1>/g;
     let m;
@@ -1062,160 +1281,52 @@ function decodeFromRot13() {
 }
 
 // ==================== IOC LOOKUP (OpenCTI) ====================
-let lookupResults = [];
-
-async function lookupIOC() {
-    const ioc = document.getElementById('lookup-ioc').value.trim();
-    if (!ioc) { showToast('Enter an IOC to lookup', 'warning'); return; }
-
-    document.getElementById('lookup-results').innerHTML = '<p>Looking up...</p>';
-
-    try {
-        const response = await fetch('/api/opencti/enrich', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ value: ioc })
-        });
-
-        const data = await response.json();
-        displayLookupResult(ioc, data);
-    } catch(e) {
-        document.getElementById('lookup-results').innerHTML = `<span class="error">Lookup failed: ${escapeHtml(e.message)}</span>`;
-    }
-}
+// Both lookups are server reads now: /ui/tools/ioc and /ui/tools/ioc-bulk
+// render what OpenCTI said. All this keeps is moving a clicked IOC into the
+// lookup box and exporting what is on screen.
 
 function lookupFromList(ioc) {
-    document.getElementById('lookup-ioc').value = ioc;
+    const input = document.getElementById('lookup-ioc');
+    if (input) input.value = ioc;
     switchToolTab('lookup');
-    document.querySelector('[data-click-action="switchToolTab"][data-args=\'["lookup"]\']').classList.add('active');
-    lookupIOC();
-}
-
-function displayLookupResult(ioc, data) {
-    let html = `<h4>Results for: <code>${escapeHtml(ioc)}</code></h4>`;
-
-    if (data.error) {
-        html += `<p class="error">${escapeHtml(data.error)}</p>`;
-    } else if (data.found === false || !data.data || data.data.length === 0) {
-        html += '<p class="muted">No threat intelligence found for this IOC.</p>';
-    } else {
-        html += '<table class="data-table">';
-        if (data.type) html += `<tr><td><strong>Type</strong></td><td>${escapeHtml(data.type)}</td></tr>`;
-        if (data.score !== undefined) html += `<tr><td><strong>Risk Score</strong></td><td><span class="badge ${data.score > 70 ? 'badge-danger' : data.score > 40 ? 'badge-warning' : ''}">${data.score}</span></td></tr>`;
-        if (data.labels && data.labels.length) html += `<tr><td><strong>Labels</strong></td><td>${data.labels.map(l => `<span class="tag">${escapeHtml(l)}</span>`).join(' ')}</td></tr>`;
-        if (data.description) html += `<tr><td><strong>Description</strong></td><td>${escapeHtml(data.description)}</td></tr>`;
-        if (data.created) html += `<tr><td><strong>First Seen</strong></td><td>${escapeHtml(data.created)}</td></tr>`;
-        if (data.modified) html += `<tr><td><strong>Last Modified</strong></td><td>${escapeHtml(data.modified)}</td></tr>`;
-        html += '</table>';
-
-        if (data.relationships && data.relationships.length) {
-            html += '<h4 class="mt-4">Related Entities</h4><ul>';
-            data.relationships.slice(0, 10).forEach(r => html += `<li>${escapeHtml(r.type)}: ${escapeHtml(r.name || r.value)}</li>`);
-            html += '</ul>';
-        }
-    }
-
-    document.getElementById('lookup-results').innerHTML = html;
-    lookupResults.push({ ioc, data, timestamp: new Date().toISOString() });
-}
-
-async function bulkLookupIOCs() {
-    const input = document.getElementById('bulk-lookup-input').value.trim();
-    if (!input) { showToast('Enter IOCs to lookup', 'warning'); return; }
-
-    const iocs = input.split('\n').map(l => l.trim()).filter(l => l);
-    const resultsDiv = document.getElementById('bulk-lookup-results');
-    resultsDiv.innerHTML = `<p>Looking up ${iocs.length} IOCs...</p>`;
-
-    lookupResults = [];
-    let html = '<table class="data-table"><tr><th>IOC</th><th>Type</th><th>Score</th><th>Status</th></tr>';
-
-    for (const ioc of iocs) {
-        try {
-            const response = await fetch('/api/opencti/enrich', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ value: ioc })
-            });
-            const data = await response.json();
-            lookupResults.push({ ioc, data, timestamp: new Date().toISOString() });
-
-            const found = data.found !== false && data.data && data.data.length > 0;
-            const score = data.score || '-';
-            const type = data.type || detectIOCType(ioc);
-            html += `<tr><td><code>${escapeHtml(ioc)}</code></td><td>${type}</td><td>${score}</td><td>${found ? '<span class="badge badge-success">Found</span>' : '<span class="muted">Not found</span>'}</td></tr>`;
-        } catch(e) {
-            html += `<tr><td><code>${escapeHtml(ioc)}</code></td><td>-</td><td>-</td><td><span class="error">Error</span></td></tr>`;
-        }
-    }
-
-    html += '</table>';
-    resultsDiv.innerHTML = html;
-}
-
-function detectIOCType(ioc) {
-    if (/^[a-f0-9]{32}$/i.test(ioc)) return 'MD5';
-    if (/^[a-f0-9]{40}$/i.test(ioc)) return 'SHA1';
-    if (/^[a-f0-9]{64}$/i.test(ioc)) return 'SHA256';
-    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ioc)) return 'IPv4';
-    if (/^https?:\/\//i.test(ioc)) return 'URL';
-    if (/@/.test(ioc)) return 'Email';
-    return 'Domain';
+    const form = document.getElementById('lookup-form');
+    if (form) htmx.trigger(form, 'submit');
 }
 
 function exportLookupResults() {
-    if (!lookupResults.length) { showToast('No results to export', 'warning'); return; }
-    const csv = 'IOC,Type,Score,Found,Timestamp\n' + lookupResults.map(r =>
-        `"${r.ioc}","${r.data.type || ''}","${r.data.score || ''}","${r.data.found !== false}","${r.timestamp}"`
-    ).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
+    // Exports what the reader can see. The page kept a parallel JavaScript
+    // array of every lookup and wrote it into CSV with bare `"${value}"`
+    // interpolation, so a type or score containing a double quote broke the
+    // row and shifted every column after it.
+    const rows = document.querySelectorAll('[data-ioc-export]');
+    if (!rows.length) { showToast('No results to export', 'warning'); return; }
+    const cell = (value) => '"' + String(value == null ? '' : value).replace(/"/g, '""') + '"';
+    const exported = new Date().toISOString();
+    const lines = ['IOC,Type,Score,Found,Exported'];
+    rows.forEach(row => {
+        lines.push([
+            row.dataset.value,
+            row.dataset.type,
+            row.dataset.score,
+            row.dataset.found,
+            exported,
+        ].map(cell).join(','));
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'ioc_lookup_results.csv';
-    a.click();
-}
-
-// ==================== UTILITIES ====================
-// Pure string-based HTML escape — never touches the DOM, so its output is not
-// considered tainted by static analysis (avoids js/xss-through-dom false positives).
-function escapeHtml(text) {
-    if (text == null) return '';
-    return String(text)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(a.href);
 }
 
 // ═══════════════════════════════════════════════════════════════
 // TRANSLATOR (was /translator — merged v0.75.0, route audit phase 7f)
 // ═══════════════════════════════════════════════════════════════
 const T = {
-  langs: [],
   busy: false,
   lastFilename: null,
 };
-
-async function loadLanguages() {
-  const r = await fetch('/api/translator/languages');
-  if (!r.ok) return;
-  const d = await r.json();
-  T.langs = d.languages || [];
-  const src = document.getElementById('t-source');
-  const tgt = document.getElementById('t-target');
-  src.replaceChildren(); tgt.replaceChildren();
-  T.langs.forEach(l => {
-    const oS = document.createElement('option');
-    oS.value = l.code; oS.textContent = l.label;
-    src.appendChild(oS);
-    if (l.code === 'auto') return;  // target can't be auto
-    const oT = document.createElement('option');
-    oT.value = l.code; oT.textContent = l.label;
-    if (l.code === 'en') oT.selected = true;
-    tgt.appendChild(oT);
-  });
-}
 
 function setStatus(msg, kind) {
   const el = document.getElementById('t-status');
@@ -1251,7 +1362,7 @@ function updateSourceMeta() {
 function setOutput(text, meta) {
   const el = document.getElementById('t-output');
   if (!text) {
-    el.innerHTML = '<span class="text-slate-600 italic">Translation will appear here.</span>';
+    showIn('t-output', cloneTemplate('tools-translation-placeholder'));
     document.getElementById('t-target-meta').textContent = '—';
     return;
   }
@@ -1259,12 +1370,25 @@ function setOutput(text, meta) {
   document.getElementById('t-target-meta').textContent = meta || `${text.length.toLocaleString()} chars`;
 }
 
+function translatorLanguage(id) {
+  // The pickers are rendered by /ui/tools/translator-languages, so before
+  // that fragment lands there is no select to read. Returning null rather
+  // than '' means the caller says the languages have not loaded instead of
+  // posting an empty source and getting a 400 back.
+  const el = document.getElementById(id);
+  return el ? el.value : null;
+}
+
 async function translateText() {
   if (T.busy) return;
   const text = document.getElementById('t-input').value;
   if (!text.trim()) { setStatus('Nothing to translate.', 'error'); return; }
-  const source = document.getElementById('t-source').value;
-  const target = document.getElementById('t-target').value;
+  const source = translatorLanguage('t-source');
+  const target = translatorLanguage('t-target');
+  if (source === null || target === null) {
+    setStatus('The language list has not loaded yet.', 'error');
+    return;
+  }
   T.busy = true;
   setStatus(`Translating ${text.length.toLocaleString()} chars via Ollama…`, 'busy');
   try {
@@ -1287,10 +1411,14 @@ async function translateText() {
 async function uploadAndTranslate(file) {
   if (T.busy) return;
   if (!file) return;
+  const source = translatorLanguage('t-source');
+  const target = translatorLanguage('t-target');
+  if (source === null || target === null) {
+    setStatus('The language list has not loaded yet.', 'error');
+    return;
+  }
   T.busy = true;
   T.lastFilename = file.name;
-  const source = document.getElementById('t-source').value;
-  const target = document.getElementById('t-target').value;
   setStatus(`Extracting & translating ${file.name} (${(file.size/1024).toFixed(1)} KB)…`, 'busy');
   const fd = new FormData();
   fd.append('file', file);
@@ -1361,14 +1489,14 @@ document.getElementById('t-input').addEventListener('keydown', (e) => {
 
 
 // As a standalone page this bootstrapped with `loadLanguages(); updateSourceMeta();`
-// on parse. As a non-default tab that fires a needless /api/translator/languages
-// round-trip on every /tools visit, so it is deferred to first activation and
-// runs at most once.
+// on parse. As a non-default tab that fires a needless round trip on every
+// /tools visit, so the pickers are requested on first activation and at
+// most once; the fragment's hx-trigger listens for this event.
 let translatorInitialised = false;
 window.ionInitTranslatorTab = function () {
     if (translatorInitialised) return;
     translatorInitialised = true;
-    loadLanguages();
+    htmx.trigger(document.body, 'ionTranslatorInit');
     updateSourceMeta();
 };
 </script>

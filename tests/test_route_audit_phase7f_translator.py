@@ -44,6 +44,17 @@ def tools() -> str:
 
 
 @pytest.fixture(scope="module")
+def fragments() -> Path:
+    """Where the server-rendered partials live.
+
+    The UI redesign moved the translator's two language pickers out of the
+    page and into one, so this file reads both halves rather than asserting
+    the page still builds markup it no longer owns.
+    """
+    return TEMPLATES / "_fragments"
+
+
+@pytest.fixture(scope="module")
 def integrations() -> str:
     return (TEMPLATES / "integrations.html").read_text(encoding="utf-8")
 
@@ -103,12 +114,23 @@ def test_ioc_stays_the_default_tab(tools):
     assert 'id="tab-translator" class="tool-tab-content"' in tools
 
 
-def test_translator_markup_and_js_came_across(tools):
-    for marker in ('id="t-source"', 'id="t-target"', 'id="t-input"',
-                   'id="t-output"', 'id="t-translate-btn"'):
+def test_translator_markup_and_js_came_across(tools, fragments):
+    """The panes stayed in the page; the two pickers moved to a fragment.
+
+    The UI redesign made the language list a server read, so `t-source` and
+    `t-target` are rendered by /ui/tools/translator-languages rather than
+    built with createElement in the page. They are still the ids the page's
+    script reads, so this asserts they exist, in whichever of the two files
+    now owns them, rather than asserting the page still builds them.
+    """
+    for marker in ('id="t-input"', 'id="t-output"', 'id="t-translate-btn"'):
         assert marker in tools, marker
+    pickers = (fragments / "tools_languages.html").read_text(encoding="utf-8")
+    for marker in ('id="t-source"', 'id="t-target"'):
+        assert marker in pickers, marker
+    assert 'hx-get="/ui/tools/translator-languages"' in tools
     js = _script_block(tools)
-    for fn in ("loadLanguages", "translateText", "uploadAndTranslate", "updateSourceMeta"):
+    for fn in ("translateText", "uploadAndTranslate", "updateSourceMeta"):
         assert re.search(rf"^(?:async )?function {fn}\b", js, re.M), fn
 
 
@@ -150,7 +172,11 @@ def test_translator_init_deferred(tools):
     # switchToolTab appears earlier in the file.
     init = js[js.index("window.ionInitTranslatorTab = function"):]
     init = init[:init.index("\n};")]
-    assert "loadLanguages()" in init
+    # The language list is a fragment now, so the deferred step is the event
+    # its hx-trigger listens for rather than a loadLanguages() call. The
+    # claim this test makes is unchanged: nothing fetches the languages
+    # until the tab is opened.
+    assert "htmx.trigger(document.body, 'ionTranslatorInit')" in init
     # ...and it must be idempotent — tab clicks are unbounded.
     assert "translatorInitialised" in init
 
