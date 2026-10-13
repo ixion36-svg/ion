@@ -22,8 +22,8 @@ page cannot be forgotten. Status is measured, never set by hand.
 | measure | remaining |
 |---|---|
 | templates | 80 |
-| total lines | 54,316 |
-| inline `<style>` lines | 6,156 |
+| total lines | 53,166 |
+| inline `<style>` lines | 4,999 |
 | runtime DOM writes | 158 |
 | literal light-on-dark colours | 4 |
 
@@ -125,10 +125,10 @@ Markup plus a short list of class strings in inline JS.
 
 | template | lines | css | js | writes | light | styled | server | done |
 |---|--:|--:|--:|--:|:--:|:--:|:--:|:--:|
-| `chat.html` | 2235 | 1157 | 695 | 4 | yes | no | no |  |
 | `documents.html` | 1524 | 0 | 1197 | 3 | yes | yes | no |  |
+| `chat.html` | 1085 | 0 | 695 | 4 | yes | yes | no |  |
 
-Subtotal: 2 templates, 3,759 lines, 1,157 inline css lines, 7 runtime writes, 0 light-mode literals.
+Subtotal: 2 templates, 2,609 lines, 0 inline css lines, 7 runtime writes, 0 light-mode literals.
 
 ## Tier C, more than 10 runtime writes
 
