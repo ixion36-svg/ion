@@ -194,7 +194,12 @@ def test_invalid_measurements_remain_unknown(client, monkeypatch, value):
 def test_viewer_status_has_no_test_control(client, monkeypatch):
     stub(monkeypatch, "status", [{"type": "gitlab", "display_name": "GitLab"}])
     client.app.dependency_overrides[get_current_user] = lambda: User(manage=False)
-    assert 'data-click-action="testConnection"' not in client.get("/ui/integrations/status").text
+    response = client.get("/ui/integrations/status")
+    # The panel has to have rendered for the absence to mean anything. A
+    # 404 or a 500 carries no test control either.
+    assert response.status_code == 200
+    assert "GitLab" in response.text
+    assert 'data-click-action="testConnection"' not in response.text
 
 
 @pytest.mark.parametrize("panel", ["status", "webhooks", "webhooks/1/logs", "logs"])
@@ -208,7 +213,21 @@ def test_failed_html_does_not_claim_empty(client, monkeypatch, panel):
 
 
 def test_status_whitelists_nested_metadata(client, monkeypatch):
+    """The test between a configured password and the page markup.
+
+    It asserts a 200 and a field that is meant to survive the allowlist
+    before asserting the secret did not. Without that it also passes when
+    the panel 404s or 500s, which is how it passed against the source
+    before this panel existed.
+    """
     sentinel = str(object())
-    stub(monkeypatch, "status", [{"metadata": {"password": sentinel, "version_compatibility": {"message": sentinel}}, "error": sentinel, "reason": sentinel}])
+    stub(monkeypatch, "status", [{
+        "type": "gitlab", "display_name": "GitLab",
+        "metadata": {"password": sentinel,
+                     "version_compatibility": {"message": sentinel}},
+        "error": sentinel, "reason": sentinel}])
     for headers in [{}, {"Accept": "application/json"}]:
-        assert sentinel not in client.get("/ui/integrations/status", headers=headers).text
+        response = client.get("/ui/integrations/status", headers=headers)
+        assert response.status_code == 200, headers
+        assert "GitLab" in response.text, headers
+        assert sentinel not in response.text, headers
