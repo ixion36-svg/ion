@@ -65,9 +65,9 @@
                         <h3 class="mb-2 text-xl">Quick Setup</h3>
                         <p class="m-0 text-base-content/60">Configure your integrations with a guided wizard. Test connections and get AI-powered help when things go wrong.</p>
                     </div>
-                    <button class="btn btn-primary btn-lg" data-click-action="openIntegrationWizard">
+                    {% if current_user.has_permission('integration:manage') %}<button class="btn btn-primary btn-lg" data-click-action="openIntegrationWizard">
                         Launch Wizard
-                    </button>
+                    </button>{% else %}<span class="loading">Integration management permission required.</span>{% endif %}
                 </div>
 
                 <div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4" id="wizard-status-grid">
@@ -83,6 +83,7 @@
             <p class="text-base-content/60 mb-6 text-[0.9rem]">Basic application configuration.</p>
 
             <form id="general-form" data-submit-action="saveSettings" data-args='["$event", "general"]'>
+            <fieldset disabled data-configuration-fields class="border-0 p-0 m-0 min-w-0">
                 <div class="mb-5">
                     <label for="default_format" class="block mb-2 font-medium text-[0.9rem]">Default Document Format</label>
                     <select class="ion-select" id="default_format" name="default_format">
@@ -118,6 +119,7 @@
                 <div class="flex gap-3 mt-6 pt-6 border-t border-base-300">
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
+            </fieldset>
             </form>
         </section>
 
@@ -127,6 +129,7 @@
             <p class="text-base-content/60 mb-6 text-[0.9rem]">Configure connection to Elasticsearch for alerts and case management.</p>
 
             <form id="elasticsearch-form" data-submit-action="saveSettings" data-args='["$event", "elasticsearch"]'>
+            <fieldset disabled data-configuration-fields class="border-0 p-0 m-0 min-w-0">
                 <div class="mb-5">
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="elasticsearch_enabled" name="elasticsearch_enabled">
@@ -203,6 +206,7 @@
                     <button type="button" class="btn btn-secondary" data-click-action="testConnection" data-args='["elasticsearch"]'>Test Connection</button>
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
+            </fieldset>
             </form>
         </section>
 
@@ -212,6 +216,7 @@
             <p class="text-base-content/60 mb-6 text-[0.9rem]">Configure GitLab for template synchronization and version control.</p>
 
             <form id="gitlab-form" data-submit-action="saveSettings" data-args='["$event", "gitlab"]'>
+            <fieldset disabled data-configuration-fields class="border-0 p-0 m-0 min-w-0">
                 <div class="mb-5">
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="gitlab_enabled" name="gitlab_enabled">
@@ -257,6 +262,7 @@
                     <button type="button" class="btn btn-secondary" data-click-action="testConnection" data-args='["gitlab"]'>Test Connection</button>
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
+            </fieldset>
             </form>
         </section>
 
@@ -266,6 +272,7 @@
             <p class="text-base-content/60 mb-6 text-[0.9rem]">Configure OpenCTI for threat intelligence integration.</p>
 
             <form id="opencti-form" data-submit-action="saveSettings" data-args='["$event", "opencti"]'>
+            <fieldset disabled data-configuration-fields class="border-0 p-0 m-0 min-w-0">
                 <div class="mb-5">
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="opencti_enabled" name="opencti_enabled">
@@ -296,6 +303,7 @@
                     <button type="button" class="btn btn-secondary" data-click-action="testConnection" data-args='["opencti"]'>Test Connection</button>
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
+            </fieldset>
             </form>
         </section>
 
@@ -305,6 +313,7 @@
             <p class="text-base-content/60 mb-6 text-[0.9rem]">Configure Kibana for bidirectional case synchronization.</p>
 
             <form id="kibana-form" data-submit-action="saveSettings" data-args='["$event", "kibana"]'>
+            <fieldset disabled data-configuration-fields class="border-0 p-0 m-0 min-w-0">
                 <div class="mb-5">
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="kibana_cases_enabled" name="kibana_cases_enabled">
@@ -359,6 +368,7 @@
                     <button type="button" class="btn btn-secondary" data-click-action="testConnection" data-args='["kibana"]'>Test Connection</button>
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
+            </fieldset>
             </form>
         </section>
 
@@ -368,6 +378,7 @@
             <p class="text-base-content/60 mb-6 text-[0.9rem]">Configure DFIR-IRIS for incident response case escalation.</p>
 
             <form id="dfir_iris-form" data-submit-action="saveSettings" data-args='["$event", "dfir_iris"]'>
+            <fieldset disabled data-configuration-fields class="border-0 p-0 m-0 min-w-0">
                 <div class="mb-5">
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="dfir_iris_enabled" name="dfir_iris_enabled">
@@ -405,6 +416,7 @@
                     <button type="button" class="btn btn-secondary" data-click-action="testConnection" data-args='["dfir_iris"]'>Test Connection</button>
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
+            </fieldset>
             </form>
         </section>
 
@@ -414,6 +426,7 @@
             <p class="text-base-content/60 mb-6 text-[0.9rem]">Configure TIDE (Threat Informed Detection Engineering) for the detection rule catalog, kill chains, and gap analysis.</p>
 
             <form id="tide-form" data-submit-action="saveSettings" data-args='["$event", "tide"]'>
+            <fieldset disabled data-configuration-fields class="border-0 p-0 m-0 min-w-0">
                 <div class="mb-5">
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="tide_enabled" name="tide_enabled">
@@ -457,6 +470,7 @@
                     <button type="button" class="btn btn-secondary" data-click-action="testConnection" data-args='["tide"]'>Test Connection</button>
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
+            </fieldset>
             </form>
         </section>
 
@@ -465,6 +479,7 @@
             <h2>Arkime Integration</h2>
             <p class="text-base-content/60 mb-6 text-[0.9rem]">Configure Arkime for PCAP download and session search from alerts.</p>
             <form data-submit-action="saveSettings" data-args='["$event", "arkime"]'>
+            <fieldset disabled data-configuration-fields class="border-0 p-0 m-0 min-w-0">
                 <div class="mb-5"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="checkbox w-[18px] h-[18px]" id="arkime_enabled" name="arkime_enabled"> Enable Arkime Integration</label></div>
                 <div class="mb-5"><label for="arkime_url" class="block mb-2 font-medium text-[0.9rem]">Arkime URL</label><input type="url" class="ion-input" id="arkime_url" name="arkime_url" placeholder="https://viewer.guardedglass.internal"></div>
                 <div class="mb-5"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="checkbox w-[18px] h-[18px]" id="arkime_verify_ssl" name="arkime_verify_ssl"> Verify SSL Certificate</label></div>
@@ -472,6 +487,7 @@
                 <div class="mb-5"><label for="arkime_username" class="block mb-2 font-medium text-[0.9rem]">Username</label><input type="text" class="ion-input" id="arkime_username" name="arkime_username" placeholder="admin"></div>
                 <div class="mb-5"><label for="arkime_password" class="block mb-2 font-medium text-[0.9rem]">Password</label><input type="password" class="ion-input" id="arkime_password" name="arkime_password" placeholder="Leave blank to keep current"></div>
                 <div class="flex gap-3 mt-6 pt-6 border-t border-base-300"><button type="submit" class="btn btn-primary">Save Changes</button></div>
+            </fieldset>
             </form>
         </section>
 
@@ -480,12 +496,14 @@
             <h2>Ollama AI</h2>
             <p class="text-base-content/60 mb-6 text-[0.9rem]">Configure the Ollama LLM for AI chat, morning briefing narratives, and training plan generation.</p>
             <form data-submit-action="saveSettings" data-args='["$event", "ollama"]'>
+            <fieldset disabled data-configuration-fields class="border-0 p-0 m-0 min-w-0">
                 <div class="mb-5"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="checkbox w-[18px] h-[18px]" id="ollama_enabled" name="ollama_enabled"> Enable Ollama AI</label></div>
                 <div class="mb-5"><label for="ollama_url" class="block mb-2 font-medium text-[0.9rem]">Ollama URL</label><input type="url" class="ion-input" id="ollama_url" name="ollama_url" placeholder="http://ollama-host:11434"></div>
                 <div class="mb-5"><label for="ollama_model" class="block mb-2 font-medium text-[0.9rem]">Model</label><input type="text" class="ion-input" id="ollama_model" name="ollama_model" placeholder="qwen2.5:3b"></div>
                 <div class="mb-5"><label for="ollama_timeout" class="block mb-2 font-medium text-[0.9rem]">Timeout (seconds)</label><input type="number" class="ion-input" id="ollama_timeout" name="ollama_timeout" min="10" max="600" placeholder="120"></div>
                 <div class="mb-5"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="checkbox w-[18px] h-[18px]" id="ollama_verify_ssl" name="ollama_verify_ssl"> Verify SSL Certificate</label></div>
                 <div class="flex gap-3 mt-6 pt-6 border-t border-base-300"><button type="submit" class="btn btn-primary">Save Changes</button></div>
+            </fieldset>
             </form>
         </section>
 
@@ -494,9 +512,11 @@
             <h2>AbuseIPDB</h2>
             <p class="text-base-content/60 mb-6 text-[0.9rem]">IP address reputation lookups for observable enrichment.</p>
             <form data-submit-action="saveSettings" data-args='["$event", "abuseipdb"]'>
+            <fieldset disabled data-configuration-fields class="border-0 p-0 m-0 min-w-0">
                 <div class="mb-5"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="checkbox w-[18px] h-[18px]" id="abuseipdb_enabled" name="abuseipdb_enabled"> Enable AbuseIPDB</label></div>
                 <div class="mb-5"><label for="abuseipdb_api_key" class="block mb-2 font-medium text-[0.9rem]">API Key</label><input type="password" class="ion-input" id="abuseipdb_api_key" name="abuseipdb_api_key" placeholder="Leave blank to keep current"><span class="block mt-1.5 text-[0.8rem] text-base-content/60" id="abuseipdb_api_key_status"></span></div>
                 <div class="flex gap-3 mt-6 pt-6 border-t border-base-300"><button type="submit" class="btn btn-primary">Save Changes</button></div>
+            </fieldset>
             </form>
         </section>
 
@@ -505,9 +525,11 @@
             <h2>VirusTotal</h2>
             <p class="text-base-content/60 mb-6 text-[0.9rem]">File hash and URL reputation lookups for observable enrichment.</p>
             <form data-submit-action="saveSettings" data-args='["$event", "virustotal"]'>
+            <fieldset disabled data-configuration-fields class="border-0 p-0 m-0 min-w-0">
                 <div class="mb-5"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="checkbox w-[18px] h-[18px]" id="virustotal_enabled" name="virustotal_enabled"> Enable VirusTotal</label></div>
                 <div class="mb-5"><label for="virustotal_api_key" class="block mb-2 font-medium text-[0.9rem]">API Key</label><input type="password" class="ion-input" id="virustotal_api_key" name="virustotal_api_key" placeholder="Leave blank to keep current"><span class="block mt-1.5 text-[0.8rem] text-base-content/60" id="virustotal_api_key_status"></span></div>
                 <div class="flex gap-3 mt-6 pt-6 border-t border-base-300"><button type="submit" class="btn btn-primary">Save Changes</button></div>
+            </fieldset>
             </form>
         </section>
 
@@ -517,6 +539,7 @@
             <p class="text-base-content/60 mb-6 text-[0.9rem]">Configure single sign-on with Keycloak or other OIDC providers.</p>
 
             <form id="oidc-form" data-submit-action="saveSettings" data-args='["$event", "oidc"]'>
+            <fieldset disabled data-configuration-fields class="border-0 p-0 m-0 min-w-0">
                 <div class="mb-5">
                     <label for="base_url" class="block mb-2 font-medium text-[0.9rem]">ION Base URL</label>
                     <input type="url" class="ion-input" id="base_url" name="base_url" placeholder="https://ion.example.org">
@@ -578,6 +601,7 @@
                 <div class="flex gap-3 mt-6 pt-6 border-t border-base-300">
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
+            </fieldset>
             </form>
         </section>
 
@@ -619,7 +643,7 @@
                 <div id="recovery-capability" class="mb-4"></div>
 
                 <div class="flex gap-3 mb-4">
-                    <button class="btn btn-primary" id="btn-create-backup" data-click-action="createBackup">Create Backup</button>
+                    {% if current_user.is_admin %}<button class="btn btn-primary" id="btn-create-backup" disabled data-click-action="createBackup">Create Backup</button>{% endif %}
                     <button class="btn btn-secondary" data-click-action="loadBackups">Refresh List</button>
                 </div>
 
@@ -640,7 +664,7 @@
                             <span>days</span>
                         </div>
                     </div>
-                    <button class="btn btn-warning" data-click-action="cleanupDatabase">Run Cleanup</button>
+                    {% if current_user.is_admin %}<button class="btn btn-warning" data-click-action="cleanupDatabase">Run Cleanup</button>{% endif %}
                 </div>
             </div>
         </section>
@@ -747,11 +771,13 @@
 {% endblock %}
 
 {% block scripts %}
+<template id="settings-secret-status-template"><span></span></template>
 {% include "_fragments/ion_fragment_client.html" %}
 <script src="/static/js/ion-fragments.js?v={{ ion_version }}"></script>
 <script nonce="{{ csp_nonce }}" src="/static/js/integration-wizard.js?v={{ ion_version }}"></script>
 <script nonce="{{ csp_nonce }}">
 let currentConfig = {};
+let configurationReady = false;
 
 document.addEventListener('DOMContentLoaded', () => {
     loadAllSettings();
@@ -791,64 +817,90 @@ function setupNavigation() {
 }
 
 async function loadWizardStatus() {
-    const container = document.getElementById('wizard-status-grid');
-    if (!container) return;
-
-    try {
-        const response = await fetch('/api/admin/wizard/integrations', {
-            credentials: 'include'
-        });
-
-        if (!response.ok) throw new Error('Failed to load integrations');
-
-        const data = await response.json();
-        const integrations = data.integrations || {};
-
-        let html = '';
-        for (const [name, meta] of Object.entries(integrations)) {
-            const isConfigured = meta.configured;
-            html += `
-                <div class="wizard-status-card">
-                    <div class="wizard-status-icon ${isConfigured ? 'configured' : 'not-configured'}">
-                        ${isConfigured ? '&#10003;' : '&#10007;'}
-                    </div>
-                    <div class="wizard-status-info">
-                        <div class="wizard-status-name">${escapeHtml(meta.name)}</div>
-                        <div class="wizard-status-state">
-                            ${isConfigured ? 'Configured' : 'Not configured'}
-                            ${meta.enabled ? ' (Enabled)' : ''}
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        container.innerHTML = html;
-
-    } catch (error) {
-        container.innerHTML = `<div class="loading">Error: ${escapeHtml(error.message)}</div>`;
-    }
+    return ionLoadFragment('/ui/settings/wizard', 'wizard-status-grid', 'Loading integration status...');
 }
 
 async function loadAllSettings() {
+    setConfigurationReady(false);
     try {
-        const response = await fetch('/api/admin/config', {
-            credentials: 'include'
+        const response = await fetch('/ui/settings/configuration', {
+            credentials: 'include',
+            headers: {'Accept': 'application/json'}
         });
 
         if (!response.ok) throw new Error('Failed to load configuration');
 
-        currentConfig = await response.json();
+        const view = await response.json();
+        if (view.state !== 'data') throw new Error('Configuration unavailable');
+        currentConfig = {...view.configuration, sources: view.sources, source_env_names: view.source_env_names};
+        setConfigurationReady(true);
+        resetConfigLocks();
         populateForms(currentConfig);
         applyConfigSources(currentConfig.sources, currentConfig.source_env_names);
+        applyRedactedFields(view.locked_fields);
+        applyUnavailableFields(view.unavailable_fields);
         // Render last and in its own try: the inventory is a read-only
         // report, and a fault in it must not stop the editable forms above
         // from being populated. populateForms is one long chain of
         // getElementById assignments, so order matters here.
-        renderConfigInventory(currentConfig.inventory);
+        await renderConfigInventory();
 
     } catch (error) {
+        setConfigurationReady(false);
+        document.querySelectorAll('[id$="_status"]').forEach(el => updateSecretStatus(el.id.slice(0, -7), undefined));
+        ionMessage('inventory-body', 'Configuration inventory unavailable.');
         showToast('Error loading settings: ' + error.message, 'error');
+    }
+}
+
+function setConfigurationReady(ready) {
+    configurationReady = ready;
+    for (const form of document.querySelectorAll('form[data-submit-action="saveSettings"]')) {
+        for (const control of form.elements) control.disabled = !ready;
+    }
+}
+
+function resetConfigLocks() {
+    for (const input of document.querySelectorAll('form [data-config-lock]')) {
+        input.readOnly = false;
+        input.disabled = false;
+        input.classList.remove('cfg-env-locked');
+        delete input.dataset.configLock;
+        input.parentElement.querySelectorAll('.cfg-env-badge').forEach(badge => badge.remove());
+    }
+}
+
+function applyRedactedFields(fields) {
+    for (const field of fields) {
+        const input = document.getElementById(field);
+        if (!input) continue;
+        input.readOnly = true;
+        input.disabled = true;
+        input.dataset.configLock = 'redacted';
+        input.classList.add('cfg-env-locked');
+        if (input.parentElement.querySelector('[data-redacted-field]')) continue;
+        const badge = document.createElement('span');
+        badge.className = 'cfg-env-badge';
+        badge.dataset.redactedField = field;
+        badge.textContent = 'Address contains credentials; edit in configuration file';
+        badge.title = 'The displayed address omits credentials or query parameters. This field is withheld from saves to preserve the stored address.';
+        input.parentElement.appendChild(badge);
+    }
+}
+
+function applyUnavailableFields(fields) {
+    for (const field of fields) {
+        const input = document.getElementById(field);
+        if (!input) continue;
+        input.readOnly = true;
+        input.disabled = true;
+        input.dataset.configLock = 'unavailable';
+        if (input.parentElement.querySelector('[data-unavailable-field]')) continue;
+        const badge = document.createElement('span');
+        badge.className = 'cfg-env-badge';
+        badge.dataset.unavailableField = field;
+        badge.textContent = 'Value unavailable; refresh before editing';
+        input.parentElement.appendChild(badge);
     }
 }
 
@@ -863,6 +915,7 @@ function applyConfigSources(sources, envNames) {
         if (!input) return;
         input.readOnly = true;
         input.disabled = true;
+        input.dataset.configLock = 'environment';
         input.classList.add('cfg-env-locked');
         if (input.parentElement.querySelector('.cfg-env-badge')) return;
         const badge = document.createElement('span');
@@ -892,120 +945,29 @@ function applyConfigSources(sources, envNames) {
 // setting cannot go missing from it the way it did from the sections.
 let configInventory = [];
 
-function renderConfigInventory(rows) {
-    configInventory = Array.isArray(rows) ? rows : [];
-    filterConfigInventory();
+async function renderConfigInventory() {
+    return filterConfigInventory();
 }
 
-const SOURCE_LABEL = {
-    environment: ['Environment', 'badge-warning'],
-    file: ['Config file', 'badge-info'],
-    default: ['Default', 'badge-ghost'],
-};
 
-function filterConfigInventory() {
-    const body = document.getElementById('inventory-body');
-    if (!body) return;
-    const term = (document.getElementById('inventory-filter')?.value || '')
-        .trim().toLowerCase();
-    const nonDefaultOnly = !!document.getElementById('inventory-non-default')?.checked;
-
-    const rows = configInventory.filter(r => {
-        if (nonDefaultOnly && r.source === 'default') return false;
-        if (!term) return true;
-        return [r.field, r.env_var, String(r.value ?? '')]
-            .some(v => v.toLowerCase().includes(term));
-    });
-
-    const count = document.getElementById('inventory-count');
-    if (count) {
-        count.textContent = rows.length === configInventory.length
-            ? `${configInventory.length} settings`
-            : `${rows.length} of ${configInventory.length} settings`;
-    }
-
-    if (!rows.length) {
-        body.innerHTML = '<tr><td colspan="4" class="text-base-content/60 p-4">'
-            + 'No settings match that filter.</td></tr>';
-        return;
-    }
-
-    body.innerHTML = rows.map(r => {
-        const [label, badge] = SOURCE_LABEL[r.source] || ['Unknown', 'badge-ghost'];
-        const id = `inv-${r.field}`;
-        let control;
-
-        if (!r.writable) {
-            // Read-only, and say which of the two reasons applies. An
-            // environment-held value can be freed by removing it from .env;
-            // a policy-blocked one cannot be changed here at all. A disabled
-            // box with no explanation just looks broken.
-            control = '<span class="font-mono text-[0.8rem] break-all">'
-                + inventoryDisplayValue(r) + '</span>'
-                + (r.write_blocked_by === 'environment'
-                    ? ` <span class="cfg-env-badge" title="Held by ${escapeHtml(r.env_var || 'an environment variable')}. The environment outranks saved settings, so a change here would not take effect. Remove it from .env to manage it from this page.">set by environment</span>`
-                    : ' <span class="text-[0.72rem] text-base-content/50">(not editable here)</span>');
-        } else if (!r.available) {
-            control = '<span class="text-warning">not available in this build</span>';
-        } else if (r.kind === 'bool') {
-            control = `<input type="checkbox" class="checkbox w-[16px] h-[16px]" id="${id}"
-                        data-inv-field="${escapeHtml(r.field)}" data-inv-kind="bool"
-                        ${r.value ? 'checked' : ''}
-                        data-change-action="markInventoryDirty">`;
-        } else if (r.kind === 'secret') {
-            // Blank means keep the stored secret, the same contract as every
-            // other credential field on this page. The placeholder has to say
-            // so, or a save looks like it wiped the value.
-            control = `<input type="password" class="input input-bordered input-xs w-full font-mono" id="${id}"
-                        data-inv-field="${escapeHtml(r.field)}" data-inv-kind="secret"
-                        placeholder="${r.value ? 'set — leave blank to keep' : 'not set'}"
-                        data-input-action="markInventoryDirty">`;
-        } else {
-            const type = (r.kind === 'int' || r.kind === 'float') ? 'number' : 'text';
-            const step = r.kind === 'float' ? ' step="any"' : '';
-            const shown = (r.value === null || r.value === undefined) ? '' : String(r.value);
-            control = `<input type="${type}"${step} class="input input-bordered input-xs w-full font-mono" id="${id}"
-                        data-inv-field="${escapeHtml(r.field)}" data-inv-kind="${r.kind}"
-                        value="${escapeHtml(shown)}"
-                        data-input-action="markInventoryDirty">`;
-        }
-
-        const restart = INVENTORY_RESTART.has(r.field)
-            ? ' <span class="text-[0.72rem] text-warning" title="Read once while ION starts, so a change takes effect after a restart.">restart</span>'
-            : '';
-        return `<tr data-inv-row="${escapeHtml(r.field)}">
-            <td class="font-mono text-[0.8rem]">${escapeHtml(r.field)}${restart}</td>
-            <td class="text-[0.8rem] break-all">${control}</td>
-            <td><span class="badge badge-sm ${badge}">${label}</span></td>
-            <td class="font-mono text-[0.75rem] text-base-content/60">${escapeHtml(r.env_var || '-')}</td>
-        </tr>`;
-    }).join('');
+async function filterConfigInventory() {
+    const term = document.getElementById('inventory-filter')?.value || '';
+    const nonDefault = !!document.getElementById('inventory-non-default')?.checked;
+    const params = new URLSearchParams({search: term, non_default: String(nonDefault)});
+    const loaded = await ionLoadFragment('/ui/settings/inventory?' + params, 'inventory-body', 'Loading settings...');
+    const carrier = document.querySelector('#inventory-body [data-inventory-state]');
+    configInventory = loaded && carrier ? JSON.parse(carrier.textContent) : [];
     updateInventoryDirtyCount();
 }
 
 // The three ways a value can be empty mean different things, so they read
 // differently: never set, set to an empty string, and a name the running
 // config does not expose at all.
-function inventoryDisplayValue(r) {
-    if (!r.available) return '<span class="text-warning">not available in this build</span>';
-    if (r.value === null || r.value === undefined) return '<span class="text-base-content/50">not set</span>';
-    if (r.value === '') {
-        return r.is_secret
-            ? '<span class="text-base-content/50">no secret set</span>'
-            : '<span class="text-base-content/50">empty</span>';
-    }
-    if (typeof r.value === 'boolean') return r.value ? 'true' : 'false';
-    return escapeHtml(String(r.value));
-}
 
 // Settings bound while ION starts. Mirrors _RESTART_REQUIRED in
 // admin_api.py; the server is the authority and repeats it in the save
 // response, this is only the hint beside the field so the operator knows
 // before they save rather than after.
-const INVENTORY_RESTART = new Set([
-    'debug_mode', 'dev_mode', 'cookie_secure', 'csrf_enabled',
-    'multi_tenant', 'base_url', 'de_module_enabled', 'workforce_enabled',
-]);
 
 function inventoryEdits() {
     // Only what actually changed. Posting the whole table back would write
@@ -1188,17 +1150,21 @@ function populateForms(config) {
 
 function updateSecretStatus(fieldId, isSet) {
     const statusEl = document.getElementById(fieldId + '_status');
-    if (statusEl) {
-        if (isSet) {
-            statusEl.innerHTML = '<span class="status-set">Currently set</span>';
-        } else {
-            statusEl.innerHTML = '<span class="status-unset">Not configured</span>';
-        }
-    }
+    if (!statusEl) return;
+    const node = cloneTemplate('settings-secret-status-template');
+    if (!node) return;
+    node.textContent = isSet === true ? 'Currently set' : isSet === false ? 'Not configured' : 'Configuration status unknown';
+    if (isSet === true) node.classList.add('status-set');
+    else if (isSet === false) node.classList.add('status-unset');
+    statusEl.replaceChildren(node);
 }
 
 async function saveSettings(event, section) {
     event.preventDefault();
+    if (!configurationReady) {
+        showToast('Configuration unavailable. Refresh settings before saving.', 'error');
+        return;
+    }
 
     const form = event.target;
     const data = {};
@@ -1363,44 +1329,7 @@ async function testConnection(integration) {
 // =============================================================================
 
 async function loadSessions() {
-    const container = document.getElementById('sessions-list');
-    container.innerHTML = '<div class="loading">Loading sessions...</div>';
-
-    try {
-        const response = await fetch('/api/admin/sessions', {
-            credentials: 'include'
-        });
-
-        if (!response.ok) throw new Error('Failed to load sessions');
-
-        const data = await response.json();
-
-        if (data.sessions.length === 0) {
-            container.innerHTML = '<div class="loading">No active sessions</div>';
-            return;
-        }
-
-        container.innerHTML = data.sessions.map(session => `
-            <div class="session-item">
-                <div class="session-info">
-                    <span class="session-user">${escapeHtml(session.username)}</span>
-                    <span class="session-meta">${escapeHtml(session.email || 'No email')}</span>
-                    <span class="session-meta">Last login: ${session.last_login ? formatDateTime(session.last_login) : 'Never'}</span>
-                    <div class="session-roles">
-                        ${session.roles.map(role => `<span class="role-badge">${escapeHtml(role)}</span>`).join('')}
-                    </div>
-                </div>
-                <div class="session-actions">
-                    ${session.username !== currentConfig.currentUser ?
-                        `<button class="btn btn-sm btn-danger" data-click-action="revokeSession" data-args='[${session.user_id}, "${escapeHtml(session.username)}"]'>Revoke</button>` :
-                        '<span class="session-meta">(current)</span>'}
-                </div>
-            </div>
-        `).join('');
-
-    } catch (error) {
-        container.innerHTML = `<div class="loading">Error: ${escapeHtml(error.message)}</div>`;
-    }
+    return ionLoadFragment('/ui/settings/sessions', 'sessions-list', 'Loading sessions...');
 }
 
 async function revokeSession(userId, username) {
@@ -1430,130 +1359,20 @@ async function revokeSession(userId, username) {
 // =============================================================================
 
 async function loadDatabaseStats() {
-    const container = document.getElementById('db-stats');
-    container.innerHTML = '<div class="loading">Loading...</div>';
-
-    try {
-        const response = await fetch('/api/admin/database/stats', {
-            credentials: 'include'
-        });
-
-        if (!response.ok) throw new Error('Failed to load database stats');
-
-        const stats = await response.json();
-
-        container.innerHTML = `
-            <div class="info-card">
-                <div class="info-card-label">Database Size</div>
-                <div class="info-card-value">${stats.database_size_mb} MB</div>
-            </div>
-            <div class="info-card">
-                <div class="info-card-label">Total Tables</div>
-                <div class="info-card-value">${stats.total_tables || 0}</div>
-            </div>
-            <div class="info-card">
-                <div class="info-card-label">Total Rows</div>
-                <div class="info-card-value">${formatNumber(stats.total_rows || 0)}</div>
-            </div>
-            <div class="info-card col-span-full">
-                <div class="info-card-label">Tables</div>
-                <div class="table-stats">
-                    ${stats.tables.map(t => `
-                        <div class="table-stat-item">
-                            <span class="table-stat-name">${t.name}</span>
-                            <span class="table-stat-count">${formatNumber(t.row_count)} rows</span>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-
-    } catch (error) {
-        container.innerHTML = `<div class="loading">Error: ${escapeHtml(error.message)}</div>`;
-    }
+    return ionLoadFragment('/ui/settings/database', 'db-stats', 'Loading database statistics...');
 }
 
 async function loadRecoveryCapability() {
-    const container = document.getElementById('recovery-capability');
-    if (!container) return;
-
-    try {
-        const response = await fetch('/api/admin/database/recovery-capability', {
-            credentials: 'include'
-        });
-        if (!response.ok) throw new Error('Failed to load recovery capability');
-
-        const cap = await response.json();
-        const supported = cap.file_copy_supported;
-        const btn = document.getElementById('btn-create-backup');
-        if (btn) btn.disabled = !supported;
-
-        const guidance = (cap.guidance || [])
-            .map(g => `<li>${escapeHtml(g)}</li>`).join('');
-        const notCovered = (cap.not_covered || [])
-            .map(n => `<li>${escapeHtml(n)}</li>`).join('');
-
-        // Everything goes in ONE child of .alert: DaisyUI lays the alert out
-        // as a grid, so sibling elements get split into separate columns and
-        // the guidance ends up in a cramped vertical strip.
-        container.innerHTML = `
-            <div class="alert ${supported ? 'alert-info' : 'alert-warning'} text-left">
-                <div class="w-full">
-                    <div class="font-medium">
-                        ${supported
-                            ? 'Built-in file copy applies to this deployment'
-                            : 'Built-in file copy does not apply to this deployment'}
-                    </div>
-                    <div class="text-sm opacity-80 mt-1">
-                        Backend: <code>${escapeHtml(cap.backend || 'unknown')}</code>
-                        &middot; Target: <code>${escapeHtml(cap.target || 'unknown')}</code>
-                    </div>
-                    <ul class="text-sm list-disc ml-5 mt-2 space-y-0.5">${guidance}</ul>
-                    <div class="text-sm font-medium mt-3">Not covered by a database backup</div>
-                    <ul class="text-sm list-disc ml-5 mt-1 opacity-80 space-y-0.5">${notCovered}</ul>
-                </div>
-            </div>`;
-    } catch (error) {
-        container.innerHTML =
-            `<div class="alert alert-warning text-sm">Could not determine backup coverage: ${escapeHtml(error.message)}</div>`;
-    }
+    const button = document.getElementById('btn-create-backup');
+    if (button) button.disabled = true;
+    const loaded = await ionLoadFragment('/ui/settings/recovery', 'recovery-capability', 'Checking backup coverage...');
+    const state = document.querySelector('#recovery-capability [data-backup-supported]');
+    if (button) button.disabled = !(loaded && state?.dataset.backupSupported === 'true');
 }
 
 async function loadBackups() {
     loadRecoveryCapability();
-    const container = document.getElementById('backups-list');
-    container.innerHTML = '<div class="loading">Loading backups...</div>';
-
-    try {
-        const response = await fetch('/api/admin/database/backups', {
-            credentials: 'include'
-        });
-
-        if (!response.ok) throw new Error('Failed to load backups');
-
-        const data = await response.json();
-
-        if (data.backups.length === 0) {
-            container.innerHTML = '<div class="loading p-4">No backups found. Click "Create Backup" to create one.</div>';
-            return;
-        }
-
-        container.innerHTML = data.backups.map(backup => `
-            <div class="backup-item">
-                <div class="backup-info">
-                    <span class="backup-name">${escapeHtml(backup.filename)}</span>
-                    <span class="backup-meta">${backup.size_mb} MB | Created: ${formatDateTime(backup.created_at)}</span>
-                </div>
-                <div class="backup-actions">
-                    <button class="btn btn-sm" data-click-action="restoreBackup" data-args='["${escapeHtml(backup.filename)}"]'>Restore</button>
-                    <button class="btn btn-sm btn-danger" data-click-action="deleteBackup" data-args='["${escapeHtml(backup.filename)}"]'>Delete</button>
-                </div>
-            </div>
-        `).join('');
-
-    } catch (error) {
-        container.innerHTML = `<div class="loading">Error: ${escapeHtml(error.message)}</div>`;
-    }
+    return ionLoadFragment('/ui/settings/backups', 'backups-list', 'Loading backups...');
 }
 
 async function createBackup() {
@@ -1671,115 +1490,12 @@ function formatDateTime(isoString) {
 // =============================================================================
 
 async function loadSystemInfo() {
-    const techContainer = document.getElementById('tech-stack');
-    const infoContainer = document.getElementById('system-info');
-    const envContainer = document.getElementById('env-vars');
-
-    try {
-        const [infoResponse, envResponse] = await Promise.all([
-            fetch('/api/admin/system/info', { credentials: 'include' }),
-            fetch('/api/admin/system/env', { credentials: 'include' })
-        ]);
-
-        if (!infoResponse.ok) throw new Error('Failed to load system info');
-
-        const info = await infoResponse.json();
-        const env = await envResponse.json();
-
-        // Render technologies section
-        const aiModel = info.ai && info.ai.enabled ? info.ai.model : 'Disabled';
-        const aiUrl = info.ai && info.ai.enabled ? info.ai.url : '';
-        techContainer.innerHTML = `
-            <div class="info-card">
-                <div class="info-card-label">Application</div>
-                <div class="info-card-value">ION v${info.ion_version}</div>
-            </div>
-            <div class="info-card">
-                <div class="info-card-label">Runtime</div>
-                <div class="info-card-value">Python ${info.python_version.split(' ')[0]}</div>
-            </div>
-            <div class="info-card">
-                <div class="info-card-label">Web Framework</div>
-                <div class="info-card-value">FastAPI ${info.packages['fastapi'] || ''} + Uvicorn</div>
-            </div>
-            <div class="info-card">
-                <div class="info-card-label">Database</div>
-                <div class="info-card-value">${info.database_type} via SQLAlchemy</div>
-            </div>
-            <div class="info-card">
-                <div class="info-card-label">AI Model</div>
-                <div class="info-card-value">${aiModel}</div>
-            </div>
-            <div class="info-card">
-                <div class="info-card-label">AI Engine</div>
-                <div class="info-card-value">${info.ai && info.ai.enabled ? 'Ollama' : 'N/A'}</div>
-            </div>
-            <div class="info-card">
-                <div class="info-card-label">Auth</div>
-                <div class="info-card-value">JWT + bcrypt + OIDC</div>
-            </div>
-            <div class="info-card">
-                <div class="info-card-label">PCAP Analysis</div>
-                <div class="info-card-value">dpkt ${info.packages['dpkt'] || ''}</div>
-            </div>
-            <div class="info-card col-span-full">
-                <div class="info-card-label">Key Dependencies</div>
-                <div class="packages-list">
-                    ${Object.entries(info.packages).map(([name, version]) =>
-                        `<span class="package-badge">${name}==${version}</span>`
-                    ).join('')}
-                </div>
-            </div>
-        `;
-
-        // Render system details
-        infoContainer.innerHTML = `
-            <div class="info-card">
-                <div class="info-card-label">Platform</div>
-                <div class="info-card-value">${info.platform}</div>
-            </div>
-            <div class="info-card">
-                <div class="info-card-label">Architecture</div>
-                <div class="info-card-value">${info.architecture}</div>
-            </div>
-            <div class="info-card">
-                <div class="info-card-label">Data Directory</div>
-                <div class="info-card-value mono">${info.data_directory}</div>
-            </div>
-            <div class="info-card">
-                <div class="info-card-label">Database Size</div>
-                <div class="info-card-value">${info.database_size_mb} MB</div>
-            </div>
-            <div class="info-card">
-                <div class="info-card-label">Config Path</div>
-                <div class="info-card-value mono">${info.config_path}</div>
-            </div>
-            ${info.disk ? `
-            <div class="info-card">
-                <div class="info-card-label">Disk Usage</div>
-                <div class="info-card-value">${info.disk.used_gb} / ${info.disk.total_gb} GB (${info.disk.percent}%)</div>
-            </div>
-            ` : ''}
-        `;
-
-        // Render environment variables
-        const vars = env.variables || {};
-        if (Object.keys(vars).length === 0) {
-            envContainer.innerHTML = '<p class="loading">No ION environment variables set</p>';
-        } else {
-            envContainer.innerHTML = Object.entries(vars).map(([name, value]) => `
-                <div class="env-var-item">
-                    <span class="env-var-name">${name}</span>
-                    <span class="env-var-value">${escapeHtml(value)}</span>
-                </div>
-            `).join('');
-        }
-
-    } catch (error) {
-        techContainer.innerHTML = `<p class="loading">Error: ${escapeHtml(error.message)}</p>`;
-        infoContainer.replaceChildren();
-        envContainer.replaceChildren();
-    }
+    ionMessage('system-info', 'Loading system information...', true);
+    const results = await Promise.all([
+        ionLoadFragment('/ui/settings/system', 'tech-stack', 'Loading technologies...'),
+        ionLoadFragment('/ui/settings/environment', 'env-vars', 'Loading environment information...')
+    ]);
+    if (!results[0]) ionMessage('system-info', 'System information unavailable.');
 }
 
 // =============================================================================
@@ -1789,59 +1505,14 @@ async function loadSystemInfo() {
 let logsAutoRefreshTimer = null;
 
 async function loadSystemLogs() {
-    const container = document.getElementById('logs-container');
-    const countEl = document.getElementById('logs-count');
+    const params = new URLSearchParams({limit: document.getElementById('log-limit').value});
     const level = document.getElementById('log-level-filter').value;
     const search = document.getElementById('log-search').value;
-    const limit = document.getElementById('log-limit').value;
-
-    // Build query params
-    const params = new URLSearchParams({limit});
     if (level) params.set('level', level);
     if (search) params.set('search', search);
-
-    try {
-        const response = await fetch(`/api/admin/logs?${params}`);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-
-        if (!data.logs || data.logs.length === 0) {
-            container.innerHTML = '<div class="p-8 text-center text-[var(--text-muted)]">No log entries found</div>';
-            countEl.textContent = '';
-            return;
-        }
-
-        container.innerHTML = data.logs.map(entry => {
-            const time = entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString('en-GB', {hour12: false}) : '';
-            const msg = escapeHtml(entry.message || '');
-            const meta = [entry.logger, entry.function ? `${entry.file}:${entry.line}` : ''].filter(Boolean).join(' · ');
-            const exc = entry.exception ? `<div class="log-exception">${escapeHtml(entry.exception)}</div>` : '';
-            const extra = [
-                entry.username ? `user:${entry.username}` : '',
-                entry.client_ip ? `ip:${entry.client_ip}` : '',
-                entry.request_id ? `req:${entry.request_id.substring(0,8)}` : '',
-            ].filter(Boolean).join(' · ');
-            const metaLine = [meta, extra].filter(Boolean).join(' — ');
-
-            return `<div class="log-entry">
-                <span class="log-time">${time}</span>
-                <span class="log-level ${entry.level}">${entry.level}</span>
-                <div>
-                    <div class="log-msg">${msg}</div>
-                    ${metaLine ? `<div class="log-meta">${escapeHtml(metaLine)}</div>` : ''}
-                    ${exc}
-                </div>
-            </div>`;
-        }).join('');
-
-        countEl.textContent = `Showing ${data.logs.length} entries (newest first)`;
-
-    } catch (error) {
-        container.innerHTML = `<div class="p-4 text-[var(--sev-critical)]">Failed to load logs: ${escapeHtml(error.message)}</div>`;
-        countEl.textContent = '';
-    }
-
-    // Handle auto-refresh
+    document.getElementById('logs-count').textContent = 'Loading entry count...';
+    const loaded = await ionLoadFragment('/ui/settings/logs?' + params, 'logs-container', 'Loading logs...');
+    if (!loaded) document.getElementById('logs-count').textContent = 'Entry count unknown';
     setupLogsAutoRefresh();
 }
 
