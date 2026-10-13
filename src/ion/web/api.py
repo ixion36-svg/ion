@@ -3534,9 +3534,25 @@ async def get_batch_triage(
     If es_statuses is provided, syncs Kibana/ES status changes into ION triage
     records (Kibana → ION direction). This handles the case where someone changes
     alert status directly in Kibana.
+
+    That sync is a write, and this endpoint is reached with alert:read, which
+    two seeded roles hold without alert:triage: `forensic`, and `metis`, the
+    service account auth/service.py scopes to "read + propose only" with
+    approval "reserved for human reviewers". Either could set any alert's
+    triage status, and create triage rows that did not exist, by naming them
+    in es_statuses. The sync needs alert:triage now.
+
+    A caller without it is not refused, because the read itself is
+    legitimate: alerts.html's loadTriageBatch sends es_statuses on every page
+    load for every viewer and drops the whole response on a non-ok status, so
+    a 403 would take the triage map away from the queue for a forensic user.
+    The sync is skipped instead, and `synced` reports whether it ran, so a
+    reconciliation nobody performed is not left looking done.
     """
+    may_sync = current_user.has_permission("alert:triage")
+
     if not data.alert_ids:
-        return {"triage": {}}
+        return {"triage": {}, "synced": False}
 
     # Wrapped in to_thread — multiple DB queries + potential writes per alert
     # in the batch would block the event loop for the entire batch duration.
@@ -3556,8 +3572,9 @@ async def get_batch_triage(
         )
         triage_map = {t.es_alert_id: t for t in triages}
 
-        # Sync ES status → ION triage (Kibana → ION direction)
-        if data.es_statuses:
+        # Sync ES status → ION triage (Kibana → ION direction), for a caller
+        # allowed to triage. See the docstring.
+        if data.es_statuses and may_sync:
             valid_statuses = {"open", "acknowledged", "closed"}
             for alert_id, es_status in data.es_statuses.items():
                 es_status_lower = es_status.lower() if es_status else "open"
@@ -3609,7 +3626,7 @@ async def get_batch_triage(
                 "observable_threat": _worst_observable_threat(obs, threat_levels),
             }
 
-        return {"triage": result}
+        return {"triage": result, "synced": bool(data.es_statuses) and may_sync}
 
     return await asyncio.to_thread(_batch_triage)
 
