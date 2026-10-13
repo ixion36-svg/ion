@@ -1,0 +1,44 @@
+{% if params_state == 'unreadable' %}
+<p>These step parameters could not be read.</p>
+{% elif step_type == 'manual_checklist' %}
+<div class="form-group">
+    <label>Checklist Items (one per line)</label>
+    <textarea class="form-control step-checklist-items" rows="3">{{ checklist_text }}</textarea>
+</div>
+{% elif step_type == 'auto_enrich_observables' %}
+<div class="form-group">
+    <label>Sources</label>
+    <label class="checkbox-label">
+        <input type="checkbox" class="step-source" value="opencti"{% if opencti_checked %} checked{% endif %}>
+        OpenCTI
+    </label>
+</div>
+{% elif step_type == 'auto_update_status' %}
+<div class="step-row">
+    <div class="form-group flex-1">
+        <label>New Status</label>
+        <select class="form-control step-new-status">
+            {% for opt in status_options %}<option value="{{ opt.value }}"{% if opt.selected %} selected{% endif %}>{{ opt.value }}</option>{% endfor %}
+        </select>
+    </div>
+    <div class="form-group flex-1">
+        <label>Priority</label>
+        <select class="form-control step-new-priority">
+            {% for opt in priority_options %}<option value="{{ opt.value }}"{% if opt.selected %} selected{% endif %}>{{ opt.value }}</option>{% endfor %}
+        </select>
+    </div>
+</div>
+{% elif step_type == 'auto_create_case' %}
+<div class="step-row">
+    <div class="form-group flex-[2]">
+        <label>Title Template</label>
+        <input type="text" class="form-control step-case-title" value="{{ title_template }}" placeholder="Case: {rule_name}">
+    </div>
+    <div class="form-group flex-1">
+        <label>Severity</label>
+        <select class="form-control step-case-severity">
+            {% for opt in severity_options %}<option value="{{ opt.value }}"{% if opt.selected %} selected{% endif %}>{{ opt.value }}</option>{% endfor %}
+        </select>
+    </div>
+</div>
+{% endif %}
