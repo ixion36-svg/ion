@@ -88,29 +88,18 @@
           </div>
         </section>
 
-        <!-- KPI cards — coloured. Stat values keep the
-             existing ids so the original ``loadOverview`` JS keeps
-             working unchanged. -->
-        <section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-                <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Watched Actors</div>
-                <div id="stat-actors" class="text-[28px] font-semibold text-white font-mono">—</div>
-                <div class="text-[11px] text-slate-500 mt-1">on the watchlist</div>
-            </div>
-            <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-                <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Watched Campaigns</div>
-                <div id="stat-campaigns" class="text-[28px] font-semibold text-ion-cyan font-mono">—</div>
-                <div class="text-[11px] text-slate-500 mt-1">on the watchlist</div>
-            </div>
-            <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-                <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Matches (7d)</div>
-                <div id="stat-matches" class="text-[28px] font-semibold text-ion-coral font-mono">—</div>
-                <div class="text-[11px] text-slate-500 mt-1">across alerts</div>
-            </div>
-            <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-                <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Unread Alerts</div>
-                <div id="stat-unread" class="text-[28px] font-semibold text-ion-amber font-mono">—</div>
-                <div class="text-[11px] text-slate-500 mt-1">match alerts pending</div>
+        {# KPI cards, rendered by /ui/threat-intel/overview-stats. The tiles
+           used to be written by loadOverview with textContent and no guard,
+           and its catch was a console.error that rendered nothing, so a
+           failed read left all four showing this dash and the page looked
+           like it was still loading. The fragment says unknown instead. #}
+        <section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"
+                 id="ti-overview-stats"
+                 hx-get="/ui/threat-intel/overview-stats"
+                 hx-trigger="load, ti-show"
+                 hx-swap="innerHTML">
+            <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5 col-span-2 md:col-span-4">
+                <div class="text-[11px] uppercase tracking-wider text-slate-500">Loading overview…</div>
             </div>
         </section>
 
@@ -122,7 +111,15 @@
               <h3 class="font-sans font-semibold text-base text-white">Top Threat Actors</h3>
               <button data-click-action="tiSwitchTab" data-args='["actors"]' class="text-[11px] text-ion-cyan hover:text-white transition">View all →</button>
             </div>
-            <div id="ti-overview-actors" class="rounded-xl border border-white/5 bg-ink-900/50 p-4 min-h-[140px]">
+            {# Rendered by /ui/threat-intel/landscape-actors, which separates
+               OpenCTI being unconfigured from OpenCTI failing. The old catch
+               rendered "Actors unavailable, OpenCTI not configured?" for
+               both, a guess with a question mark in it, while the 503 that
+               caused it says exactly which. #}
+            <div id="ti-overview-actors" class="rounded-xl border border-white/5 bg-ink-900/50 p-4 min-h-[140px]"
+                 hx-get="/ui/threat-intel/landscape-actors"
+                 hx-trigger="load, ti-show"
+                 hx-swap="innerHTML">
               <div class="text-slate-500 text-sm animate-pulse">Loading actors…</div>
             </div>
           </div>
@@ -131,7 +128,10 @@
               <h3 class="font-sans font-semibold text-base text-white">Latest High-Score IOCs</h3>
               <button data-click-action="tiSwitchTab" data-args='["ioc"]' class="text-[11px] text-ion-cyan hover:text-white transition">View feed →</button>
             </div>
-            <div id="ti-overview-iocs" class="rounded-xl border border-white/5 bg-ink-900/50 p-4 min-h-[140px]">
+            <div id="ti-overview-iocs" class="rounded-xl border border-white/5 bg-ink-900/50 p-4 min-h-[140px]"
+                 hx-get="/ui/threat-intel/landscape-iocs"
+                 hx-trigger="load, ti-show"
+                 hx-swap="innerHTML">
               <div class="text-slate-500 text-sm animate-pulse">Loading IOCs…</div>
             </div>
           </div>
@@ -144,7 +144,32 @@
             <div class="flex items-center justify-between mb-3">
               <h3 class="font-sans font-semibold text-base text-white">Recently Active Observables <span class="text-[11px] text-slate-500 font-normal">— last 30d in cases</span></h3>
               <label class="text-[11px] text-slate-400 inline-flex items-center gap-1.5 cursor-pointer" title="Hide rule-field / command-content items (process names, command lines, file paths, registry) — not trackable IOCs">
-                <input type="checkbox" class="checkbox checkbox-xs" id="ti-hide-rule-obs" checked data-change-action="loadRecentlyActive"> Hide rule-field
+                {# The control that filters the lists is the control that
+                   requests them. Both lists come back as out-of-band swaps
+                   into #ti-recent-obs and #ti-recent-tech, so this element
+                   swaps nothing itself.
+
+                   Two inputs for one boolean, because a checkbox sends its
+                   value only when checked. Unchecked on its own would send
+                   no parameter at all and the route's default of true would
+                   reassert the filter the reader just turned off.
+
+                   So the hidden input always sends false and the checkbox
+                   sends true on top of it when checked. That puts the
+                   parameter in twice, and FastAPI reads the LAST copy,
+                   measured elsewhere in this project as `?days=7&days=180`
+                   resolving to 180. hx-include lists them in that order
+                   deliberately: hidden first, checkbox second, so checked
+                   wins. This is the one place a duplicated parameter is the
+                   mechanism rather than the bug. #}
+                <input type="hidden" id="ti-hide-rule-obs-off"
+                       name="hide_rule_observables" value="false">
+                <input type="checkbox" class="checkbox checkbox-xs" id="ti-hide-rule-obs"
+                       name="hide_rule_observables" value="true" checked
+                       hx-get="/ui/threat-intel/recently-active"
+                       hx-trigger="load, change, ti-show"
+                       hx-include="#ti-hide-rule-obs-off, #ti-hide-rule-obs"
+                       hx-swap="none"> Hide rule-field
               </label>
             </div>
             <div id="ti-recent-obs" class="text-sm text-slate-400">Loading…</div>
@@ -160,7 +185,14 @@
             <h3 class="font-sans font-semibold text-base text-white mb-3">Recent Matches</h3>
             <table class="ti-table" id="overview-matches-table">
                 <thead><tr><th>Time</th><th>Observable</th><th>Matched Entity</th><th>Type</th><th>Actions</th></tr></thead>
-                <tbody id="overview-matches-body"><tr><td colspan="5" class="ti-empty">Loading...</td></tr></tbody>
+                {# The same fragment the Watchlist tab uses, with its own
+                   ten-row limit and show_type for this table's fourth
+                   column. renderMatchRows was a second definition of a
+                   match row and the two had already drifted. #}
+                <tbody id="overview-matches-body"
+                       hx-get="/ui/threat-intel/matches?limit=10&amp;show_type=true"
+                       hx-trigger="load, ti-show"
+                       hx-swap="innerHTML"><tr><td colspan="5" class="ti-empty">Loading...</td></tr></tbody>
             </table>
         </section>
     </div>
@@ -385,7 +417,8 @@ data-click-action="tiCloseReport"></div>
                 el => el.dispatchEvent(new Event('ti-show')));
         }
 
-        if (tab.dataset.panel === 'overview') loadOverview();
+        // The overview tab needs no special case: the ti-show dispatch
+        // above reaches all five of its server-rendered regions.
         // lazy-load the merged tabs.
         if (tab.dataset.panel === 'ioc' && !window._tiIOCLoaded) { tiLoadIOCFeed(); window._tiIOCLoaded = true; }
         if (tab.dataset.panel === 'reports' && !window._tiReportsLoaded) { tiLoadReports(); window._tiReportsLoaded = true; }
@@ -525,89 +558,23 @@ data-click-action="tiCloseReport"></div>
     document.getElementById('kev-ransomware-only').addEventListener('change', kevSearch);
 
     // ── Overview ──────────────────────────────
-    async function loadOverview() {
-        try {
-            const [stats, matches] = await Promise.all([
-                fetch(API + '/overview').then(r => r.json()),
-                fetch(API + '/matches?limit=10').then(r => r.json()),
-            ]);
-            document.getElementById('stat-actors').textContent = stats.watched_actors;
-            document.getElementById('stat-campaigns').textContent = stats.watched_campaigns;
-            document.getElementById('stat-matches').textContent = stats.matches_7d;
-            document.getElementById('stat-unread').textContent = stats.unread_alerts;
-
-            if (stats.unread_alerts > 0) {
-                const badge = document.getElementById('ti-unread-badge');
-                badge.textContent = stats.unread_alerts;
-                badge.style.display = 'inline-block';
-            } else {
-                document.getElementById('ti-unread-badge').style.display = 'none';
-            }
-
-            renderMatchRows('overview-matches-body', matches.matches || [], true);
-
-            // populate the additional Overview surfaces.
-            loadRecentlyActive();
-            loadOverviewActors();
-            loadOverviewIOCs();
-        } catch(e) {
-            console.error('Failed to load overview', e);
-        }
-    }
+    // loadOverview, loadOverviewActors, loadOverviewIOCs,
+    // loadRecentlyActive and renderMatchRows are gone. The Overview tab's
+    // five regions are rendered by /ui/threat-intel/overview-stats,
+    // landscape-actors, landscape-iocs, recently-active, and the same
+    // matches fragment the Watchlist tab uses.
+    //
+    // What each of them did wrong, in one place because it is the same
+    // mistake five times: a failed read was never rendered as a failed
+    // read. loadOverview caught to console.error and left four tiles
+    // showing a dash. The two OpenCTI cards rendered the guess "OpenCTI
+    // not configured?" in the same grey as their empty state, while the
+    // 503 behind it said which. loadRecentlyActive returned silently and
+    // left both its panels on the shell's "Loading..." forever.
 
     // ── v0.27.0: Top 5 Threat Actors preview (Overview tab) ──
-    async function loadOverviewActors() {
-        const el = document.getElementById('ti-overview-actors');
-        try {
-            const r = await fetch('/api/threat-landscape/overview');
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            const d = await r.json();
-            const actors = (d.actors || []).slice(0, 5);
-            if (!actors.length) {
-                el.innerHTML = '<div class="text-slate-500 text-sm">No actors tracked yet.</div>';
-                return;
-            }
-            el.innerHTML = '<div class="space-y-2">' + actors.map(a => {
-                const flag = a.country_flag || '';
-                return `<div class="flex items-center gap-3 py-1.5">
-                    <span class="text-ion-cyan font-semibold text-sm flex-shrink-0">${flag ? flag + ' ' : ''}${escapeHtml(a.name)}</span>
-                    <span class="text-slate-500 text-xs">${a.ttp_count || 0} TTPs</span>
-                    <span class="text-slate-500 text-xs">${a.malware_count || 0} malware</span>
-                    <span class="flex-1"></span>
-                    <span class="text-slate-600 text-[10px] font-mono">${(a.modified || '').substring(0, 10)}</span>
-                </div>`;
-            }).join('') + '</div>';
-        } catch(e) {
-            el.innerHTML = '<div class="text-slate-500 text-sm">Actors unavailable — OpenCTI not configured?</div>';
-        }
-    }
 
     // ── v0.27.0: Top 5 High-Score IOCs preview (Overview tab) ──
-    async function loadOverviewIOCs() {
-        const el = document.getElementById('ti-overview-iocs');
-        try {
-            const r = await fetch('/api/threat-landscape/ioc-feed?limit=5&min_score=75');
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            const d = await r.json();
-            const iocs = (d.indicators || []).slice(0, 5);
-            if (!iocs.length) {
-                el.innerHTML = '<div class="text-slate-500 text-sm">No high-score IOCs at this threshold.</div>';
-                return;
-            }
-            el.innerHTML = '<div class="space-y-1.5">' + iocs.map(i => {
-                const score = i.score || 0;
-                const cls = score >= 90 ? 'text-red-400' : score >= 70 ? 'text-amber-400' : 'text-slate-400';
-                return `<div class="flex items-center gap-3 py-1">
-                    <span class="font-mono text-[11px] font-bold w-7 text-right ${cls}">${score}</span>
-                    <span class="text-[10px] text-slate-500 font-mono w-20">${escapeHtml(i.ioc_type)}</span>
-                    <span class="text-xs text-slate-200 font-mono truncate flex-1">${escapeHtml(i.ioc_value)}</span>
-                    <span class="text-[10px] text-slate-500">${escapeHtml(i.source || '')}</span>
-                </div>`;
-            }).join('') + '</div>';
-        } catch(e) {
-            el.innerHTML = '<div class="text-slate-500 text-sm">IOCs unavailable — OpenCTI not configured?</div>';
-        }
-    }
 
     // ── v0.27.0: AI Threat Briefing (Overview tab) ──
     window.tiLoadAISummary = async function() {
@@ -843,48 +810,13 @@ data-click-action="tiCloseReport"></div>
         tiDrillTechnique(techId);
     };
 
-    async function loadRecentlyActive() {
-        try {
-            const hideEl = document.getElementById('ti-hide-rule-obs');
-            const hide = hideEl ? hideEl.checked : true;
-            const r = await fetch(API + '/recently-active?days=30&top_n=8&hide_rule_observables=' + hide);
-            if (!r.ok) return;
-            const d = await r.json();
-            const obsEl = document.getElementById('ti-recent-obs');
-            const techEl = document.getElementById('ti-recent-tech');
-            if (!d.observables.length) {
-                obsEl.innerHTML = '<em>No observable activity in the last 30 days.</em>';
-            } else {
-                obsEl.innerHTML = '<ul class="list-none p-0 m-0">' +
-                    d.observables.map(o =>
-                        `<li class="py-1 px-0 border-b-[1px] border-b-[var(--ion-border)] flex justify-between gap-2">
-                            <span><code class="text-xs text-[var(--text-muted)]">${o.type}</code>
-                            <code class="ml-1.5 text-[var(--text-primary)]">${escapeHtml(o.value)}</code></span>
-                            <span class="text-[var(--accent)] font-mono text-xs">${o.count}×</span>
-                        </li>`
-                    ).join('') + '</ul>';
-            }
-            if (!d.techniques.length) {
-                techEl.innerHTML = '<em>No MITRE techniques tagged in the last 30 days.</em>';
-            } else {
-                // each technique chip is now click-to-drill.
-                techEl.innerHTML = '<ul class="list-none p-0 m-0">' +
-                    d.techniques.map(t =>
-                        `<li class="py-1 px-0 border-b-[1px] border-b-[var(--ion-border)] flex justify-between gap-2">
-                            <a class="text-[var(--ion-cyan,#6de4ff)] no-underline font-mono" href="javascript:void(0)" data-click-action="tiDrillTechnique" data-args='["${escapeHtml(t.id)}"]'
- 
- title="Drill into this technique">${escapeHtml(t.id)}</a>
-                            <span class="text-[var(--accent)] font-mono text-xs">${t.count}×</span>
-                        </li>`
-                    ).join('') + '</ul>';
-            }
-        } catch(e) {
-            console.warn('Recently-active widget failed', e);
-        }
-    }
-    // Exposed on window so the "Hide rule-field" checkbox's data-change-action
-    // (resolved via window[name] by event-delegation.js) can reach it.
-    window.loadRecentlyActive = loadRecentlyActive;
+    // The "Hide rule-field" checkbox no longer needs a window export:
+    // it carries hx-get and hx-trigger="change" and refreshes itself.
+    // This line used to read `window.loadRecentlyActive =
+    // loadRecentlyActive;` and survived the function being deleted as a
+    // bare ReferenceError at script-evaluation time, which node --check
+    // cannot see and the fragment tests never load the page to hit.
+    // Found by driving the real page.
 
     // ── v0.27.0: helper for safe HTML escaping in inline-rendered cells ──
     function escapeHtml(s) {
@@ -1097,29 +1029,6 @@ data-click-action="tiCloseReport"></div>
     // "ElasticsearchError"}. A switched-off correlation engine was being
     // reported to the analyst as a clean result.
 
-    function renderMatchRows(tbodyId, matches, showType) {
-        const tbody = document.getElementById(tbodyId);
-        if (!matches.length) {
-            tbody.innerHTML = '<tr><td colspan="5" class="ti-empty">No matches found.</td></tr>';
-            return;
-        }
-        tbody.innerHTML = matches.map(m => {
-            const d = m.details || {};
-            const cls = m.is_read ? '' : ' class="ti-unread"';
-            const time = m.created_at ? new Date(m.created_at).toLocaleString() : '-';
-            const entityName = d.watch_name || '-';
-            const entityType = d.entity_type ? d.entity_type.replace('_', ' ') : '-';
-            const readBtn = m.is_read ? '<span class="text-[var(--text-secondary)] text-xs">Read</span>' :
-                `<button class="ti-btn-outline ti-btn-sm" data-click-action="markRead" data-args='[${m.id}]'>Mark Read</button>`;
-            return `<tr${cls}>
-                <td>${esc(time)}</td>
-                <td><code>${esc(m.observable_value || '-')}</code> <span class="text-[var(--text-secondary)] text-[.72rem]">(${esc(m.observable_type || '')})</span></td>
-                <td>${esc(entityName)}</td>
-                ${showType ? `<td>${esc(entityType)}</td>` : ''}
-                <td>${readBtn}</td>
-            </tr>`;
-        }).join('');
-    }
 
     window.markRead = async function(id) {
         // r.ok, because POST .../read answers 404 for a match that is gone.
@@ -1133,10 +1042,12 @@ data-click-action="tiCloseReport"></div>
             }
             return;
         }
-        loadOverview();
-        // Both match tables: the one on the Watchlist tab is server-rendered
-        // now, and the overview copy is still built by renderMatchRows.
+        // Both match tables and the tiles, all server-rendered now, so one
+        // event each rather than a reload of the whole tab. The unread
+        // count on the tab badge rides along with the stats fragment.
+        tiRefresh('#ti-overview-stats');
         tiRefresh('#matches-body');
+        tiRefresh('#overview-matches-body');
     };
 
     // ── Actors ────────────────────────────────
@@ -1473,7 +1384,9 @@ data-click-action="tiCloseReport"></div>
     }
 
     // ── Init ──────────────────────────────────
-    loadOverview();
+    // Nothing to kick off. The Overview tab is the one active on first
+    // paint and each of its regions carries hx-trigger="load", so they
+    // request themselves and the first paint is not waiting on a script.
 })();
 </script>
 {% endblock %}

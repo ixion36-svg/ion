@@ -95,6 +95,20 @@ WATCH_LIMIT = 500
 #: Rows the matches table shows, from the page's `?limit=50`.
 MATCH_LIMIT = 50
 
+#: Rows the Overview tab's copy of the matches table shows, from its own
+#: `?limit=10`. Same fragment, different limit, so there is one definition
+#: of what a match row looks like rather than two.
+OVERVIEW_MATCH_LIMIT = 10
+
+#: Entries the Overview tab's actor and IOC cards show, from the page's
+#: `.slice(0, 5)` on both.
+OVERVIEW_CARD_ROWS = 5
+
+#: What the Overview tab's recently-active widget asks for, from the page's
+#: `?days=30&top_n=8`.
+RECENT_DAYS = 30
+RECENT_TOP_N = 8
+
 
 def _rows(payload: Any, key: str) -> list[dict] | None:
     """The list under `key`, or None when the payload is not that shape.
@@ -172,20 +186,28 @@ def threat_intel_watchlist_fragment(
 def threat_intel_matches_fragment(
     request: Request,
     unread_only: bool = Query(False),
+    limit: int = Query(MATCH_LIMIT, ge=1, le=200),
+    show_type: bool = Query(False),
     session: Session = Depends(get_db_session),
 ) -> HTMLResponse:
     """The match-alert table, optionally filtered to unread.
 
-    `unread_only` is the page's Show Unread toggle and is bounded exactly as
-    GET /api/threat-intel/matches bounds it, so a filter the API would
-    refuse is not reachable through the page.
+    `unread_only` is the page's Show Unread toggle and `limit` lets the
+    Overview tab's copy ask for its own ten rows. Both are bounded exactly
+    as GET /api/threat-intel/matches bounds them, so a filter or a page size
+    the API would refuse is not reachable through the page.
+
+    One fragment serves both tables. The page had renderMatchRows building
+    the Overview copy and loadMatches building the Watchlist copy, two
+    definitions of a match row that had already drifted: the Overview copy
+    took a showType argument and rendered an extra column.
     """
     from ion.services.threat_intel_service import ThreatIntelService
     from ion.web.threat_intel_api import _match_to_dict
 
     try:
         items, total = ThreatIntelService(session).get_matches(
-            unread_only=unread_only, limit=MATCH_LIMIT
+            unread_only=unread_only, limit=limit
         )
         matches = [_match_to_dict(m) for m in items]
     except Exception:
@@ -194,7 +216,7 @@ def threat_intel_matches_fragment(
             request=request,
             name=MATCHES_FRAGMENT,
             context={"failed": True, "matches": None, "total": None,
-                     "unread_only": unread_only},
+                     "unread_only": unread_only, "show_type": show_type},
             status_code=200,
         )
 
@@ -202,7 +224,7 @@ def threat_intel_matches_fragment(
         request=request,
         name=MATCHES_FRAGMENT,
         context={"failed": False, "matches": matches, "total": total,
-                 "unread_only": unread_only},
+                 "unread_only": unread_only, "show_type": show_type},
     )
 
 
@@ -287,3 +309,199 @@ async def threat_intel_stories_fragment(
         "stories": _rows(payload, "stories"),
         "kill_chain_order": _rows(payload, "kill_chain_order") or [],
     })
+
+
+# ---------------------------------------------------------------------------
+# The Overview tab
+#
+# Five regions the page built in JavaScript, each with its own failure
+# behaviour and none of them honest:
+#
+#   * loadOverview's catch was console.error and rendered nothing. The four
+#     stat tiles kept the dash they ship with, so a failed read looked like
+#     a page still loading. The figures went in with textContent and no
+#     guard, so a payload missing a key printed "undefined" into the tile.
+#   * loadOverviewActors and loadOverviewIOCs both ended in "Actors
+#     unavailable, OpenCTI not configured?" and the same for IOCs. A guess,
+#     punctuated with a question mark, rendered in the same muted grey as
+#     the empty state, while the 503 that caused it carries the exact
+#     reason: "OpenCTI integration is not configured". Both cards now
+#     separate not-configured from a failed read and say which it was.
+#   * loadRecentlyActive did `if (!r.ok) return;`, a silent return that left
+#     both its panels showing the hardcoded "Loading..." from the shell
+#     forever. That is the worst of the three, because a permanent loading
+#     state reads as work in progress rather than as a failure.
+#   * renderMatchRows built the Overview's copy of the match table, a second
+#     definition of a match row that had already drifted from the
+#     Watchlist's: it took a showType argument and rendered an extra
+#     column. The matches fragment serves both now.
+# ---------------------------------------------------------------------------
+
+STATS_FRAGMENT = "_fragments/threat_intel_overview_stats.html"
+RECENT_FRAGMENT = "_fragments/threat_intel_recently_active.html"
+ACTORS_FRAGMENT = "_fragments/threat_intel_landscape_actors.html"
+IOCS_FRAGMENT = "_fragments/threat_intel_landscape_iocs.html"
+
+
+@router.get(
+    "/threat-intel/overview-stats",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+def threat_intel_overview_stats_fragment(
+    request: Request,
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    """The four watch-and-match tiles, and the unread badge on the tab.
+
+    Calls get_overview_stats, which is the whole body of GET
+    /api/threat-intel/overview, so the tiles and the JSON cannot disagree.
+
+    The badge swaps out of band, because it lives in the tab strip rather
+    than in this fragment's target and no second read knows the count.
+    """
+    from ion.services.threat_intel_service import ThreatIntelService
+
+    try:
+        stats = ThreatIntelService(session).get_overview_stats()
+    except Exception:
+        logger.exception("Threat intel overview stats could not be rendered")
+        return templates.TemplateResponse(
+            request=request, name=STATS_FRAGMENT,
+            context={"failed": True, "stats": None}, status_code=200,
+        )
+
+    return templates.TemplateResponse(
+        request=request, name=STATS_FRAGMENT,
+        context={"failed": False,
+                 "stats": stats if isinstance(stats, dict) else None},
+    )
+
+
+@router.get(
+    "/threat-intel/recently-active",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+def threat_intel_recently_active_fragment(
+    request: Request,
+    hide_rule_observables: bool = Query(True),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    """Observables and MITRE techniques seen most in recent case activity.
+
+    One read answers both lists, so they are one fragment. A state where the
+    observables rendered and the techniques still showed "Loading..." was
+    reachable before only because the silent return left whichever panel the
+    script had not reached yet.
+
+    `hide_rule_observables` is the page's checkbox. `days` and `top_n` are
+    fixed at the values the page asked for rather than exposed, because
+    nothing on the page changes them.
+    """
+    from ion.web.threat_intel_api import recently_active
+
+    try:
+        payload = recently_active(
+            days=RECENT_DAYS, top_n=RECENT_TOP_N,
+            hide_rule_observables=hide_rule_observables,
+            session=session, user=None,
+        )
+    except Exception:
+        logger.exception("Threat intel recently-active could not be rendered")
+        return templates.TemplateResponse(
+            request=request, name=RECENT_FRAGMENT,
+            context={"failed": True, "observables": None, "techniques": None,
+                     "days": RECENT_DAYS},
+            status_code=200,
+        )
+
+    # `_rows`, so a payload carrying neither list reaches the template as
+    # None and says the read failed, rather than as [] saying there has been
+    # no activity. The page did `d.observables.length` with no guard at all,
+    # which raises on a payload missing the key.
+    return templates.TemplateResponse(
+        request=request, name=RECENT_FRAGMENT,
+        context={
+            "failed": False,
+            "observables": _rows(payload, "observables"),
+            "techniques": _rows(payload, "techniques"),
+            "days": (payload or {}).get("time_window_days") or RECENT_DAYS,
+        },
+    )
+
+
+async def _landscape(request: Request, fragment: str, rows_key: str,
+                     fetch, label: str) -> HTMLResponse:
+    """Shared body for the two OpenCTI-backed Overview cards.
+
+    Three outcomes, and the first is the one the page guessed at.
+    get_opencti_service().is_configured is the same check
+    /api/threat-landscape/overview and /ioc-feed make before raising their
+    503, so not-configured is reported as the fact it is instead of as a
+    question. is_configured is a property on this service too, so it is read
+    and not called.
+    """
+    from ion.services.opencti_service import get_opencti_service
+
+    def answer(ctx: dict) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request=request, name=fragment,
+            context={"rows": None, "configured": True, "failed": False,
+                     "error": None, "limit": OVERVIEW_CARD_ROWS, **ctx},
+            status_code=200,
+        )
+
+    service = get_opencti_service()
+    if not service.is_configured:
+        return answer({"configured": False})
+
+    try:
+        payload = await fetch(service)
+    except Exception as exc:
+        logger.exception("Threat intel %s card could not be rendered", label)
+        # The class name only. The service's own messages can carry estate
+        # detail and this card renders for anyone with observable:read.
+        return answer({"failed": True, "error": type(exc).__name__})
+
+    rows = _rows(payload, rows_key)
+    return answer({"rows": None if rows is None else rows[:OVERVIEW_CARD_ROWS]})
+
+
+@router.get(
+    "/threat-intel/landscape-actors",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def threat_intel_landscape_actors_fragment(request: Request) -> HTMLResponse:
+    """Top tracked actors, from the read GET /api/threat-landscape/overview
+    performs."""
+    return await _landscape(
+        request, ACTORS_FRAGMENT, "actors",
+        lambda s: s.get_threat_landscape_overview(), "actors",
+    )
+
+
+@router.get(
+    "/threat-intel/landscape-iocs",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def threat_intel_landscape_iocs_fragment(
+    request: Request,
+    min_score: int = Query(75, ge=0, le=100),
+) -> HTMLResponse:
+    """Highest-scoring recent indicators, from the read GET
+    /api/threat-landscape/ioc-feed performs.
+
+    `min_score` keeps the page's 75 as its default and is bounded as that
+    endpoint bounds it.
+    """
+    from ion.web.threat_landscape_api import get_ioc_feed
+
+    async def fetch(_service):
+        return await get_ioc_feed(
+            limit=OVERVIEW_CARD_ROWS, min_score=min_score, user=None
+        )
+
+    return await _landscape(request, IOCS_FRAGMENT, "indicators", fetch, "iocs")

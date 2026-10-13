@@ -56,8 +56,15 @@
          Spelled out here because `m.details.watch_name` on a null details
          raises in Jinja's default undefined rather than rendering. #}
       <td>{{ (m.details or {}).get('watch_name') or '-' }}</td>
+      {# The fourth column differs between the two tables that use this
+         fragment, which is what renderMatchRows' showType argument did:
+         the Overview copy shows the observable type, the Watchlist copy
+         shows read state. Both headers declare five columns, so the choice
+         is which fourth one, not whether there is one. #}
       <td>
-        {%- if m.is_read -%}
+        {%- if show_type -%}
+          {{ m.observable_type or '-' }}
+        {%- elif m.is_read -%}
           Read
         {%- else -%}
           <strong class="text-[var(--accent)]">Unread</strong>

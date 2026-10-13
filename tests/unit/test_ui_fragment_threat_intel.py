@@ -39,6 +39,10 @@ from ion.web.templating import make_templates
 from ion.web.ui.threat_intel import (
     MANAGE_PERMISSION,
     MATCH_LIMIT,
+    OVERVIEW_CARD_ROWS,
+    OVERVIEW_MATCH_LIMIT,
+    RECENT_DAYS,
+    RECENT_TOP_N,
     PERMISSION,
     STORIES_PERMISSION,
     WATCH_LIMIT,
@@ -665,13 +669,14 @@ def test_the_write_controls_read_the_permission_from_the_server():
 
 #: Reads still using `fetch(url).then(r => r.json())`, which discards the
 #: status so a refusal body gets destructured for a key it does not carry.
-#: Two in loadOverview on the Overview panel, two in the actor search and
-#: its row detail, two in the campaign equivalents. All six belong to
-#: panels a later stage converts, and each goes with its panel.
+#: Two in the actor search and its row detail, two in the campaign
+#: equivalents. Both panels are converted by a later stage and each read
+#: goes with its panel. loadOverview's two are gone as of the Overview
+#: stage, which took this count from 6 to 4.
 #:
 #: Pinned rather than left unmeasured. This number may only go down: a new
 #: one is the defect this whole conversion exists to remove, reappearing.
-UNCHECKED_READS_REMAINING = 6
+UNCHECKED_READS_REMAINING = 4
 
 
 def test_the_unchecked_reads_this_page_still_has_do_not_increase():
@@ -714,3 +719,499 @@ def test_the_permission_constants_match_what_the_endpoints_declare():
     assert PERMISSION == "observable:read"
     assert MANAGE_PERMISSION == "observable:enrich"
     assert STORIES_PERMISSION == "alert:read"
+
+
+# ---------------------------------------------------------------------------
+# The Overview tab
+#
+# Five regions, and the same mistake in all five: a failed read was never
+# rendered as a failed read. loadOverview caught to console.error and left
+# four tiles showing the dash they ship with. The two OpenCTI cards rendered
+# the guess "OpenCTI not configured?" in the same grey as their empty state,
+# while the 503 behind it names the cause exactly. loadRecentlyActive did
+# `if (!r.ok) return;` and left both its panels on the shell's "Loading..."
+# forever, which is the worst of the three: a reader waits out a spinner and
+# acts on an empty state, and a permanent spinner gets neither.
+# ---------------------------------------------------------------------------
+
+STATS = "_fragments/threat_intel_overview_stats.html"
+RECENT = "_fragments/threat_intel_recently_active.html"
+LS_ACTORS = "_fragments/threat_intel_landscape_actors.html"
+LS_IOCS = "_fragments/threat_intel_landscape_iocs.html"
+
+_STATS_OK = {
+    "watched_actors": 4,
+    "watched_campaigns": 2,
+    "matches_7d": 11,
+    "unread_alerts": 3,
+}
+
+
+def test_failed_overview_stats_say_unknown_rather_than_showing_zeros():
+    """loadOverview's catch rendered nothing, so the tiles kept their dash
+    and a failed read looked like a page still loading."""
+    html = render(STATS, failed=True, stats=None)
+    assert "unknown" in html
+    assert "could not be read" in html
+    assert 'role="alert"' in html
+    # The tiles only. The out-of-band badge renders a 0 behind its hidden
+    # class, which is not a figure anyone reads.
+    tiles = html[:html.index('id="ti-unread-badge"')]
+    assert ">0<" not in tiles.replace(" ", "")
+
+
+def test_a_stat_the_payload_omits_is_not_printed_as_undefined():
+    """`stats.watched_actors` with textContent and no guard printed the
+    string "undefined" into the tile for a payload missing the key."""
+    html = render(STATS, failed=False, stats={"watched_actors": 4})
+    assert "not recorded" in html
+    assert "undefined" not in html
+    assert "None" not in html
+
+
+def test_a_measured_zero_is_still_shown_as_zero():
+    html = render(STATS, failed=False, stats=dict(_STATS_OK, watched_actors=0))
+    assert re.search(r">\s*0\s*<", html)
+    assert "not recorded" not in html
+    assert "unknown" not in html
+
+
+@pytest.mark.parametrize("unread,hidden", [(0, True), (None, True), (3, False)])
+def test_the_tab_badge_only_appears_for_a_real_unread_count(unread, hidden):
+    """The badge draws the eye. One reading 0 does that for nothing, and an
+    unmeasured count is not a reason to draw it either."""
+    html = render(STATS, failed=False, stats=dict(_STATS_OK, unread_alerts=unread))
+    badge = html[html.index('id="ti-unread-badge"'):]
+    badge = badge[:badge.index("</span>")]
+    assert ("hidden" in badge) is hidden
+    assert 'hx-swap-oob="outerHTML"' in badge
+
+
+def test_a_failed_recently_active_read_does_not_leave_a_permanent_loading():
+    """`if (!r.ok) return;` left both panels on the shell's "Loading..."
+    text. Both now say the read failed."""
+    html = render(RECENT, failed=True, observables=None, techniques=None, days=30)
+    assert html.count("could not be read") == 2
+    assert "Loading" not in html
+    assert html.count('role="alert"') == 2
+    assert 'hx-swap-oob="innerHTML"' in html
+
+
+def test_recently_active_distinguishes_no_activity_from_a_failed_read():
+    empty = render(RECENT, failed=False, observables=[], techniques=[], days=30)
+    assert "No observable activity in the last 30 days" in empty
+    assert "No MITRE techniques tagged in the last 30 days" in empty
+    assert "could not be read" not in empty
+
+
+def test_a_recently_active_payload_missing_a_list_is_a_failure_not_an_absence():
+    """The page did `d.observables.length` with no guard, which raises on a
+    payload that does not carry the key. `_rows` makes that None, and None
+    renders as a failure rather than as no activity."""
+    html = render(RECENT, failed=False, observables=None,
+                  techniques=[{"id": "T1059", "count": 2}], days=30)
+    assert "Recent observable activity could not be read" in html
+    assert "T1059" in html, "the list that did arrive still renders"
+
+
+def test_a_technique_chip_is_a_button_not_a_javascript_href():
+    """The page used <a href="javascript:void(0)">, which is a dead link in
+    the accessibility tree and a navigation the CSP has no reason to
+    permit."""
+    html = render(RECENT, failed=False, observables=[],
+                  techniques=[{"id": "T1059", "count": 2}], days=30)
+    assert "javascript:void(0)" not in html
+    assert "<button" in html
+    assert "tiDrillTechnique" in html
+
+
+@pytest.mark.parametrize("fragment", [LS_ACTORS, LS_IOCS])
+def test_opencti_not_configured_is_stated_not_guessed_at(fragment):
+    """The page rendered "OpenCTI not configured?" with a question mark for
+    both this case and a genuine failure, in the same grey as the empty
+    state. Measured live: /api/threat-landscape/overview answers 503 with
+    "OpenCTI integration is not configured", which says which it is."""
+    html = render(fragment, configured=False, rows=None, failed=False,
+                  error=None, limit=5)
+    assert "not configured" in html
+    assert "?" not in html.replace("&quot;", "")
+    assert "nothing to retry" in html or "rather than a fault" in html
+
+
+@pytest.mark.parametrize("fragment", [LS_ACTORS, LS_IOCS])
+def test_a_configured_opencti_that_fails_is_a_fault_not_an_absence(fragment):
+    html = render(fragment, configured=True, rows=None, failed=True,
+                  error="OpenCTIError", limit=5)
+    assert "could not be read" in html
+    assert "not configured, so" not in html
+    assert "OpenCTIError" in html
+    assert 'role="alert"' in html
+
+
+@pytest.mark.parametrize("fragment,empty", [
+    (LS_ACTORS, "No actors tracked yet"),
+    (LS_IOCS, "No high-score IOCs at this threshold"),
+])
+def test_an_opencti_card_that_answered_with_nothing_says_so_plainly(fragment, empty):
+    html = render(fragment, configured=True, rows=[], failed=False,
+                  error=None, limit=5)
+    assert empty in html
+    assert "could not be read" not in html
+    assert "not configured" not in html
+
+
+def test_an_actor_with_no_counted_ttps_is_not_reported_as_zero():
+    """`a.ttp_count || 0` printed a confident zero for an actor whose TTPs
+    were never counted."""
+    counted = render(LS_ACTORS, configured=True, failed=False, error=None,
+                     limit=5, rows=[{"name": "APT29", "ttp_count": 0}])
+    missing = render(LS_ACTORS, configured=True, failed=False, error=None,
+                     limit=5, rows=[{"name": "APT29", "ttp_count": None}])
+    assert "0 TTPs" in counted
+    assert "TTPs not counted" in missing
+    assert "0 TTPs" not in missing
+
+
+def test_an_unscored_indicator_is_not_painted_as_a_low_score():
+    """`i.score || 0` sent an unscored indicator through the colour bands as
+    a zero and painted it the same slate as a genuinely low score."""
+    row = {"ioc_type": "ipv4-addr", "ioc_value": "1.2.3.4", "source": "feed"}
+    unscored = render(LS_IOCS, configured=True, failed=False, error=None,
+                      limit=5, rows=[dict(row, score=None)])
+    low = render(LS_IOCS, configured=True, failed=False, error=None,
+                 limit=5, rows=[dict(row, score=10)])
+    high = render(LS_IOCS, configured=True, failed=False, error=None,
+                  limit=5, rows=[dict(row, score=95)])
+    assert "carries no score" in unscored
+    assert "text-slate-600" in unscored
+    assert "carries no score" not in low
+    assert "text-slate-400" in low
+    assert "text-red-400" in high
+
+
+def test_the_two_match_tables_share_one_row_definition():
+    """renderMatchRows was a second definition of a match row and the two
+    had drifted: its showType argument rendered the observable type where
+    the Watchlist table shows read state. One fragment, one parameter."""
+    status = render(MATCHES, failed=False, matches=[_match()], total=1,
+                    unread_only=False, show_type=False)
+    typed = render(MATCHES, failed=False, matches=[_match()], total=1,
+                   unread_only=False, show_type=True)
+    assert "Unread" in status
+    assert "ip" in typed
+    assert "Unread</strong>" not in typed
+    # Five columns either way, because both table headers declare five.
+    assert status.count("<td") == typed.count("<td") == 5
+
+
+OVERVIEW_PATHS = [
+    "/ui/threat-intel/overview-stats",
+    "/ui/threat-intel/recently-active",
+    "/ui/threat-intel/landscape-actors",
+    "/ui/threat-intel/landscape-iocs",
+]
+
+
+@pytest.mark.parametrize("path", OVERVIEW_PATHS)
+def test_an_overview_fragment_refuses_a_caller_with_no_permissions(session, path):
+    app = _client(session, _User())
+    with TestClient(app) as client:
+        assert client.get(path).status_code == 403
+
+
+@pytest.mark.parametrize("path", OVERVIEW_PATHS)
+def test_an_overview_fragment_answers_a_reader(session, path):
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        r = client.get(path)
+    assert r.status_code == 200
+    # Never an empty body: every one of these has a render for every outcome,
+    # and a blank panel is what the page did on failure.
+    assert r.text.strip()
+
+
+def test_the_overview_cards_report_opencti_as_unconfigured_here(session):
+    """This deployment has no OpenCTI, measured: both landscape endpoints
+    answer 503. So the cards must say not configured, and that is the one
+    outcome a live page on this machine can show."""
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        for path in ("/ui/threat-intel/landscape-actors",
+                     "/ui/threat-intel/landscape-iocs"):
+            body = client.get(path).text
+            assert "not configured" in body, path
+            assert "could not be read" not in body, path
+
+
+def test_the_ioc_card_bounds_min_score_as_the_json_endpoint_does(session):
+    from ion.web.threat_landscape_api import get_ioc_feed
+    import inspect
+
+    api = inspect.signature(get_ioc_feed).parameters["min_score"].default
+    from ion.web.ui.threat_intel import threat_intel_landscape_iocs_fragment
+    frag = inspect.signature(
+        threat_intel_landscape_iocs_fragment).parameters["min_score"].default
+    assert frag.metadata == api.metadata
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        assert client.get(
+            "/ui/threat-intel/landscape-iocs?min_score=500").status_code == 422
+
+
+def test_the_page_no_longer_builds_the_overview_in_javascript():
+    page = _page()
+    for gone in ("async function loadOverview", "async function loadOverviewActors",
+                 "async function loadOverviewIOCs", "async function loadRecentlyActive",
+                 "function renderMatchRows"):
+        assert gone not in page, f"{gone} should have been removed"
+
+
+@pytest.mark.parametrize("target,url", [
+    ("ti-overview-stats", "/ui/threat-intel/overview-stats"),
+    ("ti-overview-actors", "/ui/threat-intel/landscape-actors"),
+    ("ti-overview-iocs", "/ui/threat-intel/landscape-iocs"),
+    ("overview-matches-body", "/ui/threat-intel/matches?limit=10&amp;show_type=true"),
+])
+def test_each_overview_region_pulls_its_markup_from_its_fragment(target, url):
+    page = _page()
+    block = page[page.index(f'id="{target}"'):]
+    block = block[:block.index(">") + 500]
+    assert url in block, f"{target} does not request {url}"
+
+
+def test_the_overview_regions_load_without_a_click():
+    """Overview is the tab that is active on first paint, so its regions
+    cannot wait for the ti-show a tab click dispatches."""
+    page = _page()
+    for target in ("ti-overview-stats", "ti-overview-actors",
+                   "ti-overview-iocs", "overview-matches-body"):
+        block = page[page.index(f'id="{target}"'):]
+        block = block[:block.index(">") + 500]
+        assert 'hx-trigger="load' in block, target
+
+
+def test_the_hide_rule_observables_toggle_sends_both_of_its_states():
+    """A checkbox sends nothing when unchecked, and the route's default of
+    true would then reassert the filter the reader just turned off. The
+    hidden companion always sends false and the checkbox sends true on top
+    of it, which puts the parameter in twice on purpose: FastAPI reads the
+    last copy, so hx-include lists hidden first and checkbox second."""
+    page = _page()
+    assert 'id="ti-hide-rule-obs-off"' in page
+    block = page[page.index('id="ti-hide-rule-obs"'):]
+    block = block[:block.index(">") + 500]
+    assert 'hx-include="#ti-hide-rule-obs-off, #ti-hide-rule-obs"' in block
+    assert 'hx-swap="none"' in block, "both lists arrive out of band"
+
+
+def test_the_overview_limits_are_the_ones_the_page_asked_for():
+    assert OVERVIEW_MATCH_LIMIT == 10
+    assert OVERVIEW_CARD_ROWS == 5
+    assert RECENT_DAYS == 30
+    assert RECENT_TOP_N == 8
+
+
+def test_the_landscape_cards_render_rows_when_opencti_answers(session, monkeypatch):
+    """OpenCTI is unconfigured on this deployment, so both cards
+    short-circuit before their fetch runs and the rows path is otherwise
+    never exercised. This drives it with a configured stub.
+    """
+    import ion.services.opencti_service as octi
+
+    class _Svc:
+        is_configured = True
+
+        async def get_threat_landscape_overview(self):
+            return {"actors": [{"name": "APT29", "ttp_count": 7,
+                                "country_flag": "RU"}]}
+
+    monkeypatch.setattr(octi, "get_opencti_service", lambda: _Svc())
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/landscape-actors").text
+    assert "APT29" in body
+    assert "7 TTPs" in body
+    assert "not configured" not in body
+    assert "could not be read" not in body
+
+
+def test_a_landscape_card_that_raises_reports_the_class_not_the_message(session,
+                                                                       monkeypatch):
+    """The service's own messages can carry estate detail and this card
+    renders for anyone with observable:read, so only the exception class
+    name reaches the page."""
+    import ion.services.opencti_service as octi
+
+    class _Svc:
+        is_configured = True
+
+        async def get_threat_landscape_overview(self):
+            raise RuntimeError("opencti at https://cti.internal.example said no")
+
+    monkeypatch.setattr(octi, "get_opencti_service", lambda: _Svc())
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/landscape-actors").text
+    assert "could not be read" in body
+    assert "RuntimeError" in body
+    assert "cti.internal.example" not in body
+    assert "not configured, so" not in body
+
+
+def test_the_landscape_card_trims_to_the_rows_the_page_showed(session, monkeypatch):
+    """Both cards did `.slice(0, 5)` in the browser after fetching the full
+    list. The trim happens server-side now, so the extra rows are not sent
+    to a card that would never show them."""
+    import ion.services.opencti_service as octi
+
+    class _Svc:
+        is_configured = True
+
+        async def get_threat_landscape_overview(self):
+            return {"actors": [{"name": f"ACTOR-{i}", "ttp_count": i}
+                               for i in range(12)]}
+
+    monkeypatch.setattr(octi, "get_opencti_service", lambda: _Svc())
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/landscape-actors").text
+    assert body.count("ACTOR-") == OVERVIEW_CARD_ROWS
+    assert "ACTOR-0" in body
+    assert "ACTOR-5" not in body
+
+
+def test_a_missing_observable_list_from_the_route_is_a_failure_not_an_absence(
+        session, monkeypatch):
+    """Closes a survivor. The template is tested directly above, but nothing
+    drove the module with a payload that omits a list, so replacing `_rows`
+    with `.get(...) or []` went unnoticed: a payload carrying neither key
+    would have rendered "No observable activity" for a read that failed to
+    produce one."""
+    import ion.web.threat_intel_api as api
+
+    monkeypatch.setattr(api, "recently_active",
+                        lambda **kw: {"time_window_days": 30})
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        body = client.get("/ui/threat-intel/recently-active").text
+    assert "Recent observable activity could not be read" in body
+    assert "Recent technique activity could not be read" in body
+    assert "No observable activity" not in body
+    assert "No MITRE techniques tagged" not in body
+
+
+def test_a_missing_technique_list_alone_is_a_failure_not_an_absence():
+    """Closes a survivor. The observables side of this was tested and the
+    techniques side was not, so dropping `techniques is none` from its guard
+    left no test red."""
+    html = render(RECENT, failed=False, techniques=None,
+                  observables=[{"type": "ip", "value": "1.2.3.4", "count": 3}],
+                  days=30)
+    assert "Recent technique activity could not be read" in html
+    assert "No MITRE techniques tagged" not in html
+    assert "1.2.3.4" in html, "the list that did arrive still renders"
+
+
+def test_the_matches_route_honours_show_type(session):
+    """Closes a survivor. The fragment's show_type branch was tested by
+    rendering it directly, and the page's request for it was tested by
+    reading the markup, but nothing checked that the route passes the
+    parameter through, so hardcoding it to False survived."""
+    from ion.services.threat_intel_service import ThreatIntelService
+    from ion.models.threat_intel import ThreatIntelWatch  # noqa: F401
+
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        plain = client.get("/ui/threat-intel/matches")
+        typed = client.get("/ui/threat-intel/matches?show_type=true")
+    assert plain.status_code == typed.status_code == 200
+
+    # Both tables are empty on this deployment, so compare the parameter the
+    # route resolved rather than rendered rows: the fragment only branches on
+    # show_type inside a row.
+    import inspect
+    from ion.web.ui.threat_intel import threat_intel_matches_fragment
+    sig = inspect.signature(threat_intel_matches_fragment)
+    assert "show_type" in sig.parameters
+    assert sig.parameters["show_type"].default.default is False
+
+    src = inspect.getsource(threat_intel_matches_fragment)
+    assert src.count('"show_type": show_type') == 2, (
+        "both the success and the failure context must carry show_type, or "
+        "one of the two renders silently loses the column"
+    )
+
+
+#: Functions this conversion deleted from the page's script. Any surviving
+#: reference to one is a ReferenceError the moment the script is evaluated
+#: or the moment a delegated handler resolves it on window.
+DELETED_FUNCTIONS = [
+    "loadWatches", "loadMatches", "tiLoadStories", "loadOverview",
+    "loadOverviewActors", "loadOverviewIOCs", "loadRecentlyActive",
+    "renderMatchRows",
+]
+
+
+def _script() -> str:
+    """The page's script block with its comments stripped.
+
+    Comments are where these names legitimately still appear, explaining
+    what was removed and why, so a check that did not strip them would
+    either fail on the documentation or be written so loosely that it
+    passed on a real reference.
+    """
+    page = _page()
+    body = page[page.index('<script nonce="{{ csp_nonce }}">') + 32:]
+    body = body[:body.index("</script>")]
+    return "\n".join(
+        line for line in body.splitlines()
+        if not line.lstrip().startswith("//")
+    )
+
+
+@pytest.mark.parametrize("name", DELETED_FUNCTIONS)
+def test_no_live_code_still_references_a_deleted_function(name):
+    """`window.loadRecentlyActive = loadRecentlyActive;` outlived the
+    function it exported and threw "loadRecentlyActive is not defined" when
+    the script was evaluated. node --check cannot see that, because the name
+    is syntactically valid, and the fragment tests never load the page. It
+    was found by driving the real page, which is why this guard exists.
+    """
+    assert name not in _script(), (
+        f"{name} was deleted but something still references it; a delegated "
+        "data-*-action resolves by name on window, so this throws at runtime"
+    )
+
+
+def test_every_delegated_action_on_the_page_resolves_to_something():
+    """The same hazard from the markup side. A data-click-action or
+    data-change-action naming a function that no longer exists is a
+    ReferenceError on the first click, and nothing offline catches it.
+    """
+    import re
+
+    page = _page()
+    actions = set(re.findall(r'data-(?:click|change)-action="([A-Za-z0-9_]+)"', page))
+
+    # base.html too. It defines window helpers that every page inherits, and
+    # this page uses one of them: tiCopyIOC lives at base.html:123. Scoping
+    # the search to this page's own script reported that as a dead action,
+    # which is the fourth time in this project a guard has named something
+    # adjacent to its subject as the defect.
+    script = _script() + (ROOT / "src/ion/web/templates/base.html").read_text(
+        encoding="utf-8")
+
+    missing = sorted(
+        a for a in actions
+        if f"window.{a} " not in script
+        and f"window.{a}=" not in script
+        and f"function {a}(" not in script
+        and f"{a} = function" not in script
+        and f"{a} = async function" not in script
+    )
+    assert not missing, f"delegated actions with no definition: {missing}"
