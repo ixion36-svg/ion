@@ -33,6 +33,7 @@
   <div class="ad-sys-loading text-[var(--danger)]" role="alert">
     The system overview could not be read. This is not a deployment with no
     systems in it: whether any exist, and how they are covered, is not known.
+    {% if reason %}({{ reason }}){% endif %}
   </div>
 {% elif rows is none %}
   <div class="ad-sys-loading text-[var(--danger)]" role="alert">
@@ -45,6 +46,15 @@
     No systems found. Connect Elasticsearch to see system data.
   </div>
 {% else %}
+  {% if degraded %}
+    {# The systems below are the CyAB mappings out of ION's own database, so
+       the list is real. The alert side of the payload is not, and every
+       count on these cards renders as not reported rather than as nought. #}
+    <div class="ad-sys-loading text-[var(--warning)]" role="status">
+      These systems are the ones ION has mapped. How many alerts each raised
+      could not be read{% if reason %}: {{ reason }}{% endif %}.
+    </div>
+  {% endif %}
   {% for sys in rows %}
     <div class="ad-sys-card{{ ' mapped' if sys.mapped else '' }}">
       <div class="ad-sys-head">

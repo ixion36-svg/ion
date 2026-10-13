@@ -2819,6 +2819,14 @@ def sys_card(row: Any) -> Optional[dict]:
     }
 
 
+def sys_failed(reason: Optional[str] = None) -> dict:
+    """The view for a read that did not happen, with its reason when the
+    payload gave one."""
+    return {"failed": True, "degraded": False, "reason": reason, "rows": None,
+            "total_alerts": None, "total_systems": None,
+            "mapped_systems": None, "avg_coverage": None}
+
+
 def sys_overview(payload: Any) -> dict:
     """The systems tab's view, as failed or as the four figures plus the
     cards.
@@ -2826,13 +2834,43 @@ def sys_overview(payload: Any) -> dict:
     `rows` is None when the payload carried no system list, so the grid can
     say the read did not answer rather than advising the reader to connect
     Elasticsearch, which is what "No systems found" did for a refusal.
+
+    `es_failed` is the other half of that. get_system_overview merges the
+    Elasticsearch systems with the CyAB namespace mappings out of ION's own
+    database, so when Elasticsearch cannot be read there are two different
+    answers depending on what is left:
+
+      nothing          no ES and no mapping, so which systems exist is not
+                       known. That is a failed read, and it names the reason
+                       rather than telling the reader to connect the thing
+                       whose absence is the reason.
+
+      the mappings     ION knows these systems exist. The list is real and
+                       the alert figures are not, so the cards render and
+                       every count goes in as None. Zero would say the
+                       estate was quiet when the truth is nobody counted.
+
+    A payload that does not carry `es_failed` is not read as a failure.
+    get_system_overview always sets it, so its absence is an unexpected
+    shape rather than a signal, and treating it as one would turn every
+    healthy render into a warning.
     """
     if not isinstance(payload, dict):
-        return {"failed": True, "rows": None, "total_alerts": None,
-                "total_systems": None, "mapped_systems": None,
-                "avg_coverage": None}
+        return sys_failed()
     rows = _rows(payload, "systems")
     cards = [c for c in (sys_card(r) for r in rows) if c] if rows is not None else None
+
+    es_failed = payload.get("es_failed") is True
+    reason = payload.get("error") or None
+    if es_failed and not cards:
+        return sys_failed(reason)
+
+    if cards is not None and es_failed:
+        # Every card is a CyAB mapping in this case, and the API gives those
+        # an alert_count of 0 because it has nothing to put there.
+        for card in cards:
+            card["alert_count"] = None
+
     if cards is not None:
         # Mapped first, then by alert count, as the page sorted them. A card
         # with no count sorts last rather than as a zero.
@@ -2840,8 +2878,10 @@ def sys_overview(payload: Any) -> dict:
                                   -(c["alert_count"] if c["alert_count"] is not None else -1)))
     return {
         "failed": False,
+        "degraded": es_failed,
+        "reason": reason,
         "rows": cards,
-        "total_alerts": _count(payload.get("total_alerts")),
+        "total_alerts": None if es_failed else _count(payload.get("total_alerts")),
         "total_systems": _count(payload.get("total_systems")),
         "mapped_systems": _count(payload.get("mapped_systems")),
         "avg_coverage": _number(payload.get("avg_tide_coverage")),
@@ -2874,9 +2914,7 @@ async def alerts_systems_fragment(
         view = sys_overview(payload)
     except Exception:
         logger.exception("Alert systems fragment could not read the overview")
-        view = {"failed": True, "rows": None, "total_alerts": None,
-                "total_systems": None, "mapped_systems": None,
-                "avg_coverage": None}
+        view = sys_failed()
     return templates.TemplateResponse(
         request=request, name=SYSTEMS_FRAGMENT,
         context={"hours": hours, **view}, status_code=200,

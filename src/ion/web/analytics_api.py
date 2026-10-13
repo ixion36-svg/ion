@@ -212,15 +212,36 @@ async def get_system_overview(
     from ion.services.tide_service import get_tide_service
 
     # 1. Load ES system analytics
+    #
+    # Three ways this does not happen: no url configured, a service that
+    # reports itself not configured, and a read that throws. All three left
+    # the empty default in place, and only the third recorded anything, an
+    # `error` key no consumer read. A caller could not tell an estate with no
+    # systems from an Elasticsearch nobody could reach, so the alerts page's
+    # systems tab advised connecting Elasticsearch as the explanation for a
+    # panel that was empty because Elasticsearch was not connected.
+    #
+    # es_failed below says whether the alert figures in this payload are a
+    # reading or the placeholder. The system list is a separate question: it
+    # merges these with the CyAB namespace mappings out of ION's own
+    # database, so it can be a real answer even when this half failed.
     es_data = {"systems": [], "total": 0, "total_severity": {}, "total_timeline": []}
+    es_read = False
+    es_error = None
     config = get_elasticsearch_config()
-    if config.get("url"):
+    if not config.get("url"):
+        es_error = "Elasticsearch is not configured"
+    else:
         try:
             es = ElasticsearchService()
             if es.is_configured:
                 es_data = await es.get_system_analytics(hours=hours)
+                es_read = True
+            else:
+                es_error = "Elasticsearch is not configured"
         except Exception as e:
-            es_data["error"] = safe_error(e, "analytics_es")
+            es_error = safe_error(e, "analytics_es")
+            es_data["error"] = es_error
 
     # 2. Load CyAB namespace mappings
     sources = session.query(CyabDataSource).filter(
@@ -340,5 +361,9 @@ async def get_system_overview(
         "indices": es_data.get("indices", []),
         "hours": hours,
         "interval": es_data.get("interval", "1h"),
-        "error": es_data.get("error"),
+        "error": es_data.get("error") or es_error,
+        # Whether the Elasticsearch half of this payload happened. The
+        # figures above that come from it are placeholders when this is
+        # true, not measurements of a quiet estate.
+        "es_failed": not es_read,
     }

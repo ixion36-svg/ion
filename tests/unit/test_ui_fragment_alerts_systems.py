@@ -545,3 +545,115 @@ def test_the_help_modal_keeps_its_close_controls():
     tpl = tpl[:tpl.index("</template>")]
     assert tpl.count('data-remove-target="keyboard-help-modal"') == 2
     assert "data-remove-self-on-self-click" in tpl
+
+
+# ---------------------------------------------------------------------------
+# An Elasticsearch that could not be read, told apart from an estate with
+# no systems in it.
+#
+# get_system_overview initialised es_data to {"systems": [], ...} and used
+# that default for all three unreadable cases: no url configured, a service
+# reporting itself not configured, and a read that threw. Only the third
+# recorded anything, an `error` key no consumer read. So this tab said "No
+# systems found. Connect Elasticsearch to see system data." while the
+# analytics tab beside it, reading the same absent Elasticsearch, correctly
+# said the alerts could not be read. Measured live on 2026-10-13.
+#
+# The system list is not purely an Elasticsearch read: get_system_overview
+# merges the ES systems with the CyAB namespace mappings out of ION's own
+# database, so an unreadable ES can still leave a real list of systems
+# whose alert figures are unknown. The two cases are separated below.
+# ---------------------------------------------------------------------------
+
+
+def test_an_unreadable_elasticsearch_with_no_mapped_systems_is_a_failed_read():
+    """Nothing is known: no ES, and no CyAB mapping to fall back on. The
+    reader must not be told to go and connect the thing that is the reason
+    the panel is empty."""
+    view = sys_overview({"systems": [], "es_failed": True,
+                         "error": "Elasticsearch is not configured"})
+    assert view["failed"] is True
+    assert view["reason"] == "Elasticsearch is not configured"
+
+
+def test_an_unreadable_elasticsearch_still_lists_the_mapped_systems():
+    """The CyAB mappings come from ION's own database and are a real answer
+    to "which systems exist". Losing them because ES is down would be the
+    opposite mistake."""
+    view = sys_overview({"systems": [_sys(alert_count=0)], "es_failed": True,
+                         "error": "Elasticsearch is not configured",
+                         "total_alerts": 0})
+    assert view["failed"] is False
+    assert view["degraded"] is True
+    assert view["reason"] == "Elasticsearch is not configured"
+    assert [c["name"] for c in view["rows"]] == ["corp-ad"]
+
+
+def test_an_unreadable_read_reports_no_alert_total_rather_than_zero():
+    """total_alerts comes from the ES side. Zero would say the estate was
+    quiet, when the truth is that nobody counted."""
+    view = sys_overview({"systems": [_sys()], "es_failed": True,
+                         "total_alerts": 0, "error": "boom"})
+    assert view["total_alerts"] is None
+
+
+def test_a_degraded_read_keeps_the_figures_ion_itself_knows():
+    """total_systems and mapped_systems are counted from the merged list,
+    which ION produced, so they stay measurements."""
+    view = sys_overview({"systems": [_sys(), _sys(system="corp-dns")],
+                         "es_failed": True, "total_systems": 2,
+                         "mapped_systems": 2, "error": "boom"})
+    assert view["total_systems"] == 2
+    assert view["mapped_systems"] == 2
+
+
+def test_a_successful_read_with_no_systems_is_still_a_real_absence():
+    """The branch the old wording was written for, and the only one where
+    "Connect Elasticsearch" is the right advice."""
+    view = sys_overview({"systems": [], "es_failed": False})
+    assert view["failed"] is False
+    assert view["degraded"] is False
+    assert view["rows"] == []
+
+
+def test_a_payload_that_does_not_say_is_not_treated_as_degraded():
+    """get_system_overview always sets es_failed, so an absent key is an
+    unexpected shape rather than a signal. It is not read as a failure,
+    which would turn every healthy render into a warning."""
+    view = sys_overview({"systems": [_sys()], "total_alerts": 5})
+    assert view["degraded"] is False
+    assert view["total_alerts"] == 5
+
+
+def test_the_fragment_says_the_counts_are_unknown_on_a_degraded_read(overview):
+    overview["payload"] = {"systems": [_sys(alert_count=0)], "es_failed": True,
+                           "error": "Elasticsearch is not configured",
+                           "total_alerts": 0, "total_systems": 1,
+                           "mapped_systems": 1}
+    body = get().text
+    assert "corp-ad" in body, "the mapped system is still listed"
+    assert "Elasticsearch is not configured" in body
+    assert "No systems found" not in body
+
+
+def test_the_fragment_does_not_advise_connecting_es_when_es_is_the_problem(overview):
+    overview["payload"] = {"systems": [], "es_failed": True,
+                           "error": "Elasticsearch is not configured"}
+    body = get().text
+    assert "No systems found. Connect Elasticsearch" not in body
+    assert "could not be read" in body
+
+
+def test_the_real_overview_reports_an_unconfigured_elasticsearch(session):
+    """Drives the handler itself rather than the stub. This deployment has
+    no Elasticsearch, which is the case that returned an empty list and
+    said nothing."""
+    import asyncio
+
+    from ion.web.analytics_api import get_system_overview
+
+    payload = asyncio.run(
+        get_system_overview(hours=24, current_user=None, session=session))
+    assert payload["es_failed"] is True
+    assert payload["error"]
+    assert isinstance(payload["systems"], list)
