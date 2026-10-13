@@ -155,7 +155,11 @@
         </div>
         <div class="doc-panel-actions">
             <button id="save-amendment-btn" class="btn btn-sm btn-success hidden">Save Amendment</button>
-            <button id="export-pdf-btn" class="btn btn-sm btn-primary"><i class="icon-file-text"></i> PDF</button>
+            {# The label is its own element so the busy state can change the
+               words without rebuilding the button from a string, which is
+               what rebuilding the whole button and restoring it did.
+               The spinner is .is-busy in documents-page.css. #}
+            <button id="export-pdf-btn" class="btn btn-sm btn-primary"><i class="icon-file-text"></i> <span data-btn-label>PDF</span></button>
             <button id="download-btn" class="btn btn-sm">Download</button>
             <button id="delete-doc-btn" class="btn btn-sm btn-danger">Delete</button>
             <button class="ion-ws-close" data-click-action="closeModal">&times;</button>
@@ -314,6 +318,22 @@
         </div>
     </div>
 </div>
+
+{# Client state, cloned rather than built from strings.
+
+   These four are filled with textContent and setAttribute, so a document
+   name, a tag or a section label is content and never markup. They live
+   here, in the content block, because a <template> inside a <script> is
+   inert text and clones to nothing with no error.
+
+   The tag chip is the reason the remove control is its own element: its
+   data-args was `[${JSON.stringify(tag)}]` inside a single-quoted
+   attribute, and a tag with an apostrophe closed the attribute early. #}
+<template id="doc-rail-item"><div class="ion-ws-rail-item" data-click-action="viewDocument"><div class="ion-ws-rail-item-head"><span class="ion-ws-rail-item-name"></span></div><div class="ion-ws-rail-item-sub"></div></div></template>
+<template id="doc-rail-overflow"><div class="ion-ws-rail-item-sub ion-ws-rail-overflow"></div></template>
+<template id="doc-jump-link"><a class="iad-jump-link" data-click-action="docJumpTo"></a></template>
+<template id="doc-tag-chip"><span class="tag-chip"><span data-tag-name></span> <span class="tag-remove" data-click-action="removeDocTag">&times;</span></span></template>
+<template id="doc-tags-empty"><span class="muted doc-tags-none">No tags</span></template>
 
 </div><!-- /ion-tw inner -->
 </div><!-- /ion-tw -->
@@ -578,7 +598,11 @@ let docQuillInitialHtml = '';
 function initDocQuillEditor(content, format) {
     // Destroy previous instance
     const container = document.getElementById('edit-quill-wrap');
-    container.innerHTML = '<div id="edit-quill-editor"></div>';
+    if (!container) return;
+    // One empty div for Quill to mount into. Built rather than parsed.
+    const mount = document.createElement('div');
+    mount.id = 'edit-quill-editor';
+    container.replaceChildren(mount);
     docQuillEditor = null;
 
     // Convert markdown content to HTML for the editor
@@ -974,17 +998,34 @@ function renderDocRail(activeId) {
         docs = capped;
     }
 
-    rail.innerHTML = docs.map(d => `
-        <div class="ion-ws-rail-item${d.id === activeId ? ' selected' : ''}"
-             data-click-action="viewDocument" data-args='[${d.id}]'>
-          <div class="ion-ws-rail-item-head">
-            <span class="ion-ws-rail-item-name">${escapeHtml(d.name)}</span>
-          </div>
-          <div class="ion-ws-rail-item-sub">${escapeHtml(d.output_format || '')} · v${d.current_version || 1}</div>
-        </div>`).join('')
-        + (hiddenCount
-            ? `<div class="ion-ws-rail-item-sub ion-ws-rail-overflow">${hiddenCount} more — narrow the folder or filters to see them</div>`
-            : '');
+    // Cloned rather than parsed. data-args goes on with setAttribute, so a
+    // document id that is not a number cannot produce broken JSON, and the
+    // name is textContent rather than escapeHtml by hand.
+    const rows = [];
+    docs.forEach(d => {
+        const row = cloneDocTemplate('doc-rail-item');
+        if (!row) return;
+        if (d.id === activeId) row.classList.add('selected');
+        row.setAttribute('data-args', JSON.stringify([d.id]));
+        row.querySelector('.ion-ws-rail-item-name').textContent =
+            d.name ?? 'Untitled document';
+        // `v${d.current_version || 1}` claimed v1 for a document whose
+        // version the payload did not carry.
+        const version = Number.isInteger(d.current_version)
+            ? 'v' + d.current_version : 'version unknown';
+        row.querySelector('.ion-ws-rail-item-sub').textContent =
+            d.output_format ? d.output_format + ' · ' + version : version;
+        rows.push(row);
+    });
+    if (hiddenCount) {
+        const more = cloneDocTemplate('doc-rail-overflow');
+        if (more) {
+            more.textContent = hiddenCount
+                + ' more. Narrow the folder or filters to see them.';
+            rows.push(more);
+        }
+    }
+    rail.replaceChildren(...rows);
 
     const sel = rail.querySelector('.ion-ws-rail-item.selected');
     if (sel) sel.scrollIntoView({ block: 'nearest' });
@@ -1044,10 +1085,18 @@ const DOC_SECTIONS = [
 function renderDocJump(hasInputData) {
     const nav = document.getElementById('doc-jump');
     if (!nav) return;
-    nav.innerHTML = DOC_SECTIONS
+    const links = [];
+    DOC_SECTIONS
         .filter(s => s.id !== 'modal-doc-data-section' || hasInputData)
-        .map(s => `<a class="iad-jump-link" href="#${s.id}" data-click-action="docJumpTo" data-args='["${s.id}"]'>${s.label}</a>`)
-        .join('');
+        .forEach(s => {
+            const link = cloneDocTemplate('doc-jump-link');
+            if (!link) return;
+            link.href = '#' + s.id;
+            link.setAttribute('data-args', JSON.stringify([s.id]));
+            link.textContent = s.label;
+            links.push(link);
+        });
+    nav.replaceChildren(...links);
 }
 
 function docJumpTo(sectionId) {
@@ -1173,6 +1222,18 @@ function updateParentSelect() {
 // reset-and-seed was innerHTML. An <option> is not markup a stylesheet
 // sweep needs to reach, so this needs no fragment, just the DOM call that
 // does the same thing without parsing a string.
+// static/js/ion-fragments.js has a cloneTemplate, and it also sets
+// htmx.config.useTemplateFragments = true for the whole page. That is the
+// right call on the two pages it was written for and it is a behaviour
+// change this page does not need, so the three lines live here. Worth
+// consolidating once the helper is separated from the config side effect.
+function cloneDocTemplate(id) {
+    const template = document.getElementById(id);
+    return template && template.content.firstElementChild
+        ? template.content.firstElementChild.cloneNode(true)
+        : null;
+}
+
 function seedSelect(select, label, value = '') {
     if (!select) return null;
     select.replaceChildren();
@@ -1380,8 +1441,15 @@ function observeDocSections() {
 document.getElementById('export-pdf-btn').addEventListener('click', async function() {
     if (!currentDocId) return;
     const btn = this;
-    const origText = btn.innerHTML;
-    btn.innerHTML = '<i class="icon-loader"></i> Generating...';
+    // The busy state rebuilt the whole button from a string, spinner
+    // markup and all, saved the original and put it back, so the button
+    // was reparsed twice per export. The
+    // label is the only part that changes, so only the label changes, and
+    // the spinner is a class the stylesheet owns.
+    const label = btn.querySelector('[data-btn-label]') || btn;
+    const origText = label.textContent;
+    label.textContent = 'Generating...';
+    btn.classList.add('is-busy');
     btn.disabled = true;
     try {
         const response = await fetch('/api/documents/' + currentDocId + '/pdf');
@@ -1400,7 +1468,8 @@ document.getElementById('export-pdf-btn').addEventListener('click', async functi
     } catch (e) {
         showToast(e.message || 'PDF export failed', 'error');
     } finally {
-        btn.innerHTML = origText;
+        label.textContent = origText;
+        btn.classList.remove('is-busy');
         btn.disabled = false;
     }
 });
@@ -1466,7 +1535,7 @@ document.getElementById('version-modal').addEventListener('click', function(e) {
 function showUploadModal() {
     // Populate folder select
     const folderSelect = document.getElementById('upload-folder');
-    folderSelect.innerHTML = '<option value="">No Folder</option>';
+    if (!seedSelect(folderSelect, 'No Folder')) return;
     const tree = buildFolderTree(allCollections);
     function addFolderOptions(folders, prefix) {
         folders.forEach(function(f) {
@@ -1548,16 +1617,25 @@ function renderDocumentTags() {
 
     tagsSection.style.display = 'block';
 
-    if (currentDocTags.length === 0) {
-        tagsList.innerHTML = '<span class="muted text-[0.8rem]">No tags</span> ';
+    if (!Array.isArray(currentDocTags) || currentDocTags.length === 0) {
+        const none = cloneDocTemplate('doc-tags-empty');
+        tagsList.replaceChildren(...(none ? [none] : []));
     } else {
-        let html = '';
+        // `data-args='[${JSON.stringify(tag)}]'` put a JSON string inside a
+        // single-quoted attribute. JSON.stringify escapes " and leaves '
+        // alone, so a tag containing an apostrophe closed the attribute
+        // early and its remove control silently did nothing. Tags are free
+        // text. setAttribute has no HTML to escape, so it cannot happen.
+        const chips = [];
         currentDocTags.forEach(function(tag) {
-            html += '<span class="tag-chip">' + escapeHtml(tag);
-            html += ` <span class="tag-remove" data-click-action="removeDocTag" data-args='[${JSON.stringify(tag)}]'>&times;</span>`;
-            html += '</span> ';
+            const chip = cloneDocTemplate('doc-tag-chip');
+            if (!chip) return;
+            chip.querySelector('[data-tag-name]').textContent = tag;
+            chip.querySelector('.tag-remove')
+                .setAttribute('data-args', JSON.stringify([tag]));
+            chips.push(chip);
         });
-        tagsList.innerHTML = html;
+        tagsList.replaceChildren(...chips);
     }
 }
 

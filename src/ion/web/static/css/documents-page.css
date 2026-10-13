@@ -35,3 +35,35 @@
     background: color-mix(in srgb, var(--warning, #f59e0b) 8%, transparent);
     border-radius: 0.25rem;
 }
+
+/* A control waiting on a request. The page replaced the whole button's
+   markup with '<i class="icon-loader"></i> Generating...' and put the
+   original back afterwards, so the button was rebuilt from a string twice
+   per export and the spinner lived in JavaScript. Only the label changes
+   now, and the spinner is here. */
+.is-busy { position: relative; pointer-events: none; }
+
+.is-busy::after {
+    content: "";
+    display: inline-block;
+    width: 0.75em;
+    height: 0.75em;
+    margin-left: 0.4em;
+    vertical-align: -0.1em;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: doc-busy-spin 0.7s linear infinite;
+}
+
+@keyframes doc-busy-spin { to { transform: rotate(360deg); } }
+
+/* A viewer who has asked for no motion gets the disabled state without
+   the spin, which is what the animation was there to signal. */
+@media (prefers-reduced-motion: reduce) {
+    .is-busy::after { animation: none; opacity: 0.6; }
+}
+
+/* The empty tag state. It was `class="muted text-[0.8rem]"` in a JS
+   string, an arbitrary Tailwind value the page owned. */
+.doc-tags-none { font-size: 0.8rem; }
