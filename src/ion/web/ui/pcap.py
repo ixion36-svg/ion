@@ -439,3 +439,332 @@ def pcap_network_fragment(
     if refusal is not None:
         view["error"] = refusal
     return render_view(request, NETWORK_FRAGMENT, view)
+
+
+# ---------------------------------------------------------------------------
+# The table panels
+# ---------------------------------------------------------------------------
+#
+# Fourteen of the page's panels were the same function written fourteen
+# times: take a list off the result, hide the tab if it is empty, set a tab
+# badge, and build a table. They are a registry here, because the thing
+# that actually differs between them is a heading, a badge tone and a list
+# of columns, and that is data.
+#
+# What they had in common besides shape:
+#
+#   * `d.whatever || []` throughout, so a payload in the wrong shape drew
+#     as an empty panel with its tab hidden. A hidden tab is the strongest
+#     possible claim that a capture contained no credentials, no malware
+#     JA3 match and no ARP anomalies, and it was being made on the basis
+#     of a read that failed.
+#   * Numbers straight into markup: `${b.port}`, `${b.score}`,
+#     `${b.connections}`, `${s.retransmits}`, `${h.beacons}`, each
+#     printing "undefined" for a row that did not carry one.
+#   * `fmtBytes` on a missing size, which falls through every comparison
+#     and returns "NaN GB".
+#   * ARP built a CSS variable name out of the payload:
+#     `data-ion-style="color:var(--sev-${a.severity})"`. A severity the
+#     analyser did not emit resolves to an undefined custom property and
+#     the text takes its inherited colour, so the row looked ordinary.
+#     The severity picks a class from a fixed set now.
+
+TABLES_FRAGMENT = "_fragments/pcap_tables.html"
+
+#: A column: the header, the key it reads, and how the cell is drawn.
+#: The kinds are the ones the page actually used.
+#:
+#:   text      plain, escaped
+#:   mono      font-mono
+#:   wrap      font-mono break-all
+#:   strong    <strong>
+#:   code      <code>, with the size class the page gave it
+#:   num       right-aligned thousands separated
+#:   plain_num right-aligned, no separator (ports, counts, scores)
+#:   bytes     a size label
+#:   list      a list joined with ", "
+#:   malware   the known-malware match, critical when there is one
+#:   endpoint  an ip:port pair
+#:   seconds   a "~Ns" interval
+Column = tuple  # (header, key, kind, extra)
+
+
+def col(header: str, key: str, kind: str = "text", extra: str = "") -> Column:
+    return (header, key, kind, extra)
+
+
+#: One panel: where it lives, what it reads, and what it draws.
+#: `tab` is the tab button that is hidden when the list is empty, and
+#: `badge` the count beside it.
+TABLE_PANELS: tuple[dict, ...] = (
+    {"key": "dns_queries", "panel": "panel-dns", "data_panel": None, "label": None, "tab": None,
+     "badge": None, "tone": None, "heading": "DNS Queries",
+     "unit": "unique", "empty": "No DNS queries captured.",
+     "limit": 40,
+     "columns": (col("Query", "query", "wrap"),
+                 col("Count", "count", "num"))},
+    {"key": "http_requests", "panel": "panel-http", "data_panel": None, "label": None, "tab": None,
+     "badge": None, "tone": None, "heading": "HTTP Requests",
+     "unit": "unique", "empty": "No HTTP requests captured.",
+     "limit": 40,
+     "columns": (col("Request", "request", "wrap"),
+                 col("Count", "count", "num"))},
+    {"key": "tls_handshakes", "panel": "panel-tls", "data_panel": None, "label": None, "tab": None,
+     "badge": None, "tone": None, "heading": "TLS SNI",
+     "unit": "unique", "empty": "No TLS handshakes captured.",
+     "limit": 40,
+     "columns": (col("SNI", "sni", "mono"),
+                 col("Handshakes", "count", "num"))},
+    {"key": "extracted_files", "panel": "panel-files", "data_panel": "files", "label": "Extracted Files", "tab": "tab-files",
+     "badge": "files-count-badge", "tone": "tone-high",
+     "heading": "Extracted Files",
+     "note": "Files carved from reassembled TCP streams by magic byte "
+             "signature.",
+     "columns": (col("File", "filename", "strong"),
+                 col("Type", "mime_type"),
+                 col("Size", "size", "bytes"),
+                 col("MD5", "md5", "code", "text-[.7rem] break-all"),
+                 col("SHA-256", "sha256", "code", "text-[.65rem] break-all"),
+                 col("Source", "src_ip"),
+                 col("Destination", "dst_ip"))},
+    {"key": "ja3_fingerprints", "panel": "panel-ja3", "data_panel": "ja3", "label": "JA3 Fingerprints", "tab": "tab-ja3",
+     "badge": "ja3-count-badge", "tone": "tone-critical",
+     "tone_when_flagged": "tone-critical", "tone_otherwise": "tone-primary",
+     "flag": "known_malware", "heading": "JA3 TLS Fingerprints",
+     "columns": (col("JA3 Hash", "ja3_hash", "code", "text-[.72rem]"),
+                 col("SNI", "sni"),
+                 col("Source", "src_ip"),
+                 col("Destination", "dst_ip", "endpoint", "dst_port"),
+                 col("Malware Match", "known_malware", "malware"))},
+    {"key": "credential_captures", "panel": "panel-creds", "data_panel": "creds", "label": "Credentials",
+     "tab": "tab-creds", "badge": "creds-count-badge",
+     "tone": "tone-critical", "heading": "Captured Credentials",
+     "columns": (col("Protocol", "protocol", "strong"),
+                 col("Username", "username", "code"),
+                 col("Credential / Hash", "credential", "code",
+                     "text-[.7rem] break-all max-w-[200px] inline-block "
+                     "overflow-hidden text-ellipsis"),
+                 col("Source", "src_ip"),
+                 col("Destination", "dst_ip"),
+                 col("Detail", "detail"))},
+    {"key": "ja3s_fingerprints", "panel": "panel-ja3s", "data_panel": "ja3s", "label": "JA3S", "tab": "tab-ja3s",
+     "badge": "ja3s-count-badge", "tone": "tone-critical",
+     "tone_when_flagged": "tone-critical", "tone_otherwise": "tone-primary",
+     "flag": "known_malware", "heading": "JA3S Server Fingerprints",
+     "columns": (col("JA3S Hash", "ja3s_hash", "code", "text-[.72rem]"),
+                 col("Server", "src_ip"),
+                 col("Client", "dst_ip"),
+                 col("Port", "src_port", "plain_num"),
+                 col("Malware Match", "known_malware", "malware"))},
+    {"key": "hassh_fingerprints", "panel": "panel-hassh", "data_panel": "hassh", "label": "HASSH",
+     "tab": "tab-hassh", "badge": "hassh-count-badge",
+     "tone": "tone-primary",
+     "tone_when_flagged": "tone-critical", "tone_otherwise": "tone-primary",
+     "flag": "known_malware", "heading": "HASSH SSH Fingerprints",
+     "columns": (col("HASSH Hash", "hassh_hash", "code", "text-[.72rem]"),
+                 col("Direction", "direction"),
+                 col("Source", "src_ip"),
+                 col("Destination", "dst_ip"),
+                 col("SSH Version", "ssh_version"),
+                 col("Match", "known_malware", "malware"))},
+    {"key": "smb_transfers", "panel": "panel-smb", "data_panel": "smb", "label": "SMB", "tab": "tab-smb",
+     "badge": "smb-count-badge", "tone": "tone-warning",
+     "heading": "SMB File Operations",
+     "columns": (col("Command", "command", "strong"),
+                 col("Source", "src_ip"),
+                 col("Destination", "dst_ip"),
+                 col("Detail", "detail"))},
+    {"key": "kerberos_tickets", "panel": "panel-kerberos", "data_panel": "kerberos", "label": "Kerberos",
+     "tab": "tab-kerberos", "badge": "kerberos-count-badge",
+     "tone": "tone-info", "heading": "Kerberos Traffic",
+     "columns": (col("Type", "msg_type", "strong"),
+                 col("Source", "src_ip"),
+                 col("Destination", "dst_ip"),
+                 col("Detail", "detail"))},
+    {"key": "http_files", "panel": "panel-httpfiles", "data_panel": "httpfiles", "label": "HTTP Files",
+     "tab": "tab-httpfiles", "badge": "httpfiles-count-badge",
+     "tone": "tone-high", "heading": "HTTP File Transfers",
+     "columns": (col("Filename", "filename", "strong"),
+                 col("Content-Type", "content_type"),
+                 col("Size", "size", "bytes"),
+                 col("MD5", "md5", "code", "text-[.7rem]"),
+                 col("Source", "src_ip"),
+                 col("Destination", "dst_ip"))},
+    {"key": "arp_anomalies", "panel": "panel-arp", "data_panel": "arp", "label": "ARP", "tab": "tab-arp",
+     "badge": "arp-count-badge", "tone": "tone-critical",
+     "heading": "ARP Anomalies",
+     "columns": (col("MAC", "mac", "code"),
+                 col("IPs Claimed", "ips", "list"),
+                 col("Severity", "severity", "severity"),
+                 col("Detail", "detail", "small"))},
+    {"key": "base64_payloads", "panel": "panel-b64", "data_panel": "b64", "label": "Base64", "tab": "tab-b64",
+     "badge": "b64-count-badge", "tone": "tone-high",
+     "heading": "Base64 Encoded Payloads",
+     "columns": (col("Type", "type", "strong"),
+                 col("Encoded Size", "encoded_length", "bytes"),
+                 col("Decoded Size", "decoded_length", "bytes"),
+                 col("Source", "src_ip"),
+                 col("Destination", "dst_ip", "endpoint", "port"),
+                 col("Preview", "preview", "code",
+                     "text-[.68rem] break-all max-w-[300px] inline-block "
+                     "overflow-hidden text-ellipsis"))},
+    {"key": "beacons", "panel": "panel-beacons", "data_panel": "beacons", "label": "Beaconing", "tab": "tab-beacons",
+     "badge": "beacons-count-badge", "tone": "tone-high",
+     "heading": "Beaconing Candidates",
+     "columns": (col("Source", "src"),
+                 col("Destination", "dst"),
+                 col("Port", "port", "plain_num"),
+                 col("Score", "score", "strong"),
+                 col("Connections", "connections", "num"),
+                 col("Interval", "interval_s", "seconds"))},
+)
+
+#: The severity classes an ARP row may take. The page built the custom
+#: property name from the payload, so a severity the analyser did not emit
+#: left the text its inherited colour and the row read as ordinary.
+SEVERITY_CLASSES: tuple[str, ...] = (
+    "critical", "high", "medium", "low", "info",
+)
+
+
+class Cell(TypedDict):
+    kind: str
+    css_class: str
+    value: Optional[str]
+    missing: Optional[str]
+    flagged: bool
+
+
+def _cell(column: Column, row: dict) -> Cell:
+    header, key, kind, extra = column
+    raw = row.get(key)
+    value: Optional[str] = None
+    flagged = False
+    missing = "This row carried no %s" % header.lower()
+
+    if kind in ("num",):
+        value = count_label(raw)
+    elif kind == "plain_num":
+        number = _int(raw)
+        value = None if number is None else str(number)
+    elif kind == "bytes":
+        value = bytes_label(raw)
+    elif kind == "seconds":
+        number = _num(raw)
+        value = None if number is None else "~%gs" % number
+    elif kind == "list":
+        if isinstance(raw, list):
+            parts = [t for t in (_text(v) if isinstance(v, str)
+                                 else _text(str(v)) for v in raw) if t]
+            value = ", ".join(parts) if parts else None
+            missing = "No %s were recorded" % header.lower()
+        else:
+            missing = "The %s are not in a readable shape" % header.lower()
+    elif kind == "malware":
+        name = _text(raw)
+        flagged = bool(name)
+        value = name or "clean"
+        missing = None
+    elif kind == "severity":
+        name = _text(raw)
+        value = name
+        flagged = name in SEVERITY_CLASSES
+    elif kind == "endpoint":
+        host = _text(row.get(key))
+        port = _int(row.get(extra))
+        if host is not None:
+            value = host if port is None else "%s:%d" % (host, port)
+    else:
+        value = _text(raw) if isinstance(raw, str) else (
+            str(raw) if _num(raw) is not None else None)
+
+    return {"kind": kind, "css_class": extra, "value": value,
+            "missing": missing, "flagged": flagged}
+
+
+class Table(TypedDict):
+    key: str
+    panel: str
+    data_panel: Optional[str]
+    label: Optional[str]
+    tab: Optional[str]
+    badge: Optional[str]
+    tone: Optional[str]
+    heading: str
+    unit: Optional[str]
+    note: Optional[str]
+    empty: Optional[str]
+    state: str
+    count: Optional[int]
+    headers: list[str]
+    rows: list[list[Cell]]
+
+
+def table_panel(spec: dict, result: dict) -> Table:
+    raw = result.get(spec["key"])
+    headers = [c[0] for c in spec["columns"]]
+    base: Table = {
+        "key": spec["key"], "panel": spec["panel"],
+        "data_panel": spec.get("data_panel"), "label": spec.get("label"),
+        "tab": spec.get("tab"),
+        "badge": spec.get("badge"), "tone": spec.get("tone"),
+        "heading": spec["heading"], "unit": spec.get("unit"),
+        "note": spec.get("note"), "empty": spec.get("empty"),
+        "state": "unreadable", "count": None, "headers": headers,
+        "rows": [],
+    }
+    if not isinstance(raw, list):
+        # `d.whatever || []` hid the tab for this, which claims the
+        # capture contained none of whatever it is.
+        return base
+    entries = [e for e in raw if isinstance(e, dict)]
+    limit = spec.get("limit")
+    shown = entries[:limit] if limit else entries
+    base["count"] = len(entries)
+    base["state"] = "data" if entries else "empty"
+    base["rows"] = [[_cell(c, row) for c in spec["columns"]]
+                    for row in shown]
+    flag = spec.get("flag")
+    if flag:
+        hit = any(_text(row.get(flag)) for row in entries)
+        base["tone"] = (spec["tone_when_flagged"] if hit
+                        else spec["tone_otherwise"])
+    return base
+
+
+class TablesView(TypedDict):
+    state: str
+    error: Optional[str]
+    tables: list[Table]
+
+
+def tables_view(job: Any) -> TablesView:
+    if not isinstance(job, dict) or not isinstance(job.get("result"), dict):
+        return {"state": "failed",
+                "error": (_text(job.get("error"))
+                          if isinstance(job, dict) else None),
+                "tables": []}
+    result = job["result"]
+    return {"state": "data", "error": None,
+            "tables": [table_panel(spec, result)
+                       for spec in TABLE_PANELS]}
+
+
+@router.get(
+    "/pcap/{job_id}/tables",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+def pcap_tables_fragment(
+    request: Request,
+    job_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> Response:
+    """Fourteen table panels in one request, each swapped into its own
+    container out of band."""
+    job, refusal = _job(job_id, current_user, session)
+    view = tables_view(job)
+    if refusal is not None:
+        view["error"] = refusal
+    return render_view(request, TABLES_FRAGMENT, view)

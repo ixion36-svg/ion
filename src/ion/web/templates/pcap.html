@@ -515,27 +515,28 @@
                 source: document.getElementById('panel-network'),
                 target: '#panel-network', swap: 'innerHTML',
             });
+            // Fourteen table panels in one request. Each is swapped into
+            // its own container out of band, and its tab button comes
+            // with it, so a panel and its tab cannot disagree about
+            // whether there is anything to show.
+            //
+            // They were fourteen copies of the same function, and they
+            // shared `d.whatever || []`, which hid the tab whenever the
+            // list was empty. That also hid it when the read had failed,
+            // and a hidden tab is the strongest claim this page can
+            // make: no credentials, no malware JA3 match, no ARP
+            // anomalies, no extracted files.
+            htmx.ajax('GET', '/ui/pcap/' + _currentJobId + '/tables', {
+                source: document.getElementById('panel-dns'),
+                target: '#panel-dns', swap: 'innerHTML',
+            });
         }
 
-        renderDns(d);
-        renderHttp(d);
-        renderTls(d);
         renderData(d);
         renderIsakmp(d);
-        renderExtractedFiles(d);
-        renderJA3(d);
-        renderCredentials(d);
-        renderJA3S(d);
-        renderHASSH(d);
         renderJA4(d);
         renderCerts(d);
         renderHosts(d);
-        renderBeacons(d);
-        renderSMB(d);
-        renderKerberos(d);
-        renderHTTPFiles(d);
-        renderARP(d);
-        renderBase64(d);
         renderStreams(d);
         renderEmail(d);
         renderNetworkGraph(d);
@@ -543,47 +544,8 @@
         renderThreatIntel(d);
     }
 
-    function renderDns(d) {
-        const items = d.dns_queries || [];
-        if (!items.length) {
-            document.getElementById('panel-dns').innerHTML = '<p class="text-[var(--text-secondary)] text-[.85rem] p-5">No DNS queries captured.</p>';
-            return;
-        }
-        let rows = items.slice(0, 40).map(i =>
-            `<tr><td class="font-mono break-all">${esc(i.query)}</td><td class="text-right">${fmtNum(i.count)}</td></tr>`
-        ).join('');
-        document.getElementById('panel-dns').innerHTML =
-            `<h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">DNS Queries (${items.length} unique)</h3>` +
-            `<table class="pcap-table"><thead><tr><th>Query</th><th class="text-right">Count</th></tr></thead><tbody>${rows}</tbody></table>`;
-    }
 
-    function renderHttp(d) {
-        const items = d.http_requests || [];
-        if (!items.length) {
-            document.getElementById('panel-http').innerHTML = '<p class="text-[var(--text-secondary)] text-[.85rem] p-5">No HTTP requests captured.</p>';
-            return;
-        }
-        let rows = items.slice(0, 40).map(i =>
-            `<tr><td class="font-mono break-all">${esc(i.request)}</td><td class="text-right">${fmtNum(i.count)}</td></tr>`
-        ).join('');
-        document.getElementById('panel-http').innerHTML =
-            `<h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">HTTP Requests (${items.length} unique)</h3>` +
-            `<table class="pcap-table"><thead><tr><th>Request</th><th class="text-right">Count</th></tr></thead><tbody>${rows}</tbody></table>`;
-    }
 
-    function renderTls(d) {
-        const items = d.tls_handshakes || [];
-        if (!items.length) {
-            document.getElementById('panel-tls').innerHTML = '<p class="text-[var(--text-secondary)] text-[.85rem] p-5">No TLS handshakes captured.</p>';
-            return;
-        }
-        let rows = items.slice(0, 40).map(i =>
-            `<tr><td class="font-mono">${esc(i.sni)}</td><td class="text-right">${fmtNum(i.count)}</td></tr>`
-        ).join('');
-        document.getElementById('panel-tls').innerHTML =
-            `<h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">TLS Server Name Indications (${items.length} unique)</h3>` +
-            `<table class="pcap-table"><thead><tr><th>SNI</th><th class="text-right">Handshakes</th></tr></thead><tbody>${rows}</tbody></table>`;
-    }
 
     function renderData(d) {
         const dt = d.data_transfer || {};
@@ -673,120 +635,14 @@
     }
 
     // ── Extracted Files ──
-    function renderExtractedFiles(d) {
-        const files = d.extracted_files || [];
-        const tab = document.getElementById('tab-files');
-        const badge = document.getElementById('files-count-badge');
-        if (!files.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        badge.textContent = files.length;
-        badge.className = 'badge pcap-tab-badge tone-high';
-
-        const panel = document.getElementById('panel-files');
-        panel.innerHTML = `<h3>Extracted Files (${files.length})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">Files carved from reassembled TCP streams by magic byte signature.</p>
-        <table class="pcap-table"><thead><tr><th>File</th><th>Type</th><th>Size</th><th>MD5</th><th>SHA-256</th><th>Source</th><th>Destination</th></tr></thead><tbody>
-        ${files.map(f => `<tr>
-            <td><strong>${esc(f.filename)}</strong></td>
-            <td>${esc(f.mime_type)}</td>
-            <td>${fmtBytes(f.size)}</td>
-            <td><code class="text-[.7rem] break-all">${esc(f.md5)}</code></td>
-            <td><code class="text-[.65rem] break-all">${esc(f.sha256)}</code></td>
-            <td>${esc(f.src_ip)}</td>
-            <td>${esc(f.dst_ip)}</td>
-        </tr>`).join('')}
-        </tbody></table>`;
-    }
 
     // ── JA3 Fingerprints ──
-    function renderJA3(d) {
-        const fps = d.ja3_fingerprints || [];
-        const tab = document.getElementById('tab-ja3');
-        const badge = document.getElementById('ja3-count-badge');
-        if (!fps.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        const badCount = fps.filter(f => f.known_malware).length;
-        badge.textContent = fps.length;
-        badge.className = 'badge pcap-tab-badge ' + (badCount ? 'tone-critical' : 'tone-primary');
-
-        const panel = document.getElementById('panel-ja3');
-        panel.innerHTML = `<h3>JA3 TLS Fingerprints (${fps.length})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">TLS ClientHello fingerprints computed from the PCAP. Known-malware matches are highlighted.</p>
-        <table class="pcap-table"><thead><tr><th>JA3 Hash</th><th>SNI</th><th>Source</th><th>Destination</th><th>Malware Match</th></tr></thead><tbody>
-        ${fps.map(f => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
-            <td><code class="text-[.72rem]">${esc(f.ja3_hash)}</code></td>
-            <td>${esc(f.sni || '-')}</td>
-            <td>${esc(f.src_ip)}</td>
-            <td>${esc(f.dst_ip)}:${f.dst_port}</td>
-            <td>${f.known_malware ? `<span class="text-[var(--sev-critical)] font-bold">${esc(f.known_malware)}</span>` : '<span class="text-[var(--text-secondary)]">No match</span>'}</td>
-        </tr>`).join('')}
-        </tbody></table>`;
-    }
 
     // ── Credentials ──
-    function renderCredentials(d) {
-        const creds = d.credential_captures || [];
-        const tab = document.getElementById('tab-creds');
-        const badge = document.getElementById('creds-count-badge');
-        if (!creds.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        badge.textContent = creds.length;
-        badge.className = 'badge pcap-tab-badge tone-critical';
-
-        const panel = document.getElementById('panel-creds');
-        panel.innerHTML = `<h3>Captured Credentials (${creds.length})</h3>
-        <p class="text-[var(--sev-critical)] text-[.82rem] mb-3 font-semibold">Credentials and authentication hashes found in cleartext or weak protocols.</p>
-        <table class="pcap-table"><thead><tr><th>Protocol</th><th>Username</th><th>Credential / Hash</th><th>Source</th><th>Destination</th><th>Detail</th></tr></thead><tbody>
-        ${creds.map(c => `<tr class="bg-[rgba(248,81,73,.05)]">
-            <td><strong>${esc(c.protocol)}</strong></td>
-            <td><code>${esc(c.username)}</code></td>
-            <td><code class="text-[.7rem] break-all max-w-[200px] inline-block overflow-hidden text-ellipsis">${esc(c.credential)}</code></td>
-            <td>${esc(c.src_ip)}</td>
-            <td>${esc(c.dst_ip)}</td>
-            <td class="text-[.78rem] text-[var(--text-secondary)]">${esc(c.detail)}</td>
-        </tr>`).join('')}
-        </tbody></table>`;
-    }
 
     // ── JA3S (Server TLS Fingerprints) ──
-    function renderJA3S(d) {
-        const fps = d.ja3s_fingerprints || [];
-        const tab = document.getElementById('tab-ja3s');
-        const badge = document.getElementById('ja3s-count-badge');
-        if (!fps.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        const badCount = fps.filter(f => f.known_malware).length;
-        badge.textContent = fps.length;
-        badge.className = 'badge pcap-tab-badge ' + (badCount ? 'tone-critical' : 'tone-primary');
-        document.getElementById('panel-ja3s').innerHTML = `<h3>JA3S Server Fingerprints (${fps.length})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">TLS ServerHello fingerprints. Pairs with JA3 for C2 server identification.</p>
-        <table class="pcap-table"><thead><tr><th>JA3S Hash</th><th>Server</th><th>Client</th><th>Port</th><th>Malware Match</th></tr></thead><tbody>
-        ${fps.map(f => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
-            <td><code class="text-[.72rem]">${esc(f.ja3s_hash)}</code></td>
-            <td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td><td>${f.src_port}</td>
-            <td>${f.known_malware ? `<span class="text-[var(--sev-critical)] font-bold">${esc(f.known_malware)}</span>` : '<span class="text-[var(--text-secondary)]">No match</span>'}</td>
-        </tr>`).join('')}</tbody></table>`;
-    }
 
     // ── HASSH (SSH Fingerprints) ──
-    function renderHASSH(d) {
-        const fps = d.hassh_fingerprints || [];
-        const tab = document.getElementById('tab-hassh');
-        const badge = document.getElementById('hassh-count-badge');
-        if (!fps.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        badge.textContent = fps.length;
-        badge.className = 'badge pcap-tab-badge tone-primary';
-        document.getElementById('panel-hassh').innerHTML = `<h3>HASSH SSH Fingerprints (${fps.length})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">SSH KEX_INIT fingerprints for client and server identification.</p>
-        <table class="pcap-table"><thead><tr><th>HASSH Hash</th><th>Direction</th><th>Source</th><th>Destination</th><th>SSH Version</th><th>Match</th></tr></thead><tbody>
-        ${fps.map(f => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
-            <td><code class="text-[.72rem]">${esc(f.hassh_hash)}</code></td>
-            <td>${esc(f.direction)}</td><td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td>
-            <td class="text-[.78rem]">${esc(f.ssh_version || '-')}</td>
-            <td>${f.known_malware ? `<span class="text-[var(--sev-critical)] font-bold">${esc(f.known_malware)}</span>` : '-'}</td>
-        </tr>`).join('')}</tbody></table>`;
-    }
 
     // ── JA4 / JA4S Fingerprints (FoxIO JA4+) ──
     function renderJA4(d) {
@@ -877,114 +733,16 @@
     }
 
     // ── Beaconing (RITA-style scoring) ──
-    function renderBeacons(d) {
-        const beacons = (d.beacons || []).filter(b => (b.score || 0) >= 0.85);
-        const tab = document.getElementById('tab-beacons');
-        const badge = document.getElementById('beacons-count-badge');
-        if (!beacons.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        const strong = beacons.filter(b => b.score >= 0.9).length;
-        badge.textContent = beacons.length;
-        badge.className = 'badge pcap-tab-badge ' + (strong ? 'tone-high' : 'tone-medium');
-        document.getElementById('panel-beacons').innerHTML = `<h3>Beaconing Candidates (${beacons.length})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">RITA-style scoring of connection regularity (interval + payload-size consistency). A near-1.0 score is metronome-regular traffic — a hallmark of automated C2.</p>
-        <table class="pcap-table"><thead><tr><th>Source</th><th>Destination</th><th>Port</th><th>Score</th><th>Connections</th><th>Interval</th></tr></thead><tbody>
-        ${beacons.map(b => `<tr class="bg-[rgba(248,81,73,.05)]">
-            <td>${esc(b.src)}</td><td>${esc(b.dst)}</td><td>${b.port}</td>
-            <td><strong>${b.score}</strong></td>
-            <td class="text-right">${b.connections}</td>
-            <td class="text-right">~${b.interval_s}s</td>
-        </tr>`).join('')}
-        </tbody></table>`;
-    }
 
     // ── SMB Transfers ──
-    function renderSMB(d) {
-        const items = d.smb_transfers || [];
-        const tab = document.getElementById('tab-smb');
-        const badge = document.getElementById('smb-count-badge');
-        if (!items.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        badge.textContent = items.length;
-        badge.className = 'badge pcap-tab-badge tone-warning';
-        document.getElementById('panel-smb').innerHTML = `<h3>SMB File Operations (${items.length})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">SMB/CIFS file operations detected on port 445/139. May indicate lateral movement.</p>
-        <table class="pcap-table"><thead><tr><th>Command</th><th>Source</th><th>Destination</th><th>Detail</th></tr></thead><tbody>
-        ${items.map(s => `<tr><td><strong>${esc(s.command)}</strong></td><td>${esc(s.src_ip)}</td><td>${esc(s.dst_ip)}</td><td class="text-[.78rem] text-[var(--text-secondary)]">${esc(s.detail)}</td></tr>`).join('')}
-        </tbody></table>`;
-    }
 
     // ── Kerberos Tickets ──
-    function renderKerberos(d) {
-        const items = d.kerberos_tickets || [];
-        const tab = document.getElementById('tab-kerberos');
-        const badge = document.getElementById('kerberos-count-badge');
-        if (!items.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        badge.textContent = items.length;
-        badge.className = 'badge pcap-tab-badge tone-info';
-        document.getElementById('panel-kerberos').innerHTML = `<h3>Kerberos Traffic (${items.length})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">Kerberos authentication messages on port 88. AS-REP/TGS-REP may contain extractable tickets.</p>
-        <table class="pcap-table"><thead><tr><th>Type</th><th>Source</th><th>Destination</th><th>Detail</th></tr></thead><tbody>
-        ${items.map(k => `<tr><td><strong>${esc(k.msg_type)}</strong></td><td>${esc(k.src_ip)}</td><td>${esc(k.dst_ip)}</td><td class="text-[.78rem]">${esc(k.detail)}</td></tr>`).join('')}
-        </tbody></table>`;
-    }
 
     // ── HTTP Files ──
-    function renderHTTPFiles(d) {
-        const items = d.http_files || [];
-        const tab = document.getElementById('tab-httpfiles');
-        const badge = document.getElementById('httpfiles-count-badge');
-        if (!items.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        badge.textContent = items.length;
-        badge.className = 'badge pcap-tab-badge tone-high';
-        document.getElementById('panel-httpfiles').innerHTML = `<h3>HTTP File Transfers (${items.length})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">Files reconstructed from HTTP response bodies via Content-Type headers.</p>
-        <table class="pcap-table"><thead><tr><th>Filename</th><th>Content-Type</th><th>Size</th><th>MD5</th><th>Source</th><th>Destination</th></tr></thead><tbody>
-        ${items.map(f => `<tr>
-            <td><strong>${esc(f.filename)}</strong></td><td>${esc(f.content_type)}</td><td>${fmtBytes(f.size)}</td>
-            <td><code class="text-[.7rem]">${esc(f.md5)}</code></td><td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td>
-        </tr>`).join('')}</tbody></table>`;
-    }
 
     // ── ARP Anomalies ──
-    function renderARP(d) {
-        const items = d.arp_anomalies || [];
-        const tab = document.getElementById('tab-arp');
-        const badge = document.getElementById('arp-count-badge');
-        if (!items.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        badge.textContent = items.length;
-        badge.className = 'badge pcap-tab-badge tone-critical';
-        document.getElementById('panel-arp').innerHTML = `<h3>ARP Anomalies (${items.length})</h3>
-        <p class="text-[var(--sev-critical)] text-[.82rem] mb-3 font-semibold">MAC addresses claiming multiple IPs — possible ARP spoofing / MITM.</p>
-        <table class="pcap-table"><thead><tr><th>MAC</th><th>IPs Claimed</th><th>Severity</th><th>Detail</th></tr></thead><tbody>
-        ${items.map(a => `<tr class="bg-[rgba(248,81,73,.05)]">
-            <td><code>${esc(a.mac)}</code></td><td>${(a.ips||[]).map(ip => esc(ip)).join(', ')}</td>
-            <td><span class="font-bold" data-ion-style="color:var(--sev-${a.severity})">${esc(a.severity)}</span></td>
-            <td class="text-[.78rem]">${esc(a.detail)}</td>
-        </tr>`).join('')}</tbody></table>`;
-    }
 
     // ── Base64 Payloads ──
-    function renderBase64(d) {
-        const items = d.base64_payloads || [];
-        const tab = document.getElementById('tab-b64');
-        const badge = document.getElementById('b64-count-badge');
-        if (!items.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        badge.textContent = items.length;
-        badge.className = 'badge pcap-tab-badge tone-high';
-        document.getElementById('panel-b64').innerHTML = `<h3>Base64 Encoded Payloads (${items.length})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">Base64-encoded scripts or binary payloads found in HTTP streams. May indicate obfuscated C2 or malware delivery.</p>
-        <table class="pcap-table"><thead><tr><th>Type</th><th>Encoded Size</th><th>Decoded Size</th><th>Source</th><th>Destination</th><th>Preview</th></tr></thead><tbody>
-        ${items.map(b => `<tr class="bg-[rgba(248,81,73,.05)]">
-            <td><strong>${esc(b.type)}</strong></td><td>${fmtBytes(b.encoded_length)}</td><td>${fmtBytes(b.decoded_length)}</td>
-            <td>${esc(b.src_ip)}</td><td>${esc(b.dst_ip)}:${b.port}</td>
-            <td><code class="text-[.68rem] break-all max-w-[300px] inline-block overflow-hidden text-ellipsis">${esc(b.preview)}</code></td>
-        </tr>`).join('')}</tbody></table>`;
-    }
 
     // ── Network Graph (vis-network) ──
     function renderStreams(d) {
