@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ion.auth.dependencies import get_current_user
+from ion.auth.dependencies import require_permission
 from ion.core.safe_errors import safe_error
 from ion.models.analytics import AnalyticsJob, AnalyticsSnapshot
 from ion.models.user import User
@@ -24,7 +24,7 @@ class AnalyticsJobUpdate(BaseModel):
 
 @router.get("/jobs")
 def list_analytics_jobs(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ):
     """List all analytics jobs with their latest results."""
@@ -52,7 +52,7 @@ def list_analytics_jobs(
 @router.get("/jobs/{job_type}")
 def get_analytics_job(
     job_type: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ):
     """Get a single analytics job with its full latest result."""
@@ -78,7 +78,7 @@ def get_analytics_job(
 @router.post("/jobs/{job_type}/run")
 def run_analytics_job(
     job_type: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("system:settings")),
     session: Session = Depends(get_db_session),
 ):
     """Manually trigger an analytics job."""
@@ -94,7 +94,7 @@ def run_analytics_job(
 def update_analytics_job(
     job_type: str,
     data: AnalyticsJobUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("system:settings")),
     session: Session = Depends(get_db_session),
 ):
     """Update an analytics job's schedule or enabled state."""
@@ -120,7 +120,7 @@ def update_analytics_job(
 def get_analytics_snapshots(
     job_type: str,
     days: int = 7,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ):
     """Get historical snapshots for a job (for trend charts)."""
@@ -145,7 +145,7 @@ def get_analytics_snapshots(
 
 @router.get("/dashboard")
 def get_analytics_dashboard(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ):
     """Get aggregated dashboard data from all analytics jobs."""
@@ -198,7 +198,7 @@ def get_analytics_dashboard(
 @router.get("/system-overview")
 async def get_system_overview(
     hours: int = 168,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ):
     """Combined system analytics: ES alert data + CyAB namespace mappings + TIDE coverage.

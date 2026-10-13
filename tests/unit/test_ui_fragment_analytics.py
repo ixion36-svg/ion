@@ -108,8 +108,8 @@ def _job(result="default", **over):
 
 
 def test_the_panel_needs_the_pages_permission(job):
-    """Every analytics endpoint is bare authentication and the page is
-    gated on alert:read, so the fragment takes the page's."""
+    """The page and the read endpoints take alert:read, and so does this
+    fragment. A viewer without it is refused."""
     job(payload=_job())
     assert _get(_User()).status_code == 403
     assert _get(_reader()).status_code == 200

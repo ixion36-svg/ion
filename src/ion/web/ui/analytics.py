@@ -33,14 +33,12 @@ Smaller things the same read turned up:
     was out by the viewer's offset. Sixth page with that one, and the first
     where it skews a duration rather than a timestamp.
 
-Permissions. Every analytics endpoint is bare authentication, with no named
-permission, while the page route is gated on `alert:read` (server.py:1303).
-So these fragments take the page's permission: stricter than the endpoint,
-never softer. The two mutations in that module, PATCH /jobs/{job_type} and
-POST /jobs/{job_type}/run, are bare auth as well, which means any
-authenticated account can disable an analytics job or change its schedule.
-That is an authorisation gap rather than a rendering one and is filed
-separately; nothing here widens or narrows it.
+Permissions. The five reads take `alert:read`, the same permission as the
+page route (server.py:1303) and these fragments. PATCH /jobs/{job_type} and
+POST /jobs/{job_type}/run take `system:settings`. Nothing in the seeded
+catalogue means "may run an expensive read", so running a job is as strict
+as changing its schedule. These fragments call the read handlers in-process
+and pass the viewer through; the HTTP gate is what closes the mutations.
 """
 from __future__ import annotations
 
@@ -62,7 +60,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-#: What the page route requires. The endpoints require only a session.
+#: What the page route and the analytics read endpoints require.
 PERMISSION = "alert:read"
 
 #: The severities the badge has a colour for. One outside this set keeps
