@@ -214,3 +214,22 @@ def age_label(created_at: Any, now: Optional[datetime] = None) -> Optional[str]:
     if seconds > 3600:
         return f"{int(seconds // 3600)}h"
     return f"{int(seconds // 60)}m"
+
+
+def instant_label(value: Any) -> Optional[str]:
+    """`2026-09-01 10:30 UTC`, or None when there is no usable timestamp.
+
+    The zone is named because the columns these pages read are naive UTC
+    and the pages were presenting them as local time: `new Date(iso)` reads
+    a zoneless string in the viewer's zone, so every absolute timestamp was
+    wrong by the viewer's offset. An aware value is converted rather than
+    relabelled, so a row that does carry an offset still reads correctly.
+
+    `age_label` above answers "how long ago"; this answers "when", and the
+    two have different failure modes. Here it is a third page asking for
+    it, which is what earns it a place in this module.
+    """
+    parsed = parse_instant(value)
+    if parsed is None:
+        return None
+    return parsed.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")

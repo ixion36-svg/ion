@@ -1451,66 +1451,22 @@ async function loadSavedSearches() {
     }
 }
 
+// GET /ui/discover/saved-searches renders all three lists from one
+// response, where the page made three writes after a /api/auth/me round
+// trip to learn whose searches were whose.
+//
+// Its split was wrong as well as client-side: `mine` was
+// `s => !s.is_shared || s.created_by_id === me`, so an unshared search
+// belonging to somebody else landed in My searches. The repository is
+// not expected to return one, which is what let it survive.
 function displaySavedSearches() {
-    const favoritesList = document.getElementById('favorites-list');
-    const myList = document.getElementById('my-searches-list');
-    const sharedList = document.getElementById('shared-searches-list');
-
-    // Get current user ID from somewhere (we'll approximate by checking created_by)
-    const favorites = savedSearchesData.filter(s => s.is_favorite);
-    const mine = savedSearchesData.filter(s => !s.is_shared || s.created_by_id === getCurrentUserId());
-    const shared = savedSearchesData.filter(s => s.is_shared && s.created_by_id !== getCurrentUserId());
-
-    favoritesList.innerHTML = favorites.length > 0
-        ? favorites.map(s => renderSavedSearchItem(s)).join('')
-        : '<div class="empty-searches">No favorites yet</div>';
-
-    myList.innerHTML = mine.length > 0
-        ? mine.map(s => renderSavedSearchItem(s)).join('')
-        : '<div class="empty-searches">No saved searches</div>';
-
-    sharedList.innerHTML = shared.length > 0
-        ? shared.map(s => renderSavedSearchItem(s)).join('')
-        : '<div class="empty-searches">No shared searches</div>';
+    const host = document.getElementById('my-searches-list');
+    if (!host) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/discover/saved-searches', {
+        source: host, target: host, swap: 'innerHTML',
+    });
 }
 
-function renderSavedSearchItem(search) {
-    const isOwner = search.created_by_id === getCurrentUserId();
-    const lastRun = search.last_executed_at ? new Date(search.last_executed_at).toLocaleDateString() : 'Never';
-
-    return `
-        <div class="saved-search-item" data-id="${search.id}">
-            <span class="saved-search-favorite ${search.is_favorite ? 'active' : ''}"
-                  data-click-action="toggleFavorite" data-stop-propagation data-args='[${search.id}]'
-                  title="${search.is_favorite ? 'Remove from favorites' : 'Add to favorites'}">
-                ${search.is_favorite ? '★' : '☆'}
-            </span>
-            <div class="saved-search-info" data-click-action="loadSavedSearch" data-args='[${search.id}]'>
-                <div class="saved-search-name">${escapeHtml(search.name)}</div>
-                <div class="saved-search-meta">
-                    ${search.is_shared ? '🔗 Shared' : ''}
-                    ${search.execution_count} runs | Last: ${lastRun}
-                    ${!isOwner ? ` | By: ${search.created_by_username || 'Unknown'}` : ''}
-                </div>
-            </div>
-            <div class="saved-search-actions">
-                <button class="btn btn-sm btn-primary" data-click-action="executeSavedSearch" data-stop-propagation data-args='[${search.id}]'>Run</button>
-                ${isOwner ? `
-                    <button class="btn btn-sm" data-click-action="editSavedSearch" data-stop-propagation data-args='[${search.id}]'>Edit</button>
-                    <button class="btn btn-sm" data-click-action="deleteSavedSearch" data-stop-propagation data-args='[${search.id}]'>Delete</button>
-                ` : ''}
-            </div>
-        </div>
-    `;
-}
-
-function getCurrentUserId() {
-    // Get from session or global - for now check if window has currentUser
-    if (window.currentUser && window.currentUser.id) {
-        return window.currentUser.id;
-    }
-    return null;
-}
 
 function toggleSavedSearchesPanel() {
     const panel = document.getElementById('saved-searches-panel');
@@ -1776,15 +1732,15 @@ function applyNlQuery() {
     showToast('AI query applied — click Search to execute', 'success');
 }
 
-// Initialize
-document.addEventListener('DOMContentLoaded', function() {
-    // Tab is already on search by default
-    // Load current user info
-    fetch('/api/auth/me')
-        .then(r => r.json())
-        .then(data => { window.currentUser = data; })
-        .catch(() => {});
-});
+// The /api/auth/me read that used to run here fed getCurrentUserId, and
+// only the saved-search split used it. The server does that split now, so
+// the round trip is gone and with it a race: the fetch resolved after
+// DOMContentLoaded and its .catch swallowed a failure, so a split running
+// before it, or at all after a failed read, put your own shared searches
+// under Shared and labelled every item "By: you".
+//
+// Nothing else needed DOMContentLoaded, so the listener went too. The tab
+// starts on search by default.
 
 // Enter submits the AI query. Bound at load, because the modal is in
 // the page: the listener used to be attached inside the builder, so it

@@ -59,7 +59,6 @@ whether to offer Delete. The rows are otherwise the rows the JSON reports.
 from __future__ import annotations
 
 import logging
-from datetime import timezone
 from typing import Any, Optional, TypedDict
 
 from fastapi import APIRouter, Depends, Request, Response
@@ -69,7 +68,7 @@ from sqlalchemy.orm import Session
 from ion.auth.dependencies import get_current_user, require_permission
 from ion.models.user import User
 from ion.storage.database import get_db_session
-from ion.web.ui._shared import parse_instant, plain, render_view
+from ion.web.ui._shared import instant_label, plain, render_view
 
 logger = logging.getLogger(__name__)
 
@@ -146,19 +145,6 @@ def _number(value: Any) -> Optional[int]:
     if isinstance(value, bool) or not isinstance(value, int):
         return None
     return value
-
-
-def instant_label(value: Any) -> Optional[str]:
-    """`2026-09-01 10:30 UTC`, or None when there is no usable timestamp.
-
-    The zone is named because the column is naive UTC and the page was
-    presenting it as local time. An aware value is converted, not
-    relabelled.
-    """
-    parsed = parse_instant(value)
-    if parsed is None:
-        return None
-    return parsed.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
 
 def may_delete(document: Any, user: Any) -> bool:

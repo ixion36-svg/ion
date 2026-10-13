@@ -587,3 +587,162 @@ def test_the_three_ioc_panels_share_one_visibility_mechanism():
     for ident in ("ioc-empty-state", "ioc-single-results",
                   "ioc-bulk-results"):
         assert ident + "').style.display" not in body, ident
+
+
+# ---------------------------------------------------------------------------
+# Saved searches
+# ---------------------------------------------------------------------------
+
+
+SAVED = "/ui/discover/saved-searches"
+
+
+@pytest.fixture
+def saved(monkeypatch):
+    def set(rows=None, raises=None):
+        def handler(search_type=None, favorites_only=False,
+                    current_user=None, session=None):
+            if raises is not None:
+                raise raises
+            return rows
+
+        monkeypatch.setattr("ion.web.api.list_saved_searches", handler)
+
+    return set
+
+
+def _row(ident=1, **over):
+    r = {"id": ident, "name": "my search", "created_by_id": 1,
+         "created_by_username": "lyndon", "is_shared": False,
+         "is_favorite": False, "execution_count": 3,
+         "last_executed_at": "2026-09-01T10:30:00"}
+    r.update(over)
+    return r
+
+
+def _saved_get(user):
+    from ion.storage.database import get_db_session
+
+    application = _app(user)
+    application.dependency_overrides[get_db_session] = lambda: None
+    with TestClient(application) as client:
+        return client.get(SAVED)
+
+
+def test_a_search_of_someone_elses_that_is_not_shared_is_in_no_list(saved):
+    """The defect. `mine` was `s => !s.is_shared || s.created_by_id === me`,
+    so an unshared search belonging to somebody else landed in My searches.
+    The repository is not expected to return one, which is what let it
+    survive."""
+    saved(rows={"saved_searches": [
+        _row(1, name="mine", created_by_id=1),
+        _row(2, name="theirs", created_by_id=99, is_shared=False),
+    ]})
+    body = flat(_saved_get(_reader()).text)
+    assert "mine" in body
+    assert "theirs" not in body
+
+
+def test_my_own_shared_search_is_mine_not_shared_with_me(saved):
+    """getCurrentUserId read window.currentUser, set by an /api/auth/me
+    fetch that resolved after DOMContentLoaded with its failure swallowed,
+    so before it landed every owned search looked like somebody else's."""
+    saved(rows={"saved_searches": [
+        _row(1, name="my shared one", created_by_id=1, is_shared=True)]})
+    html = _saved_get(_reader()).text
+    # The favourites and shared lists come back as out-of-band blocks; the
+    # fragment's own body is the "mine" list, because that is the target
+    # the page swaps into.
+    body = html.split('id="shared-searches-list"')[-1]
+    mine = body.split("</div>", 1)[-1]
+    assert "my shared one" in flat(mine), html
+    assert "By:" not in flat(html)
+
+
+def test_someone_elses_shared_search_is_attributed(saved):
+    saved(rows={"saved_searches": [
+        _row(2, name="theirs", created_by_id=99, is_shared=True,
+             created_by_username="sam")]})
+    body = flat(_saved_get(_reader()).text)
+    assert "theirs" in body
+    assert "By: sam" in body
+
+
+def test_a_username_carrying_markup_is_escaped(saved):
+    saved(rows={"saved_searches": [
+        _row(2, created_by_id=99, is_shared=True,
+             created_by_username="<img src=x>")]})
+    html = _saved_get(_reader()).text
+    assert "<img src=x>" not in html
+
+
+def test_a_favourite_appears_in_the_favourites_list(saved):
+    saved(rows={"saved_searches": [
+        _row(1, name="starred", is_favorite=True)]})
+    html = _saved_get(_reader()).text
+    favourites = html.split('id="shared-searches-list"')[0]
+    assert "starred" in flat(favourites)
+
+
+@pytest.mark.parametrize("rows", [None, {}, {"saved_searches": None},
+                                   {"saved_searches": "two"}])
+def test_an_unreadable_list_says_unavailable_not_empty(saved, rows):
+    saved(rows=rows)
+    body = flat(_saved_get(_reader()).text)
+    assert "Saved searches unavailable" in body, rows
+    assert "No saved searches" not in body, rows
+
+
+def test_a_read_that_raised_says_unavailable(saved):
+    saved(raises=RuntimeError("the repository fell over"))
+    assert "Saved searches unavailable" in flat(_saved_get(_reader()).text)
+
+
+def test_no_searches_says_so_in_each_list(saved):
+    saved(rows={"saved_searches": []})
+    body = flat(_saved_get(_reader()).text)
+    assert "No saved searches" in body
+    assert "No favorites yet" in body
+    assert "No shared searches" in body
+
+
+def test_a_missing_run_count_is_not_printed_as_undefined(saved):
+    saved(rows={"saved_searches": [_row(1, execution_count=None)]})
+    body = flat(_saved_get(_reader()).text)
+    assert "undefined" not in body
+    assert "run count unknown" in body
+
+
+def test_the_last_run_date_is_read_as_utc(saved):
+    saved(rows={"saved_searches": [
+        _row(1, last_executed_at="2026-09-01T10:30:00")]})
+    assert "2026-09-01 10:30 UTC" in flat(_saved_get(_reader()).text)
+
+
+def test_a_search_never_run_says_never(saved):
+    saved(rows={"saved_searches": [_row(1, last_executed_at=None)]})
+    assert "Never" in flat(_saved_get(_reader()).text)
+
+
+def test_every_saved_search_data_args_is_parseable_json(saved):
+    import json as _json
+    saved(rows={"saved_searches": [_row(1), _row("not-a-number")]})
+    html = _saved_get(_reader()).text
+    found = re.findall(r"data-args='([^']*)'", html)
+    assert found
+    for raw in found:
+        _json.loads(unescape(raw))
+
+
+def test_the_page_no_longer_builds_the_saved_search_lists():
+    body = re.sub(r"\{#.*?#\}", "", PAGE.read_text(encoding="utf-8"),
+                  flags=re.S)
+    block = re.search(r"\bfunction displaySavedSearches\(.*?\n\}", body,
+                      re.S)
+    assert block, "the entry point is still there"
+    assert not re.search(r"\.innerHTML\s*=", block.group(0))
+    assert "htmx.ajax" in block.group(0)
+    assert "function renderSavedSearchItem" not in body
+    # The helper and the round trip it needed are gone.
+    assert "function getCurrentUserId" not in body
+    assert "window.currentUser" not in body

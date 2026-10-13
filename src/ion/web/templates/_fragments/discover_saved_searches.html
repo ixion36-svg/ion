@@ -1,0 +1,56 @@
+{% macro item(s) %}
+<div class="saved-search-item" data-id="{{ s.id }}">
+  <span class="saved-search-favorite{% if s.favorite %} active{% endif %}"
+        data-click-action="toggleFavorite" data-stop-propagation
+        data-args='{{ [s.id]|tojson }}'
+        title="{% if s.favorite %}Remove from favorites{% else %}Add to favorites{% endif %}">
+    {{- '★' if s.favorite else '☆' -}}
+  </span>
+  <div class="saved-search-info" data-click-action="loadSavedSearch"
+       data-args='{{ [s.id]|tojson }}'>
+    <div class="saved-search-name">{{ s.name or 'Unnamed search' }}</div>
+    <div class="saved-search-meta">
+      {%- if s.shared %}Shared{% endif %}
+      {#- Not "undefined runs". -#}
+      {%- if s.runs is not none %} {{ s.runs }} runs{% else %} run count unknown{% endif %}
+      {#- The date is formatted from the naive UTC column and labelled;
+          `new Date(iso).toLocaleDateString()` read it in the viewer's
+          zone. -#}
+      | Last: {% if s.last_run %}{{ s.last_run }}{% else %}Never{% endif %}
+      {%- if not s.mine %} | By: {{ s.owner or 'Unknown' }}{% endif %}
+    </div>
+  </div>
+</div>
+{% endmacro %}
+{# The three saved-search lists, from ui/discover.py's
+   saved_searches_view.
+
+   The split is by ownership and the server does it. The page fetched
+   /api/auth/me to learn who it was, and then got the split wrong anyway:
+   `mine` was `s => !s.is_shared || s.created_by_id === me`, so an unshared
+   search belonging to somebody else landed in "My searches". The
+   repository is not expected to return one, which is exactly what let it
+   survive.
+
+   All three lists are swapped from one response, so the three reads the
+   page made become one.
+#}
+<div id="favorites-list" hx-swap-oob="innerHTML:#favorites-list">
+  {%- if state == 'failed' %}
+  <div class="empty-searches">Saved searches unavailable</div>
+  {%- elif not favorites %}
+  <div class="empty-searches">No favorites yet</div>
+  {%- else %}{% for s in favorites %}{{ item(s) }}{% endfor %}{% endif %}
+</div>
+<div id="shared-searches-list" hx-swap-oob="innerHTML:#shared-searches-list">
+  {%- if state == 'failed' %}
+  <div class="empty-searches">Saved searches unavailable</div>
+  {%- elif not shared %}
+  <div class="empty-searches">No shared searches</div>
+  {%- else %}{% for s in shared %}{{ item(s) }}{% endfor %}{% endif %}
+</div>
+{% if state == 'failed' %}
+<div class="empty-searches">Saved searches unavailable</div>
+{% elif not mine %}
+<div class="empty-searches">No saved searches</div>
+{% else %}{% for s in mine %}{{ item(s) }}{% endfor %}{% endif %}

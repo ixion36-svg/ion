@@ -50,9 +50,12 @@ from typing import Any, Optional, TypedDict
 from fastapi import APIRouter, Depends, Form, Request, Response
 from fastapi.responses import HTMLResponse
 
+from sqlalchemy.orm import Session
+
 from ion.auth.dependencies import get_current_user, require_permission
 from ion.models.user import User
-from ion.web.ui._shared import plain, render_view
+from ion.storage.database import get_db_session
+from ion.web.ui._shared import instant_label, plain, render_view
 
 logger = logging.getLogger(__name__)
 
@@ -724,3 +727,128 @@ async def discover_ioc_bulk_fragment(
         view = bulk_view(payload)
 
     return render_view(request, BULK_FRAGMENT, view)
+
+
+# ---------------------------------------------------------------------------
+# Saved searches
+# ---------------------------------------------------------------------------
+#
+# GET /api/saved-searches returns what this account may see: its own, plus
+# the shared ones. The page then split them into three lists in the
+# browser, which needed it to know who it was, so it fetched /api/auth/me
+# and kept the id in getCurrentUserId(). The server knows.
+#
+# That split was also wrong. `mine` was
+#
+#     s => !s.is_shared || s.created_by_id === getCurrentUserId()
+#
+# so an unshared search belonging to somebody else landed in "My
+# searches". The repository is not expected to return one, which is what
+# made it survive: a filter that is wrong only about rows you should not
+# have is a filter nobody notices until the day you have them.
+#
+# Three more:
+#
+#   * `new Date(s.last_executed_at).toLocaleDateString()` over isoformat()
+#     of a naive UTC column, so the date was read in the viewer's zone.
+#     Fifth page with this one.
+#   * `${search.execution_count} runs` printed "undefined runs".
+#   * `${search.created_by_username || 'Unknown'}` put a username into
+#     markup unescaped.
+
+SAVED_FRAGMENT = "_fragments/discover_saved_searches.html"
+
+
+class SavedSearch(TypedDict):
+    id: Any
+    name: Optional[str]
+    shared: bool
+    favorite: bool
+    runs: Optional[int]
+    last_run: Optional[str]
+    owner: Optional[str]
+    mine: bool
+
+
+class SavedSearchesView(TypedDict):
+    """Three buckets and a state. `state` is "failed" when the read did not
+    answer or answered a shape we could not read, which is not the same as
+    an account with no saved searches."""
+
+    state: str
+    favorites: list[SavedSearch]
+    mine: list[SavedSearch]
+    shared: list[SavedSearch]
+
+
+def saved_search(raw: Any, user_id: Any) -> Optional[SavedSearch]:
+    if not isinstance(raw, dict):
+        return None
+    ident = raw.get("id")
+    if ident is None:
+        return None
+    name = plain(raw.get("name"))
+    owner = plain(raw.get("created_by_username"))
+    created_by = raw.get("created_by_id")
+    return {
+        "id": ident,
+        "name": str(name) if name is not None else None,
+        "shared": raw.get("is_shared") is True,
+        "favorite": raw.get("is_favorite") is True,
+        "runs": _int(raw.get("execution_count")),
+        "last_run": instant_label(raw.get("last_executed_at")),
+        "owner": str(owner) if owner is not None else None,
+        "mine": created_by is not None and created_by == user_id,
+    }
+
+
+def saved_searches_view(payload: Any, user_id: Any) -> SavedSearchesView:
+    """The endpoint's body as the three lists.
+
+    The split is by ownership, which the server knows: a search is mine, or
+    it is somebody else's and shared with me. There is no third case, and
+    the page's filter put one there.
+    """
+    rows = payload.get("saved_searches") if isinstance(payload, dict) \
+        else None
+    if not isinstance(rows, list):
+        return {"state": "failed", "favorites": [], "mine": [],
+                "shared": []}
+    items = [s for s in (saved_search(r, user_id) for r in rows)
+             if s is not None]
+    return {
+        "state": "data",
+        "favorites": [s for s in items if s["favorite"]],
+        "mine": [s for s in items if s["mine"]],
+        "shared": [s for s in items if not s["mine"] and s["shared"]],
+    }
+
+
+@router.get(
+    "/discover/saved-searches",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+def discover_saved_searches_fragment(
+    request: Request,
+    search_type: str = "discover",
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> Response:
+    """The three saved-search lists."""
+    try:
+        from ion.web.api import list_saved_searches
+
+        payload = list_saved_searches(
+            search_type=search_type,
+            favorites_only=False,
+            current_user=current_user,
+            session=session,
+        )
+    except Exception:
+        logger.exception("Discover fragment could not list saved searches")
+        payload = None
+
+    view = saved_searches_view(
+        payload, getattr(current_user, "id", None))
+    return render_view(request, SAVED_FRAGMENT, view)
