@@ -19,7 +19,7 @@
 </div>
 <div class="flex items-center gap-2 flex-wrap">
         <button class="btn btn-secondary" data-click-action="refreshMetrics">Refresh Metrics</button>
-        <button class="btn btn-primary" data-click-action="runHealthChecks">Run Health Checks</button>
+        {% if current_user and current_user.has_permission('integration:manage') %}<button class="btn btn-primary" data-click-action="runHealthChecks">Run Health Checks</button>{% endif %}
     </div>
 </section>
 
@@ -53,14 +53,14 @@
                 <!-- Row 1: Server + ES Cluster -->
                 <div class="ion-card" id="server-metrics">
                     <h3 class="mt-0 mb-3 text-sm font-semibold text-base-content/60 uppercase tracking-[0.5px]">Server Health</h3>
-                    <div class="metrics-content text-sm">
+                    <div class="metrics-content text-sm" id="server-metrics-content">
                         <div class="loading">Loading...</div>
                     </div>
                 </div>
 
                 <div class="ion-card" id="es-cluster-metrics">
                     <h3 class="mt-0 mb-3 text-sm font-semibold text-base-content/60 uppercase tracking-[0.5px]">Elasticsearch Cluster</h3>
-                    <div class="metrics-content text-sm">
+                    <div class="metrics-content text-sm" id="es-cluster-metrics-content">
                         <div class="loading">Loading...</div>
                     </div>
                 </div>
@@ -68,14 +68,14 @@
                 <!-- Row 2: Ingestion + Data Flows -->
                 <div class="ion-card" id="es-ingest-metrics">
                     <h3 class="mt-0 mb-3 text-sm font-semibold text-base-content/60 uppercase tracking-[0.5px]">Ingestion Statistics</h3>
-                    <div class="metrics-content text-sm">
+                    <div class="metrics-content text-sm" id="es-ingest-metrics-content">
                         <div class="loading">Loading...</div>
                     </div>
                 </div>
 
                 <div class="ion-card" id="data-flow-metrics">
                     <h3 class="mt-0 mb-3 text-sm font-semibold text-base-content/60 uppercase tracking-[0.5px]">Data Flows (24h)</h3>
-                    <div class="metrics-content text-sm">
+                    <div class="metrics-content text-sm" id="data-flow-metrics-content">
                         <div class="loading">Loading...</div>
                     </div>
                 </div>
@@ -83,7 +83,7 @@
                 <!-- Row 3: Server Logs - Full Width -->
                 <div class="ion-card min-[769px]:col-span-2" id="server-logs-metrics">
                     <h3 class="mt-0 mb-3 text-sm font-semibold text-base-content/60 uppercase tracking-[0.5px]">Server Logs (Elasticsearch)</h3>
-                    <div class="metrics-content text-sm">
+                    <div class="metrics-content text-sm" id="server-logs-metrics-content">
                         <div class="loading">Loading...</div>
                     </div>
                 </div>
@@ -96,7 +96,7 @@
         <section class="mb-6">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-[1.1rem] mb-0">Webhooks</h2>
-                <button class="btn btn-sm btn-primary" data-click-action="showCreateWebhookModal">+ New</button>
+                {% if current_user and current_user.has_permission('integration:manage') %}<button class="btn btn-sm btn-primary" data-click-action="showCreateWebhookModal">+ New</button>{% endif %}
             </div>
             <div class="mt-4" id="webhooks-list">
                 <div class="loading">Loading webhooks...</div>
@@ -144,6 +144,7 @@
 </section>
 
 <!-- Create Webhook Modal -->
+{% if current_user and current_user.has_permission('integration:manage') %}
 <div class="modal" id="create-webhook-modal">
     <div class="bg-base-100 rounded-lg p-6 max-w-[500px] w-[90%] max-h-[80vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-4">
@@ -184,7 +185,10 @@
     </div>
 </div>
 
+{% endif %}
+
 <!-- Edit Webhook Modal -->
+{% if current_user and current_user.has_permission('integration:manage') %}
 <div class="modal" id="edit-webhook-modal">
     <div class="bg-base-100 rounded-lg p-6 max-w-[500px] w-[90%] max-h-[80vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-4">
@@ -223,7 +227,10 @@
     </div>
 </div>
 
+{% endif %}
+
 <!-- Webhook Token Modal -->
+{% if current_user and current_user.has_permission('integration:manage') %}
 <div class="modal" id="webhook-token-modal">
     <div class="bg-base-100 rounded-lg p-6 max-w-[500px] w-[90%] max-h-[80vh] overflow-y-auto">
         <div class="flex items-center justify-between mb-4">
@@ -252,6 +259,8 @@
         </div>
     </div>
 </div>
+
+{% endif %}
 
 <!-- Webhook Logs Modal -->
 <div class="modal" id="webhook-logs-modal">
@@ -381,6 +390,7 @@
 </div><!-- /ion-tw -->
 {% endblock %}
 
+
 {% block scripts %}
 {% include "_fragments/ion_fragment_client.html" %}
 <script src="/static/js/ion-fragments.js?v={{ ion_version }}"></script>
@@ -465,64 +475,7 @@ ionLiveUpdates('integrations', loadMetrics, 30000);
 // =============================================================================
 
 async function loadIntegrationStatus() {
-    const container = document.getElementById('integration-cards');
-
-    try {
-        const integrations = await ionFetchJson('/api/integrations/status', 'integrations');
-
-        if (integrations.length === 0) {
-            container.innerHTML = '<p class="loading">No integrations configured</p>';
-            return;
-        }
-
-        container.innerHTML = integrations.map(integration => {
-            const iconClass = getIconClass(integration.type);
-            const statusClass = getStatusClass(integration.status || (integration.is_configured ? 'healthy' : 'not_configured'));
-            const statusText = integration.status || (integration.is_configured ? 'Configured' : 'Not Configured');
-
-            // Version badge
-            const meta = integration.metadata || {};
-            const version = meta.version || null;
-            const compat = meta.version_compatibility || null;
-            let versionBadgeHtml = '';
-            let versionWarningHtml = '';
-
-            if (version && compat) {
-                const badgeClass = compat.in_range ? 'compatible' : 'incompatible';
-                versionBadgeHtml = `<span class="version-badge ${badgeClass}">v${escapeHtml(version)}</span>`;
-                if (!compat.in_range) {
-                    versionWarningHtml = `<div class="version-warning">${escapeHtml(compat.message)}</div>`;
-                }
-            } else if (version) {
-                versionBadgeHtml = `<span class="version-badge compatible">v${escapeHtml(version)}</span>`;
-            }
-
-            return `
-                <div class="integration-card">
-                    <div class="integration-card-header">
-                        <div class="integration-icon ${iconClass}" aria-hidden="true">${integration.display_name.charAt(0)}</div>
-                        <div class="integration-card-title">${escapeHtml(integration.display_name)}</div>
-                        ${versionBadgeHtml}
-                    </div>
-                    <div class="integration-card-status">
-                        <span class="status-indicator ${statusClass}"></span>
-                        <span>${statusText}</span>
-                    </div>
-                    <div class="integration-card-details">
-                        ${integration.is_enabled ? 'Enabled' : 'Disabled'}
-                        ${integration.response_time_ms ? ` | ${integration.response_time_ms.toFixed(0)}ms` : ''}
-                        ${versionWarningHtml}
-                    </div>
-                    <div class="integration-card-actions">
-                        <button class="btn btn-sm" data-click-action="testConnection" data-args='["${integration.type}"]'>Test</button>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-    } catch (error) {
-        container.innerHTML = `<p class="loading">Error: ${escapeHtml(error.message)}</p>`;
-    }
+    await ionLoadFragment('/ui/integrations/status', 'integration-cards', 'Loading integrations...');
 }
 
 async function runHealthChecks() {
@@ -816,37 +769,7 @@ async function loadServerLogsMetrics() {
 // =============================================================================
 
 async function loadWebhooks() {
-    const container = document.getElementById('webhooks-list');
-
-    try {
-        const webhooks = await ionFetchJson('/api/integrations/webhooks', 'webhooks');
-
-        if (webhooks.length === 0) {
-            container.innerHTML = '<p class="loading p-4">No webhooks configured</p>';
-            return;
-        }
-
-        container.innerHTML = webhooks.map(webhook => `
-            <div class="webhook-item">
-                <div class="webhook-header">
-                    <span class="webhook-name">${escapeHtml(webhook.name)}</span>
-                    <span class="status-badge ${webhook.is_active ? 'active' : 'inactive'}">${webhook.is_active ? 'Active' : 'Inactive'}</span>
-                </div>
-                <div class="webhook-meta">
-                    <span>${escapeHtml(webhook.source_type)}</span>
-                    <span>${webhook.trigger_count} triggers</span>
-                </div>
-                <div class="webhook-actions">
-                    <button class="btn btn-sm" data-click-action="showWebhookLogs" data-args='[${webhook.id}]'>Logs</button>
-                    <button class="btn btn-sm" data-click-action="showEditWebhookModal" data-args='[${webhook.id}]'>Edit</button>
-                    <button class="btn btn-sm btn-danger" data-click-action="deleteWebhook" data-args='[${webhook.id}]'>Delete</button>
-                </div>
-            </div>
-        `).join('');
-
-    } catch (error) {
-        container.innerHTML = `<p class="loading">Error: ${escapeHtml(error.message)}</p>`;
-    }
+    await ionLoadFragment('/ui/integrations/webhooks', 'webhooks-list', 'Loading webhooks...');
 }
 
 function showCreateWebhookModal() {
@@ -979,31 +902,8 @@ async function deleteWebhook(webhookId) {
 }
 
 async function showWebhookLogs(webhookId) {
-    const tbody = document.getElementById('webhook-logs-body');
-    tbody.innerHTML = '<tr><td colspan="5" class="loading">Loading...</td></tr>';
     document.getElementById('webhook-logs-modal').classList.add('active');
-
-    try {
-        const logs = await ionFetchJson(`/api/integrations/webhooks/${webhookId}/logs?limit=50`, 'webhook logs');
-
-        if (logs.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="loading">No logs found</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = logs.map(log => `
-            <tr>
-                <td>${formatTime(log.created_at)}</td>
-                <td>${escapeHtml(log.event_type || 'unknown')}</td>
-                <td><span class="status-badge ${log.status === 'success' ? 'success' : 'failed'}">${log.status}</span></td>
-                <td>${escapeHtml(log.source_ip || 'N/A')}</td>
-                <td>${log.processing_time_ms ? log.processing_time_ms.toFixed(2) + 'ms' : 'N/A'}</td>
-            </tr>
-        `).join('');
-
-    } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="5" class="loading">Error: ${escapeHtml(error.message)}</td></tr>`;
-    }
+    await ionLoadFragment(`/ui/integrations/webhooks/${encodeURIComponent(webhookId)}/logs`, 'webhook-logs-body', 'Loading webhook logs...');
 }
 
 // =============================================================================
@@ -1011,35 +911,12 @@ async function showWebhookLogs(webhookId) {
 // =============================================================================
 
 async function loadIntegrationLogs() {
-    const tbody = document.getElementById('logs-body');
-    const typeFilter = document.getElementById('log-type-filter').value;
-    const levelFilter = document.getElementById('log-level-filter').value;
-
-    let url = '/api/integrations/logs?limit=100';
-    if (typeFilter) url += `&integration_type=${typeFilter}`;
-    if (levelFilter) url += `&level=${levelFilter}`;
-
-    try {
-        const logs = await ionFetchJson(url, 'integration logs');
-
-        if (logs.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="loading">No logs found</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = logs.map(log => `
-            <tr>
-                <td>${formatTime(log.timestamp)}</td>
-                <td>${escapeHtml(log.integration_type)}</td>
-                <td><span class="log-level-${log.level}">${log.level.toUpperCase()}</span></td>
-                <td>${escapeHtml(log.action)}</td>
-                <td>${escapeHtml(log.message)}</td>
-            </tr>
-        `).join('');
-
-    } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="5" class="loading">Error: ${escapeHtml(error.message)}</td></tr>`;
-    }
+    const params = new URLSearchParams();
+    const type = document.getElementById('log-type-filter').value;
+    const level = document.getElementById('log-level-filter').value;
+    if (type) params.set('integration_type', type);
+    if (level) params.set('level', level);
+    await ionLoadFragment('/ui/integrations/logs?' + params.toString(), 'logs-body', 'Loading integration logs...');
 }
 
 // =============================================================================

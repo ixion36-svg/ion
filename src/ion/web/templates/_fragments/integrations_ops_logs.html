@@ -1,0 +1,2 @@
+{% if state != 'data' %}<tr><td colspan="5" class="loading">{% if state == 'failed' %}Integration logs unavailable{% else %}No logs found{% endif %}</td></tr>
+{% else %}{% for item in items %}<tr><td>{{ item.timestamp }}</td><td>{{ item.integration_type }}</td><td><span{% if item.level in ['debug', 'info', 'warning', 'error', 'critical'] %} class="log-level-{{ item.level }}"{% endif %}>{{ item.level|upper }}</span></td><td>{{ item.action }}</td><td>{{ item.message }}</td></tr>{% endfor %}{% endif %}

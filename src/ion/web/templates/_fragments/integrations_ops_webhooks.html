@@ -1,0 +1,12 @@
+{% if state == 'failed' %}<p class="loading">Webhooks unavailable</p>
+{% elif state == 'empty' %}<p class="loading">No webhooks configured</p>
+{% else %}{% for item in items %}
+<div class="webhook-item">
+ <div class="webhook-header"><span class="webhook-name">{{ item.name }}</span><span class="status-badge {% if item.active is sameas true %}active{% elif item.active is sameas false %}inactive{% endif %}">{% if item.active is sameas true %}Active{% elif item.active is sameas false %}Inactive{% else %}Unknown{% endif %}</span></div>
+ <div class="webhook-meta"><span>{{ item.source_type }}</span><span>{% if item.trigger_count is not none %}{{ item.trigger_count }}{% else %}Unknown{% endif %} triggers</span></div>
+ {% if item.id is not none %}<div class="webhook-actions">
+ <button class="btn btn-sm" data-click-action="showWebhookLogs" data-args='{{ [item.id]|tojson }}'>Logs</button>
+ {% if can_manage %}<button class="btn btn-sm" data-click-action="showEditWebhookModal" data-args='{{ [item.id]|tojson }}'>Edit</button><button class="btn btn-sm btn-danger" data-click-action="deleteWebhook" data-args='{{ [item.id]|tojson }}'>Delete</button>{% endif %}
+ </div>{% endif %}
+</div>
+{% endfor %}{% endif %}
