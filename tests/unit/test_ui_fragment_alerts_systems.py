@@ -79,7 +79,7 @@ def overview(monkeypatch):
     return box
 
 
-def get(*permissions: str, url: str = URL):
+def get(*permissions: str, url: str = URL, accept: str | None = None):
     from ion.auth.dependencies import get_current_user
     from ion.storage.database import get_db_session
 
@@ -88,8 +88,9 @@ def get(*permissions: str, url: str = URL):
     app.dependency_overrides[get_current_user] = lambda: _User(
         *(permissions or ("alert:read",)))
     app.dependency_overrides[get_db_session] = lambda: None
+    headers = {"accept": accept} if accept else None
     with TestClient(app) as client:
-        return client.get(url)
+        return client.get(url, headers=headers)
 
 
 def _sys(**over):
@@ -182,7 +183,7 @@ def test_a_coverage_of_zero_is_a_measurement_with_a_band(overview):
     overview["payload"] = {"systems": [_sys(tide={"coverage_pct": 0})]}
     body = get().text
     assert "0%" in body
-    assert "var(--danger)" in body, "nought percent coverage is the urgent band"
+    assert "tide-poor" in body, "nought percent coverage is the urgent band"
     assert "not measured" not in body
 
 
@@ -193,16 +194,28 @@ def test_an_unreported_coverage_is_not_banded_at_all(overview):
     body = get().text
     assert "not measured" in text_of(body)
     assert "ad-sys-tide-bar-fill" not in body, "no figure, no bar"
-    assert "var(--danger)" not in body
+    assert "tide-poor" not in body
 
 
 @pytest.mark.parametrize("pct, band", [
-    (TIDE_GOOD, "var(--success)"), (100, "var(--success)"),
-    (TIDE_FAIR, "var(--warning)"), (TIDE_GOOD - 1, "var(--warning)"),
-    (TIDE_FAIR - 1, "var(--danger)"), (0, "var(--danger)"),
+    (TIDE_GOOD, "good"), (100, "good"),
+    (TIDE_FAIR, "fair"), (TIDE_GOOD - 1, "fair"),
+    (TIDE_FAIR - 1, "poor"), (0, "poor"),
 ])
 def test_the_coverage_bands_are_the_ones_the_page_used(pct, band):
+    """The thresholds are unchanged; only the word is. The band used to be
+    the CSS variable that paints it, which put this stylesheet's vocabulary
+    into the view model every reader of the route is built on."""
     assert tide_band(pct) == band
+
+
+def test_the_band_names_no_colour_and_no_css_variable():
+    """What the move is for. A band of "var(--success)" is a fact about
+    ION's current theme; "good" is a fact about the coverage."""
+    for pct in (100, TIDE_GOOD, TIDE_FAIR, 0):
+        value = tide_band(pct)
+        assert value in ("good", "fair", "poor")
+        assert "var(" not in value and "#" not in value
 
 
 def test_no_figure_means_no_band():
@@ -657,3 +670,127 @@ def test_the_real_overview_reports_an_unconfigured_elasticsearch(session):
     assert payload["es_failed"] is True
     assert payload["error"]
     assert isinstance(payload["systems"], list)
+
+
+# ---------------------------------------------------------------------------
+# One named view model, rendered as this page's markup or as itself.
+#
+# The route used to build its context inline, `{"hours": hours, **view}`,
+# which meant the shape of what the panel needs existed only as a dict
+# literal halfway down a handler. Nothing could be built against it and no
+# type checker could hold it. It is a SystemsView now, and the whole
+# context is that one object, so render_view can answer either.
+#
+# This is the seam a change of rendering stack would be made across. The
+# tests below are about the contract, not about JSON being available: that
+# the model is complete, that the negotiation cannot surprise htmx, and
+# that answering JSON grants nobody anything the markup did not.
+# ---------------------------------------------------------------------------
+
+HTMX_ACCEPT = "text/html, */*; q=0.01"
+
+
+def test_the_route_answers_the_view_model_when_asked_for_json(overview):
+    overview["payload"] = {"systems": [_sys()], "total_alerts": 12,
+                           "total_systems": 1, "mapped_systems": 1,
+                           "avg_tide_coverage": 55, "es_failed": False}
+    res = get(accept="application/json")
+    assert res.status_code == 200
+    assert res.headers["content-type"].startswith("application/json")
+    body = res.json()
+    assert body["rows"][0]["name"] == "corp-ad"
+    assert body["total_alerts"] == 12
+    assert body["failed"] is False
+
+
+def test_the_json_is_the_whole_model_and_the_route_adds_nothing(overview):
+    """The contract point. If the route still merged extras into the
+    context, the markup would be built on something the model does not
+    describe, and the two would drift."""
+    from ion.web.ui.alerts import SystemsView
+
+    overview["payload"] = {"systems": [_sys()], "es_failed": False}
+    body = get(accept="application/json").json()
+    assert set(body) == set(SystemsView.__annotations__)
+
+
+def test_the_window_is_part_of_the_model_not_bolted_on(overview):
+    overview["payload"] = {"systems": [], "es_failed": False}
+    body = get(url="/ui/alerts/systems?hours=24", accept="application/json").json()
+    assert body["hours"] == 24
+
+
+def test_a_failed_read_answers_json_too(overview):
+    """A model that only exists on the happy path is not a contract."""
+    overview["payload"] = RuntimeError("boom")
+    body = get(accept="application/json").json()
+    assert body["failed"] is True
+    assert body["rows"] is None
+
+
+def test_htmx_still_gets_markup(overview):
+    """htmx sends `text/html, */*; q=0.01`. The */* in it must not read as
+    an ask for JSON, or every swap on the page would start inserting a JSON
+    document into the grid."""
+    overview["payload"] = {"systems": [_sys()], "es_failed": False}
+    res = get(accept=HTMX_ACCEPT)
+    assert res.headers["content-type"].startswith("text/html")
+    assert "ad-sys-card" in res.text
+
+
+@pytest.mark.parametrize("accept", [None, "*/*", "text/html", ""])
+def test_anything_that_does_not_ask_for_json_gets_markup(accept, overview):
+    overview["payload"] = {"systems": [_sys()], "es_failed": False}
+    res = get(accept=accept)
+    assert res.headers["content-type"].startswith("text/html")
+
+
+def test_json_does_not_bypass_the_permission_gate(overview):
+    """The model is reached through the same route and the same dependency.
+    A reader who may not see the grid may not read it either."""
+    overview["payload"] = {"systems": [_sys()], "es_failed": False}
+    res = get("some:other:permission", accept="application/json")
+    assert res.status_code == 403
+
+
+def test_the_model_carries_nothing_the_markup_did_not_already(overview):
+    """Answering JSON must not widen what the route discloses. Every value
+    in the model is one the fragment already receives, so this asserts the
+    figures and the first card's fields appear in the rendered HTML too."""
+    overview["payload"] = {"systems": [_sys()], "total_alerts": 12,
+                           "total_systems": 1, "mapped_systems": 1,
+                           "avg_tide_coverage": 55, "es_failed": False}
+    body = get(accept="application/json").json()
+    html = get(accept=HTMX_ACCEPT).text
+    for value in (body["rows"][0]["name"], str(body["total_alerts"]),
+                  str(body["rows"][0]["alert_count"])):
+        assert value in html
+
+
+def test_the_model_names_no_css_variable_anywhere(overview):
+    """A view model is not the place for this stylesheet's vocabulary. The
+    band was `var(--success)` until this pilot."""
+    import json
+
+    overview["payload"] = {"systems": [_sys()], "es_failed": False}
+    raw = json.dumps(get(accept="application/json").json())
+    assert "var(--" not in raw
+    assert "#" not in raw
+
+
+def test_a_client_naming_both_html_and_json_gets_markup(overview):
+    """Closes a survivor. test_htmx_still_gets_markup could not see the
+    difference, because htmx's own header never names application/json: it
+    sends `text/html, */*; q=0.01`, and dropping the html clause leaves
+    that answering markup either way.
+
+    The clause is for a caller that names both, which fetch() does when it
+    is given `Accept: application/json, text/html`. These are HTML routes,
+    so naming HTML at all is taken as wanting it, and JSON stays the
+    deliberate ask."""
+    overview["payload"] = {"systems": [_sys()], "es_failed": False}
+    for accept in ("text/html, application/json",
+                   "application/json, text/html",
+                   "application/json;q=0.9, text/html;q=0.8"):
+        res = get(accept=accept)
+        assert res.headers["content-type"].startswith("text/html"), accept

@@ -106,11 +106,17 @@
                  had measured. #}
               <span class="font-mono font-semibold text-[var(--text-muted)]">not measured</span>
             {% else %}
-              <span class="font-mono font-semibold" data-ion-style="color:{{ sys.tide.band }}">{{ sys.tide.coverage_pct }}%</span>
+              {# The band is "good", "fair" or "poor" and the colour for each
+                 is this stylesheet's business. It used to arrive from the
+                 Python as var(--success), which put ION's theme vocabulary
+                 inside the view model every reader of this route is built
+                 on. The width below stays an attribute because a percentage
+                 is genuinely per-system. #}
+              <span class="font-mono font-semibold tide-{{ sys.tide.band }}">{{ sys.tide.coverage_pct }}%</span>
             {% endif %}
           </div>
           {% if sys.tide.coverage_pct is not none %}
-            <div class="ad-sys-tide-bar-track"><div class="ad-sys-tide-bar-fill" data-ion-style="width:{{ sys.tide.coverage_pct }}%; background:{{ sys.tide.band }}"></div></div>
+            <div class="ad-sys-tide-bar-track"><div class="ad-sys-tide-bar-fill tide-{{ sys.tide.band }}-bg" data-ion-style="width:{{ sys.tide.coverage_pct }}%"></div></div>
           {% endif %}
           <div class="ad-sys-tide-stats">
             <span>{{ figure(sys.tide.applied_rules) }}/{{ figure(sys.tide.total_rules) }} rules</span>

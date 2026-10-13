@@ -2908,3 +2908,17 @@ kbd {
     font-size: 0.8125rem;
     padding: 0.5rem 0;
 }
+
+/* TIDE coverage bands.
+ *
+ * sys_card used to put the colour itself in the view model, as
+ * var(--success), so the Python decided what "good" looks like and every
+ * reader of /ui/alerts/systems inherited this theme's variable names. The
+ * model says "good", "fair" or "poor" now and the mapping lives here,
+ * which is also what lets the accent themes reach it. */
+.tide-good { color: var(--success); }
+.tide-fair { color: var(--warning); }
+.tide-poor { color: var(--danger); }
+.tide-good-bg { background: var(--success); }
+.tide-fair-bg { background: var(--warning); }
+.tide-poor-bg { background: var(--danger); }

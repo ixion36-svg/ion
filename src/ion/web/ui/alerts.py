@@ -103,9 +103,9 @@ import logging
 import math
 import re
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from typing import Any, Optional, TypedDict
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse
 from markupsafe import Markup, escape
 from sqlalchemy.orm import Session
@@ -113,7 +113,7 @@ from sqlalchemy.orm import Session
 from ion.auth.dependencies import get_current_user, require_permission
 from ion.models.user import User
 from ion.storage.database import get_db_session
-from ion.web.ui._shared import plain, templates
+from ion.web.ui._shared import plain, render_view, templates
 
 logger = logging.getLogger(__name__)
 
@@ -2733,6 +2733,10 @@ async def alerts_analytics_fragment(
 #: The TIDE coverage bands buildAdSysCard used, with their CSS variables.
 TIDE_GOOD, TIDE_FAIR = 70, 40
 
+#: The systems tab's default window. The route's Query default and the
+#: view model's default are the same number, named once.
+SYSTEMS_DEFAULT_HOURS = 168
+
 #: The sparkline's box, from the page.
 SYS_SPARK_W, SYS_SPARK_H = 320, 32
 
@@ -2742,16 +2746,25 @@ SYS_SEV_PILLS = (("critical", "crit", "crit"), ("high", "high", "high"),
 
 
 def tide_band(pct: Optional[float]) -> Optional[str]:
-    """The colour variable for a coverage figure, or None when there is no
+    """Which band a coverage figure falls in, or None when there is no
     figure. The page banded a missing figure as nought and painted it the
-    danger colour, which asserts a finding about a system nobody measured."""
+    danger colour, which asserts a finding about a system nobody measured.
+
+    "good", "fair" and "poor" rather than the CSS variable each one used to
+    return. The variable name was this stylesheet's answer to the question,
+    and it travelled into the view model, which is the contract the
+    fragment and anything else reading this route are built on. A reading
+    of 81% is good whatever paints it; `var(--success)` is a fact about
+    ION's current theme, and putting it here made every future renderer
+    inherit the theme's vocabulary.
+    """
     if pct is None:
         return None
     if pct >= TIDE_GOOD:
-        return "var(--success)"
+        return "good"
     if pct >= TIDE_FAIR:
-        return "var(--warning)"
-    return "var(--danger)"
+        return "fair"
+    return "poor"
 
 
 def sys_spark(timeline: Any) -> Optional[dict]:
@@ -2786,7 +2799,7 @@ def sys_spark(timeline: Any) -> Optional[dict]:
     return {"points": points, "flat": False, "w": SYS_SPARK_W, "h": SYS_SPARK_H}
 
 
-def sys_card(row: Any) -> Optional[dict]:
+def sys_card(row: Any) -> Optional["SystemCard"]:
     """One system card's figures, or None for a row that is not a mapping."""
     if not isinstance(row, dict):
         return None
@@ -2819,15 +2832,74 @@ def sys_card(row: Any) -> Optional[dict]:
     }
 
 
-def sys_failed(reason: Optional[str] = None) -> dict:
+class TideView(TypedDict):
+    """One system's TIDE coverage, as the panel states it."""
+    coverage_pct: Optional[float]
+    band: Optional[str]  # "good" | "fair" | "poor", or None when unmeasured
+    applied_rules: Optional[int]
+    total_rules: Optional[int]
+    enabled_rules: Optional[int]
+    disabled_rules: Optional[int]
+
+
+class SparkView(TypedDict):
+    """A sparkline, or the fact that every bucket was zero."""
+    points: Optional[str]
+    flat: bool
+    w: int
+    h: int
+
+
+class SevPill(TypedDict):
+    count: int
+    label: str
+    cls: str
+
+
+class SystemCard(TypedDict):
+    name: str
+    initials: str
+    mapped: bool
+    alert_count: Optional[int]
+    pills: list[SevPill]
+    spark: Optional[SparkView]
+    tide: Optional[TideView]
+
+
+class SystemsView(TypedDict):
+    """Everything the systems tab renders, named.
+
+    This is the whole template context, not part of it, which is what lets
+    the route hand it to render_view and answer either markup or JSON from
+    one object. `hours` is in here rather than merged in by the route for
+    the same reason: a model the caller has to complete is not a contract.
+
+    Every figure is Optional because every one of them has a third outcome.
+    None is "not reported by this read", which the fragment draws as an
+    ellipsis, and it is not nought.
+    """
+    failed: bool
+    degraded: bool
+    reason: Optional[str]
+    hours: int
+    rows: Optional[list[SystemCard]]
+    total_alerts: Optional[int]
+    total_systems: Optional[int]
+    mapped_systems: Optional[int]
+    avg_coverage: Optional[float]
+
+
+def sys_failed(reason: Optional[str] = None,
+               hours: int = SYSTEMS_DEFAULT_HOURS) -> SystemsView:
     """The view for a read that did not happen, with its reason when the
     payload gave one."""
-    return {"failed": True, "degraded": False, "reason": reason, "rows": None,
-            "total_alerts": None, "total_systems": None,
+    return {"failed": True, "degraded": False, "reason": reason, "hours": hours,
+            "rows": None, "total_alerts": None, "total_systems": None,
             "mapped_systems": None, "avg_coverage": None}
 
 
-def sys_overview(payload: Any) -> dict:
+def sys_overview(payload: Any,
+                 hours: int = SYSTEMS_DEFAULT_HOURS) -> SystemsView:
     """The systems tab's view, as failed or as the four figures plus the
     cards.
 
@@ -2856,14 +2928,14 @@ def sys_overview(payload: Any) -> dict:
     healthy render into a warning.
     """
     if not isinstance(payload, dict):
-        return sys_failed()
+        return sys_failed(hours=hours)
     rows = _rows(payload, "systems")
     cards = [c for c in (sys_card(r) for r in rows) if c] if rows is not None else None
 
     es_failed = payload.get("es_failed") is True
     reason = payload.get("error") or None
     if es_failed and not cards:
-        return sys_failed(reason)
+        return sys_failed(reason, hours)
 
     if cards is not None and es_failed:
         # Every card is a CyAB mapping in this case, and the API gives those
@@ -2880,6 +2952,7 @@ def sys_overview(payload: Any) -> dict:
         "failed": False,
         "degraded": es_failed,
         "reason": reason,
+        "hours": hours,
         "rows": cards,
         "total_alerts": None if es_failed else _count(payload.get("total_alerts")),
         "total_systems": _count(payload.get("total_systems")),
@@ -2895,27 +2968,30 @@ def sys_overview(payload: Any) -> dict:
 )
 async def alerts_systems_fragment(
     request: Request,
-    hours: int = Query(168),
+    hours: int = Query(SYSTEMS_DEFAULT_HOURS),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
-) -> HTMLResponse:
+) -> Response:
     """The systems tab's grid, with the four figures above it out of band.
 
     Calls get_system_overview, the handler GET /api/analytics/system-overview
     runs, with explicit arguments. No Authorization header is constructed:
     the fragment is already authenticated as the viewer, which is the whole
     reason the page's hand-built one never mattered.
+
+    The context is one SystemsView and nothing else, so render_view can
+    answer this route's markup or the model itself to a caller that asks
+    for JSON. Everything that decides what the reader sees is in that
+    object, which is what makes it a contract rather than a detail of this
+    template.
     """
     from ion.web.analytics_api import get_system_overview
 
     try:
         payload = await get_system_overview(
             hours=hours, current_user=current_user, session=session)
-        view = sys_overview(payload)
+        view = sys_overview(payload, hours)
     except Exception:
         logger.exception("Alert systems fragment could not read the overview")
-        view = sys_failed()
-    return templates.TemplateResponse(
-        request=request, name=SYSTEMS_FRAGMENT,
-        context={"hours": hours, **view}, status_code=200,
-    )
+        view = sys_failed(hours=hours)
+    return render_view(request, SYSTEMS_FRAGMENT, view)

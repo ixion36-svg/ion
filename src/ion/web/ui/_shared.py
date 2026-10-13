@@ -18,11 +18,54 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Mapping, Optional
+
+from fastapi import Request, Response
+from fastapi.responses import JSONResponse
 
 from ion.web.templating import make_templates
 
 templates = make_templates()
+
+
+def wants_json(request: Request) -> bool:
+    """Whether this caller asked for the view model rather than the markup.
+
+    Strict on purpose. JSON is served only when the Accept header names it
+    and does not name HTML, so htmx, which sends
+    `text/html, */*; q=0.01`, and a browser address bar, which sends
+    `text/html,...`, both keep getting markup. A client that sends `*/*`,
+    or no Accept at all, gets markup too: HTML is what these routes are
+    for, and JSON is the deliberate ask.
+    """
+    accept = request.headers.get("accept") or ""
+    return "application/json" in accept and "text/html" not in accept
+
+
+def render_view(
+    request: Request,
+    name: str,
+    view: Mapping[str, Any],
+    *,
+    status_code: int = 200,
+) -> Response:
+    """Render one view model, as this page's fragment or as JSON.
+
+    The point is that there is one object. A route that assembles its
+    template context inline has no name for the thing it renders, so there
+    is nothing a different front end could be built against and nothing a
+    type checker can hold. A route that hands its whole context to this
+    helper has published its contract by construction.
+
+    Nothing new is exposed. The JSON is the same object the template reads,
+    reached through the same route with the same permission dependency, so
+    a caller who may not see the markup cannot see the model either.
+    """
+    if wants_json(request):
+        return JSONResponse(dict(view), status_code=status_code)
+    return templates.TemplateResponse(
+        request=request, name=name, context=dict(view), status_code=status_code,
+    )
 
 
 def plain(value: object) -> object:
