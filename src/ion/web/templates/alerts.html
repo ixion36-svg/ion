@@ -3226,7 +3226,10 @@ async function translateComment(cmtId) {
         return;
     }
     try {
-        const resp = await fetch('/api/ai/translate', {
+        // /api/translator/translate, not /api/ai/translate, which no route
+        // has ever answered. The fetch 404d, resp.ok was false, and every
+        // use of Translate showed "The comment could not be translated".
+        const resp = await fetch('/api/translator/translate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: el.dataset.originalText || '' }),
