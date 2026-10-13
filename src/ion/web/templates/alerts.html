@@ -259,7 +259,7 @@
 
 <!-- Filters -->
 <div class="flex gap-3 mb-6 flex-wrap items-center">
-    <select id="alert-time-range" class="ion-select w-auto!" data-change-action="handleTimeRangeChange">
+    <select id="alert-time-range" name="time_range" class="ion-select w-auto!" data-change-action="handleTimeRangeChange">
         <option value="1">Last Hour</option>
         <option value="4">Last 4 Hours</option>
         <option value="12">Last 12 Hours</option>
@@ -270,10 +270,14 @@
         <option value="custom">Custom Range...</option>
     </select>
     <div id="custom-time-range" class="custom-time-range hidden">
-        <input type="datetime-local" id="custom-time-from" class="px-2 py-1.5 border border-white/10 rounded-md text-[0.8125rem] bg-white/5 text-slate-200" title="From">
+        <input type="datetime-local" id="custom-time-from" name="custom_from" class="px-2 py-1.5 border border-white/10 rounded-md text-[0.8125rem] bg-white/5 text-slate-200" title="From">
         <span class="text-slate-400 text-[0.8125rem]">&rarr;</span>
-        <input type="datetime-local" id="custom-time-to" class="px-2 py-1.5 border border-white/10 rounded-md text-[0.8125rem] bg-white/5 text-slate-200" title="To">
+        <input type="datetime-local" id="custom-time-to" name="custom_to" class="px-2 py-1.5 border border-white/10 rounded-md text-[0.8125rem] bg-white/5 text-slate-200" title="To">
         <button class="btn btn-sm btn-primary" data-click-action="applyCustomTimeRange">Apply</button>
+        {# The viewer's getTimezoneOffset(), set by the script before htmx
+           makes its first request, so the server reads a datetime-local
+           value on the viewer's clock the way `new Date(from)` did. #}
+        <input type="hidden" id="aq-tz-offset" name="tz_offset" value="">
     </div>
     <select id="alert-severity-filter" class="ion-select w-auto!" data-change-action="applyFilters">
         <option value="">All Severities</option>
@@ -283,7 +287,7 @@
         <option value="low">Low</option>
         <option value="info">Info</option>
     </select>
-    <select id="alert-status-filter" class="ion-select w-auto!" data-change-action="handleStatusFilterChange">
+    <select id="alert-status-filter" name="status" class="ion-select w-auto!" data-change-action="handleStatusFilterChange">
         <!-- "Open Only" is the page-load default per user
              direction. The Active (Open + Ack) option remains
              selectable, but new analyst eyes land on Open. -->
@@ -293,7 +297,10 @@
         <option value="closed">Closed</option>
         <option value="all">All Statuses</option>
     </select>
-    <select id="alert-system-filter" class="ion-select w-auto!" data-change-action="loadAlerts" title="Filter by source system (CyAB-registered systems only)">
+    {# Its options are swapped out of band by /ui/alerts/queue, from the
+       system registry plus every system the rows carry, with the
+       requested one kept selected. #}
+    <select id="alert-system-filter" name="system" class="ion-select w-auto!" data-change-action="loadAlerts" title="Filter by source system (CyAB-registered systems only)">
         <option value="">All Systems</option>
     </select>
     <input type="text" id="alert-search" class="px-3 py-2 border border-white/10 rounded-md text-sm bg-white/5 flex-1 min-w-[200px]" placeholder="Search alerts..." data-input-action="debouncedSearch">
@@ -436,15 +443,45 @@
                     <div class="aq-colmenu" id="aq-cols"></div>
                 </div>
                 <span class="aq-count" id="aq-count"></span>
+                {# Shown by htmx while /ui/alerts/queue is in flight. It sits
+                   here, outside the tbody it describes, so the rows stay on
+                   screen during a refresh instead of being wiped to
+                   "Loading", and a failed render cannot remove it. #}
+                <span class="aq-count htmx-indicator" id="alerts-queue-loading" role="status">Refreshing…</span>
             </div>
+            {# The queue's notice line: a degraded Elasticsearch, a capped
+               window, a time range that could not be read. Swapped out of
+               band by every /ui/alerts/queue response, empty when there is
+               nothing to say, hidden by the stylesheet when empty. #}
+            <div id="alerts-queue-notice" class="aq-notice"></div>
             <div class="aq-wrap">
                 <table class="aq" id="alerts-table">
                     <thead><tr></tr></thead>
-                    <tbody id="alerts-tbody">
-                        <tr><td colspan="9" class="aq-empty">Loading alerts…</td></tr>
+                    {# The read. hx-include names the filter controls, so every
+                       refresh sends what they hold; `load` paints once and
+                       `alerts-refresh from:body` is what loadAlerts() dispatches.
+                       Both are native htmx parsing, nothing is evaluated.
+                       hx-select takes only the rows out of the response and the
+                       rest of it is swapped out of band. hx-disinherit so no
+                       descendant request inherits any of this. #}
+                    <tbody id="alerts-tbody"
+                           hx-get="/ui/alerts/queue"
+                           hx-trigger="load, alerts-refresh from:body"
+                           hx-include="#alert-time-range, #custom-time-from, #custom-time-to, #aq-tz-offset, #alert-status-filter, #alert-system-filter"
+                           hx-select="#alerts-queue-rows > tr"
+                           hx-swap="innerHTML"
+                           hx-indicator="#alerts-queue-loading"
+                           hx-disinherit="*">
+                        <tr><td colspan="12" class="aq-empty">Loading alerts…</td></tr>
                     </tbody>
                 </table>
             </div>
+            {# The data block /ui/alerts/queue swaps out of band: the alert
+               array the page's own renderers still aggregate from, with
+               data-outcome saying whether a read happened at all. A
+               non-JavaScript type is never executed. Outside the tbody, so
+               the queue module's own render cannot overwrite it. #}
+            <script type="application/json" id="alerts-queue-data" data-outcome="none"></script>
             <div class="aq-keys">
                 <span><kbd>j</kbd><kbd>k</kbd> move</span>
                 <span><kbd>x</kbd> select</span>
@@ -490,7 +527,7 @@
         <div class="ion-card mb-4">
             <div class="flex items-center justify-between mb-3 pb-3 border-b border-white/10">
                 <h3 class="text-[13px] font-medium text-base-content">Top Hosts</h3>
-                <span class="badge" id="hosts-count">0</span>
+                <span class="badge" id="hosts-count" title="Not counted yet">&hellip;</span>
             </div>
             <div id="top-hosts-list" class="flex flex-col gap-2 max-h-[240px] overflow-y-auto">
                 <div class="loading">Loading...</div>
@@ -499,7 +536,7 @@
         <div class="ion-card mb-4">
             <div class="flex items-center justify-between mb-3 pb-3 border-b border-white/10">
                 <h3 class="text-[13px] font-medium text-base-content">Top Rules</h3>
-                <span class="badge" id="rules-count">0</span>
+                <span class="badge" id="rules-count" title="Not counted yet">&hellip;</span>
             </div>
             <div id="top-rules-list" class="flex flex-col gap-2 max-h-[240px] overflow-y-auto">
                 <div class="loading">Loading...</div>
@@ -508,12 +545,40 @@
         <div class="ion-card mb-4">
             <div class="flex items-center justify-between mb-3 pb-3 border-b border-white/10">
                 <h3 class="text-[13px] font-medium text-base-content">Top Users</h3>
-                <span class="badge" id="users-count">0</span>
+                <span class="badge" id="users-count" title="Not counted yet">&hellip;</span>
             </div>
             <div id="top-users-list" class="flex flex-col gap-2 max-h-[240px] overflow-y-auto">
                 <div class="loading">Loading...</div>
             </div>
         </div>
+        {# The side lists follow the client's own narrowing (search text,
+           severity, entity, saved view), which the server does not hold,
+           so their rows are cloned from these by renderSideList and filled
+           with textContent. The markup has one definition, here, in the
+           template. Only their failed state comes from /ui/alerts/queue. #}
+        <template id="aq-facet-template">
+            <div class="list-item aq-facet" data-click-action="filterByEntity" data-args="[]" title="">
+                <span class="overflow-hidden text-ellipsis whitespace-nowrap aq-facet-name"></span>
+                <span class="list-item-count"></span>
+                <span class="aq-mix"><i class="sev-critical" data-sev="critical"></i><i class="sev-high" data-sev="high"></i><i class="sev-medium" data-sev="medium"></i><i class="sev-low" data-sev="low"></i></span>
+            </div>
+        </template>
+        <template id="aq-facet-empty-template">
+            <div class="empty-state">None</div>
+        </template>
+        {# The active-filter chips describe control state, which is the
+           client's, so renderFilterChips clones these. #}
+        <template id="aq-chip-template">
+            <span class="aq-chip"><span class="aq-chip-label"></span> <b></b><button type="button" class="x" data-aq-chip="" title="Remove">&#10005;</button></span>
+        </template>
+        <template id="aq-chip-all-template">
+            <button type="button" class="aq-chip-all" data-aq-chip="__all">Clear all</button>
+        </template>
+        {# Said once in the notice line when static/js/alerts-queue.js did
+           not load: the server's rows stay, unsorted and ungrouped. #}
+        <template id="aq-module-missing-template">
+            <span role="status" class="aq-notice-item aq-notice-module">The queue renderer did not load; rows are shown as the server read them, without sorting or grouping. Reload the page.</span>
+        </template>
     </div>
 </div>
 
@@ -863,7 +928,10 @@ Object.entries(MITRE_TECHNIQUE_MAP).forEach(([tactic, techniques]) => {
     techniques.forEach(t => { TECHNIQUE_TO_TACTIC[t.id] = tactic; });
 });
 
-const debouncedSearch = debounce(() => applyFilters(), 300);
+// `var`, not `const`: event-delegation.js resolves data-input-action names on
+// window, and a top-level const is not a window property. As a const the
+// search box dispatched to nothing (measured live: typing did not narrow).
+var debouncedSearch = debounce(() => applyFilters(), 300);
 
 // =========================================================================
 // Notifications
@@ -890,8 +958,16 @@ function showNotification(message, type = 'info') {
 // =========================================================================
 // Initialization
 // =========================================================================
+// The viewer's zone offset, set before htmx makes its first request so a
+// custom range is read on the viewer's clock, as `new Date(from)` read it.
+(function () {
+    const tz = document.getElementById('aq-tz-offset');
+    if (tz) tz.value = String(new Date().getTimezoneOffset());
+})();
+
 document.addEventListener('DOMContentLoaded', function() {
-    loadAlerts();
+    // The queue requests itself (hx-trigger="load" on #alerts-tbody) and
+    // onQueueSwapped runs the pipeline when the response lands.
     // The Cases card loads itself (hx-trigger="load"); this fills the JSON
     // index the detail modal and analytics still read.
     loadCasesIndex();
@@ -925,75 +1001,60 @@ function formatAIContent(text) {
 // =========================================================================
 // Data Loading
 // =========================================================================
-async function loadAlerts() {
-    const timeVal = document.getElementById('alert-time-range').value;
-    const statusFilter = document.getElementById('alert-status-filter').value;
-    const tbody = document.getElementById('alerts-tbody');
-    tbody.innerHTML = '<tr><td colspan="12" class="loading">Loading alerts...</td></tr>';
-
-    try {
-        const params = new URLSearchParams({ limit: 500 });
-        if (timeVal === 'custom') {
-            const from = document.getElementById('custom-time-from').value;
-            const to = document.getElementById('custom-time-to').value;
-            if (from) params.set('time_from', new Date(from).toISOString());
-            if (to) params.set('time_to', new Date(to).toISOString());
-            if (!from) params.set('hours', '24');  // fallback
-        } else {
-            params.set('hours', timeVal);
-        }
-        // Include closed alerts only when user explicitly requests them
-        if (statusFilter === 'closed' || statusFilter === 'all') {
-            params.set('include_closed', 'true');
-        }
-        const systemFilter = document.getElementById('alert-system-filter')?.value;
-        if (systemFilter) params.set('system', systemFilter);
-        const response = await fetch(`/api/elasticsearch/alerts?${params}`);
-        if (!response.ok) {
-            if (response.status === 401) {
-                window.location.href = '/login?redirect=/alerts';
-                return;
-            }
-            throw new Error('Failed to load alerts');
-        }
-
-        const data = await response.json();
-
-        // Handle graceful error responses (ES not enabled, not configured, or unreachable).
-        // when the API still returns alerts despite a degraded-ES
-        // message (lab-fixture rows always surface regardless of ES state),
-        // render them instead of wiping the table. Only short-circuit to the
-        // error banner if there is genuinely nothing to show.
-        const incomingAlerts = data.alerts || [];
-        if (data.message && incomingAlerts.length === 0) {
-            const friendlyMsg = data.connection_error
-                ? 'Unable to connect to Elasticsearch. Verify the service is running and the connection settings are correct.'
-                : data.message;
-            tbody.innerHTML = `<tr><td colspan="12" class="error">${friendlyMsg}</td></tr>`;
-            document.getElementById('top-hosts-list').innerHTML = '<div class="empty-state">-</div>';
-            document.getElementById('top-rules-list').innerHTML = '<div class="empty-state">-</div>';
-            document.getElementById('top-users-list').innerHTML = '<div class="empty-state">-</div>';
-            return;
-        }
-
-        allAlerts = incomingAlerts;
-        arkimeEnabled = !!data.arkime_enabled;
-        populateSystemFilterFromAlerts(incomingAlerts);
-        applyFilters();
-        renderThreatBanner();
-        renderAnalytics();
-        // Load triage/case data for all alerts in batch
-        loadTriageBatch();
-        // Load multi-alert pattern detections
-        loadPatternDetections();
-    } catch (error) {
-        console.error('Error loading alerts:', error);
-        tbody.innerHTML = '<tr><td colspan="12" class="error">Error loading alerts. Check Elasticsearch connection.</td></tr>';
-        document.getElementById('top-hosts-list').innerHTML = '<div class="empty-state">-</div>';
-        document.getElementById('top-rules-list').innerHTML = '<div class="empty-state">-</div>';
-        document.getElementById('top-users-list').innerHTML = '<div class="empty-state">-</div>';
-    }
+// The read is the /ui/alerts/queue fragment. #alerts-tbody carries the
+// hx-get with hx-include naming the filter controls, and loadAlerts() asks
+// for a refresh by dispatching the event its hx-trigger listens for. The
+// response swaps the fallback rows into the tbody and, out of band, the
+// system select, the notice line, the failed state of the three side lists
+// and a data block carrying the alert array. onQueueSwapped reads that
+// block, because the queue module, the threat banner, the stats bar, the
+// attention chips, the analytics and the triage batch all still aggregate
+// from allAlerts. The plan calls that array the data spine and gives the
+// analytics their own server aggregation in a later stage before it can go.
+//
+// What this replaced wrote `data.alerts || []`, and on the handler's own
+// message branch and in its catch wrote the same "-" into all three side
+// lists, so a failed Elasticsearch read and a quiet estate were the same
+// picture. The fragment renders the four outcomes apart.
+function loadAlerts() {
+    document.body.dispatchEvent(new CustomEvent('alerts-refresh'));
 }
+
+function onQueueSwapped() {
+    const block = document.getElementById('alerts-queue-data');
+    if (!block) return;
+    if (block.dataset.outcome !== 'read') {
+        // A failed read. The server's row names the reason and the side
+        // lists say they could not be read. The arrays are left as they
+        // were rather than emptied, because nothing was measured.
+        return;
+    }
+    let data;
+    try {
+        data = JSON.parse(block.textContent);
+    } catch (error) {
+        console.error('The alert queue data block did not parse:', error);
+        return;
+    }
+    if (!data || !Array.isArray(data.alerts)) {
+        console.error('The alert queue data block carried no alert list');
+        return;
+    }
+    allAlerts = data.alerts;
+    arkimeEnabled = data.arkime_enabled === true;
+    applyFilters();
+    renderThreatBanner();
+    renderAnalytics();
+    // Load triage/case data for all alerts in batch
+    loadTriageBatch();
+    // Load multi-alert pattern detections
+    loadPatternDetections();
+}
+
+document.body.addEventListener('htmx:afterSwap', (e) => {
+    const target = e.detail && e.detail.target;
+    if (target && target.id === 'alerts-tbody') onQueueSwapped();
+});
 
 // =========================================================================
 // Pattern Detections
@@ -3854,42 +3915,10 @@ function applySorting() {
 // Render the system attribution badge for an alert. Prefers the CyAB system
 // name (linked to /cyab#id) and falls back to the raw namespace. Tooltip
 // surfaces the TIDE system name when it differs.
-// Populate the system filter dropdown from the alerts actually loaded into
-// the table — i.e. distinct `source_system` (data_stream.namespace) values —
-// rather than the CyAB/TIDE registry. Accumulates into a module-level map so
-// the option list doesn't collapse to a single entry while a system filter is
-// active (the table only returns that one system in that case), and so options
-// survive across time-range/severity reloads.
-// value = raw namespace (what the backend `system=` filter matches on);
-// label = the resolved CyAB/TIDE name when present, else the raw namespace.
-const _knownSystems = new Map();  // namespace -> display label
-
-function populateSystemFilterFromAlerts(alerts) {
-    const sel = document.getElementById('alert-system-filter');
-    if (!sel) return;
-    let changed = false;
-    for (const a of (alerts || [])) {
-        const ns = a.source_system;
-        if (!ns) continue;
-        const label = a.cyab_system_name || a.tide_system_name || ns;
-        if (_knownSystems.get(ns) !== label) {
-            _knownSystems.set(ns, label);
-            changed = true;
-        }
-    }
-    if (!changed && sel.options.length > 1) return;
-    const current = sel.value;
-    const entries = [..._knownSystems.entries()]
-        .sort((a, b) => a[1].toLowerCase().localeCompare(b[1].toLowerCase()));
-    sel.innerHTML = '<option value="">All Systems</option>';
-    for (const [ns, label] of entries) {
-        const opt = document.createElement('option');
-        opt.value = ns;
-        opt.textContent = label;
-        sel.appendChild(opt);
-    }
-    if (current) sel.value = current;
-}
+// The system filter's options come from /ui/alerts/queue, swapped out of
+// band on every load: the system registry plus every system the rows carry,
+// with the requested one kept selected. The client Map that accumulated
+// them for the life of the page is gone with it.
 
 
 // ── Saved views ───────────────────────────────────────────────────────────
@@ -3989,10 +4018,19 @@ function renderFilterChips() {
     if (entityFilter) chips.push(['entity', entityFilter.type, entityFilter.value]);
     if (search) chips.push(['search', 'Text', `"${search}"`]);
 
-    el.innerHTML = !chips.length ? '' : chips.map(([k, lab, val]) =>
-        `<span class="aq-chip">${escapeHtml(lab)} <b>${escapeHtml(String(val))}</b>`
-        + `<button type="button" class="x" data-aq-chip="${k}" title="Remove">&#10005;</button></span>`
-    ).join('') + '<button type="button" class="aq-chip-all" data-aq-chip="__all">Clear all</button>';
+    // the chip markup is the <template> in the page shell; this fills it
+    el.replaceChildren();
+    if (!chips.length) return;
+    for (const [k, lab, val] of chips) {
+        const chip = cloneTemplate('aq-chip-template');
+        if (!chip) return;
+        chip.querySelector('.aq-chip-label').textContent = lab;
+        chip.querySelector('b').textContent = String(val);
+        chip.querySelector('.x').dataset.aqChip = k;
+        el.appendChild(chip);
+    }
+    const all = cloneTemplate('aq-chip-all-template');
+    if (all) el.appendChild(all);
 }
 
 function _clearChip(k) {
@@ -4124,61 +4162,15 @@ function _aqBindToolbar() {
 function renderAlerts() {
     _aqMount();
     if (window.ionAlertQueue) { window.ionAlertQueue.render(); return; }
-    // module missing (cache miss on a stale page): fall back to the plain list so
-    // the queue degrades to something readable rather than to nothing
-    _renderAlertsFallback();
-}
-
-function _renderAlertsFallback() {
-    const tbody = document.getElementById('alerts-tbody');
-
-    if (filteredAlerts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="12" class="empty">No alerts match the current filters</td></tr>';
-        return;
+    // module missing (cache miss on a stale page): the rows /ui/alerts/queue
+    // rendered into the tbody stay. They are the window the server read,
+    // without the client's narrowing, sorting or grouping, and the notice
+    // line says so once rather than this page keeping a second row renderer.
+    const notice = document.getElementById('alerts-queue-notice');
+    if (notice && !notice.querySelector('.aq-notice-module')) {
+        const warn = cloneTemplate('aq-module-missing-template');
+        if (warn) notice.appendChild(warn);
     }
-
-    tbody.innerHTML = filteredAlerts.map(a => {
-        const triage = triageCache[a.id];
-        const triageStatus = triage ? triage.status : 'none';
-        const caseName = triage && triage.case_number
-            ? `<span class="case-link-badge" title="${escapeHtml(triage.case_title || '')}">${escapeHtml(triage.case_number)}</span>`
-            : '<span class="text-[var(--text-muted)]">-</span>';
-        const mitreBadge = a.mitre_technique_id
-            ? `<span class="mitre-inline-badge" title="${escapeHtml(a.mitre_technique_name || '')} (${escapeHtml(a.mitre_tactic_name || '')})">${escapeHtml(a.mitre_technique_id)}</span>`
-            : '';
-        const labFixtureBadge = a.is_lab_fixture
-            ? `<span class="lab-fixture-badge" title="Training lab fixture — not a real alert">Lab fixture</span>`
-            : '';
-        const isSelected = selectedAlertIds.has(a.id);
-        return `
-        <tr class="alert-row ${isSelected ? 'selected' : ''}"
-            data-click-action="showAlertDetail" data-args='["${escapeHtml(a.id)}"]'
-            data-contextmenu-action="showContextMenu" data-contextmenu-args='["$event", "${escapeHtml(a.id)}"]'
-            data-alert-id="${escapeHtml(a.id)}">
-            <td class="checkbox-col" data-stop-propagation>
-                <input type="checkbox" class="alert-checkbox" data-alert-id="${escapeHtml(a.id)}"
-                       ${isSelected ? 'checked' : ''} data-change-action="toggleAlertSelection" data-args='["${escapeHtml(a.id)}", "$checked"]'>
-            </td>
-            <td class="w-[32px] text-center"><span class="triage-dot triage-${triageStatus}" title="Triage: ${triageStatus}"></span></td>
-            <td><span class="severity-badge severity-${a.severity}">${a.severity}</span></td>
-            <td title="${escapeHtml(a.title)}">${escapeHtml(a.title)}${mitreBadge}${labFixtureBadge}</td>
-            <td title="${escapeHtml(a.host || '-')}">${escapeHtml(a.host || '-')}</td>
-            <td title="${escapeHtml(a.user || '-')}">${escapeHtml(a.user || '-')}</td>
-            <td title="${escapeHtml(a.rule_name || '-')}">${escapeHtml(a.rule_name || '-')}</td>
-            <td>${renderSystemBadge(a)}</td>
-            <td>${caseName}</td>
-            <td><span class="status-badge alert-status-${triageStatus !== 'none' ? triageStatus : a.status}">${triageStatus !== 'none' ? triageStatus : a.status}</span></td>
-            <td>${formatDate(a.timestamp)}</td>
-            <td class="quick-actions-col" data-stop-propagation>
-                <div class="quick-actions">
-                    <button class="quick-action-btn" data-click-action="quickAssignToMe" data-args='["${escapeHtml(a.id)}"]' title="Assign to me"><i class="icon-user-check"></i></button>
-                    <button class="quick-action-btn" data-click-action="quickStatusChange" data-args='["${escapeHtml(a.id)}", "acknowledged"]' title="Acknowledge"><i class="icon-search"></i></button>
-                    <button class="quick-action-btn" data-click-action="showCreateCaseForm" data-args='["${escapeHtml(a.id)}"]' title="Create case"><i class="icon-folder-plus"></i></button>
-                    ${(arkimeEnabled && (a.network_community_id || a.source_ip || a.destination_ip || a.arkime_node)) ? `<a class="quick-action-btn arkime-action-btn text-[#6de4ff]" href="/alerts/${encodeURIComponent(a.id)}/arkime" title="Arkime PCAP analysis${a.network_community_id ? '' : ' (IP search — no community ID)'}" data-stop-propagation><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg></a>` : ''}
-                </div>
-            </td>
-        </tr>
-    `}).join('');
 }
 
 // the aggregations follow the filter.
@@ -4313,30 +4305,35 @@ function renderSideList(containerId, countBadgeId, groups, entityType) {
         .sort((a, b) => _worstSev(a[1]) - _worstSev(b[1]) || b[1].length - a[1].length)
         .slice(0, 10);
 
+    // a count, so the "Not counted yet" the badge starts with (and the "?"
+    // a failed read swaps in) comes off with it
     badge.textContent = Object.keys(groups).length;
+    badge.removeAttribute('title');
 
     if (entries.length === 0) {
-        container.innerHTML = '<div class="empty-state">None</div>';
+        const none = cloneTemplate('aq-facet-empty-template');
+        if (none) container.replaceChildren(none); else container.replaceChildren();
         return;
     }
 
-    container.innerHTML = entries.map(([name, items]) => {
+    // the row markup is the <template> in the page shell; this fills it
+    const rows = [];
+    for (const [name, items] of entries) {
         const on = entityFilter && entityFilter.type === entityType && entityFilter.value === name;
         const worst = _AQ_SEVS[_worstSev(items)] || 'low';
-        return `
-        <div class="list-item aq-facet${on ? ' is-on' : ''} sev-${worst}"
-             data-click-action="${on ? 'clearEntityFilter' : 'filterByEntity'}"
-             data-args='${on ? '[]' : `["${entityType}", "${escapeHtml(name)}"]`}'
-             title="${on ? 'Clear this filter' : `Filter by ${entityType}: ${escapeHtml(name)}`}">
-            <span class="overflow-hidden text-ellipsis whitespace-nowrap">${escapeHtml(name)}</span>
-            <span class="list-item-count">${items.length}</span>
-            ${_sevMixBar(items)}
-        </div>`;
-    }).join('');
-    // widths are a property write, never an inline style attribute
-    container.querySelectorAll('[data-aq-w]').forEach(el => {
-        el.style.setProperty('width', el.dataset.aqW + '%');
-    });
+        const row = cloneTemplate('aq-facet-template');
+        if (!row) return;
+        row.classList.add('sev-' + worst);
+        if (on) row.classList.add('is-on');
+        row.dataset.clickAction = on ? 'clearEntityFilter' : 'filterByEntity';
+        row.dataset.args = JSON.stringify(on ? [] : [entityType, name]);
+        row.title = on ? 'Clear this filter' : `Filter by ${entityType}: ${name}`;
+        row.querySelector('.aq-facet-name').textContent = name;
+        row.querySelector('.list-item-count').textContent = items.length;
+        _fillSevMix(row.querySelector('.aq-mix'), items);
+        rows.push(row);
+    }
+    container.replaceChildren(...rows);
 }
 
 function _worstSev(items) {
@@ -4344,12 +4341,18 @@ function _worstSev(items) {
                                              : _AQ_SEVS.indexOf(a.severity)), 9);
 }
 
-function _sevMixBar(items) {
+// The template carries one bar per severity; the ones with no alerts are
+// removed and the rest get their share. Widths are a property write,
+// never an inline style attribute.
+function _fillSevMix(mix, items) {
+    if (!mix) return;
     const total = items.length || 1;
-    return '<span class="aq-mix">' + _AQ_SEVS.map(s => {
-        const n = items.filter(a => a.severity === s).length;
-        return n ? `<i class="sev-${s}" data-aq-w="${(n / total * 100).toFixed(2)}"></i>` : '';
-    }).join('') + '</span>';
+    for (const bar of [...mix.children]) {
+        const n = items.filter(a => a.severity === bar.dataset.sev).length;
+        if (!n) { bar.remove(); continue; }
+        bar.dataset.aqW = (n / total * 100).toFixed(2);
+        bar.style.setProperty('width', bar.dataset.aqW + '%');
+    }
 }
 
 

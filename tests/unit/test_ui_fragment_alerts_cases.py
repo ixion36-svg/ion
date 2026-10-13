@@ -1151,8 +1151,10 @@ def test_the_five_modal_refreshes_go_through_the_fragment():
 #: playbook region, removed 11 more (loadCasePlaybookExecutions 3,
 #: renderPlaybooksSection 2, togglePlaybookLibrary 2,
 #: renderPlaybookLibraryPanel 2, showCasePlaybookPicker 1,
-#: loadPlaybooksForAlert 1): 80 to 69.
-WRITES_REMAINING = 69
+#: loadPlaybooksForAlert 1): 80 to 69. Stage 4, the alert queue, removed
+#: 15 more (loadAlerts 9, _renderAlertsFallback 2, renderSideList 2,
+#: renderFilterChips 1, populateSystemFilterFromAlerts 1): 69 to 54.
+WRITES_REMAINING = 54
 
 
 def test_the_dom_writes_in_the_page_do_not_increase():

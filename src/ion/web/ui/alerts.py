@@ -7,8 +7,11 @@ panel, the Add-to-Case picker, the case management modal and the AI case
 summary. Stage 3 is the playbook region: the executions list in the case
 management modal, the Start Playbook picker, the Investigation Playbooks
 section of the alert detail modal and its Browse Playbook Library panel.
-The alert queue, the analytics panels and the rest of the alert detail
-modal are later stages and are not in here.
+Stage 4 is the alert queue: the read behind the table, the fallback rows,
+the system select and the failed state of the three side lists; its notes
+are above its own section at the end of this module. The analytics panels
+and the rest of the alert detail modal are later stages and are not in
+here.
 
 What the playbook region did, measured against the tree before stage 3:
 
@@ -1229,3 +1232,397 @@ async def alerts_playbook_library_fragment(
                        "recommended": None, "library": None})
     return answer({"missing": False, "failed": False, "error": None,
                    **library_groups(playbooks)})
+
+
+# ---------------------------------------------------------------------------
+# The alert queue
+# ---------------------------------------------------------------------------
+#
+# Stage 4. What loadAlerts did, measured against the tree before it:
+#
+#   * `const incomingAlerts = data.alerts || [];` and then, on the handler's
+#     own message branch AND in the catch, the identical
+#     `'<div class="empty-state">-</div>'` into top-hosts-list,
+#     top-rules-list and top-users-list. A failed Elasticsearch read and a
+#     quiet estate rendered the same picture in all three side panels.
+#
+#   * When the handler reported a message but lab fixtures were present,
+#     the fixtures were rendered and the message was dropped, so an
+#     instance whose Elasticsearch was unreachable looked like a healthy
+#     one with a few alerts.
+#
+#   * The table was wiped to "Loading alerts..." on every refresh, five
+#     minutes apart, so an analyst mid-read lost the rows for the length of
+#     the round trip.
+#
+#   * The system select was rebuilt from the alerts seen so far, in a
+#     client Map that lived as long as the page, so filtering by one system
+#     emptied the list of every other on a fresh load.
+#
+#   * The row limit of 500 was never shown. A window with 2,000 alerts
+#     rendered as 500 with nothing to say the rest existed.
+#
+# What stays on the client, and why: the table rows are rendered by
+# static/js/alerts-queue.js from `allAlerts`, and the threat banner, the
+# stats bar, the attention chips, the analytics panels and the triage batch
+# all aggregate from that same array. The plan calls it the data spine and
+# says the analytics stage has to give those their own server aggregation
+# before the array can go. So this fragment carries the array the JSON
+# endpoint produced, in a data block the page reads once, and the rows it
+# renders itself are the fallback the module replaces when it is present.
+# The side lists follow the client's own filters (search text, severity,
+# entity, saved view), and a second server-side definition of that filter
+# would be the two-paths-disagree failure the page's own comments warn of,
+# so their rows are cloned from a <template> in the page and only their
+# failed state comes from here.
+
+QUEUE_FRAGMENT = "_fragments/alerts_queue.html"
+
+#: What GET /api/elasticsearch/alerts and POST
+#: /api/elasticsearch/alerts-triage/batch carry.
+QUEUE_PERMISSION = "alert:read"
+
+#: The page's `limit: 500`. Also the cap the fragment says out loud when
+#: the read returned exactly this many, because the endpoint has no way to
+#: say there were more.
+QUEUE_LIMIT = 500
+
+#: The `hours` the page sent for a window it could not read off the
+#: controls: a custom range with no start, or a select value that is not a
+#: number. The page did `parseInt(val) || 24`.
+QUEUE_DEFAULT_HOURS = 24
+
+#: Columns of the fallback row, for the colspan of a state row. The
+#: module's own column count varies with the chooser; these rows do not.
+QUEUE_FALLBACK_COLUMNS = 12
+
+#: The `alert-time-range` option value that means the two datetime-local
+#: inputs decide the window.
+CUSTOM_RANGE = "custom"
+
+#: Status filter values that made the page ask for closed alerts too.
+STATUSES_INCLUDING_CLOSED = ("closed", "all")
+
+
+def _parse_local(value: Any, tz_offset_minutes: Optional[int]) -> Optional[datetime]:
+    """A datetime-local control value as an aware UTC instant, or None.
+
+    The control emits "YYYY-MM-DDTHH:MM" (seconds optional) with no zone.
+    The page did `new Date(from).toISOString()`, which reads it as the
+    viewer's local time. The server cannot know that zone, so the page
+    sends `getTimezoneOffset()` in a hidden input and the same arithmetic
+    is done here: JavaScript's offset is minutes WEST of UTC, so UTC is
+    local plus the offset. With no offset the value is read as UTC, which
+    is the one honest reading of a zoneless time.
+    """
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        local = datetime.fromisoformat(value.strip())
+    except ValueError:
+        return None
+    if local.tzinfo is not None:
+        return local.astimezone(timezone.utc)
+    from datetime import timedelta
+
+    return (local + timedelta(minutes=tz_offset_minutes or 0)).replace(tzinfo=timezone.utc)
+
+
+def _int_or_none(value: Any) -> Optional[int]:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
+def queue_window(time_range: str, custom_from: str = "", custom_to: str = "",
+                 tz_offset: str = "") -> dict:
+    """hours, time_from and time_to for the alerts read, from the raw
+    control values, as loadAlerts derived them.
+
+    `custom` with a parseable start sends absolute bounds; `custom` with
+    no start falls back to QUEUE_DEFAULT_HOURS, as the page did. Any other
+    value is the hours figure, with the same default for one that is not a
+    positive integer. `defaulted` says when that fallback was taken, so the
+    fragment can say the window it actually read rather than the one the
+    control claims.
+    """
+    offset = _int_or_none(tz_offset)
+    if time_range == CUSTOM_RANGE:
+        start = _parse_local(custom_from, offset)
+        if start is None:
+            return {"hours": QUEUE_DEFAULT_HOURS, "time_from": None, "time_to": None,
+                    "defaulted": True}
+        end = _parse_local(custom_to, offset)
+        return {"hours": QUEUE_DEFAULT_HOURS,
+                "time_from": start.isoformat().replace("+00:00", "Z"),
+                "time_to": end.isoformat().replace("+00:00", "Z") if end else None,
+                "defaulted": False}
+    hours = _int_or_none(time_range)
+    if hours is None or hours <= 0:
+        return {"hours": QUEUE_DEFAULT_HOURS, "time_from": None, "time_to": None,
+                "defaulted": True}
+    return {"hours": hours, "time_from": None, "time_to": None, "defaulted": False}
+
+
+def include_closed(status: Any) -> bool:
+    """Whether the status control's value asked for closed alerts. The
+    narrowing to one status stays on the client, because it reads the
+    triage status the batch endpoint supplies after the alerts arrive."""
+    return status in STATUSES_INCLUDING_CLOSED
+
+
+def queue_outcome(payload: Any) -> dict:
+    """The alerts read as one of four outcomes, from what get_es_alerts
+    returns.
+
+      failed    the handler reported a message and no alerts came with it.
+                `reason` is its message; `connection_error` says whether it
+                was a connection failure or a configuration state.
+      degraded  the handler reported a message AND alerts came with it. On
+                this handler those are lab fixtures, which it merges in on
+                every return path. The page rendered them and dropped the
+                message; here both are kept.
+      empty     no message, no alerts. A measured zero.
+      data      no message, alerts.
+
+    `alerts` is None only for failed, so a template cannot render "no
+    alerts" for a read that did not happen. A payload that is not a dict
+    or has no list under `alerts` is failed with no reason, because the
+    handler did not produce what it promises.
+    """
+    alerts = _rows(payload, "alerts")
+    if alerts is None:
+        return {"failed": True, "degraded": False, "reason": None,
+                "connection_error": False, "alerts": None, "arkime_enabled": False}
+    alerts = [a for a in alerts if isinstance(a, dict)]
+    message = payload.get("message")
+    reason = str(message) if message else None
+    connection_error = bool(payload.get("connection_error"))
+    arkime = payload.get("arkime_enabled") is True
+    if reason and not alerts:
+        return {"failed": True, "degraded": False, "reason": reason,
+                "connection_error": connection_error, "alerts": None,
+                "arkime_enabled": arkime}
+    return {"failed": False, "degraded": bool(reason), "reason": reason,
+            "connection_error": connection_error, "alerts": alerts,
+            "arkime_enabled": arkime}
+
+
+def system_options(alerts: Optional[list], known: Optional[list], selected: str) -> list:
+    """The system select's options: every registered system, every system
+    the alerts carry, and the one currently selected even if neither list
+    has it, so the control never stops showing what it is filtering by.
+
+    Sorted by label, case-insensitively, as populateSystemFilterFromAlerts
+    sorted them. `known` is list_known_systems' output or None when that
+    read failed, in which case the alerts alone supply the list.
+    """
+    labels: dict[str, str] = {}
+    for row in known or []:
+        if not isinstance(row, dict):
+            continue
+        ns = row.get("namespace")
+        if ns:
+            labels[str(ns)] = str(row.get("display_name") or ns)
+    for a in alerts or []:
+        ns = a.get("source_system")
+        if not ns:
+            continue
+        label = a.get("cyab_system_name") or a.get("tide_system_name") or ns
+        labels[str(ns)] = str(label)
+    if selected and selected not in labels:
+        labels[selected] = selected
+    out = [{"value": ns, "label": label, "selected": ns == selected}
+           for ns, label in labels.items()]
+    out.sort(key=lambda r: r["label"].lower())
+    return out
+
+
+def _system_badge(a: dict) -> Optional[dict]:
+    """What renderSystemBadge in alert-detail.js shows: the CyAB name, else
+    the TIDE name, else the namespace, with the tooltip listing all three,
+    and a link when the CyAB system has an id. None when the alert names
+    no system at all."""
+    ns = a.get("source_system")
+    cyab = a.get("cyab_system_name")
+    tide = a.get("tide_system_name")
+    if not ns and not cyab and not tide:
+        return None
+    display = cyab or tide or ns
+    parts = []
+    if ns:
+        parts.append(f"namespace: {ns}")
+    if cyab:
+        parts.append(f"CyAB: {cyab}")
+    if tide and tide != cyab:
+        parts.append(f"TIDE: {tide}")
+    return {"display": display, "tooltip": " • ".join(parts) or display,
+            "cyab_system_id": a.get("cyab_system_id")}
+
+
+def queue_rows(alerts: list, triage: Optional[dict], arkime_enabled: bool) -> list:
+    """The fallback rows: each alert dict passed through with the
+    derivations the row template needs.
+
+    `triage` is the batch endpoint's map or None when it could not be
+    read. The two render differently: an alert absent from a map that was
+    read has no triage record (dot `triage-none`, no case), while a row
+    whose map is None has a triage that was not read (dot
+    `triage-unknown`, case "?"). The page's fallback read a client cache
+    and showed `none` for both.
+
+    The triage status is taken as the handler emits it: get_batch_triage
+    writes `t.status.value`, a string, and the test file pins that on the
+    handler. The alert's own status is not so normalised: a lab fixture's
+    dict carries the AlertTriageStatus member itself (_fixture_alert_dicts
+    passes `t.status` through), and on the one path where it is rendered,
+    a fixture whose triage read failed, str(member) would print
+    "AlertTriageStatus.OPEN" into the class and the badge. Hence `plain`
+    there and not on the triage side.
+    """
+    rows = []
+    for a in alerts:
+        t = triage.get(a.get("id")) if isinstance(triage, dict) else None
+        t = t if isinstance(t, dict) else None
+        triage_status = t.get("status") if t else None
+        has_network = bool(a.get("network_community_id") or a.get("source_ip")
+                           or a.get("destination_ip") or a.get("arkime_node"))
+        rows.append({
+            **a,
+            "triage_read": triage is not None,
+            "triage_status": triage_status,
+            "effective_status": triage_status or plain(a.get("status")),
+            "case_number": t.get("case_number") if t else None,
+            "case_title": t.get("case_title") if t else None,
+            "system_badge": _system_badge(a),
+            "arkime": bool(arkime_enabled and has_network),
+            "arkime_by_ip": bool(arkime_enabled and has_network and not a.get("network_community_id")),
+        })
+    return rows
+
+
+async def _triage_map(alert_ids: list, current_user: User, session: Session) -> Optional[dict]:
+    """The batch triage endpoint's map for these ids, or None when it could
+    not be read. No `es_statuses` is passed, so the handler's Kibana-to-ION
+    status sync does not run: this is a read. The page's loadTriageBatch
+    still runs after the swap and does the sync as before."""
+    from ion.web.api import BatchTriageRequestWithStatus, get_batch_triage
+
+    try:
+        payload = await get_batch_triage(
+            BatchTriageRequestWithStatus(alert_ids=alert_ids),
+            current_user=current_user, session=session,
+        )
+    except Exception:
+        logger.exception("Alert queue fragment could not read the triage batch")
+        return None
+    if not isinstance(payload, dict) or not isinstance(payload.get("triage"), dict):
+        return None
+    return payload["triage"]
+
+
+def _known_systems(session: Session) -> Optional[list]:
+    from ion.services.system_resolver_service import list_known_systems
+
+    try:
+        found = list_known_systems(session)
+    except Exception:
+        logger.exception("Alert queue fragment could not list the known systems")
+        return None
+    return found if isinstance(found, list) else None
+
+
+@router.get(
+    "/alerts/queue",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(QUEUE_PERMISSION))],
+)
+async def alerts_queue_fragment(
+    request: Request,
+    time_range: str = Query("24", description="The alert-time-range control's value"),
+    custom_from: str = Query("", description="datetime-local start, for a custom range"),
+    custom_to: str = Query("", description="datetime-local end, for a custom range"),
+    tz_offset: str = Query("", description="The viewer's getTimezoneOffset(), minutes"),
+    status: str = Query("", description="The alert-status-filter control's value"),
+    system: str = Query("", description="The alert-system-filter control's value"),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    """The alert queue: the fallback rows for #alerts-tbody, and out of
+    band the data block the page's pipeline reads, the system select, the
+    notice line, and on a failed read the three side lists.
+
+    Calls get_es_alerts, the handler GET /api/elasticsearch/alerts runs,
+    with the arguments loadAlerts derived from the same controls, so the
+    alert dict has one definition. Then the batch triage handler for the
+    rows' triage status and case, as a read.
+
+    The parameters are the raw control values; the derivation the page did
+    (hours from the select, ISO bounds from the datetime-local inputs,
+    include_closed from the status filter) is queue_window and
+    include_closed, so a saved view that restores the controls and a hand
+    change of them take the same path.
+
+    Four outcomes, in queue_outcome. The failed one renders a row that
+    names the reason and swaps the side lists to "could not be read" with
+    their badges unknown; the data block then says no data was read, so
+    the page leaves its arrays alone. The other three carry the array.
+    """
+    from ion.web import elasticsearch_api as es_api
+
+    window = queue_window(time_range, custom_from, custom_to, tz_offset)
+    closed = include_closed(status)
+    try:
+        payload = await es_api.get_es_alerts(
+            hours=window["hours"],
+            limit=QUEUE_LIMIT,
+            include_closed=closed,
+            time_from=window["time_from"],
+            time_to=window["time_to"],
+            system=system or None,
+            current_user=current_user,
+            session=session,
+        )
+        outcome = queue_outcome(payload)
+    except Exception:
+        logger.exception("Alert queue fragment could not read alerts")
+        outcome = {"failed": True, "degraded": False, "reason": None,
+                   "connection_error": False, "alerts": None, "arkime_enabled": False}
+
+    alerts = outcome["alerts"]
+    triage: Optional[dict] = None
+    if alerts:
+        triage = await _triage_map([a.get("id") for a in alerts if a.get("id") is not None],
+                                   current_user, session)
+
+    return templates.TemplateResponse(
+        request=request,
+        name=QUEUE_FRAGMENT,
+        context={
+            **outcome,
+            "rows": queue_rows(alerts, triage, outcome["arkime_enabled"]) if alerts is not None else None,
+            "triage_failed": alerts is not None and len(alerts) > 0 and triage is None,
+            "total": len(alerts) if alerts is not None else None,
+            "limit": QUEUE_LIMIT,
+            "truncated": alerts is not None and len(alerts) >= QUEUE_LIMIT,
+            "window": window,
+            "include_closed": closed,
+            "systems": system_options(alerts, _known_systems(session), system),
+            "system": system,
+            "colspan": QUEUE_FALLBACK_COLUMNS,
+            "can_triage": _can(current_user, TRIAGE_PERMISSION),
+            "can_create_case": _can(current_user, CREATE_PERMISSION),
+            # The spine. Only the keys the page reads; the rows above carry
+            # everything else the fallback needs.
+            "data": {"alerts": alerts, "arkime_enabled": outcome["arkime_enabled"]}
+                    if alerts is not None else None,
+        },
+        status_code=200,
+    )

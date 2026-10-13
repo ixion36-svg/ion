@@ -1362,6 +1362,27 @@ kbd {
 .triage-dot.triage-acknowledged { background: var(--warning); }
 .triage-dot.triage-closed { background: var(--text-muted); }
 .triage-dot.triage-none { background: transparent; border: 1px dashed var(--ion-border); }
+/* The fallback row's triage was not read (the batch read failed), which is
+   not the same as no triage record. */
+.triage-dot.triage-unknown { background: transparent; border: 1px dotted var(--warning); }
+
+/* ============================================= */
+/* The queue's notice line and failed states     */
+/* (stage 4 of the alerts conversion)            */
+/* ============================================= */
+.aq-notice {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+.aq-notice:empty { display: none; }
+.aq-notice-degraded, .aq-notice-triage, .aq-notice-module { color: var(--warning); }
+.aq-failed { color: var(--danger); }
+.aq-reason { opacity: 0.85; }
+.side-panel .empty-state.aq-side-failed { color: var(--danger); }
 
 .triage-case-link {
     font-size: 0.8125rem;
