@@ -739,14 +739,31 @@ function updateFolderPath() {
         return;
     }
 
+    // Built rather than parsed. The leaf is textContent, so a folder whose
+    // name contains markup is a folder name and not markup, which
+    // escapeHtml was doing by hand on one of the two branches.
+    const crumb = leaf => {
+        const all = document.createElement('span');
+        all.textContent = 'All';
+        all.setAttribute('data-click-action', 'selectFolder');
+        all.setAttribute('data-args', '[null]');
+        const tail = document.createElement('span');
+        tail.textContent = leaf;
+        pathEl.replaceChildren(all, document.createTextNode(' / '), tail);
+    };
+
     if (selectedFolderId === 'uncategorized') {
-        pathEl.innerHTML = `<span data-click-action="selectFolder" data-args='[null]'>All</span> / <span>Uncategorized</span>`;
+        crumb('Uncategorized');
         return;
     }
 
-    const folder = allCollections.find(c => c.id === selectedFolderId);
+    const folder = (allCollections || []).find(c => c.id === selectedFolderId);
     if (folder) {
-        pathEl.innerHTML = `<span data-click-action="selectFolder" data-args='[null]'>All</span> / <span>${escapeHtml(folder.full_path)}</span>`;
+        // full_path can be absent on a folder the payload did not fill in,
+        // and `${undefined}` printed the word.
+        crumb(folder.full_path ?? folder.name ?? 'Unnamed folder');
+    } else {
+        pathEl.replaceChildren();
     }
 }
 
@@ -1131,7 +1148,7 @@ function closeFoldersModal() {
 
 function updateParentSelect() {
     const select = document.getElementById('new-folder-parent');
-    select.innerHTML = '<option value="">Root Level</option>';
+    if (!seedSelect(select, 'Root Level')) return;
 
     function addOptions(folders, prefix = '') {
         folders.forEach(f => {
@@ -1149,9 +1166,23 @@ function updateParentSelect() {
     addOptions(tree);
 }
 
+// A select's own options are built with createElement below; only the
+// reset-and-seed was innerHTML. An <option> is not markup a stylesheet
+// sweep needs to reach, so this needs no fragment, just the DOM call that
+// does the same thing without parsing a string.
+function seedSelect(select, label, value = '') {
+    if (!select) return null;
+    select.replaceChildren();
+    const first = document.createElement('option');
+    first.value = value;
+    first.textContent = label;
+    select.appendChild(first);
+    return select;
+}
+
 function updateFolderSelects() {
     const moveSelect = document.getElementById('move-folder-select');
-    moveSelect.innerHTML = '<option value="">No Folder (Root)</option>';
+    if (!seedSelect(moveSelect, 'No Folder (Root)')) return;
 
     function addOptions(folders, prefix = '') {
         folders.forEach(f => {
@@ -1624,7 +1655,7 @@ function updateTagFilter() {
 
     allTags = Array.from(tagSet).sort();
 
-    select.innerHTML = '<option value="">All Tags</option>';
+    if (!seedSelect(select, 'All Tags')) return;
     allTags.forEach(function(tag) {
         const opt = document.createElement('option');
         opt.value = tag;
