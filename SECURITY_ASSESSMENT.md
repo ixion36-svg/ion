@@ -20,6 +20,20 @@
 
 ## Executive Summary
 
+### Unreleased detection engineering UI conversion, 2026-10-13
+
+Fourteen authenticated fragment routes are added for detection posture, spaces,
+gaps, use cases, rules, progression, execution, actor/system readiness, D3FEND,
+emulation and vulnerability coverage. Every route requires `alert:read`, matching
+the existing APIs. They carry no DE module licence gate because this page and its
+source APIs are available independently of that module. The system-readiness
+POST delegates the existing assessment read with `generate_ai=False`; it adds no
+mutation. Catalogue mutation controls remain bound to `alert:triage`, which the
+existing write APIs enforce. Each fragment can return its named semantic view
+model as JSON, under the same permission. Jinja escaping, JSON action arguments
+and cloned client templates preserve the existing CSP. No new credential,
+permission grant, external sink or dependency is added.
+
 ### Unreleased training UI conversion, 2026-10-13
 
 Two authenticated read surfaces are added. `GET /ui/training/plans/{plan_id}/items`

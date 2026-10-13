@@ -1,8 +1,7 @@
 {% extends "base.html" %}
 
-{% block page_id %}detection-engineering{% endblock %}
-
 {% block title %}Detection Engineering - ION{% endblock %}
+{% block page_id %}detection-engineering{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
@@ -75,15 +74,9 @@
 
 const API = '/api/cyab';
 let _activeTab = 'posture';
-let _postureData = null;
-let _killChainsData = null;
-let _gapsData = null;
-let _rulesPage = {search:'', severity:'', enabled:'', offset:0, limit:50, total:0, rows:[]};
+let _rulesPage = {search:'', severity:'', enabled:'', offset:0, limit:50};
 let _execHours = 168;
 let _loaded = {posture:false, killchains:false, rules:false, execution:false, readiness:false, progression:false, gaps:false, d3fend:false, emulation:false, vulns:false};
-let _vulnsCache = null;
-let _d3fendCache = null;
-let _emCache = null;
 
 /* ── Helpers ──────────────────────────────────── */
 async function apiFetch(path) {
@@ -92,11 +85,6 @@ async function apiFetch(path) {
     return r.json();
 }
 function $(id){ return document.getElementById(id); }
-// Values here are names, severities and error strings -- escape them, never
-// filter them: DOMPurify.sanitize() would pass benign markup straight through.
-function esc(s){ return escapeHtml(s); }
-function pct(a,b){ return b ? Math.round(a/b*100) : 0; }
-function sevClass(s){ return (s||'').toLowerCase(); }
 
 /* ── Tab switching ────────────────────────────── */
 window.deSwitch = function(tab) {
@@ -108,14 +96,10 @@ window.deSwitch = function(tab) {
 
 window.deRefresh = function() {
     _loaded = {posture:false, killchains:false, rules:false, execution:false, readiness:false, progression:false, gaps:false, d3fend:false, emulation:false, vulns:false};
-    _postureData = null; _killChainsData = null; _gapsData = null;
-    _d3fendCache = null; _emCache = null; _vulnsCache = null;
     loadTab(_activeTab);
 };
 
 function loadTab(tab) {
-    const panel = $('de-panel-'+tab);
-    deMessage(panel, 'Loading...', true);
     switch(tab) {
         case 'posture': loadPosture(); break;
         case 'killchains': loadKillChains(); break;
@@ -293,54 +277,7 @@ async function loadD3fend() {
 }
 
 async function loadEmulation() {
-    const panel = $('de-panel-emulation');
-    try {
-        const r = await fetch('/api/emulation/plans', {credentials:'include'});
-        if (!r.ok) throw new Error('Emulation fetch failed');
-        _emCache = (await r.json()).plans || [];
-
-        const totalPlans = _emCache.length;
-        const running = _emCache.filter(p => p.status === 'running').length;
-        const completed = _emCache.filter(p => p.status === 'completed').length;
-        const avgCov = totalPlans
-            ? Math.round(_emCache.reduce((a, p) => a + (p.coverage_pct || 0), 0) / totalPlans)
-            : 0;
-
-        let html = `<div class="de-stats">
-            <div class="de-stat"><div class="de-stat-label">Plans</div><div class="de-stat-val">${totalPlans}</div></div>
-            <div class="de-stat warn"><div class="de-stat-label">Running</div><div class="de-stat-val">${running}</div></div>
-            <div class="de-stat green"><div class="de-stat-label">Completed</div><div class="de-stat-val">${completed}</div></div>
-            <div class="de-stat"><div class="de-stat-label">Avg Coverage</div><div class="de-stat-val">${avgCov}%</div></div>
-        </div>`;
-
-        html += `<div class="de-section"><div class="de-section-title">
-            Adversary Emulation Plans
-            <button class="btn btn-primary btn-sm ml-[auto] py-1 px-3 text-xs" data-click-action="emCreatePrompt">+ New Plan</button>
-        </div>`;
-
-        if (!totalPlans) {
-            html += '<div class="text-center p-[30px] text-[var(--text-secondary)] italic">No plans yet. Create a per-actor purple-team plan, add TTP steps, mark them executed, then click Verify to check Elasticsearch for matching detections.</div>';
-        } else {
-            html += '<table class="de-table"><thead><tr><th>Name</th><th>Actor</th><th>Status</th><th>Steps</th><th>Coverage</th><th>Updated</th><th></th></tr></thead><tbody>';
-            for (const p of _emCache) {
-                const color = (p.coverage_pct||0) >= 80 ? 'var(--mitre-covered,#3fb950)' : (p.coverage_pct||0) >= 50 ? 'var(--sev-medium,#d29922)' : 'var(--sev-critical,#f85149)';
-                html += `<tr class="cursor-pointer" data-click-action="emOpenPlan" data-args='[${p.id}]'>
-                    <td><strong>${esc(p.name)}</strong></td>
-                    <td>${esc(p.actor_name||'-')}</td>
-                    <td>${esc(p.status)}</td>
-                    <td>${p.passed_count||0}/${p.step_count||0}</td>
-                    <td><span class="font-mono font-bold" data-ion-style="color:${color}">${p.coverage_pct||0}%</span></td>
-                    <td>${p.updated_at ? new Date(p.updated_at).toLocaleDateString() : '-'}</td>
-                    <td><button class="btn btn-secondary btn-sm py-0.5 px-2 text-[.7rem]" data-click-action="emDeletePlan" data-stop-propagation data-args='[${p.id}]'>Delete</button></td>
-                </tr>`;
-            }
-            html += '</tbody></table>';
-        }
-        html += '</div><div id="de-emulation-detail"></div>';
-        panel.innerHTML = html;
-    } catch (e) {
-        panel.innerHTML = `<div class="de-section text-[var(--sev-critical)]">Error: ${esc(e.message)}</div>`;
-    }
+    _loaded.emulation = await deLoadFragment('/ui/detection-engineering/emulation', 'de-panel-emulation', 'Loading emulation plans');
 }
 
 window.emCreatePrompt = async function() {
@@ -363,46 +300,8 @@ window.emDeletePlan = async function(id) {
 };
 
 window.emOpenPlan = async function(id) {
-    const r = await fetch(`/api/emulation/plans/${id}`, {credentials: 'include'});
-    if (!r.ok) return;
-    const p = await r.json();
-    const det = $('de-emulation-detail');
-    let html = `<div class="de-section"><div class="de-section-title">${esc(p.name)} (${esc(p.actor_name||'-')})</div>`;
-    if (p.description) html += `<div class="text-[var(--text-secondary)] text-[.82rem] mb-2.5">${esc(p.description)}</div>`;
-    html += `<div class="de-stats mb-3.5">
-        <div class="de-stat"><div class="de-stat-label">Coverage</div><div class="de-stat-val">${p.coverage_pct||0}%</div></div>
-        <div class="de-stat green"><div class="de-stat-label">Passed</div><div class="de-stat-val">${p.passed_count||0}</div></div>
-        <div class="de-stat crit"><div class="de-stat-label">Failed</div><div class="de-stat-val">${p.failed_count||0}</div></div>
-        <div class="de-stat warn"><div class="de-stat-label">Partial</div><div class="de-stat-val">${p.partial_count||0}</div></div>
-        <div class="de-stat"><div class="de-stat-label">Total</div><div class="de-stat-val">${p.step_count||0}</div></div>
-    </div>`;
-
-    for (const s of p.steps || []) {
-        const color = s.result === 'passed' ? 'var(--mitre-covered,#3fb950)' : s.result === 'failed' ? 'var(--sev-critical,#f85149)' : s.result === 'partial' ? 'var(--sev-medium,#d29922)' : 'var(--text-secondary)';
-        const tids = (s.mitre_techniques||[]).map(t => `<span class="mono bg-[rgba(0,212,255,.06)] border border-[var(--ion-border)] py-[1px] px-1.5 rounded-[3px] text-[.7rem]">${esc(t)}</span>`).join(' ');
-        html += `<div class="bg-[var(--bg-tertiary)] border border-[var(--ion-border)] rounded-[6px] py-2.5 px-3.5 mb-1.5" data-ion-style="border-left:3px solid ${color}">
-            <div class="flex justify-between items-center gap-2.5">
-                <div><strong>${(s.order_index||0)+1}. ${esc(s.title)}</strong></div>
-                <div class="flex items-center gap-2">
-                    <span class="mono text-[.7rem]" data-ion-style="color:${color}">${esc(s.result)}</span>
-                    ${s.matched_alert_count != null ? `<span class="text-[.7rem] text-[var(--text-secondary)]">${s.matched_alert_count} alerts</span>` : ''}
-                </div>
-            </div>
-            ${tids ? `<div class="mt-[5px]">${tids}</div>` : ''}
-            <div class="mt-1.5 flex gap-[5px]">
-                <button class="btn btn-secondary btn-sm py-[3px] px-[9px] text-[.7rem]" data-click-action="emExecuteStep" data-args='[${s.id}]'>Mark Executed</button>
-                <button class="btn btn-secondary btn-sm py-[3px] px-[9px] text-[.7rem]" data-click-action="emVerifyStep" data-args='[${s.id}]'>Verify in ES</button>
-                <button class="btn btn-secondary btn-sm py-[3px] px-[9px] text-[.7rem]" data-click-action="emDeleteStep" data-args='[${s.id}]'>Delete</button>
-            </div>
-        </div>`;
-    }
-
-    html += `<div class="_ion-s-78cae35616">
-        <input class="w-full bg-[var(--bg-secondary)] border border-[var(--ion-border)] text-[var(--text-primary)] py-1.5 px-2.5 rounded-[4px] text-[.78rem] mb-1.5" id="em-newstep-title" placeholder="Step title">
-        <input class="w-full bg-[var(--bg-secondary)] border border-[var(--ion-border)] text-[var(--text-primary)] py-1.5 px-2.5 rounded-[4px] text-[.78rem] mb-1.5" id="em-newstep-tids" placeholder="Techniques: T1003, T1059.001">
-        <button class="btn btn-primary btn-sm py-[5px] px-3.5 text-[.78rem]" data-click-action="emAddStep" data-args='[${p.id}]'>+ Add Step</button>
-    </div></div>`;
-    det.innerHTML = html;
+    _emCurrentPlan = id;
+    return deLoadFragment(`/ui/detection-engineering/emulation/${encodeURIComponent(id)}`, 'de-emulation-detail', 'Loading emulation plan');
 };
 
 window.emAddStep = async function(planId) {
@@ -437,12 +336,6 @@ window.emDeleteStep = async function(id) {
 };
 
 let _emCurrentPlan = null;
-const _origEmOpenPlan = window.emOpenPlan;
-window.emOpenPlan = async function(id) {
-    _emCurrentPlan = id;
-    return _origEmOpenPlan(id);
-};
-
 /* ────────────────────────────────────────────────────────────────────── */
 /*  Vulnerability ↔ detection coverage                                     */
 /* ────────────────────────────────────────────────────────────────────── */

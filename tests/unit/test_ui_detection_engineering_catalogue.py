@@ -35,8 +35,18 @@ def test_vulns_states(client, monkeypatch, payload, state):
     assert c.get('/ui/detection-engineering/vulns', headers={'Accept': 'application/json'}).json()['state'] == state
 
 
+@pytest.mark.parametrize('payload,state', [(None, 'failed'), ([], 'empty'), ([{'id': 1, 'name': 'Actor < B'}], 'data')])
+def test_emulation_states(client, monkeypatch, payload, state):
+    c, ui = client
+    monkeypatch.setattr(ui.emulation_service, 'list_plans', lambda session: payload)
+    assert c.get('/ui/detection-engineering/emulation', headers={'Accept': 'application/json'}).json()['state'] == state
 
 
+@pytest.mark.parametrize('payload,state', [(None, 'failed'), ({}, 'failed'), ({'steps': []}, 'empty'), ({'steps': [{'id': 1, 'title': 'Run < B'}]}, 'data')])
+def test_detail_states(client, monkeypatch, payload, state):
+    c, ui = client
+    monkeypatch.setattr(ui.emulation_service, 'get_plan', lambda session, plan_id: SimpleNamespace(to_dict=lambda: payload) if payload is not None else None)
+    assert c.get('/ui/detection-engineering/emulation/1', headers={'Accept': 'application/json'}).json()['state'] == state
 
 
 @pytest.mark.parametrize('zero', [None, 0])
@@ -50,9 +60,19 @@ def test_missing_and_zero_numbers(client, monkeypatch, zero):
     assert soup.find('script') is None
 
 
+def test_read_only_controls(client, monkeypatch):
+    c, ui = client
+    for dependency in list(c.app.dependency_overrides):
+        if dependency.__name__ != 'get_db_session':
+            c.app.dependency_overrides[dependency] = lambda: SimpleNamespace(has_permission=lambda p: False)
+    monkeypatch.setattr(ui.emulation_service, 'list_plans', lambda session: [{'id': 1, 'name': 'Plan'}])
+    html = c.get('/ui/detection-engineering/emulation').text
+    assert 'emCreatePrompt' not in html
+    assert 'emDeletePlan' not in html
+    assert 'emOpenPlan' in html
 
 
-@pytest.mark.parametrize('panel', ['d3fend', 'vulns'])
+@pytest.mark.parametrize('panel', ['d3fend', 'emulation', 'vulns'])
 def test_service_failure(client, monkeypatch, panel):
     c, ui = client
     def fail(*args):
@@ -76,8 +96,29 @@ def test_d3fend_numbers(client, monkeypatch, zero):
     assert soup.find('defense') is None
 
 
+@pytest.mark.parametrize('zero', [None, 0])
+def test_detail_numbers_and_safe_arguments(client, monkeypatch, zero):
+    from bs4 import BeautifulSoup
+    import json
+    c, ui = client
+    plan = {'id': 'quote"id', 'name': '<Plan>', 'steps': [{'id': 'step"id', 'title': '<Step>', 'matched_alert_count': zero, 'order_index': zero}], **{k: zero for k in ('coverage_pct', 'passed_count', 'failed_count', 'partial_count', 'step_count')}}
+    monkeypatch.setattr(ui.emulation_service, 'get_plan', lambda session, plan_id: SimpleNamespace(to_dict=lambda: plan))
+    soup = BeautifulSoup(c.get('/ui/detection-engineering/emulation/1').text, 'html.parser')
+    assert [x.text.strip() for x in soup.select('.de-stat-val')] == (['—'] * 5 if zero is None else ['0%', '0', '0', '0', '0'])
+    assert ('0 alerts' in soup.text) == (zero is not None)
+    assert json.loads(soup.select_one('[data-click-action="emExecuteStep"]')['data-args']) == ['step"id']
+    assert json.loads(soup.select_one('[data-click-action="emAddStep"]')['data-args']) == ['quote"id']
+    assert soup.find('plan') is None
 
 
+@pytest.mark.parametrize('zero', [None, 0])
+def test_plan_coverage_missing_and_zero(client, monkeypatch, zero):
+    c, ui = client
+    monkeypatch.setattr(ui.emulation_service, 'list_plans', lambda session: [{'id': 1, 'name': 'Plan', 'coverage_pct': zero}])
+    view = c.get('/ui/detection-engineering/emulation', headers={'Accept': 'application/json'}).json()
+    assert view['average'] == zero
+    assert view['running'] is None
+    assert view['completed'] is None
 
 
 def test_permissions_have_no_licence_dependency(client):

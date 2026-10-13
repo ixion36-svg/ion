@@ -33,8 +33,20 @@ class VulnsPanel(TypedDict):
     can_edit: bool
 
 
+class EmulationPanel(TypedDict):
+    state: Literal['failed', 'empty', 'data']
+    plans: list[dict[str, Any]] | None
+    running: int | None
+    completed: int | None
+    average: int | None
+    can_edit: bool
 
 
+class EmulationDetail(TypedDict):
+    state: Literal['failed', 'empty', 'data']
+    plan: dict[str, Any]
+    steps: list[dict[str, Any]] | None
+    can_edit: bool
 
 
 def _state(items: list | None) -> Literal['failed', 'empty', 'data']:
@@ -77,5 +89,36 @@ def vulns(request: Request, current_user: User = Depends(require_permission('ale
     return render_view(request, '_fragments/detection_engineering_vulns.html', view)
 
 
+@router.get('/detection-engineering/emulation', response_class=HTMLResponse)
+def emulation(request: Request, current_user: User = Depends(require_permission('alert:read')),
+              session: Session = Depends(get_db_session)):
+    plans = None
+    try:
+        plans = _records({'plans': emulation_service.list_plans(session)}, 'plans')
+    except Exception:
+        logger.exception('Could not read emulation plans')
+    coverage = [p.get('coverage_pct') for p in plans] if plans else []
+    statuses_known = plans is not None and all(p.get('status') is not None for p in plans)
+    view: EmulationPanel = {'state': _state(plans), 'plans': plans,
+        'running': sum(p.get('status') == 'running' for p in plans) if statuses_known else None,
+        'completed': sum(p.get('status') == 'completed' for p in plans) if statuses_known else None,
+        'average': round(sum(coverage) / len(coverage)) if coverage and all(isinstance(n, (int, float)) for n in coverage) else None,
+        'can_edit': current_user.has_permission('alert:triage')}
+    return render_view(request, '_fragments/detection_engineering_emulation.html', view)
 
 
+@router.get('/detection-engineering/emulation/{plan_id}', response_class=HTMLResponse)
+def emulation_detail(request: Request, plan_id: int,
+                     current_user: User = Depends(require_permission('alert:read')),
+                     session: Session = Depends(get_db_session)):
+    plan = {}
+    try:
+        record = emulation_service.get_plan(session, plan_id)
+        data = record.to_dict() if record else None
+        plan = data if isinstance(data, dict) else {}
+    except Exception:
+        logger.exception('Could not read emulation plan')
+    steps = _records(plan, 'steps')
+    view: EmulationDetail = {'state': _state(steps), 'plan': plan, 'steps': steps,
+                            'can_edit': current_user.has_permission('alert:triage')}
+    return render_view(request, '_fragments/detection_engineering_emulation_detail.html', view)
