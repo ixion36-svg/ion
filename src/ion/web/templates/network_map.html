@@ -23,46 +23,52 @@
       <p class="mt-1 text-sm text-base-content/60">Asset inventory auto-populated from Elasticsearch host data.</p>
     </div>
     <div class="flex items-center gap-3">
+      <!-- The label is its own element so the busy state is a textContent
+           write. It used to be `btn.textContent = 'Syncing…'` followed by
+           `btn.innerHTML = '<svg …/> Sync Now'`, which rebuilt the icon
+           from a string every time a sync finished. -->
       <button data-click-action="triggerSync" class="btn btn-primary btn-sm" id="sync-btn">
         <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
-        Sync Now
+        <span id="sync-label">Sync Now</span>
       </button>
     </div>
   </section>
 
-  <!-- Stats row -->
-  <section class="stats stats-vertical sm:stats-horizontal w-full bg-base-200 shadow mb-8 rise d-2">
+  <!-- Stats row. The four tiles are one read, so they are one fragment:
+       a per-tile request would let three succeed and one fail and give
+       the reader no way to tell that from three figures and a dash. -->
+  <section id="nm-stats"
+           class="stats stats-vertical sm:stats-horizontal w-full bg-base-200 shadow mb-8 rise d-2"
+           hx-get="/ui/network-map/stats"
+           hx-trigger="load, nm-refresh from:body"
+           hx-swap="innerHTML">
     <div class="stat">
       <div class="stat-title">Total Assets</div>
-      <div id="stat-total" class="stat-value text-2xl">—</div>
-    </div>
-    <div class="stat">
-      <div class="stat-title">Seen 24h</div>
-      <div id="stat-seen24" class="stat-value text-2xl text-primary">—</div>
-    </div>
-    <div class="stat">
-      <div class="stat-title">Unique IPs</div>
-      <div id="stat-ips" class="stat-value text-2xl text-success">—</div>
-    </div>
-    <div class="stat">
-      <div class="stat-title">OS Families</div>
-      <div id="stat-os-count" class="stat-value text-2xl text-secondary">—</div>
+      <div class="stat-value text-2xl">&#8212;</div>
+      <div class="stat-desc">Loading</div>
     </div>
   </section>
 
-  <!-- Filters -->
-  <section class="flex flex-wrap items-center gap-3 mb-6 rise d-3">
-    <input type="text" id="filter-search" placeholder="Search hostname or IP…"
-           class="input input-sm w-64"
-           data-input-action="debounceLoad">
-    <select id="filter-env" data-change-action="loadAssets" class="select select-sm w-auto">
+  <!-- Filters.
+       A <form> rather than five listeners: the field names are the query
+       parameters /ui/network-map/assets takes, so there is one definition
+       of what a filter is called and the browser serialises it. A filter
+       change submits page 0, which is what a filter change means. -->
+  <form id="nm-filters" class="flex flex-wrap items-center gap-3 mb-6 rise d-3"
+        hx-get="/ui/network-map/assets"
+        hx-target="#assets-panel"
+        hx-swap="innerHTML"
+        hx-trigger="load, change, keyup changed delay:300ms">
+    <input type="text" id="filter-search" name="search" placeholder="Search hostname or IP…"
+           class="input input-sm w-64">
+    <select id="filter-env" name="environment" class="select select-sm w-auto">
       <option value="">All Environments</option>
       <option value="prod">Production</option>
       <option value="staging">Staging</option>
       <option value="dev">Development</option>
       <option value="unknown">Unknown</option>
     </select>
-    <select id="filter-crit" data-change-action="loadAssets" class="select select-sm w-auto">
+    <select id="filter-crit" name="criticality" class="select select-sm w-auto">
       <option value="">All Criticality</option>
       <option value="critical">Critical</option>
       <option value="high">High</option>
@@ -70,26 +76,40 @@
       <option value="low">Low</option>
       <option value="unknown">Unknown</option>
     </select>
-    <select id="filter-system" data-change-action="loadAssets" class="select select-sm w-auto">
-      <option value="">All Systems</option>
-    </select>
-    <select id="filter-seen" data-change-action="loadAssets" class="select select-sm w-auto">
+    <!-- The source systems are data, so the select is rendered by a
+         fragment. hx-include carries the current choice back, because this
+         region is re-requested after a sync and rebuilding the options
+         used to reset the reader's filter while the table stayed filtered. -->
+    <div id="nm-system-filter" class="flex items-center gap-2"
+         hx-get="/ui/network-map/systems"
+         hx-trigger="load, nm-refresh from:body"
+         hx-include="#filter-system"
+         hx-swap="innerHTML">
+      <select id="filter-system" name="source_system" class="select select-sm w-auto">
+        <option value="">All Systems</option>
+      </select>
+    </div>
+    <select id="filter-seen" name="last_seen_within" class="select select-sm w-auto">
       <option value="">All Time</option>
       <option value="24h">Last 24h</option>
       <option value="7d">Last 7 days</option>
       <option value="30d">Last 30 days</option>
     </select>
-    <button data-click-action="clearFilters" class="btn btn-ghost btn-sm">Clear</button>
+    <button type="button" data-click-action="clearFilters" class="btn btn-ghost btn-sm">Clear</button>
     <span id="results-count" class="text-xs text-base-content/50 ml-auto"></span>
     <!-- JS setView() rewrites these button classNames; keep the classes it assigns. -->
     <div class="flex items-center gap-1 p-0.5 rounded-md bg-base-200 border border-base-300 ml-2">
-      <button id="view-table-btn" data-click-action="setView" data-args='["table"]' class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-white bg-white/10">Table</button>
-      <button id="view-graph-btn" data-click-action="setView" data-args='["graph"]' class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-slate-500 hover:text-slate-300">Graph</button>
-      <button id="view-topology-btn" data-click-action="setView" data-args='["topology"]' class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-slate-500 hover:text-slate-300">Topology</button>
+      <button type="button" id="view-table-btn" data-click-action="setView" data-args='["table"]' class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-white bg-white/10">Table</button>
+      <button type="button" id="view-graph-btn" data-click-action="setView" data-args='["graph"]' class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-slate-500 hover:text-slate-300">Graph</button>
+      <button type="button" id="view-topology-btn" data-click-action="setView" data-args='["topology"]' class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-slate-500 hover:text-slate-300">Topology</button>
     </div>
-  </section>
+  </form>
 
-  <!-- Network graph visualization -->
+  <!-- Network graph visualization.
+       This one stays in the browser. vis-network takes a node and edge
+       DataSet and draws into a canvas, so there is no markup for a server
+       to render; the only HTML it ever produced was the empty-state line,
+       which is a <template> below. -->
   <section id="graph-view" class="rise d-4 mb-6 hidden">
     <div class="card bg-base-200 shadow">
       <div class="card-body p-0">
@@ -119,35 +139,32 @@
           <span class="label-tiny text-base-content/50">Subnet Topology</span>
           <span class="text-xs text-base-content/50">Assets grouped by /24 subnet · colored by worst criticality</span>
         </div>
-        <div id="topology-content" class="space-y-3">
-          <div class="alert alert-info justify-center">Loading topology...</div>
+        <!-- /api/network-map/subnets takes no filters, so this region does
+             not depend on the form above and loads once. -->
+        <div id="topology-content" class="space-y-3"
+             hx-get="/ui/network-map/topology"
+             hx-trigger="load, nm-refresh from:body"
+             hx-swap="innerHTML">
+          <div class="alert alert-info justify-center">Loading topology…</div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- Asset table -->
+  <!-- Asset table. The whole panel is the swap target, table head, body
+       and pager together, because a fragment that rendered only rows would
+       need the pager swapped out of band from inside a <tbody>, and htmx
+       parses a table fragment by its first tag. -->
   <section id="table-view" class="card bg-base-200 shadow rise d-4">
-    <div class="overflow-x-auto">
-      <table class="table table-sm w-full">
-        <thead>
-          <tr>
-            <th>Hostname</th>
-            <th>Primary IP</th>
-            <th>OS</th>
-            <th>Environment</th>
-            <th>Criticality</th>
-            <th>Source Systems</th>
-            <th>Last Seen</th>
-            <th>Events</th>
-          </tr>
-        </thead>
-        <tbody id="assets-tbody">
-          <tr><td colspan="8" class="text-center py-12 text-base-content/50">Loading assets…</td></tr>
-        </tbody>
-      </table>
+    <div id="assets-panel">
+      <div class="overflow-x-auto">
+        <table class="table table-sm w-full">
+          <tbody>
+            <tr><td class="text-center py-12 text-base-content/50">Loading assets…</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
-    <div id="pagination" class="flex items-center justify-between px-4 py-3 border-t border-base-300 text-xs text-base-content/50"></div>
   </section>
 
   <!-- Detail drawer (hidden by default) -->
@@ -165,17 +182,36 @@
 
 </div>
 </div>
+
+<!-- Client-state markup. Both of these describe something only the browser
+     knows: whether vis-network was handed any nodes, and whether a drawer
+     request is still in flight. Neither has a server to ask, so the markup
+     is here and the script clones it and sets textContent.
+
+     They sit outside the <script> deliberately. A <template> inside a
+     <script> is inert text, document.getElementById finds nothing,
+     cloneTemplate returns null and every control built from it vanishes
+     without an error. -->
+<template id="nm-graph-empty"><div class="flex items-center justify-center h-full text-slate-500 text-[13px]">No assets to visualize. Run a sync first.</div></template>
+<template id="nm-graph-failed"><div class="flex items-center justify-center h-full text-slate-500 text-[13px]">The asset read failed, so there is nothing to draw. This is not an empty estate.</div></template>
+<template id="nm-drawer-loading"><div class="text-slate-500 text-[12px]">Loading asset detail…</div></template>
 {% endblock %}
 
 {% block scripts %}
 <script nonce="{{ csp_nonce }}" src="/static/js/vis-network.min.js"></script>
 <script nonce="{{ csp_nonce }}">
 const $ = (id) => document.getElementById(id);
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// A copy of a <template>'s first element. The markup is Jinja's; nothing
+// here assembles it. Null when the template is not on the page.
+function cloneTemplate(id) {
+    const tpl = document.getElementById(id);
+    if (!tpl || !tpl.content || !tpl.content.firstElementChild) return null;
+    return tpl.content.firstElementChild.cloneNode(true);
+}
 
 let currentView = 'table';
 let graphNetwork = null;
-let allAssetsCache = [];
 
 function setView(view) {
   currentView = view;
@@ -202,242 +238,60 @@ function setView(view) {
     renderGraph();
   } else if (view === 'topology') {
     topoEl.style.display = 'block';
-    renderTopology();
   } else {
     if (tableEl) tableEl.style.display = 'block';
   }
 }
 
-let currentPage = 0;
-const PAGE_SIZE = 200;
-let debounceTimer = null;
-
-function debounceLoad() {
-  clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => loadAssets(), 300);
+function filterParams() {
+  // The form is the single definition of what a filter is called, so the
+  // graph reads the same names the fragment routes take rather than a
+  // second list of element ids.
+  const form = $('nm-filters');
+  const params = new URLSearchParams();
+  if (!form) return params;
+  for (const [key, value] of new FormData(form).entries()) {
+    if (typeof value === 'string' && value.trim()) params.set(key, value.trim());
+  }
+  return params;
 }
 
 function clearFilters() {
-  $('filter-search').value = '';
-  $('filter-env').value = '';
-  $('filter-crit').value = '';
-  $('filter-system').value = '';
-  $('filter-seen').value = '';
-  currentPage = 0;
-  loadAssets();
-}
-
-function relTime(iso) {
-  if (!iso) return '—';
-  const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
-  if (s < 60) return s + 's ago';
-  if (s < 3600) return Math.round(s/60) + 'm ago';
-  if (s < 86400) return Math.round(s/3600) + 'h ago';
-  return Math.round(s/86400) + 'd ago';
-}
-
-const CRIT_CLS = {
-  critical: 'bg-ion-coral/10 text-ion-coral border-ion-coral/20',
-  high: 'bg-ion-amber/10 text-ion-amber border-ion-amber/20',
-  medium: 'bg-ion-iris/10 text-ion-iris border-ion-iris/20',
-  low: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
-  unknown: 'bg-white/5 text-slate-500 border-white/10',
-};
-const ENV_CLS = {
-  prod: 'bg-ion-coral/10 text-ion-coral border-ion-coral/20',
-  staging: 'bg-ion-amber/10 text-ion-amber border-ion-amber/20',
-  dev: 'bg-ion-lime/10 text-ion-lime border-ion-lime/20',
-  unknown: 'bg-white/5 text-slate-500 border-white/10',
-};
-
-function pill(text, cls) {
-  return `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold uppercase border ${cls}">${esc(text)}</span>`;
-}
-
-async function loadStats() {
-  try {
-    const r = await fetch('/api/network-map/stats', {credentials:'same-origin'});
-    if (!r.ok) return;
-    const d = await r.json();
-    $('stat-total').textContent = d.total_assets ?? '—';
-    $('stat-seen24').textContent = d.seen_24h ?? '—';
-    $('stat-ips').textContent = d.total_ips ?? '—';
-    $('stat-os-count').textContent = Object.keys(d.os_breakdown || {}).length;
-    // Populate source system dropdown
-    const sysSel = $('filter-system');
-    const curVal = sysSel.value;
-    sysSel.innerHTML = '<option value="">All Systems</option>';
-    for (const sys of (d.source_systems || [])) {
-      sysSel.innerHTML += `<option value="${esc(sys)}">${esc(sys)}</option>`;
-    }
-    sysSel.value = curVal;
-  } catch(e) { console.warn('stats failed', e); }
-}
-
-async function loadAssets() {
-  const params = new URLSearchParams();
-  const search = $('filter-search').value.trim();
-  if (search) params.set('search', search);
-  const env = $('filter-env').value;
-  if (env) params.set('environment', env);
-  const crit = $('filter-crit').value;
-  if (crit) params.set('criticality', crit);
-  const sys = $('filter-system').value;
-  if (sys) params.set('source_system', sys);
-  const seen = $('filter-seen').value;
-  if (seen) params.set('last_seen_within', seen);
-  params.set('offset', String(currentPage * PAGE_SIZE));
-  params.set('limit', String(PAGE_SIZE));
-
-  try {
-    const r = await fetch('/api/network-map/assets?' + params, {credentials:'same-origin'});
-    if (!r.ok) { $('assets-tbody').innerHTML = '<tr><td colspan="8" class="px-4 py-12 text-center text-slate-500">Error loading assets</td></tr>'; return; }
-    const d = await r.json();
-    renderTable(d.assets || []);
-    renderPagination(d.total, d.offset, d.limit);
-    $('results-count').textContent = d.total + ' asset' + (d.total === 1 ? '' : 's');
-  } catch(e) {
-    $('assets-tbody').innerHTML = '<tr><td colspan="8" class="px-4 py-12 text-center text-slate-500">Failed to load</td></tr>';
-  }
-  // Re-render active visualization view
+  const form = $('nm-filters');
+  if (!form) return;
+  form.reset();
+  // reset() restores the markup defaults, which for the system select is
+  // whatever the fragment rendered as selected. Force it back to All.
+  const sys = $('filter-system');
+  if (sys) sys.value = '';
+  htmx.trigger(form, 'change');
   if (currentView === 'graph') renderGraph();
-  if (currentView === 'topology') renderTopology();
 }
 
-function renderTable(assets) {
-  if (!assets.length) {
-    $('assets-tbody').innerHTML = '<tr><td colspan="8" class="px-4 py-12 text-center text-slate-500">No assets found. Run a sync or adjust filters.</td></tr>';
-    return;
-  }
-  $('assets-tbody').innerHTML = assets.map(a => {
-    const os = [a.os_name, a.os_version].filter(Boolean).join(' ') || '—';
-    const systems = (a.source_systems || []).map(s => `<span class="inline-block px-1.5 py-0.5 rounded bg-white/5 text-[10px] text-slate-400 mr-1">${esc(s)}</span>`).join('');
-    return `<tr class="row-hover border-b border-white/[0.03] cursor-pointer" data-click-action="openDetail" data-args='[${a.id}]'>
-      <td class="px-4 py-3 font-mono text-[12px] text-ion-cyan">${esc(a.display_hostname)}</td>
-      <td class="px-4 py-3 font-mono text-[12px] text-slate-300">${esc(a.primary_ip || '—')}</td>
-      <td class="px-4 py-3 text-slate-300">${esc(os)}</td>
-      <td class="px-4 py-3">${pill(a.environment || 'unknown', ENV_CLS[a.environment] || ENV_CLS.unknown)}</td>
-      <td class="px-4 py-3">${pill(a.criticality || 'unknown', CRIT_CLS[a.criticality] || CRIT_CLS.unknown)}</td>
-      <td class="px-4 py-3">${systems || '<span class="text-slate-600">—</span>'}</td>
-      <td class="px-4 py-3 text-slate-400 text-[12px]">${relTime(a.last_seen)}</td>
-      <td class="px-4 py-3 font-mono text-[12px] text-slate-400">${a.event_count?.toLocaleString() || '—'}</td>
-    </tr>`;
-  }).join('');
+function reloadAll() {
+  // One place that says "something changed on the server, read it again":
+  // the three load-once regions listen for nm-refresh and the table is the
+  // form's own target.
+  htmx.trigger(document.body, 'nm-refresh');
+  const form = $('nm-filters');
+  if (form) htmx.trigger(form, 'change');
+  if (currentView === 'graph') renderGraph();
 }
 
-function renderPagination(total, offset, limit) {
-  const pages = Math.ceil(total / limit);
-  const current = Math.floor(offset / limit);
-  if (pages <= 1) { $('pagination').replaceChildren(); return; }
-  let html = `<span>Page ${current + 1} of ${pages}</span><div class="flex gap-1">`;
-  if (current > 0) html += `<button data-click-action="goPage" data-args='[${current - 1}]' class="px-2 py-1 rounded bg-white/5 hover:bg-white/10 transition">Prev</button>`;
-  if (current < pages - 1) html += `<button data-click-action="goPage" data-args='[${current + 1}]' class="px-2 py-1 rounded bg-white/5 hover:bg-white/10 transition">Next</button>`;
-  html += '</div>';
-  $('pagination').innerHTML = html;
-}
-
-function goPage(p) {
-  currentPage = p;
-  loadAssets();
-}
-
-async function openDetail(id) {
-  try {
-    const r = await fetch('/api/network-map/assets/' + id, {credentials:'same-origin'});
-    if (!r.ok) return;
-    const a = await r.json();
-    renderDrawer(a);
-  } catch(e) { console.warn('detail failed', e); }
-}
-
-function renderDrawer(a) {
-  $('drawer-hostname').textContent = a.display_hostname;
-  const os = [a.os_name, a.os_version].filter(Boolean).join(' ') || 'Unknown';
-  const ips = (a.ips || []).map(ip =>
-    `<div class="flex items-center justify-between py-1.5 border-b border-white/[0.03]">
-      <span class="font-mono text-[12px] text-slate-200">${esc(ip.ip)}</span>
-      <span class="text-[10px] text-slate-500">${relTime(ip.last_seen)} · ${ip.event_count} events</span>
-    </div>`
-  ).join('') || '<div class="text-slate-500 text-[12px]">No IPs recorded</div>';
-  const macs = (a.macs || []).map(m =>
-    `<span class="inline-block px-2 py-0.5 rounded bg-white/5 text-[11px] font-mono text-slate-400 mr-1 mb-1">${esc(m.mac)}</span>`
-  ).join('') || '<span class="text-slate-500 text-[12px]">None</span>';
-  const systems = (a.source_systems || []).map(s =>
-    `<span class="inline-block px-2 py-0.5 rounded bg-ion-cyan/10 text-[10px] text-ion-cyan mr-1 mb-1">${esc(s)}</span>`
-  ).join('') || '<span class="text-slate-500 text-[12px]">—</span>';
-
-  $('drawer-content').innerHTML = `
-    <div class="space-y-5">
-      <!-- Metadata -->
-      <div class="grid grid-cols-2 gap-3 text-[12px]">
-        <div><span class="text-slate-500">OS</span><div class="text-slate-200 mt-0.5">${esc(os)}</div></div>
-        <div><span class="text-slate-500">Architecture</span><div class="text-slate-200 mt-0.5">${esc(a.architecture || '—')}</div></div>
-        <div><span class="text-slate-500">First Seen</span><div class="text-slate-200 mt-0.5">${a.first_seen ? new Date(a.first_seen).toLocaleString() : '—'}</div></div>
-        <div><span class="text-slate-500">Last Seen</span><div class="text-slate-200 mt-0.5">${relTime(a.last_seen)}</div></div>
-        <div><span class="text-slate-500">Events</span><div class="text-slate-200 mt-0.5">${a.event_count?.toLocaleString()}</div></div>
-        <div><span class="text-slate-500">Last Index</span><div class="text-slate-200 mt-0.5 font-mono text-[11px] truncate" title="${esc(a.last_index)}">${esc(a.last_index || '—')}</div></div>
-      </div>
-
-      <!-- Source systems -->
-      <div>
-        <div class="label-tiny text-slate-500 mb-2">Source Systems</div>
-        <div>${systems}</div>
-      </div>
-
-      <!-- Editable fields -->
-      <div class="border-t border-white/5 pt-4 space-y-3">
-        <div class="label-tiny text-slate-500 mb-2">Enrichment</div>
-        <div class="flex gap-3">
-          <div class="flex-1">
-            <label class="text-[11px] text-slate-500">Environment</label>
-            <select id="edit-env" class="mt-1 w-full h-8 px-2 rounded border border-white/10 bg-ink-800 text-[12px] text-slate-200">
-              <option value="unknown" ${a.environment==='unknown'?'selected':''}>Unknown</option>
-              <option value="prod" ${a.environment==='prod'?'selected':''}>Production</option>
-              <option value="staging" ${a.environment==='staging'?'selected':''}>Staging</option>
-              <option value="dev" ${a.environment==='dev'?'selected':''}>Development</option>
-            </select>
-          </div>
-          <div class="flex-1">
-            <label class="text-[11px] text-slate-500">Criticality</label>
-            <select id="edit-crit" class="mt-1 w-full h-8 px-2 rounded border border-white/10 bg-ink-800 text-[12px] text-slate-200">
-              <option value="unknown" ${a.criticality==='unknown'?'selected':''}>Unknown</option>
-              <option value="low" ${a.criticality==='low'?'selected':''}>Low</option>
-              <option value="medium" ${a.criticality==='medium'?'selected':''}>Medium</option>
-              <option value="high" ${a.criticality==='high'?'selected':''}>High</option>
-              <option value="critical" ${a.criticality==='critical'?'selected':''}>Critical</option>
-            </select>
-          </div>
-        </div>
-        <div>
-          <label class="text-[11px] text-slate-500">Owner</label>
-          <input type="text" id="edit-owner" value="${esc(a.owner || '')}" placeholder="Team or person"
-                 class="mt-1 w-full h-8 px-2 rounded border border-white/10 bg-ink-800 text-[12px] text-slate-200">
-        </div>
-        <div>
-          <label class="text-[11px] text-slate-500">Notes</label>
-          <textarea id="edit-notes" rows="3" placeholder="Free-text notes…"
-                    class="mt-1 w-full px-2 py-1.5 rounded border border-white/10 bg-ink-800 text-[12px] text-slate-200 resize-y">${esc(a.notes || '')}</textarea>
-        </div>
-        <button data-click-action="saveEnrichment" data-args='[${a.id}]' class="h-8 px-4 rounded-md bg-ion-cyan text-ink-950 text-[12px] font-semibold hover:brightness-110 transition">Save</button>
-      </div>
-
-      <!-- IP History -->
-      <div class="border-t border-white/5 pt-4">
-        <div class="label-tiny text-slate-500 mb-2">IP History (${(a.ips||[]).length})</div>
-        <div>${ips}</div>
-      </div>
-
-      <!-- MAC Addresses -->
-      <div class="border-t border-white/5 pt-4">
-        <div class="label-tiny text-slate-500 mb-2">MAC Addresses</div>
-        <div>${macs}</div>
-      </div>
-    </div>
-  `;
-
+function openDetail(id) {
   const drawer = $('detail-drawer');
+  const loading = cloneTemplate('nm-drawer-loading');
+  if (loading) $('drawer-content').replaceChildren(loading);
+  $('drawer-hostname').textContent = '';
   drawer.style.display = '';
   requestAnimationFrame(() => drawer.classList.remove('translate-x-full'));
+  // The drawer, the hostname above it and the enrichment form are all one
+  // fragment; the hostname arrives out of band because it sits outside the
+  // swapped region.
+  htmx.ajax('GET', '/ui/network-map/assets/' + encodeURIComponent(id), {
+    target: '#drawer-content',
+    swap: 'innerHTML',
+  });
 }
 
 function closeDrawer() {
@@ -454,15 +308,14 @@ async function saveEnrichment(id) {
     notes: $('edit-notes').value,
   };
   try {
-    const r = await fetch('/api/network-map/assets/' + id, {
+    const r = await fetch('/api/network-map/assets/' + encodeURIComponent(id), {
       method: 'PATCH', credentials: 'same-origin',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(body),
     });
     if (r.ok) {
       if (typeof showToast === 'function') showToast('Asset updated', 'success');
-      loadAssets();
-      loadStats();
+      reloadAll();
     } else {
       if (typeof showToast === 'function') showToast('Update failed', 'error');
     }
@@ -473,15 +326,15 @@ async function saveEnrichment(id) {
 
 async function triggerSync() {
   const btn = $('sync-btn');
+  const label = $('sync-label');
   btn.disabled = true;
-  btn.textContent = 'Syncing…';
+  if (label) label.textContent = 'Syncing…';
   try {
     const r = await fetch('/api/network-map/sync', {method:'POST', credentials:'same-origin'});
     const d = await r.json();
     if (r.ok) {
       if (typeof showToast === 'function') showToast(`Synced: ${d.hosts_processed} hosts, ${d.ips_upserted} IPs`, 'success');
-      loadStats();
-      loadAssets();
+      reloadAll();
     } else {
       if (typeof showToast === 'function') showToast(d.detail || 'Sync failed', 'error');
     }
@@ -489,7 +342,20 @@ async function triggerSync() {
     if (typeof showToast === 'function') showToast('Sync failed', 'error');
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '<svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg> Sync Now';
+    if (label) label.textContent = 'Sync Now';
+  }
+}
+
+function toggleSubnet(idx) {
+  const body = $('topo-body-' + idx);
+  const chevron = $('topo-chevron-' + idx);
+  if (!body) return;
+  if (body.classList.contains('hidden')) {
+    body.classList.remove('hidden');
+    if (chevron) chevron.classList.add('rotate-90');
+  } else {
+    body.classList.add('hidden');
+    if (chevron) chevron.classList.remove('rotate-90');
   }
 }
 
@@ -499,11 +365,11 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(
 // ── Network Graph ──────────────────────────────────────────
 
 const CRIT_COLORS = {
-  critical: { bg: '#ff6c6c', border: '#ff4444', font: '#fff' },
-  high:     { bg: '#f8b33a', border: '#e6a020', font: '#000' },
-  medium:   { bg: '#9a8cff', border: '#7b6bff', font: '#fff' },
-  low:      { bg: '#64748b', border: '#475569', font: '#fff' },
-  unknown:  { bg: '#475569', border: '#334155', font: '#fff' },
+  critical: { border: '#ff4444' },
+  high:     { border: '#e6a020' },
+  medium:   { border: '#7b6bff' },
+  low:      { border: '#475569' },
+  unknown:  { border: '#334155' },
 };
 
 function ipToSubnet(ip) {
@@ -514,26 +380,18 @@ function ipToSubnet(ip) {
 }
 
 async function fetchGraphAssets() {
-  const params = new URLSearchParams();
-  const search = $('filter-search').value.trim();
-  if (search) params.set('search', search);
-  const env = $('filter-env').value;
-  if (env) params.set('environment', env);
-  const crit = $('filter-crit').value;
-  if (crit) params.set('criticality', crit);
-  const sys = $('filter-system').value;
-  if (sys) params.set('source_system', sys);
-  const seen = $('filter-seen').value;
-  if (seen) params.set('last_seen_within', seen);
+  const params = filterParams();
+  params.delete('page');
   params.set('limit', '2000');
 
   try {
     const r = await fetch('/api/network-map/assets?' + params, {credentials:'same-origin'});
-    if (!r.ok) return [];
+    if (!r.ok) return null;
     const d = await r.json();
-    allAssetsCache = d.assets || [];
-    return allAssetsCache;
-  } catch(e) { return []; }
+    // null, not []. A read that answered something other than a list of
+    // assets is not an estate with nothing in it, and the caller says so.
+    return Array.isArray(d && d.assets) ? d.assets : null;
+  } catch(e) { return null; }
 }
 
 // Detect device type from OS/hostname for icon selection
@@ -561,11 +419,25 @@ const DEVICE_ICONS = {
   device:      'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36"><rect x="4" y="4" width="28" height="28" rx="4" fill="#1e293b" stroke="#475569" stroke-width="1.5"/><circle cx="18" cy="18" r="6" fill="none" stroke="#64748b" stroke-width="1.5"/><circle cx="18" cy="18" r="2" fill="#64748b"/></svg>'),
 };
 
+function graphMessage(id) {
+  const container = $('network-graph');
+  if (!container) return;
+  const node = cloneTemplate(id);
+  if (node) container.replaceChildren(node);
+  else container.replaceChildren();
+}
+
 async function renderGraph() {
   const assets = await fetchGraphAssets();
 
+  if (assets === null) {
+    // A failed read is not an empty estate. The same sentence for both is
+    // what the table did, and it told the reader to run a sync.
+    graphMessage('nm-graph-failed');
+    return;
+  }
   if (!assets.length) {
-    $('network-graph').innerHTML = '<div class="flex items-center justify-center h-full text-[#64748b] text-[13px]">No assets to visualize. Run a sync first.</div>';
+    graphMessage('nm-graph-empty');
     return;
   }
 
@@ -630,8 +502,14 @@ async function renderGraph() {
       const hostId = nextId++;
       const devType = detectDeviceType(a);
       const crit = CRIT_COLORS[a.criticality] || CRIT_COLORS.unknown;
-      const name = a.display_hostname.length > 16 ? a.display_hostname.slice(0, 14) + '…' : a.display_hostname;
+      const hostname = a.display_hostname || a.hostname || 'unnamed';
+      const name = hostname.length > 16 ? hostname.slice(0, 14) + '…' : hostname;
       const ipShort = a.primary_ip ? a.primary_ip.split('.').pop() : '';
+      // A measured zero is a host that reported nothing in the window and
+      // is worth noticing; a missing count is not zero. `|| 0` said both
+      // were zero.
+      const events = typeof a.event_count === 'number'
+        ? a.event_count.toLocaleString() : 'not read';
 
       nodes.push({
         id: hostId,
@@ -645,7 +523,7 @@ async function renderGraph() {
         color: { border: crit.border },
         _type: 'host',
         _assetId: a.id,
-        title: a.display_hostname + '\n' + (a.primary_ip || '') + '\nOS: ' + ([a.os_name, a.os_version].filter(Boolean).join(' ') || '?') + '\nType: ' + devType + '\nCriticality: ' + a.criticality + '\nEvents: ' + (a.event_count || 0).toLocaleString(),
+        title: hostname + '\n' + (a.primary_ip || 'no IP seen') + '\nOS: ' + ([a.os_name, a.os_version].filter(Boolean).join(' ') || 'unidentified') + '\nType: ' + devType + '\nCriticality: ' + (a.criticality || 'unknown') + '\nEvents: ' + events,
       });
 
       edges.push({
@@ -706,136 +584,5 @@ async function renderGraph() {
     }
   });
 }
-
-// ── Topology View ─────────────────────────────────────────
-
-const TOPO_CRIT_COLORS = {
-  critical: 'bg-red-400',
-  high: 'bg-amber-400',
-  medium: 'bg-violet-400',
-  low: 'bg-slate-400',
-  unknown: 'bg-slate-600',
-};
-
-const TOPO_CRIT_TEXT = {
-  critical: 'text-red-400',
-  high: 'text-amber-400',
-  medium: 'text-violet-400',
-  low: 'text-slate-400',
-  unknown: 'text-slate-500',
-};
-
-const TOPO_CRIT_PILL = {
-  critical: 'bg-red-400/10 text-red-400 border-red-400/20',
-  high: 'bg-amber-400/10 text-amber-400 border-amber-400/20',
-  medium: 'bg-violet-400/10 text-violet-400 border-violet-400/20',
-  low: 'bg-slate-400/10 text-slate-400 border-slate-400/20',
-  unknown: 'bg-white/5 text-slate-500 border-white/10',
-};
-
-const CRIT_RANK = { critical: 4, high: 3, medium: 2, low: 1, unknown: 0 };
-
-async function renderTopology() {
-  const container = $('topology-content');
-  container.innerHTML = '<div class="text-slate-500 text-sm animate-pulse text-center py-12">Loading topology...</div>';
-
-  // Try the dedicated subnets endpoint first, fall back to client-side grouping
-  let subnets = null;
-  try {
-    const r = await fetch('/api/network-map/subnets', {credentials:'same-origin'});
-    if (r.ok) {
-      const d = await r.json();
-      subnets = d.subnets || d;
-    }
-  } catch(e) {}
-
-  if (!subnets) {
-    // Fall back: fetch all assets and group client-side
-    const assets = await fetchGraphAssets();
-    if (!assets.length) {
-      container.innerHTML = '<div class="text-slate-500 text-sm text-center py-12">No assets found. Run a sync or adjust filters.</div>';
-      return;
-    }
-    // Group by /24 subnet
-    const grouped = new Map();
-    for (const a of assets) {
-      const subnet = ipToSubnet(a.primary_ip) || 'Unknown';
-      if (!grouped.has(subnet)) grouped.set(subnet, []);
-      grouped.get(subnet).push(a);
-    }
-    subnets = Array.from(grouped.entries()).map(([cidr, hosts]) => {
-      const worstCrit = hosts.reduce((w, h) => (CRIT_RANK[h.criticality] || 0) > (CRIT_RANK[w] || 0) ? h.criticality : w, 'unknown');
-      const envs = [...new Set(hosts.map(h => h.environment).filter(Boolean))];
-      const totalEvents = hosts.reduce((s, h) => s + (h.event_count || 0), 0);
-      return { cidr, host_count: hosts.length, worst_criticality: worstCrit, environments: envs, total_events: totalEvents, hosts };
-    });
-  }
-
-  // Sort by host count descending
-  subnets.sort((a, b) => (b.host_count || 0) - (a.host_count || 0));
-
-  if (!subnets.length) {
-    container.innerHTML = '<div class="text-slate-500 text-sm text-center py-12">No subnets to display.</div>';
-    return;
-  }
-
-  container.innerHTML = subnets.map((s, idx) => {
-    const crit = s.worst_criticality || 'unknown';
-    const critPill = TOPO_CRIT_PILL[crit] || TOPO_CRIT_PILL.unknown;
-    const envTags = (s.environments || []).map(e => `<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium uppercase ${ENV_CLS[e] || ENV_CLS.unknown} border">${esc(e)}</span>`).join(' ');
-    const hosts = s.hosts || [];
-
-    const hostCards = hosts.map(h => {
-      const hostName = h.display_hostname || h.hostname || '—';
-      const hostIp = h.primary_ip || h.ip || '—';
-      const os = h.os || [h.os_name, h.os_version].filter(Boolean).join(' ') || '—';
-      const hCrit = h.criticality || 'unknown';
-      const dotCls = TOPO_CRIT_COLORS[hCrit] || TOPO_CRIT_COLORS.unknown;
-      return `<div class="rounded-lg border border-white/5 bg-white/[0.02] p-3 cursor-pointer hover:bg-white/[0.04] transition" data-click-action="openDetail" data-args='[${h.id}]'>
-        <div class="flex items-center gap-2 mb-1.5">
-          <span class="w-2 h-2 rounded-full ${dotCls} flex-shrink-0"></span>
-          <span class="font-mono text-[12px] text-ion-cyan truncate">${esc(hostName)}</span>
-        </div>
-        <div class="text-[11px] text-slate-400 space-y-0.5 pl-4">
-          <div class="font-mono">${esc(hostIp)}</div>
-          <div>${esc(os)}</div>
-          <div class="text-slate-500">${relTime(h.last_seen)}</div>
-        </div>
-      </div>`;
-    }).join('');
-
-    return `<div class="rounded-xl border border-white/5 bg-ink-900/40 overflow-hidden" id="topo-subnet-${idx}">
-      <div class="px-4 py-3 flex items-center gap-4 cursor-pointer hover:bg-white/5 transition" data-click-action="toggleSubnet" data-args='[${idx}]'>
-        <svg id="topo-chevron-${idx}" class="w-4 h-4 text-slate-500 transform transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
-        <span class="font-mono text-[13px] text-white font-semibold">${esc(s.subnet || s.cidr || '?')}</span>
-        <span class="text-[11px] text-slate-400">${s.host_count} host${s.host_count === 1 ? '' : 's'}</span>
-        <span class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold uppercase border ${critPill}">${esc(crit)}</span>
-        <div class="flex items-center gap-1.5">${envTags}</div>
-        <span class="ml-auto text-[11px] text-slate-500 tabular-nums">${(s.total_events || 0).toLocaleString()} events</span>
-      </div>
-      <div id="topo-body-${idx}" class="px-4 pb-4 hidden">
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
-          ${hostCards}
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function toggleSubnet(idx) {
-  const body = $('topo-body-' + idx);
-  const chevron = $('topo-chevron-' + idx);
-  if (body.classList.contains('hidden')) {
-    body.classList.remove('hidden');
-    chevron.classList.add('rotate-90');
-  } else {
-    body.classList.add('hidden');
-    chevron.classList.remove('rotate-90');
-  }
-}
-
-// Initial load
-loadStats();
-loadAssets();
 </script>
 {% endblock %}

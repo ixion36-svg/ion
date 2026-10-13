@@ -1,0 +1,146 @@
+{# The asset table of /network-map, its pager and its result count.
+
+   Replaces five innerHTML writes: two failure lines that said different
+   things about the same failure, the empty-state row that told the reader
+   to run a sync when the read had not happened, the whole tbody, and the
+   pager.
+
+   Four states, not two:
+
+     failed        the read did not complete. Not an empty estate, and not
+                   an estate whose filters matched nothing.
+     no rows       the query ran and matched nothing.
+     rows          what the query matched.
+     no total      rows, but no count of how many there are in all. The
+                   pager is withheld rather than computed from NaN, which
+                   is what `Math.ceil(undefined / 200)` produced and what
+                   `pages <= 1` then swallowed.
+
+   The count lives in the filter bar, above this panel, so it is swapped
+   out of band. It is the one figure on the page that was built by string
+   concatenation (`d.total + ' asset'`), which printed "undefined assets".
+
+   Last Seen is an age rather than a wall-clock reading, and the age is
+   computed on the server. That is sound where rendering an absolute time
+   server-side would not be: an elapsed interval is the same number in
+   every timezone. First Seen, in the drawer, is absolute and goes through
+   the `ts` macro instead. #}
+
+{% set CRIT_BADGE = {
+    'critical': 'badge-error', 'high': 'badge-warning',
+    'medium': 'badge-info', 'low': 'badge-ghost', 'unknown': 'badge-ghost'} %}
+{% set ENV_BADGE = {
+    'prod': 'badge-error', 'staging': 'badge-warning',
+    'dev': 'badge-success', 'unknown': 'badge-ghost'} %}
+
+<span id="results-count" class="text-xs text-base-content/50 ml-auto"
+      hx-swap-oob="true">
+  {%- if failed %}count unknown
+  {%- elif total is none %}count unmeasured
+  {%- else %}{{ total }} asset{{ '' if total == 1 else 's' }}
+  {%- endif %}
+</span>
+
+<div class="overflow-x-auto">
+  <table class="table table-sm w-full">
+    <thead>
+      <tr>
+        <th>Hostname</th>
+        <th>Primary IP</th>
+        <th>OS</th>
+        <th>Environment</th>
+        <th>Criticality</th>
+        <th>Source Systems</th>
+        <th>Last Seen</th>
+        <th>Events</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if failed %}
+      <tr>
+        <td colspan="8" class="text-center py-12">
+          <span class="text-base-content/60">
+            The asset list could not be read. This is not an estate with no
+            hosts in it and not a filter that matched nothing: the query
+            failed, so how many assets ION knows about is unknown rather
+            than zero. Adjusting the filters will retry it.
+          </span>
+        </td>
+      </tr>
+      {% elif not rows %}
+      <tr>
+        <td colspan="8" class="text-center py-12 text-base-content/50">
+          No assets matched. Run a sync or widen the filters.
+        </td>
+      </tr>
+      {% else %}
+      {% for row in rows %}
+      <tr class="row-hover cursor-pointer" data-click-action="openDetail"
+          data-args='{{ [row.id] | tojson }}'>
+        <td class="px-4 py-3 font-mono text-[12px] text-ion-cyan">
+          {%- if row.hostname %}{{ row.hostname }}
+          {%- else %}<span class="text-slate-600">unnamed</span>{% endif -%}
+        </td>
+        <td class="px-4 py-3 font-mono text-[12px] text-slate-300">
+          {%- if row.ip %}{{ row.ip }}
+          {%- else %}<span class="text-slate-600">no IP seen</span>{% endif -%}
+        </td>
+        <td class="px-4 py-3 text-slate-300">
+          {%- if row.os %}{{ row.os }}
+          {%- else %}<span class="text-slate-600">unidentified</span>{% endif -%}
+        </td>
+        <td class="px-4 py-3">
+          <span class="badge badge-sm {{ ENV_BADGE.get(row.environment, 'badge-ghost') }} uppercase">{{ row.environment }}</span>
+        </td>
+        <td class="px-4 py-3">
+          <span class="badge badge-sm {{ CRIT_BADGE.get(row.criticality, 'badge-ghost') }} uppercase">{{ row.criticality }}</span>
+        </td>
+        <td class="px-4 py-3">
+          {%- if row.systems %}
+          {%- for system in row.systems %}
+          <span class="inline-block px-2 py-0.5 rounded bg-white/5 text-[10px] text-slate-400 mr-1">{{ system }}</span>
+          {%- endfor %}
+          {%- else %}<span class="text-slate-600">&#8212;</span>{% endif -%}
+        </td>
+        <td class="px-4 py-3 text-slate-400 text-[12px]">
+          {%- if row.age %}{{ row.age }} ago
+          {%- else %}<span class="text-slate-600">no timestamp</span>{% endif -%}
+        </td>
+        <td class="px-4 py-3 font-mono text-[12px] text-slate-400">
+          {#- A measured zero is the asset worth noticing. The JavaScript's
+              `a.event_count?.toLocaleString() || '—'` hid exactly that one. -#}
+          {%- if row.event_count is not none %}{{ "{:,}".format(row.event_count) }}
+          {%- else %}<span class="text-slate-600">&#8212;</span>{% endif -%}
+        </td>
+      </tr>
+      {% endfor %}
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+<div class="flex items-center justify-between px-4 py-3 border-t border-base-300 text-xs text-base-content/50">
+  {% if failed %}
+  <span>&nbsp;</span>
+  {% elif total is none %}
+  <span>Paging unavailable: this read returned rows but no total.</span>
+  {% elif pages is not none and pages > 1 %}
+  <span>Page {{ page + 1 }} of {{ pages }}</span>
+  <div class="flex gap-1">
+    {% if page > 0 %}
+    <button type="button" class="btn btn-ghost btn-sm"
+            hx-get="/ui/network-map/assets" hx-include="#nm-filters"
+            hx-target="#assets-panel" hx-swap="innerHTML"
+            hx-vals='{{ {"page": page - 1} | tojson }}'>Prev</button>
+    {% endif %}
+    {% if page + 1 < pages %}
+    <button type="button" class="btn btn-ghost btn-sm"
+            hx-get="/ui/network-map/assets" hx-include="#nm-filters"
+            hx-target="#assets-panel" hx-swap="innerHTML"
+            hx-vals='{{ {"page": page + 1} | tojson }}'>Next</button>
+    {% endif %}
+  </div>
+  {% else %}
+  <span>&nbsp;</span>
+  {% endif %}
+</div>
