@@ -20,6 +20,7 @@
       </p>
     </div>
     <div class="flex items-center gap-3">
+      <button id="analyst-refresh" type="button" data-click-action="analystRefresh" class="btn btn-ghost btn-sm">Refresh</button>
       <span id="es-status-pill" class="badge badge-ghost gap-1.5">
         <span class="h-1.5 w-1.5 rounded-full bg-current"></span>
         Checking...
@@ -28,36 +29,42 @@
   </div>
 </section>
 
-<!-- Row 2: KPI Strip -->
+<!-- Row 2: KPI Strip. Open alerts and severity are filled out of band by the
+     queue request. MTTR and watched each have their own request, and the
+     title of each tile stays outside that request's swap target. -->
 <section class="stats stats-vertical md:stats-horizontal w-full bg-base-200 shadow mb-6 rise d-2">
   <a href="/alerts" class="stat">
     <div class="stat-title">Open Alerts</div>
     <div class="stat-value font-mono text-base-content" id="kpi-open-alerts">&mdash;</div>
-    <div class="stat-desc">Last 24h</div>
+    <div class="stat-desc" id="kpi-open-alerts-desc">Last 24h</div>
   </a>
   <a href="/cases" class="stat">
     <div class="stat-title">My Cases</div>
     <div class="stat-value font-mono text-base-content" id="kpi-my-cases">&mdash;</div>
-    <div class="stat-desc">Open / Investigating</div>
+    <div class="stat-desc" id="kpi-my-cases-desc">Open / Investigating</div>
   </a>
   <div class="stat">
     <div class="stat-title">Critical / High</div>
     <div class="stat-value font-mono flex items-center gap-2">
-      <span class="text-error" id="kpi-critical">0</span>
+      <span class="text-error" id="kpi-critical">&mdash;</span>
       <span class="text-2xl font-mono text-base-content/20">/</span>
-      <span class="text-warning" id="kpi-high">0</span>
+      <span class="text-warning" id="kpi-high">&mdash;</span>
     </div>
-    <div class="stat-desc">Severity breakdown</div>
+    <div class="stat-desc" id="kpi-severity-desc">Severity breakdown</div>
   </div>
   <div class="stat">
     <div class="stat-title">MTTR</div>
-    <div class="stat-value font-mono text-base-content" id="kpi-mttr">&mdash;</div>
-    <div class="stat-desc">Avg hours (30d)</div>
+    <div id="kpi-mttr" hx-get="/ui/analyst/mttr" hx-trigger="load" hx-swap="innerHTML">
+      <div class="stat-value font-mono text-base-content">&mdash;</div>
+      <div class="stat-desc">Avg hours (30d)</div>
+    </div>
   </div>
   <a href="/observables" class="stat">
     <div class="stat-title">Watched IOCs</div>
-    <div class="stat-value font-mono text-base-content" id="kpi-watched">&mdash;</div>
-    <div class="stat-desc">Observables tracked</div>
+    <div id="kpi-watched" hx-get="/ui/analyst/watched" hx-trigger="load" hx-swap="innerHTML">
+      <div class="stat-value font-mono text-base-content">&mdash;</div>
+      <div class="stat-desc">Observables tracked</div>
+    </div>
   </a>
 </section>
 
@@ -74,7 +81,7 @@
           <h2 class="card-title text-xs uppercase tracking-wider">Priority Queue</h2>
           <a href="/alerts" class="link link-primary text-xs">View All &rarr;</a>
         </div>
-        <div id="priority-queue">
+        <div id="priority-queue" hx-get="/ui/analyst/alerts" hx-trigger="load" hx-swap="innerHTML">
           <div class="alert alert-info m-4 justify-center">Loading alerts...</div>
         </div>
       </div>
@@ -87,7 +94,7 @@
           <h2 class="card-title text-xs uppercase tracking-wider">My Active Cases</h2>
           <a href="/cases" class="link link-primary text-xs">All Cases &rarr;</a>
         </div>
-        <div id="my-cases">
+        <div id="my-cases" hx-get="/ui/analyst/cases" hx-trigger="load" hx-swap="innerHTML">
           <div class="alert alert-info m-4 justify-center">Loading cases...</div>
         </div>
       </div>
@@ -97,17 +104,18 @@
   <!-- Right column -->
   <div class="lg:col-span-4 flex flex-col gap-4">
 
-    <!-- Quick IOC Lookup -->
+    <!-- Quick IOC Lookup. The form stays outside #ioc-result, so a failed
+         render cannot take the input with it. Enter submits the form;
+         there is no keyup filter, which CSP would refuse to compile. -->
     <div class="card bg-base-200 shadow">
       <div class="card-body">
         <h2 class="card-title text-xs uppercase tracking-wider">Quick IOC Lookup</h2>
-        <div class="join w-full">
-          <input id="ioc-input" type="text" placeholder="IP, domain, hash..."
-                 class="input input-sm join-item flex-1"
-                 data-enter-key-action="doIOCLookup">
-          <button data-click-action="doIOCLookup" class="btn btn-primary btn-sm join-item">Lookup</button>
-        </div>
-        <div id="ioc-result" class="mt-3 hidden"></div>
+        <form class="join w-full" hx-post="/ui/analyst/ioc" hx-target="#ioc-result" hx-swap="innerHTML">
+          <input id="ioc-input" name="value" type="text" required placeholder="IP, domain, hash..."
+                 class="input input-sm join-item flex-1">
+          <button type="submit" class="btn btn-primary btn-sm join-item">Lookup</button>
+        </form>
+        <div id="ioc-result" class="mt-3"></div>
       </div>
     </div>
 
@@ -153,25 +161,32 @@
   </div>
 </section>
 
-<!-- Row 4: Knowledge Base — browse, then search.
-     v0.79.0: this was a search box and nothing else. An analyst who did not
-     already know what to type saw an empty panel and moved on, while ~600
-     articles sat one collection away. Topics and recently-updated articles
-     are shown up front; typing replaces them with results. -->
+<!-- Row 4: Knowledge Base. The search box is outside #kb-content so a
+     failed render cannot remove it. The box's value is included on the
+     panel's own request, and hx-disinherit stops a topic chip inside the
+     panel from sending that value a second time. -->
 <section class="card bg-base-200 shadow rise d-4">
   <div class="card-body">
     <div class="flex items-center justify-between gap-4">
       <h2 class="card-title text-xs uppercase tracking-wider">Knowledge Base</h2>
       <a href="/documents" class="link link-hover text-xs text-base-content/50">Open library &rarr;</a>
     </div>
-    <input id="kb-search" type="text" placeholder="Search titles and article text..."
-           class="input w-full"
-           data-input-action="debounceKBSearch">
-    <div id="kb-results" class="mt-3 hidden divide-y divide-base-300"></div>
-    <div id="kb-browse" class="mt-4">
-      <div id="kb-topics" class="flex flex-wrap gap-1.5"></div>
-      <div class="text-xs uppercase tracking-wider font-semibold text-base-content/40 mt-4 mb-2">Recently updated</div>
-      <div id="kb-recent" class="divide-y divide-base-300"></div>
+    <form hx-get="/ui/analyst/kb" hx-target="#kb-content" hx-swap="innerHTML">
+      <input id="kb-search" name="q" type="text" placeholder="Search titles and article text..."
+             class="input w-full"
+             hx-get="/ui/analyst/kb"
+             hx-trigger="input changed delay:250ms"
+             hx-target="#kb-content"
+             hx-swap="innerHTML"
+             hx-include="#kb-search">
+    </form>
+    <div id="kb-content" class="mt-4"
+         hx-get="/ui/analyst/kb"
+         hx-trigger="load"
+         hx-swap="innerHTML"
+         hx-include="#kb-search"
+         hx-disinherit="hx-include">
+      <div class="alert alert-info justify-center">Loading knowledge base...</div>
     </div>
   </div>
 </section>
@@ -182,231 +197,59 @@
 
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
-// ── Helpers ─────────────────────────────────────────
-function esc(s) {
-  if (s == null) return '';
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-function timeAgo(iso) {
-  if (!iso) return '';
-  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (diff < 60) return 'just now';
-  if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-  if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-  return Math.floor(diff / 86400) + 'd ago';
-}
-
-function sevPill(sev) {
-  const s = (sev || 'low').toLowerCase();
-  const map = {
-    critical: 'bg-red-500/15 text-red-400',
-    high:     'bg-amber-500/15 text-amber-400',
-    medium:   'bg-violet-500/15 text-violet-400',
-    low:      'bg-slate-500/15 text-slate-400',
-    info:     'bg-slate-500/15 text-slate-400',
-  };
-  return `<span class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wide ${map[s] || map.low}">${esc(s)}</span>`;
-}
-
-function truncate(s, n) { return s && s.length > n ? s.slice(0, n) + '...' : (s || ''); }
-
-let _currentUsername = null;
-
-// ── Shift timer ─────────────────────────────────────
 const _shiftStart = sessionStorage.getItem('ion_shift_start') || new Date().toISOString();
 if (!sessionStorage.getItem('ion_shift_start')) sessionStorage.setItem('ion_shift_start', _shiftStart);
 
 function updateClock() {
   const now = new Date();
-  const utc = now.toISOString().slice(11, 19) + ' UTC';
-  document.getElementById('utc-clock').textContent = utc;
-  const h = now.getUTCHours();
-  document.getElementById('greeting-period').textContent = h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening';
+  const clock = document.getElementById('utc-clock');
+  if (clock) clock.textContent = now.toISOString().slice(11, 19) + ' UTC';
+  const period = document.getElementById('greeting-period');
+  if (period) {
+    const h = now.getUTCHours();
+    period.textContent = h < 12 ? 'morning' : h < 18 ? 'afternoon' : 'evening';
+  }
   const elapsed = Math.floor((now - new Date(_shiftStart)) / 60000);
-  document.getElementById('shift-duration').textContent = elapsed < 60 ? elapsed + 'm' : Math.floor(elapsed / 60) + 'h ' + (elapsed % 60) + 'm';
+  const duration = document.getElementById('shift-duration');
+  if (duration) {
+    duration.textContent = elapsed < 60
+      ? elapsed + 'm'
+      : Math.floor(elapsed / 60) + 'h ' + (elapsed % 60) + 'm';
+  }
 }
 setInterval(updateClock, 1000);
 updateClock();
 
-// ── Main loader ─────────────────────────────────────
-async function loadWorkspace() {
-  // Wait for app.js to populate user data
-  const user = await getUserData();
-  if (user) {
-    _currentUsername = user.username;
-    document.getElementById('greeting-name').textContent = user.display_name || user.username;
-  }
-
-  // Parallel fetches
-  const [alertsRes, casesRes, metricsRes, obsRes] = await Promise.all([
-    safeFetch('/api/elasticsearch/alerts?hours=24&limit=500'),
-    safeFetch('/api/cases?status=open'),
-    safeFetch('/api/dashboard/team-metrics'),
-    safeFetch('/api/observables/stats'),
-  ]);
-
-  // ES status pill
-  const pill = document.getElementById('es-status-pill');
-  if (alertsRes && !alertsRes.connection_error && alertsRes.configured !== false) {
-    pill.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold tracking-wide bg-emerald-500/15 text-emerald-400';
-    pill.innerHTML = '<span class="h-1.5 w-1.5 rounded-full bg-current"></span>ES Connected';
-  } else {
-    pill.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold tracking-wide bg-red-500/15 text-red-400';
-    pill.innerHTML = '<span class="h-1.5 w-1.5 rounded-full bg-current"></span>ES Degraded';
-  }
-
-  // KPI: Open Alerts + severity breakdown + priority queue
-  if (alertsRes) {
-    const alerts = alertsRes.alerts || [];
-    document.getElementById('kpi-open-alerts').textContent = alertsRes.total || 0;
-    let crit = 0, high = 0;
-    alerts.forEach(a => {
-      const s = (a.severity || '').toLowerCase();
-      if (s === 'critical') crit++;
-      if (s === 'high') high++;
-    });
-    document.getElementById('kpi-critical').textContent = crit;
-    document.getElementById('kpi-high').textContent = high;
-    renderPriorityQueue(alerts.slice(0, 8));
-  }
-
-  // KPI: My Cases
-  if (casesRes && casesRes.cases) {
-    const myCases = _currentUsername
-      ? casesRes.cases.filter(c => c.assigned_to === _currentUsername)
-      : casesRes.cases;
-    document.getElementById('kpi-my-cases').textContent = myCases.length;
-    renderMyCases(myCases.slice(0, 5));
-  }
-
-  // KPI: MTTR
-  if (metricsRes) {
-    const mttr = metricsRes.mttr_hours;
-    document.getElementById('kpi-mttr').textContent = mttr != null ? mttr + 'h' : '--';
-  }
-
-  // KPI: Watched IOCs
-  if (obsRes) {
-    document.getElementById('kpi-watched').textContent = obsRes.watched || obsRes.total || 0;
-  }
-}
-
 async function getUserData() {
-  // Try sessionStorage first (app.js caches here)
   try {
     const cached = sessionStorage.getItem('ion_user');
     if (cached) return JSON.parse(cached);
-  } catch {}
-  // Fallback: fetch directly
+  } catch (e) { /* a bad cache is the same as no cache */ }
   try {
     const r = await fetch('/api/auth/me', { credentials: 'same-origin' });
     if (r.ok) return await r.json();
-  } catch {}
+  } catch (e) { /* the greeting keeps its placeholder */ }
   return null;
 }
 
-async function safeFetch(url) {
-  try {
-    const r = await fetch(url, { credentials: 'same-origin' });
-    if (r.ok) return await r.json();
-  } catch {}
-  return null;
+function analystRefresh() {
+  if (!window.htmx) return;
+  htmx.ajax('GET', '/ui/analyst/alerts', {target: '#priority-queue'});
+  htmx.ajax('GET', '/ui/analyst/cases', {target: '#my-cases'});
+  htmx.ajax('GET', '/ui/analyst/mttr', {target: '#kpi-mttr'});
+  htmx.ajax('GET', '/ui/analyst/watched', {target: '#kpi-watched'});
 }
 
-// ── Priority Queue ──────────────────────────────────
-function renderPriorityQueue(alerts) {
-  const el = document.getElementById('priority-queue');
-  if (!alerts || !alerts.length) {
-    el.innerHTML = '<div class="px-5 py-8 text-center text-[13px] text-slate-600">No alerts in the last 24 hours</div>';
-    return;
-  }
-  // Sort: critical > high > medium > low, then newest first
-  const sevOrder = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
-  alerts.sort((a, b) => {
-    const sa = sevOrder[(a.severity || 'low').toLowerCase()] ?? 4;
-    const sb = sevOrder[(b.severity || 'low').toLowerCase()] ?? 4;
-    if (sa !== sb) return sa - sb;
-    return new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
-  });
-
-  el.innerHTML = alerts.map(a => {
-    const host = a.host || '';
-    const user = a.user || '';
-    const ts = timeAgo(a.timestamp || a['@timestamp']);
-    return `<a href="/alerts" class="flex items-center gap-3 px-5 py-3 border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer">
-      <div class="shrink-0">${sevPill(a.severity)}</div>
-      <div class="flex-1 min-w-0 text-[13px] text-slate-300 truncate">${esc(truncate(a.rule_name || a.title || 'Untitled', 60))}</div>
-      <div class="hidden sm:block text-[11px] text-slate-600 font-mono w-28 truncate">${esc(host)}</div>
-      <div class="hidden md:block text-[11px] text-slate-600 font-mono w-24 truncate">${esc(user)}</div>
-      <div class="text-[11px] text-slate-600 font-mono w-16 text-right shrink-0">${ts}</div>
-    </a>`;
-  }).join('');
+function kbBack() {
+  const box = document.getElementById('kb-search');
+  if (box) box.value = '';
+  if (!window.htmx) return;
+  htmx.ajax('GET', '/ui/analyst/kb', {target: '#kb-content'});
 }
 
-// ── My Active Cases ─────────────────────────────────
-function renderMyCases(cases) {
-  const el = document.getElementById('my-cases');
-  if (!cases || !cases.length) {
-    el.innerHTML = '<div class="px-5 py-8 text-center text-[13px] text-slate-600">No open cases assigned to you</div>';
-    return;
-  }
-  el.innerHTML = cases.map(c => {
-    return `<a href="/cases?id=${c.id}" class="flex items-center gap-3 px-5 py-3 border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer">
-      <span class="text-[12px] font-mono text-ion-cyan shrink-0">${esc(c.case_number || '#' + c.id)}</span>
-      <div class="flex-1 min-w-0 text-[13px] text-slate-300 truncate">${esc(truncate(c.title, 50))}</div>
-      ${sevPill(c.severity)}
-      <span class="text-[11px] text-slate-600 font-mono">${c.alert_count || 0} alerts</span>
-      <span class="text-[11px] text-slate-600 font-mono w-16 text-right shrink-0">${timeAgo(c.updated_at)}</span>
-    </a>`;
-  }).join('');
-}
-
-// ── IOC Lookup ──────────────────────────────────────
-async function doIOCLookup() {
-  const input = document.getElementById('ioc-input');
-  const val = input.value.trim();
-  if (!val) return;
-  const el = document.getElementById('ioc-result');
-  el.className = 'mt-3';
-  el.innerHTML = '<div class="text-[12px] text-slate-500">Looking up...</div>';
-
-  try {
-    const r = await fetch('/api/opencti/enrich', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'same-origin',
-      body: JSON.stringify({ value: val }),
-    });
-    const data = await r.json();
-    if (data.error) {
-      el.innerHTML = '<div class="text-[12px] text-red-400">' + esc(data.error) + '</div>';
-    } else if (data.found === false) {
-      el.innerHTML = '<div class="text-[12px] text-slate-500">No threat intelligence found for this indicator.</div>';
-    } else {
-      let html = '<div class="space-y-2">';
-      if (data.score != null) {
-        const cls = data.score > 70 ? 'text-red-400' : data.score > 40 ? 'text-amber-400' : 'text-emerald-400';
-        html += `<div class="flex items-center gap-2"><span class="text-[11px] text-slate-500 uppercase tracking-wider">Risk</span><span class="text-[16px] font-mono font-semibold ${cls}">${data.score}</span></div>`;
-      }
-      if (data.labels && data.labels.length) {
-        html += `<div class="flex flex-wrap gap-1">${data.labels.map(l => `<span class="px-2 py-0.5 rounded text-[10px] bg-violet-500/15 text-violet-400">${esc(l)}</span>`).join('')}</div>`;
-      }
-      if (data.description) {
-        html += `<div class="text-[12px] text-slate-400 leading-relaxed">${esc(truncate(data.description, 200))}</div>`;
-      }
-      html += `<a href="/observables?search=${encodeURIComponent(val)}" class="inline-block text-[11px] text-ion-cyan hover:underline">View in Observables &rarr;</a>`;
-      html += '</div>';
-      el.innerHTML = html;
-    }
-  } catch (e) {
-    el.innerHTML = '<div class="text-[12px] text-red-400">Lookup failed: ' + esc(e.message) + '</div>';
-  }
-}
-
-// ── Shift Notes ─────────────────────────────────────
 (function initShiftNotes() {
   const ta = document.getElementById('shift-notes');
+  if (!ta) return;
   const today = new Date().toISOString().slice(0, 10);
   const key = 'ion_shift_notes_' + today;
   const saved = localStorage.getItem(key);
@@ -418,128 +261,18 @@ async function doIOCLookup() {
     saveTimer = setTimeout(() => {
       localStorage.setItem(key, ta.value);
       const badge = document.getElementById('notes-saved');
+      if (!badge) return;
       badge.classList.remove('hidden');
       setTimeout(() => badge.classList.add('hidden'), 1500);
     }, 400);
   });
 })();
 
-// ── KB Quick Search ─────────────────────────────────
-let _kbTimer = null;
-function debounceKBSearch() {
-  clearTimeout(_kbTimer);
-  _kbTimer = setTimeout(doKBSearch, 250);
-}
-
-// One row renderer for both search results and the recent list, so the two
-// halves of this panel cannot drift apart in look or in link shape.
-function _kbRow(a, sub) {
-  return `<a href="/documents#doc-${a.id}" class="flex items-start justify-between gap-3 px-4 py-3 hover:bg-white/5 transition-colors cursor-pointer">
-    <div class="min-w-0">
-      <div class="text-[13px] text-slate-300 truncate">${esc(a.name)}</div>
-      ${sub}
-    </div>
-    <span class="text-[11px] text-slate-600 shrink-0 mt-0.5">&rarr;</span>
-  </a>`;
-}
-
-async function doKBSearch() {
-  const q = document.getElementById('kb-search').value.trim();
-  const el = document.getElementById('kb-results');
-  const browse = document.getElementById('kb-browse');
-  if (!q || q.length < 2) {
-    el.classList.add('hidden');
-    el.replaceChildren();
-    if (browse) browse.classList.remove('hidden');   // clearing the box returns you to browsing
-    return;
-  }
-  if (browse) browse.classList.add('hidden');
-
-  const data = await safeFetch('/api/analyst/knowledge-base/search?q=' + encodeURIComponent(q) + '&limit=8');
-  if (!data || !data.results || !data.results.length) {
-    el.classList.remove('hidden');
-    el.innerHTML = '<div class="py-4 text-center text-[12px] text-slate-600">No articles found</div>';
-    return;
-  }
-  el.classList.remove('hidden');
-  el.innerHTML = data.results.slice(0, 8).map(a => {
-    const col = a.collection_name
-      ? `<span class="text-[10px] text-slate-600">${esc(a.collection_name)}</span>` : '';
-    // A content match needs to show WHY it matched, or the analyst opens a
-    // title that does not obviously contain what they typed.
-    const snip = (a.matched_in === 'content' && a.snippet)
-      ? `<div class="text-[11px] text-slate-500 mt-1 line-clamp-2">${esc(a.snippet)}</div>` : '';
-    return _kbRow(a, col + snip);
-  }).join('');
-}
-
-async function loadKBBrowse() {
-  const topics = document.getElementById('kb-topics');
-  const recent = document.getElementById('kb-recent');
-  if (!topics || !recent) return;
-
-  const data = await safeFetch('/api/analyst/knowledge-base?include_articles=false&recent=6');
-  if (!data || data.status === 'not_found') {
-    topics.innerHTML = '<span class="text-[12px] text-slate-600">Knowledge Base not configured</span>';
-    return;
-  }
-
-  // The library has ~55 topics. All of them as chips buries the rest of the
-  // workspace, so show the biggest handful and hand the rest to the library
-  // page — this panel is a way in, not a replacement for it.
-  const TOPIC_CHIPS = 12;
-  const cols = (data.collections || []).filter(c => c.article_count > 0);
-  cols.sort((a, b) => (b.article_count - a.article_count) || a.name.localeCompare(b.name));
-  const shown = cols.slice(0, TOPIC_CHIPS);
-  const hidden = cols.length - shown.length;
-
-  topics.innerHTML = (shown.map(c =>
-    `<button type="button" data-click-action="kbTopic" data-args='[${c.id}]'
-       class="text-[11px] px-2.5 py-1 rounded-md border border-white/10 bg-white/5 text-slate-400 hover:text-ion-cyan hover:border-ion-cyan/40 transition">
-       ${esc(c.name)} <span class="text-slate-600">${c.article_count}</span></button>`
-  ).join('') + (hidden > 0
-    ? `<a href="/documents" class="text-[11px] px-2.5 py-1 rounded-md border border-dashed border-white/10 text-slate-500 hover:text-ion-cyan hover:border-ion-cyan/40 transition">+${hidden} more</a>`
-    : '')) || '<span class="text-[12px] text-slate-600">No articles yet</span>';
-
-  recent.innerHTML = (data.recent || []).map(a =>
-    _kbRow(a, `<span class="text-[10px] text-slate-600">${esc(a.collection_name || '')}</span>`)
-  ).join('') || '<div class="py-3 text-[12px] text-slate-600">Nothing updated yet</div>';
-}
-
-// Clicking a topic LISTS that collection — it does not text-search for the
-// collection's name. "Windows & Active Directory" is a shelf label; no article
-// contains that phrase, so searching for it returns nothing. The analyst stays
-// on the workspace either way, which is the point of having the panel here.
-async function kbTopic(collectionId) {
-  const el = document.getElementById('kb-results');
-  const browse = document.getElementById('kb-browse');
-  const data = await safeFetch('/api/analyst/knowledge-base/search?collection_id='
-                               + encodeURIComponent(collectionId) + '&limit=12');
-  if (!data || !data.results || !data.results.length) {
-    return;   // leave the browse view up rather than showing an empty panel
-  }
-  if (browse) browse.classList.add('hidden');
-  el.classList.remove('hidden');
-  el.innerHTML =
-    `<div class="flex items-center justify-between gap-3 px-4 py-2">
-       <span class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">${esc(data.results[0].collection_name || 'Topic')}</span>
-       <button type="button" data-click-action="kbClearTopic" class="text-[11px] text-slate-500 hover:text-ion-cyan transition">Back</button>
-     </div>` +
-    data.results.map(a => _kbRow(a, '')).join('');
-}
-window.kbTopic = kbTopic;
-
-function kbClearTopic() {
-  const box = document.getElementById('kb-search');
-  if (box) box.value = '';
-  doKBSearch();   // empty query restores the browse view
-}
-window.kbClearTopic = kbClearTopic;
-
-// ── Init ────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  loadWorkspace();
-  loadKBBrowse();
+document.addEventListener('DOMContentLoaded', async () => {
+  const user = await getUserData();
+  if (!user) return;
+  const name = document.getElementById('greeting-name');
+  if (name) name.textContent = user.display_name || user.username;
 });
 </script>
 {% endblock %}
