@@ -84,7 +84,7 @@ import math
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import HTMLResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -99,7 +99,7 @@ from ion.web.ui._shared import (
     closure_short,
     parse_instant,
     plain,
-    templates,
+    render_view,
 )
 
 logger = logging.getLogger(__name__)
@@ -166,35 +166,32 @@ DONUT_CIRCUMFERENCE = 2 * math.pi * DONUT_RADIUS
 
 #: Segment order, label and colour for the two fixed-key donuts, from the
 #: arrays the page passed to renderDonutChart.
-SEVERITY_SEGMENTS: tuple[tuple[str, str, str], ...] = (
-    ("critical", "Critical", "#ef4444"),
-    ("high", "High", "#f59e0b"),
-    ("medium", "Medium", "#3b82f6"),
-    ("low", "Low", "#6b7280"),
+SEVERITY_SEGMENTS: tuple[tuple[str, str], ...] = (
+    ("critical", "Critical"),
+    ("high", "High"),
+    ("medium", "Medium"),
+    ("low", "Low"),
 )
-STATUS_SEGMENTS: tuple[tuple[str, str, str], ...] = (
-    ("open", "Open", "#3b82f6"),
-    ("acknowledged", "Acknowledged", "#f59e0b"),
-    ("closed", "Closed", "#6b7280"),
+STATUS_SEGMENTS: tuple[tuple[str, str], ...] = (
+    ("open", "Open"),
+    ("acknowledged", "Acknowledged"),
+    ("closed", "Closed"),
 )
 
-#: Closure reason to arc colour, from `closureReasonColors`. A reason this
-#: map does not know gets the fallback, which is what the page did.
-CLOSURE_COLOURS: dict[str, str] = {
-    "true_positive": "#ef4444",
-    "false_positive": "#9ca3af",
-    "benign_true_positive": "#f59e0b",
-    "duplicate": "#8b5cf6",
-    "insufficient_data": "#6b7280",
-    "not_applicable": "#64748b",
-}
-CLOSURE_FALLBACK_COLOUR = "#6b7280"
-
-#: Workload bar colours, cycled by row, from `barColors`.
-BAR_COLOURS: tuple[str, ...] = (
-    "#3b82f6", "#8b5cf6", "#06b6d4", "#10b981",
-    "#f59e0b", "#ef4444", "#ec4899", "#f97316",
+#: The closure reasons the summary donut paints. A reason not in here is
+#: drawn in the fallback, which is what the page did. The colours are in
+#: static/css/cases-page.css, keyed by these names: which colour means
+#: "true positive" is the stylesheet's answer, and a model carrying it
+#: makes every reader of /ui/cases/summary inherit ION's palette.
+CLOSURE_KEYS: tuple[str, ...] = (
+    "true_positive", "false_positive", "benign_true_positive",
+    "duplicate", "insufficient_data", "not_applicable",
 )
+CLOSURE_FALLBACK_KEY = "other"
+
+#: How many workload bar colours the stylesheet cycles through. The row's
+#: index modulo this is the class it gets.
+BAR_COLOUR_COUNT = 8
 
 #: Severities the "critical/high active" chip counts, lower-cased.
 URGENT_SEVERITIES = ("critical", "high")
@@ -247,23 +244,23 @@ def donut(segments: Optional[list[tuple[str, Any, str]]]) -> Optional[dict]:
         return None
     counted: list[tuple[str, int, str]] = []
     unreadable: list[str] = []
-    for label, value, colour in segments:
+    for label, value, key in segments:
         count = _count(value)
         if count is None:
             unreadable.append(label)
         else:
-            counted.append((label, count, colour))
+            counted.append((label, count, key))
     total = sum(v for _, v, _ in counted)
     arcs: list[dict] = []
     legend: list[dict] = []
     offset = 0.0
-    for label, value, colour in counted:
+    for label, value, key in counted:
         if value == 0:
             continue
         share = value / total
         dash = DONUT_CIRCUMFERENCE * share
         arcs.append({
-            "colour": colour,
+            "key": key,
             "dash": round(dash, 2),
             "gap": round(DONUT_CIRCUMFERENCE - dash, 2),
             "offset": round(-offset, 2),
@@ -272,7 +269,7 @@ def donut(segments: Optional[list[tuple[str, Any, str]]]) -> Optional[dict]:
             "label": label,
             "value": value,
             "pct": round(share * 100),
-            "colour": colour,
+            "key": key,
         })
         offset += dash
     return {
@@ -296,8 +293,8 @@ def severity_donut(metrics: Any) -> Optional[dict]:
     if not isinstance(by_severity, dict):
         return None
     return donut([
-        (label, by_severity.get(key, 0), colour)
-        for key, label, colour in SEVERITY_SEGMENTS
+        (label, by_severity.get(key, 0), key)
+        for key, label in SEVERITY_SEGMENTS
     ])
 
 
@@ -314,8 +311,8 @@ def status_donut(facets: Any) -> Optional[dict]:
     if not isinstance(by_status, dict):
         return None
     return donut([
-        (label, by_status.get(key, 0), colour)
-        for key, label, colour in STATUS_SEGMENTS
+        (label, by_status.get(key, 0), key)
+        for key, label in STATUS_SEGMENTS
     ])
 
 
@@ -338,7 +335,8 @@ def closure_donut(closed: Any) -> Optional[dict]:
         key = str(plain(reason))
         label = closure_label(key) if key != "unspecified" else "No reason recorded"
         segments.append((
-            label or key, count, CLOSURE_COLOURS.get(key, CLOSURE_FALLBACK_COLOUR),
+            label or key, count,
+            key if key in CLOSURE_KEYS else CLOSURE_FALLBACK_KEY,
         ))
     return donut(segments)
 
@@ -365,7 +363,7 @@ def workload_bars(metrics: Any) -> Optional[list[dict]]:
             "name": row.get("display_name") or row.get("username") or "Unknown",
             "open_count": count,
             "pct": None if count is None else round(count / peak * 100, 1),
-            "colour": BAR_COLOURS[index % len(BAR_COLOURS)],
+            "colour_index": index % BAR_COLOUR_COUNT,
         })
     return bars
 
@@ -680,7 +678,7 @@ def cases_summary_fragment(
     request: Request,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
-) -> HTMLResponse:
+) -> Response:
     """The eight tiles, with the analytics panel and retry control out of band.
 
     Synchronous on purpose: team_metrics_payload is eight-odd queries and
@@ -691,9 +689,5 @@ def cases_summary_fragment(
     can_read_metrics = bool(
         current_user and current_user.has_permission(METRICS_PERMISSION)
     )
-    return templates.TemplateResponse(
-        request=request,
-        name=FRAGMENT,
-        context=summary_context(session, can_read_metrics),
-        status_code=200,
-    )
+    return render_view(request, FRAGMENT,
+                       summary_context(session, can_read_metrics))

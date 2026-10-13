@@ -433,22 +433,31 @@ def test_a_donut_draws_one_arc_per_non_zero_segment(session):
     session.commit()
     html = _both(session).text
     status_svg = html.split("Status Breakdown", 1)[1].split("</svg>", 1)[0]
-    arcs = re.findall(r'class="donut-arc"', status_svg)
+    arcs = re.findall(r'class="donut-arc case-seg-(\w+)"', status_svg)
     assert len(arcs) == 2, "open and closed drawn, acknowledged (zero) skipped"
+    # the class names the segment, so a reader can tell which arc is which
+    assert set(arcs) == {"open", "closed"}, arcs
     # Two equal halves of the circumference 2*pi*45 = 282.74.
     assert 'stroke-dasharray="141.37 141.37"' in status_svg
     assert 'stroke-dashoffset="-141.37"' in status_svg
-    assert 'stroke="#3b82f6"' in status_svg
-    assert 'stroke="#6b7280"' in status_svg
+    # Each arc names its segment; cases-page.css holds the two colours.
+    assert 'case-seg-open' in status_svg
+    assert 'case-seg-closed' in status_svg
+    assert "stroke=\"#" not in status_svg, (
+        "the colour belongs to the stylesheet, not the markup")
 
 
-def test_a_legend_dot_colour_travels_as_data_ion_style_not_an_inline_style(session):
+def test_a_legend_dot_names_its_segment_rather_than_a_colour(session):
     """style-src-attr 'none' blocks a style attribute; the page used
     data-ion-style for exactly this and ion-dynamic-styles.js applies it."""
     _case(session, "L-1")
     session.commit()
     html = _both(session).text
-    assert 'data-ion-style="background:#3b82f6"' in html
+    # The dot carried the colour in a data-ion-style attribute, which put
+    # the palette in the view model. It names the segment now and
+    # cases-page.css paints it, so a theme can reach it.
+    assert 'class="donut-legend-dot case-dot-open"' in html
+    assert "#3b82f6" not in html, "the colour belongs to the stylesheet"
     assert ' style="' not in html
 
 
@@ -475,8 +484,12 @@ def test_workload_bars_are_shares_of_the_busiest_assignee(session, monkeypatch):
     monkeypatch.setattr(api, "team_metrics_payload", payload)
     html = _both(session).text
     assert 'title="Ann"' in html
-    assert 'data-ion-style="width:100.0%;background:#3b82f6"' in html
-    assert 'data-ion-style="width:25.0%;background:#8b5cf6"' in html
+    # The width is genuinely per row and stays an attribute. The colour
+    # is cycled by row index and is the stylesheet's.
+    assert 'data-ion-style="width:100.0%"' in html
+    assert "case-bar-0" in html
+    assert 'data-ion-style="width:25.0%"' in html
+    assert 'case-bar-1' in html
     assert "hbar-value\">4<" in html.replace(" ", "").replace('hbar-value">', 'hbar-value">')
 
 

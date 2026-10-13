@@ -55,7 +55,7 @@
 <svg width="{{ donut_size }}" height="{{ donut_size }}" viewBox="0 0 {{ donut_size }} {{ donut_size }}" role="img" aria-label="{{ d.total }} {{ centre }}">
   <circle cx="{{ donut_size // 2 }}" cy="{{ donut_size // 2 }}" r="{{ donut_radius }}" fill="none" stroke="rgba(99,110,123,.15)" stroke-width="{{ donut_stroke }}"/>
   {%- for arc in d.arcs %}
-  <circle cx="{{ donut_size // 2 }}" cy="{{ donut_size // 2 }}" r="{{ donut_radius }}" fill="none" stroke="{{ arc.colour }}" stroke-width="{{ donut_stroke }}" stroke-dasharray="{{ arc.dash }} {{ arc.gap }}" stroke-dashoffset="{{ arc.offset }}" transform="rotate(-90 {{ donut_size // 2 }} {{ donut_size // 2 }})" class="donut-arc"/>
+  <circle cx="{{ donut_size // 2 }}" cy="{{ donut_size // 2 }}" r="{{ donut_radius }}" fill="none" stroke-width="{{ donut_stroke }}" stroke-dasharray="{{ arc.dash }} {{ arc.gap }}" stroke-dashoffset="{{ arc.offset }}" transform="rotate(-90 {{ donut_size // 2 }} {{ donut_size // 2 }})" class="donut-arc case-seg-{{ arc.key }}"/>
   {%- endfor %}
   <text x="{{ donut_size // 2 }}" y="{{ donut_size // 2 - 2 }}" text-anchor="middle" dominant-baseline="central" class="donut-center-text">{{ d.total }}</text>
   <text x="{{ donut_size // 2 }}" y="{{ donut_size // 2 + 12 }}" text-anchor="middle" dominant-baseline="central" class="donut-center-sub">{{ centre }}</text>
@@ -63,7 +63,7 @@
 <div class="donut-legend-list">
   {%- for item in d.legend %}
   <div class="donut-legend-item">
-    <span class="donut-legend-dot" data-ion-style="background:{{ item.colour }}"></span>
+    <span class="donut-legend-dot case-dot-{{ item.key }}"></span>
     <span class="donut-legend-label">{{ item.label }}</span>
     <span class="donut-legend-val">{{ item.value }} <span class="font-normal text-[var(--text-secondary)] text-[0.65rem]">{{ item.pct }}%</span></span>
   </div>
@@ -166,7 +166,7 @@
       <div class="hbar-row">
         <span class="hbar-label" title="{{ bar.name }}">{{ bar.name }}</span>
         <div class="hbar-track">
-          {%- if bar.pct is not none %}<div class="hbar-fill" data-ion-style="width:{{ bar.pct }}%;background:{{ bar.colour }}"></div>{% endif %}
+          {%- if bar.pct is not none %}<div class="hbar-fill case-bar-{{ bar.colour_index }}" data-ion-style="width:{{ bar.pct }}%"></div>{% endif %}
         </div>
         <span class="hbar-value">{% if bar.open_count is not none %}{{ bar.open_count }}{% else %}<span title="count not reported">?</span>{% endif %}</span>
       </div>

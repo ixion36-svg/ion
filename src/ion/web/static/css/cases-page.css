@@ -1,0 +1,59 @@
+/* /cases, the page's own rules.
+ *
+ * These colours were tuples and a dict in ui/cases.py, copied into every
+ * arc, legend dot and workload bar of the view model, so the Python
+ * decided what "critical" looks like and /ui/cases/summary published
+ * ION's palette as part of its contract. The values are unchanged: the
+ * port is meant to be invisible. What changed is where the decision is.
+ *
+ * The page still carries an inline <style> block. It belongs here, and
+ * moving it is what the styled column is waiting for.
+ */
+
+/* Severity donut */
+.case-seg-critical { stroke: #ef4444; }
+.case-seg-high     { stroke: #f59e0b; }
+.case-seg-medium   { stroke: #3b82f6; }
+.case-seg-low      { stroke: #6b7280; }
+
+/* Status donut */
+.case-seg-open         { stroke: #3b82f6; }
+.case-seg-acknowledged { stroke: #f59e0b; }
+.case-seg-closed       { stroke: #6b7280; }
+
+/* Closure-reason donut. `other` is the fallback a reason the map does not
+   know is drawn in, which is what the page did. */
+.case-seg-true_positive        { stroke: #ef4444; }
+.case-seg-false_positive       { stroke: #9ca3af; }
+.case-seg-benign_true_positive { stroke: #f59e0b; }
+.case-seg-duplicate            { stroke: #8b5cf6; }
+.case-seg-insufficient_data    { stroke: #6b7280; }
+.case-seg-not_applicable       { stroke: #64748b; }
+.case-seg-other                { stroke: #6b7280; }
+
+/* The legend dot beside each arc, same colours as a background. */
+.case-dot-critical { background: #ef4444; }
+.case-dot-high     { background: #f59e0b; }
+.case-dot-medium   { background: #3b82f6; }
+.case-dot-low      { background: #6b7280; }
+.case-dot-open         { background: #3b82f6; }
+.case-dot-acknowledged { background: #f59e0b; }
+.case-dot-closed       { background: #6b7280; }
+.case-dot-true_positive        { background: #ef4444; }
+.case-dot-false_positive       { background: #9ca3af; }
+.case-dot-benign_true_positive { background: #f59e0b; }
+.case-dot-duplicate            { background: #8b5cf6; }
+.case-dot-insufficient_data    { background: #6b7280; }
+.case-dot-not_applicable       { background: #64748b; }
+.case-dot-other                { background: #6b7280; }
+
+/* Workload bars, cycled by row index. BAR_COLOUR_COUNT in ui/cases.py is
+   how many there are, and the two have to agree. */
+.case-bar-0 { background: #3b82f6; }
+.case-bar-1 { background: #8b5cf6; }
+.case-bar-2 { background: #06b6d4; }
+.case-bar-3 { background: #10b981; }
+.case-bar-4 { background: #f59e0b; }
+.case-bar-5 { background: #ef4444; }
+.case-bar-6 { background: #ec4899; }
+.case-bar-7 { background: #f97316; }
