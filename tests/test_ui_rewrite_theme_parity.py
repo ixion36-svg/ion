@@ -438,8 +438,27 @@ def test_ion_modals_are_not_hidden_by_daisyuis_mechanism():
     joined = "\n".join(src)
     # Comments mentioning modal-open are explanations of this very bridge.
     code = re.sub(r"<!--.*?-->|/\*.*?\*/", "", joined, flags=re.S)
-    for api in ("<dialog", "modal-toggle", ".showModal("):
-        assert api not in code, (
-            f"{api} is now used, so daisyUI's modal mechanism is live and the "
-            "blanket .modal bridge in the theme may force it open"
-        )
+    # The bridge is unconditional: `.modal { visibility: visible }` forces
+    # every element carrying daisyUI's class to show. What breaks is an
+    # element that has that class AND is driven by the native dialog API,
+    # because it would never hide again.
+    #
+    # Banning <dialog> outright was the first guard and the app outgrew it.
+    # Five <dialog> elements exist now, in investigation_memory, templates
+    # and shift_handover, and not one carries `modal`: they are native
+    # dialogs styled with rounded-box, which the bridge never touches. This
+    # asserts the invariant rather than its proxy.
+    offenders = []
+    for m in re.finditer(r"<dialog\b[^>]*>", code):
+        tag = m.group(0)
+        cls = re.search(r'class="([^"]*)"', tag)
+        if cls and "modal" in cls.group(1).split():
+            offenders.append(tag[:90])
+    assert not offenders, (
+        "a <dialog> carries daisyUI's `modal` class, so the blanket bridge "
+        "forces it visible and showModal/close cannot hide it: "
+        + "; ".join(offenders))
+
+    assert "modal-toggle" not in code, (
+        "modal-toggle is daisyUI's checkbox mechanism; the bridge overrides "
+        "the hidden half of it and the modal would never close")

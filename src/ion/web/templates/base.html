@@ -255,7 +255,7 @@
     .tw-drop.is-open > .tw-drop-menu { display: block; }
     .tw-drop-item { display: block; padding: 8px 12px; border-radius: 6px; color: rgb(148 163 184); font-size: 13px; transition: background .18s, color .18s; }
     .tw-drop-item:hover { color: #fff; background: rgba(255,255,255,0.05); }
-    .tw-drop-item.is-active { color: #6de4ff; background: rgba(109, 228, 255, 0.08); }
+    .tw-drop-item.is-active { color: var(--primary); background: color-mix(in srgb, var(--primary) 8%, transparent); }
 
     /* The header in light mode.
        Every colour above was picked against a near-black bar, and this
@@ -396,7 +396,7 @@
     /* ── Tabs ────────────────────────────────────── */
     .np-tabs{display:flex;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0}
     .np-tab{flex:1;padding:14px 10px;background:transparent;border:none;color:#64748b;cursor:pointer;font-family:inherit;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;transition:color .15s ease,border-color .15s ease;border-bottom:2px solid transparent;margin-bottom:-1px}
-    .np-tab.active{color:var(--color-ion-cyan);border-bottom-color:#6de4ff}
+    .np-tab.active{color:var(--primary);border-bottom-color:var(--primary)}
     .np-tab:hover{color:var(--text-primary)}
 
     /* ── Content panels ─────────────────────────── */
@@ -407,10 +407,10 @@
     .np-list-header,.np-clip-header{display:flex;gap:8px;padding:14px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.05)}
     .np-search{flex:1;height:2.125rem;padding:0 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:.5rem;color:#fff;font-family:inherit;font-size:.8125rem;transition:border-color .15s ease,background .15s ease}
     .np-search::placeholder{color:#475569}
-    .np-search:focus{outline:none;border-color:rgba(109,228,255,.5);background:rgba(255,255,255,.06);box-shadow:0 0 0 2px rgba(109,228,255,.1)}
+    .np-search:focus{outline:none;border-color:color-mix(in srgb, var(--primary) 50%, transparent);background:rgba(255,255,255,.06);box-shadow:0 0 0 2px color-mix(in srgb, var(--primary) 10%, transparent)}
 
     /* ── Buttons ─────────────────────────────────── */
-    .np-btn-primary{display:inline-flex;align-items:center;gap:4px;height:2.125rem;padding:0 14px;background:#6de4ff;color:#07080c;border:none;border-radius:.5rem;cursor:pointer;font-family:inherit;font-size:.75rem;font-weight:600;white-space:nowrap;transition:filter .15s ease;box-shadow:0 0 0 1px rgba(109,228,255,.25),0 0 16px -6px rgba(109,228,255,.8)}
+    .np-btn-primary{display:inline-flex;align-items:center;gap:4px;height:2.125rem;padding:0 14px;background:var(--primary);color:#07080c;border:none;border-radius:.5rem;cursor:pointer;font-family:inherit;font-size:.75rem;font-weight:600;white-space:nowrap;transition:filter .15s ease;box-shadow:0 0 0 1px color-mix(in srgb, var(--primary) 25%, transparent),0 0 16px -6px color-mix(in srgb, var(--primary) 80%, transparent)}
     .np-btn-primary:hover{filter:brightness(1.08)}
     .np-btn-sm{display:inline-flex;align-items:center;gap:4px;padding:6px 10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:.375rem;color:#94a3b8;cursor:pointer;font-family:inherit;font-size:.75rem;transition:background .15s ease,color .15s ease}
     .np-btn-sm:hover{color:#fff;background:rgba(255,255,255,.08)}
@@ -423,7 +423,7 @@
     .np-note-list{flex:1;overflow-y:auto;padding:8px}
     .np-note-item{padding:12px;border-radius:.5rem;cursor:pointer;margin-bottom:2px;transition:background .15s ease;border:1px solid transparent}
     .np-note-item:hover{background:rgba(255,255,255,.03)}
-    .np-note-item.active{background:rgba(109,228,255,.06);border-color:rgba(109,228,255,.2)}
+    .np-note-item.active{background:color-mix(in srgb, var(--primary) 6%, transparent);border-color:color-mix(in srgb, var(--primary) 20%, transparent)}
     .np-note-item-header{display:flex;align-items:center;gap:6px}
     .np-note-title{font-size:.8125rem;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .np-pin-icon{font-size:.7rem;color:var(--warning)}
@@ -437,7 +437,7 @@
     .np-editor-toolbar{display:flex;align-items:center;gap:6px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.05);flex-shrink:0}
     .np-save-status{flex:1;text-align:right;font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#64748b}
     .np-title-input{width:100%;padding:14px;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.05);color:#fff;font-family:'Geist',ui-sans-serif,system-ui,sans-serif;font-size:1.125rem;font-weight:600;letter-spacing:-.01em;flex-shrink:0}
-    .np-title-input:focus{outline:none;border-bottom-color:rgba(109,228,255,.5)}
+    .np-title-input:focus{outline:none;border-bottom-color:color-mix(in srgb, var(--primary) 50%, transparent)}
     .np-title-input::placeholder{color:#475569}
 
     /* Quill overrides */
@@ -453,7 +453,7 @@
     .np-quill-wrap .ql-snow .ql-picker-item{color:var(--text-primary)}
     .np-quill-wrap .ql-snow button:hover .ql-stroke,
     .np-quill-wrap .ql-snow .ql-picker-label:hover{color:var(--color-ion-cyan)}
-    .np-quill-wrap .ql-snow button:hover .ql-stroke{stroke:#6de4ff}
+    .np-quill-wrap .ql-snow button:hover .ql-stroke{stroke:var(--primary)}
 
     /* ── Clipboard ───────────────────────────────── */
     .np-clip-list{flex:1;overflow-y:auto;padding:8px}
