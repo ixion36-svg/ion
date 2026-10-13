@@ -836,6 +836,19 @@ def _count(value: Any) -> Optional[int]:
     return value
 
 
+def _number(value: Any) -> Optional[float]:
+    """A real number, or None. Same bool rule as `_count`: True is an int
+    in Python and a payload carrying a flag where a figure was expected
+    must not render as 1.
+
+    This duplicates the one in ui/cases.py. Two pages need it now, so by
+    this package's own rule the pair belongs in _shared; that lift touches
+    two committed modules and is left for whoever needs it third.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return value
+
 def execution_progress(execution: dict) -> dict:
     """completed, total and pct for an execution, computed the way
     get_case_playbook_executions computes them: a step is done when its
@@ -1281,6 +1294,9 @@ QUEUE_FRAGMENT = "_fragments/alerts_queue.html"
 
 #: Stage 6, the analytics drawer.
 ANALYTICS_FRAGMENT = "_fragments/alerts_analytics.html"
+
+#: Stage 7, the drawer's systems tab.
+SYSTEMS_FRAGMENT = "_fragments/alerts_systems.html"
 
 #: What GET /api/elasticsearch/alerts and POST
 #: /api/elasticsearch/alerts-triage/batch carry.
@@ -2672,4 +2688,196 @@ async def alerts_analytics_fragment(
             "trend_h": TREND_H,
         },
         status_code=200,
+    )
+
+
+# ---------------------------------------------------------------------------
+# The analytics drawer's systems tab
+# ---------------------------------------------------------------------------
+#
+# Stage 7. loadAdSystems fetched GET /api/analytics/system-overview and
+# renderAdSystems plus buildAdSysCard assembled the cards.
+#
+# What they did, measured against the tree before this stage:
+#
+#   * The fetch sent `Authorization: Bearer ${localStorage.getItem('token')}`.
+#     Nothing in this codebase ever calls localStorage.setItem('token', ...),
+#     and this was its only reader, so the header was always the string
+#     "Bearer null". It worked anyway, because get_session_token tries the
+#     ion_session cookie first and only falls back to the header. Had the
+#     precedence been the other way round the systems tab would have
+#     answered 401 for every user since it was written. The fragment sends
+#     no header at all.
+#
+#   * `data.total_alerts || 0`, `total_systems || 0`, `mapped_systems || 0`
+#     and `avg_tide_coverage || 0` turned a figure the payload did not carry
+#     into a measured zero, in the four cards above the grid.
+#
+#   * `t.coverage_pct || 0` did the same to TIDE coverage, where it matters
+#     most: a system with no coverage figure reported and a system measured
+#     at nought percent are the same number on screen and opposite findings.
+#     Nought percent is also the one that should be read as urgent, and the
+#     colour band made it red either way, so the urgency was asserted for a
+#     system nobody had measured.
+#
+#   * `data.systems || []` rendered "No systems found. Connect Elasticsearch
+#     to see system data." So a payload that carried no system list at all,
+#     which is what a refusal looks like, advised the reader to connect
+#     Elasticsearch.
+#
+#   * The sparkline drew only when `tl.length > 1`, so a system with one
+#     bucket of history and a system with none drew the same nothing. And
+#     `Math.max(1, ...)` meant an all-zero timeline drew a flat line along
+#     the bottom rather than saying no alerts landed in the window.
+
+#: The TIDE coverage bands buildAdSysCard used, with their CSS variables.
+TIDE_GOOD, TIDE_FAIR = 70, 40
+
+#: The sparkline's box, from the page.
+SYS_SPARK_W, SYS_SPARK_H = 320, 32
+
+#: The severity pills, in the order the page emitted them.
+SYS_SEV_PILLS = (("critical", "crit", "crit"), ("high", "high", "high"),
+                 ("medium", "med", "med"), ("low", "low", "low"))
+
+
+def tide_band(pct: Optional[float]) -> Optional[str]:
+    """The colour variable for a coverage figure, or None when there is no
+    figure. The page banded a missing figure as nought and painted it the
+    danger colour, which asserts a finding about a system nobody measured."""
+    if pct is None:
+        return None
+    if pct >= TIDE_GOOD:
+        return "var(--success)"
+    if pct >= TIDE_FAIR:
+        return "var(--warning)"
+    return "var(--danger)"
+
+
+def sys_spark(timeline: Any) -> Optional[dict]:
+    """The sparkline polyline for one system's timeline, or None when there
+    is no timeline to draw.
+
+    Three outcomes, where the page had one. A timeline of one bucket is
+    drawn as a single point rather than skipped, because a system with one
+    hour of history is not a system with none. A timeline whose every bucket
+    is zero reports itself as empty rather than drawing a flat line along
+    the bottom, which `Math.max(1, ...)` produced and which reads as a real
+    series that happens to be low.
+    """
+    if not isinstance(timeline, list) or not timeline:
+        return None
+    counts = []
+    for t in timeline:
+        value = _count(t.get("count")) if isinstance(t, dict) else None
+        counts.append(value if value is not None else 0)
+    peak = max(counts)
+    if peak == 0:
+        return {"points": None, "flat": True, "w": SYS_SPARK_W, "h": SYS_SPARK_H}
+    step = SYS_SPARK_W / (len(counts) - 1) if len(counts) > 1 else 0
+    points = " ".join(
+        f"{i * step:.1f},{SYS_SPARK_H - c / peak * (SYS_SPARK_H - 4) - 2:.1f}"
+        for i, c in enumerate(counts)
+    )
+    if len(counts) == 1:
+        # One bucket is a point, not a line. A polyline of one pair draws
+        # nothing, so it is given a second identical pair.
+        points = f"{points} {SYS_SPARK_W:.1f},{points.split(',')[1]}"
+    return {"points": points, "flat": False, "w": SYS_SPARK_W, "h": SYS_SPARK_H}
+
+
+def sys_card(row: Any) -> Optional[dict]:
+    """One system card's figures, or None for a row that is not a mapping."""
+    if not isinstance(row, dict):
+        return None
+    name = str(row.get("system") or "unknown")
+    severity = row.get("severity") if isinstance(row.get("severity"), dict) else {}
+    pills = []
+    for key, label, cls in SYS_SEV_PILLS:
+        count = _count(severity.get(key))
+        # Truthiness on the count, as the page had it: a severity measured at
+        # zero is not a pill saying "0 crit".
+        if count:
+            pills.append({"count": count, "label": label, "cls": cls})
+    tide = row.get("tide") if isinstance(row.get("tide"), dict) else None
+    coverage = _number(tide.get("coverage_pct")) if tide else None
+    return {
+        "name": name,
+        "initials": name[:2].upper(),
+        "mapped": row.get("mapped") is True,
+        "alert_count": _count(row.get("alert_count")),
+        "pills": pills,
+        "spark": sys_spark(row.get("timeline")),
+        "tide": {
+            "coverage_pct": coverage,
+            "band": tide_band(coverage),
+            "applied_rules": _count(tide.get("applied_rules")),
+            "total_rules": _count(tide.get("total_rules")),
+            "enabled_rules": _count(tide.get("enabled_rules")),
+            "disabled_rules": _count(tide.get("disabled_rules")),
+        } if tide else None,
+    }
+
+
+def sys_overview(payload: Any) -> dict:
+    """The systems tab's view, as failed or as the four figures plus the
+    cards.
+
+    `rows` is None when the payload carried no system list, so the grid can
+    say the read did not answer rather than advising the reader to connect
+    Elasticsearch, which is what "No systems found" did for a refusal.
+    """
+    if not isinstance(payload, dict):
+        return {"failed": True, "rows": None, "total_alerts": None,
+                "total_systems": None, "mapped_systems": None,
+                "avg_coverage": None}
+    rows = _rows(payload, "systems")
+    cards = [c for c in (sys_card(r) for r in rows) if c] if rows is not None else None
+    if cards is not None:
+        # Mapped first, then by alert count, as the page sorted them. A card
+        # with no count sorts last rather than as a zero.
+        cards.sort(key=lambda c: (not c["mapped"],
+                                  -(c["alert_count"] if c["alert_count"] is not None else -1)))
+    return {
+        "failed": False,
+        "rows": cards,
+        "total_alerts": _count(payload.get("total_alerts")),
+        "total_systems": _count(payload.get("total_systems")),
+        "mapped_systems": _count(payload.get("mapped_systems")),
+        "avg_coverage": _number(payload.get("avg_tide_coverage")),
+    }
+
+
+@router.get(
+    "/alerts/systems",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(QUEUE_PERMISSION))],
+)
+async def alerts_systems_fragment(
+    request: Request,
+    hours: int = Query(168),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    """The systems tab's grid, with the four figures above it out of band.
+
+    Calls get_system_overview, the handler GET /api/analytics/system-overview
+    runs, with explicit arguments. No Authorization header is constructed:
+    the fragment is already authenticated as the viewer, which is the whole
+    reason the page's hand-built one never mattered.
+    """
+    from ion.web.analytics_api import get_system_overview
+
+    try:
+        payload = await get_system_overview(
+            hours=hours, current_user=current_user, session=session)
+        view = sys_overview(payload)
+    except Exception:
+        logger.exception("Alert systems fragment could not read the overview")
+        view = {"failed": True, "rows": None, "total_alerts": None,
+                "total_systems": None, "mapped_systems": None,
+                "avg_coverage": None}
+    return templates.TemplateResponse(
+        request=request, name=SYSTEMS_FRAGMENT,
+        context={"hours": hours, **view}, status_code=200,
     )

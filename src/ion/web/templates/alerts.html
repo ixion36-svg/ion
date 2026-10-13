@@ -234,7 +234,11 @@
                 <option value="720">30 days</option>
             </select>
         </div>
-        <div id="ad-sys-grid" class="ad-sys-grid">
+        <div id="ad-sys-grid" class="ad-sys-grid"
+             hx-get="/ui/alerts/systems"
+             hx-trigger="alerts-systems from:body"
+             hx-include="#ad-sys-range"
+             hx-swap="innerHTML"></div>
             <div class="ad-sys-loading">Loading system analytics...</div>
         </div>
     </div>
@@ -3782,118 +3786,21 @@ async function loadTideMitreCoverage() {
     if (_adActiveTab === 'mitre') renderMitreHeatmap();
 }
 
-async function loadAdSystems() {
-    const grid = document.getElementById('ad-sys-grid');
-    const hours = document.getElementById('ad-sys-range').value;
-    grid.innerHTML = '<div class="ad-sys-loading">Loading system analytics...</div>';
-    _adSystemsLoaded = false;
-    try {
-        const resp = await fetch(`/api/analytics/system-overview?hours=${hours}`, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data = await resp.json();
-        renderAdSystems(data);
-        _adSystemsLoaded = true;
-    } catch (e) {
-        grid.innerHTML = `<div class="ad-sys-loading text-[var(--danger)]">Failed to load: ${escapeHtml(e.message)}</div>`;
-    }
+function loadAdSystems() {
+    // The grid and the four figures above it come from /ui/alerts/systems,
+    // which carries the range select through hx-include. Dispatching rather
+    // than building a URL here keeps one definition of the window, the same
+    // way renderAnalytics dispatches alerts-analytics.
+    //
+    // The old fetch sent `Authorization: Bearer ${localStorage.getItem('token')}`
+    // and nothing in this codebase ever set that key, so the header was the
+    // literal string "Bearer null". It worked only because get_session_token
+    // reads the ion_session cookie before it looks at the header.
+    _adSystemsLoaded = true;
+    document.body.dispatchEvent(new CustomEvent('alerts-systems'));
 }
 
-function renderAdSystems(data) {
-    // Stats
-    document.getElementById('ad-sys-total').textContent = (data.total_alerts || 0).toLocaleString();
-    document.getElementById('ad-sys-count').textContent = data.total_systems || 0;
-    document.getElementById('ad-sys-mapped').textContent = data.mapped_systems || 0;
-    document.getElementById('ad-sys-coverage').textContent = (data.avg_tide_coverage || 0) + '%';
 
-    const grid = document.getElementById('ad-sys-grid');
-    const systems = data.systems || [];
-    if (systems.length === 0) {
-        grid.innerHTML = '<div class="ad-sys-loading">No systems found. Connect Elasticsearch to see system data.</div>';
-        return;
-    }
-
-    // Sort: mapped first, then by alert_count desc
-    systems.sort((a, b) => {
-        if (a.mapped !== b.mapped) return a.mapped ? -1 : 1;
-        return (b.alert_count || 0) - (a.alert_count || 0);
-    });
-
-    grid.innerHTML = systems.map(sys => buildAdSysCard(sys)).join('');
-}
-
-function buildAdSysCard(sys) {
-    const ns = sys.system || 'unknown';
-    const initials = ns.slice(0, 2).toUpperCase();
-    const isMapped = sys.mapped;
-    const sev = sys.severity || {};
-    const alerts = sys.alert_count || 0;
-
-    // Severity pills
-    let sevHtml = '';
-    if (sev.critical) sevHtml += `<span class="ad-sys-sev-pill crit">${sev.critical} crit</span>`;
-    if (sev.high) sevHtml += `<span class="ad-sys-sev-pill high">${sev.high} high</span>`;
-    if (sev.medium) sevHtml += `<span class="ad-sys-sev-pill med">${sev.medium} med</span>`;
-    if (sev.low) sevHtml += `<span class="ad-sys-sev-pill low">${sev.low} low</span>`;
-    if (!sevHtml) sevHtml = '<span class="text-xs text-[var(--text-muted)]">No alerts</span>';
-
-    // Sparkline
-    let sparkHtml = '';
-    const tl = sys.timeline || [];
-    if (tl.length > 1) {
-        const maxTl = Math.max(1, ...tl.map(t => t.count || 0));
-        const w = 320, h = 32;
-        const step = w / (tl.length - 1);
-        let pts = tl.map((t, i) => `${(i * step).toFixed(1)},${(h - (t.count || 0) / maxTl * (h - 4) - 2).toFixed(1)}`).join(' ');
-        sparkHtml = `<div class="ad-sys-sparkline"><svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-            <polyline points="${pts}" fill="none" stroke="var(--primary)" stroke-width="1.5" opacity="0.6"/>
-        </svg></div>`;
-    }
-
-    // TIDE section
-    let tideHtml = '';
-    if (isMapped && sys.tide) {
-        const t = sys.tide;
-        const pct = t.coverage_pct || 0;
-        const barColor = pct >= 70 ? 'var(--success)' : pct >= 40 ? 'var(--warning)' : 'var(--danger)';
-        tideHtml = `<div class="ad-sys-tide">
-            <div class="ad-sys-tide-label">
-                <span>TIDE Detection Coverage</span>
-                <span class="font-mono font-semibold" data-ion-style="color:${barColor}">${pct}%</span>
-            </div>
-            <div class="ad-sys-tide-bar-track"><div class="ad-sys-tide-bar-fill" data-ion-style="width:${pct}%; background:${barColor}"></div></div>
-            <div class="ad-sys-tide-stats">
-                <span>${t.applied_rules || 0}/${t.total_rules || 0} rules</span>
-                <span>${t.enabled_rules || 0} enabled</span>
-                <span>${t.disabled_rules || 0} disabled</span>
-            </div>
-        </div>`;
-    } else if (isMapped && !sys.tide) {
-        tideHtml = `<div class="ad-sys-tide">
-            <div class="ad-sys-tide-label"><span>TIDE Detection Coverage</span><span class="text-[var(--text-muted)]">Not linked</span></div>
-        </div>`;
-    }
-
-    // Unmapped badge
-    let unmappedHtml = '';
-    if (!isMapped) {
-        unmappedHtml = `<div class="ad-sys-unmapped">No system mapping for this namespace</div>`;
-    }
-
-    return `<div class="ad-sys-card ${isMapped ? 'mapped' : ''}">
-        <div class="ad-sys-card-hdr">
-            <div class="ad-sys-card-name"><span class="ns-icon">${escapeHtml(initials)}</span> ${escapeHtml(ns)}</div>
-            <div class="ad-sys-card-alerts">${alerts.toLocaleString()}</div>
-        </div>
-        <div class="ad-sys-card-body">
-            ${sparkHtml}
-            <div class="ad-sys-sev-row">${sevHtml}</div>
-            ${tideHtml}
-            ${unmappedHtml}
-        </div>
-    </div>`;
-}
 
 // --- MITRE ATT&CK Heatmap ---
 function renderMitreHeatmap() {
