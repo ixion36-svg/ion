@@ -1,0 +1,63 @@
+{#
+  Traffic volume and protocol mix: the first three stats tiles, both trend
+  deltas, and the series the two charts are drawn from.
+
+  The tiles come back as out-of-band swaps because they sit in a six-tile
+  grid whose other three belong to other reads, and the series travels in a
+  data attribute through |tojson so Chart.js is handed data rather than the
+  page being handed markup to re-parse. The canvases themselves stay in the
+  shell: a drawing surface is not markup a partial can own.
+
+  Four outcomes, all different. A window this page cannot ask for, a read
+  that refused (503 for an unconfigured Arkime, 502 for one that refused),
+  a histogram that came back measured and empty, and data. `|| 0` on the
+  totals is what made the second and the third look the same.
+#}
+
+{%- macro figure(value) -%}
+{%- if value is not none %}{{ value }}{% else %}<span class="atf-unmeasured" title="Arkime did not report this figure. It is unknown, not zero.">Unknown</span>{% endif -%}
+{%- endmacro -%}
+
+{%- macro delta(trend) -%}
+{%- if trend %}<span class="atf-delta atf-delta-{{ trend.direction }}">{% if trend.direction == 'up' %}&#9650;{% else %}&#9660;{% endif %} {{ trend.pct }}%</span>{% endif -%}
+{%- endmacro -%}
+
+<div id="atf-tile-sessions" hx-swap-oob="true" class="stat bg-base-200 rounded-box shadow p-4">
+  <div class="stat-value font-mono text-2xl">{{ figure(sessions) }}</div>
+  <div class="stat-title">Total Sessions {{ delta(sessions_trend) }}</div>
+</div>
+<div id="atf-tile-bytes" hx-swap-oob="true" class="stat bg-base-200 rounded-box shadow p-4">
+  <div class="stat-value font-mono text-2xl">{{ figure(bytes) }}</div>
+  <div class="stat-title">Total Volume {{ delta(bytes_trend) }}</div>
+</div>
+<div id="atf-tile-proto" hx-swap-oob="true" class="stat bg-base-200 rounded-box shadow p-4">
+  <div class="stat-value font-mono text-2xl text-primary">{{ figure(top_protocol) }}</div>
+  <div class="stat-title">Top Protocol</div>
+</div>
+
+<div hx-swap-oob="innerHTML:#vol-subtitle">
+  {%- if demo %}synthetic data
+  {%- elif points is not none %}{{ points }} data points
+  {%- endif %}
+</div>
+
+{# The protocol card's own state slot. Same read, so the doughnut cannot
+   say "No data" while the Top Protocol tile names one. #}
+<div hx-swap-oob="innerHTML:#atf-protocols">
+  {%- if failed %}<div class="atf-overlay atf-state-failed">Protocol mix unread</div>
+  {%- elif series.protocols is none %}<div class="atf-overlay atf-state-failed">Protocol mix unread</div>
+  {%- elif not series.protocols %}<div class="atf-overlay">No data</div>
+  {%- endif %}
+</div>
+
+{# The main target, inside the volume chart's positioned container. #}
+<span class="hidden" data-atf-series='{{ series|tojson }}' data-atf-demo="{{ 'yes' if demo else 'no' }}"></span>
+{% if failed %}
+<div role="alert" class="atf-overlay atf-state-failed">
+  Traffic volume could not be read. {{ reason or 'Arkime did not answer, so session and byte totals are unknown rather than zero.' }}
+</div>
+{% elif empty %}
+<div class="atf-overlay">No data for this range</div>
+{% elif demo %}
+<div class="atf-demo-note">Demo mode &mdash; Arkime is not configured, so these figures are synthetic.</div>
+{% endif %}

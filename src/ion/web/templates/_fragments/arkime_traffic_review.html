@@ -1,0 +1,29 @@
+{#
+  Bob's read of one sensor node's traffic.
+
+  Four outcomes. No node picked (a request that should not have been made),
+  a request that did not complete, a model that answered with nothing, and
+  an analysis.
+
+  The analysis is markdown, and it is handed over as text inside a hidden
+  textarea for the page's own safeMarkdown (marked plus DOMPurify) to
+  paint. ION ships no HTML sanitiser, markdown.markdown passes raw HTML and
+  javascript: hrefs straight through, and this is model output, so
+  rendering it on the server and marking it safe would be a scripting hole.
+  template_render made the same call for the same reason; .ion-md already
+  styles the generated elements by descendant selector, so the restyling
+  argument for moving markup to the server does not apply to this one case.
+#}
+{% if needs_node %}
+<span class="atf-state-pending">Select a node first.</span>
+{% elif failed %}
+<span role="alert" class="atf-state-failed">The AI review could not be completed. {{ reason or 'The request did not finish, so there is no analysis.' }}</span>
+{% elif not analysis %}
+<span class="text-base-content/50">Bob returned no analysis for {{ node }} over {{ range }}. There is nothing to show; this is not a failed request.</span>
+{% else %}
+{# No id on the textarea: an id makes htmx copy the old element's
+   attributes onto the new one on every swap. It is found by position. #}
+<textarea class="hidden" readonly aria-hidden="true" tabindex="-1">{{ analysis }}</textarea>
+<div data-md-pane></div>
+<div class="mt-2 text-xs text-base-content/50">model: {{ model or 'not stated' }} &middot; node {{ node }} &middot; {{ range }}</div>
+{% endif %}
