@@ -163,3 +163,8 @@ test_pcaps/real/smbtorture.cap
 todo.md
 decisions.tsv
 .grok-rejected/
+
+# uv lockfile. Nothing in this repo uses uv: the only reference is
+# inside the gitignored .venv. A stray from someone running it once,
+# kept on disk but out of the tree. Delete this line if uv is adopted.
+uv.lock
