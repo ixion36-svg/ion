@@ -99,6 +99,7 @@
    <style> blocks had. See the header of ion-pages.css. */
 @import "./ion-pages.css";
 @import "./ion-training.css";
+@import "./ion-detection-engineering.css";
 
 /*
  * Tokens for Tailwind utility generation (bg-ink-900, text-ion-cyan, ...).

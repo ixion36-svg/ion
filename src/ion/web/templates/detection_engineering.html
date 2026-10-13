@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 
+{% block page_id %}detection-engineering{% endblock %}
+
 {% block title %}Detection Engineering - ION{% endblock %}
 
 {% block content %}
@@ -57,231 +59,8 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* ── Detection Engineering ─────────────────────────── */
-.de-tide-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);border-radius:20px;font-size:.75rem;font-weight:700;color:var(--neon-cyan,var(--primary));letter-spacing:.5px;font-family:'JetBrains Mono',monospace}
-.de-tide-dot{width:8px;height:8px;border-radius:50%;background:var(--sev-critical);animation:de-pulse 2s infinite}
-.de-tide-dot.ok{background:var(--mitre-covered)}
-@keyframes de-pulse{0%,100%{opacity:1}50%{opacity:.4}}
-
-/* Tabs — horizontal scroll on narrow screens, never wrap (10 tabs) */
-.de-tabs{display:flex;gap:2px;border-bottom:1px solid var(--ion-border,rgba(99,110,123,.4));margin-bottom:20px;overflow-x:auto;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
-.de-tabs::-webkit-scrollbar{height:4px}
-.de-tabs::-webkit-scrollbar-thumb{background:var(--ion-border,rgba(99,110,123,.5));border-radius:2px}
-.de-tab{padding:10px 20px;background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text-secondary,#8b949e);cursor:pointer;font-size:.85rem;font-weight:600;transition:all .15s;white-space:nowrap;flex-shrink:0}
-.de-tab:hover{color:var(--text-primary,var(--text-primary))}
-.de-tab.active{color:var(--neon-cyan,var(--primary));border-bottom-color:var(--neon-cyan,var(--primary))}
-.de-panel{display:none}
-.de-panel.active{display:block}
-
-/* Stat cards row */
-.de-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px}
-.de-stat{background:var(--bg-secondary,var(--bg-secondary));border:1px solid var(--ion-border,rgba(99,110,123,.4));border-radius:10px;padding:16px;position:relative;overflow:hidden}
-.de-stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent,var(--primary))}
-.de-stat.crit::before{background:var(--sev-critical)}
-.de-stat.high::before{background:var(--sev-high)}
-.de-stat.med::before{background:var(--sev-medium)}
-.de-stat.low::before{background:var(--sev-low)}
-.de-stat.green::before{background:var(--mitre-covered)}
-.de-stat.warn::before{background:var(--sev-high)}
-.de-stat-label{font-size:.72rem;color:var(--text-secondary,#8b949e);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
-.de-stat-val{font-size:1.5rem;font-weight:700;color:var(--text-primary,var(--text-primary));font-family:'JetBrains Mono',monospace;line-height:1}
-.de-stat-sub{font-size:.72rem;color:var(--text-secondary,#8b949e);margin-top:4px}
-
-/* Section cards */
-.de-section{background:var(--bg-secondary,var(--bg-secondary));border:1px solid var(--ion-border,rgba(99,110,123,.4));border-radius:10px;padding:16px;margin-bottom:16px}
-.de-section-title{font-size:.8rem;font-weight:700;color:var(--text-secondary,#8b949e);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
-.de-section-title i{color:var(--neon-cyan,var(--primary))}
-
-/* Two-column layout */
-.de-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media(max-width:900px){.de-cols{grid-template-columns:1fr}}
-
-/* Tables */
-.de-section{overflow-x:auto}  /* allow tables inside sections to scroll on narrow screens */
-.de-table{width:100%;border-collapse:collapse;font-size:.82rem}
-.de-table th{text-align:left;padding:8px 10px;color:var(--text-secondary,#8b949e);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--ion-border,rgba(99,110,123,.4));white-space:nowrap}
-.de-table td{padding:8px 10px;border-bottom:1px solid rgba(99,110,123,.15);color:var(--text-primary,var(--text-primary))}
-.de-table tr:hover td{background:rgba(0,212,255,.03)}
-.de-table .mono{font-family:'JetBrains Mono',monospace;font-size:.78rem;word-break:break-all}
-
-/* Mobile reflow */
-@media (max-width: 768px) {
-    .de-stats { grid-template-columns: repeat(2, 1fr); }
-    .de-stat { padding: 12px; }
-    .de-stat-val { font-size: 1.2rem; }
-    .de-tab { padding: 9px 14px; font-size: .8rem; }
-}
-@media (max-width: 480px) {
-    .de-stats { grid-template-columns: 1fr 1fr; gap: 8px; }
-    .de-stat-val { font-size: 1.1rem; }
-}
-
-/* Severity badges */
-.de-sev{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
-.de-sev.critical{background:var(--sev-critical-dim);color:var(--sev-critical)}
-.de-sev.high{background:var(--sev-high-dim);color:var(--sev-high)}
-.de-sev.medium{background:var(--sev-medium-dim);color:var(--sev-medium)}
-.de-sev.low{background:var(--sev-low-dim);color:var(--sev-low)}
-
-/* Enabled/disabled badge */
-.de-enabled{color:var(--mitre-covered);font-weight:600}
-.de-disabled{color:var(--sev-critical);font-weight:600}
-
-/* Quality bar */
-.de-qbar{display:flex;height:20px;border-radius:4px;overflow:hidden;background:rgba(99,110,123,.2)}
-.de-qbar-seg{display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:700;color:#fff;min-width:0;transition:width .3s}
-.de-qbar-seg.excellent{background:var(--quality-excellent)}
-.de-qbar-seg.good{background:var(--quality-good)}
-.de-qbar-seg.fair{background:var(--quality-fair)}
-.de-qbar-seg.poor{background:var(--quality-poor)}
-
-/* Donut charts (canvas-free) */
-.de-donut-row{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:16px}
-.de-donut-wrap{display:flex;align-items:center;gap:16px}
-.de-donut{width:120px;height:120px;border-radius:50%;position:relative;display:flex;align-items:center;justify-content:center}
-.de-donut-center{position:absolute;width:64px;height:64px;border-radius:50%;background:var(--bg-secondary,var(--bg-secondary));display:flex;align-items:center;justify-content:center;flex-direction:column}
-.de-donut-center .de-donut-pct{font-size:1rem;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--text-primary,var(--text-primary))}
-.de-donut-center .de-donut-label{font-size:.6rem;color:var(--text-secondary,#8b949e);text-transform:uppercase}
-.de-donut-legend{display:flex;flex-direction:column;gap:4px}
-.de-donut-legend-item{display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--text-secondary,#8b949e)}
-.de-donut-legend-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
-
-/* Kill chain */
-.de-kc{margin-bottom:24px}
-.de-kc-title{font-size:.95rem;font-weight:700;color:var(--text-primary,var(--text-primary));margin-bottom:4px}
-.de-kc-desc{font-size:.78rem;color:var(--text-secondary,#8b949e);margin-bottom:12px}
-.de-kc-chain{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding-bottom:8px}
-.de-kc-node{flex:0 0 auto;width:160px;background:var(--bg-primary,var(--bg-primary));border:2px solid var(--ion-border,rgba(99,110,123,.4));border-radius:8px;padding:12px;position:relative;display:flex;flex-direction:column;gap:6px;transition:border-color .2s}
-.de-kc-node.covered{border-color:var(--mitre-covered)}
-.de-kc-node.partial{border-color:var(--mitre-partial)}
-.de-kc-node.blind{border-color:var(--mitre-gap);border-style:dashed}
-.de-kc-arrow{display:flex;align-items:center;justify-content:center;width:32px;flex-shrink:0;color:var(--text-secondary,#8b949e);font-size:1.2rem}
-.de-kc-node-header{font-size:.72rem;font-weight:700;color:var(--neon-cyan,var(--primary));font-family:'JetBrains Mono',monospace}
-.de-kc-node-name{font-size:.78rem;color:var(--text-primary,var(--text-primary));font-weight:600;line-height:1.3}
-.de-kc-node-rules{font-size:.68rem;color:var(--text-secondary,#8b949e);margin-top:auto}
-.de-kc-node-rules .ok{color:var(--mitre-covered)}
-.de-kc-node-rules .warn{color:var(--mitre-partial)}
-.de-kc-node-rules .bad{color:var(--mitre-gap)}
-
-/* Rules toolbar */
-.de-rules-toolbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
-.de-rules-toolbar input,.de-rules-toolbar select{padding:7px 10px;background:var(--bg-primary,var(--bg-primary));border:1px solid var(--ion-border,rgba(99,110,123,.4));border-radius:6px;color:var(--text-primary,var(--text-primary));font-size:.82rem}
-.de-rules-toolbar input{flex:1;min-width:200px}
-.de-rules-toolbar select{min-width:120px}
-.de-rules-toolbar input::placeholder{color:var(--text-secondary,#8b949e)}
-
-/* Pagination */
-.de-pager{display:flex;align-items:center;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:1px solid var(--ion-border,rgba(99,110,123,.4))}
-.de-pager-info{font-size:.78rem;color:var(--text-secondary,#8b949e)}
-.de-pager-btns{display:flex;gap:4px}
-.de-pager-btns button{padding:5px 12px;background:var(--bg-primary,var(--bg-primary));border:1px solid var(--ion-border,rgba(99,110,123,.4));border-radius:4px;color:var(--text-secondary,#8b949e);cursor:pointer;font-size:.78rem}
-.de-pager-btns button:hover:not(:disabled){color:var(--text-primary,var(--text-primary));border-color:var(--neon-cyan,var(--primary))}
-.de-pager-btns button:disabled{opacity:.4;cursor:default}
-
-/* Gaps tactic grid */
-.de-gap-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px}
-.de-gap-card{background:var(--bg-primary,var(--bg-primary));border:1px solid var(--ion-border,rgba(99,110,123,.4));border-radius:8px;padding:12px}
-.de-gap-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.de-gap-tactic{font-size:.78rem;font-weight:700;color:var(--text-primary,var(--text-primary));text-transform:capitalize}
-.de-gap-count{font-size:.72rem;font-weight:700;color:var(--sev-critical);font-family:'JetBrains Mono',monospace}
-.de-gap-list{display:flex;flex-direction:column;gap:3px}
-.de-gap-item{font-size:.75rem;color:var(--text-secondary,#8b949e);padding:3px 0;border-bottom:1px solid rgba(99,110,123,.1)}
-.de-gap-item code{color:var(--neon-cyan,var(--primary));font-size:.72rem;margin-right:4px}
-
-/* Loading / empty */
-.de-loading{text-align:center;padding:40px;color:var(--text-secondary,#8b949e)}
-.de-loading .de-spinner{display:inline-block;width:24px;height:24px;border:3px solid var(--ion-border,rgba(99,110,123,.4));border-top-color:var(--neon-cyan,var(--primary));border-radius:50%;animation:de-spin .8s linear infinite;margin-bottom:8px}
-@keyframes de-spin{to{transform:rotate(360deg)}}
-.de-empty{text-align:center;padding:40px;color:var(--text-secondary,#8b949e);font-size:.85rem}
-
-/* MITRE ID chip */
-.de-mitre-chip{display:inline-block;padding:1px 6px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.25);border-radius:3px;font-size:.68rem;font-family:'JetBrains Mono',monospace;color:var(--neon-cyan,var(--primary));margin:1px}
-
-/* Execution tab */
-.de-exec-time{display:flex;gap:8px;align-items:center;margin-bottom:16px}
-.de-exec-time button{padding:5px 12px;background:var(--bg-primary,var(--bg-primary));border:1px solid var(--ion-border,rgba(99,110,123,.4));border-radius:4px;color:var(--text-secondary,#8b949e);cursor:pointer;font-size:.78rem;transition:all .15s}
-.de-exec-time button:hover{border-color:var(--neon-cyan,var(--primary));color:var(--text-primary)}
-.de-exec-time button.active{background:rgba(0,212,255,.1);border-color:var(--neon-cyan,var(--primary));color:var(--neon-cyan,var(--primary))}
-
-/* Volume chart */
-.de-vol-chart{position:relative;height:140px;background:var(--bg-primary,var(--bg-primary));border:1px solid var(--ion-border,rgba(99,110,123,.4));border-radius:8px;padding:8px 12px;overflow:hidden}
-.de-vol-bars{display:flex;align-items:flex-end;gap:1px;height:100%;position:relative}
-.de-vol-bar{flex:1;min-width:2px;border-radius:2px 2px 0 0;transition:height .3s;position:relative}
-.de-vol-bar:hover{opacity:.8}
-.de-vol-bar .de-vol-tip{display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);padding:4px 8px;background:var(--bg-secondary);border:1px solid var(--ion-border);border-radius:4px;font-size:.68rem;white-space:nowrap;z-index:10;color:var(--text-primary)}
-.de-vol-bar:hover .de-vol-tip{display:block}
-
-/* Efficacy indicator */
-.de-eff{display:inline-flex;align-items:center;gap:4px;font-size:.72rem;font-weight:700}
-.de-eff.good{color:var(--mitre-covered)}
-.de-eff.warn{color:var(--mitre-partial)}
-.de-eff.bad{color:var(--sev-critical)}
-
-/* Inline bar for close rate */
-.de-rate-bar{display:inline-flex;align-items:center;gap:6px;width:100px}
-.de-rate-track{flex:1;height:6px;background:rgba(99,110,123,.2);border-radius:3px;overflow:hidden}
-.de-rate-fill{height:100%;border-radius:3px;transition:width .3s}
-.de-rate-val{font-size:.72rem;font-family:'JetBrains Mono',monospace;min-width:36px;text-align:right}
-
-/* Actor Readiness — Report modal */
-.de-report-bar{display:flex;gap:8px;align-items:center;padding:10px 14px;background:var(--bg-primary,var(--bg-primary));border:1px solid var(--ion-border,rgba(99,110,123,.4));border-radius:8px;margin-bottom:12px;flex-wrap:wrap}
-.de-report-bar select{padding:6px 10px;background:var(--bg-secondary,var(--bg-secondary));border:1px solid var(--ion-border,rgba(99,110,123,.4));border-radius:6px;color:var(--text-primary);font-size:.82rem;max-width:250px}
-.de-report-bar label{font-size:.75rem;color:var(--text-secondary);font-weight:600}
-.de-btn-report{padding:7px 16px;background:rgba(0,212,255,.15);border:1px solid var(--neon-cyan,var(--primary));border-radius:6px;color:var(--neon-cyan);cursor:pointer;font-size:.78rem;font-weight:700;transition:all .15s;white-space:nowrap}
-.de-btn-report:hover{background:rgba(0,212,255,.25)}
-.de-btn-report:disabled{opacity:.4;cursor:default}
-.de-btn-pdf{padding:7px 16px;background:var(--sev-critical-bg);border:1px solid var(--sev-critical);border-radius:6px;color:var(--sev-critical);cursor:pointer;font-size:.78rem;font-weight:700;transition:all .15s;white-space:nowrap}
-.de-btn-pdf:hover{background:var(--sev-critical-dim)}
-.de-btn-pdf:disabled{opacity:.4;cursor:default}
-
-/* System readiness detail */
-.de-sys-readiness{background:var(--bg-secondary,var(--bg-secondary));border:1px solid var(--ion-border,rgba(99,110,123,.4));border-radius:10px;padding:16px;margin-bottom:16px}
-.de-readiness-gauge{display:flex;align-items:center;gap:16px;margin:12px 0}
-.de-readiness-bar{flex:1;height:16px;background:rgba(99,110,123,.2);border-radius:8px;overflow:hidden}
-.de-readiness-fill{height:100%;border-radius:8px;transition:width .5s}
-
-/* Actor Readiness */
-.de-actor{background:var(--bg-secondary,var(--bg-secondary));border:1px solid var(--ion-border,rgba(99,110,123,.4));border-radius:10px;margin-bottom:12px;overflow:hidden}
-.de-actor-header{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;transition:background .15s}
-.de-actor-header:hover{background:rgba(0,212,255,.03)}
-.de-actor-name{font-size:.9rem;font-weight:700;color:var(--text-primary,var(--text-primary));flex:1}
-.de-actor-aliases{font-size:.7rem;color:var(--text-secondary,#8b949e);margin-top:2px}
-.de-actor-gauge{width:80px;text-align:center}
-.de-actor-gauge-ring{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 2px}
-.de-actor-gauge-val{font-size:.85rem;font-weight:700;font-family:'JetBrains Mono',monospace}
-.de-actor-gauge-label{font-size:.6rem;color:var(--text-secondary);text-transform:uppercase}
-.de-actor-meta{display:flex;gap:12px;align-items:center}
-.de-actor-meta-item{font-size:.72rem;color:var(--text-secondary);font-family:'JetBrains Mono',monospace}
-.de-actor-body{display:none;padding:0 16px 16px;border-top:1px solid var(--ion-border,rgba(99,110,123,.4))}
-.de-actor.open .de-actor-body{display:block}
-.de-actor-chevron{color:var(--text-secondary);transition:transform .2s;font-size:.8rem}
-.de-actor.open .de-actor-chevron{transform:rotate(90deg)}
-.de-actor-ttp-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
-@media(max-width:800px){.de-actor-ttp-grid{grid-template-columns:1fr}}
-.de-ttp-covered,.de-ttp-gap{padding:8px;border-radius:6px}
-.de-ttp-covered{background:var(--mitre-covered-bg);border:1px solid var(--mitre-covered-dim)}
-.de-ttp-gap{background:var(--mitre-gap-bg);border:1px solid var(--mitre-gap-dim)}
-
-/* Kill Chain Progression */
-.de-prog{background:var(--bg-secondary,var(--bg-secondary));border-radius:10px;margin-bottom:12px;overflow:hidden}
-.de-prog-header{padding:14px 16px;display:flex;align-items:center;gap:12px;border-left:4px solid var(--ion-border)}
-.de-prog-header.critical{border-left-color:var(--sev-critical)}
-.de-prog-header.high{border-left-color:var(--sev-high)}
-.de-prog-header.medium{border-left-color:var(--sev-medium)}
-.de-prog-host{font-size:.9rem;font-weight:700;color:var(--text-primary);font-family:'JetBrains Mono',monospace}
-.de-prog-playbook{font-size:.78rem;color:var(--neon-cyan,var(--primary))}
-.de-prog-pct{font-size:.85rem;font-weight:700;font-family:'JetBrains Mono',monospace}
-.de-prog-steps{padding:0 16px 16px;display:flex;align-items:stretch;gap:0;overflow-x:auto}
-.de-prog-step{flex:0 0 auto;width:140px;padding:10px;border-radius:6px;border:2px solid var(--ion-border,rgba(99,110,123,.4));display:flex;flex-direction:column;gap:4px}
-.de-prog-step.fired{border-color:var(--sev-critical);background:var(--sev-critical-bg)}
-.de-prog-step.safe{border-color:var(--mitre-covered);border-style:dashed;opacity:.6}
-.de-prog-step-num{font-size:.65rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase}
-.de-prog-step-name{font-size:.75rem;font-weight:600;color:var(--text-primary);line-height:1.3}
-.de-prog-step-detail{font-size:.65rem;color:var(--text-secondary);margin-top:auto}
-.de-prog-arrow{display:flex;align-items:center;justify-content:center;width:24px;flex-shrink:0;color:var(--text-secondary);font-size:1rem}
-</style>
-
+{% include "_fragments/detection_engineering_client.html" %}
+<script src="/static/js/detection-engineering.js?v={{ ion_version }}"></script>
 <script nonce="{{ csp_nonce }}">
 (function(){
 'use strict';
@@ -328,7 +107,7 @@ window.deRefresh = function() {
 
 function loadTab(tab) {
     const panel = $('de-panel-'+tab);
-    panel.innerHTML = '<div class="de-loading"><div class="de-spinner"></div><div>Loading...</div></div>';
+    deMessage(panel, 'Loading...', true);
     switch(tab) {
         case 'posture': loadPosture(); break;
         case 'killchains': loadKillChains(); break;
@@ -345,137 +124,7 @@ function loadTab(tab) {
 
 /* ── Posture tab ──────────────────────────────── */
 async function loadPosture() {
-    try {
-        const data = await apiFetch('/tide/de/posture');
-        if (!data.enabled) { $('de-panel-posture').innerHTML='<div class="de-empty">TIDE not configured</div>'; return; }
-        _postureData = data;
-        $('de-tide-badge').querySelector('.de-tide-dot').classList.add('ok');
-
-        const disabled_crit = await apiFetch('/tide/de/disabled-critical');
-        renderPosture(data, disabled_crit);
-        _loaded.posture = true;
-    } catch(e) {
-        $('de-panel-posture').innerHTML=`<div class="de-empty">Failed to load posture: ${esc(e.message)}</div>`;
-    }
-}
-
-function renderPosture(d, disabledCrit) {
-    // TIDE 6 will not serve the ATT&CK catalogue to the external query API,
-    // so the total is routinely absent. pct() already returns 0 for a zero
-    // denominator, which reads as a measured 0% rather than as no denominator.
-    const haveTechTotal = d.total_techniques != null && d.total_techniques > 0;
-    const covPct = pct(d.covered_techniques, d.total_techniques);
-    const enabledPct = pct(d.enabled_rules, d.total_rules);
-    const q = d.quality || {};
-
-    let html = `
-    <div class="de-stats">
-        <div class="de-stat"><div class="de-stat-label">Total Rules</div><div class="de-stat-val">${d.total_rules.toLocaleString()}</div><div class="de-stat-sub">in default space</div></div>
-        <div class="de-stat green"><div class="de-stat-label">Enabled</div><div class="de-stat-val">${d.enabled_rules.toLocaleString()}</div><div class="de-stat-sub">${enabledPct}% of total</div></div>
-        <div class="de-stat warn"><div class="de-stat-label">Disabled</div><div class="de-stat-val">${d.disabled_rules.toLocaleString()}</div><div class="de-stat-sub">${100-enabledPct}% of total</div></div>
-        <div class="de-stat"><div class="de-stat-label">MITRE Coverage</div><div class="de-stat-val">${haveTechTotal ? `${d.covered_techniques}/${d.total_techniques}` : d.covered_techniques}</div><div class="de-stat-sub">${haveTechTotal ? `${covPct}% with an enabled rule` : 'with an enabled rule; TIDE did not return a technique total'}</div></div>
-        <div class="de-stat"><div class="de-stat-label">Unmapped Rules</div><div class="de-stat-val">${d.unmapped_rules}</div><div class="de-stat-sub">no MITRE mapping</div></div>
-        <div class="de-stat"><div class="de-stat-label">Systems</div><div class="de-stat-val">${d.total_systems}</div><div class="de-stat-sub">monitored</div></div>
-    </div>
-
-    <div class="de-cols">
-        <div class="de-section">
-            <div class="de-section-title"><i class="icon-bar-chart-2"></i> Severity Breakdown</div>
-            <div class="de-donut-row">${renderSeverityDonut(d)}</div>
-            ${renderSeverityTable(d)}
-        </div>
-        <div class="de-section">
-            <div class="de-section-title"><i class="icon-star"></i> Quality Distribution</div>
-            ${renderQualityBar(q, d.total_rules)}
-            <div class="mt-3 text-[.78rem] text-[var(--text-secondary)]">
-                Average quality: <span class="text-[var(--text-primary)] font-bold font-mono">${q.avg_quality || 0}</span>/100
-            </div>
-        </div>
-    </div>`;
-
-    if (disabledCrit.length) {
-        html += `<div class="de-section">
-            <div class="de-section-title"><i class="icon-alert-triangle"></i> Disabled Critical/High Rules (${disabledCrit.length})</div>
-            <table class="de-table"><thead><tr><th>Rule</th><th>Severity</th><th>Quality</th><th>MITRE</th></tr></thead><tbody>`;
-        for (const r of disabledCrit.slice(0, 25)) {
-            const mitre = (r.mitre_ids||[]).map(m=>`<span class="de-mitre-chip">${esc(m)}</span>`).join(' ');
-            html += `<tr>
-                <td>${esc(r.name)}</td>
-                <td><span class="de-sev ${sevClass(r.severity)}">${esc(r.severity)}</span></td>
-                <td class="mono">${r.quality_score??'-'}</td>
-                <td>${mitre||'-'}</td>
-            </tr>`;
-        }
-        html += `</tbody></table></div>`;
-    }
-
-    $('de-panel-posture').innerHTML = html;
-}
-
-function renderSeverityDonut(d) {
-    const sev = d.severity || {};
-    const colors = {critical:'var(--sev-critical)',high:'var(--sev-high)',medium:'var(--sev-medium)',low:'var(--sev-low)'};
-    const order = ['critical','high','medium','low'];
-    let total = 0;
-    const slices = [];
-    for (const s of order) {
-        const v = (sev[s]||{}).total||0;
-        total += v;
-        slices.push({label:s, value:v, color:colors[s]});
-    }
-    if (!total) return '<div class="de-empty">No severity data</div>';
-
-    let cumPct = 0;
-    const gradParts = [];
-    for (const sl of slices) {
-        const p = sl.value/total*100;
-        gradParts.push(`${sl.color} ${cumPct}% ${cumPct+p}%`);
-        cumPct += p;
-    }
-    const legend = slices.map(sl =>
-        `<div class="de-donut-legend-item"><div class="de-donut-legend-dot" data-ion-style="background:${sl.color}"></div>${sl.label}: ${sl.value}</div>`
-    ).join('');
-
-    return `<div class="de-donut-wrap">
-        <div class="de-donut" data-ion-style="background:conic-gradient(${gradParts.join(',')})">
-            <div class="de-donut-center"><span class="de-donut-pct">${total}</span><span class="de-donut-label">rules</span></div>
-        </div>
-        <div class="de-donut-legend">${legend}</div>
-    </div>`;
-}
-
-function renderSeverityTable(d) {
-    const sev = d.severity || {};
-    const order = ['critical','high','medium','low'];
-    let html = '<table class="de-table mt-3"><thead><tr><th>Severity</th><th>Total</th><th>Enabled</th><th>Disabled</th></tr></thead><tbody>';
-    for (const s of order) {
-        const v = sev[s] || {total:0,enabled:0,disabled:0};
-        html += `<tr><td><span class="de-sev ${s}">${s}</span></td><td class="mono">${v.total}</td><td class="mono de-enabled">${v.enabled}</td><td class="mono de-disabled">${v.disabled}</td></tr>`;
-    }
-    html += '</tbody></table>';
-    return html;
-}
-
-function renderQualityBar(q, total) {
-    if (!total) return '<div class="de-empty">No data</div>';
-    const segs = [
-        {cls:'excellent',label:'Excellent (30+)',val:q.excellent||0},
-        {cls:'good',label:'Good (20-29)',val:q.good||0},
-        {cls:'fair',label:'Fair (10-19)',val:q.fair||0},
-        {cls:'poor',label:'Poor (<10)',val:q.poor||0},
-    ];
-    let bar = '<div class="de-qbar">';
-    for (const s of segs) {
-        const w = s.val/total*100;
-        if (w > 0) bar += `<div class="de-qbar-seg ${s.cls}" data-ion-style="width:${w}%" title="${s.label}: ${s.val}">${w>5?s.val:''}</div>`;
-    }
-    bar += '</div>';
-    bar += '<div class="flex gap-3 mt-2 flex-wrap">';
-    for (const s of segs) {
-        bar += `<div class="de-donut-legend-item"><div class="de-donut-legend-dot ${s.cls}" data-ion-style="background:${s.cls==='excellent'?'var(--quality-excellent)':s.cls==='good'?'var(--quality-good)':s.cls==='fair'?'var(--quality-fair)':'var(--quality-poor)'}"></div>${s.label}: <strong>${s.val}</strong></div>`;
-    }
-    bar += '</div>';
-    return bar;
+    _loaded.posture = await deLoadFragment('/ui/detection-engineering/posture', 'de-panel-posture', 'Loading detection posture...');
 }
 
 /* ── Use Cases tab (TIDE baselines / playbooks) ─── */
@@ -1201,94 +850,7 @@ function renderProgression(d) {
 
 /* ── Gaps tab ─────────────────────────────────── */
 async function loadGaps() {
-    try {
-        const data = await apiFetch('/tide/de/gaps');
-        if (!data.enabled) { $('de-panel-gaps').innerHTML='<div class="de-empty">TIDE not configured</div>'; return; }
-        _gapsData = data;
-        renderGaps(data);
-        _loaded.gaps = true;
-    } catch(e) {
-        $('de-panel-gaps').innerHTML=`<div class="de-empty">Failed to load: ${esc(e.message)}</div>`;
-    }
-}
-
-function renderGaps(d) {
-    let html = `
-    <div class="de-stats mb-5">
-        <div class="de-stat crit"><div class="de-stat-label">Blind Spots</div><div class="de-stat-val">${d.total_blind_spots}</div><div class="de-stat-sub">MITRE techniques with 0 rules</div></div>
-        <div class="de-stat warn"><div class="de-stat-label">Unmapped Rules</div><div class="de-stat-val">${d.unmapped_rules.length}</div><div class="de-stat-sub">rules with no MITRE mapping</div></div>
-        <div class="de-stat green"><div class="de-stat-label">Quick Wins</div><div class="de-stat-val">${d.quick_wins.length}</div><div class="de-stat-sub">disabled high-quality crit/high rules</div></div>
-    </div>`;
-
-    // Blind spots by tactic
-    const tactics = d.blind_spots_by_tactic || {};
-    const tacticEntries = Object.entries(tactics).sort((a,b) => b[1].length - a[1].length);
-    if (tacticEntries.length) {
-        html += `<div class="de-section">
-            <div class="de-section-title"><i class="icon-eye-off"></i> Blind Spots by Tactic</div>
-            <div class="de-gap-grid">`;
-        for (const [tactic, techs] of tacticEntries) {
-            html += `<div class="de-gap-card">
-                <div class="de-gap-card-header">
-                    <div class="de-gap-tactic">${esc(tactic.replace(/-/g,' '))}</div>
-                    <div class="de-gap-count">${techs.length}</div>
-                </div>
-                <div class="de-gap-list">`;
-            for (const t of techs.slice(0, 10)) {
-                html += `<div class="de-gap-item"><code>${esc(t.id)}</code> ${esc(t.name)}</div>`;
-            }
-            if (techs.length > 10) html += `<div class="de-gap-item text-[var(--neon-cyan)]">+${techs.length-10} more</div>`;
-            html += '</div></div>';
-        }
-        html += '</div></div>';
-    }
-
-    // Quick wins
-    if (d.quick_wins.length) {
-        html += `<div class="de-section">
-            <div class="de-section-title"><i class="icon-zap"></i> Quick Wins &mdash; High-Quality Disabled Rules</div>
-            <table class="de-table"><thead><tr><th>Rule</th><th>Severity</th><th>Quality</th><th>MITRE</th></tr></thead><tbody>`;
-        for (const r of d.quick_wins) {
-            const mitre = (r.mitre_ids||[]).map(m=>`<span class="de-mitre-chip">${esc(m)}</span>`).join(' ');
-            html += `<tr>
-                <td>${esc(r.name)}</td>
-                <td><span class="de-sev ${sevClass(r.severity)}">${esc(r.severity)}</span></td>
-                <td class="mono">${r.quality_score??'-'}</td>
-                <td>${mitre||'-'}</td>
-            </tr>`;
-        }
-        html += '</tbody></table></div>';
-    }
-
-    // System coverage
-    if (d.systems_coverage && d.systems_coverage.length) {
-        html += `<div class="de-section">
-            <div class="de-section-title"><i class="icon-server"></i> System Coverage (Lowest First)</div>
-            <table class="de-table"><thead><tr><th>System</th><th>Applied Rules</th></tr></thead><tbody>`;
-        for (const s of d.systems_coverage) {
-            html += `<tr><td>${esc(s.name)}</td><td class="mono">${s.applied_rules}</td></tr>`;
-        }
-        html += '</tbody></table></div>';
-    }
-
-    // Unmapped rules
-    if (d.unmapped_rules.length) {
-        html += `<div class="de-section">
-            <div class="de-section-title"><i class="icon-unlink"></i> Unmapped Rules (no MITRE mapping) &mdash; Top ${Math.min(d.unmapped_rules.length,50)}</div>
-            <table class="de-table"><thead><tr><th>Rule</th><th>Severity</th><th>Status</th><th>Quality</th></tr></thead><tbody>`;
-        for (const r of d.unmapped_rules.slice(0, 50)) {
-            const status = r.enabled ? '<span class="de-enabled">Enabled</span>' : '<span class="de-disabled">Disabled</span>';
-            html += `<tr>
-                <td>${esc(r.name)}</td>
-                <td><span class="de-sev ${sevClass(r.severity)}">${esc(r.severity)}</span></td>
-                <td>${status}</td>
-                <td class="mono">${r.quality_score??'-'}</td>
-            </tr>`;
-        }
-        html += '</tbody></table></div>';
-    }
-
-    $('de-panel-gaps').innerHTML = html;
+    _loaded.gaps = await deLoadFragment('/ui/detection-engineering/gaps', 'de-panel-gaps', 'Loading detection gaps...');
 }
 
 /* ────────────────────────────────────────────────────────────────────── */
@@ -1586,76 +1148,54 @@ window.vlnDelete = async function(id) {
 
 /* ── TIDE Sync ────────────────────────────────── */
 window.deSyncTide = async function() {
-    const badge = $('de-tide-badge');
-    badge.innerHTML = '<span class="de-tide-dot"></span> Syncing...';
+    deSetBadge('Syncing...');
     try {
-        const r = await fetch(API + '/tide/de/sync-now', {method:'POST', credentials:'include'});
-        const j = await r.json();
-        if (j.error) {
-            badge.innerHTML = `<span class="de-tide-dot"></span> TIDE (${esc(j.error)})`;
+        const response = await fetch(API + '/tide/de/sync-now', {method:'POST', credentials:'include'});
+        if (!response.ok) throw new Error('Sync failed');
+        const payload = await response.json();
+        if (!payload || payload.error) {
+            deSetBadge(payload && typeof payload.error === 'string' ? 'TIDE (' + payload.error + ')' : 'TIDE (sync failed)');
             return;
         }
-        badge.innerHTML = `<span class="de-tide-dot ok"></span> TIDE synced (${j.synced}/${j.total})`;
-        // Auto-refresh current tab with fresh snapshot data
+        deSetBadge('TIDE synced (' + (payload.synced ?? 'Unknown') + '/' + (payload.total ?? 'Unknown') + ')', true);
         deRefresh();
-    } catch (e) {
-        badge.innerHTML = '<span class="de-tide-dot"></span> TIDE (sync failed)';
+    } catch (error) {
+        deSetBadge('TIDE (sync failed)');
     }
 };
 
-// Check sync status on load to show the badge correctly
 async function deCheckSyncStatus() {
     try {
-        const r = await fetch(API + '/tide/de/sync-status', {credentials:'include'});
-        if (!r.ok) return;
-        const j = await r.json();
-        const badge = $('de-tide-badge');
-        if (j.healthy > 0) {
-            badge.innerHTML = `<span class="de-tide-dot ok"></span> TIDE (${j.healthy}/${j.total_datasets} cached)`;
-        }
-    } catch (e) {}
+        const payload = await apiFetch('/tide/de/sync-status');
+        if (!payload || typeof payload !== 'object') throw new Error('Invalid sync status');
+        deSetBadge('TIDE (' + (payload.healthy ?? 'Unknown') + '/' + (payload.total_datasets ?? 'Unknown') + ' cached)', payload.healthy > 0);
+    } catch (error) {
+        deSetBadge('TIDE (status unavailable)');
+    }
 }
 
-/* ── Space selector ────────────────────────────── */
 async function deLoadSpaces() {
-    const sel = $('de-space-select');
-    try {
-        const data = await apiFetch('/tide/de/spaces');
-        const spaces = data.spaces || [];
-        const active = data.active || 'default';
-        if (!spaces.length) {
-            sel.innerHTML = '<option value="default">default</option>';
-            return;
-        }
-        sel.innerHTML = spaces.map(s => {
-            const selected = s.space === active ? ' selected' : '';
-            return `<option value="${s.space}"${selected}>${s.space} (${s.rule_count})</option>`;
-        }).join('');
-    } catch (e) {
-        sel.innerHTML = '<option value="default">default</option>';
-    }
+    const selector = $('de-space-select');
+    selector.disabled = true;
+    await deLoadFragment('/ui/detection-engineering/spaces', selector, 'Loading spaces...');
+    selector.disabled = !selector.options.length || selector.options[0].disabled;
 }
 
 window.deChangeSpace = async function(space) {
     if (!space) return;
+    const selector = $('de-space-select');
+    selector.disabled = true;
     try {
-        await fetch(API + '/tide/de/spaces/' + encodeURIComponent(space), {
-            method: 'POST', credentials: 'include'
-        });
-        // Reset cached data and reload current tab
-        _loaded = {posture:false, killchains:false, rules:false, execution:false, readiness:false, progression:false, gaps:false, d3fend:false, emulation:false, vulns:false};
-        _postureData = null;
-        _killChainsData = null;
-        _gapsData = null;
-        _vulnsCache = null;
-        _d3fendCache = null;
-        _emCache = null;
-        loadTab(_activeTab);
-    } catch (e) {
-        console.warn('Space switch failed:', e);
+        const response = await fetch(API + '/tide/de/spaces/' + encodeURIComponent(space), {method:'POST', credentials:'include'});
+        const payload = await response.json();
+        if (!response.ok || !payload || payload.ok !== true) throw new Error('Space switch failed');
+        deRefresh();
+    } catch (error) {
+        deSetBadge('TIDE (space switch failed)');
+    } finally {
+        await deLoadSpaces();
     }
 };
-
 /* ── Init ─────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => { deLoadSpaces(); loadTab('posture'); deCheckSyncStatus(); });
 
