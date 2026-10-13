@@ -569,9 +569,11 @@
     <div id="rm-content"><div class="rm-loading">Loading...</div></div>
 </div>
 
-{% include '_fragments/training_client.html' %}
 {% include '_fragments/training_assessment_client.html' %}
 {% include '_fragments/training_plans_client.html' %}
+{% include "_fragments/training_client.html" %}
+{% include "_fragments/training_client_nodes.html" %}
+<script src="/static/js/training-nodes.js?v={{ ion_version }}"></script>
 <script nonce="{{ csp_nonce }}">
 function cloneTemplate(id) {
     const template = document.getElementById(id);
@@ -3199,12 +3201,12 @@ async function loadAssessmentData() {
 
 function populateRoleDropdowns() {
     const opts = Object.entries(ROLES).map(([id, r]) =>
-        `<option value="${id}">${esc(r.title)}</option>`
-    ).join('');
+        [["open","training-node-0",[["value",(id)]],false],["value",trainingIdentity(r.title)],["close"]]
+    ).flat();
     const curSel = document.getElementById('sa-current-role');
     const tgtSel = document.getElementById('sa-target-role');
-    if (curSel) curSel.innerHTML = '<option value="">-- Select --</option>' + opts;
-    if (tgtSel) tgtSel.innerHTML = '<option value="">-- Select --</option>' + opts;
+    if (curSel) trainingRender(curSel, [["open","training-node-1",[],false],["text",`-- Select --`],["close"]].concat(opts));
+    if (tgtSel) trainingRender(tgtSel, [["open","training-node-2",[],false],["text",`-- Select --`],["close"]].concat(opts));
     if (careerGoal.current_role && curSel) curSel.value = careerGoal.current_role;
     if (careerGoal.target_role && tgtSel) tgtSel.value = careerGoal.target_role;
     if (curSel) curSel.addEventListener('change', () => { careerGoal.current_role = curSel.value; renderAssessmentForm(); });
@@ -3256,7 +3258,7 @@ function renderForecast() {
 
     const targetRole = careerGoal.target_role;
     if (!targetRole || !ROLES[targetRole]) {
-        container.innerHTML = '<div class="sa-forecast"><h3>Training Forecast</h3><p class="text-[var(--text-muted)] italic">Select a target role to see your training forecast.</p></div>';
+        trainingRender(container, [["open","training-node-3",[],false],["open","training-node-4",[],false],["text",`Training Forecast`],["close"],["open","training-node-5",[],false],["text",`Select a target role to see your training forecast.`],["close"],["close"]]);
         return;
     }
 
@@ -3291,50 +3293,50 @@ function renderForecast() {
         return '~6 months';
     }
 
-    const gapHtml = gaps.slice(0, 15).map(g => `
-        <div class="sa-gap-item">
-            <span class="sa-gap-skill">${esc(g.name)}</span>
-            <div class="sa-gap-detail">
-                <span class="sa-gap-badge">Gap -${g.gap}</span>
-                <span class="text-[var(--text-muted)]">${g.rating} → ${g.target}</span>
-                <span class="sa-gap-time">${estTime(g.gap)}</span>
-            </div>
-        </div>`).join('');
+    const gapHtml = gaps.slice(0, 15).map(g => [["text",`
+        `],["open","training-node-6",[],false],["text",`
+            `],["open","training-node-7",[],false],["value",trainingIdentity(g.name)],["close"],["text",`
+            `],["open","training-node-8",[],false],["text",`
+                `],["open","training-node-9",[],false],["text",`Gap -`],["value",g.gap],["close"],["text",`
+                `],["open","training-node-10",[],false],["value",g.rating],["text",` → `],["value",g.target],["close"],["text",`
+                `],["open","training-node-11",[],false],["value",estTime(g.gap)],["close"],["text",`
+            `],["close"],["text",`
+        `],["close"]]).flat();
 
     // Recommended certs from target role
     const targetCerts = ROLES[targetRole]?.certs || [];
     const certHtml = targetCerts.map(c =>
-        `<div class="cert-card mb-[0.3rem]">
-            <div class="cert-header">
-                <span class="cert-name text-[0.8rem]">${esc(c.name)}</span>
-                <span class="cert-price text-[0.72rem]">~\u00a3${c.price.toLocaleString()}</span>
-            </div>
-            <span class="cert-provider text-[0.68rem]">${esc(c.provider)}</span>
-            <span class="cert-difficulty ${c.difficulty} ml-2">${c.difficulty}</span>
-        </div>`
-    ).join('');
+        [["open","training-node-12",[],false],["text",`
+            `],["open","training-node-13",[],false],["text",`
+                `],["open","training-node-14",[],false],["value",trainingIdentity(c.name)],["close"],["text",`
+                `],["open","training-node-15",[],false],["text",`~\u00a3`],["value",c.price.toLocaleString()],["close"],["text",`
+            `],["close"],["text",`
+            `],["open","training-node-16",[],false],["value",trainingIdentity(c.provider)],["close"],["text",`
+            `],["open","training-node-17",[["class",`cert-difficulty ` + (c.difficulty) + ` ml-2`]],false],["value",c.difficulty],["close"],["text",`
+        `],["close"]]
+    ).flat();
 
-    container.innerHTML = `
-        <div class="sa-forecast">
-            <h3>Training Forecast — ${esc(ROLES[targetRole].title)}</h3>
-            <div class="mb-[0.3rem] text-[0.82rem] text-[var(--text-secondary)]">Readiness: ${readiness}%</div>
-            <div class="sa-readiness-bar">
-                <div class="sa-readiness-fill ${readinessClass}" data-ion-style="width:${Math.max(readiness, 5)}%">${readiness}%</div>
-            </div>
-            ${gaps.length > 0 ? `
-                <div class="sa-gap-list">
-                    <div class="text-xs font-bold text-[var(--text-muted)] uppercase mb-2">Skills Gaps (${gaps.length})</div>
-                    ${gapHtml}
-                    ${gaps.length > 15 ? `<div class="text-[var(--text-muted)] text-xs pt-[0.3rem]">+ ${gaps.length - 15} more...</div>` : ''}
-                </div>
-            ` : '<div class="text-[var(--neon-green)] text-[0.9rem] mt-4">You meet or exceed all skill targets for this role!</div>'}
-            ${targetCerts.length > 0 ? `
-                <div class="sa-rec-certs">
-                    <h4>Recommended Certifications</h4>
-                    ${certHtml}
-                </div>
-            ` : ''}
-        </div>`;
+    trainingRender(container, [["text",`
+        `],["open","training-node-24",[],false],["text",`
+            `],["open","training-node-25",[],false],["text",`Training Forecast — `],["value",trainingIdentity(ROLES[targetRole].title)],["close"],["text",`
+            `],["open","training-node-26",[],false],["text",`Readiness: `],["value",readiness],["text",`%`],["close"],["text",`
+            `],["open","training-node-27",[],false],["text",`
+                `],["open","training-node-28",[["class",`sa-readiness-fill ` + (readinessClass)],["data-ion-style",`width:` + (Math.max(readiness, 5)) + `%`]],false],["value",readiness],["text",`%`],["close"],["text",`
+            `],["close"],["text",`
+            `],["value",gaps.length > 0 ? [["text",`
+                `],["open","training-node-19",[],false],["text",`
+                    `],["open","training-node-20",[],false],["text",`Skills Gaps (`],["value",gaps.length],["text",`)`],["close"],["text",`
+                    `],["value",gapHtml],["text",`
+                    `],["value",gaps.length > 15 ? [["open","training-node-18",[],false],["text",`+ `],["value",gaps.length - 15],["text",` more...`],["close"]] : ''],["text",`
+                `],["close"],["text",`
+            `]] : [["open","training-node-21",[],false],["text",`You meet or exceed all skill targets for this role!`],["close"]]],["text",`
+            `],["value",targetCerts.length > 0 ? [["text",`
+                `],["open","training-node-22",[],false],["text",`
+                    `],["open","training-node-23",[],false],["text",`Recommended Certifications`],["close"],["text",`
+                    `],["value",certHtml],["text",`
+                `],["close"],["text",`
+            `]] : ''],["text",`
+        `],["close"]]);
 }
 
 async function saveAssessment() {
@@ -3602,10 +3604,13 @@ async function loadTeamData() {
     try {
         const resp = await fetch('/api/skills/team-overview');
         if (!resp.ok) {
-            document.getElementById('team-heatmap').innerHTML = '<p class="text-[var(--text-muted)] italic">Access denied or no data available.</p>';
-            return;
+            throw new Error('Team data unavailable');
         }
         teamData = await resp.json();
+        if (!teamData || !Array.isArray(teamData.members) || !Array.isArray(teamData.snapshots)) {
+            teamData = null;
+            throw new Error('Invalid team data');
+        }
         renderTeamComposition();
         renderCapabilityCoverage();
         renderHeatmap();
@@ -3613,6 +3618,7 @@ async function loadTeamData() {
         populateDepartureDropdown();
         teamSubLoaded.overview = true;
     } catch (e) {
+        ['team-heatmap', 'team-comp-cards', 'soc-cap-grid', 'sparkline-grid'].forEach(id => trainingMessage(document.getElementById(id), 'Team data unavailable. Please try again.'));
         console.warn('Team data load failed:', e);
     }
 }
@@ -3637,7 +3643,7 @@ function renderTeamComposition() {
     if (!container || !teamData) return;
 
     const members = teamData.members || [];
-    if (members.length === 0) { container.replaceChildren(); return; }
+    if (members.length === 0) { trainingMessage(container, 'No team members found.'); return; }
 
     // Count by RBAC role
     const roleCounts = {};
@@ -3652,25 +3658,25 @@ function renderTeamComposition() {
     });
 
     // Build cards: Total + RBAC roles + SOC functions
-    let html = `<div class="tc-card"><div class="tc-card-value">${members.length}</div><div class="tc-card-label">Total Staff</div></div>`;
+    let html = [["open","training-node-30",[],false],["open","training-node-31",[],false],["value",members.length],["close"],["open","training-node-32",[],false],["text",`Total Staff`],["close"],["close"]];
 
     // RBAC roles
     const roleOrder = ['analyst', 'lead', 'engineering', 'admin', 'editor', 'viewer'];
     const roleLabels = { analyst: 'Analysts', lead: 'Leads', engineering: 'Engineers', admin: 'Admins', editor: 'Editors', viewer: 'Viewers' };
     roleOrder.forEach(r => {
         if (roleCounts[r]) {
-            html += `<div class="tc-card"><div class="tc-card-value">${roleCounts[r]}</div><div class="tc-card-label">${roleLabels[r] || r}</div></div>`;
+            html = html.concat([["open","training-node-33",[],false],["open","training-node-34",[],false],["value",roleCounts[r]],["close"],["open","training-node-35",[],false],["value",roleLabels[r] || r],["close"],["close"]]);
         }
     });
 
     // Separator + SOC function breakdown
-    html += `<div class="tc-card border-l-[2px] border-l-[var(--primary)]"><div class="tc-card-value text-[0.78rem] text-[var(--primary)] font-bold">SOC Roles</div><div class="tc-card-label text-[0.62rem]">by function</div></div>`;
+    html = html.concat([["open","training-node-36",[],false],["open","training-node-37",[],false],["text",`SOC Roles`],["close"],["open","training-node-38",[],false],["text",`by function`],["close"],["close"]]);
     Object.entries(funcCounts).sort((a, b) => b[1] - a[1]).forEach(([roleKey, count]) => {
         const role = ROLES[roleKey];
-        html += `<div class="tc-card"><div class="tc-card-value">${count}</div><div class="tc-card-label">${esc(role ? role.title : roleKey)}</div></div>`;
+        html = html.concat([["open","training-node-39",[],false],["open","training-node-40",[],false],["value",count],["close"],["open","training-node-41",[],false],["value",trainingIdentity(role ? role.title : roleKey)],["close"],["close"]]);
     });
 
-    container.innerHTML = html;
+    trainingRender(container, html);
 }
 
 function renderCapabilityCoverage() {
@@ -3678,9 +3684,9 @@ function renderCapabilityCoverage() {
     if (!container || !teamData) return;
 
     const members = teamData.members || [];
-    if (members.length === 0) { container.replaceChildren(); return; }
+    if (members.length === 0) { trainingMessage(container, 'No team members found.'); return; }
 
-    let html = '';
+    let html = [];
     Object.entries(SOC_CAPABILITIES).forEach(([capName, capDef]) => {
         const catSkills = SKILLS_MATRIX[capDef.cat];
         if (!catSkills) return;
@@ -3713,9 +3719,9 @@ function renderCapabilityCoverage() {
         else                   { levelClass = 'level-expert'; levelLabel = 'Expert'; }
 
         // Bar color matches level
-        const barColors = { 'level-none': '#666', 'level-low': '#ef4444', 'level-basic': '#f97316',
-            'level-good': '#eab308', 'level-strong': '#22c55e', 'level-expert': '#06b6d4' };
-        const barColor = barColors[levelClass] || '#666';
+        const barColors = { 'level-none': 'var(--text-muted)', 'level-low': 'var(--error)', 'level-basic': 'var(--warning)',
+            'level-good': 'var(--warning)', 'level-strong': 'var(--success)', 'level-expert': 'var(--info)' };
+        const barColor = barColors[levelClass] || 'var(--text-muted)';
         const barPct = Math.min(100, (teamAvg / 5) * 100);
 
         // Top contributors (people at >= 3)
@@ -3725,25 +3731,25 @@ function renderCapabilityCoverage() {
             .slice(0, 4)
             .map(m => m.name);
 
-        html += `
-            <div class="soc-cap-card">
-                <div class="soc-cap-header">
-                    <span class="soc-cap-name">${capDef.icon} ${esc(capName)}</span>
-                    <span class="soc-cap-level ${levelClass}">${levelLabel}</span>
-                </div>
-                <div class="soc-cap-bar-track">
-                    <div class="soc-cap-bar-fill" data-ion-style="width:${barPct.toFixed(0)}%; background:${barColor}"></div>
-                </div>
-                <div class="soc-cap-detail">
-                    <span class="cap-stat">Avg: <strong>${teamAvg.toFixed(1)}</strong>/5</span>
-                    <span class="cap-stat">Peak: <strong>${maxAvg.toFixed(1)}</strong></span>
-                    <span class="cap-stat">Coverage: <strong>${covCount}/${members.length}</strong></span>
-                    ${topPeople.length > 0 ? `<span class="cap-people">Key: ${topPeople.map(n => esc(n)).join(', ')}</span>` : '<span class="cap-people">No staff at intermediate+</span>'}
-                </div>
-            </div>`;
+        html = html.concat([["text",`
+            `],["open","training-node-44",[],false],["text",`
+                `],["open","training-node-45",[],false],["text",`
+                    `],["open","training-node-46",[],false],["value",capDef.icon],["text",` `],["value",trainingIdentity(capName)],["close"],["text",`
+                    `],["open","training-node-47",[["class",`soc-cap-level ` + (levelClass)]],false],["value",levelLabel],["close"],["text",`
+                `],["close"],["text",`
+                `],["open","training-node-48",[],false],["text",`
+                    `],["open","training-node-49",[["data-ion-style",`width:` + (barPct.toFixed(0)) + `%; background:` + (barColor)]],false],["close"],["text",`
+                `],["close"],["text",`
+                `],["open","training-node-50",[],false],["text",`
+                    `],["open","training-node-51",[],false],["text",`Avg: `],["open","training-node-52",[],false],["value",teamAvg.toFixed(1)],["close"],["text",`/5`],["close"],["text",`
+                    `],["open","training-node-53",[],false],["text",`Peak: `],["open","training-node-54",[],false],["value",maxAvg.toFixed(1)],["close"],["close"],["text",`
+                    `],["open","training-node-55",[],false],["text",`Coverage: `],["open","training-node-56",[],false],["value",covCount],["text",`/`],["value",members.length],["close"],["close"],["text",`
+                    `],["value",topPeople.length > 0 ? [["open","training-node-42",[],false],["text",`Key: `],["value",topPeople.map(n => trainingIdentity(n)).join(', ')],["close"]] : [["open","training-node-43",[],false],["text",`No staff at intermediate+`],["close"]]],["text",`
+                `],["close"],["text",`
+            `],["close"]]);
     });
 
-    container.innerHTML = html;
+    trainingRender(container, html);
 }
 
 function renderHeatmap() {
@@ -3752,51 +3758,51 @@ function renderHeatmap() {
 
     const members = teamData.members || [];
     if (members.length === 0) {
-        container.innerHTML = '<p class="text-[var(--text-muted)] italic">No team members have completed assessments yet.</p>';
+        trainingRender(container, [["open","training-node-57",[],false],["text",`No team members have completed assessments yet.`],["close"]]);
         return;
     }
 
     const cols = members.length + 2; // skill name + N members + coverage
     let gridCss = `grid-template-columns: minmax(160px, 200px) repeat(${members.length}, minmax(60px, 1fr)) minmax(60px, 90px);`;
 
-    let html = `<div class="team-heatmap" data-ion-style="${gridCss}">`;
+    let html = [["open","training-node-58",[["data-ion-style",(gridCss)]],false]];
 
     // Header row
-    html += `<div class="hm-cell hm-header hm-skill-name">Skill</div>`;
+    html = html.concat([["open","training-node-59",[],false],["text",`Skill`],["close"]]);
     members.forEach(m => {
-        html += `<div class="hm-cell hm-header" title="${esc(m.display_name)}">${esc(m.username)}</div>`;
+        html = html.concat([["open","training-node-60",[["title",(trainingIdentity(m.display_name))]],false],["value",trainingIdentity(m.username)],["close"]]);
     });
-    html += `<div class="hm-cell hm-header hm-coverage">Coverage</div>`;
+    html = html.concat([["open","training-node-61",[],false],["text",`Coverage`],["close"]]);
 
     // Skills rows grouped by category
     Object.entries(SKILLS_MATRIX).forEach(([catName, skills]) => {
         // Category header spans full width
-        html += `<div class="hm-cell hm-cat-header col-span-full">${esc(catName)}</div>`;
+        html = html.concat([["open","training-node-62",[],false],["value",trainingIdentity(catName)],["close"]]);
 
         Object.entries(skills).forEach(([key, skill]) => {
-            html += `<div class="hm-cell hm-skill-name">${esc(skill.name)}</div>`;
+            html = html.concat([["open","training-node-63",[],false],["value",trainingIdentity(skill.name)],["close"]]);
             let atTarget = 0;
             let totalRaters = 0;
             members.forEach(m => {
                 const r = m.skills[key] || 0;
-                html += `<div class="hm-cell hm-prof-${r}">${r > 0 ? r : '-'}</div>`;
+                html = html.concat([["open","training-node-64",[["class",`hm-cell hm-prof-` + (r)]],false],["value",r > 0 ? r : '-'],["close"]]);
                 if (r >= 3) atTarget++;
                 if (r > 0) totalRaters++;
             });
-            html += `<div class="hm-cell hm-coverage">${atTarget}/${totalRaters}</div>`;
+            html = html.concat([["open","training-node-65",[],false],["value",atTarget],["text",`/`],["value",totalRaters],["close"]]);
         });
     });
 
-    html += '</div>';
-    container.innerHTML = html;
+    html = html.concat([["close"]]);
+    trainingRender(container, html);
 }
 
 function populateDepartureDropdown() {
     const sel = document.getElementById('departure-user');
     if (!sel || !teamData) return;
-    sel.innerHTML = '<option value="">-- Select team member --</option>';
+    trainingRender(sel, [["open","training-node-66",[],false],["text",`-- Select team member --`],["close"]]);
     (teamData.members || []).forEach(m => {
-        sel.innerHTML += `<option value="${m.user_id}">${esc(m.display_name || m.username)}</option>`;
+        trainingRender(sel, [["open","training-node-67",[["value",(m.user_id)]],false],["value",trainingIdentity(m.display_name || m.username)],["close"]], true);
     });
 }
 
@@ -3810,46 +3816,46 @@ async function simulateDeparture() {
 
     try {
         const resp = await fetch(`/api/skills/team-overview/departure-impact?user_id=${userId}`);
-        if (!resp.ok) { container.innerHTML = '<p class="text-[#ef4444]">Failed to load impact data.</p>'; return; }
+        if (!resp.ok) { trainingRender(container, [["open","training-node-68",[],false],["text",`Failed to load impact data.`],["close"]]); return; }
         const data = await resp.json();
-
+        if (!data || !Array.isArray(data.impacts) || data.readiness_before == null || data.readiness_after == null) throw new Error('Invalid impact data');
         const critCount = data.impacts.filter(i => i.severity === 'critical').length;
         const warnCount = data.impacts.filter(i => i.severity === 'warning').length;
 
-        let html = `
-            <div class="departure-readiness">
-                <div class="departure-readiness-item">
-                    <div class="dr-value text-[var(--text-bright)]">${data.readiness_before}%</div>
-                    <div class="dr-label">Readiness Before</div>
-                </div>
-                <div class="departure-readiness-item">
-                    <div class="dr-value" data-ion-style="color:${data.readiness_after < data.readiness_before ? '#ef4444' : 'var(--text-bright)'}">${data.readiness_after}%</div>
-                    <div class="dr-label">Readiness After</div>
-                </div>
-                <div class="departure-readiness-item">
-                    <div class="dr-value text-[#ef4444]">${critCount}</div>
-                    <div class="dr-label">Critical</div>
-                </div>
-                <div class="departure-readiness-item">
-                    <div class="dr-value text-[#f97316]">${warnCount}</div>
-                    <div class="dr-label">Warning</div>
-                </div>
-            </div>
-            <div class="impact-list">`;
+        let html = [["text",`
+            `],["open","training-node-69",[],false],["text",`
+                `],["open","training-node-70",[],false],["text",`
+                    `],["open","training-node-71",[],false],["value",data.readiness_before],["text",`%`],["close"],["text",`
+                    `],["open","training-node-72",[],false],["text",`Readiness Before`],["close"],["text",`
+                `],["close"],["text",`
+                `],["open","training-node-73",[],false],["text",`
+                    `],["open","training-node-74",[["data-ion-style",`color:` + (data.readiness_after < data.readiness_before ? 'var(--error)' : 'var(--text-bright)')]],false],["value",data.readiness_after],["text",`%`],["close"],["text",`
+                    `],["open","training-node-75",[],false],["text",`Readiness After`],["close"],["text",`
+                `],["close"],["text",`
+                `],["open","training-node-76",[],false],["text",`
+                    `],["open","training-node-77",[],false],["value",critCount],["close"],["text",`
+                    `],["open","training-node-78",[],false],["text",`Critical`],["close"],["text",`
+                `],["close"],["text",`
+                `],["open","training-node-79",[],false],["text",`
+                    `],["open","training-node-80",[],false],["value",warnCount],["close"],["text",`
+                    `],["open","training-node-81",[],false],["text",`Warning`],["close"],["text",`
+                `],["close"],["text",`
+            `],["close"],["text",`
+            `],["open","training-node-82",[],false]];
 
         data.impacts.forEach(imp => {
-            html += `
-                <div class="impact-item">
-                    <span class="impact-sev ${imp.severity}">${imp.severity}</span>
-                    <span class="impact-skill">${esc(getSkillName(imp.skill_key))}</span>
-                    <span class="impact-coverage">${imp.coverage_before} → ${imp.coverage_after}</span>
-                </div>`;
+            html = html.concat([["text",`
+                `],["open","training-node-83",[],false],["text",`
+                    `],["open","training-node-84",[["class",`impact-sev ` + (imp.severity)]],false],["value",imp.severity],["close"],["text",`
+                    `],["open","training-node-85",[],false],["value",trainingIdentity(getSkillName(imp.skill_key))],["close"],["text",`
+                    `],["open","training-node-86",[],false],["value",imp.coverage_before],["text",` → `],["value",imp.coverage_after],["close"],["text",`
+                `],["close"]]);
         });
 
-        html += '</div>';
-        container.innerHTML = html;
+        html = html.concat([["close"]]);
+        trainingRender(container, html);
     } catch (e) {
-        container.innerHTML = '<p class="text-[#ef4444]">Error loading departure impact.</p>';
+        trainingRender(container, [["open","training-node-87",[],false],["text",`Error loading departure impact.`],["close"]]);
     }
 }
 
@@ -3862,7 +3868,7 @@ function renderSparklines() {
 
     const snapshots = teamData.snapshots || [];
     if (snapshots.length === 0) {
-        container.innerHTML = '<p class="text-[var(--text-muted)] italic">No snapshot history yet. Snapshots are created daily on server startup.</p>';
+        trainingRender(container, [["open","training-node-88",[],false],["text",`No snapshot history yet. Snapshots are created daily on server startup.`],["close"]]);
         return;
     }
 
@@ -3878,7 +3884,7 @@ function renderSparklines() {
         });
     });
 
-    let html = '';
+    let html = [];
     Object.entries(catAvgs).forEach(([catName, dateMap]) => {
         const dates = Object.keys(dateMap).sort();
         if (dates.length === 0) return;
@@ -3905,16 +3911,16 @@ function renderSparklines() {
         const polyline = pathPoints.join(' ');
         const lastVal = points[points.length - 1].toFixed(1);
 
-        html += `
-            <div class="sparkline-card">
-                <div class="sparkline-label">${esc(catName)} <span class="text-[var(--primary)] text-[0.68rem]">${lastVal}</span></div>
-                <svg class="sparkline-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
-                    <polyline points="${polyline}" fill="none" stroke="var(--primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-            </div>`;
+        html = html.concat([["text",`
+            `],["open","training-node-89",[],false],["text",`
+                `],["open","training-node-90",[],false],["value",trainingIdentity(catName)],["text",` `],["open","training-node-91",[],false],["value",lastVal],["close"],["close"],["text",`
+                `],["open","training-node-92",[["viewBox",`0 0 ` + (w) + ` ` + (h)]],false],["text",`
+                    `],["open","training-node-93",[["points",(polyline)]],false],["close"],["text",`
+                `],["close"],["text",`
+            `],["close"]]);
     });
 
-    container.innerHTML = html || '<p class="text-[var(--text-muted)] italic">Not enough snapshot data for trends.</p>';
+    trainingRender(container, html.length ? html : [["open","training-node-94",[],false],["text",`Not enough snapshot data for trends.`],["close"]]);
 }
 
 // =========================================================================
@@ -3941,10 +3947,16 @@ async function loadKnowledgeData() {
     try {
         await loadKnowledgeTemplateMap();
         const resp = await fetch('/api/skills/knowledge');
-        if (!resp.ok) return;
+        if (!resp.ok) throw new Error('Knowledge data unavailable');
         knowledgeData = await resp.json();
+        if (!knowledgeData || !Array.isArray(knowledgeData.articles)) throw new Error('Invalid knowledge data');
         renderKnowledge();
-    } catch (e) { console.warn('Knowledge load failed:', e); }
+    } catch (e) {
+        knowledgeData = null;
+        trainingMessage(document.getElementById('km-grid'), 'Document registry unavailable. Please try again.');
+        document.getElementById('km-progress')?.replaceChildren();
+        console.warn('Knowledge load failed:', e);
+    }
 }
 
 let kmSaveTimer = null;
@@ -4026,42 +4038,42 @@ function renderKnowledge() {
     const gridEl = document.getElementById('km-grid');
     if (!gridEl) return;
 
-    const memberOpts = members.map(m => `<option value="${m.user_id}">${esc(m.display_name || m.username)}</option>`).join('');
+    const memberOpts = members.map(m => [["open","training-node-95",[["value",(m.user_id)]],false],["value",trainingIdentity(m.display_name || m.username)],["close"]]).flat();
 
-    let html = `<table class="km-doc-table"><thead><tr>
-        <th class="min-w-[200px]">Document</th><th>Status</th><th>Owner</th><th>Notes</th><th class="w-[3rem]">Template</th>
-    </tr></thead><tbody>`;
+    let html = [["open","training-node-96",[],false],["open","training-node-97",[],false],["open","training-node-98",[],false],["text",`
+        `],["open","training-node-99",[],false],["text",`Document`],["close"],["open","training-node-100",[],false],["text",`Status`],["close"],["open","training-node-101",[],false],["text",`Owner`],["close"],["open","training-node-102",[],false],["text",`Notes`],["close"],["open","training-node-103",[],false],["text",`Template`],["close"],["text",`
+    `],["close"],["close"],["open","training-node-104",[],false]];
 
     Object.entries(SOC_DOCUMENTS).forEach(([catName, docs]) => {
         // Category header row
         const catDone = docs.filter(d => (saved[d.key]||{}).doc_status === 'comprehensive').length;
-        html += `<tr class="km-cat-row"><td colspan="5">${esc(catName)} <span class="font-normal text-[0.65rem] text-[var(--text-muted)]">(${catDone}/${docs.length} approved)</span></td></tr>`;
+        html = html.concat([["open","training-node-105",[],false],["open","training-node-106",[],false],["value",trainingIdentity(catName)],["text",` `],["open","training-node-107",[],false],["text",`(`],["value",catDone],["text",`/`],["value",docs.length],["text",` approved)`],["close"],["close"],["close"]]);
 
         docs.forEach(d => {
             const s = saved[d.key] || {};
             const status = s.doc_status || 'undocumented';
             const tplId = kmTemplateMap[d.name] || null;
             const tplLink = tplId
-                ? `<a href="/templates/${tplId}" target="_blank" class="km-tpl-link" title="Open template"><i class="icon-file-text"></i></a>`
-                : `<span class="text-[var(--text-muted)] text-[0.65rem]">--</span>`;
-            html += `<tr data-doc="${esc(d.key)}">
-                <td><div class="km-doc-name">${esc(d.name)}</div><div class="km-doc-desc">${esc(d.desc)}</div></td>
-                <td><select class="km-select" data-doc="${esc(d.key)}" data-field="doc_status" data-change-action="saveKnowledgeDebounced">
-                    <option value="undocumented" ${status==='undocumented'?'selected':''}>Missing</option>
-                    <option value="basic" ${status==='basic'?'selected':''}>Draft</option>
-                    <option value="comprehensive" ${status==='comprehensive'?'selected':''}>Approved</option>
-                </select></td>
-                <td><select class="km-select" data-doc="${esc(d.key)}" data-field="owner_user_id" data-change-action="saveKnowledgeDebounced">
-                    <option value="">--</option>${memberOpts}
-                </select></td>
-                <td><textarea class="km-notes-edit" data-doc="${esc(d.key)}" data-field="notes" placeholder="..." data-change-action="saveKnowledgeDebounced" data-input-action="saveKnowledgeDebounced" rows="1">${esc(s.notes || '')}</textarea></td>
-                <td class="text-center">${tplLink}</td>
-            </tr>`;
+                ? [["open","training-node-108",[["href",`/templates/` + (tplId)]],false],["open","training-node-109",[],false],["close"],["close"]]
+                : [["open","training-node-110",[],false],["text",`--`],["close"]];
+            html = html.concat([["open","training-node-111",[["data-doc",(trainingIdentity(d.key))]],false],["text",`
+                `],["open","training-node-112",[],false],["open","training-node-113",[],false],["value",trainingIdentity(d.name)],["close"],["open","training-node-114",[],false],["value",trainingIdentity(d.desc)],["close"],["close"],["text",`
+                `],["open","training-node-115",[],false],["open","training-node-116",[["data-doc",(trainingIdentity(d.key))]],false],["text",`
+                    `],["open","training-node-117",[["selected",Boolean(status==='undocumented'?'selected':'')]],false],["text",`Missing`],["close"],["text",`
+                    `],["open","training-node-118",[["selected",Boolean(status==='basic'?'selected':'')]],false],["text",`Draft`],["close"],["text",`
+                    `],["open","training-node-119",[["selected",Boolean(status==='comprehensive'?'selected':'')]],false],["text",`Approved`],["close"],["text",`
+                `],["close"],["close"],["text",`
+                `],["open","training-node-120",[],false],["open","training-node-121",[["data-doc",(trainingIdentity(d.key))]],false],["text",`
+                    `],["open","training-node-122",[],false],["text",`--`],["close"],["value",memberOpts],["text",`
+                `],["close"],["close"],["text",`
+                `],["open","training-node-123",[],false],["open","training-node-124",[["data-doc",(trainingIdentity(d.key))]],false],["value",trainingIdentity(s.notes || '')],["close"],["close"],["text",`
+                `],["open","training-node-125",[],false],["value",tplLink],["close"],["text",`
+            `],["close"]]);
         });
     });
 
-    html += '</tbody></table>';
-    gridEl.innerHTML = html;
+    html = html.concat([["close"],["close"]]);
+    trainingRender(gridEl, html);
 
     // Set owner select values after render
     ALL_SOC_DOCS.forEach(d => {
@@ -4081,18 +4093,18 @@ function renderKnowledgeProgress(saved) {
     const draft = ALL_SOC_DOCS.filter(d => (saved[d.key]||{}).doc_status === 'basic').length;
     const missing = total - approved - draft;
     const pct = total > 0 ? Math.round((approved / total) * 100) : 0;
-    progEl.innerHTML = `
-        <div class="flex justify-between items-baseline mb-[0.35rem]">
-            <span class="text-[0.82rem] font-bold text-[var(--text-bright)]">${pct}% Complete</span>
-            <span class="text-[0.68rem] text-[var(--text-muted)]">${total} documents expected</span>
-        </div>
-        <div class="km-progress-bar"><div class="km-progress-fill" data-ion-style="width:${pct}%"></div></div>
-        <div class="km-summary">
-            <div class="km-summary-item"><span class="km-summary-num text-[#22c55e]">${approved}</span> Approved</div>
-            <div class="km-summary-item"><span class="km-summary-num text-[#eab308]">${draft}</span> Draft</div>
-            <div class="km-summary-item"><span class="km-summary-num text-[#ef4444]">${missing}</span> Missing</div>
-        </div>
-    `;
+    trainingRender(progEl, [["text",`
+        `],["open","training-node-126",[],false],["text",`
+            `],["open","training-node-127",[],false],["value",pct],["text",`% Complete`],["close"],["text",`
+            `],["open","training-node-128",[],false],["value",total],["text",` documents expected`],["close"],["text",`
+        `],["close"],["text",`
+        `],["open","training-node-129",[],false],["open","training-node-130",[["data-ion-style",`width:` + (pct) + `%`]],false],["close"],["close"],["text",`
+        `],["open","training-node-131",[],false],["text",`
+            `],["open","training-node-132",[],false],["open","training-node-133",[],false],["value",approved],["close"],["text",` Approved`],["close"],["text",`
+            `],["open","training-node-134",[],false],["open","training-node-135",[],false],["value",draft],["close"],["text",` Draft`],["close"],["text",`
+            `],["open","training-node-136",[],false],["open","training-node-137",[],false],["value",missing],["close"],["text",` Missing`],["close"],["text",`
+        `],["close"],["text",`
+    `]]);
 }
 
 function saveKnowledgeDebounced() {
@@ -4249,7 +4261,7 @@ function renderCalStats() {
     if (calSource === 'plan') {
         const plan = tpPlans.find(p => p.id === tpActivePlanId);
         if (!plan || !plan.items || plan.items.length === 0) {
-            container.innerHTML = '<p class="text-[var(--text-muted)] italic">Create a training plan (My Training Plan tab) or switch to Auto-Generated mode.</p>';
+            trainingRender(container, [["open","training-node-138",[],false],["text",`Create a training plan (My Training Plan tab) or switch to Auto-Generated mode.`],["close"]]);
             return;
         }
         const activeItems = plan.items.filter(i => i.status !== 'skipped');
@@ -4259,35 +4271,35 @@ function renderCalStats() {
         const lastEnd = calPlanSchedule.length > 0 ? calPlanSchedule.reduce((max, s) => s.endDate > max ? s.endDate : max, new Date()) : null;
         const totalWeeks = lastEnd ? Math.max(0, Math.ceil((lastEnd - new Date()) / (7 * 86400000))) : 0;
 
-        container.innerHTML = `
-            <div class="cal-stat">
-                <div class="cal-stat-value">${activeItems.length}</div>
-                <div class="cal-stat-label">Certifications</div>
-            </div>
-            <div class="cal-stat">
-                <div class="cal-stat-value">${completedItems.length}/${activeItems.length}</div>
-                <div class="cal-stat-label">Completed</div>
-            </div>
-            <div class="cal-stat">
-                <div class="cal-stat-value">~\u00a3${totalCost.toLocaleString()}</div>
-                <div class="cal-stat-label">Total Cost</div>
-            </div>
-            <div class="cal-stat">
-                <div class="cal-stat-value">${totalWeeks > 0 ? '~' + totalWeeks + 'w' : '-'}</div>
-                <div class="cal-stat-label">Est. Timeline</div>
-            </div>
-            <div class="cal-stat">
-                <div class="cal-stat-value">${esc(targetTitle)}</div>
-                <div class="cal-stat-label">Target Role</div>
-            </div>
-        `;
+        trainingRender(container, [["text",`
+            `],["open","training-node-139",[],false],["text",`
+                `],["open","training-node-140",[],false],["value",activeItems.length],["close"],["text",`
+                `],["open","training-node-141",[],false],["text",`Certifications`],["close"],["text",`
+            `],["close"],["text",`
+            `],["open","training-node-142",[],false],["text",`
+                `],["open","training-node-143",[],false],["value",completedItems.length],["text",`/`],["value",activeItems.length],["close"],["text",`
+                `],["open","training-node-144",[],false],["text",`Completed`],["close"],["text",`
+            `],["close"],["text",`
+            `],["open","training-node-145",[],false],["text",`
+                `],["open","training-node-146",[],false],["text",`~\u00a3`],["value",totalCost.toLocaleString()],["close"],["text",`
+                `],["open","training-node-147",[],false],["text",`Total Cost`],["close"],["text",`
+            `],["close"],["text",`
+            `],["open","training-node-148",[],false],["text",`
+                `],["open","training-node-149",[],false],["value",totalWeeks > 0 ? '~' + totalWeeks + 'w' : '-'],["close"],["text",`
+                `],["open","training-node-150",[],false],["text",`Est. Timeline`],["close"],["text",`
+            `],["close"],["text",`
+            `],["open","training-node-151",[],false],["text",`
+                `],["open","training-node-152",[],false],["value",trainingIdentity(targetTitle)],["close"],["text",`
+                `],["open","training-node-153",[],false],["text",`Target Role`],["close"],["text",`
+            `],["close"],["text",`
+        `]]);
         return;
     }
 
     // Auto-generated mode
     const targetRole = careerGoal.target_role;
     if (!targetRole || !ROLES[targetRole]) {
-        container.innerHTML = '<p class="text-[var(--text-muted)] italic">Select a target role in the Skills Assessment tab to generate your training calendar.</p>';
+        trainingRender(container, [["open","training-node-154",[],false],["text",`Select a target role in the Skills Assessment tab to generate your training calendar.`],["close"]]);
         return;
     }
 
@@ -4298,24 +4310,24 @@ function renderCalStats() {
         ? Math.ceil((milestone.startDate - new Date()) / (7 * 86400000))
         : 0;
 
-    container.innerHTML = `
-        <div class="cal-stat">
-            <div class="cal-stat-value">${skillItems.length}</div>
-            <div class="cal-stat-label">Skills to Train</div>
-        </div>
-        <div class="cal-stat">
-            <div class="cal-stat-value">${certItems.length}</div>
-            <div class="cal-stat-label">Cert Targets</div>
-        </div>
-        <div class="cal-stat">
-            <div class="cal-stat-value">${totalWeeks > 0 ? '~' + totalWeeks + 'w' : '-'}</div>
-            <div class="cal-stat-label">Est. Timeline</div>
-        </div>
-        <div class="cal-stat">
-            <div class="cal-stat-value">${esc(ROLES[targetRole].title)}</div>
-            <div class="cal-stat-label">Target Role</div>
-        </div>
-    `;
+    trainingRender(container, [["text",`
+        `],["open","training-node-155",[],false],["text",`
+            `],["open","training-node-156",[],false],["value",skillItems.length],["close"],["text",`
+            `],["open","training-node-157",[],false],["text",`Skills to Train`],["close"],["text",`
+        `],["close"],["text",`
+        `],["open","training-node-158",[],false],["text",`
+            `],["open","training-node-159",[],false],["value",certItems.length],["close"],["text",`
+            `],["open","training-node-160",[],false],["text",`Cert Targets`],["close"],["text",`
+        `],["close"],["text",`
+        `],["open","training-node-161",[],false],["text",`
+            `],["open","training-node-162",[],false],["value",totalWeeks > 0 ? '~' + totalWeeks + 'w' : '-'],["close"],["text",`
+            `],["open","training-node-163",[],false],["text",`Est. Timeline`],["close"],["text",`
+        `],["close"],["text",`
+        `],["open","training-node-164",[],false],["text",`
+            `],["open","training-node-165",[],false],["value",trainingIdentity(ROLES[targetRole].title)],["close"],["text",`
+            `],["open","training-node-166",[],false],["text",`Target Role`],["close"],["text",`
+        `],["close"],["text",`
+    `]]);
 }
 
 function initCalendar() {
@@ -4387,13 +4399,13 @@ function renderCalMonth() {
         }
     });
 
-    let html = '<div class="cal-grid">';
-    DOW_NAMES.forEach(d => { html += `<div class="cal-dow">${d}</div>`; });
+    let html = [["open","training-node-167",[],false]];
+    DOW_NAMES.forEach(d => { html = html.concat([["open","training-node-168",[],false],["value",d],["close"]]); });
 
     // Leading blanks
     for (let i = 0; i < startDow; i++) {
         const prevDay = new Date(calYear, calMonth, -(startDow - 1 - i));
-        html += `<div class="cal-day outside"><div class="cal-day-num">${prevDay.getDate()}</div></div>`;
+        html = html.concat([["open","training-node-169",[],false],["open","training-node-170",[],false],["value",prevDay.getDate()],["close"],["close"]]);
     }
 
     // Month days
@@ -4402,26 +4414,26 @@ function renderCalMonth() {
         const isToday = ds === todayStr;
         const events = dayEvents[ds] || [];
 
-        html += `<div class="cal-day${isToday ? ' today' : ''}">`;
-        html += `<div class="cal-day-num">${d}</div>`;
+        html = html.concat([["open","training-node-171",[["class",`cal-day` + (isToday ? ' today' : '')]],false]]);
+        html = html.concat([["open","training-node-172",[],false],["value",d],["close"]]);
         events.slice(0, 3).forEach(ev => {
-            html += `<div class="cal-event ${ev.css}" title="${esc(ev.label)}">${esc(ev.label)}</div>`;
+            html = html.concat([["open","training-node-173",[["class",`cal-event ` + (ev.css)],["title",(trainingIdentity(ev.label))]],false],["value",trainingIdentity(ev.label)],["close"]]);
         });
         if (events.length > 3) {
-            html += `<div class="cal-event text-[var(--text-muted)] bg-transparent">+${events.length - 3} more</div>`;
+            html = html.concat([["open","training-node-174",[],false],["text",`+`],["value",events.length - 3],["text",` more`],["close"]]);
         }
-        html += '</div>';
+        html = html.concat([["close"]]);
     }
 
     // Trailing blanks
     const totalCells = startDow + daysInMonth;
     const trailing = (7 - (totalCells % 7)) % 7;
     for (let i = 1; i <= trailing; i++) {
-        html += `<div class="cal-day outside"><div class="cal-day-num">${i}</div></div>`;
+        html = html.concat([["open","training-node-175",[],false],["open","training-node-176",[],false],["value",i],["close"],["close"]]);
     }
 
-    html += '</div>';
-    container.innerHTML = html;
+    html = html.concat([["close"]]);
+    trainingRender(container, html);
 }
 
 function dateStr(d) {
@@ -4437,7 +4449,7 @@ function renderGantt() {
     const allItems = [...skillItems, ...certItems];
 
     if (allItems.length === 0) {
-        container.innerHTML = '<p class="text-[var(--text-muted)] italic">No training items to display. Select a target role in Skills Assessment.</p>';
+        trainingRender(container, [["open","training-node-177",[],false],["text",`No training items to display. Select a target role in Skills Assessment.`],["close"]]);
         return;
     }
 
@@ -4453,7 +4465,7 @@ function renderGantt() {
     const totalDays = Math.ceil((maxDate - minDate) / 86400000);
 
     // Build month headers
-    let monthHeaders = '';
+    let monthHeaders = [];
     const tmpDate = new Date(minDate);
     tmpDate.setDate(1);
     while (tmpDate <= maxDate) {
@@ -4462,11 +4474,11 @@ function renderGantt() {
         const mEnd = new Date(Math.min(tmpDate.getTime(), maxDate.getTime()));
         const mDays = Math.ceil((mEnd - mStart) / 86400000);
         const pct = (mDays / totalDays * 100).toFixed(1);
-        monthHeaders += `<div class="gantt-month-mark" data-ion-style="flex:0 0 ${pct}%">${MONTH_NAMES[mStart.getMonth()].slice(0,3)} ${mStart.getFullYear()}</div>`;
+        monthHeaders = monthHeaders.concat([["open","training-node-178",[["data-ion-style",`flex:0 0 ` + (pct) + `%`]],false],["value",MONTH_NAMES[mStart.getMonth()].slice(0,3)],["text",` `],["value",mStart.getFullYear()],["close"]]);
     }
 
-    let html = '<div class="gantt-chart">';
-    html += `<div class="gantt-header"><div class="gantt-label-col">Training Item</div><div class="gantt-timeline-col">${monthHeaders}</div></div>`;
+    let html = [["open","training-node-179",[],false]];
+    html = html.concat([["open","training-node-180",[],false],["open","training-node-181",[],false],["text",`Training Item`],["close"],["open","training-node-182",[],false],["value",monthHeaders],["close"],["close"]]);
 
     // Today marker reference
     const todayPct = ((today - minDate) / 86400000 / totalDays * 100).toFixed(1);
@@ -4481,17 +4493,17 @@ function renderGantt() {
                       item.type === 'milestone' ? `\u2B50 ${item.name}` :
                       item.name;
 
-        html += `<div class="gantt-row">`;
-        html += `<div class="gantt-row-label" title="${esc(item.name)}">${esc(item.name)}</div>`;
-        html += `<div class="gantt-row-bar-area">`;
+        html = html.concat([["open","training-node-183",[],false]]);
+        html = html.concat([["open","training-node-184",[["title",(trainingIdentity(item.name))]],false],["value",trainingIdentity(item.name)],["close"]]);
+        html = html.concat([["open","training-node-185",[],false]]);
         // Today line
-        html += `<div class="absolute top-0 bottom-0 w-[1px] bg-[var(--primary)] opacity-40 z-[1]" data-ion-style="left:${todayPct}%"></div>`;
-        html += `<div class="gantt-bar ${item.catCss}" data-ion-style="left:${leftPct}%; width:${widthPct}%" title="${esc(label)}">${esc(item.type === 'skill' ? '' : item.name)}</div>`;
-        html += `</div></div>`;
+        html = html.concat([["open","training-node-186",[["data-ion-style",`left:` + (todayPct) + `%`]],false],["close"]]);
+        html = html.concat([["open","training-node-187",[["class",`gantt-bar ` + (item.catCss)],["data-ion-style",`left:` + (leftPct) + `%; width:` + (widthPct) + `%`],["title",(trainingIdentity(label))]],false],["value",trainingIdentity(item.type === 'skill' ? '' : item.name)],["close"]]);
+        html = html.concat([["close"],["close"]]);
     });
 
-    html += '</div>';
-    container.innerHTML = html;
+    html = html.concat([["close"]]);
+    trainingRender(container, html);
 }
 
 // =========================================================================
@@ -4523,24 +4535,24 @@ function schedNavMonth(delta) {
 
 let socCovView = 'day';
 let covThresholds = {};  // capName -> { min_staff, min_level, notes }
+let covThresholdsAvailable = false;
 
 async function loadCovThresholds() {
     try {
         const resp = await fetch('/api/skills/coverage/thresholds');
-        if (!resp.ok) return;
+        if (!resp.ok) throw new Error('Thresholds unavailable');
         const data = await resp.json();
+        if (!data || !Array.isArray(data.thresholds)) throw new Error('Invalid thresholds');
         covThresholds = {};
-        (data.thresholds || []).forEach(t => { covThresholds[t.capability_key] = t; });
-    } catch (e) { /* thresholds optional */ }
+        data.thresholds.forEach(t => { covThresholds[t.capability_key] = t; });
+        covThresholdsAvailable = true;
+    } catch (e) { covThresholdsAvailable = false; }
 }
 
 async function initSchedule() {
     // Also need team skills data for capability coverage
     if (!teamData) {
-        try {
-            const resp = await fetch('/api/skills/team-overview');
-            if (resp.ok) teamData = await resp.json();
-        } catch (e) { /* skip capability grid */ }
+        await loadTeamData();
     }
     await loadCovThresholds();
     if (schedData) { renderScheduleGrid(); renderCapCoverageGrid(); fixGridCols(); renderScheduleSummary(); renderUnderstaffed(); return; }
@@ -4555,11 +4567,11 @@ async function loadScheduleData() {
     try {
         const resp = await fetch(`/api/skills/schedule?month=${monthStr}`);
         if (!resp.ok) {
-            document.getElementById('sched-grid').innerHTML = '<p class="text-[var(--text-muted)] italic">Access denied or no data.</p>';
-            return;
+            throw new Error('Schedule unavailable');
         }
         const data = await resp.json();
-        schedMembers = data.members || [];
+        if (!data || !Array.isArray(data.members) || !Array.isArray(data.entries)) throw new Error('Invalid schedule data');
+        schedMembers = data.members;
         // Build lookup: { "userId-YYYY-MM-DD": entry }
         schedData = {};
         (data.entries || []).forEach(e => {
@@ -4572,6 +4584,9 @@ async function loadScheduleData() {
         const csvLink = document.getElementById('sched-export-csv');
         if (csvLink) csvLink.href = `/api/skills/schedule/export.csv?month=${monthStr}`;
     } catch (e) {
+        schedData = null;
+        schedMembers = [];
+        ['sched-grid', 'soc-cov-grid', 'sched-summary', 'soc-understaffed'].forEach(id => trainingMessage(document.getElementById(id), 'Schedule unavailable. Please try again.'));
         console.warn('Schedule load failed:', e);
     }
 }
@@ -4613,48 +4628,48 @@ function renderScheduleSummary() {
         .filter(([, s]) => s.level <= 1)
         .sort((a, b) => a[1].level - b[1].level);
 
-    let html = '<div class="sched-summary">';
+    let html = [["open","training-node-189",[],false]];
 
     // Card 1: Staff on duty
-    html += `<div class="ss-card">
-        <div class="ss-card-header">\u{1F4CB} Today &mdash; ${esc(todayLabel)}</div>
-        <div class="ss-big-num ${workPct >= 60 ? 'green' : workPct >= 40 ? 'amber' : 'red'}">${working.length}<span class="text-[0.9rem] text-[var(--text-muted)]">/${total}</span></div>
-        <div class="ss-sub">staff on duty (${workPct}%)</div>
-    </div>`;
+    html = html.concat([["open","training-node-190",[],false],["text",`
+        `],["open","training-node-191",[],false],["text",`\u{1F4CB} Today — `],["value",trainingIdentity(todayLabel)],["close"],["text",`
+        `],["open","training-node-192",[["class",`ss-big-num ` + (workPct >= 60 ? 'green' : workPct >= 40 ? 'amber' : 'red')]],false],["value",working.length],["open","training-node-193",[],false],["text",`/`],["value",total],["close"],["close"],["text",`
+        `],["open","training-node-194",[],false],["text",`staff on duty (`],["value",workPct],["text",`%)`],["close"],["text",`
+    `],["close"]]);
 
     // Card 2: Who's out
     const absent = [...onLeave, ...sick, ...training, ...off.filter(() => today.getDay() !== 0 && today.getDay() !== 6)];
-    html += `<div class="ss-card">
-        <div class="ss-card-header">\u{1F6AB} Not Available</div>`;
+    html = html.concat([["open","training-node-195",[],false],["text",`
+        `],["open","training-node-196",[],false],["text",`\u{1F6AB} Not Available`],["close"]]);
     if (absent.length === 0) {
-        html += '<div class="ss-sub mt-[0.3rem]">Everyone is working today</div>';
+        html = html.concat([["open","training-node-197",[],false],["text",`Everyone is working today`],["close"]]);
     } else {
-        html += '<ul class="ss-list">';
-        onLeave.forEach(m => { html += `<li><span class="ss-dot ss-dot-blue"></span>${esc(m.display_name)} <span class="text-[var(--text-muted)]">&mdash; Leave</span></li>`; });
-        sick.forEach(m => { html += `<li><span class="ss-dot ss-dot-red"></span>${esc(m.display_name)} <span class="text-[var(--text-muted)]">&mdash; Sick</span></li>`; });
-        training.forEach(m => { html += `<li><span class="ss-dot ss-dot-purple"></span>${esc(m.display_name)} <span class="text-[var(--text-muted)]">&mdash; Training</span></li>`; });
-        html += '</ul>';
+        html = html.concat([["open","training-node-198",[],false]]);
+        onLeave.forEach(m => { html = html.concat([["open","training-node-199",[],false],["open","training-node-200",[],false],["close"],["value",trainingIdentity(m.display_name)],["text",` `],["open","training-node-201",[],false],["text",`— Leave`],["close"],["close"]]); });
+        sick.forEach(m => { html = html.concat([["open","training-node-202",[],false],["open","training-node-203",[],false],["close"],["value",trainingIdentity(m.display_name)],["text",` `],["open","training-node-204",[],false],["text",`— Sick`],["close"],["close"]]); });
+        training.forEach(m => { html = html.concat([["open","training-node-205",[],false],["open","training-node-206",[],false],["close"],["value",trainingIdentity(m.display_name)],["text",` `],["open","training-node-207",[],false],["text",`— Training`],["close"],["close"]]); });
+        html = html.concat([["close"]]);
     }
-    html += '</div>';
+    html = html.concat([["close"]]);
 
     // Card 3: Capability health
-    html += `<div class="ss-card">
-        <div class="ss-card-header">\u{1F6E1} Capability Status</div>`;
+    html = html.concat([["open","training-node-208",[],false],["text",`
+        `],["open","training-node-209",[],false],["text",`\u{1F6E1} Capability Status`],["close"]]);
     if (atRisk.length > 0) {
-        html += `<div class="ss-big-num red">${atRisk.length}</div>
-            <div class="ss-sub mb-[0.4rem]">at-risk capabilities</div>`;
+        html = html.concat([["open","training-node-210",[],false],["value",atRisk.length],["close"],["text",`
+            `],["open","training-node-211",[],false],["text",`at-risk capabilities`],["close"]]);
         atRisk.forEach(([name, s]) => {
-            html += `<div class="ss-cap-row"><span class="ss-cap-badge ${levelClasses[s.level]}">${levelLabels[s.level]}</span> <span class="text-[var(--text-secondary)]">${esc(name)}</span></div>`;
+            html = html.concat([["open","training-node-212",[],false],["open","training-node-213",[["class",`ss-cap-badge ` + (levelClasses[s.level])]],false],["value",levelLabels[s.level]],["close"],["text",` `],["open","training-node-214",[],false],["value",trainingIdentity(name)],["close"],["close"]]);
         });
     } else {
-        html += `<div class="ss-big-num green">\u2714</div>
-            <div class="ss-sub">All capabilities covered</div>`;
+        html = html.concat([["open","training-node-215",[],false],["text",`\u2714`],["close"],["text",`
+            `],["open","training-node-216",[],false],["text",`All capabilities covered`],["close"]]);
     }
-    html += '</div>';
+    html = html.concat([["close"]]);
 
     // Card 4: Week ahead outlook (next 5 working days)
-    html += `<div class="ss-card">
-        <div class="ss-card-header">\u{1F4C5} Week Ahead</div>`;
+    html = html.concat([["open","training-node-217",[],false],["text",`
+        `],["open","training-node-218",[],false],["text",`\u{1F4C5} Week Ahead`],["close"]]);
     let weekMin = Infinity, weekMinDay = '';
     for (let i = 1; i <= 7; i++) {
         const d = new Date(today); d.setDate(today.getDate() + i);
@@ -4667,12 +4682,12 @@ function renderScheduleSummary() {
         }
     }
     if (weekMin === Infinity) weekMin = working.length;
-    html += `<div class="ss-big-num ${weekMin >= total * 0.6 ? 'cyan' : weekMin >= total * 0.4 ? 'amber' : 'red'}">${weekMin}</div>
-        <div class="ss-sub">minimum staff: ${esc(weekMinDay)}</div>`;
-    html += '</div>';
+    html = html.concat([["open","training-node-219",[["class",`ss-big-num ` + (weekMin >= total * 0.6 ? 'cyan' : weekMin >= total * 0.4 ? 'amber' : 'red')]],false],["value",weekMin],["close"],["text",`
+        `],["open","training-node-220",[],false],["text",`minimum staff: `],["value",trainingIdentity(weekMinDay)],["close"]]);
+    html = html.concat([["close"]]);
 
-    html += '</div>';
-    container.innerHTML = html;
+    html = html.concat([["close"]]);
+    trainingRender(container, html);
 }
 
 function renderScheduleGrid() {
@@ -4680,7 +4695,7 @@ function renderScheduleGrid() {
     if (!container) return;
 
     if (schedMembers.length === 0) {
-        container.innerHTML = '<p class="text-[var(--text-muted)] italic">No team members found. Run the seed script first.</p>';
+        trainingRender(container, [["open","training-node-221",[],false],["text",`No team members found. Run the seed script first.`],["close"]]);
         return;
     }
 
@@ -4692,10 +4707,10 @@ function renderScheduleGrid() {
 
     let gridCols = `minmax(130px,160px) repeat(${daysInMonth}, minmax(32px, 1fr))`;
 
-    let html = `<div class="sched-grid" data-grid-cols="${gridCols}">`;
+    let html = [["open","training-node-222",[["data-grid-cols",(gridCols)]],false]];
 
     // Header row: Name + day numbers with day-of-week
-    html += `<div class="sg-cell sg-header sg-name justify-start">Team Member</div>`;
+    html = html.concat([["open","training-node-223",[],false],["text",`Team Member`],["close"]]);
     for (let d = 1; d <= daysInMonth; d++) {
         const dt = new Date(y, m, d);
         const dow = dt.getDay();
@@ -4703,12 +4718,12 @@ function renderScheduleGrid() {
         const dayName = dt.toLocaleDateString('en-GB', { weekday: 'short' }).substring(0, 2);
         const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         const isToday = dateStr === todayStr;
-        html += `<div class="sg-cell sg-header ${isWeekend ? 'sg-header-weekend' : ''} ${isToday ? 'sg-today-marker' : ''} cursor-pointer" title="Click to view daily roster: ${dt.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'long'})}" data-click-action="openDayRoster" data-args='["${dateStr}"]'><span class="sg-hdr-day">${dayName}</span><span class="sg-hdr-num">${d}</span></div>`;
+        html = html.concat([["open","training-node-224",[["class",`sg-cell sg-header ` + (isWeekend ? 'sg-header-weekend' : '') + ` ` + (isToday ? 'sg-today-marker' : '') + ` cursor-pointer`],["title",`Click to view daily roster: ` + (dt.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'long'}))],["data-args",JSON.stringify([(dateStr)])]],false],["open","training-node-225",[],false],["value",dayName],["close"],["open","training-node-226",[],false],["value",d],["close"],["close"]]);
     }
 
     // One row per team member
     schedMembers.forEach(member => {
-        html += `<div class="sg-cell sg-name cursor-pointer" title="Click to view ${esc(member.display_name)}'s skill profile" data-click-action="openMemberProfile" data-args='[${member.user_id}]'>${esc(member.display_name)}</div>`;
+        html = html.concat([["open","training-node-227",[["title",`Click to view ` + (trainingIdentity(member.display_name)) + `'s skill profile`],["data-args",JSON.stringify([(member.user_id)])]],false],["value",trainingIdentity(member.display_name)],["close"]]);
         for (let d = 1; d <= daysInMonth; d++) {
             const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
             const key = `${member.user_id}-${dateStr}`;
@@ -4724,13 +4739,13 @@ function renderScheduleGrid() {
             const shift = entry && entry.shift ? ` (${entry.shift})` : '';
             const tooltip = `${member.display_name}\n${dt.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'short'})}\nStatus: ${info.label}${shift}${entry && entry.notes ? '\nNote: ' + entry.notes : ''}`;
 
-            const shiftMark = entry && entry.shift ? `<span class="text-[0.45rem] block leading-[1] opacity-70">${entry.shift.charAt(0).toUpperCase()}</span>` : '';
-            html += `<div class="${cellCls}" title="${esc(tooltip)}" data-uid="${member.user_id}" data-date="${dateStr}" data-click-action="openSchedulePicker" data-args='["$target"]'><span class="sg-status-icon">${info.icon}</span>${shiftMark}</div>`;
+            const shiftMark = entry && entry.shift ? [["open","training-node-228",[],false],["value",entry.shift.charAt(0).toUpperCase()],["close"]] : '';
+            html = html.concat([["open","training-node-229",[["class",(cellCls)],["title",(trainingIdentity(tooltip))],["data-uid",(member.user_id)],["data-date",(dateStr)]],false],["open","training-node-230",[],false],["value",info.icon],["close"],["value",shiftMark],["close"]]);
         }
     });
 
     // Coverage summary row
-    html += `<div class="sg-cell sg-summary">Staff On Duty</div>`;
+    html = html.concat([["open","training-node-231",[],false],["text",`Staff On Duty`],["close"]]);
     for (let d = 1; d <= daysInMonth; d++) {
         const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         const dt = new Date(y, m, d);
@@ -4749,11 +4764,11 @@ function renderScheduleGrid() {
         let covCls = 'sg-cov-ok';
         if (pct < 0.25) covCls = 'sg-cov-low';
         else if (pct < 0.5) covCls = 'sg-cov-warn';
-        html += `<div class="sg-cell sg-cov ${covCls} ${isToday ? 'sg-today-marker' : ''}" title="${workingCount} of ${total} staff working">${workingCount}/${total}</div>`;
+        html = html.concat([["open","training-node-232",[["class",`sg-cell sg-cov ` + (covCls) + ` ` + (isToday ? 'sg-today-marker' : '')],["title",(workingCount) + ` of ` + (total) + ` staff working`]],false],["value",workingCount],["text",`/`],["value",total],["close"]]);
     }
 
-    html += '</div>';
-    container.innerHTML = html;
+    html = html.concat([["close"]]);
+    trainingRender(container, html);
 
     // Also render/update the summary panel
     renderScheduleSummary();
@@ -4785,42 +4800,42 @@ function openSchedulePicker(cell) {
     const currentNotes = entry ? (entry.notes || '') : '';
 
     const root = document.getElementById('sched-modal-root');
-    let html = `<div class="sched-modal-backdrop" data-click-action="closeSchedModal" data-args='["$event"]'>
-        <div class="sched-modal" data-stop-propagation>
-            <div class="sched-modal-title">${esc(member ? member.display_name : 'User ' + uid)}</div>
-            <div class="sched-modal-sub">${dt.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'long', year:'numeric'})}</div>
+    let html = [["open","training-node-233",[],false],["text",`
+        `],["open","training-node-234",[],false],["text",`
+            `],["open","training-node-235",[],false],["value",trainingIdentity(member ? member.display_name : 'User ' + uid)],["close"],["text",`
+            `],["open","training-node-236",[],false],["value",dt.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'long', year:'numeric'})],["close"],["text",`
 
-            <div class="sched-modal-field">
-                <label>Status</label>
-                <div class="sched-modal-statuses">`;
+            `],["open","training-node-237",[],false],["text",`
+                `],["open","training-node-238",[],false],["text",`Status`],["close"],["text",`
+                `],["open","training-node-239",[],false]];
     SCHED_STATUSES.forEach(s => {
         const sel = s.key === currentStatus ? ' selected' : '';
-        html += `<button class="sched-modal-status-btn ${s.cls}${sel}" data-status="${s.key}" data-click-action="selectModalStatus" data-args='["$target"]'>${s.icon} ${s.label}</button>`;
+        html = html.concat([["open","training-node-240",[["class",`sched-modal-status-btn ` + (s.cls) + (sel)],["data-status",(s.key)]],false],["value",s.icon],["text",` `],["value",s.label],["close"]]);
     });
-    html += `</div></div>
+    html = html.concat([["close"],["close"],["text",`
 
-            <div class="sched-modal-field">
-                <label>Shift</label>
-                <div class="sched-modal-shifts">`;
+            `],["open","training-node-241",[],false],["text",`
+                `],["open","training-node-242",[],false],["text",`Shift`],["close"],["text",`
+                `],["open","training-node-243",[],false]]);
     SCHED_SHIFTS.forEach(sh => {
         const sel = sh.key === currentShift ? ' selected' : '';
-        html += `<button class="sched-modal-shift-btn${sel}" data-shift="${sh.key || ''}" data-click-action="selectModalShift" data-args='["$target"]'>${sh.label}</button>`;
+        html = html.concat([["open","training-node-244",[["class",`sched-modal-shift-btn` + (sel)],["data-shift",(sh.key || '')]],false],["value",sh.label],["close"]]);
     });
-    html += `</div></div>
+    html = html.concat([["close"],["close"],["text",`
 
-            <div class="sched-modal-field">
-                <label>Notes</label>
-                <textarea class="sched-modal-notes" id="sched-modal-notes" placeholder="e.g. Annual leave, SANS training, on-call...">${esc(currentNotes)}</textarea>
-            </div>
+            `],["open","training-node-245",[],false],["text",`
+                `],["open","training-node-246",[],false],["text",`Notes`],["close"],["text",`
+                `],["open","training-node-247",[],false],["value",trainingIdentity(currentNotes)],["close"],["text",`
+            `],["close"],["text",`
 
-            <div class="sched-modal-actions">
-                <button class="sched-modal-clear" data-click-action="clearSchedEntry" data-args='[${uid}, "${dateStr}"]'>Reset to Default</button>
-                <button class="sched-modal-cancel" data-click-action="closeSchedModal">Cancel</button>
-                <button class="sched-modal-save" data-click-action="saveSchedModal" data-args='[${uid}, "${dateStr}"]'>Save</button>
-            </div>
-        </div>
-    </div>`;
-    root.innerHTML = html;
+            `],["open","training-node-248",[],false],["text",`
+                `],["open","training-node-249",[["data-args",JSON.stringify([(uid), (dateStr)])]],false],["text",`Reset to Default`],["close"],["text",`
+                `],["open","training-node-250",[],false],["text",`Cancel`],["close"],["text",`
+                `],["open","training-node-251",[["data-args",JSON.stringify([(uid), (dateStr)])]],false],["text",`Save`],["close"],["text",`
+            `],["close"],["text",`
+        `],["close"],["text",`
+    `],["close"]]);
+    trainingRender(root, html);
 }
 
 function selectModalStatus(btn) {
@@ -4932,59 +4947,59 @@ function openDayRoster(dateStr) {
         .filter(([, s]) => s.level <= 1)
         .map(([name, s]) => ({ name, level: s.level, label: ['None', 'Weak'][s.level] }));
 
-    let html = `<div class="day-roster-backdrop" data-click-action="closeDayRoster" data-args='["$event"]'>
-        <div class="day-roster" data-stop-propagation>
-            <button class="day-roster-close" data-click-action="closeDayRoster">&times;</button>
-            <div class="day-roster-title">Daily Roster &mdash; Who Can Do What</div>
-            <div class="day-roster-sub">${esc(dayLabel)} &mdash; ${workingMembers.length} on duty, ${absentMembers.length} off</div>`;
+    let html = [["open","training-node-252",[],false],["text",`
+        `],["open","training-node-253",[],false],["text",`
+            `],["open","training-node-254",[],false],["text",`×`],["close"],["text",`
+            `],["open","training-node-255",[],false],["text",`Daily Roster — Who Can Do What`],["close"],["text",`
+            `],["open","training-node-256",[],false],["value",trainingIdentity(dayLabel)],["text",` — `],["value",workingMembers.length],["text",` on duty, `],["value",absentMembers.length],["text",` off`],["close"]];
 
     // Capability gaps warning
     if (capGaps.length > 0) {
-        html += `<div class="dr-gap-card">
-            <div class="dr-gap-title">\u26A0 Capability Gaps on This Day</div>
-            <div class="dr-gap-list">${capGaps.map(g => `<strong>${esc(g.name)}</strong>: ${g.label} coverage`).join(' &bull; ')}</div>
-        </div>`;
+        html = html.concat([["open","training-node-258",[],false],["text",`
+            `],["open","training-node-259",[],false],["text",`\u26A0 Capability Gaps on This Day`],["close"],["text",`
+            `],["open","training-node-260",[],false],["value",trainingJoin(capGaps.map(g => [["open","training-node-257",[],false],["value",trainingIdentity(g.name)],["close"],["text",`: `],["value",g.label],["text",` coverage`]]), ' • ')],["close"],["text",`
+        `],["close"]]);
     }
 
     // Working members
-    html += `<div class="dr-section-title">\u2714 On Duty (${workingMembers.length})</div>`;
+    html = html.concat([["open","training-node-261",[],false],["text",`\u2714 On Duty (`],["value",workingMembers.length],["text",`)`],["close"]]);
     workingMembers.forEach(m => {
         const caps = getMemberCaps(m);
-        html += `<div class="dr-member-card">
-            <div>
-                <div class="dr-member-name">${esc(m.display_name)}</div>
-                <div class="dr-member-role">${m.current_role ? m.current_role.replace(/-/g, ' ') : 'N/A'}</div>
-            </div>
-            <div class="dr-member-caps">`;
+        html = html.concat([["open","training-node-262",[],false],["text",`
+            `],["open","training-node-263",[],false],["text",`
+                `],["open","training-node-264",[],false],["value",trainingIdentity(m.display_name)],["close"],["text",`
+                `],["open","training-node-265",[],false],["value",m.current_role ? m.current_role.replace(/-/g, ' ') : 'N/A'],["close"],["text",`
+            `],["close"],["text",`
+            `],["open","training-node-266",[],false]]);
         caps.forEach(c => {
-            html += `<span class="dr-cap-badge ${c.cls}" title="${c.name}: avg ${c.avg.toFixed(1)}">${c.icon} ${esc(c.name)}</span>`;
+            html = html.concat([["open","training-node-267",[["class",`dr-cap-badge ` + (c.cls)],["title",(c.name) + `: avg ` + (c.avg.toFixed(1))]],false],["value",c.icon],["text",` `],["value",trainingIdentity(c.name)],["close"]]);
         });
-        if (caps.length === 0) html += '<span class="text-[0.65rem] text-[var(--text-muted)]">No assessments</span>';
-        html += `</div></div>`;
+        if (caps.length === 0) html = html.concat([["open","training-node-268",[],false],["text",`No assessments`],["close"]]);
+        html = html.concat([["close"],["close"]]);
     });
 
     // Absent members
     if (absentMembers.length > 0) {
-        html += `<div class="dr-section-title">\u2716 Not Available (${absentMembers.length})</div>`;
+        html = html.concat([["open","training-node-269",[],false],["text",`\u2716 Not Available (`],["value",absentMembers.length],["text",`)`],["close"]]);
         absentMembers.forEach(m => {
             const caps = getMemberCaps(m);
             const topCaps = caps.slice(0, 3);
-            html += `<div class="dr-member-card opacity-60">
-                <div>
-                    <div class="dr-member-name">${esc(m.display_name)}</div>
-                    <div class="dr-member-role">${m.statusIcon} ${m.statusLabel}</div>
-                </div>
-                <div class="dr-member-caps">`;
+            html = html.concat([["open","training-node-270",[],false],["text",`
+                `],["open","training-node-271",[],false],["text",`
+                    `],["open","training-node-272",[],false],["value",trainingIdentity(m.display_name)],["close"],["text",`
+                    `],["open","training-node-273",[],false],["value",m.statusIcon],["text",` `],["value",m.statusLabel],["close"],["text",`
+                `],["close"],["text",`
+                `],["open","training-node-274",[],false]]);
             topCaps.forEach(c => {
-                html += `<span class="dr-cap-badge ${c.cls} opacity-50">${c.icon} ${esc(c.name)}</span>`;
+                html = html.concat([["open","training-node-275",[["class",`dr-cap-badge ` + (c.cls) + ` opacity-50`]],false],["value",c.icon],["text",` `],["value",trainingIdentity(c.name)],["close"]]);
             });
-            if (topCaps.length < caps.length) html += `<span class="text-[0.6rem] text-[var(--text-muted)]">+${caps.length - topCaps.length} more</span>`;
-            html += `</div></div>`;
+            if (topCaps.length < caps.length) html = html.concat([["open","training-node-276",[],false],["text",`+`],["value",caps.length - topCaps.length],["text",` more`],["close"]]);
+            html = html.concat([["close"],["close"]]);
         });
     }
 
-    html += `</div></div>`;
-    document.getElementById('day-roster-root').innerHTML = html;
+    html = html.concat([["close"],["close"]]);
+    trainingRender(document.getElementById('day-roster-root'), html);
 }
 
 function closeDayRoster(event) {
@@ -5002,20 +5017,20 @@ function openMemberProfile(userId) {
 
     const levelLabels = ['N/A', 'Awareness', 'Basic', 'Intermediate', 'Advanced', 'Expert'];
     const levelClasses = ['', 'awareness', 'basic', 'intermediate', 'advanced', 'expert'];
-    const levelColors = ['transparent', 'rgba(100,100,100,0.3)', 'rgba(249,115,22,0.3)', 'rgba(234,179,8,0.3)', 'rgba(34,197,94,0.3)', 'rgba(6,182,212,0.3)'];
+    const levelColors = ['transparent', 'color-mix(in srgb,var(--text-muted) 30%,transparent)', 'color-mix(in srgb,var(--warning) 30%,transparent)', 'color-mix(in srgb,var(--warning) 30%,transparent)', 'color-mix(in srgb,var(--success) 30%,transparent)', 'color-mix(in srgb,var(--info) 30%,transparent)'];
 
-    let html = `<div class="member-popover-backdrop" data-click-action="closeMemberPopover" data-args='["$event"]'>
-        <div class="member-popover" data-stop-propagation>
-            <div class="mp-header">
-                <div>
-                    <div class="mp-name">${esc(member.display_name)}</div>
-                    <div class="mp-role">${td.current_role ? td.current_role.replace(/-/g, ' ') : ''} ${td.target_role ? '\u2192 ' + td.target_role.replace(/-/g, ' ') : ''}</div>
-                </div>
-                <button class="mp-close" data-click-action="closeMemberPopover">&times;</button>
-            </div>`;
+    let html = [["open","training-node-277",[],false],["text",`
+        `],["open","training-node-278",[],false],["text",`
+            `],["open","training-node-279",[],false],["text",`
+                `],["open","training-node-280",[],false],["text",`
+                    `],["open","training-node-281",[],false],["value",trainingIdentity(member.display_name)],["close"],["text",`
+                    `],["open","training-node-282",[],false],["value",td.current_role ? td.current_role.replace(/-/g, ' ') : ''],["text",` `],["value",td.target_role ? '\u2192 ' + td.target_role.replace(/-/g, ' ') : ''],["close"],["text",`
+                `],["close"],["text",`
+                `],["open","training-node-283",[],false],["text",`×`],["close"],["text",`
+            `],["close"]];
 
     // Capability breakdown
-    html += `<div class="dr-section-title">Capability Profile</div>`;
+    html = html.concat([["open","training-node-284",[],false],["text",`Capability Profile`],["close"]]);
     Object.entries(SOC_CAPABILITIES).forEach(([capName, capDef]) => {
         const catSkills = SKILLS_MATRIX[capDef.cat];
         if (!catSkills) return;
@@ -5024,25 +5039,25 @@ function openMemberProfile(userId) {
         if (vals.length === 0) return;
         const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
         const lvl = avg >= 4.5 ? 5 : avg >= 3.5 ? 4 : avg >= 2.5 ? 3 : avg >= 1.5 ? 2 : avg > 0 ? 1 : 0;
-        html += `<div class="mp-cap-row">
-            <span class="mp-cap-name">${capDef.icon} ${esc(capName)}</span>
-            <span class="mp-cap-level" data-ion-style="background:${levelColors[lvl]}; color:${lvl>=4?'#06b6d4':lvl>=3?'#22c55e':lvl>=2?'#eab308':'var(--text-muted)'}">${levelLabels[lvl]} (${avg.toFixed(1)})</span>
-        </div>`;
+        html = html.concat([["open","training-node-285",[],false],["text",`
+            `],["open","training-node-286",[],false],["value",capDef.icon],["text",` `],["value",trainingIdentity(capName)],["close"],["text",`
+            `],["open","training-node-287",[["data-ion-style",`background:` + (levelColors[lvl]) + `; color:` + (lvl>=4?'var(--info)':lvl>=3?'var(--success)':lvl>=2?'var(--warning)':'var(--text-muted)')]],false],["value",levelLabels[lvl]],["text",` (`],["value",avg.toFixed(1)],["text",`)`],["close"],["text",`
+        `],["close"]]);
 
         // Individual skills under this capability
-        html += '<div class="mp-skills-detail">';
+        html = html.concat([["open","training-node-288",[],false]]);
         skillKeys.forEach(k => {
             const r = td.skills[k] || 0;
             if (r === 0) return;
             const skillLabel = catSkills[k] ? catSkills[k].name : k;
             const barWidth = (r / 5 * 60);
-            html += `<span class="mp-skill-bar" data-ion-style="width:${barWidth}px; background:${levelColors[r]}"></span> ${esc(skillLabel)}: <strong>${r}</strong><br>`;
+            html = html.concat([["open","training-node-289",[["data-ion-style",`width:` + (barWidth) + `px; background:` + (levelColors[r])]],false],["close"],["text",` `],["value",trainingIdentity(skillLabel)],["text",`: `],["open","training-node-290",[],false],["value",r],["close"],["open","training-node-291",[],true]]);
         });
-        html += '</div>';
+        html = html.concat([["close"]]);
     });
 
-    html += `</div></div>`;
-    document.getElementById('member-popover-root').innerHTML = html;
+    html = html.concat([["close"],["close"]]);
+    trainingRender(document.getElementById('member-popover-root'), html);
 }
 
 function closeMemberPopover(event) {
@@ -5060,7 +5075,7 @@ function closeMemberPopover(event) {
 // now ride on a CSP-safe data-grid-cols attribute and are applied here.
 function fixGridCols() {
     document.querySelectorAll('#sched-grid .sched-grid[data-grid-cols], #soc-cov-grid .sched-grid[data-grid-cols]').forEach(g => {
-        g.style.gridTemplateColumns = g.getAttribute('data-grid-cols');
+        g.setAttribute('data-ion-style', 'grid-template-columns:' + g.getAttribute('data-grid-cols'));
     });
 }
 
@@ -5125,8 +5140,13 @@ function computeCapScores(workingIds) {
 
 function renderCapCoverageGrid() {
     const container = document.getElementById('soc-cov-grid');
-    if (!container || !teamData || schedMembers.length === 0) {
-        if (container) container.replaceChildren();
+    if (!container) return;
+    if (!teamData) {
+        trainingMessage(container, 'Team capability data unavailable. Please try again.');
+        return;
+    }
+    if (schedMembers.length === 0) {
+        trainingMessage(container, 'No team members found.');
         return;
     }
 
@@ -5147,16 +5167,16 @@ function renderCapCoverageGrid() {
 
     // Daily view
     let gridCols = `minmax(140px,170px) repeat(${daysInMonth}, minmax(28px, 1fr))`;
-    let html = `<div class="sched-grid" data-grid-cols="${gridCols}">`;
+    let html = [["open","training-node-292",[["data-grid-cols",(gridCols)]],false]];
 
     // Header
-    html += `<div class="sg-cell sg-header sc-cap-name text-left">Capability</div>`;
+    html = html.concat([["open","training-node-293",[],false],["text",`Capability`],["close"]]);
     for (let d = 1; d <= daysInMonth; d++) {
         const dt = new Date(y, m, d);
         const dow = dt.getDay();
         const isWeekend = dow === 0 || dow === 6;
         const dayName = dt.toLocaleDateString('en-GB', { weekday: 'short' }).charAt(0);
-        html += `<div class="sg-cell sg-header ${isWeekend ? 'sg-header-weekend' : ''}">${dayName}<br>${d}</div>`;
+        html = html.concat([["open","training-node-294",[["class",`sg-cell sg-header ` + (isWeekend ? 'sg-header-weekend' : '')]],false],["value",dayName],["open","training-node-295",[],true],["value",d],["close"]]);
     }
 
     // Pre-compute daily scores
@@ -5171,16 +5191,16 @@ function renderCapCoverageGrid() {
     const shortLabels = ['-', 'W', 'B', 'G', 'S']; // None/Weak/Basic/Good/Strong short
     capNames.forEach(capName => {
         const icon = SOC_CAPABILITIES[capName].icon;
-        html += `<div class="sg-cell sc-cap-name">${icon} ${esc(capName)}</div>`;
+        html = html.concat([["open","training-node-296",[],false],["value",icon],["text",` `],["value",trainingIdentity(capName)],["close"]]);
         for (let d = 0; d < daysInMonth; d++) {
             const sc = dailyScores[d][capName] || { level: 0, avg: 0, cover: 0, people: [] };
             const tooltip = `${capName}\n${levelLabels[sc.level]} coverage (level ${sc.level}/4)\nAvg proficiency: ${sc.avg.toFixed(1)}\nStaff at 3+: ${sc.cover}${sc.people.length > 0 ? '\nKey people: ' + sc.people.join(', ') : ''}`;
-            html += `<div class="sg-cell sc-cov-${sc.level}" title="${esc(tooltip)}"><span class="sc-level-label">${shortLabels[sc.level]}</span></div>`;
+            html = html.concat([["open","training-node-297",[["class",`sg-cell sc-cov-` + (sc.level)],["title",(trainingIdentity(tooltip))]],false],["open","training-node-298",[],false],["value",shortLabels[sc.level]],["close"],["close"]]);
         }
     });
 
-    html += '</div>';
-    container.innerHTML = html;
+    html = html.concat([["close"]]);
+    trainingRender(container, html);
 }
 
 function renderCapCoverageWeekly(container, capNames, y, m, daysInMonth, levelLabels) {
@@ -5201,18 +5221,18 @@ function renderCapCoverageWeekly(container, capNames, y, m, daysInMonth, levelLa
 
     const numWeeks = weeks.length;
     let gridCols = `minmax(140px,170px) repeat(${numWeeks}, minmax(80px, 1fr))`;
-    let html = `<div class="sched-grid" data-grid-cols="${gridCols}">`;
+    let html = [["open","training-node-299",[["data-grid-cols",(gridCols)]],false]];
 
     // Header
-    html += `<div class="sg-cell sg-header sc-cap-name text-left">Capability</div>`;
+    html = html.concat([["open","training-node-300",[],false],["text",`Capability`],["close"]]);
     weeks.forEach(w => {
-        html += `<div class="sg-cell sc-week-header">${w.start}-${w.end} ${schedMonth.toLocaleDateString('en-GB',{month:'short'})}</div>`;
+        html = html.concat([["open","training-node-301",[],false],["value",w.start],["text",`-`],["value",w.end],["text",` `],["value",schedMonth.toLocaleDateString('en-GB',{month:'short'})],["close"]]);
     });
 
     // Compute weekly aggregates per capability
     capNames.forEach(capName => {
         const icon = SOC_CAPABILITIES[capName].icon;
-        html += `<div class="sg-cell sc-cap-name">${icon} ${esc(capName)}</div>`;
+        html = html.concat([["open","training-node-302",[],false],["value",icon],["text",` `],["value",trainingIdentity(capName)],["close"]]);
         weeks.forEach(w => {
             // Average the daily scores across this week's working days
             let totalAvg = 0;
@@ -5242,12 +5262,12 @@ function renderCapCoverageWeekly(container, capNames, y, m, daysInMonth, levelLa
             else level = 4;
             const peopleArr = Array.from(allPeople).slice(0, 3);
             const tooltip = `${capName}\nWeek ${w.start}-${w.end}: ${levelLabels[level]}\nAvg proficiency: ${weekAvg.toFixed(1)}\n~${weekCover} staff/day at 3+${peopleArr.length > 0 ? '\nKey: ' + peopleArr.join(', ') : ''}`;
-            html += `<div class="sg-cell sc-cov-${level} text-[0.72rem] flex-col" title="${esc(tooltip)}"><span class="sc-level-label">${levelLabels[level]}</span><span class="text-[0.58rem] text-[var(--text-muted)]">${weekAvg.toFixed(1)}</span></div>`;
+            html = html.concat([["open","training-node-303",[["class",`sg-cell sc-cov-` + (level) + ` text-[0.72rem] flex-col`],["title",(trainingIdentity(tooltip))]],false],["open","training-node-304",[],false],["value",levelLabels[level]],["close"],["open","training-node-305",[],false],["value",weekAvg.toFixed(1)],["close"],["close"]]);
         });
     });
 
-    html += '</div>';
-    container.innerHTML = html;
+    html = html.concat([["close"]]);
+    trainingRender(container, html);
 }
 
 // =========================================================================
@@ -5290,10 +5310,10 @@ function renderCapCoverageMonthly(container, capNames, y, m, daysInMonth, levelL
     const dates = monthWorkingDates();
     const monthName = schedMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
     const gridCols = `minmax(140px,200px) minmax(90px,1fr) minmax(90px,1fr)`;
-    let html = `<div class="sched-grid" data-grid-cols="${gridCols}">`;
-    html += `<div class="sg-cell sg-header sc-cap-name text-left">Capability</div>`;
-    html += `<div class="sg-cell sc-week-header">${esc(monthName)} (avg)</div>`;
-    html += `<div class="sg-cell sc-week-header">Worst day</div>`;
+    let html = [["open","training-node-306",[["data-grid-cols",(gridCols)]],false]];
+    html = html.concat([["open","training-node-307",[],false],["text",`Capability`],["close"]]);
+    html = html.concat([["open","training-node-308",[],false],["value",trainingIdentity(monthName)],["text",` (avg)`],["close"]]);
+    html = html.concat([["open","training-node-309",[],false],["text",`Worst day`],["close"]]);
 
     capNames.forEach(capName => {
         const icon = SOC_CAPABILITIES[capName].icon;
@@ -5306,12 +5326,12 @@ function renderCapCoverageMonthly(container, capNames, y, m, daysInMonth, levelL
         const avgLvl = n > 0 ? total / n : 0;
         const avgRounded = Math.round(avgLvl);
         const worstLvl = n > 0 ? worst : 0;
-        html += `<div class="sg-cell sc-cap-name">${icon} ${esc(capName)}</div>`;
-        html += `<div class="sg-cell sc-cov-${avgRounded} text-[0.72rem] flex-col" title="${esc(capName)}: month-average coverage"><span class="sc-level-label">${levelLabels[avgRounded]}</span><span class="text-[0.58rem] text-[var(--text-muted)]">${avgLvl.toFixed(1)}</span></div>`;
-        html += `<div class="sg-cell sc-cov-${worstLvl} text-[0.72rem] flex-col" title="Lowest single-day coverage this month"><span class="sc-level-label">${levelLabels[worstLvl]}</span></div>`;
+        html = html.concat([["open","training-node-310",[],false],["value",icon],["text",` `],["value",trainingIdentity(capName)],["close"]]);
+        html = html.concat([["open","training-node-311",[["class",`sg-cell sc-cov-` + (avgRounded) + ` text-[0.72rem] flex-col`],["title",(trainingIdentity(capName)) + `: month-average coverage`]],false],["open","training-node-312",[],false],["value",levelLabels[avgRounded]],["close"],["open","training-node-313",[],false],["value",avgLvl.toFixed(1)],["close"],["close"]]);
+        html = html.concat([["open","training-node-314",[["class",`sg-cell sc-cov-` + (worstLvl) + ` text-[0.72rem] flex-col`]],false],["open","training-node-315",[],false],["value",levelLabels[worstLvl]],["close"],["close"]]);
     });
-    html += '</div>';
-    container.innerHTML = html;
+    html = html.concat([["close"]]);
+    trainingRender(container, html);
 }
 
 // Threshold-driven RAG summary: which capabilities miss their minimum
@@ -5319,9 +5339,13 @@ function renderCapCoverageMonthly(container, capNames, y, m, daysInMonth, levelL
 function renderUnderstaffed() {
     const root = document.getElementById('soc-understaffed');
     if (!root) return;
+    if (!covThresholdsAvailable) {
+        trainingMessage(root, 'Staffing thresholds unavailable. Please try again.');
+        return;
+    }
     const capsWithThresholds = Object.keys(covThresholds);
     if (capsWithThresholds.length === 0) {
-        root.innerHTML = `<div class="us-card us-hint">No staffing thresholds set &mdash; click <strong>&#9881; Thresholds</strong> to define minimum capability coverage and surface understaffed days.</div>`;
+        trainingRender(root, [["open","training-node-316",[],false],["text",`No staffing thresholds set — click `],["open","training-node-317",[],false],["text",`⚙ Thresholds`],["close"],["text",` to define minimum capability coverage and surface understaffed days.`],["close"]]);
         return;
     }
     const dates = monthWorkingDates();
@@ -5339,23 +5363,23 @@ function renderUnderstaffed() {
     const breachedCaps = Object.keys(breaches);
     const monthName = schedMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
     if (breachedCaps.length === 0) {
-        root.innerHTML = `<div class="us-card us-ok">&#10004; All ${capsWithThresholds.length} capability threshold(s) met on every working day in ${esc(monthName)}.</div>`;
+        trainingRender(root, [["open","training-node-318",[],false],["text",`✔ All `],["value",capsWithThresholds.length],["text",` capability threshold(s) met on every working day in `],["value",trainingIdentity(monthName)],["text",`.`],["close"]]);
         return;
     }
-    let html = `<div class="us-card us-warn"><div class="us-title">&#9888; Understaffed days &mdash; ${esc(monthName)}</div>`;
+    let html = [["open","training-node-319",[],false],["open","training-node-320",[],false],["text",`⚠ Understaffed days — `],["value",trainingIdentity(monthName)],["close"]];
     breachedCaps.forEach(cap => {
         const thr = covThresholds[cap];
         const days = breaches[cap];
-        html += `<div class="us-row"><div class="us-cap">${SOC_CAPABILITIES[cap].icon} ${esc(cap)} <span class="us-need">need ${thr.min_staff}@L${thr.min_level}</span></div><div class="us-days">`;
+        html = html.concat([["open","training-node-321",[],false],["open","training-node-322",[],false],["value",SOC_CAPABILITIES[cap].icon],["text",` `],["value",trainingIdentity(cap)],["text",` `],["open","training-node-323",[],false],["text",`need `],["value",thr.min_staff],["text",`@L`],["value",thr.min_level],["close"],["close"],["open","training-node-324",[],false]]);
         days.slice(0, 12).forEach(b => {
             const dd = b.date.slice(8);
-            html += `<button class="us-day" data-click-action="openFillGap" data-args='["${esc(cap)}","${b.date}"]' title="${b.have}/${b.need} on ${b.date} — click to find cover">${dd}</button>`;
+            html = html.concat([["open","training-node-325",[["data-args",JSON.stringify([(trainingIdentity(cap)),(b.date)])],["title",(b.have) + `/` + (b.need) + ` on ` + (b.date) + ` — click to find cover`]],false],["value",dd],["close"]]);
         });
-        if (days.length > 12) html += `<span class="us-more">+${days.length - 12} more</span>`;
-        html += `</div></div>`;
+        if (days.length > 12) html = html.concat([["open","training-node-326",[],false],["text",`+`],["value",days.length - 12],["text",` more`],["close"]]);
+        html = html.concat([["close"],["close"]]);
     });
-    html += `</div>`;
-    root.innerHTML = html;
+    html = html.concat([["close"]]);
+    trainingRender(root, html);
 }
 
 // "Fill the gap" — off-duty staff who hold the capability on a given day.
@@ -5368,22 +5392,22 @@ function openFillGap(capName, dateStr) {
         .filter(c => c.avg >= thr.min_level)
         .sort((a, b) => b.avg - a.avg);
     const dayLabel = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
-    let html = `<div class="day-roster-backdrop" data-click-action="closeFillGap" data-args='["$event"]'>
-        <div class="day-roster" data-stop-propagation>
-            <button class="day-roster-close" data-click-action="closeFillGap">&times;</button>
-            <div class="day-roster-title">Cover for ${esc(capName)}</div>
-            <div class="day-roster-sub">${esc(dayLabel)} &mdash; off-duty staff at L${thr.min_level}+ proficiency</div>`;
+    let html = [["open","training-node-327",[],false],["text",`
+        `],["open","training-node-328",[],false],["text",`
+            `],["open","training-node-329",[],false],["text",`×`],["close"],["text",`
+            `],["open","training-node-330",[],false],["text",`Cover for `],["value",trainingIdentity(capName)],["close"],["text",`
+            `],["open","training-node-331",[],false],["value",trainingIdentity(dayLabel)],["text",` — off-duty staff at L`],["value",thr.min_level],["text",`+ proficiency`],["close"]];
     if (candidates.length === 0) {
-        html += `<div class="dr-gap-card"><div class="dr-gap-title">No off-duty cover available</div><div class="dr-gap-list">Nobody off-duty meets L${thr.min_level}+ in ${esc(capName)}. Consider cross-training or adjusting the threshold.</div></div>`;
+        html = html.concat([["open","training-node-332",[],false],["open","training-node-333",[],false],["text",`No off-duty cover available`],["close"],["open","training-node-334",[],false],["text",`Nobody off-duty meets L`],["value",thr.min_level],["text",`+ in `],["value",trainingIdentity(capName)],["text",`. Consider cross-training or adjusting the threshold.`],["close"],["close"]]);
     } else {
-        html += `<div class="dr-section-title">Available to call in (${candidates.length})</div>`;
+        html = html.concat([["open","training-node-335",[],false],["text",`Available to call in (`],["value",candidates.length],["text",`)`],["close"]]);
         candidates.forEach(c => {
             const lvl = c.avg >= 4.5 ? 5 : c.avg >= 3.5 ? 4 : c.avg >= 2.5 ? 3 : 2;
-            html += `<div class="dr-member-card"><div><div class="dr-member-name">${esc(c.name)}</div></div><div class="dr-member-caps"><span class="dr-cap-badge ${['','awareness','awareness','basic','advanced','expert'][lvl] || 'intermediate'}">avg ${c.avg.toFixed(1)}</span></div></div>`;
+            html = html.concat([["open","training-node-336",[],false],["open","training-node-337",[],false],["open","training-node-338",[],false],["value",trainingIdentity(c.name)],["close"],["close"],["open","training-node-339",[],false],["open","training-node-340",[["class",`dr-cap-badge ` + (['','awareness','awareness','basic','advanced','expert'][lvl] || 'intermediate')]],false],["text",`avg `],["value",c.avg.toFixed(1)],["close"],["close"],["close"]]);
         });
     }
-    html += `</div></div>`;
-    document.getElementById('fill-gap-root').innerHTML = html;
+    html = html.concat([["close"],["close"]]);
+    trainingRender(document.getElementById('fill-gap-root'), html);
 }
 function closeFillGap(event) {
     if (event && event.target !== event.currentTarget) return;
@@ -5393,24 +5417,24 @@ function closeFillGap(event) {
 // Threshold configuration modal.
 function openThresholdConfig() {
     const caps = Object.keys(SOC_CAPABILITIES);
-    let html = `<div class="day-roster-backdrop" data-click-action="closeThresholdConfig" data-args='["$event"]'>
-        <div class="day-roster" data-stop-propagation>
-            <button class="day-roster-close" data-click-action="closeThresholdConfig">&times;</button>
-            <div class="day-roster-title">&#9881; Capability staffing thresholds</div>
-            <div class="day-roster-sub">Minimum people on duty at a proficiency level for each capability. Set staff to 0 to stop tracking.</div>
-            <div class="thr-grid">`;
+    let html = [["open","training-node-341",[],false],["text",`
+        `],["open","training-node-342",[],false],["text",`
+            `],["open","training-node-343",[],false],["text",`×`],["close"],["text",`
+            `],["open","training-node-344",[],false],["text",`⚙ Capability staffing thresholds`],["close"],["text",`
+            `],["open","training-node-345",[],false],["text",`Minimum people on duty at a proficiency level for each capability. Set staff to 0 to stop tracking.`],["close"],["text",`
+            `],["open","training-node-346",[],false]];
     caps.forEach((cap, i) => {
         const t = covThresholds[cap] || { min_staff: 0, min_level: 3 };
-        html += `<div class="thr-row" data-cap="${esc(cap)}">
-            <div class="thr-cap">${SOC_CAPABILITIES[cap].icon} ${esc(cap)}</div>
-            <label class="thr-fld">min staff <input type="number" min="0" max="50" value="${t.min_staff}" id="thr-staff-${i}"></label>
-            <label class="thr-fld">at level <input type="number" min="1" max="5" value="${t.min_level}" id="thr-level-${i}"></label>
-        </div>`;
+        html = html.concat([["open","training-node-347",[["data-cap",(trainingIdentity(cap))]],false],["text",`
+            `],["open","training-node-348",[],false],["value",SOC_CAPABILITIES[cap].icon],["text",` `],["value",trainingIdentity(cap)],["close"],["text",`
+            `],["open","training-node-349",[],false],["text",`min staff `],["open","training-node-350",[["value",(t.min_staff)],["id",`thr-staff-` + (i)]],true],["close"],["text",`
+            `],["open","training-node-351",[],false],["text",`at level `],["open","training-node-352",[["value",(t.min_level)],["id",`thr-level-` + (i)]],true],["close"],["text",`
+        `],["close"]]);
     });
-    html += `</div>
-            <div class="thr-actions"><button class="btn btn-primary" data-click-action="saveThresholds">Save thresholds</button></div>
-        </div></div>`;
-    document.getElementById('threshold-config-root').innerHTML = html;
+    html = html.concat([["close"],["text",`
+            `],["open","training-node-353",[],false],["open","training-node-354",[],false],["text",`Save thresholds`],["close"],["close"],["text",`
+        `],["close"],["close"]]);
+    trainingRender(document.getElementById('threshold-config-root'), html);
 }
 function closeThresholdConfig(event) {
     if (event && event.target !== event.currentTarget) return;
@@ -5481,9 +5505,9 @@ async function checkTeamTabAccess() {
         const resp = await fetch('/api/skills/team-overview');
         if (resp.ok) {
             const btn = document.getElementById('tab-team-btn');
-            if (btn) btn.style.display = '';
+            if (btn) btn.classList.remove('hidden');
             const schedBtn = document.getElementById('tab-schedule-btn');
-            if (schedBtn) schedBtn.style.display = '';
+            if (schedBtn) schedBtn.classList.remove('hidden');
         }
     } catch (e) { /* hide tabs */ }
 }
