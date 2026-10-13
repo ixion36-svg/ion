@@ -559,14 +559,11 @@ async def alerts_case_panel_fragment(
     """
     can_update = _can(current_user, UPDATE_PERMISSION)
 
-    def answer(ctx: dict) -> HTMLResponse:
-        return templates.TemplateResponse(
-            request=request, name=PANEL_FRAGMENT,
-            context={"case_id": case_id, "can_update": can_update,
-                     "status_options": STATUS_OPTIONS,
-                     "severity_options": SEVERITY_OPTIONS, **ctx},
-            status_code=200,
-        )
+    def answer(ctx: dict) -> Response:
+        return render_view(request, PANEL_FRAGMENT,
+                           {"case_id": case_id, "can_update": can_update,
+                            "status_options": STATUS_OPTIONS,
+                            "severity_options": SEVERITY_OPTIONS, **ctx})
 
     try:
         case = await _read_case(case_id, current_user, session)
@@ -705,13 +702,10 @@ async def alerts_case_manage_fragment(
         flags["can_execute_playbooks"] and _can(current_user, PLAYBOOK_READ_PERMISSION)
     )
 
-    def answer(ctx: dict) -> HTMLResponse:
-        return templates.TemplateResponse(
-            request=request, name=MANAGE_FRAGMENT,
-            context={"case_id": case_id, "status_options": STATUS_OPTIONS,
-                     "severity_options": SEVERITY_OPTIONS, **flags, **ctx},
-            status_code=200,
-        )
+    def answer(ctx: dict) -> Response:
+        view = {"case_id": case_id, "status_options": STATUS_OPTIONS,
+                "severity_options": SEVERITY_OPTIONS, **flags, **ctx}
+        return render_view(request, MANAGE_FRAGMENT, view)
 
     try:
         case = await _read_case(case_id, current_user, session)
@@ -772,11 +766,9 @@ async def alerts_case_ai_summary_fragment(
     """
     from ion.web.ai_api import analyze_alert
 
-    def answer(ctx: dict) -> HTMLResponse:
-        return templates.TemplateResponse(
-            request=request, name=AI_SUMMARY_FRAGMENT,
-            context={"case_id": case_id, **ctx}, status_code=200,
-        )
+    def answer(ctx: dict) -> Response:
+        return render_view(request, AI_SUMMARY_FRAGMENT,
+                           {"case_id": case_id, **ctx})
 
     try:
         case = await _read_case(case_id, current_user, session)
@@ -1029,11 +1021,9 @@ def alerts_case_playbook_executions_fragment(
     """
     from ion.web.case_lifecycle_api import get_case_playbook_executions
 
-    def answer(ctx: dict) -> HTMLResponse:
-        return templates.TemplateResponse(
-            request=request, name=CASE_EXECUTIONS_FRAGMENT,
-            context={"case_id": case_id, **ctx}, status_code=200,
-        )
+    def answer(ctx: dict) -> Response:
+        return render_view(request, CASE_EXECUTIONS_FRAGMENT,
+                           {"case_id": case_id, **ctx})
 
     try:
         payload = get_case_playbook_executions(case_id, current_user=current_user, session=session)
@@ -1077,12 +1067,9 @@ def alerts_case_playbook_picker_fragment(
 
     can_start = _can(current_user, PLAYBOOK_EXECUTE_PERMISSION)
 
-    def answer(ctx: dict) -> HTMLResponse:
-        return templates.TemplateResponse(
-            request=request, name=CASE_PLAYBOOK_PICKER_FRAGMENT,
-            context={"case_id": case_id, "can_start": can_start, **ctx},
-            status_code=200,
-        )
+    def answer(ctx: dict) -> Response:
+        return render_view(request, CASE_PLAYBOOK_PICKER_FRAGMENT,
+                           {"case_id": case_id, "can_start": can_start, **ctx})
 
     try:
         payload = list_playbooks(active_only=True, current_user=current_user, session=session)
@@ -1220,12 +1207,9 @@ async def alerts_playbook_library_fragment(
 
     can_start = _can(current_user, PLAYBOOK_EXECUTE_PERMISSION)
 
-    def answer(ctx: dict) -> HTMLResponse:
-        return templates.TemplateResponse(
-            request=request, name=PLAYBOOK_LIBRARY_FRAGMENT,
-            context={"alert_id": alert_id, "can_start": can_start, **ctx},
-            status_code=200,
-        )
+    def answer(ctx: dict) -> Response:
+        return render_view(request, PLAYBOOK_LIBRARY_FRAGMENT,
+                           {"alert_id": alert_id, "can_start": can_start, **ctx})
 
     try:
         payload = await get_suggested_playbooks(alert_id, current_user=current_user, session=session)
