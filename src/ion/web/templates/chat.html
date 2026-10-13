@@ -1026,6 +1026,25 @@
 .ai-grounding ul { margin: 4px 0 4px 1.1rem; padding: 0; }
 .ai-grounding-foot { display: block; color: var(--text-muted); font-size: 0.68rem; }
 
+/* The advisory's two new states. "Not checked" used to be drawn as
+   nothing at all, which is also what a clean check looked like. */
+.ai-grounding.none {
+    border-left: 2px dashed var(--border-color, #30363d);
+    background: rgba(139, 148, 158, 0.06);
+    color: var(--text-muted);
+}
+.ai-grounding-notes {
+    display: block;
+    margin: 3px 0;
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    font-style: italic;
+}
+.ai-citation-chip.ai-cite-unreadable {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
 /* Feedback */
 .ai-feedback-row {
     display: flex;
@@ -1739,16 +1758,33 @@
             const idx = aiPageMessages.findIndex(m => m.id === msgId);
             if (idx !== -1) aiPageMessages[idx].content = fullResponse;
 
-            // Citations + feedback
+            // GET is wrong here: the citations and the grounding result
+            // arrive as SSE events on this stream, so the page is the only
+            // thing holding them. They go back to /ui/chat/answer-meta,
+            // which renders the sources bar, the grounding advisory and
+            // the feedback row. One request per completed answer, not per
+            // token.
+            //
+            // The advisory is the reason this moved. It had two states
+            // here, a box or nothing, and nothing meant both "checked,
+            // and every specific is in the cited sources" and "never
+            // checked". The check is off unless ION_CHAT_GROUNDING_CHECK
+            // is set and skips whenever RAG returned nothing to check
+            // against, so the second was the common case. It also turned
+            // a warning into a reassurance: `g.unsupported_claims || []`
+            // made an unreadable claims list an empty one, and an empty
+            // one with `grounded` set printed "every specific here
+            // appears in the cited sources".
             const wrapper = contentEl.closest('.ai-msg');
             if (wrapper) {
-                if (pendingCitations && pendingCitations.length > 0 && aiPreferences.show_citations !== false) {
-                    wrapper.insertAdjacentHTML('beforeend', renderCitations(pendingCitations));
-                }
-                if (pendingGrounding) {
-                    wrapper.insertAdjacentHTML('beforeend', renderGrounding(pendingGrounding));
-                }
-                wrapper.insertAdjacentHTML('beforeend', renderFeedback(msgId));
+                const values = { msg_id: msgId };
+                if (pendingCitations !== null) values.citations = JSON.stringify(pendingCitations);
+                if (pendingGrounding !== null) values.grounding = JSON.stringify(pendingGrounding);
+                values.show_citations = aiPreferences.show_citations === false ? 'false' : 'true';
+                await htmx.ajax('POST', '/ui/chat/answer-meta', {
+                    source: wrapper, target: wrapper, swap: 'beforeend',
+                    values: values,
+                });
             }
         } catch (error) {
             addMessage('assistant', `Sorry, I encountered an error: ${error.message || 'Unknown error'}`);
@@ -1797,37 +1833,6 @@
     function scrollToBottom() {
         const c = document.getElementById('ai-page-messages');
         c.scrollTop = c.scrollHeight;
-    }
-
-    function renderCitations(citations) {
-        if (!citations || !citations.length) return '';
-        const icons = { knowledge_base: '\u{1F4C4}', user_note: '\u{1F4DD}', playbook: '\u{1F4CB}' };
-        const labels = { knowledge_base: 'KB', user_note: 'Note', playbook: 'PB' };
-        const chips = citations.map(c =>
-            `<span class="ai-citation-chip">${icons[c.type] || ''} ${escapeHtml(labels[c.type] || c.type)}: ${escapeHtml(c.title)}</span>`
-        ).join('');
-        return `<div class="ai-citations-bar"><span class="ai-citations-label">Sources:</span>${chips}</div>`;
-    }
-
-    function renderGrounding(g) {
-        if (!g || g.skipped) return '';
-        const claims = g.unsupported_claims || [];
-        if (g.grounded && !claims.length) {
-            return `<div class="ai-grounding ok">\u{2713} Every specific here appears in the cited sources.</div>`;
-        }
-        const items = claims.map(c => `<li>${escapeHtml(c)}</li>`).join('');
-        return `<div class="ai-grounding warn">
-            <span class="ai-grounding-head">\u{26A0} Not found in the cited sources</span>
-            ${items ? `<ul>${items}</ul>` : ''}
-            <span class="ai-grounding-foot">Advisory only \u{2014} verify before acting.</span>
-        </div>`;
-    }
-
-    function renderFeedback(msgId) {
-        return `<div class="ai-feedback-row" data-msg-id="${msgId}">
-            <button class="ai-fb-btn" data-click-action="submitFeedback" data-args='["$target", "up"]' title="Good">\u{1F44D}</button>
-            <button class="ai-fb-btn" data-click-action="submitFeedback" data-args='["$target", "down"]' title="Poor">\u{1F44E}</button>
-        </div>`;
     }
 
     window.submitFeedback = async function(btn, rating) {
