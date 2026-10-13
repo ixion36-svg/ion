@@ -392,6 +392,15 @@
 
 
 {% block scripts %}
+<template id="topology-service-node"><div class="topo-node"><div class="topo-node-card checking"><div class="topo-node-pulse checking"></div><div class="topo-node-icon checking"><i></i></div><div class="topo-node-name"></div><div class="topo-node-meta"></div></div></div></template>
+<template id="flow-stage-template"><div class="flow-stage"><div class="flow-stage-card"><div class="flow-stage-stripe"></div><div class="flow-stage-inner"><div class="flow-stage-icon"><i></i></div><div class="flow-stage-name"></div><div class="flow-stage-meta"></div></div></div><div class="flow-stage-details"><div class="flow-stage-details-inner"><ul></ul></div></div></div></template>
+<template id="flow-detail-item"><li></li></template>
+<template id="flow-arrow-template"><div class="flow-harrow flow-pipe-step"><div class="flow-harrow-line"></div><div class="flow-harrow-head"></div><div class="flow-harrow-dot"></div></div></template>
+<template id="flow-branch-template"><div class="flow-branch-group flow-pipe-step" data-step="4"></div></template>
+<template id="flow-legend-item"><div class="flow-legend-item"><div class="flow-legend-dot"></div><span></span></div></template>
+<template id="flow-controls-template"><div class="flow-controls" id="flow-controls"><button class="flow-btn" id="flow-btn-reset" data-click-action="flowReset" title="Reset">⟲ Reset</button><button class="flow-btn" id="flow-btn-prev" data-click-action="flowRetreat" title="Previous">◀ Prev</button><span class="flow-step-counter" id="flow-step-counter">Step 1 / 8</span><button class="flow-btn" id="flow-btn-next" data-click-action="flowAdvance" title="Next">Next ▶</button><button class="flow-btn" id="flow-btn-auto" data-click-action="flowAutoToggle" title="Auto Play">▶ Auto Play</button></div></template>
+
+
 {% include "_fragments/ion_fragment_client.html" %}
 <script src="/static/js/ion-fragments.js?v={{ ion_version }}"></script>
 <script nonce="{{ csp_nonce }}">
@@ -478,6 +487,7 @@ async function loadIntegrationStatus() {
     await ionLoadFragment('/ui/integrations/status', 'integration-cards', 'Loading integrations...');
 }
 
+
 async function runHealthChecks() {
     showToast('Running health checks...', 'info');
 
@@ -560,8 +570,6 @@ async function loadDataFlowMetrics() {
     const loaded = await ionLoadFragment('/ui/integrations/metrics/data-flows', 'data-flow-metrics-content', 'Loading metrics...');
 }
 
-
-
 async function loadServerLogsMetrics() {
     const loaded = await ionLoadFragment('/ui/integrations/metrics/server-logs', 'server-logs-metrics-content', 'Loading metrics...');
 }
@@ -573,6 +581,7 @@ async function loadServerLogsMetrics() {
 async function loadWebhooks() {
     await ionLoadFragment('/ui/integrations/webhooks', 'webhooks-list', 'Loading webhooks...');
 }
+
 
 function showCreateWebhookModal() {
     document.getElementById('create-webhook-form').reset();
@@ -708,6 +717,7 @@ async function showWebhookLogs(webhookId) {
     await ionLoadFragment(`/ui/integrations/webhooks/${encodeURIComponent(webhookId)}/logs`, 'webhook-logs-body', 'Loading webhook logs...');
 }
 
+
 // =============================================================================
 // Integration Logs
 // =============================================================================
@@ -720,6 +730,7 @@ async function loadIntegrationLogs() {
     if (level) params.set('level', level);
     await ionLoadFragment('/ui/integrations/logs?' + params.toString(), 'logs-body', 'Loading integration logs...');
 }
+
 
 // =============================================================================
 // Utilities
@@ -835,24 +846,17 @@ let animFrameId = null;
 // ═══════════════════════════════════════════════════════════════
 function createServiceNodes() {
     const diagram = document.getElementById('topo-diagram');
-
-    SERVICES.forEach((svc, i) => {
-        const node = document.createElement('div');
-        node.className = 'topo-node';
+    SERVICES.forEach(svc => {
+        const node = cloneTemplate('topology-service-node');
         node.id = `node-${svc.id}`;
         node.dataset.service = svc.id;
-        node.onclick = () => scrollToDetail(svc.id);
-        node.innerHTML = `
-            <div class="topo-node-card checking">
-                <div class="topo-node-pulse checking"></div>
-                <div class="topo-node-icon checking"><i class="${svc.icon}"></i></div>
-                <div class="topo-node-name">${svc.name}</div>
-                <div class="topo-node-meta">:${svc.port}</div>
-            </div>
-        `;
+        node.dataset.clickAction = 'scrollToDetail';
+        node.dataset.args = JSON.stringify([svc.id]);
+        node.querySelector('i').className = svc.icon;
+        node.querySelector('.topo-node-name').textContent = svc.name;
+        node.querySelector('.topo-node-meta').textContent = ':' + svc.port;
         diagram.appendChild(node);
     });
-
     positionNodes();
 }
 
@@ -892,66 +896,38 @@ function drawConnections() {
     const svg = document.getElementById('topo-svg');
     const diagram = document.getElementById('topo-diagram');
     const rect = diagram.getBoundingClientRect();
-    const cx = rect.width / 2;
-    const cy = rect.height / 2;
-
-    let svgContent = '';
-
+    const cx = rect.width / 2, cy = rect.height / 2;
+    const ns = 'http://www.w3.org/2000/svg';
+    const fragment = document.createDocumentFragment();
+    const geometry = (tag, attributes) => {
+        const node = document.createElementNS(ns, tag);
+        Object.entries(attributes).forEach(([name, value]) => node.setAttribute(name, value));
+        return node;
+    };
     SERVICES.forEach(svc => {
         const node = document.getElementById(`node-${svc.id}`);
         if (!node) return;
-
-        const nodeRect = node.getBoundingClientRect();
-        const diagramRect = diagram.getBoundingClientRect();
-        const nx = (nodeRect.left - diagramRect.left) + nodeRect.width / 2;
-        const ny = (nodeRect.top - diagramRect.top) + nodeRect.height / 2;
-
-        const health = healthData[svc.id];
-        const status = health ? health.status : 'checking';
-
-        // Curved line from center to node
-        const midX = (cx + nx) / 2;
-        const midY = (cy + ny) / 2;
-        // Slight curve offset perpendicular to the line
-        const dx = nx - cx;
-        const dy = ny - cy;
-        const len = Math.sqrt(dx * dx + dy * dy) || 1;
-        const curveFactor = 20;
-        const cpx = midX + (-dy / len) * curveFactor;
-        const cpy = midY + (dx / len) * curveFactor;
-
-        const pathId = `path-${svc.id}`;
-        const pathD = `M ${cx} ${cy} Q ${cpx} ${cpy} ${nx} ${ny}`;
-
-        // Glow layer (for healthy connections)
-        if (status === 'healthy') {
-            svgContent += `<path class="topo-line-glow healthy" d="${pathD}"/>`;
+        const bounds = node.getBoundingClientRect();
+        const nx = bounds.left - rect.left + bounds.width / 2;
+        const ny = bounds.top - rect.top + bounds.height / 2;
+        const midX = (cx + nx) / 2, midY = (cy + ny) / 2;
+        const dx = nx - cx, dy = ny - cy, length = Math.hypot(dx, dy) || 1;
+        const curve = `M ${cx} ${cy} Q ${midX - dy / length * 20} ${midY + dx / length * 20} ${nx} ${ny}`;
+        const status = healthData[svc.id]?.status || 'checking';
+        if (status === 'healthy') fragment.appendChild(geometry('path', {class:'topo-line-glow healthy', d:curve}));
+        fragment.appendChild(geometry('path', {id:'path-' + svc.id, class:'topo-line ' + status, d:curve}));
+        if (status === 'healthy') for (let particle = 0; particle < 2; particle++) {
+            const circle = geometry('circle', {r:3, class:'topo-particle active'});
+            const motion = geometry('animateMotion', {dur:'2.5s', begin:particle * 1.2 + 's', repeatCount:'indefinite', rotate:'auto'});
+            motion.appendChild(geometry('mpath', {href:'#path-' + svc.id}));
+            circle.appendChild(motion);
+            fragment.appendChild(circle);
         }
-
-        // Main line
-        svgContent += `<path id="${pathId}" class="topo-line ${status}" d="${pathD}"/>`;
-
-        // Data flow particles for healthy connections
-        if (status === 'healthy') {
-            for (let p = 0; p < 2; p++) {
-                svgContent += `
-                    <circle r="3" class="topo-particle active" data-ion-style="animation-delay:${p * 1.2}s">
-                        <animateMotion dur="2.5s" begin="${p * 1.2}s" repeatCount="indefinite" rotate="auto">
-                            <mpath href="#${pathId}"/>
-                        </animateMotion>
-                    </circle>`;
-            }
-        }
-
-        // Protocol label at midpoint
-        svgContent += `
-            <text x="${midX}" y="${midY - 8}" text-anchor="middle"
-                  fill="var(--text-secondary)" font-size="9" font-family="monospace" opacity=".6">
-                ${svc.protocol}:${svc.port}
-            </text>`;
+        const label = geometry('text', {x:midX, y:midY - 8, 'text-anchor':'middle', class:'topology-protocol-label'});
+        label.textContent = svc.protocol + ':' + svc.port;
+        fragment.appendChild(label);
     });
-
-    svg.innerHTML = svgContent;
+    svg.replaceChildren(fragment);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -960,90 +936,26 @@ function drawConnections() {
 async function refreshAll() {
     const loading = document.getElementById('diagram-loading');
     loading.style.display = 'flex';
-
     healthData = {};
-
-    // Check ION health first
-    try {
-        const start = performance.now();
-        const resp = await fetch('/api/health');
-        const rt = Math.round(performance.now() - start);
-        const data = await resp.json();
-        healthData['ion'] = {
-            id: 'ion', name: 'ION', port: 8000, protocol: 'HTTP',
-            status: data.status === 'ok' ? 'healthy' : 'error',
-            responseTime: rt, version: data.version || null, details: data,
-        };
-    } catch {
-        healthData['ion'] = { id: 'ion', name: 'ION', status: 'healthy', responseTime: null, details: {} };
+    SERVICES.forEach(svc => updateNodeStatus(svc.id, 'checking'));
+    for (const id of ['health-pct','healthy-count','error-count','disabled-count']) document.getElementById(id).textContent = 'Unknown';
+    const loaded = await ionLoadFragment('/ui/integrations/topology', 'details-grid', 'Checking integration health...');
+    const carrier = document.querySelector('#details-grid [data-topology-state]');
+    if (loaded && carrier) {
+        const model = JSON.parse(carrier.dataset.topologyState);
+        model.services.forEach((id, index) => {
+            healthData[id] = {status:model.statuses[index], version:model.versions[index]};
+            updateNodeStatus(id, model.statuses[index]);
+        });
+        updateHealthBanner(model.percentage);
+    } else {
+        SERVICES.forEach(svc => {healthData[svc.id] = {status:'unknown'};updateNodeStatus(svc.id, 'unknown');});
+        document.getElementById('health-title').textContent = 'Integration health unavailable';
+        document.getElementById('health-subtitle').textContent = 'No health verdict has been measured.';
+        updateHealthBanner(null);
     }
-
-    // Check all services in parallel
-    const checks = SERVICES.map(async svc => {
-        const result = {
-            id: svc.id, name: svc.name, port: svc.port, protocol: svc.protocol,
-            status: 'disabled', responseTime: null, version: null, details: {},
-            description: svc.description,
-        };
-
-        try {
-            const start = performance.now();
-            const configResp = await fetch(svc.configUrl);
-            result.responseTime = Math.round(performance.now() - start);
-
-            if (!configResp.ok) {
-                result.status = 'disabled';
-                healthData[svc.id] = result;
-                updateNodeStatus(svc.id, 'disabled');
-                return;
-            }
-
-            const config = await configResp.json();
-            result.details = config;
-
-            const isEnabled = config.enabled !== false && (
-                config.has_token !== false || config.url || config.configured !== false || config.available === true || config.success === true
-            );
-            if (!isEnabled) {
-                result.status = 'disabled';
-                healthData[svc.id] = result;
-                updateNodeStatus(svc.id, 'disabled');
-                return;
-            }
-
-            if (svc.testUrl && svc.testUrl !== svc.configUrl) {
-                const tStart = performance.now();
-                const testResp = await fetch(svc.testUrl);
-                result.responseTime = Math.round(performance.now() - tStart);
-                if (testResp.ok) {
-                    const testResult = await testResp.json();
-                    result.status = (testResult.connected || testResult.status === 'ok' || testResult.cluster_name)
-                        ? 'healthy' : 'error';
-                    result.version = testResult.version || testResult.server_version || null;
-                    result.details = { ...config, ...testResult };
-                } else {
-                    result.status = 'error';
-                }
-            } else {
-                result.status = (config.connected || config.status === 'ok' || config.cluster_name || config.available || config.success === true)
-                    ? 'healthy' : 'error';
-                result.version = config.version || config.server_version || config.model || null;
-            }
-        } catch (err) {
-            result.status = 'error';
-            result.details = { error: err.message };
-        }
-
-        healthData[svc.id] = result;
-        updateNodeStatus(svc.id, result.status);
-    });
-
-    await Promise.all(checks);
-
     loading.style.display = 'none';
     positionNodes();
-    updateHealthBanner();
-    renderDetailCards();
     updateLastChecked();
 }
 
@@ -1058,7 +970,7 @@ function updateNodeStatus(serviceId, status) {
     const pulse = node.querySelector('.topo-node-pulse');
     const icon = node.querySelector('.topo-node-icon');
 
-    ['healthy', 'error', 'disabled', 'checking'].forEach(cls => {
+    ['healthy', 'error', 'disabled', 'checking', 'unknown'].forEach(cls => {
         card.classList.remove(cls);
         pulse.classList.remove(cls);
         icon.classList.remove(cls);
@@ -1070,166 +982,26 @@ function updateNodeStatus(serviceId, status) {
 
     // Update meta text with version if available
     const health = healthData[serviceId];
-    if (health && health.version) {
-        const meta = node.querySelector('.topo-node-meta');
-        meta.textContent = `v${health.version}`;
-    }
+    const meta = node.querySelector('.topo-node-meta');
+    const service = SERVICES.find(item => item.id === serviceId);
+    meta.textContent = health && health.version ? `v${health.version}` : ':' + service.port;
 }
 
 // ═══════════════════════════════════════════════════════════════
 // Health banner
 // ═══════════════════════════════════════════════════════════════
-function updateHealthBanner() {
-    const services = SERVICES.map(s => healthData[s.id]).filter(Boolean);
-    const configured = services.filter(s => s.status !== 'disabled');
-    const healthy = services.filter(s => s.status === 'healthy');
-    const errored = services.filter(s => s.status === 'error');
-    const disabled = services.filter(s => s.status === 'disabled');
-
-    const total = configured.length || 1;
-    const pct = Math.round((healthy.length / total) * 100);
-
-    // Update ring
-    const circumference = 97.4; // 2 * PI * 15.5
-    const offset = circumference - (circumference * pct / 100);
+function updateHealthBanner(percentage) {
     const ring = document.getElementById('health-ring-fill');
-    ring.style.strokeDashoffset = offset;
-    ring.style.stroke = pct === 100 ? '#22c55e' : pct >= 50 ? '#eab308' : '#ef4444';
-
-    document.getElementById('health-pct').textContent = pct + '%';
-    document.getElementById('healthy-count').textContent = healthy.length;
-    document.getElementById('error-count').textContent = errored.length;
-    document.getElementById('disabled-count').textContent = disabled.length;
-
-    const ion = healthData['ion'];
-    const ionVersion = ion && ion.details && ion.details.version ? ` v${ion.details.version}` : '';
-
-    if (pct === 100) {
-        document.getElementById('health-title').textContent = 'All Systems Operational';
-        document.getElementById('health-subtitle').textContent = `ION${ionVersion} — ${configured.length} services online`;
-    } else if (pct >= 50) {
-        document.getElementById('health-title').textContent = 'Partial Service Degradation';
-        document.getElementById('health-subtitle').textContent = `${errored.length} service${errored.length > 1 ? 's' : ''} reporting errors`;
-    } else {
-        document.getElementById('health-title').textContent = 'Critical Infrastructure Issues';
-        document.getElementById('health-subtitle').textContent = `${errored.length} of ${total} configured services are down`;
-    }
+    const known = typeof percentage === 'number';
+    ring.style.strokeDashoffset = known ? 97.4 - 97.4 * percentage / 100 : 97.4;
+    ring.classList.remove('topology-health-good','topology-health-partial','topology-health-poor','topology-health-unknown');
+    ring.classList.add(!known ? 'topology-health-unknown' : percentage === 100 ? 'topology-health-good' : percentage >= 50 ? 'topology-health-partial' : 'topology-health-poor');
 }
 
 // ═══════════════════════════════════════════════════════════════
 // Service Detail Cards
 // ═══════════════════════════════════════════════════════════════
-function renderDetailCards() {
-    const grid = document.getElementById('details-grid');
-    let html = '';
 
-    SERVICES.forEach(svc => {
-        const h = healthData[svc.id] || { status: 'disabled', details: {} };
-        const statusLabel = { healthy: 'Online', error: 'Error', disabled: 'Not Configured', checking: 'Checking...' };
-
-        let metricsHtml = '';
-
-        // Port
-        metricsHtml += `
-            <div class="topo-metric">
-                <div class="topo-metric-label">Port</div>
-                <div class="topo-metric-value">${svc.port}</div>
-            </div>`;
-
-        // Protocol
-        metricsHtml += `
-            <div class="topo-metric">
-                <div class="topo-metric-label">Protocol</div>
-                <div class="topo-metric-value">${svc.protocol}</div>
-            </div>`;
-
-        // Response time
-        metricsHtml += `
-            <div class="topo-metric">
-                <div class="topo-metric-label">Response</div>
-                <div class="topo-metric-value">${h.responseTime != null ? h.responseTime + 'ms' : '-'}</div>
-            </div>`;
-
-        // Version
-        metricsHtml += `
-            <div class="topo-metric">
-                <div class="topo-metric-label">Version</div>
-                <div class="topo-metric-value">${h.version || '-'}</div>
-            </div>`;
-
-        // Extra metrics from details
-        const d = h.details || {};
-        if (d.cluster_name) {
-            metricsHtml += `
-                <div class="topo-metric">
-                    <div class="topo-metric-label">Cluster</div>
-                    <div class="topo-metric-value">${escapeHtml(d.cluster_name)}</div>
-                </div>`;
-        }
-        if (d.cluster_status) {
-            const csColor = d.cluster_status === 'green' ? '#22c55e' : d.cluster_status === 'yellow' ? '#eab308' : '#ef4444';
-            metricsHtml += `
-                <div class="topo-metric">
-                    <div class="topo-metric-label">Health</div>
-                    <div class="topo-metric-value" data-ion-style="color:${csColor}">${d.cluster_status.toUpperCase()}</div>
-                </div>`;
-        }
-        if (d.node_count != null) {
-            metricsHtml += `
-                <div class="topo-metric">
-                    <div class="topo-metric-label">Nodes</div>
-                    <div class="topo-metric-value">${d.node_count}</div>
-                </div>`;
-        }
-        if (d.index_count != null) {
-            metricsHtml += `
-                <div class="topo-metric">
-                    <div class="topo-metric-label">Indices</div>
-                    <div class="topo-metric-value">${d.index_count}</div>
-                </div>`;
-        }
-        if (d.model) {
-            metricsHtml += `
-                <div class="topo-metric">
-                    <div class="topo-metric-label">Model</div>
-                    <div class="topo-metric-value text-xs">${escapeHtml(d.model)}</div>
-                </div>`;
-        }
-        if (d.url) {
-            const shortUrl = d.url.replace(/^https?:\/\//, '').replace(/\/$/, '');
-            metricsHtml += `
-                <div class="topo-metric col-span-full">
-                    <div class="topo-metric-label">Endpoint</div>
-                    <div class="topo-metric-value text-xs">${escapeHtml(shortUrl)}</div>
-                </div>`;
-        }
-        if (d.error) {
-            metricsHtml += `
-                <div class="topo-metric col-span-full">
-                    <div class="topo-metric-label">Error</div>
-                    <div class="topo-metric-value text-[#ef4444] text-xs">${escapeHtml(String(d.error))}</div>
-                </div>`;
-        }
-
-        html += `
-            <div class="topo-detail-card ${h.status}" id="detail-${svc.id}" data-service="${svc.id}">
-                <div class="topo-detail-head">
-                    <div class="topo-detail-icon ${h.status}"><i class="${svc.icon}"></i></div>
-                    <div>
-                        <div class="topo-detail-title">${svc.name}</div>
-                        <div class="topo-detail-status">
-                            <span class="status-text ${h.status}">${statusLabel[h.status] || h.status}</span>
-                            <span class="text-[var(--text-secondary)]">·</span>
-                            <span class="text-[var(--text-secondary)] text-[.72rem]">${svc.description}</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="topo-detail-metrics">${metricsHtml}</div>
-            </div>`;
-    });
-
-    grid.innerHTML = html;
-}
 
 // ═══════════════════════════════════════════════════════════════
 // Utilities
@@ -1392,97 +1164,47 @@ function createFlowSlide() {
     const diagram = document.getElementById('flow-diagram');
     if (!diagram) return;
     diagram.replaceChildren();
-
-    // Helper: create a stage card element with step index
     function makeStage(stage, step, skipPipeClass) {
-        const el = document.createElement('div');
-        const cls = ['flow-stage'];
-        if (!skipPipeClass) cls.push('flow-pipe-step');
-        if (stage.decision) cls.push('decision');
-        if (stage.branch) cls.push('branch');
-        el.className = cls.join(' ');
-        if (!skipPipeClass) el.dataset.step = step;
+        const el = cloneTemplate('flow-stage-template');
+        if (!skipPipeClass) {el.classList.add('flow-pipe-step');el.dataset.step = step;}
+        if (stage.decision) el.classList.add('decision');
+        if (stage.branch) el.classList.add('branch');
         el.style.setProperty('--glow-color', stage.color + '88');
-        el.onclick = () => toggleFlowDetail(stage.id);
-
-        if (stage.decision) {
-            el.innerHTML = `
-                <div class="flow-stage-card" data-ion-style="border: 2px solid ${stage.color}55">
-                    <div class="flow-stage-inner">
-                        <div class="flow-stage-icon" data-ion-style="background:${stage.color}22; color:${stage.color}">
-                            <i class="${stage.icon}"></i>
-                        </div>
-                        <div class="flow-stage-name">${stage.name}</div>
-                    </div>
-                </div>
-                <div class="flow-stage-details" id="flow-detail-${stage.id}">
-                    <div class="flow-stage-details-inner">
-                        <ul>${stage.details.map(d => `<li>${d}</li>`).join('')}</ul>
-                    </div>
-                </div>`;
-        } else {
-            el.innerHTML = `
-                <div class="flow-stage-card" data-ion-style="border-color:${stage.color}33">
-                    <div class="absolute top-0 left-0 right-0 h-[3px] rounded-[10px_10px_0_0]" data-ion-style="background:${stage.color}"></div>
-                    <div class="flow-stage-icon" data-ion-style="background:${stage.color}22; color:${stage.color}">
-                        <i class="${stage.icon}"></i>
-                    </div>
-                    <div class="flow-stage-name">${stage.name}</div>
-                    <div class="flow-stage-meta">${stage.meta}</div>
-                </div>
-                <div class="flow-stage-details" id="flow-detail-${stage.id}">
-                    <div class="flow-stage-details-inner">
-                        <ul>${stage.details.map(d => `<li>${d}</li>`).join('')}</ul>
-                    </div>
-                </div>`;
-        }
+        el.dataset.clickAction = 'toggleFlowDetail';
+        el.dataset.args = JSON.stringify([stage.id]);
+        const card = el.querySelector('.flow-stage-card');
+        card.dataset.ionStyle = 'border-color:' + stage.color + '55';
+        el.querySelector('.flow-stage-stripe').dataset.ionStyle = 'background:' + stage.color;
+        el.querySelector('.flow-stage-icon').dataset.ionStyle = 'background:' + stage.color + '22;color:' + stage.color;
+        el.querySelector('i').className = stage.icon;
+        el.querySelector('.flow-stage-name').textContent = stage.name;
+        el.querySelector('.flow-stage-meta').textContent = stage.meta || '';
+        const details = el.querySelector('.flow-stage-details');
+        details.id = 'flow-detail-' + stage.id;
+        stage.details.forEach(text => {const item=cloneTemplate('flow-detail-item');item.textContent=text;details.querySelector('ul').appendChild(item);});
         return el;
     }
-
-    // Helper: create a horizontal arrow connector with step index
     function makeArrow(color, delay, step) {
-        const el = document.createElement('div');
-        el.className = 'flow-harrow flow-pipe-step';
+        const el = cloneTemplate('flow-arrow-template');
         el.dataset.step = step;
-        el.innerHTML = `
-            <div class="flow-harrow-line" data-ion-style="background:${color}"></div>
-            <div class="flow-harrow-head" data-ion-style="border-left-color:${color}"></div>
-            <div class="flow-harrow-dot" data-ion-style="background:${color}; animation-delay:${delay || 0}s"></div>`;
+        el.querySelector('.flow-harrow-line').dataset.ionStyle = 'background:' + color;
+        el.querySelector('.flow-harrow-head').dataset.ionStyle = 'border-left-color:' + color;
+        el.querySelector('.flow-harrow-dot').dataset.ionStyle = 'background:' + color + ';animation-delay:' + delay + 's';
         return el;
     }
-
-    // ── Single horizontal pipeline ──
-    // Step 0: Ingestion
-    diagram.appendChild(makeStage(flowStageMap['ingestion'], 0));
-    // → Step 1: Triage
-    diagram.appendChild(makeArrow('#ef4444', 0, 1));
-    diagram.appendChild(makeStage(flowStageMap['triage'], 1));
-    // → Step 2: Investigation
-    diagram.appendChild(makeArrow('#f97316', 0.4, 2));
-    diagram.appendChild(makeStage(flowStageMap['investigation'], 2));
-    // → Step 3: Decision
-    diagram.appendChild(makeArrow('#eab308', 0.8, 3));
-    diagram.appendChild(makeStage(flowStageMap['decision'], 3));
-    // → Step 4: Branch outcomes (vertically stacked group)
+    diagram.appendChild(makeStage(flowStageMap.ingestion, 0));
+    for (const [id, color, step] of [['triage','#ef4444',1],['investigation','#f97316',2],['decision','#eab308',3]]) {
+        diagram.appendChild(makeArrow(color, (step-1)*.4, step));
+        diagram.appendChild(makeStage(flowStageMap[id], step));
+    }
     diagram.appendChild(makeArrow('#a855f7', 1.2, 4));
-    const branchGroup = document.createElement('div');
-    branchGroup.className = 'flow-branch-group flow-pipe-step';
-    branchGroup.dataset.step = 4;
-    branchGroup.style.setProperty('--glow-color', '#a855f788');
-    ['false_positive', 'benign', 'escalation'].forEach(id => {
-        branchGroup.appendChild(makeStage(flowStageMap[id], 4, true));
-    });
-    diagram.appendChild(branchGroup);
-    // → Step 5: Case Management
-    diagram.appendChild(makeArrow('#ef4444', 1.6, 5));
-    diagram.appendChild(makeStage(flowStageMap['case_mgmt'], 5));
-    // → Step 6: Response
-    diagram.appendChild(makeArrow('#0ea5e9', 2.0, 6));
-    diagram.appendChild(makeStage(flowStageMap['response'], 6));
-    // → Step 7: Resolution
-    diagram.appendChild(makeArrow('#ec4899', 2.4, 7));
-    diagram.appendChild(makeStage(flowStageMap['resolution'], 7));
-
+    const branches = cloneTemplate('flow-branch-template');
+    ['false_positive','benign','escalation'].forEach(id => branches.appendChild(makeStage(flowStageMap[id],4,true)));
+    diagram.appendChild(branches);
+    for (const [id,color,step] of [['case_mgmt','#ef4444',5],['response','#0ea5e9',6],['resolution','#ec4899',7]]) {
+        diagram.appendChild(makeArrow(color,(step-1)*.4,step));
+        diagram.appendChild(makeStage(flowStageMap[id],step));
+    }
     renderFlowLegend();
     injectFlowControls();
     flowSetStep(0);
@@ -1497,41 +1219,20 @@ function toggleFlowDetail(stageId) {
 function renderFlowLegend() {
     const legend = document.getElementById('flow-legend');
     if (!legend) return;
-
-    const items = [
-        { color: '#ef4444', label: 'Ingestion / Escalation' },
-        { color: '#f97316', label: 'Triage' },
-        { color: '#eab308', label: 'Investigation' },
-        { color: '#a855f7', label: 'Decision' },
-        { color: '#6b7280', label: 'False Positive' },
-        { color: '#22c55e', label: 'Resolved / Benign' },
-        { color: '#0ea5e9', label: 'Case Management' },
-        { color: '#ec4899', label: 'Response' },
-    ];
-
-    legend.innerHTML = items.map(it =>
-        `<div class="flow-legend-item">
-            <div class="flow-legend-dot" data-ion-style="background:${it.color}; box-shadow:0 0 6px ${it.color}66"></div>
-            ${it.label}
-        </div>`
-    ).join('');
+    legend.replaceChildren();
+    const items = [['#ef4444','Ingestion / Escalation'],['#f97316','Triage'],['#eab308','Investigation'],['#a855f7','Decision'],['#6b7280','False Positive'],['#22c55e','Resolved / Benign'],['#0ea5e9','Case Management'],['#ec4899','Response']];
+    items.forEach(([color,label]) => {
+        const item = cloneTemplate('flow-legend-item');
+        item.querySelector('.flow-legend-dot').dataset.ionStyle = 'background:' + color + ';box-shadow:0 0 6px ' + color + '66';
+        item.querySelector('span').textContent = label;
+        legend.appendChild(item);
+    });
 }
 
 // ── Inject controls bar into section header ──────────────────
 function injectFlowControls() {
     const header = document.getElementById('flow-section-header');
-    if (!header || document.getElementById('flow-controls')) return;
-
-    const controls = document.createElement('div');
-    controls.className = 'flow-controls';
-    controls.id = 'flow-controls';
-    controls.innerHTML = `
-        <button class="flow-btn" id="flow-btn-reset" data-click-action="flowReset" title="Reset">&#x27F2; Reset</button>
-        <button class="flow-btn" id="flow-btn-prev" data-click-action="flowRetreat" title="Previous">&#x25C0; Prev</button>
-        <span class="flow-step-counter" id="flow-step-counter">Step 1 / 8</span>
-        <button class="flow-btn" id="flow-btn-next" data-click-action="flowAdvance" title="Next">Next &#x25B6;</button>
-        <button class="flow-btn" id="flow-btn-auto" data-click-action="flowAutoToggle" title="Auto Play">&#x25B6; Auto Play</button>`;
-    header.appendChild(controls);
+    if (header && !document.getElementById('flow-controls')) header.appendChild(cloneTemplate('flow-controls-template'));
 }
 
 // ── Set pipeline to show all steps ≤ n, hide all > n ─────────
@@ -1624,9 +1325,9 @@ function flowUpdateControls() {
 
     if (btnAuto) {
         if (flowAutoTimer) {
-            btnAuto.innerHTML = '&#x23F8; Pause';
+            btnAuto.textContent = '⏸ Pause';
         } else {
-            btnAuto.innerHTML = '&#x25B6; Auto Play';
+            btnAuto.textContent = '▶ Auto Play';
         }
         btnAuto.disabled = flowCurrentStep >= FLOW_TOTAL_STEPS - 1 && !flowAutoTimer;
     }
