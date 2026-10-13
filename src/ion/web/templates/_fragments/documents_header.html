@@ -1,0 +1,26 @@
+{# The document modal's badge row, from ui/documents.py's doc_header.
+
+   `failed` is the third outcome and it matters here: the modal opens on a
+   click, so when the read behind it fails the row has to say so rather
+   than stay as whatever the last document left there.
+
+   The page printed the word "undefined" for a format it did not have and
+   "v1" for a version it did not have, and ran both dates through
+   formatDate, which reads a naive UTC column in the viewer's zone.
+#}
+{% if failed %}
+<span class="doc-unmeasured">This document could not be read</span>
+{% else %}
+{%- if output_format %}<span class="badge">{{ output_format }}</span>{% endif %}
+{%- if version is not none %}
+<span class="badge badge-version">v{{ version }}</span>
+{%- else %}
+<span class="badge doc-unmeasured" title="This document arrived without a version number">version unknown</span>
+{%- endif %}
+{%- if archived %}<span class="badge badge-archived">Archived</span>{% endif %}
+{%- if template_id is not none %}
+<span>From template #{{ template_id }}{% if template_version is not none %} v{{ template_version }}{% endif %}</span>
+{%- endif %}
+{%- if created %}<span>Created: {{ created }}</span>{% endif %}
+{%- if updated %}<span>Updated: {{ updated }}</span>{% endif %}
+{% endif %}

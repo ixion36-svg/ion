@@ -521,3 +521,171 @@ def documents_versions_fragment(
         current_user and current_user.has_permission(REVERT))
     return render_view(request, VERSIONS_FRAGMENT, versions_view(
         versions, current=current, may_revert=may_revert))
+
+
+# ---------------------------------------------------------------------------
+# The two modal headers
+# ---------------------------------------------------------------------------
+#
+# WHY THIS PAGE DOES NOT REACH ZERO WRITES, AND SHOULD NOT
+#
+# documents.html has two writes that are staying: `rendered-view` in
+# viewDocument and `version-content` in previewVersion. Both put a
+# document's body on screen through renderContent, which for `html` returns
+# the stored content untouched and for `markdown` hands it to marked.
+#
+# ION ships no HTML sanitiser and the decision not to add one is recorded in
+# ui/template_render.py. The established consequence, from ui/alerts.py, is
+# that prose moves to the server as escaped text: "Markdown formatting is
+# lost; stored XSS is not reintroduced." That is the right trade for a
+# comment on an alert.
+#
+# It is the wrong trade here. The body IS the page: an SOP rendered as a
+# <pre> block is not a downgrade in styling, it is a document viewer that no
+# longer shows documents. The three remaining options were escaping it,
+# adding a dependency the project has decided against, or leaving the body
+# where it is. The body stays, under the strict CSP that already stops an
+# injected handler from running.
+#
+# So the `server` column on this page will read no, deliberately. Everything
+# that is data rather than a document body is converted, which is what the
+# two routes below do: the headers of both modals, where the page printed
+# "undefined" for a missing format, "v1" for a missing version, and dates
+# read in the viewer's zone.
+
+DOC_HEADER_FRAGMENT = "_fragments/documents_header.html"
+VERSION_HEADER_FRAGMENT = "_fragments/documents_version_header.html"
+
+
+class DocHeader(TypedDict):
+    """The document modal's badge row. `failed` is the third outcome: the
+    modal is open and we could not read the document behind it."""
+
+    failed: bool
+    output_format: Optional[str]
+    version: Optional[int]
+    archived: bool
+    template_id: Any
+    template_version: Optional[int]
+    created: Optional[str]
+    updated: Optional[str]
+
+
+class VersionHeader(TypedDict):
+    """The version modal's meta row."""
+
+    failed: bool
+    number: Any
+    reason: Optional[str]
+    author: Optional[str]
+    when: Optional[str]
+    is_current: bool
+    may_revert: bool
+
+
+def doc_header(document: Any) -> DocHeader:
+    """The badge row for one document, or the failed render for no document.
+
+    `doc.output_format` and `doc.source_template_version` were interpolated
+    unguarded, so a payload missing either printed the word "undefined" in a
+    badge, and `doc.current_version || 1` claimed v1 for a missing version.
+    """
+    if document is None:
+        return {
+            "failed": True, "output_format": None, "version": None,
+            "archived": False, "template_id": None,
+            "template_version": None, "created": None, "updated": None,
+        }
+    fmt = plain(getattr(document, "output_format", None))
+    status = plain(getattr(document, "status", None))
+    created = instant_label(getattr(document, "created_at", None))
+    updated = instant_label(getattr(document, "updated_at", None))
+    return {
+        "failed": False,
+        "output_format": str(fmt) if fmt is not None else None,
+        "version": _number(getattr(document, "current_version", None)),
+        "archived": status == "archived",
+        "template_id": getattr(document, "source_template_id", None),
+        "template_version": _number(
+            getattr(document, "source_template_version", None)),
+        "created": created,
+        # Only when it says something the created line does not.
+        "updated": updated if updated and updated != created else None,
+    }
+
+
+@router.get(
+    "/documents/{document_id}/header",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+def documents_header_fragment(
+    request: Request,
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> Response:
+    """The document modal's badge row."""
+    from ion.storage.document_repository import DocumentRepository
+
+    try:
+        document = DocumentRepository(session).get_by_id(document_id)
+    except Exception:
+        logger.exception(
+            "Documents fragment could not read document %s", document_id)
+        document = None
+
+    return render_view(request, DOC_HEADER_FRAGMENT, doc_header(document))
+
+
+@router.get(
+    "/documents/{document_id}/versions/{version_number}/header",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+def documents_version_header_fragment(
+    request: Request,
+    document_id: int,
+    version_number: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> Response:
+    """The version modal's meta row, and whether Revert belongs on it.
+
+    The page decided that with `versionNumber === currentDocVersion`, a
+    comparison against a variable it had set when the document modal
+    opened, and offered the button to every reader regardless of
+    document:update.
+    """
+    from ion.storage.document_repository import DocumentRepository
+
+    version: Any = None
+    current: Any = None
+    try:
+        repo = DocumentRepository(session)
+        document = repo.get_by_id(document_id)
+        if document is not None:
+            current = getattr(document, "current_version", None)
+            version = next(
+                (v for v in repo.list_versions(document_id)
+                 if getattr(v, "version_number", None) == version_number),
+                None)
+    except Exception:
+        logger.exception(
+            "Documents fragment could not read version %s of %s",
+            version_number, document_id)
+        version = None
+
+    may_revert = bool(current_user
+                      and current_user.has_permission(REVERT))
+    if version is None:
+        view: VersionHeader = {
+            "failed": True, "number": version_number, "reason": None,
+            "author": None, "when": None, "is_current": False,
+            "may_revert": False,
+        }
+    else:
+        row = version_row(version, current=_number(current),
+                          may_revert=may_revert)
+        view = {"failed": False, **(row or {})}  # type: ignore[typeddict-item]
+    return render_view(request, VERSION_HEADER_FRAGMENT, view)

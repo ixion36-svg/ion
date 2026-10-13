@@ -282,3 +282,92 @@ def test_the_page_no_longer_writes_the_version_table():
     assert "htmx.ajax" in block.group(0)
     assert "versions-table" not in block.group(0)
     assert "formatDate" not in block.group(0)
+
+
+# ---------------------------------------------------------------------------
+# The two modal headers
+# ---------------------------------------------------------------------------
+
+
+def _get_url(user, url):
+    with TestClient(_app(user)) as client:
+        return client.get(url)
+
+
+def test_the_document_header_renders_its_badges(answers):
+    answers(versions=[], current=4)
+    body = flat(_get_url(_reader(), "/ui/documents/5/header").text)
+    assert "v4" in body
+
+
+def test_the_document_header_says_so_when_the_document_cannot_be_read(
+        answers):
+    """The modal opens on a click, so a failed read has to speak: the row
+    otherwise keeps whatever the last document left in it."""
+    answers(versions=[], document=False)
+    body = flat(_get_url(_reader(), "/ui/documents/5/header").text)
+    assert "could not be read" in body
+
+
+@pytest.mark.parametrize("current", [None, "latest"])
+def test_the_document_header_does_not_claim_v1(answers, current):
+    """`doc.current_version || 1` printed a version it did not have."""
+    answers(versions=[], current=current)
+    body = flat(_get_url(_reader(), "/ui/documents/5/header").text)
+    assert "v1" not in body
+    assert "version unknown" in body
+
+
+def test_the_version_header_renders_the_amendment(answers):
+    answers(versions=[_ver(2)], current=3)
+    body = flat(_get_url(_reader(), "/ui/documents/5/versions/2/header").text)
+    assert "typo fixed" in body
+    assert "lyndon" in body
+    assert "2026-09-01 10:30 UTC" in body
+
+
+def test_the_version_header_offers_revert_only_to_an_editor(answers):
+    answers(versions=[_ver(2)], current=3)
+    reader = _get_url(_reader(), "/ui/documents/5/versions/2/header").text
+    editor = _get_url(_reader(REVERT),
+                      "/ui/documents/5/versions/2/header").text
+    assert "confirmRevert" not in reader
+    assert "confirmRevert" in editor
+
+
+def test_the_version_header_never_offers_revert_to_the_current_version(
+        answers):
+    answers(versions=[_ver(3)], current=3)
+    html = _get_url(_reader(REVERT),
+                    "/ui/documents/5/versions/3/header").text
+    assert "Current" in flat(html)
+    assert "confirmRevert" not in html
+
+
+def test_a_version_that_is_not_there_says_so(answers):
+    answers(versions=[_ver(2)], current=3)
+    body = flat(_get_url(_reader(), "/ui/documents/5/versions/9/header").text)
+    assert "could not be read" in body
+
+
+def test_the_revert_button_is_swapped_into_the_footer_slot(answers):
+    """It belongs in the modal footer, not in the meta row, so the fragment
+    sends it there out of band. The shell carries the slot and no button."""
+    answers(versions=[_ver(2)], current=3)
+    html = _get_url(_reader(REVERT), "/ui/documents/5/versions/2/header").text
+    assert 'hx-swap-oob="innerHTML:#revert-version-slot"' in html
+    assert "confirmRevert" in html
+    page = PAGE.read_text(encoding="utf-8")
+    assert 'id="revert-version-slot"' in page
+    assert "revert-version-btn" not in page, (
+        "the shell's own button and its load-time listener are gone")
+
+
+def test_a_reader_gets_an_empty_footer_slot_not_a_hidden_button(answers):
+    """`style.display = 'none'` left the control in the DOM. A reader has no
+    Revert button at all now, which is what the endpoint means."""
+    answers(versions=[_ver(2)], current=3)
+    html = _get_url(_reader(), "/ui/documents/5/versions/2/header").text
+    assert 'id="revert-version-slot"' in html
+    assert "confirmRevert" not in html
+    assert "display" not in html

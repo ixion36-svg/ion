@@ -1,0 +1,29 @@
+{# The version modal's meta row, from ui/documents.py.
+
+   Revert is here rather than fixed in the shell because whether it belongs
+   depends on two facts the server holds: whether this is the current
+   version, and whether the account may call POST .../revert/{n}, which
+   needs document:update. The page decided the first from a variable set
+   when the document modal opened and never asked the second.
+#}
+{% if failed %}
+<span class="doc-unmeasured">This version could not be read</span>
+{% else %}
+{%- if reason %}<span><strong>Reason:</strong> {{ reason }}</span>
+{%- else %}<span class="doc-unmeasured">no reason recorded</span>{% endif %}
+{%- if author %}<span><strong>By:</strong> {{ author }}</span>
+{%- else %}<span class="doc-unmeasured">author unknown</span>{% endif %}
+{%- if when %}<span><strong>Date:</strong> {{ when }}</span>
+{%- else %}<span class="doc-unmeasured">undated</span>{% endif %}
+{%- if is_current %}<span class="badge badge-current">Current</span>{% endif %}
+{% endif %}
+{#- The Revert button belongs in the modal footer, not in this row, so it
+    is swapped there out of band. Its argument is this version's number as
+    the server read it, where the shell's button took previewVersionNumber,
+    a module variable, from a listener bound at page load. -#}
+<span id="revert-version-slot" hx-swap-oob="innerHTML:#revert-version-slot">
+  {%- if may_revert %}
+  <button class="btn btn-warning" data-click-action="confirmRevert"
+          data-args='{{ [number]|tojson }}'>Revert to This Version</button>
+  {%- endif %}
+</span>

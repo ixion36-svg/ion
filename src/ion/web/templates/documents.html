@@ -262,7 +262,9 @@
             <div id="version-content" class="document-content rendered-content"></div>
         </div>
         <div class="modal-action">
-            <button id="revert-version-btn" class="btn btn-warning">Revert to This Version</button>
+            {# Filled out of band by /ui/documents/{id}/versions/{n}/header,
+               which is where whether Revert belongs is decided. #}
+            <span id="revert-version-slot"></span>
             <button class="btn btn-ghost" data-click-action="closeVersionModal">Close</button>
         </div>
     </div>
@@ -877,20 +879,17 @@ async function viewDocument(id) {
         currentDocVersion = doc.current_version || 1;
         currentDocInputData = doc.input_data;
 
-        document.getElementById('modal-doc-name').textContent = doc.name;
-        let metaHtml = '<span class="badge">' + doc.output_format + '</span>';
-        metaHtml += '<span class="badge badge-version">v' + currentDocVersion + '</span>';
-        if (doc.status === 'archived') {
-            metaHtml += '<span class="badge badge-archived">Archived</span>';
+        document.getElementById('modal-doc-name').textContent = doc.name ?? 'Untitled document';
+        // GET /ui/documents/{id}/header renders the badge row. It printed
+        // "undefined" for a missing format, "v1" for a missing version,
+        // and both dates through formatDate, which reads a naive UTC
+        // column in the viewer's zone.
+        const metaHost = document.getElementById('modal-doc-meta');
+        if (metaHost) {
+            htmx.ajax('GET', '/ui/documents/' + encodeURIComponent(id) + '/header', {
+                source: metaHost, target: metaHost, swap: 'innerHTML',
+            });
         }
-        if (doc.source_template_id) {
-            metaHtml += '<span>From template #' + doc.source_template_id + ' v' + doc.source_template_version + '</span>';
-        }
-        metaHtml += '<span>Created: ' + formatDate(doc.created_at) + '</span>';
-        if (doc.updated_at && doc.updated_at !== doc.created_at) {
-            metaHtml += '<span>Updated: ' + formatDate(doc.updated_at) + '</span>';
-        }
-        document.getElementById('modal-doc-meta').innerHTML = metaHtml;
 
         // Show tags section
         currentDocTags = doc.tags || [];
@@ -1070,21 +1069,22 @@ async function previewVersion(versionNumber) {
 
         document.getElementById('version-modal-title').textContent = 'Version ' + versionNumber + ' Preview';
 
-        let metaHtml = '';
-        if (version.amendment_reason) {
-            metaHtml += '<span><strong>Reason:</strong> ' + escapeHtml(version.amendment_reason) + '</span>';
+        // GET /ui/documents/{id}/versions/{n}/header renders the meta row
+        // and decides whether Revert belongs on it, which needs
+        // document:update and whether this is the current version. The
+        // page asked neither: it compared against currentDocVersion, set
+        // when the document modal opened, and showed the button to any
+        // reader.
+        const vMeta = document.getElementById('version-meta');
+        if (vMeta) {
+            htmx.ajax('GET', '/ui/documents/' + encodeURIComponent(currentDocId)
+                + '/versions/' + encodeURIComponent(versionNumber) + '/header', {
+                source: vMeta, target: vMeta, swap: 'innerHTML',
+            });
         }
-        if (version.amended_by) {
-            metaHtml += '<span><strong>By:</strong> ' + escapeHtml(version.amended_by) + '</span>';
-        }
-        metaHtml += '<span><strong>Date:</strong> ' + formatDate(version.created_at) + '</span>';
-        document.getElementById('version-meta').innerHTML = metaHtml;
 
         document.getElementById('version-content').innerHTML = renderContent(version.rendered_content, currentDocFormat);
 
-        // Show/hide revert button
-        document.getElementById('revert-version-btn').style.display =
-            versionNumber === currentDocVersion ? 'none' : 'inline-block';
 
         document.getElementById('version-modal').style.display = 'flex';
     } catch (e) {
@@ -1462,11 +1462,6 @@ document.getElementById('version-modal').addEventListener('click', function(e) {
     if (e.target.id === 'version-modal') closeVersionModal();
 });
 
-document.getElementById('revert-version-btn').addEventListener('click', function() {
-    if (previewVersionNumber !== null) {
-        confirmRevert(previewVersionNumber);
-    }
-});
 
 // Upload Document Modal
 function showUploadModal() {
