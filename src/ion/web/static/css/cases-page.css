@@ -57,3 +57,32 @@
 .case-bar-5 { background: #ef4444; }
 .case-bar-6 { background: #ec4899; }
 .case-bar-7 { background: #f97316; }
+
+/* Similar Closed Cases ------------------------------------------------
+ *
+ * The verdict chip beside each card. These were a `closureColors` map in
+ * cases.html, read in JavaScript and written into a data-ion-style
+ * attribute, so every colour the panel could show was decided by the page
+ * and a theme could not reach it. The values are unchanged.
+ *
+ * `other` is the fallback. The map's default was its not_applicable entry,
+ * so a reason nobody had added yet was painted as "not applicable", which
+ * is a verdict rather than an absence of one.
+ */
+.case-closure-true_positive        { background: rgba(239, 68, 68, .14); color: var(--danger, #ef4444); }
+.case-closure-false_positive       { background: rgba(34, 197, 94, .14); color: var(--success, #22c55e); }
+.case-closure-benign_true_positive { background: rgba(245, 158, 11, .14); color: var(--warning, #f59e0b); }
+.case-closure-duplicate            { background: rgba(107, 114, 128, .14); color: #9ca3af; }
+.case-closure-insufficient_data    { background: rgba(107, 114, 128, .14); color: #9ca3af; }
+.case-closure-not_applicable       { background: rgba(107, 114, 128, .14); color: #9ca3af; }
+.case-closure-other                { background: rgba(107, 114, 128, .14); color: #9ca3af; }
+
+/* The similarity score. This was `bg-[rgba(109,228,255,.12)]
+ * text-[#6de4ff]`, the brand cyan written into the page as an arbitrary
+ * Tailwind value, which is why retheming the accent left this chip behind.
+ * It reads the accent token now, so it follows the eight themes.
+ */
+.case-sim-badge {
+    background: color-mix(in srgb, var(--primary) 12%, transparent);
+    color: var(--primary);
+}

@@ -3727,50 +3727,23 @@ function renderPanelContent(c) {
 }
 
 // ── Load Similar Cases (pgvector-backed) ──────────────────
-async function loadSimilarCases(caseId) {
+// GET /ui/cases/{id}/similar renders the cards. The panel lives in the
+// detail body, which this page still builds as a string, so the fragment is
+// fetched with htmx.ajax rather than an hx-get the container would need
+// htmx to have processed. Same shape as the 44 call sites on /alerts.
+//
+// What moved to the server, beyond the markup: a payload that is not the
+// expected shape now reads as "Similarity unavailable" rather than "No
+// similar closed cases yet", a row with no similarity says so instead of
+// printing 0%, the closure colours are in cases-page.css where a theme can
+// reach them, data-args goes through tojson, and the case number is no
+// longer a javascript: href that this CSP blocks.
+function loadSimilarCases(caseId) {
     const container = document.getElementById('similar-cases-container');
-    if (!container) return;
-    try {
-        const resp = await fetch('/api/cases/' + caseId + '/similar?limit=5');
-        if (!resp.ok) {
-            container.innerHTML = '<div class="cpanel-empty-hint">Similarity unavailable</div>';
-            return;
-        }
-        const data = await resp.json();
-        const items = data.similar || [];
-        if (!items.length) {
-            const reason = data.reason ? ' (' + esc(data.reason) + ')' : '';
-            container.innerHTML = '<div class="cpanel-empty-hint">No similar closed cases yet' + reason + '</div>';
-            return;
-        }
-        // Colour-code closure_reason — true_positive red-ish, false_positive
-        // green-ish, benign_true_positive amber, others grey. Matches how
-        // detection-eng reads the scorecard.
-        const closureColors = {
-            true_positive: { bg: 'rgba(239,68,68,.14)', color: 'var(--danger,#ef4444)' },
-            false_positive: { bg: 'rgba(34,197,94,.14)', color: 'var(--success,#22c55e)' },
-            benign_true_positive: { bg: 'rgba(245,158,11,.14)', color: 'var(--warning,#f59e0b)' },
-            duplicate: { bg: 'rgba(107,114,128,.14)', color: '#9ca3af' },
-            insufficient_data: { bg: 'rgba(107,114,128,.14)', color: '#9ca3af' },
-            not_applicable: { bg: 'rgba(107,114,128,.14)', color: '#9ca3af' },
-        };
-        container.innerHTML = items.map(s => {
-            const c = closureColors[s.closure_reason] || closureColors.not_applicable;
-            const pct = Math.round((s.similarity || 0) * 100) + '%';
-            return '<div class="cpanel-alert-card cursor-pointer" data-click-action="openCaseDetail" data-args=\'[' + s.case_id + ']\'>'
-                +   '<div class="cpanel-alert-card-header">'
-                +     '<a class="cpanel-alert-id" href="javascript:openCaseDetail(' + s.case_id + ')">' + esc(s.case_number || ('#' + s.case_id)) + '</a>'
-                +     '<div class="cpanel-alert-badges">'
-                +       '<span class="cpanel-alert-badge bg-[rgba(109,228,255,.12)] text-[#6de4ff]" title="Cosine similarity">' + esc(pct) + '</span>'
-                +       '<span class="cpanel-alert-badge" data-ion-style="background:' + c.bg + ';color:' + c.color + '">' + esc((s.closure_reason || '').replace(/_/g, ' ')) + '</span>'
-                +     '</div>'
-                +   '</div>'
-                +   '<div class="cpanel-alert-card-meta">' + esc((s.title || '').slice(0, 120)) + '</div>'
-                + '</div>';
-        }).join('');
-    } catch (e) {
-        container.innerHTML = '<div class="cpanel-empty-hint">Similarity unavailable</div>';
-    }
+    if (!container) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/cases/' + encodeURIComponent(caseId) + '/similar', {
+        source: container, target: container, swap: 'innerHTML',
+    });
 }
 
 // ═════════════════════════════════════════════════════════

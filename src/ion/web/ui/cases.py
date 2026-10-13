@@ -82,7 +82,7 @@ from __future__ import annotations
 import logging
 import math
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Optional, TypedDict
 
 from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import HTMLResponse
@@ -100,6 +100,7 @@ from ion.web.ui._shared import (
     parse_instant,
     plain,
     render_view,
+    rows as _rows,
 )
 
 logger = logging.getLogger(__name__)
@@ -691,3 +692,146 @@ def cases_summary_fragment(
     )
     return render_view(request, FRAGMENT,
                        summary_context(session, can_read_metrics))
+
+
+# ---------------------------------------------------------------------------
+# Similar Closed Cases
+# ---------------------------------------------------------------------------
+#
+# The panel the detail view loads beside a case, from the pgvector endpoint
+# GET /api/cases/{id}/similar (case:read, no module gate). loadSimilarCases
+# already told a failed request from an empty answer, so two of the three
+# outcomes were distinct; `const items = data.similar || []` collapsed the
+# third into the second, and a 200 whose body was not that shape read as
+# "No similar closed cases yet".
+
+SIMILAR_FRAGMENT = "_fragments/cases_similar.html"
+
+#: What the sidebar asked the endpoint for.
+SIMILAR_SHOWN = 5
+
+#: How much of a title the card has room for, as the page sliced it.
+SIMILAR_TITLE_CHARS = 120
+
+#: The closure reasons the verdict badge has a colour for, in
+#: static/css/cases-page.css. A reason outside this set is painted as
+#: `other`, where the page fell back to the not_applicable grey. Which
+#: colour means "true positive" is the stylesheet's answer: the view model
+#: carried rgba() and var() literals, so the palette shipped in the page.
+CLOSURE_BADGE_KEYS: tuple[str, ...] = (
+    "true_positive",
+    "false_positive",
+    "benign_true_positive",
+    "duplicate",
+    "insufficient_data",
+    "not_applicable",
+)
+CLOSURE_BADGE_FALLBACK = "other"
+
+
+class SimilarCase(TypedDict):
+    """One card. `similarity_pct` is None for a row that carried no score."""
+
+    case_id: Any
+    label: str
+    title: Optional[str]
+    closure_key: str
+    closure_label: Optional[str]
+    similarity_pct: Optional[int]
+
+
+class SimilarView(TypedDict):
+    """`cases` is None when the read failed or answered a shape we cannot
+    read, [] when there are genuinely none, and a list otherwise. `reason`
+    is the endpoint's own word for why it found nothing, which it sends for
+    the common case of a case that has not been embedded yet."""
+
+    cases: Optional[list[SimilarCase]]
+    reason: Optional[str]
+
+
+def similarity_pct(value: Any) -> Optional[int]:
+    """A cosine similarity as whole percent, or None when there isn't one.
+
+    `Math.round((s.similarity || 0) * 100)` printed 0% for a row that
+    arrived without a score, and 0% is the one number that means the
+    opposite of unknown. bool is excluded before the numeric check because
+    True is an int in Python and 100% is not what it means.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if math.isnan(value) or math.isinf(value):
+        return None
+    return int(round(value * 100))
+
+
+def similar_case(row: Any) -> Optional[SimilarCase]:
+    """One row of the endpoint's `similar` list, or None for a row that is
+    not a mapping at all. A list with one bad row still renders its others."""
+    if not isinstance(row, dict):
+        return None
+    case_id = plain(row.get("case_id"))
+    number = plain(row.get("case_number"))
+    reason = plain(row.get("closure_reason"))
+    key = str(reason) if reason in CLOSURE_BADGE_KEYS else CLOSURE_BADGE_FALLBACK
+    title = plain(row.get("title"))
+    return {
+        "case_id": case_id,
+        "label": str(number) if number else f"#{case_id}",
+        "title": str(title)[:SIMILAR_TITLE_CHARS] if title else None,
+        "closure_key": key,
+        "closure_label": closure_label(reason),
+        "similarity_pct": similarity_pct(plain(row.get("similarity"))),
+    }
+
+
+def similar_view(payload: Any) -> SimilarView:
+    """The endpoint's body as the panel's model.
+
+    A payload that is not a dict, or whose `similar` is not a list, is the
+    failed outcome rather than the empty one: we did not read it, so we
+    cannot say there are none.
+    """
+    found = _rows(payload, "similar")
+    if found is None:
+        return {"cases": None, "reason": None}
+    cases = [card for card in (similar_case(row) for row in found)
+             if card is not None]
+    reason = plain(payload.get("reason")) if isinstance(payload, dict) else None
+    return {"cases": cases, "reason": str(reason) if reason else None}
+
+
+@router.get(
+    "/cases/{case_id}/similar",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+def cases_similar_fragment(
+    request: Request,
+    case_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> Response:
+    """The Similar Closed Cases panel.
+
+    Reads through the endpoint's own handler so the card a reader sees is
+    the row the JSON reports. The endpoint is pgvector, which SQLite cannot
+    answer at all, so every failure mode lands in the one except: that is
+    the unavailable outcome, and it is not the empty one.
+    """
+    from ion.web.case_lifecycle_api import get_similar_cases
+
+    try:
+        payload = get_similar_cases(
+            case_id,
+            limit=SIMILAR_SHOWN,
+            current_user=current_user,
+            session=session,
+        )
+    except Exception:
+        logger.exception(
+            "Cases similar fragment could not read similar cases for %s",
+            case_id)
+        payload = None
+
+    return render_view(request, SIMILAR_FRAGMENT, similar_view(payload))
