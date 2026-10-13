@@ -17,15 +17,15 @@ page cannot be forgotten. Status is measured, never set by hand.
 | styled | no inline `<style>` block at all | appearance comes from the compiled sheet, so it is themed, cached and swept once |
 | server | no `innerHTML` / `insertAdjacentHTML` | one partial renders a thing, so a restyle reaches every instance of it |
 
-**55 of 80 templates complete.**
+**64 of 80 templates complete.**
 
 | measure | remaining |
 |---|---|
 | templates | 80 |
-| total lines | 60,985 |
-| inline `<style>` lines | 10,075 |
-| runtime DOM writes | 418 |
-| literal light-on-dark colours | 5 |
+| total lines | 58,327 |
+| inline `<style>` lines | 8,277 |
+| runtime DOM writes | 355 |
+| literal light-on-dark colours | 4 |
 
 ## Shell and partials
 
@@ -48,26 +48,26 @@ A restyle here is a markup edit and is fully visible in a screenshot.
 |---|--:|--:|--:|--:|:--:|:--:|:--:|:--:|
 | `alerts.html` | 6577 | 0 | 6007 | 0 | yes | yes | yes | **done** |
 | `training.html` | 6526 | 0 | 5715 | 0 | yes | yes | yes | **done** |
+| `forensics.html` | 1193 | 0 | 753 | 0 | yes | yes | yes | **done** |
+| `observables.html` | 1132 | 0 | 757 | 0 | yes | yes | yes | **done** |
 | `guide.html` | 935 | 0 | 27 | 0 | yes | yes | yes | **done** |
 | `threat_intel.html` | 873 | 0 | 863 | 0 | yes | yes | yes | **done** |
 | `workforce_orbat.html` | 724 | 0 | 634 | 0 | yes | yes | yes | **done** |
-| `gitlab.html` | 587 | 144 | 269 | 0 | no | no | yes |  |
 | `template_render.html` | 470 | 0 | 300 | 0 | yes | yes | yes | **done** |
 | `users.html` | 463 | 0 | 232 | 0 | yes | yes | yes | **done** |
+| `gitlab.html` | 446 | 0 | 269 | 0 | yes | yes | yes | **done** |
 | `detection_engineering.html` | 428 | 0 | 356 | 0 | yes | yes | yes | **done** |
-| `scheduler.html` | 424 | 45 | 219 | 0 | yes | no | yes |  |
-| `security_dashboard.html` | 420 | 90 | 146 | 0 | yes | no | yes |  |
 | `dashboard_v2.html` | 412 | 0 | 98 | 0 | yes | yes | yes | **done** |
 | `alert_prompt_templates.html` | 397 | 0 | 198 | 0 | yes | yes | yes | **done** |
 | `investigation_memory.html` | 384 | 0 | 126 | 0 | yes | yes | yes | **done** |
+| `scheduler.html` | 382 | 0 | 219 | 0 | yes | yes | yes | **done** |
 | `workforce_journey.html` | 376 | 0 | 309 | 0 | yes | yes | yes | **done** |
 | `profile.html` | 370 | 0 | 185 | 0 | yes | yes | yes | **done** |
 | `workforce_people.html` | 370 | 0 | 295 | 0 | yes | yes | yes | **done** |
-| `template_view.html` | 362 | 161 | 87 | 0 | yes | no | yes |  |
 | `architecture.html` | 339 | 0 | 221 | 0 | yes | yes | yes | **done** |
+| `security_dashboard.html` | 333 | 0 | 146 | 0 | yes | yes | yes | **done** |
 | `workforce_profiles.html` | 312 | 0 | 202 | 0 | yes | yes | yes | **done** |
 | `template_form.html` | 307 | 0 | 201 | 0 | yes | yes | yes | **done** |
-| `templates.html` | 288 | 166 | 75 | 0 | yes | no | yes |  |
 | `analyst.html` | 278 | 0 | 78 | 0 | yes | yes | yes | **done** |
 | `change_requests.html` | 274 | 0 | 89 | 0 | yes | yes | yes | **done** |
 | `de_workbench.html` | 267 | 0 | 102 | 0 | yes | yes | yes | **done** |
@@ -78,6 +78,7 @@ A restyle here is a markup edit and is fully visible in a screenshot.
 | `knowledge_graph.html` | 213 | 0 | 131 | 0 | yes | yes | yes | **done** |
 | `bob_eval.html` | 208 | 0 | 50 | 0 | yes | yes | yes | **done** |
 | `investigation_queue.html` | 208 | 0 | 120 | 0 | yes | yes | yes | **done** |
+| `template_view.html` | 204 | 0 | 87 | 0 | yes | yes | yes | **done** |
 | `maturity.html` | 191 | 0 | 135 | 0 | yes | yes | yes | **done** |
 | `de_quirks.html` | 184 | 0 | 66 | 0 | yes | yes | yes | **done** |
 | `daily_work.html` | 178 | 0 | 131 | 0 | yes | yes | yes | **done** |
@@ -91,15 +92,16 @@ A restyle here is a markup edit and is fully visible in a screenshot.
 | `versions.html` | 144 | 0 | 79 | 0 | yes | yes | yes | **done** |
 | `notes.html` | 137 | 0 | 31 | 0 | yes | yes | yes | **done** |
 | `de_metrics.html` | 136 | 0 | 54 | 0 | yes | yes | yes | **done** |
-| `wallboard.html` | 120 | 19 | 14 | 0 | yes | no | yes |  |
+| `templates.html` | 125 | 0 | 75 | 0 | yes | yes | yes | **done** |
 | `case_grouper.html` | 119 | 0 | 49 | 0 | yes | yes | yes | **done** |
 | `executive_report.html` | 116 | 0 | 21 | 0 | yes | yes | yes | **done** |
 | `verdict_review.html` | 116 | 0 | 63 | 0 | yes | yes | yes | **done** |
-| `alert_arkime.html` | 102 | 24 | 15 | 0 | yes | no | yes |  |
+| `wallboard.html` | 101 | 0 | 14 | 0 | yes | yes | yes | **done** |
 | `briefing.html` | 95 | 0 | 0 | 0 | yes | yes | yes | **done** |
 | `audit_logs.html` | 94 | 0 | 0 | 0 | yes | yes | yes | **done** |
 | `entity_timeline.html` | 89 | 0 | 0 | 0 | yes | yes | yes | **done** |
 | `response_approvals.html` | 89 | 0 | 40 | 0 | yes | yes | yes | **done** |
+| `alert_arkime.html` | 81 | 0 | 15 | 0 | yes | yes | yes | **done** |
 | `soc_roles.html` | 56 | 0 | 0 | 0 | yes | yes | yes | **done** |
 | `data_flow.html` | 55 | 0 | 0 | 0 | yes | yes | yes | **done** |
 | `compliance.html` | 54 | 0 | 0 | 0 | yes | yes | yes | **done** |
@@ -107,7 +109,7 @@ A restyle here is a markup edit and is fully visible in a screenshot.
 | `service_accounts.html` | 50 | 0 | 0 | 0 | yes | yes | yes | **done** |
 | `threat_intel_actor.html` | 44 | 0 | 0 | 0 | yes | yes | yes | **done** |
 
-Subtotal: 60 templates, 28,164 lines, 649 inline css lines, 0 runtime writes, 1 light-mode literals.
+Subtotal: 62 templates, 29,858 lines, 0 inline css lines, 0 runtime writes, 0 light-mode literals.
 
 ## Tier C, more than 10 runtime writes
 
@@ -115,13 +117,11 @@ Needs the server-rendered fragment work first; a markup-only restyle cannot reac
 
 | template | lines | css | js | writes | light | styled | server | done |
 |---|--:|--:|--:|--:|:--:|:--:|:--:|:--:|
-| `cases.html` | 5493 | 2163 | 3315 | 55 | no | no | no |  |
+| `cases.html` | 5466 | 2163 | 3288 | 51 | no | no | no |  |
 | `integrations.html` | 3063 | 1087 | 1591 | 40 | yes | no | no |  |
 | `settings.html` | 3035 | 1173 | 1111 | 27 | yes | no | no |  |
-| `observables.html` | 2591 | 824 | 1398 | 31 | yes | no | no |  |
 | `chat.html` | 2199 | 1126 | 733 | 17 | yes | no | no |  |
 | `discover.html` | 1811 | 329 | 1078 | 24 | yes | no | no |  |
-| `forensics.html` | 1734 | 325 | 970 | 28 | yes | no | no |  |
 | `playbooks.html` | 1721 | 588 | 921 | 11 | yes | no | no |  |
 | `analytics.html` | 1716 | 719 | 823 | 28 | yes | no | no |  |
 | `documents.html` | 1712 | 234 | 1163 | 28 | yes | no | no |  |
@@ -132,7 +132,7 @@ Needs the server-rendered fragment work first; a markup-only restyle cannot reac
 | `network_map.html` | 841 | 0 | 668 | 14 | yes | yes | no |  |
 | `network_topology.html` | 579 | 178 | 320 | 11 | yes | no | no |  |
 
-Subtotal: 16 templates, 31,897 lines, 9,073 inline css lines, 418 runtime writes, 2 light-mode literals.
+Subtotal: 14 templates, 27,545 lines, 7,924 inline css lines, 355 runtime writes, 2 light-mode literals.
 
 ## Cleanup, so nothing is left behind
 

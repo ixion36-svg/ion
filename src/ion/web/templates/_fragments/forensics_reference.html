@@ -1,0 +1,1 @@
+{% if state == 'failed' %}<div class="empty-state">Reference document unavailable</div>{% else %}<h2>{{ document.title|default('Unknown',true) }}</h2><div class="forensic-reference-content">{{ content_html|safe if content_html is not none else 'Content unavailable' }}</div>{% endif %}

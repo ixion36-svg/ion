@@ -20,6 +20,18 @@
 
 ## Executive Summary
 
+### Unreleased observables and forensics UI conversion, 2026-10-13
+
+Authenticated read fragments retain `observable:read` or `forensic:read`, matching
+their source APIs. Forensic analyst options additionally require `user:read`
+before querying users; other readers see an explicit withheld state. Mutation
+controls follow the existing create, update, enrich, close and playbook permissions,
+and the existing APIs continue to enforce writes. HTML and JSON views share the
+same permission dependency. Escaped Jinja text, JSON action arguments, sanitized
+reference markdown and cloned client templates preserve CSP protections. Failed
+reads remain distinct from empty collections and measured zero. No new credential,
+permission grant, external sink or dependency is added.
+
 ### Unreleased detection engineering UI conversion, 2026-10-13
 
 Fourteen authenticated fragment routes are added for detection posture, spaces,

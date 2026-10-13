@@ -97,7 +97,15 @@ def custody(request:Request,evidence_id:int,user=Depends(read_user),session:Sess
     view:CollectionPanel=_collection(_read(forensics_api.get_custody_log,evidence_id=evidence_id,user=user,session=session),user)
     return render_view(request,'_fragments/forensics_custody.html',view)
 
+@router.get('/forensics/playbooks',response_class=HTMLResponse)
+def playbooks(request:Request,investigation_type:str|None=None,user=Depends(read_user),session:Session=Depends(get_db_session)):
+    view:CollectionPanel=_collection(_read(forensics_api.list_playbooks,investigation_type=investigation_type,active_only=False,user=user,session=session),user)
+    return render_view(request,'_fragments/forensics_playbooks.html',view)
 
+@router.get('/forensics/reference-docs',response_class=HTMLResponse)
+def references(request:Request,user=Depends(read_user)):
+    view:CollectionPanel=_collection(_read(forensics_api.get_reference_docs,user=user),user)
+    return render_view(request,'_fragments/forensics_references.html',view)
 
 class _ReferenceHTML(HTMLParser):
     """Keep document typography, stripping links and all HTML attributes."""
@@ -120,3 +128,11 @@ def _reference_html(content: object) -> str | None:
     return ''.join(parser.parts)
 
 
+@router.get('/forensics/reference-docs/{document_id}',response_class=HTMLResponse)
+def reference(request:Request,document_id:str,user=Depends(read_user)):
+    payload=_read(forensics_api.get_reference_docs,user=user)
+    items=rows({'items':payload},'items')
+    document=next((d for d in items if isinstance(d,dict) and str(d.get('id'))==document_id),None) if items is not None else None
+    view:ReferencePanel={'state':'data' if document is not None else 'failed','document':document,
+                        'content_html':_reference_html(document.get('content')) if document else None}
+    return render_view(request,'_fragments/forensics_reference.html',view)

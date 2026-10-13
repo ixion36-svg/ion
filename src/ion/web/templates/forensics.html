@@ -438,12 +438,13 @@
 <script src="/static/js/ion-fragments.js?v={{ ion_version }}"></script>
 <script nonce="{{ csp_nonce }}">
 const API = '/api/forensics';
+let forensicPermissions={};
 function applyForensicPermissions(view){
  forensicPermissions={'forensic:create':view.can_create===true,'forensic:update':view.can_update===true,'forensic:close':view.can_close===true,'forensic:manage_playbooks':view.can_manage_playbooks===true};
  document.querySelectorAll('[data-forensic-permission]').forEach(el=>{const allowed=forensicPermissions[el.dataset.forensicPermission]===true;el.hidden=!allowed;el.disabled=!allowed;});
  for(const id of ['cd-title','cd-description']){const el=document.getElementById(id);if(forensicPermissions['forensic:update'])el.dataset.clickAction=id==='cd-title'?'startEditTitle':'startEditDesc';else delete el.dataset.clickAction;}
 }
-let forensicPermissions={};
+
 let allCases = [];
 let allPlaybooks = [];
 let currentCaseId = null;
@@ -457,9 +458,7 @@ let filterTimeout = null;
 
 async function init() {
     await populateDropdowns();
-    const refResponse = await fetch(API + '/reference-docs');
-    if (refResponse.ok) referenceDocs = await refResponse.json();
-    await loadCases();
+    await Promise.all([loadCases(), renderReferenceDocs()]);
 }
 
 async function populateDropdowns() {
@@ -481,10 +480,9 @@ async function populateDropdowns() {
 }
 
 function fmtLabel(s){return s?s.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()):''}
-function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
 function fmtDate(iso){if(!iso)return'-';const d=new Date(iso);return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}
 function fmtDateTime(iso){if(!iso)return'-';const d=new Date(iso);return fmtDate(iso)+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}
-function showToast(msg,err){const d=document.createElement('div');d.textContent=msg;d.style.cssText='position:fixed;bottom:24px;right:24px;padding:12px 20px;border-radius:8px;z-index:9999;font-size:.9rem;color:#fff;background:'+(err?'var(--sev-critical)':'var(--mitre-covered)');document.body.appendChild(d);setTimeout(()=>d.remove(),3000)}
+function showToast(msg,err){const d=document.createElement('div');d.textContent=msg;d.className=err?'forensic-toast forensic-toast-error':'forensic-toast';document.body.appendChild(d);setTimeout(()=>d.remove(),3000)}
 function closeModal(id){document.getElementById(id).style.display='none'}
 function debouncedFilter() {
     clearTimeout(filterTimeout);
@@ -595,45 +593,7 @@ function renderCaseDetail(c){
 }
 
 // ======== SECTIONS (fillable steps) ========
-function renderFieldInput(field, value, stepId) {
-    const k = field.key, lbl = esc(field.label||k), ph = esc(field.placeholder||'');
-    const fid = `sf-${stepId}-${k}`;
-    switch(field.type) {
-        case 'textarea':
-            return `<div class="sf-group"><label class="sf-label">${lbl}</label><textarea class="form-input sf-input" id="${fid}" rows="3" placeholder="${ph}" data-field-key="${k}">${esc(value||'')}</textarea></div>`;
-        case 'list': {
-            const items = Array.isArray(value) ? value : [];
-            let html = `<div class="sf-group"><label class="sf-label">${lbl}</label><div class="sf-list" id="${fid}" data-field-key="${k}" data-field-type="list">`;
-            items.forEach((v,i) => { html += `<div class="sf-list-row"><input class="form-input sf-input" value="${esc(v)}" placeholder="${ph}"><button type="button" class="btn-icon sf-list-remove" data-remove-parent title="Remove">&times;</button></div>`; });
-            html += `</div><button type="button" class="btn btn-secondary py-[3px] px-2.5 text-xs mt-1" data-click-action="addListItem" data-args='["${fid}", "${ph}"]'>+ Add</button></div>`;
-            return html;
-        }
-        case 'table': {
-            const cols = field.columns || [];
-            const rows = Array.isArray(value) ? value : [];
-            let html = `<div class="sf-group"><label class="sf-label">${lbl}</label><div class="sf-table-wrap" id="${fid}" data-field-key="${k}" data-field-type="table" data-cols='${JSON.stringify(cols)}'>`;
-            html += `<table class="sf-table"><thead><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}<th class="w-[30px]"></th></tr></thead><tbody>`;
-            rows.forEach(row => {
-                html += `<tr>${cols.map(c=>`<td><input class="form-input sf-input" value="${esc(row[c]||'')}" data-col="${esc(c)}"></td>`).join('')}<td><button type="button" class="btn-icon sf-list-remove" data-remove-closest="tr" title="Remove">&times;</button></td></tr>`;
-            });
-            html += `</tbody></table>`;
-            html += `<button type="button" class="btn btn-secondary py-[3px] px-2.5 text-xs mt-1" data-click-action="addTableRow" data-args='["${fid}"]'>+ Add Row</button></div></div>`;
-            return html;
-        }
-        case 'select': {
-            const opts = field.options || [];
-            let html = `<div class="sf-group"><label class="sf-label">${lbl}</label><select class="form-input sf-input" id="${fid}" data-field-key="${k}">`;
-            html += `<option value="">-- Select --</option>`;
-            opts.forEach(o => { html += `<option value="${esc(o)}" ${value===o?'selected':''}>${esc(o)}</option>`; });
-            html += `</select></div>`;
-            return html;
-        }
-        case 'checkbox':
-            return `<div class="sf-group sf-check-row"><label class="sf-label"><input type="checkbox" id="${fid}" data-field-key="${k}" ${value?'checked':''}> ${lbl}</label></div>`;
-        default: // text
-            return `<div class="sf-group"><label class="sf-label">${lbl}</label><input class="form-input sf-input" id="${fid}" value="${esc(value||'')}" placeholder="${ph}" data-field-key="${k}"></div>`;
-    }
-}
+
 
 function addListItem(containerId, placeholder) {
  const c=document.getElementById(containerId),row=cloneTemplate('forensic-list-row');
@@ -1088,11 +1048,6 @@ function loadEvidenceForCase(){
  if(!id){ionMessage(document.getElementById('evidence-tbody'),'Select an investigation to view evidence');return;}
  return ionLoadFragment('/ui/forensics/cases/'+encodeURIComponent(id)+'/evidence?table=true','evidence-tbody','Loading evidence…');
 }
-function renderEvidenceTable(items){
-    const tbody=document.getElementById('evidence-tbody'),empty=document.getElementById('evidence-empty');
-    if(!items.length){tbody.replaceChildren();empty.style.display='';return}empty.style.display='none';
-    tbody.innerHTML=items.map(e=>`<tr><td><strong>${esc(e.evidence_number)}</strong></td><td>${esc(e.name)}</td><td>${fmtLabel(e.evidence_type)}</td><td>${fmtLabel(e.status)}</td><td class="ev-card-hash max-w-[150px] overflow-hidden text-ellipsis">${e.hash_sha256?'SHA:'+e.hash_sha256.substring(0,12)+'...':e.hash_md5?'MD5:'+e.hash_md5:'-'}</td><td>${esc(e.storage_location||'-')}</td><td>${esc(e.collected_by_username||'-')}</td><td><a href="#" data-click-action="showCustodyLog" data-stop-propagation data-args='[${e.id}, "${esc(e.evidence_number)}"]'>${e.custody_entries||0} entries</a></td><td><button class="btn btn-secondary py-0.5 px-2 text-xs" data-click-action="showCustodyModal" data-stop-propagation data-args='[${e.id}]'>+ Custody</button></td></tr>`).join('');
-}
 function showAddEvidenceModal(){['ae-name','ae-source','ae-storage','ae-md5','ae-sha256','ae-description'].forEach(id=>document.getElementById(id).value='');document.getElementById('modal-add-evidence').style.display='flex'}
 async function addEvidence(){
     const name=document.getElementById('ae-name').value.trim(),type=document.getElementById('ae-type').value;
@@ -1113,23 +1068,23 @@ async function showCustodyLog(evId,evNum){
 }
 
 // ======== PLAYBOOKS ========
-async function loadPlaybooks(){
-    const type=document.getElementById('pb-filter-type').value;
-    try{const r=await fetch(API+'/playbooks'+(type?'?investigation_type='+type:''));if(!r.ok)throw 0;renderPlaybooksTable(await r.json())}catch(e){showToast('Failed',true)}
-}
-function renderPlaybooksTable(pbs){
-    const tbody=document.getElementById('playbooks-tbody'),empty=document.getElementById('playbooks-empty');
-    if(!pbs.length){tbody.replaceChildren();empty.style.display='';return}empty.style.display='none';
-    tbody.innerHTML=pbs.map(p=>`<tr><td><strong>${esc(p.name)}</strong></td><td>${fmtLabel(p.investigation_type||'Any')}</td><td>${p.step_count}</td><td>${p.is_active?'<span class="text-[var(--mitre-covered)]">Active</span>':'<span class="text-[#6e7681]">Inactive</span>'}</td><td>${esc(p.created_by_username||'-')}</td><td><button class="btn btn-secondary py-0.5 px-2 text-xs" data-click-action="editPlaybook" data-args='[${p.id}]'>Edit</button> <button class="btn btn-secondary py-0.5 px-2 text-xs text-[var(--sev-critical)]" data-click-action="deletePlaybook" data-args='[${p.id}]'>Delete</button></td></tr>`).join('');
+function loadPlaybooks(){
+ document.getElementById('playbooks-empty').style.display='none';
+ const type=document.getElementById('pb-filter-type').value;
+ return ionLoadFragment('/ui/forensics/playbooks'+(type?'?investigation_type='+encodeURIComponent(type):''),'playbooks-tbody','Loading playbooks…');
 }
 function showNewPlaybookModal(){editingPlaybookId=null;document.getElementById('pb-modal-title').textContent='New Forensic Playbook';['pb-name','pb-desc'].forEach(id=>document.getElementById(id).value='');document.getElementById('pb-type').value='';document.getElementById('pb-active').checked=true;document.getElementById('pb-steps-list').replaceChildren();addPlaybookStepRow();document.getElementById('modal-playbook').style.display='flex'}
 async function editPlaybook(id){
     try{const r=await fetch(API+'/playbooks/'+id);if(!r.ok)throw 0;const pb=await r.json();editingPlaybookId=id;document.getElementById('pb-modal-title').textContent='Edit Playbook';document.getElementById('pb-name').value=pb.name;document.getElementById('pb-desc').value=pb.description||'';document.getElementById('pb-type').value=pb.investigation_type||'';document.getElementById('pb-active').checked=pb.is_active;document.getElementById('pb-steps-list').replaceChildren();(pb.steps||[]).forEach(s=>addPlaybookStepRow(s));if(!(pb.steps||[]).length)addPlaybookStepRow();document.getElementById('modal-playbook').style.display='flex'}catch(e){showToast('Failed',true)}
 }
 function addPlaybookStepRow(data){
-    const div=document.getElementById('pb-steps-list'),idx=div.children.length+1,row=document.createElement('div');row.className='pb-step-row';
-    row.innerHTML=`<span class="pb-step-num">${idx}</span><div class="flex-1"><input type="text" class="form-input pb-step-title" placeholder="Step title" value="${esc((data&&data.title)||'')}"><textarea class="form-input pb-step-desc mt-1" rows="2" placeholder="Description">${esc((data&&data.description)||'')}</textarea><div class="flex gap-3 items-center mt-1"><label class="m-0 text-[.8rem]"><input type="checkbox" class="pb-step-req" ${data&&data.is_required?'checked':''}> Required</label><label class="m-0 text-[.8rem]">Est. hours: <input type="number" class="pb-step-hours w-[60px]" step="0.5" min="0" value="${(data&&data.expected_duration_hours)||''}"></label></div></div><button class="btn btn-secondary py-0.5 px-2 text-[var(--sev-critical)] self-start" data-click-action="removeStepAndRenumber">&times;</button>`;
-    div.appendChild(row);
+ const div=document.getElementById('pb-steps-list'),row=cloneTemplate('forensic-playbook-step');
+ row.querySelector('.pb-step-num').textContent=div.children.length+1;
+ row.querySelector('.pb-step-title').value=data?.title ?? '';
+ row.querySelector('.pb-step-desc').value=data?.description ?? '';
+ row.querySelector('.pb-step-req').checked=data?.is_required===true;
+ row.querySelector('.pb-step-hours').value=data?.expected_duration_hours ?? '';
+ div.appendChild(row);
 }
 function renumberSteps(){document.querySelectorAll('#pb-steps-list .pb-step-num').forEach((el,i)=>el.textContent=i+1)}
 // data-click-action wrapper for the playbook-step delete button
@@ -1139,7 +1094,7 @@ window.removeStepAndRenumber = function(event) {
     if (btn && btn.parentElement) btn.parentElement.remove();
     renumberSteps();
 };
-function collectSteps(){return Array.from(document.querySelectorAll('#pb-steps-list .pb-step-row')).map(row=>({title:row.querySelector('.pb-step-title').value.trim(),description:row.querySelector('.pb-step-desc').value.trim()||null,is_required:row.querySelector('.pb-step-req').checked,expected_duration_hours:parseFloat(row.querySelector('.pb-step-hours').value)||null})).filter(s=>s.title)}
+function collectSteps(){return Array.from(document.querySelectorAll('#pb-steps-list .pb-step-row')).map(row=>({title:row.querySelector('.pb-step-title').value.trim(),description:row.querySelector('.pb-step-desc').value.trim()||null,is_required:row.querySelector('.pb-step-req').checked,expected_duration_hours:(row.querySelector('.pb-step-hours').value === '' ? null : Number(row.querySelector('.pb-step-hours').value))})).filter(s=>s.title)}
 async function savePlaybook(){
     const name=document.getElementById('pb-name').value.trim();if(!name){showToast('Name required',true);return}
     const body={name,description:document.getElementById('pb-desc').value||null,investigation_type:document.getElementById('pb-type').value||null,is_active:document.getElementById('pb-active').checked,steps:collectSteps()};
@@ -1148,27 +1103,12 @@ async function savePlaybook(){
 async function deletePlaybook(id){if(!confirm('Delete this playbook?'))return;try{const r=await fetch(API+'/playbooks/'+id,{method:'DELETE'});if(!r.ok)throw 0;showToast('Deleted');loadPlaybooks()}catch(e){showToast('Failed',true)}}
 
 // ======== REFERENCE DOCS ========
-function renderReferenceDocs(){
-    const grid=document.getElementById('ref-docs-grid');
-    grid.innerHTML=referenceDocs.map(d=>`<div class="fr-ref-card" data-click-action="viewRefDoc" data-args='["${d.id}"]'><div class="fr-ref-category">${esc(d.category)}</div><div class="fr-ref-title">${esc(d.title)}</div><div class="fr-ref-preview">${esc(d.content.substring(0,200))}...</div></div>`).join('')||'<div class="empty-state">No reference documents available</div>';
-}
+function renderReferenceDocs(){return ionLoadFragment('/ui/forensics/reference-docs','ref-docs-grid','Loading reference documents…');}
 function viewRefDoc(id){
-    const doc=referenceDocs.find(d=>d.id===id);if(!doc)return;
-    document.getElementById('ref-doc-title').textContent=doc.title;
-    document.getElementById('ref-doc-content').innerHTML=simpleMarkdown(doc.content);
-    document.getElementById('modal-ref-doc').style.display='flex';
+ document.getElementById('ref-doc-title').textContent='Reference document';document.getElementById('modal-ref-doc').style.display='flex';
+ return ionLoadFragment('/ui/forensics/reference-docs/'+encodeURIComponent(id),'ref-doc-content','Loading reference document…');
 }
-function simpleMarkdown(md){
-    return md.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-        .replace(/^### (.+)$/gm,'<h3>$1</h3>').replace(/^## (.+)$/gm,'<h2>$1</h2>').replace(/^# (.+)$/gm,'<h1>$1</h1>')
-        .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-        .replace(/`([^`]+)`/g,'<code>$1</code>')
-        .replace(/^```[\s\S]*?^```/gm,m=>'<pre><code>'+m.replace(/^```\w*\n?/,'').replace(/\n?```$/,'')+'</code></pre>')
-        .replace(/^\- (.+)$/gm,'<li>$1</li>')
-        .replace(/^\d+\. (.+)$/gm,'<li>$1</li>')
-        .replace(/\| .+/g,m=>{const cells=m.split('|').filter(c=>c.trim());if(cells.every(c=>/^[\-\s]+$/.test(c)))return'';return'<tr>'+cells.map(c=>'<td>'+c.trim()+'</td>').join('')+'</tr>'})
-        .replace(/\n\n/g,'<br><br>');
-}
+
 
 init();
 
@@ -1181,7 +1121,6 @@ function loadForensicAnnotations(caseId){
  _forensicAnnCaseId=caseId;
  return ionLoadFragment('/ui/forensics/cases/'+encodeURIComponent(caseId)+'/annotations','forensic-annotations-body','Loading annotations…');
 }
-
 
 
 function toggleForensicAnnotationForm() {
