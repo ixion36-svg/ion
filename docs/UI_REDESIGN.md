@@ -22,7 +22,7 @@ page cannot be forgotten. Status is measured, never set by hand.
 | measure | remaining |
 |---|---|
 | templates | 80 |
-| total lines | 48,646 |
+| total lines | 48,695 |
 | inline `<style>` lines | 2,163 |
 | runtime DOM writes | 44 |
 | literal light-on-dark colours | 2 |
@@ -50,7 +50,7 @@ A restyle here is a markup edit and is fully visible in a screenshot.
 | `training.html` | 6526 | 0 | 5715 | 0 | yes | yes | yes | **done** |
 | `settings.html` | 1536 | 0 | 757 | 0 | yes | yes | yes | **done** |
 | `tools.html` | 1503 | 0 | 1055 | 0 | yes | yes | yes | **done** |
-| `discover.html` | 1380 | 0 | 929 | 0 | yes | yes | yes | **done** |
+| `discover.html` | 1382 | 0 | 931 | 0 | yes | yes | yes | **done** |
 | `integrations.html` | 1359 | 0 | 952 | 0 | yes | yes | yes | **done** |
 | `forensics.html` | 1209 | 0 | 769 | 0 | yes | yes | yes | **done** |
 | `arkime_traffic.html` | 1202 | 0 | 1162 | 0 | yes | yes | yes | **done** |
@@ -61,8 +61,8 @@ A restyle here is a markup edit and is fully visible in a screenshot.
 | `workforce_orbat.html` | 724 | 0 | 634 | 0 | yes | yes | yes | **done** |
 | `network_map.html` | 588 | 0 | 395 | 0 | yes | yes | yes | **done** |
 | `daily_standup.html` | 566 | 0 | 525 | 0 | yes | yes | yes | **done** |
-| `pcap.html` | 537 | 0 | 410 | 0 | yes | yes | yes | **done** |
-| `analytics.html` | 522 | 0 | 342 | 0 | yes | yes | yes | **done** |
+| `pcap.html` | 559 | 0 | 432 | 0 | yes | yes | yes | **done** |
+| `analytics.html` | 536 | 0 | 356 | 0 | yes | yes | yes | **done** |
 | `template_render.html` | 470 | 0 | 300 | 0 | yes | yes | yes | **done** |
 | `users.html` | 463 | 0 | 232 | 0 | yes | yes | yes | **done** |
 | `gitlab.html` | 446 | 0 | 269 | 0 | yes | yes | yes | **done** |
@@ -120,7 +120,7 @@ A restyle here is a markup edit and is fully visible in a screenshot.
 | `service_accounts.html` | 50 | 0 | 0 | 0 | yes | yes | yes | **done** |
 | `threat_intel_actor.html` | 44 | 0 | 0 | 0 | yes | yes | yes | **done** |
 
-Subtotal: 73 templates, 40,196 lines, 0 inline css lines, 0 runtime writes, 0 light-mode literals.
+Subtotal: 73 templates, 40,234 lines, 0 inline css lines, 0 runtime writes, 0 light-mode literals.
 
 ## Tier B, 1 to 10 runtime writes
 
@@ -128,10 +128,10 @@ Markup plus a short list of class strings in inline JS.
 
 | template | lines | css | js | writes | light | styled | server | done |
 |---|--:|--:|--:|--:|:--:|:--:|:--:|:--:|
-| `documents.html` | 1524 | 0 | 1197 | 3 | yes | yes | no |  |
-| `chat.html` | 1085 | 0 | 695 | 4 | yes | yes | no |  |
+| `documents.html` | 1530 | 0 | 1203 | 3 | yes | yes | no |  |
+| `chat.html` | 1090 | 0 | 700 | 4 | yes | yes | no |  |
 
-Subtotal: 2 templates, 2,609 lines, 0 inline css lines, 7 runtime writes, 0 light-mode literals.
+Subtotal: 2 templates, 2,620 lines, 0 inline css lines, 7 runtime writes, 0 light-mode literals.
 
 ## Tier C, more than 10 runtime writes
 

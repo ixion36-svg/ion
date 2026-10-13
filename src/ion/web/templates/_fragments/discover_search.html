@@ -13,18 +13,6 @@
    The count badge is swapped out of band because it lives in the panel
    header, outside this table.
 #}
-<span id="search-result-count" hx-swap-oob="innerHTML:#search-result-count">
-  {%- if total is not none %}{{ total }} hits
-  {%- if took_ms is not none %} ({{ took_ms }}ms){% endif %}
-  {%- elif state == 'data' or state == 'empty' %}count unknown
-  {%- endif %}
-</span>
-{#- The three figures the pin-to-case capture needs, so the page does not
-    have to run the search a second time to get them. It stored the hits
-    too and neither consumer ever read them, which is 100 documents of
-    dead state per search. -#}
-<span id="dsc-search-meta" class="hidden" hx-swap-oob="true"
-      data-dsc-meta='{{ {"state": state, "total": total, "returned": rows|length, "took_ms": took_ms}|tojson }}'></span>
 {% if state == 'unconfigured' %}
 <tr><td colspan="{{ fields|length or 3 }}" class="empty-state">
   {{ detail or 'Elasticsearch is not configured, so there is nothing to search.' }}
@@ -55,3 +43,16 @@
 </tr>
 {%- endfor %}
 {% endif %}
+
+<span id="search-result-count" hx-swap-oob="innerHTML:#search-result-count">
+  {%- if total is not none %}{{ total }} hits
+  {%- if took_ms is not none %} ({{ took_ms }}ms){% endif %}
+  {%- elif state == 'data' or state == 'empty' %}count unknown
+  {%- endif %}
+</span>
+{#- The three figures the pin-to-case capture needs, so the page does not
+    have to run the search a second time to get them. It stored the hits
+    too and neither consumer ever read them, which is 100 documents of
+    dead state per search. -#}
+<span id="dsc-search-meta" class="hidden" hx-swap-oob="true"
+      data-dsc-meta='{{ {"state": state, "total": total, "returned": rows|length, "took_ms": took_ms}|tojson }}'></span>

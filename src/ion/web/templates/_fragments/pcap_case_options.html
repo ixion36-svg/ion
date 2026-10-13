@@ -4,7 +4,9 @@
    failed read rendered "No open cases" and told an analyst with findings
    to attach that there was nothing to attach them to.
 #}
-{%- if state == 'failed' %}
+{%- if state == 'withheld' %}
+<option value="">Cases withheld: case permission required</option>
+{%- elif state == 'failed' %}
 <option value="">The case list could not be read</option>
 {%- elif state == 'unreadable' %}
 <option value="">The case list is not in a readable shape</option>

@@ -11,18 +11,6 @@
    so a payload missing any one of them took the whole panel down through
    the caller's catch.
 #}
-<span id="field-stats-name" hx-swap-oob="innerHTML:#field-stats-name">{{ field or '' }}</span>
-<div id="field-stats-summary" hx-swap-oob="innerHTML:#field-stats-summary">
-  <div class="stat"><span class="stat-label">Unique Values</span><span class="stat-value">
-    {{- "{:,}".format(unique) if unique is not none else 'unknown' -}}
-  </span></div>
-  <div class="stat"><span class="stat-label">Total Count</span><span class="stat-value">
-    {{- "{:,}".format(total) if total is not none else 'unknown' -}}
-  </span></div>
-  <div class="stat"><span class="stat-label">Documents</span><span class="stat-value">
-    {{- "{:,}".format(docs) if docs is not none else 'unknown' -}}
-  </span></div>
-</div>
 {% if state == 'unconfigured' %}
 <tr><td colspan="3" class="empty-state">{{ detail or 'Elasticsearch is not configured.' }}</td></tr>
 {% elif state == 'refused' %}
@@ -45,3 +33,16 @@
 </tr>
 {%- endfor %}
 {% endif %}
+
+<span id="field-stats-name" hx-swap-oob="innerHTML:#field-stats-name">{{ field or '' }}</span>
+<div id="field-stats-summary" hx-swap-oob="innerHTML:#field-stats-summary">
+  <div class="stat"><span class="stat-label">Unique Values</span><span class="stat-value">
+    {{- "{:,}".format(unique) if unique is not none else 'unknown' -}}
+  </span></div>
+  <div class="stat"><span class="stat-label">Total Count</span><span class="stat-value">
+    {{- "{:,}".format(total) if total is not none else 'unknown' -}}
+  </span></div>
+  <div class="stat"><span class="stat-label">Documents</span><span class="stat-value">
+    {{- "{:,}".format(docs) if docs is not none else 'unknown' -}}
+  </span></div>
+</div>

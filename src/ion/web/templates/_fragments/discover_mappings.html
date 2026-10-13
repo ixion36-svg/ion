@@ -7,10 +7,6 @@
    `f.searchable ? 'Yes' : 'No'`, so a mapping that did not say became a
    mapping that said no.
 #}
-<span id="mappings-index-name" hx-swap-oob="innerHTML:#mappings-index-name">{{ index or '' }}</span>
-<span id="mappings-field-count" hx-swap-oob="innerHTML:#mappings-field-count">
-  {%- if total is not none %}{{ total }} fields{% else %}field count unknown{% endif %}
-</span>
 {% if state == 'unconfigured' %}
 <tr><td colspan="5" class="empty-state">{{ detail or 'Elasticsearch is not configured.' }}</td></tr>
 {% elif state == 'refused' %}
@@ -47,3 +43,8 @@
 </tr>
 {%- endfor %}
 {% endif %}
+
+<span id="mappings-index-name" hx-swap-oob="innerHTML:#mappings-index-name">{{ index or '' }}</span>
+<span id="mappings-field-count" hx-swap-oob="innerHTML:#mappings-field-count">
+  {%- if total is not none %}{{ total }} fields{% else %}field count unknown{% endif %}
+</span>

@@ -25,7 +25,8 @@
     findings detected</p>
 </div>
 {%- else %}
-<div class="triage-chips">
+{% if can_attach %}<div class="pcap-attach-bar"><span class="pcap-attach-hint">Attach selected findings to a case</span><select class="select select-sm" id="pcap-attach-case" aria-label="Case for selected findings"><option value="">Loading cases...</option></select><button type="button" class="btn btn-sm" data-pcap-attach>Attach selected</button></div>{% endif %}
+<div class="findings-triage">
   {%- for c in chips %}
   {#- A finding whose severity is outside the four incremented nothing,
       so the chips summed to less than the total. -#}
@@ -57,8 +58,8 @@
       {#- The index is the finding's position in the stored result, not
           its position here: the cards sort by severity, so attaching by
           display position would pin the wrong finding. -#}
-      <input type="checkbox" class="pcap-finding-pick"
-             data-finding-index="{{ f.index }}">
+      {% if can_attach %}<input type="checkbox" class="pcap-finding-pick"
+             data-finding-index="{{ f.index }}">{% endif %}
     </label>
     <span class="finding-sev {{ f.severity_class or '' }}">
       {{- fig(f.severity, 'This finding recorded no severity') -}}</span>

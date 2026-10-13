@@ -20,6 +20,15 @@
 
 ## Executive Summary
 
+### Unreleased browser verification repairs, 2026-10-14
+
+Restored PCAP attachment controls require `case:read` and `case:update`;
+the existing attachment API continues to enforce `case:update`. The case
+picker now checks `case:read` before invoking its source. Escaped JSON action
+arguments and sanitized chat rendering remain intact. Browser checks cover
+CSP, fragmented streams, OOB updates and permission combinations. No new route,
+permission grant, dependency, credential store or external sink is added.
+
 ### Unreleased cases board UI conversion, 2026-10-13
 
 The new `GET /ui/cases/board` and `GET /ui/cases/assignees` read fragments

@@ -1445,15 +1445,16 @@ class FindingsView(TypedDict):
     chips: list[dict]
     techniques: Optional[list[Technique]]
     threat_intel: ThreatIntel
+    can_attach: bool
 
 
-def findings_view(job: Any) -> FindingsView:
+def findings_view(job: Any, can_attach: bool = False) -> FindingsView:
     empty: FindingsView = {
         "state": "failed",
         "error": (_text(job.get("error")) if isinstance(job, dict)
                   else None),
         "cards": None, "chips": [], "techniques": None,
-        "threat_intel": threat_intel_view(None),
+        "threat_intel": threat_intel_view(None), "can_attach": can_attach,
     }
     if not isinstance(job, dict) or not isinstance(job.get("result"), dict):
         return empty
@@ -1465,7 +1466,7 @@ def findings_view(job: Any) -> FindingsView:
         "cards": cards,
         "chips": finding_chips(cards or []),
         "techniques": techniques(result.get("mitre_techniques")),
-        "threat_intel": threat_intel_view(result.get("threat_intel")),
+        "threat_intel": threat_intel_view(result.get("threat_intel")), "can_attach": can_attach,
     }
 
 
@@ -1554,13 +1555,15 @@ class CaseOptionsView(TypedDict):
     options: Optional[list[CaseOption]]
 
 
-def case_options_view(payload: Any) -> CaseOptionsView:
+def case_options_view(payload: Any, withheld: bool = False) -> CaseOptionsView:
     """The attach-to-case picker.
 
     `_pcapCases = r.ok ? ... : []`, with the same `[]` in its catch, so a
     failed read told an analyst with findings to attach that there was
     nothing to attach them to.
     """
+    if withheld:
+        return {"state": "withheld", "error": None, "options": None}
     if not isinstance(payload, dict):
         return {"state": "failed", "error": None, "options": None}
     raw = payload.get("cases")
@@ -1596,7 +1599,7 @@ def pcap_findings_fragment(
 ) -> Response:
     """The findings cards, the triage chips and the threat intel table."""
     job, refusal = _job(job_id, current_user, session)
-    view = findings_view(job)
+    view = findings_view(job, current_user.has_permission("case:update") and current_user.has_permission("case:read"))
     if refusal is not None:
         view["error"] = refusal
     return render_view(request, FINDINGS_FRAGMENT, view)
@@ -1638,9 +1641,13 @@ async def pcap_case_options_fragment(
     """Open cases, for attaching selected findings to one."""
     from ion.web import case_lifecycle_api
 
+    if not current_user.has_permission("case:read"):
+        view = case_options_view(None, withheld=True)
+        return render_view(request, CASE_OPTIONS_FRAGMENT, view)
+
     try:
         payload = await case_lifecycle_api.list_cases(
-            status="OPEN", limit=500, sort="case_number", order="desc",
+            status="OPEN", limit=500, offset=0, sort="case_number", order="desc",
             current_user=current_user, session=session)
     except Exception:
         logger.exception("Pcap case picker could not read the case list")

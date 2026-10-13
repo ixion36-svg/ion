@@ -162,14 +162,24 @@
         if (fileInput.files[0]) uploadFile(fileInput.files[0]);
     });
 
-    // Tabs
+    function activatePanel(name) {
+        document.querySelectorAll('.pcap-tab').forEach(tab => tab.classList.toggle('active', tab.dataset.panel === name));
+        document.querySelectorAll('.pcap-panel').forEach(panel => panel.classList.toggle('active', panel.id === 'panel-' + name));
+    }
+
     document.getElementById('pcap-tabs').addEventListener('click', e => {
-        const btn = e.target.closest('.pcap-tab');
-        if (!btn) return;
-        document.querySelectorAll('.pcap-tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.pcap-panel').forEach(p => p.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById('panel-' + btn.dataset.panel).classList.add('active');
+        const tab = e.target.closest('.pcap-tab');
+        if (!tab) return;
+        activatePanel(tab.dataset.panel);
+        if (tab.dataset.panel === 'history') loadPcapHistory();
+    });
+    document.getElementById('panel-findings').addEventListener('click', e => {
+        const chip = e.target.closest('.triage-chip');
+        if (chip) {
+            _findingsFilter = chip.dataset.sev === 'total' || chip.dataset.sev === _findingsFilter ? null : chip.dataset.sev;
+            applyFindingsFilter(e.currentTarget);
+        }
+        if (e.target.closest('[data-pcap-attach]')) attachSelectedFindings();
     });
 
     window.resetAnalysis = function() {
@@ -260,6 +270,8 @@
     // a colour, a padding and a radius where no stylesheet can reach
     // them. It is a class now.
     function renderResults(d) {
+        activatePanel('overview');
+        _findingsFilter = null;
         if (_currentJobId) {
             htmx.ajax('GET', '/ui/pcap/' + _currentJobId + '/summary', {
                 source: document.getElementById('panel-overview'),
@@ -282,7 +294,7 @@
             // anomalies, no extracted files.
             htmx.ajax('GET', '/ui/pcap/' + _currentJobId + '/tables', {
                 source: document.getElementById('panel-dns'),
-                target: '#panel-dns', swap: 'innerHTML',
+                target: '#panel-dns', swap: 'none',
             });
             // The seven panels with logic of their own: data transfer,
             // ISAKMP, certificates, host profiles, TCP streams, email and
@@ -305,7 +317,7 @@
             // every row, so one such session cost the whole panel.
             htmx.ajax('GET', '/ui/pcap/' + _currentJobId + '/detail', {
                 source: document.getElementById('panel-data'),
-                target: '#panel-data', swap: 'innerHTML',
+                target: '#panel-data', swap: 'none',
             });
             // The findings cards, the triage chips and the threat intel
             // table. `(d.findings || []).map(...)` then
@@ -316,6 +328,9 @@
             htmx.ajax('GET', '/ui/pcap/' + _currentJobId + '/findings', {
                 source: document.getElementById('panel-findings'),
                 target: '#panel-findings', swap: 'innerHTML',
+            }).then(() => {
+                applyFindingsFilter(document.getElementById('panel-findings'));
+                loadPcapCaseOptions();
             });
             // The graph's chrome and counts, and the canvas container
             // renderNetworkGraph draws into.
@@ -499,6 +514,13 @@
             source: panel, target: panel, swap: 'innerHTML',
         });
     }
+
+    loadPcapHistory().then(() => {
+        if (document.querySelector('#panel-history .pcap-reopen') && !_currentJobId) {
+            resultsDiv.classList.add('visible');
+            activatePanel('history');
+        }
+    });
 
     document.addEventListener('click', (e) => {
         const btn = e.target.closest('.pcap-reopen');

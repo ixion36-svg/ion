@@ -510,6 +510,20 @@ async function loadSystemAnalyticsTab() {
 }
 
 
+function systemReadFailed() {
+    for (const id of ['astat-systems','sys-s-total','sys-s-logs','sys-s-critical','sys-s-systems','sys-s-mapped','sys-s-coverage']) {
+        document.getElementById(id).textContent = '—';
+    }
+    document.getElementById('sys-summary-text').textContent = 'System analytics could not be read. These figures are unknown.';
+    document.getElementById('sys-timeline-chart').textContent = 'The timeline could not be read.';
+    ionSysMessage(document.getElementById('sys-cards-grid'), 'System analytics could not be read. Retry Refresh.');
+}
+for (const eventName of ['htmx:responseError','htmx:sendError','htmx:timeout']) {
+    document.addEventListener(eventName, event => {
+        if (event.detail.target === document.getElementById('index-table-container')) systemReadFailed();
+    });
+}
+
 // Lazy-load systems tab when first opened
 const origSwitchTab = switchTab;
 switchTab = function(tab) {

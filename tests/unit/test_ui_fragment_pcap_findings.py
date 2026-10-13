@@ -88,7 +88,7 @@ def _get(url, user):
 
 
 def _reader():
-    return _User(PERMISSION)
+    return _User(PERMISSION, "case:read")
 
 
 def flat(html: str) -> str:
@@ -235,7 +235,7 @@ def test_a_finding_keeps_its_index_in_the_stored_result(job):
     job(result={"findings": [
         _finding(severity="low", title="first"),
         _finding(severity="critical", title="second")]})
-    html = _get(FINDINGS, _reader()).text
+    html = _get(FINDINGS, _User(PERMISSION, "case:read", "case:update")).text
     first = html.index("second")
     chunk = html[max(0, first - 900):first]
     assert 'data-finding-index="1"' in chunk, chunk[-300:]

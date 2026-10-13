@@ -12,21 +12,6 @@
    found is not a row that was not found, and the page's ternary made those
    the same answer.
 #}
-<span id="ioc-hunt-result-count" hx-swap-oob="innerHTML:#ioc-hunt-result-count">
-  {%- if found is not none and searched is not none %}{{ found }}/{{ searched }} found
-  {%- else %}counts unknown{% endif %}
-</span>
-<div id="bulk-summary" hx-swap-oob="innerHTML:#bulk-summary">
-  <div class="stat"><span class="stat-label">Total Searched</span><span class="stat-value">
-    {{- searched if searched is not none else 'unknown' -}}
-  </span></div>
-  <div class="stat"><span class="stat-label">Found</span><span class="stat-value found-badge">
-    {{- found if found is not none else 'unknown' -}}
-  </span></div>
-  <div class="stat"><span class="stat-label">Not Found</span><span class="stat-value not-found-badge">
-    {{- not_found if not_found is not none else 'unknown' -}}
-  </span></div>
-</div>
 {% if state == 'unconfigured' %}
 <tr><td colspan="6" class="empty-state">{{ detail or 'Elasticsearch is not configured.' }}</td></tr>
 {% elif state == 'refused' %}
@@ -56,3 +41,19 @@
 </tr>
 {%- endfor %}
 {% endif %}
+
+<span id="ioc-hunt-result-count" hx-swap-oob="innerHTML:#ioc-hunt-result-count">
+  {%- if found is not none and searched is not none %}{{ found }}/{{ searched }} found
+  {%- else %}counts unknown{% endif %}
+</span>
+<div id="bulk-summary" hx-swap-oob="innerHTML:#bulk-summary">
+  <div class="stat"><span class="stat-label">Total Searched</span><span class="stat-value">
+    {{- searched if searched is not none else 'unknown' -}}
+  </span></div>
+  <div class="stat"><span class="stat-label">Found</span><span class="stat-value found-badge">
+    {{- found if found is not none else 'unknown' -}}
+  </span></div>
+  <div class="stat"><span class="stat-label">Not Found</span><span class="stat-value not-found-badge">
+    {{- not_found if not_found is not none else 'unknown' -}}
+  </span></div>
+</div>

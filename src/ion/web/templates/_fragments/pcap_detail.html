@@ -295,3 +295,8 @@
   {%- endif %}
 </div>
 {%- endif %}
+
+{% for key,panel,label in [('ike','isakmp','ISAKMP/IKE'),('certs','certs','TLS Certs'),('hosts','hosts','Hosts'),('streams','streams','Streams'),('emails','email','Email'),('ja4','ja4','JA4/JA4S')] %}
+{% set records = {'ike':ike,'certs':certs,'hosts':hosts,'streams':streams,'emails':emails,'ja4':ja4}[key] %}
+<button class="pcap-tab{% if records is not none and not records %} hidden{% endif %}" data-panel="{{ panel }}" id="tab-{{ panel }}" hx-swap-oob="outerHTML:#tab-{{ panel }}">{{ label }}{% if records %} <span class="badge pcap-tab-badge tone-info">{{ records|length }}</span>{% endif %}</button>
+{% endfor %}

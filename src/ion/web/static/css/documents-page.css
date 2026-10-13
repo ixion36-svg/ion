@@ -280,6 +280,7 @@ p.error {
    is hidden via visibility/opacity/pointer-events, which a bare inline
    `display` does not override on its own, so bridge the two here. */
 .modal[style*="flex"] {
+    z-index: 2000;
     visibility: visible;
     opacity: 1;
     pointer-events: auto;

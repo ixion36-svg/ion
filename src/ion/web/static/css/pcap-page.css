@@ -111,6 +111,7 @@
 .pcap-attach-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
     padding: .6rem .75rem; margin-bottom: .75rem; border-radius: .5rem;
     background: var(--bg-elevated, rgba(255,255,255,.03)); }
+.pcap-attach-bar select { flex: 1 1 15rem; min-width: 0; max-width: 100%; }
 .pcap-attach-hint { flex: 1 1 18rem; font-size: .78rem; color: var(--text-secondary); }
 .pcap-pick { display: inline-flex; align-items: center; margin-right: .4rem; }
 .pcap-history-row { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem;

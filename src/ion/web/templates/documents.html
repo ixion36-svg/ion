@@ -341,6 +341,11 @@
 
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
+// Plain modals must sit outside the page wrapper's stacking context.
+for (const id of ['folders-modal','move-modal','amendment-modal','version-modal','upload-modal']) {
+    document.body.appendChild(document.getElementById(id));
+}
+
 {% raw %}
 let currentDocId = null;
 let currentDocContent = '';
@@ -457,10 +462,11 @@ async function loadCollections() {
             kbCollectionIds = new Set([kbParent.id]);
             allCollections.filter(c => c.parent_id === kbParent.id).forEach(c => kbCollectionIds.add(c.id));
         }
-        renderFolderTree();
         updateFolderSelects();
     } catch (e) {
         console.error('Failed to load collections:', e);
+    } finally {
+        renderFolderTree();
     }
 }
 

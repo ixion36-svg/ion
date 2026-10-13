@@ -188,11 +188,11 @@ Server-rendered fragments. `render_view` routes also answer the view model as JS
 | GET | `/ui/observables/{observable_id}/heatmap` | `observable:read` | [_observables_analysis.py:99](src/ion/web/ui/_observables_analysis.py#L99) | `_fragments/observables_analysis_heatmap.html` | `observables.html` |
 | GET | `/ui/observables/{observable_id}/timeline` | `observable:read` | [_observables_analysis.py:85](src/ion/web/ui/_observables_analysis.py#L85) | `_fragments/forensics_timeline.html`<br>`_fragments/observables_analysis_timeline.html` | `observables.html` |
 | GET | `/ui/observables/{observable_id}/timeline-info` | `observable:read` | [_observables_analysis.py:115](src/ion/web/ui/_observables_analysis.py#L115) | `_fragments/observables_analysis_info.html` | `observables.html` |
-| GET | `/ui/pcap/case-options` | `alert:read` | [pcap.py:1628](src/ion/web/ui/pcap.py#L1628) | `_fragments/pcap_case_options.html` | `pcap.html` |
-| GET | `/ui/pcap/history` | `alert:read` | [pcap.py:1605](src/ion/web/ui/pcap.py#L1605) | `_fragments/pcap_history.html` | `pcap.html` |
+| GET | `/ui/pcap/case-options` | `alert:read` | [pcap.py:1631](src/ion/web/ui/pcap.py#L1631) | `_fragments/pcap_case_options.html` | `pcap.html` |
+| GET | `/ui/pcap/history` | `alert:read` | [pcap.py:1608](src/ion/web/ui/pcap.py#L1608) | `_fragments/pcap_history.html` | `pcap.html` |
 | GET | `/ui/pcap/{job_id}/detail` | `alert:read` | [pcap.py:1187](src/ion/web/ui/pcap.py#L1187) | `_fragments/pcap_detail.html` | `pcap.html` |
-| GET | `/ui/pcap/{job_id}/findings` | `alert:read` | [pcap.py:1586](src/ion/web/ui/pcap.py#L1586) | `_fragments/pcap_findings.html` | `pcap.html` |
-| GET | `/ui/pcap/{job_id}/graph` | `alert:read` | [pcap.py:1707](src/ion/web/ui/pcap.py#L1707) | `_fragments/pcap_graph.html` | `pcap.html` |
+| GET | `/ui/pcap/{job_id}/findings` | `alert:read` | [pcap.py:1589](src/ion/web/ui/pcap.py#L1589) | `_fragments/pcap_findings.html` | `pcap.html` |
+| GET | `/ui/pcap/{job_id}/graph` | `alert:read` | [pcap.py:1714](src/ion/web/ui/pcap.py#L1714) | `_fragments/pcap_graph.html` | `pcap.html` |
 | GET | `/ui/pcap/{job_id}/network` | `alert:read` | [pcap.py:425](src/ion/web/ui/pcap.py#L425) | `_fragments/pcap_network.html` | `pcap.html` |
 | GET | `/ui/pcap/{job_id}/summary` | `alert:read` | [pcap.py:406](src/ion/web/ui/pcap.py#L406) | `_fragments/pcap_summary.html` | `pcap.html` |
 | GET | `/ui/pcap/{job_id}/tables` | `alert:read` | [pcap.py:753](src/ion/web/ui/pcap.py#L753) | `_fragments/pcap_tables.html` | `pcap.html` |

@@ -448,6 +448,8 @@
 
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
+htmx.config.useTemplateFragments = true;
+
 // Tab switching
 function switchDiscoverTab(tabName) {
     document.querySelectorAll('.tool-tab').forEach(t => t.classList.remove('active'));
@@ -1094,7 +1096,7 @@ function displaySavedSearches() {
 
 function toggleSavedSearchesPanel() {
     const panel = document.getElementById('saved-searches-panel');
-    if (panel.style.display === 'none') {
+    if (getComputedStyle(panel).display === 'none') {
         panel.style.display = 'block';
         loadSavedSearches();
     } else {
