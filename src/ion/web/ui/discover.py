@@ -386,3 +386,341 @@ async def discover_histogram_fragment(
         view = histogram_view(payload)
 
     return render_view(request, HISTOGRAM_FRAGMENT, view)
+
+
+# ---------------------------------------------------------------------------
+# IOC hunt
+# ---------------------------------------------------------------------------
+#
+# POST /api/elasticsearch/ioc-hunt: one indicator across every index, with
+# a summary, the indices it was found in, and the hits.
+#
+# The details column has a live rendering bug, not just an escaping one.
+# The page built it as
+#
+#     `<strong>${k}:</strong> ${v}`
+#
+# joined with " | ", and then wrote `escapeHtml(details.substring(0, 200))`.
+# escapeHtml runs over the finished markup, so the <strong> tags are
+# escaped too and the cell shows the literal text `<strong>host.name:</strong>
+# web-01` to the analyst. The escaping does neutralise an injected value,
+# by accident, at the cost of the formatting it was meant to keep.
+#
+# Four values went in unescaped alongside it: `${data.ioc_type}` in the
+# summary, `${i.index}` in the indices badges, and `${hit['@timestamp']}`
+# and `${hit._index}` in the rows. Index names come from Elasticsearch.
+#
+# Also: `${data.total} hits`, `${data.total}` and `${data.took_ms}ms` all
+# printed "undefined" for a payload missing them, and `data.hits.length`
+# threw on a body whose hits were not a list, which the caller's catch
+# turned into a toast.
+
+IOC_FRAGMENT = "_fragments/discover_ioc_hunt.html"
+
+#: How many fields of a hit the details column summarises, and how much of
+#: the result fits, as the page sliced them.
+IOC_DETAIL_FIELDS = 5
+IOC_DETAIL_CHARS = 200
+
+
+class IOCDetail(TypedDict):
+    """One `key: value` pair of the details column, kept as two values so
+    the template can emphasise the key without building markup first."""
+
+    field: str
+    value: str
+
+
+class IOCHit(TypedDict):
+    when: Optional[str]
+    index: Optional[str]
+    details: list[IOCDetail]
+
+
+class IOCIndex(TypedDict):
+    index: Optional[str]
+    count: Optional[int]
+
+
+class IOCHuntView(TypedDict):
+    state: str
+    detail: Optional[str]
+    ioc_value: Optional[str]
+    ioc_type: Optional[str]
+    total: Optional[int]
+    took_ms: Optional[int]
+    indices: list[IOCIndex]
+    hits: list[IOCHit]
+
+
+def ioc_details(hit: dict) -> list[IOCDetail]:
+    """The first few fields of a hit, as pairs.
+
+    Underscore keys and @timestamp are skipped, as the page skipped them,
+    because both have their own column.
+    """
+    out: list[IOCDetail] = []
+    for key, value in hit.items():
+        if len(out) >= IOC_DETAIL_FIELDS:
+            break
+        if not isinstance(key, str) or key.startswith("_") \
+                or key == "@timestamp":
+            continue
+        if isinstance(value, (dict, list)):
+            try:
+                text = json.dumps(value, default=str)
+            except (TypeError, ValueError):
+                text = str(value)
+        else:
+            text = str(value)
+        out.append({"field": key, "value": text[:IOC_DETAIL_CHARS]})
+    return out
+
+
+def ioc_hunt_view(payload: Any) -> IOCHuntView:
+    """The endpoint's body as the panel's model."""
+    hits = payload.get("hits") if isinstance(payload, dict) else None
+    if not isinstance(hits, list):
+        return {
+            "state": "failed",
+            "detail": "The hunt answered something this page could not read.",
+            "ioc_value": None, "ioc_type": None, "total": None,
+            "took_ms": None, "indices": [], "hits": [],
+        }
+    value = plain(payload.get("ioc_value"))
+    kind = plain(payload.get("ioc_type"))
+    found = payload.get("indices_found")
+    indices: list[IOCIndex] = []
+    for entry in (found if isinstance(found, list) else []):
+        if not isinstance(entry, dict):
+            continue
+        name = plain(entry.get("index"))
+        indices.append({
+            "index": str(name) if name is not None else None,
+            "count": _int(entry.get("count")),
+        })
+    rows = [
+        {
+            "when": (str(plain(h.get("@timestamp")))
+                     if plain(h.get("@timestamp")) is not None else None),
+            "index": (str(plain(h.get("_index")))
+                      if plain(h.get("_index")) is not None else None),
+            "details": ioc_details(h),
+        }
+        for h in hits if isinstance(h, dict)
+    ]
+    return {
+        "state": "data" if rows else ("failed" if hits else "empty"),
+        "detail": ("The hunt returned rows this page could not read."
+                   if hits and not rows else None),
+        "ioc_value": str(value) if value is not None else None,
+        "ioc_type": str(kind) if kind is not None else None,
+        "total": _int(payload.get("total")),
+        "took_ms": _int(payload.get("took_ms")),
+        "indices": indices,
+        "hits": rows,
+    }
+
+
+@router.post(
+    "/discover/ioc-hunt",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def discover_ioc_hunt_fragment(
+    request: Request,
+    ioc_value: str = Form(""),
+    ioc_type: str = Form(""),
+    index_pattern: str = Form("*,-.*"),
+    time_field: str = Form("@timestamp"),
+    time_from: str = Form("now-30d"),
+    time_to: str = Form("now"),
+    size: int = Form(100),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    """One indicator, hunted across the indices."""
+    from fastapi import HTTPException
+
+    from ion.web.elasticsearch_api import IOCHuntRequest, ioc_hunt
+
+    if not ioc_value.strip():
+        # An empty box is a bad request, not a hunt that found nothing.
+        view: IOCHuntView = {
+            "state": "failed", "detail": "Enter an indicator to hunt for.",
+            "ioc_value": None, "ioc_type": None, "total": None,
+            "took_ms": None, "indices": [], "hits": [],
+        }
+        return render_view(request, IOC_FRAGMENT, view, status_code=422)
+
+    body = IOCHuntRequest(
+        ioc_value=ioc_value.strip(),
+        ioc_type=ioc_type or None,
+        index_pattern=index_pattern,
+        time_field=time_field,
+        time_from=time_from,
+        time_to=time_to,
+        size=size,
+    )
+    try:
+        payload = await ioc_hunt(body, current_user=current_user)
+    except HTTPException as refusal:
+        view = {
+            "state": failure(refusal.status_code, refusal.detail)["state"],
+            "detail": str(refusal.detail) if refusal.detail else None,
+            "ioc_value": ioc_value.strip(), "ioc_type": ioc_type or None,
+            "total": None, "took_ms": None, "indices": [], "hits": [],
+        }
+    except Exception:
+        logger.exception("Discover IOC hunt fragment could not hunt")
+        view = {
+            "state": "failed", "detail": "The hunt did not complete.",
+            "ioc_value": ioc_value.strip(), "ioc_type": ioc_type or None,
+            "total": None, "took_ms": None, "indices": [], "hits": [],
+        }
+    else:
+        view = ioc_hunt_view(payload)
+
+    return render_view(request, IOC_FRAGMENT, view)
+
+
+# ---------------------------------------------------------------------------
+# Bulk IOC hunt
+# ---------------------------------------------------------------------------
+#
+# POST /api/elasticsearch/ioc-hunt/bulk, one row per indicator.
+#
+#   * ``data-args='["${escapeHtml(r.ioc_value)}"]'``. This is the fourth
+#     shape of the same defect. escapeHtml turns a `"` into `&quot;`, which
+#     inside a JSON string is the literal six characters, so JSON.parse
+#     reads a different indicator than the one on screen; and a value
+#     containing `'` closes the attribute. An indicator is attacker-supplied
+#     by definition: it is the thing being hunted.
+#   * `${r.ioc_type}`, `${r.hit_count}` and the joined indices went in
+#     unescaped.
+#   * `data.results.map` threw on a body whose results were not a list, and
+#     `r.indices.slice` threw on a row whose indices were not, both of
+#     which the caller's catch turned into a toast.
+#   * `${data.found_count}/${data.total_searched} found` printed
+#     "undefined/undefined found".
+
+BULK_FRAGMENT = "_fragments/discover_ioc_bulk.html"
+
+#: How many index names a row lists before "...".
+BULK_INDICES_SHOWN = 3
+
+
+class BulkRow(TypedDict):
+    value: Optional[str]
+    kind: Optional[str]
+    found: Optional[bool]
+    hits: Optional[int]
+    indices: list[str]
+    more: int
+
+
+class BulkView(TypedDict):
+    state: str
+    detail: Optional[str]
+    searched: Optional[int]
+    found: Optional[int]
+    not_found: Optional[int]
+    rows: list[BulkRow]
+
+
+def bulk_row(raw: Any) -> Optional[BulkRow]:
+    """One indicator's result, or None for an entry that is not a mapping."""
+    if not isinstance(raw, dict):
+        return None
+    value = plain(raw.get("ioc_value"))
+    kind = plain(raw.get("ioc_type"))
+    found = raw.get("found")
+    names = raw.get("indices")
+    listed = [str(n) for n in names[:BULK_INDICES_SHOWN]] \
+        if isinstance(names, list) else []
+    return {
+        "value": str(value) if value is not None else None,
+        "kind": str(kind) if kind is not None else None,
+        # Not truthiness: a row that did not say whether it was found is
+        # not a row that was not found.
+        "found": found if isinstance(found, bool) else None,
+        "hits": _int(raw.get("hit_count")),
+        "indices": listed,
+        "more": (max(0, len(names) - BULK_INDICES_SHOWN)
+                 if isinstance(names, list) else 0),
+    }
+
+
+def bulk_view(payload: Any) -> BulkView:
+    """The endpoint's body as the table's model."""
+    results = payload.get("results") if isinstance(payload, dict) else None
+    if not isinstance(results, list):
+        return {
+            "state": "failed",
+            "detail": "The bulk hunt answered something this page could not read.",
+            "searched": None, "found": None, "not_found": None, "rows": [],
+        }
+    rows = [r for r in (bulk_row(r) for r in results) if r is not None]
+    return {
+        "state": "data" if rows else ("failed" if results else "empty"),
+        "detail": ("The bulk hunt returned rows this page could not read."
+                   if results and not rows else None),
+        "searched": _int(payload.get("total_searched")),
+        "found": _int(payload.get("found_count")),
+        "not_found": _int(payload.get("not_found_count")),
+        "rows": rows,
+    }
+
+
+@router.post(
+    "/discover/ioc-hunt/bulk",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def discover_ioc_bulk_fragment(
+    request: Request,
+    ioc_values: str = Form(""),
+    index_pattern: str = Form("*,-.*"),
+    time_from: str = Form("now-30d"),
+    time_to: str = Form("now"),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    """Many indicators at once. `ioc_values` arrives newline separated, as
+    the textarea holds it."""
+    from fastapi import HTTPException
+
+    from ion.web.elasticsearch_api import IOCHuntBulkRequest, ioc_hunt_bulk
+
+    values = [line.strip() for line in ioc_values.splitlines()
+              if line.strip()]
+    if not values:
+        view: BulkView = {
+            "state": "failed",
+            "detail": "Enter at least one indicator to hunt for.",
+            "searched": None, "found": None, "not_found": None, "rows": [],
+        }
+        return render_view(request, BULK_FRAGMENT, view, status_code=422)
+
+    body = IOCHuntBulkRequest(
+        ioc_values=values,
+        index_pattern=index_pattern,
+        time_from=time_from,
+        time_to=time_to,
+    )
+    try:
+        payload = await ioc_hunt_bulk(body, current_user=current_user)
+    except HTTPException as refusal:
+        view = {
+            "state": failure(refusal.status_code, refusal.detail)["state"],
+            "detail": str(refusal.detail) if refusal.detail else None,
+            "searched": None, "found": None, "not_found": None, "rows": [],
+        }
+    except Exception:
+        logger.exception("Discover bulk IOC fragment could not hunt")
+        view = {"state": "failed",
+                "detail": "The bulk hunt did not complete.",
+                "searched": None, "found": None, "not_found": None,
+                "rows": []}
+    else:
+        view = bulk_view(payload)
+
+    return render_view(request, BULK_FRAGMENT, view)

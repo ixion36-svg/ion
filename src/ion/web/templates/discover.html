@@ -1278,71 +1278,48 @@ async function executeIOCHunt() {
     const timeFrom = document.getElementById('ioc-time-from').value || null;
     const indexPattern = document.getElementById('ioc-index').value;
 
-    try {
-        const response = await fetch('/api/elasticsearch/ioc-hunt', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                ioc_value: iocValue,
-                ioc_type: iocType,
-                index_pattern: indexPattern,
-                time_from: timeFrom,
-                time_to: 'now',
-                size: 100
-            })
-        });
-
-        if (!response.ok) throw new Error('IOC hunt failed');
-
-        const data = await response.json();
-        displayIOCHuntResults(data);
-    } catch (error) {
-        showToast('IOC hunt failed: ' + error.message, 'error');
-    }
+    // One read, rendered by the server. The toast went with the second
+    // fetch: a hunt that failed showed a notification that disappears and
+    // left the previous indicator's hits on screen, which on this panel is
+    // a result attributed to the wrong IOC.
+    return displayIOCHuntResults({
+        ioc_value: iocValue,
+        ioc_type: iocType || '',
+        index_pattern: indexPattern,
+        time_from: timeFrom || 'now-30d',
+        time_to: 'now',
+        size: 100,
+    });
 }
 
-function displayIOCHuntResults(data) {
-    document.getElementById('ioc-empty-state').style.display = 'none';
-    document.getElementById('ioc-bulk-results').style.display = 'none';
-    document.getElementById('ioc-single-results').style.display = 'block';
-
-    const countBadge = document.getElementById('ioc-hunt-result-count');
-    const summary = document.getElementById('ioc-hunt-summary');
-    const indices = document.getElementById('ioc-indices-found');
+// The three IOC panels were shown and hidden with style.display while
+// two of them carry class="hidden" in the markup, so an inline style
+// and a class were both deciding the same thing. One mechanism now.
+function dscShowIOCPanel(which) {
+    const panels = { empty: 'ioc-empty-state', single: 'ioc-single-results',
+                     bulk: 'ioc-bulk-results' };
+    Object.keys(panels).forEach(name => {
+        const el = document.getElementById(panels[name]);
+        if (!el) return;
+        el.classList.toggle('hidden', name !== which);
+    });
+}
+// POST /ui/discover/ioc-hunt renders the rows and swaps the count, the
+// summary and the index badges out of band.
+//
+// The details column was the reason. The page built
+// `<strong>' + k + ':</strong> ' + v` and then wrote
+// escapeHtml(details.substring(0, 200)), so escapeHtml ran over the
+// finished markup and escaped its own tags: the cell showed the literal
+// text <strong>host.name:</strong> web-01 to the analyst. Four more
+// values went in unescaped beside it, the index names among them.
+function displayIOCHuntResults(params) {
+    dscShowIOCPanel('single');
     const tbody = document.getElementById('ioc-hunt-body');
-
-    countBadge.textContent = `${data.total} hits`;
-
-    summary.innerHTML = `
-        <div class="stat"><span class="stat-label">IOC Value</span><span class="stat-value">${escapeHtml(data.ioc_value)}</span></div>
-        <div class="stat"><span class="stat-label">Type</span><span class="stat-value">${data.ioc_type}</span></div>
-        <div class="stat"><span class="stat-label">Hits</span><span class="stat-value">${data.total}</span></div>
-        <div class="stat"><span class="stat-label">Time</span><span class="stat-value">${data.took_ms}ms</span></div>
-    `;
-
-    indices.innerHTML = data.indices_found.map(i =>
-        `<span class="index-badge">${i.index}: ${i.count}</span>`
-    ).join('');
-
-    if (data.hits.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No hits found for this IOC</td></tr>';
-        return;
-    }
-
-    tbody.innerHTML = data.hits.map(hit => {
-        const details = Object.entries(hit)
-            .filter(([k]) => !k.startsWith('_') && k !== '@timestamp')
-            .slice(0, 5)
-            .map(([k, v]) => `<strong>${k}:</strong> ${typeof v === 'object' ? JSON.stringify(v) : v}`)
-            .join(' | ');
-        return `
-            <tr>
-                <td>${hit['@timestamp'] || '-'}</td>
-                <td>${hit._index}</td>
-                <td>${escapeHtml(details.substring(0, 200))}</td>
-            </tr>
-        `;
-    }).join('');
+    if (!tbody) return Promise.resolve();
+    return htmx.ajax('POST', '/ui/discover/ioc-hunt', {
+        source: tbody, target: tbody, swap: 'innerHTML', values: params,
+    });
 }
 
 async function executeBulkIOCHunt() {
@@ -1355,54 +1332,30 @@ async function executeBulkIOCHunt() {
     const timeFrom = document.getElementById('ioc-time-from').value || null;
     const indexPattern = document.getElementById('ioc-index').value;
 
-    try {
-        const response = await fetch('/api/elasticsearch/ioc-hunt/bulk', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                ioc_values: iocs,
-                index_pattern: indexPattern,
-                time_from: timeFrom,
-                time_to: 'now'
-            })
-        });
-
-        if (!response.ok) throw new Error('Bulk IOC hunt failed');
-
-        const data = await response.json();
-        displayBulkIOCResults(data);
-    } catch (error) {
-        showToast('Bulk IOC hunt failed: ' + error.message, 'error');
-    }
+    // One read, rendered by the server. The textarea's lines go over as
+    // one field and the route splits them, so the page is not also
+    // deciding what counts as an indicator.
+    return displayBulkIOCResults({
+        ioc_values: iocs.join('\n'),
+        index_pattern: indexPattern,
+        time_from: timeFrom || 'now-30d',
+        time_to: 'now',
+    });
 }
 
-function displayBulkIOCResults(data) {
-    document.getElementById('ioc-empty-state').style.display = 'none';
-    document.getElementById('ioc-single-results').style.display = 'none';
-    document.getElementById('ioc-bulk-results').style.display = 'block';
-
-    const countBadge = document.getElementById('ioc-hunt-result-count');
-    const summary = document.getElementById('bulk-summary');
+// POST /ui/discover/ioc-hunt/bulk renders the rows and swaps the count
+// and the summary out of band. The Details button was the reason: its
+// argument was data-args='["' + escapeHtml(r.ioc_value) + '"]', and
+// escapeHtml turns a quote into &quot;, which inside a JSON string is
+// six literal characters, so JSON.parse handed the dispatcher a
+// different indicator than the one on screen.
+function displayBulkIOCResults(params) {
+    dscShowIOCPanel('bulk');
     const tbody = document.getElementById('bulk-results-body');
-
-    countBadge.textContent = `${data.found_count}/${data.total_searched} found`;
-
-    summary.innerHTML = `
-        <div class="stat"><span class="stat-label">Total Searched</span><span class="stat-value">${data.total_searched}</span></div>
-        <div class="stat"><span class="stat-label">Found</span><span class="stat-value found-badge">${data.found_count}</span></div>
-        <div class="stat"><span class="stat-label">Not Found</span><span class="stat-value not-found-badge">${data.not_found_count}</span></div>
-    `;
-
-    tbody.innerHTML = data.results.map(r => `
-        <tr>
-            <td>${escapeHtml(r.ioc_value)}</td>
-            <td>${r.ioc_type}</td>
-            <td><span class="${r.found ? 'found-badge' : 'not-found-badge'}">${r.found ? 'Found' : 'Not Found'}</span></td>
-            <td>${r.hit_count}</td>
-            <td>${r.indices.slice(0, 3).join(', ')}${r.indices.length > 3 ? '...' : ''}</td>
-            <td>${r.found ? `<button class="btn btn-sm" data-click-action="huntIOC" data-args='["${escapeHtml(r.ioc_value)}"]'>Details</button>` : ''}</td>
-        </tr>
-    `).join('');
+    if (!tbody) return Promise.resolve();
+    return htmx.ajax('POST', '/ui/discover/ioc-hunt/bulk', {
+        source: tbody, target: tbody, swap: 'innerHTML', values: params,
+    });
 }
 
 function huntIOC(value) {
@@ -1414,9 +1367,7 @@ function huntIOC(value) {
 
 function clearIOCHunt() {
     document.getElementById('ioc-value').value = '';
-    document.getElementById('ioc-empty-state').style.display = 'block';
-    document.getElementById('ioc-single-results').style.display = 'none';
-    document.getElementById('ioc-bulk-results').style.display = 'none';
+    dscShowIOCPanel('empty');
 }
 
 // Utility functions

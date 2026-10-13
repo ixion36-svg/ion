@@ -428,3 +428,162 @@ def test_the_page_no_longer_draws_the_histogram():
     assert "htmx.ajax" in block.group(0)
     assert "style.display" not in block.group(0), (
         "the panel is shown by removing the hidden class")
+
+
+# ---------------------------------------------------------------------------
+# IOC hunt
+# ---------------------------------------------------------------------------
+
+
+IOC = "/ui/discover/ioc-hunt"
+BULK = "/ui/discover/ioc-hunt/bulk"
+
+
+@pytest.fixture
+def hunt(monkeypatch):
+    def set(result=None, raises=None, bulk=False):
+        async def handler(request, current_user=None):
+            if raises is not None:
+                raise raises
+            return result
+
+        name = "ioc_hunt_bulk" if bulk else "ioc_hunt"
+        monkeypatch.setattr("ion.web.elasticsearch_api." + name, handler)
+
+    return set
+
+
+def _ioc(user, url=IOC, **form):
+    body = {"ioc_value": "203.0.113.9"} if url == IOC else {
+        "ioc_values": "203.0.113.9"}
+    body.update(form)
+    with TestClient(_app(user)) as client:
+        return client.post(url, data=body)
+
+
+def test_the_details_column_emphasises_its_keys_rather_than_escaping_them(
+        hunt):
+    """The live bug. The page built `<strong>k:</strong> v` and then ran
+    escapeHtml over the finished markup, so the analyst saw the literal
+    text `<strong>host.name:</strong> web-01`."""
+    hunt(result={"hits": [{"_index": "logs-1", "@timestamp": "t",
+                           "host.name": "web-01"}],
+                 "total": 1, "took_ms": 3, "ioc_value": "x",
+                 "indices_found": []})
+    html = _ioc(_reader()).text
+    assert "<strong>host.name:</strong>" in html
+    assert "&lt;strong&gt;" not in html
+
+
+def test_an_index_name_carrying_markup_is_escaped(hunt):
+    """`${i.index}` and `${hit._index}` went in unescaped, and index names
+    come from Elasticsearch."""
+    hunt(result={"hits": [{"_index": "<img src=x>", "@timestamp": "t"}],
+                 "total": 1, "took_ms": 1, "ioc_value": "x",
+                 "indices_found": [{"index": "<img src=y>", "count": 1}]})
+    html = _ioc(_reader()).text
+    assert "<img src=x>" not in html
+    assert "<img src=y>" not in html
+    assert "&lt;img src=x&gt;" in html
+
+
+@pytest.mark.parametrize("result", [{}, {"hits": None}, {"hits": "two"}])
+def test_an_ioc_body_of_the_wrong_shape_is_a_failure(hunt, result):
+    hunt(result=result)
+    body = flat(_ioc(_reader()).text)
+    assert "No hits found" not in body, result
+    assert "could not" in body.lower(), result
+
+
+def test_an_empty_indicator_is_a_bad_request_not_an_empty_hunt(hunt):
+    hunt(result={"hits": [], "total": 0})
+    resp = _ioc(_reader(), ioc_value="   ")
+    assert resp.status_code == 422
+    assert "Enter an indicator" in flat(resp.text)
+
+
+def test_a_missing_figure_is_not_printed_as_undefined(hunt):
+    hunt(result={"hits": [], "ioc_value": "x", "indices_found": []})
+    body = flat(_ioc(_reader()).text)
+    assert "undefined" not in body
+    assert "unknown" in body
+
+
+# ---------------------------------------------------------------------------
+# Bulk IOC hunt
+# ---------------------------------------------------------------------------
+
+
+def test_the_details_argument_survives_an_indicator_with_a_quote(hunt):
+    """The fourth shape of one defect: escapeHtml turns " into &quot;,
+    which inside a JSON string is six literal characters, so JSON.parse
+    handed the dispatcher a different indicator than the one on screen."""
+    import json as _json
+    value = 'evil"\'value'
+    hunt(bulk=True, result={"results": [
+        {"ioc_value": value, "ioc_type": "ip", "found": True,
+         "hit_count": 2, "indices": ["logs-1"]}],
+        "total_searched": 1, "found_count": 1, "not_found_count": 0})
+    html = _ioc(_reader(), url=BULK).text
+    found = re.findall(r"data-args='([^']*)'", html)
+    assert found, html
+    assert _json.loads(unescape(found[0])) == [value]
+
+
+def test_a_row_that_did_not_say_whether_it_was_found_is_not_not_found(hunt):
+    """`r.found ? 'Found' : 'Not Found'` made a missing answer into a
+    negative one."""
+    hunt(bulk=True, result={"results": [
+        {"ioc_value": "x", "ioc_type": "ip", "hit_count": 0,
+         "indices": []}],
+        "total_searched": 1, "found_count": 0, "not_found_count": 0})
+    html = _ioc(_reader(), url=BULK).text
+    # Scoped to the row: "Not Found" is also a stat label in the summary,
+    # where it is a count rather than a verdict about this indicator.
+    row = re.search(r"<tr>.*?</tr>", html, re.S)
+    assert row, html
+    assert "Not Found" not in row.group(0)
+    assert "found-badge" not in row.group(0)
+    assert "dsc-absent" in row.group(0)
+
+
+def test_a_row_whose_indices_are_not_a_list_does_not_take_the_table_down(
+        hunt):
+    """`r.indices.slice(0, 3)` threw, and the caller's catch turned the
+    whole table into a toast."""
+    hunt(bulk=True, result={"results": [
+        {"ioc_value": "x", "found": True, "hit_count": 1,
+         "indices": "logs-1"}],
+        "total_searched": 1, "found_count": 1, "not_found_count": 0})
+    body = flat(_ioc(_reader(), url=BULK).text)
+    assert "could not" not in body.lower()
+    assert "x" in body
+
+
+def test_bulk_with_no_indicators_is_a_bad_request(hunt):
+    hunt(bulk=True, result={"results": []})
+    resp = _ioc(_reader(), url=BULK, ioc_values="  \n  \n")
+    assert resp.status_code == 422
+    assert "at least one indicator" in flat(resp.text)
+
+
+def test_the_page_no_longer_builds_either_ioc_table():
+    body = re.sub(r"\{#.*?#\}", "", PAGE.read_text(encoding="utf-8"),
+                  flags=re.S)
+    for name in ("displayIOCHuntResults", "displayBulkIOCResults"):
+        block = re.search(r"\bfunction " + name + r"\(.*?\n\}", body, re.S)
+        assert block, name
+        assert not re.search(r"\.innerHTML\s*=", block.group(0)), name
+        assert "htmx.ajax" in block.group(0), name
+
+
+def test_the_three_ioc_panels_share_one_visibility_mechanism():
+    """Two of them carry class="hidden" in the markup and all three were
+    shown with style.display, so an inline style and a class were both
+    deciding the same thing."""
+    body = re.sub(r"\{#.*?#\}", "", PAGE.read_text(encoding="utf-8"),
+                  flags=re.S)
+    assert "function dscShowIOCPanel(" in body
+    for ident in ("ioc-empty-state", "ioc-single-results",
+                  "ioc-bulk-results"):
+        assert ident + "').style.display" not in body, ident

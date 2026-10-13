@@ -1,0 +1,62 @@
+{# The IOC hunt result, from ui/discover.py's ioc_hunt_view.
+
+   The details column is why this one mattered beyond escaping. The page
+   built `<strong>${k}:</strong> ${v}` and then wrote
+   `escapeHtml(details.substring(0, 200))`, so escapeHtml ran over the
+   finished markup and escaped its own <strong> tags: the cell showed the
+   literal text `<strong>host.name:</strong> web-01` to the analyst. Here
+   the key and the value are two values and the emphasis is markup, so
+   both are escaped and the formatting survives.
+
+   Four more went in unescaped: the IOC type in the summary, the index name
+   in each badge, and the timestamp and index on each row. Index names come
+   from Elasticsearch.
+
+   The summary and the two badges are swapped out of band, because they sit
+   outside the results table.
+#}
+<span id="ioc-hunt-result-count" hx-swap-oob="innerHTML:#ioc-hunt-result-count">
+  {%- if total is not none %}{{ total }} hits{% else %}count unknown{% endif %}
+</span>
+<div id="ioc-hunt-summary" hx-swap-oob="innerHTML:#ioc-hunt-summary">
+  {%- if ioc_value %}
+  <div class="stat"><span class="stat-label">IOC Value</span><span class="stat-value">{{ ioc_value }}</span></div>
+  {%- endif %}
+  {%- if ioc_type %}
+  <div class="stat"><span class="stat-label">Type</span><span class="stat-value">{{ ioc_type }}</span></div>
+  {%- endif %}
+  <div class="stat"><span class="stat-label">Hits</span><span class="stat-value">
+    {{- total if total is not none else 'unknown' -}}
+  </span></div>
+  {%- if took_ms is not none %}
+  <div class="stat"><span class="stat-label">Time</span><span class="stat-value">{{ took_ms }}ms</span></div>
+  {%- endif %}
+</div>
+<div id="ioc-indices-found" hx-swap-oob="innerHTML:#ioc-indices-found">
+  {%- for i in indices %}
+  <span class="index-badge">{{ i.index or 'unnamed index' }}:
+    {{- ' ' }}{{ i.count if i.count is not none else 'unknown' }}</span>
+  {%- endfor %}
+</div>
+{% if state == 'unconfigured' %}
+<tr><td colspan="3" class="empty-state">{{ detail or 'Elasticsearch is not configured.' }}</td></tr>
+{% elif state == 'refused' %}
+<tr><td colspan="3" class="empty-state">That index pattern is not one this deployment allows.</td></tr>
+{% elif state == 'failed' %}
+<tr><td colspan="3" class="empty-state">The hunt could not be completed{% if detail %}. {{ detail }}{% endif %}</td></tr>
+{% elif state == 'empty' %}
+<tr><td colspan="3" class="empty-state">No hits found for this IOC</td></tr>
+{% else %}
+{%- for hit in hits %}
+<tr>
+  <td>{% if hit.when %}{{ hit.when }}{% else %}<span class="dsc-absent" title="This document carries no @timestamp"></span>{% endif %}</td>
+  <td>{% if hit.index %}{{ hit.index }}{% else %}<span class="dsc-absent" title="This document reported no index"></span>{% endif %}</td>
+  <td>
+    {%- for d in hit.details %}
+    {%- if not loop.first %} | {% endif %}
+    <strong>{{ d.field }}:</strong> {{ d.value }}
+    {%- endfor %}
+  </td>
+</tr>
+{%- endfor %}
+{% endif %}
