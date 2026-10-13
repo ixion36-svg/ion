@@ -203,6 +203,10 @@
                     <tr><td colspan="3" class="empty-state">Enter a query and click Search</td></tr>
                 </tbody>
             </table>
+            {# POST /ui/discover/search swaps the three figures the
+               pin-to-case capture needs onto this, so running a search
+               does not cost a second round trip to collect them. #}
+            <span id="dsc-search-meta" class="hidden"></span>
         </div>
     </div>
 </div>
@@ -758,84 +762,65 @@ async function executeDiscoverSearch() {
     const timeFrom = document.getElementById('search-time-from').value;
     const size = parseInt(document.getElementById('search-size').value);
 
-    try {
-        const response = await fetch('/api/elasticsearch/discover/search', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                index_pattern: indexPattern,
-                query: query,
-                time_field: timeField,
-                time_from: timeFrom,
-                time_to: 'now',
-                size: size
-            })
-        });
-
-        if (!response.ok) throw new Error('Search failed');
-
-        const data = await response.json();
-        _lastDiscoverSearch = {
-            executed_at: new Date().toISOString(),
-            index_pattern: indexPattern,
-            query: query,
-            time_field: timeField,
-            time_from: timeFrom,
-            time_to: 'now',
-            requested_size: size,
-            total_hits: data.total,
-            returned_hits: (data.hits || []).length,
-            took_ms: data.took_ms,
-            hits: data.hits || []
-        };
-        displaySearchResults(data);
-    } catch (error) {
-        _lastDiscoverSearch = null;
-        showToast('Search failed: ' + error.message, 'error');
-    }
-}
-
-function displaySearchResults(data) {
-    const tbody = document.getElementById('search-results-body');
-    const countBadge = document.getElementById('search-result-count');
-
-    countBadge.textContent = `${data.total} hits (${data.took_ms}ms)`;
-
-    if (!data.hits || data.hits.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No results found</td></tr>';
-        return;
-    }
-
-    // Get all unique keys from results
-    const allKeys = new Set();
-    data.hits.forEach(hit => {
-        Object.keys(hit).forEach(k => {
-            if (!k.startsWith('_')) allKeys.add(k);
-        });
+    // One search, rendered by the server. POST /ui/discover/search returns
+    // the table, swaps the count badge and the header row out of band, and
+    // carries the three figures the pin-to-case capture needs on
+    // #dsc-search-meta, so there is no second round trip for them.
+    //
+    // The page used to store the hits in _lastDiscoverSearch as well, and
+    // neither consumer ever read them: dscQueryCaptureFields takes the
+    // query, the window, the duration and the two counts. That was 100
+    // documents of dead state per search.
+    const executedAt = new Date().toISOString();
+    await displaySearchResults({
+        index_pattern: indexPattern,
+        query: query,
+        time_field: timeField,
+        time_from: timeFrom,
+        time_to: 'now',
+        size: size,
     });
 
-    // Build table
-    const priorityFields = ['@timestamp', '_index', 'message', 'host.name', 'source.ip', 'user.name', 'event.action'];
-    const displayFields = priorityFields.filter(f => allKeys.has(f));
-    if (displayFields.length < 5) {
-        [...allKeys].filter(k => !displayFields.includes(k)).slice(0, 5 - displayFields.length).forEach(k => displayFields.push(k));
+    const meta = document.getElementById('dsc-search-meta');
+    let figures = null;
+    if (meta) {
+        // JSON.parse on a throw leaves this null rather than {}: a capture
+        // with no figures behind it should read as unknown, not as zero.
+        try { figures = JSON.parse(meta.dataset.dscMeta); } catch (e) { figures = null; }
     }
+    if (!figures || figures.state === 'failed' || figures.state === 'unconfigured'
+            || figures.state === 'refused') {
+        _lastDiscoverSearch = null;
+        return;
+    }
+    _lastDiscoverSearch = {
+        executed_at: executedAt,
+        index_pattern: indexPattern,
+        query: query,
+        time_field: timeField,
+        time_from: timeFrom,
+        time_to: 'now',
+        requested_size: size,
+        total_hits: figures.total,
+        returned_hits: figures.returned,
+        took_ms: figures.took_ms,
+    };
+}
 
-    // Update header
-    const header = document.getElementById('search-results-header');
-    header.innerHTML = displayFields.map(f => `<th>${f}</th>`).join('');
-
-    // Update body
-    tbody.innerHTML = data.hits.map(hit => {
-        const cells = displayFields.map(f => {
-            let val = hit[f];
-            if (val === undefined || val === null) val = '-';
-            if (typeof val === 'object') val = JSON.stringify(val);
-            if (typeof val === 'string' && val.length > 100) val = val.substring(0, 100) + '...';
-            return `<td>${escapeHtml(String(val))}</td>`;
-        }).join('');
-        return `<tr>${cells}</tr>`;
-    }).join('');
+// POST /ui/discover/search renders the table and swaps the count badge
+// and the header row out of band. The header cells were the reason to
+// move it: field names are Elasticsearch document keys, so in a log
+// ingest system they are whatever the logs carried, and they went into
+// <th> unescaped while the cells below them were escaped.
+//
+// The column choice moved with it, because which columns to show is a
+// presentation decision and the server renders the presentation.
+function displaySearchResults(params) {
+    const tbody = document.getElementById('search-results-body');
+    if (!tbody) return Promise.resolve();
+    return htmx.ajax('POST', '/ui/discover/search', {
+        source: tbody, target: tbody, swap: 'innerHTML', values: params,
+    });
 }
 
 async function getHistogram() {
@@ -1645,8 +1630,15 @@ async function executeSavedSearch(searchId) {
         if (params.time_from) document.getElementById('search-time-from').value = params.time_from;
         if (params.size) document.getElementById('search-size').value = params.size;
 
-        // Display results
-        displaySearchResults(data.results);
+        // Run it through the normal path now the form holds its parameters.
+        // The page rendered data.results straight and left
+        // _lastDiscoverSearch untouched, so a pin-to-case straight after
+        // running a saved search captured whatever had been searched
+        // manually before it, or nothing at all. Going through
+        // executeDiscoverSearch means the capture describes what is on
+        // screen. It costs one more Elasticsearch query, which is the
+        // right price for a provenance record that is not wrong.
+        await executeDiscoverSearch();
 
         showToast(`Executed: ${data.saved_search.name}`, 'success');
     } catch (error) {

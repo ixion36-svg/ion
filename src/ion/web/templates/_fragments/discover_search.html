@@ -1,0 +1,57 @@
+{# The discover results table, from ui/discover.py's search_view.
+
+   Five states, where the page had two. The endpoint tells apart
+   Elasticsearch being off, an index pattern outside the allowed set, and a
+   search that failed, and the page rendered one sentence for all three
+   alongside "No results found" for a body it could not read.
+
+   The header cells are escaped here, which is the point of the move: field
+   names are Elasticsearch document keys, so in a log ingest system they
+   are whatever the logs carried, and the page interpolated them into <th>
+   while escaping the cells below them.
+
+   The count badge is swapped out of band because it lives in the panel
+   header, outside this table.
+#}
+<span id="search-result-count" hx-swap-oob="innerHTML:#search-result-count">
+  {%- if total is not none %}{{ total }} hits
+  {%- if took_ms is not none %} ({{ took_ms }}ms){% endif %}
+  {%- elif state == 'data' or state == 'empty' %}count unknown
+  {%- endif %}
+</span>
+{#- The three figures the pin-to-case capture needs, so the page does not
+    have to run the search a second time to get them. It stored the hits
+    too and neither consumer ever read them, which is 100 documents of
+    dead state per search. -#}
+<span id="dsc-search-meta" class="hidden" hx-swap-oob="true"
+      data-dsc-meta='{{ {"state": state, "total": total, "returned": rows|length, "took_ms": took_ms}|tojson }}'></span>
+{% if state == 'unconfigured' %}
+<tr><td colspan="{{ fields|length or 3 }}" class="empty-state">
+  {{ detail or 'Elasticsearch is not configured, so there is nothing to search.' }}
+</td></tr>
+{% elif state == 'refused' %}
+<tr><td colspan="{{ fields|length or 3 }}" class="empty-state">
+  That index pattern is not one this deployment allows{% if detail %}: {{ detail }}{% endif %}.
+</td></tr>
+{% elif state == 'failed' %}
+<tr><td colspan="{{ fields|length or 3 }}" class="empty-state">
+  The search could not be completed{% if detail %}. {{ detail }}{% endif %}
+</td></tr>
+{% elif state == 'empty' %}
+<tr><td colspan="{{ fields|length or 3 }}" class="empty-state">No results found</td></tr>
+{% else %}
+{#- The header row is this table's, so it goes back out of band too. -#}
+<tr id="search-results-header" hx-swap-oob="innerHTML:#search-results-header">
+  {%- for field in fields %}<th>{{ field }}</th>{% endfor %}
+</tr>
+{%- for row in rows %}
+<tr>
+  {%- for value in row %}
+  {#- None means the document did not carry this field. The string "null"
+      means it carried it and set it to null, which the page showed as the
+      same dash. -#}
+  <td>{% if value is not none %}{{ value }}{% else %}<span class="dsc-absent" title="This document does not carry this field"></span>{% endif %}</td>
+  {%- endfor %}
+</tr>
+{%- endfor %}
+{% endif %}
