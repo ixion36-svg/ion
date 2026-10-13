@@ -22,9 +22,9 @@ page cannot be forgotten. Status is measured, never set by hand.
 | measure | remaining |
 |---|---|
 | templates | 80 |
-| total lines | 54,285 |
+| total lines | 54,240 |
 | inline `<style>` lines | 6,144 |
-| runtime DOM writes | 168 |
+| runtime DOM writes | 164 |
 | literal light-on-dark colours | 4 |
 
 ## Shell and partials
@@ -125,9 +125,10 @@ Markup plus a short list of class strings in inline JS.
 
 | template | lines | css | js | writes | light | styled | server | done |
 |---|--:|--:|--:|--:|:--:|:--:|:--:|:--:|
+| `chat.html` | 2159 | 1145 | 674 | 10 | yes | no | no |  |
 | `documents.html` | 1524 | 0 | 1197 | 3 | yes | yes | no |  |
 
-Subtotal: 1 templates, 1,524 lines, 0 inline css lines, 3 runtime writes, 0 light-mode literals.
+Subtotal: 2 templates, 3,683 lines, 1,145 inline css lines, 13 runtime writes, 0 light-mode literals.
 
 ## Tier C, more than 10 runtime writes
 
@@ -138,10 +139,9 @@ Needs the server-rendered fragment work first; a markup-only restyle cannot reac
 | `cases.html` | 5347 | 2163 | 3169 | 43 | no | no | no |  |
 | `integrations.html` | 3063 | 1087 | 1591 | 40 | yes | no | no |  |
 | `settings.html` | 3035 | 1173 | 1111 | 27 | yes | no | no |  |
-| `chat.html` | 2204 | 1145 | 719 | 14 | yes | no | no |  |
 | `pcap.html` | 1430 | 223 | 1087 | 41 | yes | no | no |  |
 
-Subtotal: 5 templates, 15,079 lines, 5,791 inline css lines, 165 runtime writes, 2 light-mode literals.
+Subtotal: 4 templates, 12,875 lines, 4,646 inline css lines, 151 runtime writes, 2 light-mode literals.
 
 ## Cleanup, so nothing is left behind
 

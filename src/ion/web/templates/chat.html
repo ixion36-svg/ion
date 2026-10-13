@@ -1499,37 +1499,6 @@
         engineering: 'engineering',
     };
 
-    const AI_QUICK_PROMPTS = {
-        security: [
-            "What are common indicators of a phishing attack?",
-            "Explain MITRE ATT&CK T1059 — Command and Scripting Interpreter",
-            "How do I triage a suspicious network connection?",
-            "What should I look for in Windows event logs for lateral movement?",
-            "Help me analyse this IOC for threat intelligence"
-        ],
-        engineering: [
-            "How do I configure Elastic Agent for log collection?",
-            "Help me tune Elasticsearch index performance",
-            "What's the best way to set up log pipelines with Filebeat?",
-            "Help me design a high-availability SIEM architecture",
-            "How do I harden a Linux server baseline?"
-        ],
-        coding: [
-            "Help me write a Python log parser",
-            "Write a YARA rule for detecting packed executables",
-            "Help me create a Sigma detection rule",
-            "Build a KQL query for failed authentication events",
-            "Write a PowerShell script to extract IOCs from emails"
-        ],
-        general: [
-            "What can you help me with?",
-            "How do I document a security incident?",
-            "What are security best practices for new SOC analysts?",
-            "Help me write a post-incident report",
-            "What certifications should I pursue in cyber security?"
-        ]
-    };
-
     const AI_CONTEXT_TITLES = {
         security: "Cyber Security Expert",
         engineering: "Security Engineering Expert",
@@ -1653,17 +1622,30 @@
         updateQuickPrompts();
     }
 
+    // GET /ui/chat/quick-prompts renders them. The list was
+    // AI_QUICK_PROMPTS, a JavaScript object in this template, so the one
+    // list a reviewer would want to read sat in a script block.
+    //
+    // The click handler reads data-prompt rather than the button's own
+    // textContent, which is what it used to send: any change to a label
+    // silently changed what was asked, and a label the browser
+    // whitespace-collapsed was sent collapsed.
     function updateQuickPrompts() {
         const el = document.getElementById('ai-quick-prompts');
-        const prompts = AI_QUICK_PROMPTS[aiCurrentContext] || [];
-        el.innerHTML = prompts.map(p => `<button class="ai-qp">${escapeHtml(p)}</button>`).join('');
-        el.querySelectorAll('.ai-qp').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.getElementById('ai-page-input').value = btn.textContent;
-                handleFormSubmit(new Event('submit'));
-            });
+        if (!el) return;
+        htmx.ajax('GET', '/ui/chat/quick-prompts', {
+            source: el, target: el, swap: 'innerHTML',
+            values: { context: aiCurrentContext },
         });
     }
+
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.ai-qp');
+        if (!btn) return;
+        document.getElementById('ai-page-input').value =
+            btn.dataset.prompt || btn.textContent.trim();
+        handleFormSubmit(new Event('submit'));
+    });
 
     // =========================================================================
     // Chat
@@ -1975,44 +1957,30 @@
     // Files
     // =========================================================================
 
-    async function loadUploadedFiles() {
-        try {
-            const resp = await fetch('/api/ai/files', { credentials: 'include' });
-            if (resp.ok) {
-                const data = await resp.json();
-                uploadedFiles = data.files || [];
-                renderFiles();
-            }
-        } catch (e) { console.error('Load files error:', e); }
+    // The fragment reads the listing itself, so there is nothing to
+    // fetch here and no uploadedFiles array to keep in step with it.
+    // The old version swallowed a failed read to the console and left
+    // whatever was on screen, so a failure looked like the last success.
+    function loadUploadedFiles() {
+        renderFiles();
     }
 
+    // GET /ui/chat/files renders the panel. formatFileSize reported
+    // "NaN MB" for a file with no recorded size, because both of its
+    // comparisons are false for undefined and the megabyte branch ran. A
+    // zero-byte file took the first branch and read "0 B", which is
+    // right, so only the missing case was wrong.
+    //
+    // `uploadedFiles = data.files || []` drew a payload in the wrong
+    // shape as "No files attached", and the endpoint can return None
+    // outright: it is `for db in get_session(): return {...}`, which
+    // falls off the end if the generator yields nothing.
     function renderFiles() {
         const container = document.getElementById('ai-files-list');
-        if (!uploadedFiles.length) {
-            container.innerHTML = '<div class="ai-files-empty">No files attached</div>';
-            return;
-        }
-        container.innerHTML = uploadedFiles.map(f => `
-            <div class="ai-file-item" data-file-id="${f.id}">
-                <svg class="ai-file-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                <div class="ai-file-info">
-                    <div class="ai-file-name">${escapeHtml(f.name)}</div>
-                    <div class="ai-file-meta">${formatFileSize(f.size)}</div>
-                </div>
-                <button class="ai-file-delete" data-click-action="deleteUploadedFile" data-stop-propagation data-args='["${f.id}"]'>
-                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </button>
-            </div>
-        `).join('');
-        container.querySelectorAll('.ai-file-item').forEach(item => {
-            item.addEventListener('click', e => { if (!e.target.closest('.ai-file-delete')) showFileModal(item.dataset.fileId); });
+        if (!container) return;
+        htmx.ajax('GET', '/ui/chat/files', {
+            source: container, target: container, swap: 'innerHTML',
         });
-    }
-
-    function formatFileSize(bytes) {
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-        return (bytes / 1048576).toFixed(1) + ' MB';
     }
 
     async function handleFileUpload(event) {
@@ -2037,32 +2005,19 @@
         } catch (e) { console.error(e); }
     };
 
-    async function showFileModal(fileId) {
-        try {
-            const resp = await fetch(`/api/ai/files/${fileId}`, { credentials: 'include' });
-            if (!resp.ok) throw new Error('Load failed');
-            const file = await resp.json();
-            const modal = document.createElement('div');
-            modal.className = 'ai-file-modal';
-            modal.innerHTML = `
-                <div class="ai-file-modal-content">
-                    <div class="ai-file-modal-header">
-                        <h3>${escapeHtml(file.name)}</h3>
-                        <div class="ai-file-modal-actions">
-                            <button class="btn btn-sm" data-click-action="toggleFileEdit" data-args='["$target"]'>Edit</button>
-                            <button class="btn btn-sm btn-primary hidden" data-click-action="saveFileEdit" data-args='["${file.id}"]' id="save-file-btn">Save</button>
-                            <button class="btn btn-sm" data-click-action="downloadFile" data-args='["${file.id}"]'>Download</button>
-                            <button class="btn btn-sm" data-click-action="closeFileModal">Close</button>
-                        </div>
-                    </div>
-                    <div class="ai-file-modal-body">
-                        <pre id="file-content-view">${escapeHtml(file.content)}</pre>
-                        <textarea class="hidden" id="file-content-edit">${escapeHtml(file.content)}</textarea>
-                    </div>
-                </div>`;
-            modal.addEventListener('click', e => { if (e.target === modal) closeFileModal(); });
-            document.body.appendChild(modal);
-        } catch (e) { showToast('Failed to load file', 'error'); }
+    // GET /ui/chat/files/{id} renders the viewer. The page's only
+    // failure signal was showToast('Failed to load file') with no modal,
+    // so a transient failure and a file that no longer exists looked the
+    // same and neither said which. The fragment reports the refusal's own
+    // reason.
+    function showFileModal(fileId) {
+        const modal = document.createElement('div');
+        modal.className = 'ai-file-modal';
+        modal.addEventListener('click', e => { if (e.target === modal) closeFileModal(); });
+        document.body.appendChild(modal);
+        htmx.ajax('GET', '/ui/chat/files/' + encodeURIComponent(fileId), {
+            source: modal, target: modal, swap: 'innerHTML',
+        });
     }
 
     window.toggleFileEdit = function(btn) {

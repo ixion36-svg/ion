@@ -236,3 +236,237 @@ def chat_answer_meta_fragment(
         "grounding": grounding_view(raw_grounding, parsed=grounding_parsed),
     }
     return render_view(request, ANSWER_META_FRAGMENT, view)
+
+
+# ---------------------------------------------------------------------------
+# The file panel, the file viewer and the quick prompts
+# ---------------------------------------------------------------------------
+#
+# formatFileSize reported a size for a file that had none:
+#
+#     if (bytes < 1024) return bytes + ' B';
+#     if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+#     return (bytes / 1048576).toFixed(1) + ' MB';
+#
+# Both comparisons are false for undefined, so the last line ran and the
+# file was listed as "NaN MB". A zero-byte file took the first branch and
+# read "0 B", which is right, so only the missing case was wrong, which is
+# the harder kind to notice.
+#
+# `uploadedFiles = data.files || []` drew a payload in the wrong shape as
+# "No files attached", and GET /api/ai/files can return None outright:
+# it is `for db in get_session(): return {...}`, which falls off the end
+# if the generator yields nothing.
+#
+# The file id went raw into two attributes, one of them a single-quoted
+# data-args, and the viewer did the same with file.id three more times.
+#
+# The viewer's only failure signal was showToast('Failed to load file')
+# with no modal, so a transient failure and a file that no longer exists
+# looked identical.
+
+FILES_FRAGMENT = "_fragments/chat_files.html"
+FILE_VIEWER_FRAGMENT = "_fragments/chat_file_viewer.html"
+QUICK_PROMPTS_FRAGMENT = "_fragments/chat_quick_prompts.html"
+
+#: The quick prompts per context. These were AI_QUICK_PROMPTS, a
+#: JavaScript object in the template, so the one list a reviewer would
+#: want to read sat in a script block.
+QUICK_PROMPTS: dict[str, tuple[str, ...]] = {
+    "security": (
+        "What are common indicators of a phishing attack?",
+        "Explain MITRE ATT&CK T1059 \u2014 Command and Scripting Interpreter",
+        "How do I triage a suspicious network connection?",
+        "What should I look for in Windows event logs for lateral movement?",
+        "Help me analyse this IOC for threat intelligence",
+    ),
+    "engineering": (
+        "How do I configure Elastic Agent for log collection?",
+        "Help me tune Elasticsearch index performance",
+        "What's the best way to set up log pipelines with Filebeat?",
+        "Help me design a high-availability SIEM architecture",
+        "How do I harden a Linux server baseline?",
+    ),
+    "coding": (
+        "Help me write a Python log parser",
+        "Write a YARA rule for detecting packed executables",
+        "Help me create a Sigma detection rule",
+        "Build a KQL query for failed authentication events",
+        "Write a PowerShell script to extract IOCs from emails",
+    ),
+    "general": (
+        "What can you help me with?",
+        "How do I document a security incident?",
+        "What are security best practices for new SOC analysts?",
+        "Help me write a post-incident report",
+        "What certifications should I pursue in cyber security?",
+    ),
+}
+
+
+class FileRow(TypedDict):
+    id: Optional[str]
+    name: str
+    size: Optional[str]
+    lines: Optional[int]
+
+
+class FilesView(TypedDict):
+    state: str
+    error: Optional[str]
+    files: list[FileRow]
+
+
+class ViewerView(TypedDict):
+    state: str
+    error: Optional[str]
+    file_id: Optional[str]
+    name: str
+    content: Optional[str]
+
+
+def file_size(value: Any) -> Optional[str]:
+    """The size label, or None when no size was recorded.
+
+    The thresholds are the page's. What changes is that a file with no
+    recorded size says so instead of reading "NaN MB".
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if value < 0:
+        return None
+    if value < 1024:
+        return "%d B" % int(value)
+    if value < 1048576:
+        return "%.1f KB" % (value / 1024)
+    return "%.1f MB" % (value / 1048576)
+
+
+def file_row(raw: Any) -> Optional[FileRow]:
+    if not isinstance(raw, dict):
+        return None
+    identifier = raw.get("id")
+    lines = raw.get("lines")
+    return {
+        "id": (str(identifier) if identifier is not None else None),
+        "name": _text(raw.get("name")) or "unnamed file",
+        "size": file_size(raw.get("size")),
+        "lines": (lines if isinstance(lines, int)
+                  and not isinstance(lines, bool) else None),
+    }
+
+
+def files_view(payload: Any) -> FilesView:
+    if not isinstance(payload, dict):
+        return {"state": "failed", "error": None, "files": []}
+    raw = payload.get("files")
+    if not isinstance(raw, list):
+        return {"state": "unreadable", "error": None, "files": []}
+    rows = [r for r in (file_row(entry) for entry in raw) if r is not None]
+    return {"state": "data" if rows else "empty", "error": None,
+            "files": rows}
+
+
+def viewer_view(payload: Any) -> ViewerView:
+    if not isinstance(payload, dict):
+        return {"state": "failed", "error": None, "file_id": None,
+                "name": "", "content": None}
+    identifier = payload.get("id")
+    content = payload.get("content")
+    return {
+        "state": "data",
+        "error": None,
+        "file_id": (str(identifier) if identifier is not None else None),
+        "name": _text(payload.get("name")) or "unnamed file",
+        "content": content if isinstance(content, str) else None,
+    }
+
+
+class PromptsView(TypedDict):
+    context: str
+    prompts: list[str]
+
+
+def prompts_view(context: str) -> PromptsView:
+    """An unknown context is no prompts rather than an error: the context
+    comes from the page's own buttons, and a panel of suggestions is not
+    worth failing a request over."""
+    return {"context": context,
+            "prompts": list(QUICK_PROMPTS.get(context, ()))}
+
+
+def _refusal(exc: Any) -> Optional[str]:
+    """A refusal's own reason, which the page replaced with its own
+    sentence."""
+    from fastapi import HTTPException
+
+    if isinstance(exc, HTTPException):
+        return (str(exc.detail) if exc.detail
+                else "This read was refused.")
+    return None
+
+
+@router.get(
+    "/chat/files",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def chat_files_fragment(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    """The attachment panel."""
+    from ion.web import ai_api
+
+    try:
+        payload = await ai_api.list_uploaded_files(current_user=current_user)
+    except Exception as exc:
+        reason = _refusal(exc)
+        if reason is None:
+            logger.exception("Chat file panel could not read the listing")
+        view = files_view(None)
+        view["error"] = reason
+        return render_view(request, FILES_FRAGMENT, view)
+    return render_view(request, FILES_FRAGMENT, files_view(payload))
+
+
+@router.get(
+    "/chat/files/{file_id}",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def chat_file_viewer_fragment(
+    request: Request,
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    """One uploaded file, to read or to edit."""
+    from ion.web import ai_api
+
+    try:
+        payload = await ai_api.get_file_content(
+            file_id=file_id, current_user=current_user)
+    except Exception as exc:
+        reason = _refusal(exc)
+        if reason is None:
+            logger.exception("Chat file viewer could not read %s", file_id)
+        view = viewer_view(None)
+        view["error"] = reason
+        view["file_id"] = file_id
+        return render_view(request, FILE_VIEWER_FRAGMENT, view)
+    return render_view(request, FILE_VIEWER_FRAGMENT, viewer_view(payload))
+
+
+@router.get(
+    "/chat/quick-prompts",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+def chat_quick_prompts_fragment(
+    request: Request,
+    context: str = "security",
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    """The suggested prompts for one context."""
+    return render_view(request, QUICK_PROMPTS_FRAGMENT,
+                       prompts_view(context))
