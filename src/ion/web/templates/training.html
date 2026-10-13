@@ -571,6 +571,7 @@
 
 {% include '_fragments/training_client.html' %}
 {% include '_fragments/training_assessment_client.html' %}
+{% include '_fragments/training_plans_client.html' %}
 <script nonce="{{ csp_nonce }}">
 function cloneTemplate(id) {
     const template = document.getElementById(id);
@@ -893,20 +894,7 @@ async function rmShowHistory() {
                 <button class="tp-btn text-xs" data-click-action="tpLoadForecast"><i class="icon-refresh-cw"></i> Refresh</button>
             </div>
 
-            <!-- Budget overview totals -->
-            <div class="tp-summary" id="tp-forecast-totals"></div>
-
-            <!-- Employment type breakdown -->
-            <div class="mt-5">
-                <h4 class="mt-0 mr-0 mb-3 ml-0 text-[0.9rem] text-[var(--text-bright)]">Breakdown by Employment Type</h4>
-                <div id="tp-forecast-emp-breakdown"></div>
-            </div>
-
-            <!-- Per-person table -->
-            <div class="mt-5">
-                <h4 class="mt-0 mr-0 mb-3 ml-0 text-[0.9rem] text-[var(--text-bright)]">Personnel Training Plans</h4>
-                <div id="tp-forecast-table"></div>
-            </div>
+            <div id="tp-forecast-content"></div>
         </div>
     </div>
 
@@ -5503,6 +5491,32 @@ async function checkTeamTabAccess() {
 // =========================================================================
 // My Training Plan
 // =========================================================================
+function tpSetMessage(container, message) {
+    const node = cloneTemplate('tp-message-template');
+    node.textContent = message;
+    container.replaceChildren(node);
+}
+
+async function tpLoadFragment(url, targetId, failure) {
+    const container = document.getElementById(targetId);
+    tpSetMessage(container, 'Loading...');
+    let failed = false;
+    const recordOutcome = event => {
+        if (event.detail.target !== container) return;
+        const status = event.detail.xhr.status;
+        failed = status !== 401 && (status < 200 || status >= 300);
+    };
+    document.addEventListener('htmx:afterRequest', recordOutcome);
+    try {
+        await htmx.ajax('GET', url, {target: container, swap: 'innerHTML'});
+        if (failed) tpSetMessage(container, failure);
+    } catch (error) {
+        tpSetMessage(container, failure);
+    } finally {
+        document.removeEventListener('htmx:afterRequest', recordOutcome);
+    }
+}
+
 let tpPlans = [];
 let tpActivePlanId = null;
 let tpInitialized = false;
@@ -5540,10 +5554,14 @@ async function tpLoadPlans() {
         const resp = await fetch('/api/skills/training-plans');
         if (!resp.ok) throw new Error('Failed to load plans');
         const data = await resp.json();
-        tpPlans = data.plans || [];
+        if (!Array.isArray(data.plans)) throw new Error('Unreadable training plans');
+        tpPlans = data.plans;
     } catch (e) {
         console.warn('Could not load training plans:', e);
-        tpPlans = [];
+        document.getElementById('tp-empty-state').classList.add('hidden');
+        document.getElementById('tp-items-container').classList.remove('hidden');
+        tpSetMessage(document.getElementById('tp-items-list'), 'Failed to load training plans.');
+        return;
     }
     tpRenderPlanSelector();
     if (tpActivePlanId) {
@@ -5562,21 +5580,20 @@ async function tpLoadPlans() {
     } else {
         tpShowEmpty();
     }
+    if (tpActivePlanId) document.getElementById('tp-plan-select').value = tpActivePlanId;
 }
 
 function tpRenderPlanSelector() {
     const sel = document.getElementById('tp-plan-select');
     if (!sel) return;
-    const curVal = tpActivePlanId;
-    sel.innerHTML = '<option value="">-- Select a plan --</option>';
+    sel.replaceChildren(cloneTemplate('tp-plan-placeholder'));
     tpPlans.forEach(p => {
-        const statusTag = p.status !== 'draft' ? ` (${p.status})` : '';
-        const opt = document.createElement('option');
-        opt.value = p.id;
-        opt.textContent = p.name + statusTag;
-        sel.appendChild(opt);
+        const option = cloneTemplate('tp-plan-option');
+        option.value = p.id;
+        option.textContent = (p.name ?? 'Unknown') + (p.status && p.status !== 'draft' ? ' (' + p.status + ')' : '');
+        sel.appendChild(option);
     });
-    if (curVal) sel.value = curVal;
+    if (tpActivePlanId) sel.value = tpActivePlanId;
 }
 
 function tpSelectPlan(val) {
@@ -5588,75 +5605,41 @@ function tpSelectPlan(val) {
 }
 
 function tpShowEmpty() {
-    document.getElementById('tp-summary').style.display = 'none';
-    document.getElementById('tp-items-container').style.display = 'none';
-    document.getElementById('tp-plan-actions').style.display = 'none';
-    document.getElementById('tp-empty-state').style.display = '';
+    ['tp-summary', 'tp-items-container', 'tp-plan-actions'].forEach(id => document.getElementById(id).classList.add('hidden'));
+    document.getElementById('tp-empty-state').classList.remove('hidden');
 }
 
 function tpRenderPlan(plan) {
-    document.getElementById('tp-empty-state').style.display = 'none';
-    document.getElementById('tp-summary').style.display = '';
-    document.getElementById('tp-items-container').style.display = '';
-    document.getElementById('tp-plan-actions').style.display = '';
+    document.getElementById('tp-empty-state').classList.add('hidden');
+    document.getElementById('tp-summary').classList.remove('hidden');
+    document.getElementById('tp-items-container').classList.remove('hidden');
+    document.getElementById('tp-plan-actions').classList.remove('hidden');
 
     // Status select
     const statusSel = document.getElementById('tp-status-select');
     if (statusSel) statusSel.value = plan.status;
 
     // Summary stats
-    const items = plan.items || [];
-    const totalCost = items.reduce((s, i) => s + (i.status !== 'skipped' ? i.price : 0), 0);
-    const companyCost = items.filter(i => i.funding_type === 'company' && i.status !== 'skipped').reduce((s, i) => s + i.price, 0);
-    const selfCost = items.filter(i => i.funding_type === 'self' && i.status !== 'skipped').reduce((s, i) => s + i.price, 0);
+    const readableItems = Array.isArray(plan.items);
+    const items = readableItems ? plan.items : [];
+    const sum = selected => readableItems && selected.every(item => item.price != null) ? selected.reduce((total, item) => total + item.price, 0) : null;
+    const totalCost = sum(items.filter(item => item.status !== 'skipped'));
+    const companyCost = items.some(item => item.funding_type == null) ? null : sum(items.filter(item => item.funding_type === 'company' && item.status !== 'skipped'));
+    const selfCost = items.some(item => item.funding_type == null) ? null : sum(items.filter(item => item.funding_type === 'self' && item.status !== 'skipped'));
+    const completeKnown = readableItems && items.every(item => item.status != null);
     const completedCount = items.filter(i => i.status === 'completed').length;
     const activeItems = items.filter(i => i.status !== 'skipped').length;
     const pct = activeItems > 0 ? Math.round((completedCount / activeItems) * 100) : 0;
 
-    document.getElementById('tp-total-items').textContent = items.length;
-    document.getElementById('tp-completed-count').textContent = completedCount;
-    document.getElementById('tp-total-cost').textContent = '\u00a3' + totalCost.toLocaleString();
-    document.getElementById('tp-company-cost').textContent = '\u00a3' + companyCost.toLocaleString();
-    document.getElementById('tp-self-cost').textContent = '\u00a3' + selfCost.toLocaleString();
-    document.getElementById('tp-progress-fill').style.width = pct + '%';
-    document.getElementById('tp-progress-label').textContent = pct + '% Complete';
+    document.getElementById('tp-total-items').textContent = readableItems ? items.length : 'Unknown';
+    document.getElementById('tp-completed-count').textContent = completeKnown ? completedCount : 'Unknown';
+    document.getElementById('tp-total-cost').textContent = totalCost == null ? 'Unknown' : '\u00a3' + totalCost.toLocaleString();
+    document.getElementById('tp-company-cost').textContent = companyCost == null ? 'Unknown' : '\u00a3' + companyCost.toLocaleString();
+    document.getElementById('tp-self-cost').textContent = selfCost == null ? 'Unknown' : '\u00a3' + selfCost.toLocaleString();
+    document.getElementById('tp-progress-fill').setAttribute('data-ion-style', 'width:' + (completeKnown ? pct : 0) + '%');
+    document.getElementById('tp-progress-label').textContent = completeKnown ? pct + '% Complete' : 'Completion unknown';
 
-    // Items list
-    const container = document.getElementById('tp-items-list');
-    if (items.length === 0) {
-        container.innerHTML = '<div class="tp-empty">No certifications added yet. Browse Career Pathways and add certifications to this plan.</div>';
-        return;
-    }
-
-    container.innerHTML = items.map(item => {
-        const isCompleted = item.status === 'completed';
-        const isSkipped = item.status === 'skipped';
-        const cls = isCompleted ? 'tp-item completed' : isSkipped ? 'tp-item completed' : 'tp-item';
-        const checkCls = isCompleted ? 'tp-item-check checked' : 'tp-item-check';
-        const diffCls = item.difficulty ? `tp-item-difficulty ${item.difficulty}` : 'tp-item-difficulty';
-        return `
-        <div class="${cls}" data-item-id="${item.id}">
-            <div class="${checkCls}" data-click-action="tpToggleComplete" data-args='[${plan.id}, ${item.id}, "${item.status}"]' title="Toggle complete"></div>
-            <div class="tp-item-info">
-                <div class="tp-item-name">${esc(item.cert_name)}</div>
-                <div class="tp-item-provider">${esc(item.provider || '')}</div>
-            </div>
-            <span class="tp-item-price">~\u00a3${item.price.toLocaleString()}</span>
-            <span class="${diffCls}">${esc(item.difficulty || '-')}</span>
-            <span class="tp-item-funding ${item.funding_type}" data-click-action="tpCycleFunding" data-args='["$event", ${plan.id}, ${item.id}, "${item.funding_type}"]' title="Click to change">${tpFundingLabel(item.funding_type)}</span>
-            <span class="tp-item-status ${item.status}" data-click-action="tpCycleStatus" data-args='["$event", ${plan.id}, ${item.id}, "${item.status}"]' title="Click to change">${tpStatusLabel(item.status)}</span>
-            <div class="tp-item-actions">
-                <button data-click-action="tpRemoveItem" data-args='[${plan.id}, ${item.id}]' title="Remove"><i class="icon-x"></i></button>
-            </div>
-        </div>`;
-    }).join('');
-}
-
-function tpFundingLabel(f) {
-    return { company: 'Company', self: 'Self', split: 'Split', tbd: 'TBD' }[f] || 'TBD';
-}
-function tpStatusLabel(s) {
-    return { planned: 'Planned', in_progress: 'In Progress', completed: 'Completed', skipped: 'Skipped' }[s] || s;
+    tpLoadFragment('/ui/training/plans/' + encodeURIComponent(plan.id) + '/items', 'tp-items-list', 'Failed to load training plan items.');
 }
 
 async function tpToggleComplete(planId, itemId, currentStatus) {
@@ -5754,49 +5737,27 @@ function tpShowCreateModal() {
     document.getElementById('tp-new-name').value = '';
     document.getElementById('tp-new-role').value = careerGoal.target_role || '';
     document.getElementById('tp-new-notes').value = '';
-    // Populate role multi-select checkboxes
     const multiDiv = document.getElementById('tp-new-roles-multi');
     if (multiDiv && multiDiv.children.length === 0) {
-        const cbStyle = 'display:flex;align-items:center;gap:0.35rem;font-size:0.78rem;color:var(--text-primary);cursor:pointer;padding:0.2rem 0.5rem;border-radius:4px;background:var(--bg-primary);border:1px solid var(--ion-border);white-space:nowrap;';
-        // Civilian roles header
-        const civHeader = document.createElement('div');
-        civHeader.style.cssText = 'font-size:0.7rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;padding:0.3rem 0.2rem 0.1rem;grid-column:1/-1;';
-        civHeader.textContent = 'Civilian Roles';
-        multiDiv.appendChild(civHeader);
-        Object.entries(ROLES).forEach(([id, r]) => {
-            const label = document.createElement('label');
-            label.style.cssText = cbStyle;
-            const cb = document.createElement('input');
-            cb.type = 'checkbox';
-            cb.value = id;
-            cb.className = 'tp-role-cb';
-            label.appendChild(cb);
-            label.appendChild(document.createTextNode(r.title));
-            multiDiv.appendChild(label);
-        });
-        // Service Personnel header
-        const modHeader = document.createElement('div');
-        modHeader.style.cssText = 'font-size:0.7rem;font-weight:600;color:#fbbf24;text-transform:uppercase;letter-spacing:0.05em;padding:0.5rem 0.2rem 0.1rem;grid-column:1/-1;border-top:1px solid var(--ion-border);margin-top:0.3rem;';
-        modHeader.textContent = 'Service Personnel (Army)';
-        multiDiv.appendChild(modHeader);
-        Object.entries(MOD_ROLES).forEach(([id, r]) => {
-            const label = document.createElement('label');
-            label.style.cssText = cbStyle;
-            const cb = document.createElement('input');
-            cb.type = 'checkbox';
-            cb.value = id;
-            cb.className = 'tp-role-cb';
-            label.appendChild(cb);
-            label.appendChild(document.createTextNode(r.title + (r.armyRank ? ` (${r.armyRank})` : '')));
-            multiDiv.appendChild(label);
+        [[ROLES, 'Civilian Roles', false], [MOD_ROLES, 'Service Personnel (Army)', true]].forEach(([roles, title, service]) => {
+            const heading = cloneTemplate('tp-role-heading-template');
+            heading.textContent = title;
+            if (service) heading.classList.add('tp-role-heading-service');
+            multiDiv.appendChild(heading);
+            Object.entries(roles).forEach(([id, role]) => {
+                const label = cloneTemplate('tp-role-choice-template');
+                label.querySelector('input').value = id;
+                label.querySelector('span').textContent = role.title + (role.armyRank ? ' (' + role.armyRank + ')' : '');
+                multiDiv.appendChild(label);
+            });
         });
     } else if (multiDiv) {
         multiDiv.querySelectorAll('.tp-role-cb').forEach(cb => cb.checked = false);
     }
-    document.getElementById('tp-create-modal').style.display = '';
+    document.getElementById('tp-create-modal').classList.remove('hidden');
 }
 function tpHideCreateModal() {
-    document.getElementById('tp-create-modal').style.display = 'none';
+    document.getElementById('tp-create-modal').classList.add('hidden');
 }
 
 async function tpCreatePlan() {
@@ -6092,34 +6053,34 @@ function renderCalPlanSchedule() {
     const container = document.getElementById('cal-plan-items');
     if (!container) return;
     const plan = tpPlans.find(p => p.id === tpActivePlanId);
-    if (!plan || !plan.items || plan.items.length === 0) {
-        container.innerHTML = '<div class="tp-empty">No items in your training plan. Add certifications from Career Pathways first.</div>';
+    if (!plan || !Array.isArray(plan.items)) {
+        tpSetMessage(container, plan ? 'Training plan items unavailable.' : 'Select a training plan to edit its schedule.');
         return;
     }
-
-    const activeItems = plan.items.filter(i => i.status !== 'skipped');
-    container.innerHTML = activeItems.map((item, idx) => {
-        const sched = calPlanSchedule[idx];
-        const startVal = sched ? dateStr(sched.startDate) : '';
-        const endVal = sched ? dateStr(sched.endDate) : '';
-        const weeks = sched ? sched.studyWeeks : 4;
-        const statusCls = `cal-sched-status ${item.status}`;
-        const statusLabel = { planned: 'Planned', in_progress: 'Studying', completed: 'Passed', skipped: 'Skipped' }[item.status] || item.status;
-        return `
-        <div class="cal-sched-row">
-            <div class="flex-1 min-w-[150px]">
-                <div class="tp-item-name">${esc(item.cert_name)}</div>
-                <div class="tp-item-provider">${esc(item.provider || '')} - ~\u00a3${item.price.toLocaleString()}</div>
-            </div>
-            <span class="${statusCls}">${statusLabel}</span>
-            <label>Start:</label>
-            <input type="date" value="${startVal}" data-change-action="calUpdateItemDate" data-args='[${item.id}, "start", "$value"]'>
-            <label>Exam:</label>
-            <input type="date" value="${endVal}" data-change-action="calUpdateItemDate" data-args='[${item.id}, "end", "$value"]'>
-            <label>Weeks:</label>
-            <input type="number" min="1" max="52" value="${weeks}" data-change-action="calUpdateItemWeeks" data-args='[${item.id}, "$value", "$target"]'>
-        </div>`;
-    }).join('');
+    const activeItems = plan.items.filter(item => item.status !== 'skipped');
+    if (!activeItems.length) {
+        tpSetMessage(container, 'No items in your training plan. Add certifications from Career Pathways first.');
+        return;
+    }
+    container.replaceChildren();
+    activeItems.forEach(item => {
+        const schedule = calPlanSchedule.find(entry => entry.item.id === item.id);
+        const row = cloneTemplate('tp-cal-schedule-row');
+        row.querySelector('.tp-item-name').textContent = item.cert_name ?? 'Unknown';
+        row.querySelector('.tp-item-provider').textContent = (item.provider ?? 'Unknown') + ' - ' + (item.price == null ? 'Unknown' : '~£' + item.price.toLocaleString());
+        const status = row.querySelector('.cal-sched-status');
+        status.textContent = {planned: 'Planned', in_progress: 'Studying', completed: 'Passed', skipped: 'Skipped'}[item.status] ?? item.status ?? 'Unknown';
+        if (['planned', 'in_progress', 'completed', 'skipped'].includes(item.status)) status.classList.add(item.status);
+        const dates = row.querySelectorAll('input[type="date"]');
+        dates[0].value = schedule ? dateStr(schedule.startDate) : '';
+        dates[1].value = schedule ? dateStr(schedule.endDate) : '';
+        dates[0].dataset.args = JSON.stringify([item.id, 'start', '$value']);
+        dates[1].dataset.args = JSON.stringify([item.id, 'end', '$value']);
+        const weeks = row.querySelector('input[type="number"]');
+        weeks.value = schedule ? schedule.studyWeeks : '';
+        weeks.dataset.args = JSON.stringify([item.id, '$value', '$target']);
+        container.appendChild(row);
+    });
 }
 
 function calUpdateItemDate(itemId, which, val) {
@@ -6175,151 +6136,30 @@ function calUpdateItemWeeks(itemId, weeksVal, input) {
 // =========================================================================
 let forecastLoaded = false;
 
-const EMP_TYPE_LABELS = { cs: 'Civil Servant', contractor: 'Contractor', military: 'Military', other: 'Other' };
-const EMP_TYPE_COLORS = { cs: '#00e5ff', contractor: '#f97316', military: '#22c55e', other: '#8b949e' };
 
 async function tpLoadForecast() {
-    const totalsEl = document.getElementById('tp-forecast-totals');
-    const empEl = document.getElementById('tp-forecast-emp-breakdown');
-    const tableEl = document.getElementById('tp-forecast-table');
-    if (!totalsEl || !tableEl) return;
-
-    try {
-        const resp = await fetch('/api/skills/training-plans/forecast');
-        if (resp.status === 403) {
-            document.getElementById('tp-forecast-section').style.display = 'none';
-            return;
-        }
-        if (!resp.ok) throw new Error('Forecast failed');
-        const data = await resp.json();
-        forecastLoaded = true;
-
-        const t = data.totals;
-        const totalCerts = data.forecasts.reduce((s, f) => s + f.item_count, 0);
-        const totalCompleted = data.forecasts.reduce((s, f) => s + f.completed_count, 0);
-        const overallPct = totalCerts > 0 ? Math.round(totalCompleted / totalCerts * 100) : 0;
-        // Estimate yearly budget (all active plans = this FY)
-        const companyLiability = t.company + (t.split * 0.5) + t.tbd; // TBD assumed company until classified
-
-        totalsEl.innerHTML = `
-            <div class="tp-summary-card">
-                <div class="tp-summary-value">${data.plan_count}</div>
-                <div class="tp-summary-label">Personnel with Plans</div>
-            </div>
-            <div class="tp-summary-card">
-                <div class="tp-summary-value">${totalCerts}</div>
-                <div class="tp-summary-label">Total Certifications</div>
-            </div>
-            <div class="tp-summary-card">
-                <div class="tp-summary-value text-[var(--neon-cyan)]">\u00a3${t.total.toLocaleString()}</div>
-                <div class="tp-summary-label">Total Forecast</div>
-            </div>
-            <div class="tp-summary-card">
-                <div class="tp-summary-value text-[#f97316]">\u00a3${companyLiability.toLocaleString()}</div>
-                <div class="tp-summary-label">Est. Company Liability</div>
-            </div>
-            <div class="tp-summary-card">
-                <div class="tp-summary-value">\u00a3${t.company.toLocaleString()}</div>
-                <div class="tp-summary-label">Confirmed Company</div>
-            </div>
-            <div class="tp-summary-card">
-                <div class="tp-summary-value">\u00a3${t.self.toLocaleString()}</div>
-                <div class="tp-summary-label">Self Funded</div>
-            </div>
-            <div class="tp-summary-card">
-                <div class="tp-summary-value">\u00a3${t.tbd.toLocaleString()}</div>
-                <div class="tp-summary-label">Unclassified (TBD)</div>
-            </div>
-            <div class="tp-summary-card tp-summary-card-progress">
-                <div class="tp-progress-bar">
-                    <div class="tp-progress-fill" data-ion-style="width:${overallPct}%"></div>
-                </div>
-                <div class="tp-summary-label">${overallPct}% Team Completion</div>
-            </div>
-        `;
-
-        // Employment type breakdown
-        if (empEl) {
-            const empTypes = data.by_employment_type || {};
-            if (Object.keys(empTypes).length === 0) {
-                empEl.innerHTML = '<div class="tp-empty p-4">No data yet.</div>';
-            } else {
-                let empHtml = '<div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">';
-                for (const [type, d] of Object.entries(empTypes)) {
-                    const label = EMP_TYPE_LABELS[type] || type;
-                    const color = EMP_TYPE_COLORS[type] || '#8b949e';
-                    const liability = d.company + (d.split * 0.5) + d.tbd;
-                    empHtml += `
-                    <div class="bg-[var(--bg-secondary)] border border-[var(--ion-border)] rounded-[8px] p-4" data-ion-style="border-left:3px solid ${color}">
-                        <div class="font-bold text-[0.9rem] mb-2" data-ion-style="color:${color}">${esc(label)}</div>
-                        <div class="grid grid-cols-2 gap-[0.25rem_1rem] text-[0.78rem]">
-                            <span class="text-[var(--text-muted)]">Personnel</span><span class="text-[var(--text-primary)] font-semibold">${d.headcount}</span>
-                            <span class="text-[var(--text-muted)]">Certifications</span><span class="text-[var(--text-primary)] font-semibold">${d.certs}</span>
-                            <span class="text-[var(--text-muted)]">Total Cost</span><span class="text-[var(--neon-cyan)] font-semibold">\u00a3${d.total.toLocaleString()}</span>
-                            <span class="text-[var(--text-muted)]">Company</span><span class="font-semibold">\u00a3${d.company.toLocaleString()}</span>
-                            <span class="text-[var(--text-muted)]">Self</span><span class="font-semibold">\u00a3${d.self.toLocaleString()}</span>
-                            <span class="text-[var(--text-muted)]">Est. Liability</span><span class="text-[#f97316] font-semibold">\u00a3${liability.toLocaleString()}</span>
-                        </div>
-                    </div>`;
-                }
-                empHtml += '</div>';
-                empEl.innerHTML = empHtml;
-            }
-        }
-
-        // Per-person table
-        if (data.forecasts.length === 0) {
-            tableEl.innerHTML = '<div class="tp-empty">No personnel have active training plans yet.</div>';
-            return;
-        }
-
-        let rows = data.forecasts.map(f => {
-            const pct = f.item_count > 0 ? Math.round(f.completed_count / f.item_count * 100) : 0;
-            const targetTitle = f.target_role && (ROLES[f.target_role] || MOD_ROLES[f.target_role]) ? (ROLES[f.target_role] || MOD_ROLES[f.target_role]).title : (f.target_role || '-');
-            const empLabel = EMP_TYPE_LABELS[f.employment_type] || f.employment_type || 'CS';
-            const empColor = EMP_TYPE_COLORS[f.employment_type] || '#8b949e';
-            return `<tr>
-                <td><strong>${esc(f.display_name)}</strong><br><span class="text-[0.7rem] text-[var(--text-muted)]">${esc(f.username)}</span></td>
-                <td><span class="inline-block py-[0.15rem] px-2 rounded-[4px] text-[0.7rem] font-semibold" data-ion-style="background:${empColor}22; color:${empColor}">${esc(empLabel)}</span></td>
-                <td>${esc(f.plan_name)}</td>
-                <td>${esc(targetTitle)}</td>
-                <td class="text-center">${f.item_count}</td>
-                <td class="fc-cost">\u00a3${f.total_cost.toLocaleString()}</td>
-                <td class="fc-cost">\u00a3${f.company_cost.toLocaleString()}</td>
-                <td class="fc-cost">\u00a3${f.self_cost.toLocaleString()}</td>
-                <td>
-                    ${pct}%
-                    <span class="fc-progress"><span class="fc-progress-bar" data-ion-style="width:${pct}%"></span></span>
-                </td>
-            </tr>`;
-        }).join('');
-
-        tableEl.innerHTML = `
-            <div class="overflow-x-auto">
-            <table class="fc-table">
-                <thead><tr>
-                    <th>Person</th><th>Type</th><th>Plan</th><th>Target Role</th><th class="text-center">Certs</th>
-                    <th>Total</th><th>Company</th><th>Self</th><th>Progress</th>
-                </tr></thead>
-                <tbody>${rows}</tbody>
-            </table>
-            </div>`;
-    } catch (e) {
-        console.error('Forecast error:', e);
-        if (tableEl) tableEl.innerHTML = '<div class="tp-empty">Failed to load forecast data.</div>';
-    }
+    const container = document.getElementById('tp-forecast-content');
+    if (!container) return;
+    await tpLoadFragment('/ui/training/forecast', 'tp-forecast-content', 'Failed to load forecast data.');
+    container.querySelectorAll('[data-tp-target-role]').forEach(cell => {
+        const role = ROLES[cell.dataset.tpTargetRole] || MOD_ROLES[cell.dataset.tpTargetRole];
+        if (role) cell.textContent = role.title;
+    });
+    forecastLoaded = true;
 }
 
 function tpShowForecastIfLead() {
-    // Check if user has lead+ access by trying the forecast endpoint
-    const el = document.getElementById('tp-forecast-section');
-    if (!el) return;
-    fetch('/api/skills/training-plans/forecast').then(resp => {
-        if (resp.ok) {
-            el.style.display = '';
+    const section = document.getElementById('tp-forecast-section');
+    if (!section) return;
+    fetch('/api/skills/training-plans/forecast').then(response => {
+        if (response.status !== 401 && response.status !== 403) {
+            section.classList.remove('hidden');
             tpLoadForecast();
         }
-    }).catch(() => {});
+    }).catch(() => {
+        section.classList.remove('hidden');
+        tpSetMessage(document.getElementById('tp-forecast-content'), 'Failed to load forecast data.');
+    });
 }
 
 // =========================================================================

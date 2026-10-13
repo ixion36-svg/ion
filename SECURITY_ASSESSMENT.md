@@ -20,6 +20,18 @@
 
 ## Executive Summary
 
+### Unreleased training UI conversion, 2026-10-13
+
+Two authenticated read surfaces are added. `GET /ui/training/plans/{plan_id}/items`
+requires `alert:read` and resolves the plan through the existing owner-filtered
+training plans API handler. `GET /ui/training/forecast` requires `security:read`,
+matching the existing aggregate forecast API. Both routes return escaped HTML
+fragments by default and the same named view model when the caller explicitly
+requests JSON. Failed reads remain distinct from empty results and measured zero.
+No mutation endpoint, credential, external sink, permission grant or dependency is
+added. Browser-owned computations use cloned inert templates and text nodes;
+delegated action arguments use JSON encoding. The existing CSP remains enforced.
+
 ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy ORM parameterised queries throughout the main codebase, SandboxedEnvironment Jinja2 rendering, DOMPurify XSS mitigation, RBAC with 7-tier role hierarchy, rate limiting on auth endpoints, circuit breakers on all external integrations, and ECS-compliant audit logging. v0.19.17â€“v0.20.0 closed several moderate-to-low findings from the last assessment. v0.21.0-rc added the Bob Eval Harness, per-template confidence threshold overrides, and the `reasoning_text` storage gate. v0.22.0-rc adds two well-gated read/write surfaces (MITRE coverage heatmap and timeline annotations) AND removes a latent SSRF/unvalidated-write path (`POST /api/elasticsearch/config`) along with several legacy-route dead-code surfaces. Net new in v0.22.0: 0C / 0H / 0M / 0L. The removed write path is a findings-quality improvement, not a counted closure.
 
 **Current findings posture (v0.99.11): no open findings at any severity.** ION has held **0 Critical / 0 High** across every release since the v0.9.43 baseline. The Medium (peak 3) and Low (peak 6) findings carried through the v0.2x-v0.33.x line were all closed by **v0.34.0**. Two Low findings have landed since, both introduced by v0.99.7 and both present in the v0.99.7 tag itself: they were found in a review after that tag and closed in **v0.99.8** (see *Fixed Since v0.9.43*). An instance running v0.99.7 carries both, so the position is zero open findings as of v0.99.8, not as of v0.99.7. A further external review of v0.99.8 found four issues — two Medium, two Low — all closed in **v0.99.9**; an instance running v0.99.8 or earlier carries all four. Per-release net-new findings are recorded in each `## vX.Y.Z` entry in `CHANGELOG.md`; the full per-version trend is preserved in this file's git history.
