@@ -493,13 +493,28 @@ def test_no_badge_holds_its_palette_in_javascript_any_more():
     assert "pcap-tab-badge" in body
 
 
-def test_every_badge_tone_the_page_asks_for_exists_in_the_stylesheet():
-    """A tone with no rule is a badge with no background."""
+def test_every_badge_tone_anything_asks_for_exists_in_the_stylesheet():
+    """A tone with no rule is a badge with no background.
+
+    The tones are named in the fragments and in the registry now, not in
+    the page's scripts, so this reads all three. The `assert asked` guard
+    is load-bearing: when the tones moved out of the page it was an empty
+    set, and the loop would otherwise have passed over nothing.
+    """
     import re as _re
 
     page = PAGE.read_text(encoding="utf-8")
-    asked = set(_re.findall(r"'(tone-[a-z]+)'", _scripts()))
-    assert asked, "no tones are used"
+    sources = [_scripts(),
+               (ROOT / "src/ion/web/ui/pcap.py").read_text(encoding="utf-8")]
+    fragments = ROOT / "src/ion/web/templates/_fragments"
+    for name in ("pcap_tables.html", "pcap_summary.html",
+                 "pcap_detail.html"):
+        sources.append((fragments / name).read_text(encoding="utf-8"))
+
+    asked = set()
+    for source in sources:
+        asked |= set(_re.findall(r"tone-[a-z]+", source))
+    assert len(asked) >= 2, asked
     for tone in asked:
         assert ".pcap-tab-badge." + tone + " " in page, tone
 

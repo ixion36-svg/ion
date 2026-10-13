@@ -530,15 +530,31 @@
                 source: document.getElementById('panel-dns'),
                 target: '#panel-dns', swap: 'innerHTML',
             });
+            // The seven panels with logic of their own: data transfer,
+            // ISAKMP, certificates, host profiles, TCP streams, email and
+            // JA4.
+            //
+            // The exfiltration flag is the reason this one mattered. It
+            // was
+            //
+            //   i.received > 0 && i.sent / i.received > 3 && i.sent > 100000
+            //
+            // and the `received > 0` guard, there so the division is
+            // safe, meant a host that sent a great deal and received
+            // nothing could never trip it. All outbound and no inbound is
+            // the shape the heuristic exists to catch, and the ratio
+            // column was already printing an infinity sign for it, so the
+            // row had the answer and the flag could not say so.
+            //
+            // renderIsakmp also threw on a session with no status:
+            // `s.toLowerCase()` on undefined, inside the map that built
+            // every row, so one such session cost the whole panel.
+            htmx.ajax('GET', '/ui/pcap/' + _currentJobId + '/detail', {
+                source: document.getElementById('panel-data'),
+                target: '#panel-data', swap: 'innerHTML',
+            });
         }
 
-        renderData(d);
-        renderIsakmp(d);
-        renderJA4(d);
-        renderCerts(d);
-        renderHosts(d);
-        renderStreams(d);
-        renderEmail(d);
         renderNetworkGraph(d);
         renderFindings(d);
         renderThreatIntel(d);
@@ -547,92 +563,7 @@
 
 
 
-    function renderData(d) {
-        const dt = d.data_transfer || {};
-        const byIp = dt.by_ip || [];
-        if (!byIp.length) {
-            document.getElementById('panel-data').innerHTML = '<p class="text-[var(--text-secondary)] text-[.85rem] p-5">No data transfer information.</p>';
-            return;
-        }
-        const top = byIp.slice(0, 20);
-        const maxTotal = Math.max(...top.map(i => i.sent + i.received), 1);
-        // Direction bars: length = share of the busiest host's volume; the split
-        // between amber (sent) and blue (received) makes outbound-heavy hosts —
-        // the exfiltration shape — jump out.
-        const bars = top.map(i => {
-            const total = i.sent + i.received;
-            const sentPct = (i.sent / maxTotal * 100).toFixed(1);
-            const recvPct = (i.received / maxTotal * 100).toFixed(1);
-            const exfil = i.received > 0 && i.sent / i.received > 3 && i.sent > 100000;
-            const ratio = i.received > 0 ? (i.sent / i.received).toFixed(1) + ':1' : '∞';
-            return `<div class="dt-row">
-                <div class="dt-ip" title="${esc(i.ip)}">${esc(i.ip)}</div>
-                <div class="dt-track"><div class="dt-sent" data-ion-style="width:${sentPct}%"></div><div class="dt-recv" data-ion-style="width:${recvPct}%"></div></div>
-                <div class="dt-vals">${fmtBytes(total)} · <span class="${exfil ? 'dt-exfil' : ''}">${ratio}</span></div>
-            </div>`;
-        }).join('');
-        const rows = top.map(i => {
-            const total = i.sent + i.received;
-            const ratio = i.received > 0 ? (i.sent / i.received).toFixed(1) : '∞';
-            return `<tr>
-                <td class="font-mono">${esc(i.ip)}</td>
-                <td class="text-right">${fmtBytes(i.sent)}</td>
-                <td class="text-right">${fmtBytes(i.received)}</td>
-                <td class="text-right">${fmtBytes(total)}</td>
-                <td class="text-right">${ratio}:1</td>
-            </tr>`;
-        }).join('');
-        document.getElementById('panel-data').innerHTML =
-            `<h3 class="mt-0 mr-0 mb-1 ml-0 text-[.95rem]">Data Transfer</h3>` +
-            `<p class="text-[var(--text-secondary)] text-[.82rem] mt-0 mr-0 mb-3 ml-0">Total: ${fmtBytes(dt.total_bytes || 0)}</p>` +
-            `<div class="dt-legend"><span class="dt-l-sent">Sent (outbound)</span><span class="dt-l-recv">Received (inbound)</span></div>` +
-            bars +
-            `<table class="pcap-table ion-u-mt-16"><thead><tr><th>IP</th><th class="text-right">Sent</th><th class="text-right">Received</th><th class="text-right">Total</th><th class="text-right">Send:Recv</th></tr></thead><tbody>${rows}</tbody></table>`;
-    }
 
-    function renderIsakmp(d) {
-        const items = d.isakmp_sessions || [];
-        const tab = document.getElementById('tab-isakmp');
-        if (!items.length) {
-            tab.style.display = 'none';
-            document.getElementById('panel-isakmp').replaceChildren();
-            return;
-        }
-        tab.style.display = '';
-        const statusClass = s => s.toLowerCase().replace(/\s+/g, '-');
-        let rows = items.map(s => {
-            const errStr = (s.errors || []).length ? `<br><span class="text-[var(--sev-critical)] text-xs">${s.errors.map(esc).join(', ')}</span>` : '';
-            return `<tr>
-                <td><span class="ike-status ${statusClass(s.status)}">${esc(s.status)}</span>${errStr}</td>
-                <td class="font-mono text-xs" title="Init: ${esc(s.init_spi)}">${esc(s.initiator || '-')}</td>
-                <td class="font-mono text-xs">${esc(s.responder || '-')}</td>
-                <td>${esc(s.ike_version)}</td>
-                <td class="text-[.78rem]">${(s.exchanges || []).map(esc).join(', ')}</td>
-                <td class="text-center">${s.initiator_packets}i / ${s.responder_packets}r</td>
-                <td class="text-center">${s.retransmits}</td>
-                <td class="text-right">${s.duration}s</td>
-            </tr>`;
-        }).join('');
-        const established = items.filter(s => s.status === 'Established').length;
-        const failed = items.filter(s => s.status === 'Failed').length;
-        const noResp = items.filter(s => s.status === 'No Response').length;
-        const incomplete = items.filter(s => s.status === 'Incomplete').length;
-        let summary = `<div class="flex gap-4 mb-3 flex-wrap">`;
-        summary += `<span><strong>${items.length}</strong> session(s)</span>`;
-        if (established) summary += `<span><span class="ike-status established">Established</span> ${established}</span>`;
-        if (failed) summary += `<span><span class="ike-status failed">Failed</span> ${failed}</span>`;
-        if (noResp) summary += `<span><span class="ike-status no-response">No Response</span> ${noResp}</span>`;
-        if (incomplete) summary += `<span><span class="ike-status incomplete">Incomplete</span> ${incomplete}</span>`;
-        summary += '</div>';
-        document.getElementById('panel-isakmp').innerHTML =
-            `<h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">ISAKMP / IKE Sessions</h3>` +
-            summary +
-            `<table class="pcap-table"><thead><tr>
-                <th>Status</th><th>Initiator</th><th>Responder</th><th>IKE Ver</th>
-                <th>Exchanges</th><th class="text-center">Packets</th>
-                <th class="text-center">Retrans</th><th class="text-right">Duration</th>
-            </tr></thead><tbody>${rows}</tbody></table>`;
-    }
 
     // ── Extracted Files ──
 
@@ -645,92 +576,10 @@
     // ── HASSH (SSH Fingerprints) ──
 
     // ── JA4 / JA4S Fingerprints (FoxIO JA4+) ──
-    function renderJA4(d) {
-        const cli = d.ja4_fingerprints || [];
-        const srv = d.ja4s_fingerprints || [];
-        const tab = document.getElementById('tab-ja4');
-        const badge = document.getElementById('ja4-count-badge');
-        const total = cli.length + srv.length;
-        if (!total) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        const badCount = cli.filter(f => f.known_malware).length;
-        badge.textContent = total;
-        badge.className = 'badge pcap-tab-badge ' + (badCount ? 'tone-critical' : 'tone-primary');
-
-        let html = `<h3>JA4 / JA4S TLS Fingerprints (${total})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">FoxIO JA4+ fingerprints. JA4 (client) and JA4S (server) are robust to TLS field reordering, unlike JA3. Known-malware matches are highlighted.</p>`;
-        if (cli.length) {
-            html += `<h4 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">JA4 Client (${cli.length})</h4>
-            <table class="pcap-table"><thead><tr><th>JA4</th><th>SNI</th><th>Source</th><th>Destination</th><th>Malware Match</th></tr></thead><tbody>
-            ${cli.map(f => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
-                <td><code class="text-[.72rem]">${esc(f.ja4)}</code></td>
-                <td>${esc(f.sni || '-')}</td>
-                <td>${esc(f.src_ip)}</td>
-                <td>${esc(f.dst_ip)}${f.dst_port ? ':' + f.dst_port : ''}</td>
-                <td>${f.known_malware ? `<span class="text-[var(--sev-critical)] font-bold">${esc(f.known_malware)}</span>` : '<span class="text-[var(--text-secondary)]">No match</span>'}</td>
-            </tr>`).join('')}
-            </tbody></table>`;
-        }
-        if (srv.length) {
-            html += `<h4 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">JA4S Server (${srv.length})</h4>
-            <table class="pcap-table"><thead><tr><th>JA4S</th><th>Server</th><th>Client</th><th>Port</th></tr></thead><tbody>
-            ${srv.map(f => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
-                <td><code class="text-[.72rem]">${esc(f.ja4s)}</code></td>
-                <td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td><td>${f.src_port || '-'}</td>
-            </tr>`).join('')}
-            </tbody></table>`;
-        }
-        document.getElementById('panel-ja4').innerHTML = html;
-    }
 
     // ── TLS Certificates ──
-    function renderCerts(d) {
-        const certs = d.tls_certificates || [];
-        const tab = document.getElementById('tab-certs');
-        const badge = document.getElementById('certs-count-badge');
-        if (!certs.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        const flagged = certs.filter(c => c.self_signed).length;
-        badge.textContent = certs.length;
-        badge.className = 'badge pcap-tab-badge ' + (flagged ? 'tone-medium' : 'tone-primary');
-        document.getElementById('panel-certs').innerHTML = `<h3>TLS Certificates (${certs.length})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">Leaf X.509 certificates carved from TLS server handshakes. Self-signed and known-malicious (e.g. Cobalt Strike) certs are flagged.</p>
-        <table class="pcap-table"><thead><tr><th>Server</th><th>Subject</th><th>Issuer</th><th>Self-signed</th><th>Validity</th><th>Serial</th></tr></thead><tbody>
-        ${certs.map(c => `<tr>
-            <td>${esc(c.server_ip || '-')}</td>
-            <td class="font-mono">${esc(c.subject || '-')}</td>
-            <td class="font-mono">${esc(c.issuer || '-')}</td>
-            <td>${c.self_signed ? '<span class="text-[var(--sev-critical)] font-bold">yes</span>' : '<span class="text-[var(--text-secondary)]">no</span>'}</td>
-            <td>${c.validity_days != null ? Math.round(c.validity_days / 365) + 'y' : '-'}</td>
-            <td><code class="text-[.72rem]">${esc(c.serial || '-')}</code></td>
-        </tr>`).join('')}
-        </tbody></table>`;
-    }
 
     // ── Host Profiles (OS fingerprint + role rollup) ──
-    function renderHosts(d) {
-        const hosts = d.host_profiles || [];
-        const tab = document.getElementById('tab-hosts');
-        const badge = document.getElementById('hosts-count-badge');
-        if (!hosts.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        badge.textContent = hosts.length;
-        badge.className = 'badge pcap-tab-badge tone-info';
-        document.getElementById('panel-hosts').innerHTML = `<h3>Host Profiles (${hosts.length})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">Per-host rollup: passive OS fingerprint (p0f-style, from TCP SYN), client/server role, fingerprints, SNIs, beacons, and finding count.</p>
-        <table class="pcap-table"><thead><tr><th>Host</th><th>OS</th><th>Role</th><th>Sent</th><th>Received</th><th>SNIs</th><th>Beacons</th><th>Findings</th></tr></thead><tbody>
-        ${hosts.map(h => `<tr>
-            <td><strong>${esc(h.ip)}</strong></td>
-            <td>${esc(h.os || '-')}${h.os_evidence ? ` <span class="text-[.78rem]">(${esc(h.os_evidence)})</span>` : ''}</td>
-            <td>${(h.role || []).map(r => esc(r)).join(', ')}</td>
-            <td class="text-right">${fmtBytes(h.sent || 0)}</td>
-            <td class="text-right">${fmtBytes(h.received || 0)}</td>
-            <td class="text-[.78rem]">${(h.snis || []).slice(0, 4).map(s => esc(s)).join(', ') || '-'}</td>
-            <td class="text-right">${h.beacons || 0}</td>
-            <td class="text-right">${h.findings || 0}</td>
-        </tr>`).join('')}
-        </tbody></table>`;
-    }
 
     // ── Beaconing (RITA-style scoring) ──
 
@@ -745,45 +594,7 @@
     // ── Base64 Payloads ──
 
     // ── Network Graph (vis-network) ──
-    function renderStreams(d) {
-        const items = d.tcp_streams || [];
-        const tab = document.getElementById('tab-streams');
-        const badge = document.getElementById('streams-count-badge');
-        if (!items.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        badge.className = 'badge pcap-tab-badge tone-info';
-        badge.textContent = items.length;
-        const rows = items.map(s => `
-            <details class="stream-item">
-                <summary><code>${esc(s.src)}:${s.sport} → ${esc(s.dst)}:${s.dport}</code>
-                    <span class="stream-size">${fmtBytes(s.size)}${s.truncated ? ' · truncated' : ''}</span></summary>
-                <pre class="stream-preview">${esc(s.preview)}</pre>
-            </details>`).join('');
-        document.getElementById('panel-streams').innerHTML =
-            `<h3>TCP Streams (${items.length})</h3>` +
-            `<p class="findings-hint">Top conversations by size — expand to follow the reassembled payload.</p>` + rows;
-    }
 
-    function renderEmail(d) {
-        const items = d.email_messages || [];
-        const tab = document.getElementById('tab-email');
-        const badge = document.getElementById('email-count-badge');
-        if (!items.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        badge.className = 'badge pcap-tab-badge tone-info';
-        badge.textContent = items.length;
-        const DANGER = /\.(exe|scr|com|pif|js|jse|vbs|vbe|wsf|hta|jar|lnk|bat|cmd|ps1|docm|xlsm|pptm|iso|img|cpl|msi|dll)$/i;
-        const rows = items.map(m => `<tr>
-            <td>${esc(m.protocol || '')}</td>
-            <td>${esc(m.mail_from || '')}</td>
-            <td>${(m.rcpt_to || []).map(esc).join(', ')}</td>
-            <td>${esc(m.subject || '')}</td>
-            <td>${(m.attachments || []).map(a => DANGER.test(a) ? `<span class="attach-bad">${esc(a)}</span>` : esc(a)).join(', ')}</td>
-        </tr>`).join('');
-        document.getElementById('panel-email').innerHTML =
-            `<h3>Email Messages (${items.length})</h3>` +
-            `<table class="pcap-table"><thead><tr><th>Proto</th><th>From</th><th>To</th><th>Subject</th><th>Attachments</th></tr></thead><tbody>${rows}</tbody></table>`;
-    }
 
     function renderNetworkGraph(d) {
         const graph = d.network_graph || {};

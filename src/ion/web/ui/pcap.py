@@ -768,3 +768,436 @@ def pcap_tables_fragment(
     if refusal is not None:
         view["error"] = refusal
     return render_view(request, TABLES_FRAGMENT, view)
+
+
+# ---------------------------------------------------------------------------
+# The seven panels the registry could not take
+# ---------------------------------------------------------------------------
+#
+# Each of these has real logic rather than a list of columns.
+#
+# THE EXFILTRATION FLAG COULD NOT FIRE ON THE CLEAREST EXFILTRATION SHAPE
+#
+#     const exfil = i.received > 0 && i.sent / i.received > 3
+#                   && i.sent > 100000;
+#
+# The `received > 0` guard is there so the division is safe, and the cost
+# of it is that a host which sent a great deal and received nothing never
+# trips the flag. All outbound and no inbound is the shape the heuristic
+# exists to catch. The ratio column already prints an infinity sign for
+# exactly that case, so the data is right there in the same row; only the
+# flag could not say so. A host with no `received` recorded at all fails
+# the same test for the same reason, and reads as unremarkable.
+#
+# The rule here keeps the ratio and the floor and adds the degenerate
+# case: a host over the floor with no inbound at all is at least as
+# interesting as one over the ratio.
+#
+# A MISSING IKE STATUS TOOK THE PANEL DOWN
+#
+#     const statusClass = s => s.toLowerCase().replace(/\s+/g, '-');
+#
+# `undefined.toLowerCase()` throws, and it throws inside the map that
+# builds every row, so one session with no status cost the whole panel.
+# The status also went into a class attribute, where only four values
+# style anything, and the four summary counts compared exact strings, so a
+# session with a fifth status was counted nowhere and the counts summed to
+# less than the total with nothing to say so.
+
+DETAIL_FRAGMENT = "_fragments/pcap_detail.html"
+
+#: Outbound/inbound ratio above which a host is called exfiltration-shaped.
+EXFIL_RATIO = 3.0
+
+#: Bytes sent below which the ratio is not interesting, however lopsided.
+EXFIL_FLOOR = 100000
+
+#: How many hosts the data-transfer panel shows, from slice(0, 20).
+DATA_ROWS = 20
+
+#: How many SNIs a host profile lists, from slice(0, 4).
+HOST_SNIS = 4
+
+#: The IKE statuses the stylesheet has a class for. A status outside this
+#: set keeps its text and takes no class.
+IKE_STATUS_CLASSES: dict[str, str] = {
+    "Established": "established",
+    "Failed": "failed",
+    "No Response": "no-response",
+    "Incomplete": "incomplete",
+}
+
+#: Attachment extensions the email panel marks. This is a detection list,
+#: so it lives here where a test can exercise it rather than in a regex
+#: literal inside a template's script block.
+DANGEROUS_ATTACHMENTS = __import__("re").compile(
+    r"\.(exe|scr|com|pif|js|jse|vbs|vbe|wsf|hta|jar|lnk|bat|cmd|ps1"
+    r"|docm|xlsm|pptm|iso|img|cpl|msi|dll)$",
+    __import__("re").IGNORECASE,
+)
+
+
+def _strings(value: Any, limit: Optional[int] = None) -> Optional[list[str]]:
+    """A list of strings, or None when the payload is not a list."""
+    if not isinstance(value, list):
+        return None
+    out = [t for t in (_text(v) if isinstance(v, str) else _text(str(v))
+                       for v in value) if t]
+    return out[:limit] if limit else out
+
+
+class DataRow(TypedDict):
+    ip: str
+    sent: Optional[str]
+    received: Optional[str]
+    total: Optional[str]
+    ratio: Optional[str]
+    sent_pct: Optional[float]
+    recv_pct: Optional[float]
+    exfil: bool
+    exfil_reason: Optional[str]
+
+
+def exfil_shape(sent: Optional[float],
+                received: Optional[float]) -> tuple[bool, Optional[str]]:
+    """Whether a host's traffic is exfiltration-shaped, and why.
+
+    `i.received > 0 && i.sent / i.received > 3` could not fire when
+    `received` was zero or absent, which is the most lopsided case there
+    is.
+    """
+    if sent is None or sent <= EXFIL_FLOOR:
+        return False, None
+    if received is None:
+        return True, ("%s sent and no inbound figure recorded, so the "
+                      "ratio cannot be computed" % (bytes_label(sent) or
+                                                    "a large volume"))
+    if received <= 0:
+        return True, ("%s sent and nothing received"
+                      % (bytes_label(sent) or "a large volume"))
+    if sent / received > EXFIL_RATIO:
+        return True, ("%.1f times more sent than received"
+                      % (sent / received))
+    return False, None
+
+
+def data_rows(raw: Any) -> Optional[list[DataRow]]:
+    if not isinstance(raw, list):
+        return None
+    entries = [e for e in raw[:DATA_ROWS] if isinstance(e, dict)]
+    pairs = [(_num(e.get("sent")), _num(e.get("received")))
+             for e in entries]
+    totals = [s + r for s, r in pairs if s is not None and r is not None]
+    top = max(totals) if totals else 0.0
+    out: list[DataRow] = []
+    for entry, (sent, received) in zip(entries, pairs):
+        total = (None if sent is None or received is None else sent + received)
+        exfil, reason = exfil_shape(sent, received)
+        if received is None or received <= 0:
+            ratio = None if sent is None else "\u221e"
+        else:
+            ratio = "%.1f:1" % ((sent or 0) / received)
+        out.append({
+            "ip": _text(entry.get("ip")) or "unrecorded host",
+            "sent": bytes_label(sent),
+            "received": bytes_label(received),
+            "total": bytes_label(total),
+            "ratio": ratio,
+            "sent_pct": (None if sent is None or top <= 0
+                         else round(sent / top * 100, 1)),
+            "recv_pct": (None if received is None or top <= 0
+                         else round(received / top * 100, 1)),
+            "exfil": exfil,
+            "exfil_reason": reason,
+        })
+    return out
+
+
+class IkeRow(TypedDict):
+    status: Optional[str]
+    status_class: Optional[str]
+    errors: Optional[list[str]]
+    initiator: Optional[str]
+    init_spi: Optional[str]
+    responder: Optional[str]
+    version: Optional[str]
+    exchanges: Optional[list[str]]
+    packets: Optional[str]
+    retransmits: Optional[int]
+    duration: Optional[str]
+
+
+def ike_rows(raw: Any) -> Optional[list[IkeRow]]:
+    if not isinstance(raw, list):
+        return None
+    out: list[IkeRow] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        status = _text(entry.get("status"))
+        initiator_packets = _int(entry.get("initiator_packets"))
+        responder_packets = _int(entry.get("responder_packets"))
+        duration = _num(entry.get("duration"))
+        out.append({
+            "status": status,
+            # None when the stylesheet has no class for it, so a payload
+            # value never reaches the class attribute.
+            "status_class": IKE_STATUS_CLASSES.get(status or ""),
+            "errors": _strings(entry.get("errors")),
+            "initiator": _text(entry.get("initiator")),
+            "init_spi": _text(entry.get("init_spi")),
+            "responder": _text(entry.get("responder")),
+            "version": _text(entry.get("ike_version")),
+            "exchanges": _strings(entry.get("exchanges")),
+            "packets": (None if initiator_packets is None
+                        or responder_packets is None else
+                        "%di / %dr" % (initiator_packets, responder_packets)),
+            "retransmits": _int(entry.get("retransmits")),
+            "duration": (None if duration is None else "%gs" % duration),
+        })
+    return out
+
+
+def ike_summary(rows: list[IkeRow]) -> list[dict]:
+    """The status tally.
+
+    The page counted four exact strings, so a session with any other
+    status was counted nowhere and the tally silently fell short of the
+    total.
+    """
+    out = []
+    for label, css in IKE_STATUS_CLASSES.items():
+        count = sum(1 for r in rows if r["status"] == label)
+        if count:
+            out.append({"label": label, "css_class": css, "count": count})
+    other = sum(1 for r in rows if r["status"] not in IKE_STATUS_CLASSES)
+    if other:
+        out.append({"label": "not categorised", "css_class": None,
+                    "count": other})
+    return out
+
+
+class CertRow(TypedDict):
+    server: Optional[str]
+    subject: Optional[str]
+    issuer: Optional[str]
+    self_signed: Optional[bool]
+    validity: Optional[str]
+    serial: Optional[str]
+
+
+def cert_rows(raw: Any) -> Optional[list[CertRow]]:
+    if not isinstance(raw, list):
+        return None
+    out: list[CertRow] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        days = _num(entry.get("validity_days"))
+        signed = entry.get("self_signed")
+        out.append({
+            "server": _text(entry.get("server_ip")),
+            "subject": _text(entry.get("subject")),
+            "issuer": _text(entry.get("issuer")),
+            # None keeps "not recorded" apart from a recorded false.
+            "self_signed": (signed if isinstance(signed, bool) else None),
+            "validity": (None if days is None
+                         else "%dy" % round(days / 365)),
+            "serial": _text(entry.get("serial")),
+        })
+    return out
+
+
+class HostRow(TypedDict):
+    ip: Optional[str]
+    os: Optional[str]
+    os_evidence: Optional[str]
+    role: Optional[list[str]]
+    sent: Optional[str]
+    received: Optional[str]
+    snis: Optional[list[str]]
+    beacons: Optional[int]
+    findings: Optional[int]
+
+
+def host_rows(raw: Any) -> Optional[list[HostRow]]:
+    if not isinstance(raw, list):
+        return None
+    out: list[HostRow] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        out.append({
+            "ip": _text(entry.get("ip")),
+            "os": _text(entry.get("os")),
+            "os_evidence": _text(entry.get("os_evidence")),
+            "role": _strings(entry.get("role")),
+            # `fmtBytes(h.sent || 0)` reported a host with no recorded
+            # volume as having sent nothing.
+            "sent": bytes_label(entry.get("sent")),
+            "received": bytes_label(entry.get("received")),
+            "snis": _strings(entry.get("snis"), HOST_SNIS),
+            "beacons": _int(entry.get("beacons")),
+            "findings": _int(entry.get("findings")),
+        })
+    return out
+
+
+class StreamRow(TypedDict):
+    source: Optional[str]
+    destination: Optional[str]
+    size: Optional[str]
+    truncated: bool
+    preview: Optional[str]
+
+
+def _endpoint(host: Any, port: Any) -> Optional[str]:
+    name = _text(host)
+    number = _int(port)
+    if name is None:
+        return None
+    return name if number is None else "%s:%d" % (name, number)
+
+
+def stream_rows(raw: Any) -> Optional[list[StreamRow]]:
+    if not isinstance(raw, list):
+        return None
+    out: list[StreamRow] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        out.append({
+            "source": _endpoint(entry.get("src"), entry.get("sport")),
+            "destination": _endpoint(entry.get("dst"), entry.get("dport")),
+            "size": bytes_label(entry.get("size")),
+            "truncated": entry.get("truncated") is True,
+            "preview": (entry.get("preview")
+                        if isinstance(entry.get("preview"), str) else None),
+        })
+    return out
+
+
+class Attachment(TypedDict):
+    name: str
+    dangerous: bool
+
+
+class EmailRow(TypedDict):
+    protocol: Optional[str]
+    mail_from: Optional[str]
+    rcpt_to: Optional[list[str]]
+    subject: Optional[str]
+    attachments: Optional[list[Attachment]]
+
+
+def email_rows(raw: Any) -> Optional[list[EmailRow]]:
+    if not isinstance(raw, list):
+        return None
+    out: list[EmailRow] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        names = _strings(entry.get("attachments"))
+        out.append({
+            "protocol": _text(entry.get("protocol")),
+            "mail_from": _text(entry.get("mail_from")),
+            "rcpt_to": _strings(entry.get("rcpt_to")),
+            "subject": _text(entry.get("subject")),
+            # None when the list was not readable. `m.attachments || []`
+            # drew that as no attachments, on the one column that marks a
+            # dangerous extension.
+            "attachments": (None if names is None else
+                            [{"name": n,
+                              "dangerous": bool(
+                                  DANGEROUS_ATTACHMENTS.search(n))}
+                             for n in names]),
+        })
+    return out
+
+
+class DetailView(TypedDict):
+    state: str
+    error: Optional[str]
+    data_total: Optional[str]
+    data: Optional[list[DataRow]]
+    ike: Optional[list[IkeRow]]
+    ike_summary: list[dict]
+    certs: Optional[list[CertRow]]
+    hosts: Optional[list[HostRow]]
+    streams: Optional[list[StreamRow]]
+    emails: Optional[list[EmailRow]]
+    ja4: Optional[list[dict]]
+
+
+def ja4_rows(raw: Any) -> Optional[list[dict]]:
+    """JA4 and JA4S share one panel in the page, each with its own set of
+    columns, so the registry could not describe it."""
+    if not isinstance(raw, list):
+        return None
+    out = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        malware = _text(entry.get("known_malware"))
+        out.append({
+            "ja4": _text(entry.get("ja4")),
+            "sni": _text(entry.get("sni")),
+            "src_ip": _text(entry.get("src_ip")),
+            "dst": _endpoint(entry.get("dst_ip"), entry.get("dst_port")),
+            "ja4s": _text(entry.get("ja4s")),
+            "server": _text(entry.get("server_ip")),
+            "client": _text(entry.get("client_ip")),
+            "port": _int(entry.get("port")),
+            "malware": malware,
+        })
+    return out
+
+
+def detail_view(job: Any) -> DetailView:
+    empty: DetailView = {
+        "state": "failed", "error": (_text(job.get("error"))
+                                     if isinstance(job, dict) else None),
+        "data_total": None, "data": None, "ike": None, "ike_summary": [],
+        "certs": None, "hosts": None, "streams": None, "emails": None,
+        "ja4": None,
+    }
+    if not isinstance(job, dict) or not isinstance(job.get("result"), dict):
+        return empty
+    result = job["result"]
+    transfer = result.get("data_transfer")
+    transfer = transfer if isinstance(transfer, dict) else {}
+    ike = ike_rows(result.get("isakmp_sessions"))
+    return {
+        "state": "data",
+        "error": None,
+        # `fmtBytes(dt.total_bytes || 0)` printed "Total: 0 B" for a
+        # capture whose total was not recorded.
+        "data_total": bytes_label(transfer.get("total_bytes")),
+        "data": data_rows(transfer.get("by_ip")),
+        "ike": ike,
+        "ike_summary": ike_summary(ike or []),
+        "certs": cert_rows(result.get("tls_certificates")),
+        "hosts": host_rows(result.get("host_profiles")),
+        "streams": stream_rows(result.get("tcp_streams")),
+        "emails": email_rows(result.get("email_messages")),
+        "ja4": ja4_rows(result.get("ja4_fingerprints")),
+    }
+
+
+@router.get(
+    "/pcap/{job_id}/detail",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+def pcap_detail_fragment(
+    request: Request,
+    job_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> Response:
+    """The seven panels with logic of their own."""
+    job, refusal = _job(job_id, current_user, session)
+    view = detail_view(job)
+    if refusal is not None:
+        view["error"] = refusal
+    return render_view(request, DETAIL_FRAGMENT, view)

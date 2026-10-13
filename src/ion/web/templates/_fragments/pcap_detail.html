@@ -1,0 +1,297 @@
+{% macro fig(value, why) %}
+{%- if value is not none %}{{ value }}
+{%- else %}<span class="an-absent" title="{{ why }}"></span>{% endif %}
+{% endmacro %}
+{% macro unreadable(what) %}
+<p class="text-[var(--text-secondary)] text-[.85rem] p-5">The {{ what }} is
+  not in a shape this page can read, so whether the capture held any is
+  unknown.</p>
+{% endmacro %}
+{# The seven pcap panels with logic of their own, from ui/pcap.py.
+
+   The exfiltration flag was
+   `i.received > 0 && i.sent / i.received > 3 && i.sent > 100000`, so a
+   host that sent a great deal and received nothing could never trip it,
+   which is the most lopsided shape there is. The ratio column already
+   printed an infinity sign for that case; only the flag could not say so.
+#}
+{%- if state != 'data' %}
+<div id="panel-data" class="pcap-panel" hx-swap-oob="innerHTML:#panel-data">
+  <div class="pcap-empty">
+    {%- if error %}{{ error }}
+    {%- else %}This analysis could not be read.{% endif %}
+  </div>
+</div>
+{%- else %}
+<div id="panel-data" class="pcap-panel" hx-swap-oob="innerHTML:#panel-data">
+  {%- if data is none %}{{ unreadable('data transfer breakdown') }}
+  {%- elif not data %}
+  <p class="text-[var(--text-secondary)] text-[.85rem] p-5">No data
+    transfer information.</p>
+  {%- else %}
+  <h3 class="mt-0 mr-0 mb-1 ml-0 text-[.95rem]">Data Transfer</h3>
+  <p class="text-[var(--text-secondary)] text-[.82rem] mt-0 mr-0 mb-3 ml-0">
+    Total: {{ fig(data_total, 'No total was recorded for this capture') }}</p>
+  <div class="dt-legend">
+    <span class="dt-l-sent">Sent (outbound)</span>
+    <span class="dt-l-recv">Received (inbound)</span>
+  </div>
+  {%- for r in data %}
+  <div class="dt-row">
+    <div class="dt-ip" title="{{ r.ip }}">{{ r.ip }}</div>
+    <div class="dt-track">
+      {%- if r.sent_pct is not none %}
+      <div class="dt-sent" data-ion-style="width:{{ r.sent_pct }}%"></div>
+      {%- endif %}
+      {%- if r.recv_pct is not none %}
+      <div class="dt-recv" data-ion-style="width:{{ r.recv_pct }}%"></div>
+      {%- endif %}
+    </div>
+    <div class="dt-vals">
+      {{- fig(r.total, 'This host carried no readable volume') }} &middot;
+      <span class="{% if r.exfil %}dt-exfil{% endif %}"
+            {% if r.exfil_reason %}title="{{ r.exfil_reason }}"{% endif %}>
+        {{- fig(r.ratio, 'No outbound figure was recorded') -}}
+      </span>
+    </div>
+  </div>
+  {%- endfor %}
+  <table class="pcap-table ion-u-mt-16">
+    <thead><tr><th>IP</th><th class="text-right">Sent</th>
+      <th class="text-right">Received</th><th class="text-right">Total</th>
+      <th class="text-right">Send:Recv</th></tr></thead>
+    <tbody>
+      {%- for r in data %}
+      <tr>
+        <td class="font-mono">{{ r.ip }}</td>
+        <td class="text-right">{{ fig(r.sent, 'Not recorded') }}</td>
+        <td class="text-right">{{ fig(r.received, 'Not recorded') }}</td>
+        <td class="text-right">{{ fig(r.total, 'Not recorded') }}</td>
+        <td class="text-right">{{ fig(r.ratio, 'Not recorded') }}</td>
+      </tr>
+      {%- endfor %}
+    </tbody>
+  </table>
+  {%- endif %}
+</div>
+<div id="panel-isakmp" class="pcap-panel" hx-swap-oob="innerHTML:#panel-isakmp">
+  {%- if ike is none %}{{ unreadable('ISAKMP session list') }}
+  {%- elif not ike %}
+  <p class="text-[var(--text-secondary)] text-[.85rem] p-5">No ISAKMP
+    sessions in this capture.</p>
+  {%- else %}
+  <h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">ISAKMP / IKE Sessions</h3>
+  <div class="flex gap-4 mb-3 flex-wrap">
+    <span><strong>{{ ike | length }}</strong> session(s)</span>
+    {#- A status outside the four was counted nowhere, so the tally fell
+        short of the total with nothing to say so. -#}
+    {%- for s in ike_summary %}
+    <span>
+      {%- if s.css_class %}<span class="ike-status {{ s.css_class }}">{{ s.label }}</span>
+      {%- else %}<span class="ike-status">{{ s.label }}</span>{% endif %}
+      {{ s.count }}</span>
+    {%- endfor %}
+  </div>
+  <table class="pcap-table">
+    <thead><tr>
+      <th>Status</th><th>Initiator</th><th>Responder</th><th>IKE Ver</th>
+      <th>Exchanges</th><th class="text-center">Packets</th>
+      <th class="text-center">Retrans</th><th class="text-right">Duration</th>
+    </tr></thead>
+    <tbody>
+      {%- for s in ike %}
+      <tr>
+        <td>
+          {#- The class comes from a fixed set, not from the payload. -#}
+          {%- if s.status is none %}
+          <span class="an-absent" title="This session recorded no status"></span>
+          {%- else %}
+          <span class="ike-status {{ s.status_class or '' }}">{{ s.status }}</span>
+          {%- endif %}
+          {%- if s.errors %}<br><span class="text-[var(--sev-critical)] text-xs">
+            {{- s.errors | join(', ') -}}</span>{% endif %}
+        </td>
+        <td class="font-mono text-xs"
+            {% if s.init_spi %}title="Init: {{ s.init_spi }}"{% endif %}>
+          {{- s.initiator or '-' -}}</td>
+        <td class="font-mono text-xs">{{ s.responder or '-' }}</td>
+        <td>{{ fig(s.version, 'No IKE version recorded') }}</td>
+        <td class="text-[.78rem]">
+          {%- if s.exchanges is none %}<span class="an-absent"
+              title="Not a readable list"></span>
+          {%- else %}{{ s.exchanges | join(', ') }}{% endif %}</td>
+        <td class="text-center">{{ fig(s.packets, 'No packet counts recorded') }}</td>
+        <td class="text-center">{{ fig(s.retransmits, 'Not recorded') }}</td>
+        <td class="text-right">{{ fig(s.duration, 'Not recorded') }}</td>
+      </tr>
+      {%- endfor %}
+    </tbody>
+  </table>
+  {%- endif %}
+</div>
+<div id="panel-certs" class="pcap-panel" hx-swap-oob="innerHTML:#panel-certs">
+  {%- if certs is none %}{{ unreadable('certificate list') }}
+  {%- elif not certs %}
+  <p class="text-[var(--text-secondary)] text-[.85rem] p-5">No TLS
+    certificates captured.</p>
+  {%- else %}
+  <h3>TLS Certificates ({{ certs | length }})</h3>
+  <table class="pcap-table">
+    <thead><tr><th>Server</th><th>Subject</th><th>Issuer</th>
+      <th>Self-signed</th><th>Validity</th><th>Serial</th></tr></thead>
+    <tbody>
+      {%- for c in certs %}
+      <tr>
+        <td>{{ c.server or '-' }}</td>
+        <td>{{ c.subject or '-' }}</td>
+        <td>{{ c.issuer or '-' }}</td>
+        <td>
+          {%- if c.self_signed is none %}<span class="an-absent"
+              title="Not recorded"></span>
+          {%- elif c.self_signed %}<span class="pcap-cert-selfsigned">yes</span>
+          {%- else %}<span class="pcap-cert-ca">no</span>{% endif %}
+        </td>
+        <td>{{ fig(c.validity, 'No validity period recorded') }}</td>
+        <td><code class="text-[.72rem]">{{ c.serial or '-' }}</code></td>
+      </tr>
+      {%- endfor %}
+    </tbody>
+  </table>
+  {%- endif %}
+</div>
+<div id="panel-hosts" class="pcap-panel" hx-swap-oob="innerHTML:#panel-hosts">
+  {%- if hosts is none %}{{ unreadable('host profile list') }}
+  {%- elif not hosts %}
+  <p class="text-[var(--text-secondary)] text-[.85rem] p-5">No host
+    profiles built for this capture.</p>
+  {%- else %}
+  <h3>Host Profiles ({{ hosts | length }})</h3>
+  <table class="pcap-table">
+    <thead><tr><th>Host</th><th>OS</th><th>Role</th>
+      <th class="text-right">Sent</th><th class="text-right">Received</th>
+      <th>SNIs</th><th class="text-right">Beacons</th>
+      <th class="text-right">Findings</th></tr></thead>
+    <tbody>
+      {%- for h in hosts %}
+      <tr>
+        <td><strong>{{ fig(h.ip, 'No address recorded') }}</strong></td>
+        <td>{{ h.os or '-' }}
+          {%- if h.os_evidence %} <span class="text-[.78rem]">({{ h.os_evidence }})</span>{% endif %}</td>
+        <td>
+          {%- if h.role is none %}<span class="an-absent"
+              title="Not a readable list"></span>
+          {%- else %}{{ h.role | join(', ') or '-' }}{% endif %}</td>
+        <td class="text-right">{{ fig(h.sent, 'No outbound volume recorded') }}</td>
+        <td class="text-right">{{ fig(h.received, 'No inbound volume recorded') }}</td>
+        <td>
+          {%- if h.snis is none %}<span class="an-absent"
+              title="Not a readable list"></span>
+          {%- else %}{{ h.snis | join(', ') or '-' }}{% endif %}</td>
+        <td class="text-right">{{ fig(h.beacons, 'No beacon count recorded') }}</td>
+        <td class="text-right">{{ fig(h.findings, 'No finding count recorded') }}</td>
+      </tr>
+      {%- endfor %}
+    </tbody>
+  </table>
+  {%- endif %}
+</div>
+<div id="panel-streams" class="pcap-panel" hx-swap-oob="innerHTML:#panel-streams">
+  {%- if streams is none %}{{ unreadable('stream list') }}
+  {%- elif not streams %}
+  <p class="text-[var(--text-secondary)] text-[.85rem] p-5">No reassembled
+    TCP streams.</p>
+  {%- else %}
+  <h3>TCP Streams ({{ streams | length }})</h3>
+  <p class="findings-hint">Top conversations by size. Expand to follow the
+    reassembled payload.</p>
+  {%- for s in streams %}
+  <details class="stream-item">
+    <summary>
+      <code>{{ fig(s.source, 'No source recorded') }} &rarr;
+        {{ fig(s.destination, 'No destination recorded') }}</code>
+      <span class="stream-size">
+        {{- fig(s.size, 'No size recorded') }}
+        {%- if s.truncated %} &middot; truncated{% endif %}</span>
+    </summary>
+    <pre class="stream-preview">
+      {%- if s.preview is not none %}{{ s.preview }}
+      {%- else %}No payload preview was stored for this stream.{% endif %}
+    </pre>
+  </details>
+  {%- endfor %}
+  {%- endif %}
+</div>
+<div id="panel-email" class="pcap-panel" hx-swap-oob="innerHTML:#panel-email">
+  {%- if emails is none %}{{ unreadable('message list') }}
+  {%- elif not emails %}
+  <p class="text-[var(--text-secondary)] text-[.85rem] p-5">No email
+    messages in this capture.</p>
+  {%- else %}
+  <h3>Email Messages ({{ emails | length }})</h3>
+  <table class="pcap-table">
+    <thead><tr><th>Proto</th><th>From</th><th>To</th><th>Subject</th>
+      <th>Attachments</th></tr></thead>
+    <tbody>
+      {%- for m in emails %}
+      <tr>
+        <td>{{ fig(m.protocol, 'Not recorded') }}</td>
+        <td>{{ fig(m.mail_from, 'No sender recorded') }}</td>
+        <td>
+          {%- if m.rcpt_to is none %}<span class="an-absent"
+              title="Not a readable list"></span>
+          {%- else %}{{ m.rcpt_to | join(', ') or '-' }}{% endif %}</td>
+        <td>{{ fig(m.subject, 'No subject recorded') }}</td>
+        <td>
+          {#- None means the list was not readable. Drawing that as an
+              empty cell would hide a dangerous attachment. -#}
+          {%- if m.attachments is none %}
+          <span class="an-absent"
+                title="The attachment list is not readable, so a dangerous
+                       attachment could not be marked"></span>
+          {%- elif not m.attachments %}-
+          {%- else %}
+          {%- for a in m.attachments %}
+          {%- if not loop.first %}, {% endif %}
+          {%- if a.dangerous %}<span class="attach-bad">{{ a.name }}</span>
+          {%- else %}{{ a.name }}{% endif %}
+          {%- endfor %}
+          {%- endif %}
+        </td>
+      </tr>
+      {%- endfor %}
+    </tbody>
+  </table>
+  {%- endif %}
+</div>
+<div id="panel-ja4" class="pcap-panel" hx-swap-oob="innerHTML:#panel-ja4">
+  {%- if ja4 is none %}{{ unreadable('JA4 fingerprint list') }}
+  {%- elif not ja4 %}
+  <p class="text-[var(--text-secondary)] text-[.85rem] p-5">No JA4
+    fingerprints captured.</p>
+  {%- else %}
+  <h3>JA4 / JA4S TLS Fingerprints ({{ ja4 | length }})</h3>
+  <table class="pcap-table">
+    <thead><tr><th>JA4</th><th>SNI</th><th>Source</th><th>Destination</th>
+      <th>Malware Match</th><th>JA4S</th><th>Server</th><th>Client</th>
+      <th>Port</th></tr></thead>
+    <tbody>
+      {%- for f in ja4 %}
+      <tr>
+        <td><code class="text-[.72rem]">{{ f.ja4 or '-' }}</code></td>
+        <td>{{ f.sni or '-' }}</td>
+        <td>{{ f.src_ip or '-' }}</td>
+        <td>{{ f.dst or '-' }}</td>
+        <td>
+          {%- if f.malware %}<span class="pcap-malware-hit">{{ f.malware }}</span>
+          {%- else %}<span class="pcap-malware-clean">clean</span>{% endif %}</td>
+        <td><code class="text-[.72rem]">{{ f.ja4s or '-' }}</code></td>
+        <td>{{ f.server or '-' }}</td>
+        <td>{{ f.client or '-' }}</td>
+        <td>{{ fig(f.port, 'Not recorded') }}</td>
+      </tr>
+      {%- endfor %}
+    </tbody>
+  </table>
+  {%- endif %}
+</div>
+{%- endif %}
