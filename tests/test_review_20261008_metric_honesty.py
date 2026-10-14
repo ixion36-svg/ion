@@ -317,12 +317,48 @@ class TestCaseAgePanelIsNotCalledSla:
     def test_the_panel_heading_no_longer_claims_an_sla(self):
         assert "SLA / Case Age" not in self._cases_template
 
+    @property
+    def _summary_fragment(self) -> str:
+        return (
+            Path(__file__).resolve().parent.parent
+            / "src" / "ion" / "web" / "templates" / "_fragments"
+            / "cases_summary.html"
+        ).read_text(encoding="utf-8")
+
+    @property
+    def _cases_module(self) -> str:
+        return (
+            Path(__file__).resolve().parent.parent
+            / "src" / "ion" / "web" / "ui" / "cases.py"
+        ).read_text(encoding="utf-8")
+
     def test_the_panel_says_what_it_actually_measures(self):
-        template = self._cases_template
-        assert "Open Case Age" in template
-        assert "not an SLA policy" in template
+        """The panel is server-rendered now, so the wording is the
+        fragment's. Both halves are asserted: the heading names age, and
+        the line under it denies the policy, because a heading on its own
+        still invites the reader to assume one."""
+        fragment = self._summary_fragment
+        assert "Open Case Age" in fragment
+        assert "not an SLA policy" in fragment
+        assert "SLA / Case Age" not in fragment
 
     def test_the_colour_helper_is_named_for_age(self):
-        template = self._cases_template
-        assert "getCaseAgeColor" in template
-        assert "getSLAColor" not in template
+        """getCaseAgeColor was the renamed client helper. The bands are
+        age_band in ui/cases.py now, and the old name is asserted gone from
+        the module as well as the page."""
+        module = self._cases_module
+        assert "def age_band(" in module
+        assert "getSLAColor" not in module
+        assert "getSLAColor" not in self._cases_template
+
+    def test_an_unknown_age_is_not_painted_as_the_oldest_band(self):
+        """The defect behind the rename, and the reason this panel is worth
+        a test at all. getCaseAgeColor(NaN) fell through every `<`
+        comparison to the last return, so a case with no usable created_at
+        was drawn as if it were over a week old. Not knowing how old a case
+        is and knowing it is ancient are different findings, and the server
+        counts them separately."""
+        module = self._cases_module
+        assert "unknown" in module
+        assert "oldest_days" in module
+        assert "unknown" in self._summary_fragment
