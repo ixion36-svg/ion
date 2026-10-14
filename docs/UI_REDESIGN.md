@@ -17,15 +17,15 @@ page cannot be forgotten. Status is measured, never set by hand.
 | styled | no inline `<style>` block at all | appearance comes from the compiled sheet, so it is themed, cached and swept once |
 | server | no `innerHTML` / `insertAdjacentHTML` | one partial renders a thing, so a restyle reaches every instance of it |
 
-**77 of 80 templates complete.**
+**80 of 80 templates complete.**
 
 | measure | remaining |
 |---|---|
 | templates | 80 |
-| total lines | 48,581 |
-| inline `<style>` lines | 2,163 |
-| runtime DOM writes | 28 |
-| literal light-on-dark colours | 2 |
+| total lines | 46,013 |
+| inline `<style>` lines | 0 |
+| runtime DOM writes | 0 |
+| literal light-on-dark colours | 0 |
 
 ## Shell and partials
 
@@ -48,6 +48,8 @@ A restyle here is a markup edit and is fully visible in a screenshot.
 |---|--:|--:|--:|--:|:--:|:--:|:--:|:--:|
 | `alerts.html` | 6577 | 0 | 6007 | 0 | yes | yes | yes | **done** |
 | `training.html` | 6526 | 0 | 5715 | 0 | yes | yes | yes | **done** |
+| `cases.html` | 2393 | 0 | 2102 | 0 | yes | yes | yes | **done** |
+| `documents.html` | 1542 | 0 | 1215 | 0 | yes | yes | yes | **done** |
 | `settings.html` | 1536 | 0 | 757 | 0 | yes | yes | yes | **done** |
 | `tools.html` | 1503 | 0 | 1055 | 0 | yes | yes | yes | **done** |
 | `discover.html` | 1382 | 0 | 931 | 0 | yes | yes | yes | **done** |
@@ -55,6 +57,7 @@ A restyle here is a markup edit and is fully visible in a screenshot.
 | `forensics.html` | 1209 | 0 | 769 | 0 | yes | yes | yes | **done** |
 | `arkime_traffic.html` | 1202 | 0 | 1162 | 0 | yes | yes | yes | **done** |
 | `observables.html` | 1132 | 0 | 757 | 0 | yes | yes | yes | **done** |
+| `chat.html` | 1090 | 0 | 700 | 0 | yes | yes | yes | **done** |
 | `guide.html` | 935 | 0 | 27 | 0 | yes | yes | yes | **done** |
 | `threat_intel.html` | 873 | 0 | 863 | 0 | yes | yes | yes | **done** |
 | `playbooks.html` | 756 | 0 | 515 | 0 | yes | yes | yes | **done** |
@@ -120,28 +123,7 @@ A restyle here is a markup edit and is fully visible in a screenshot.
 | `service_accounts.html` | 50 | 0 | 0 | 0 | yes | yes | yes | **done** |
 | `threat_intel_actor.html` | 44 | 0 | 0 | 0 | yes | yes | yes | **done** |
 
-Subtotal: 73 templates, 40,234 lines, 0 inline css lines, 0 runtime writes, 0 light-mode literals.
-
-## Tier B, 1 to 10 runtime writes
-
-Markup plus a short list of class strings in inline JS.
-
-| template | lines | css | js | writes | light | styled | server | done |
-|---|--:|--:|--:|--:|:--:|:--:|:--:|:--:|
-| `documents.html` | 1530 | 0 | 1203 | 3 | yes | yes | no |  |
-| `chat.html` | 1090 | 0 | 700 | 4 | yes | yes | no |  |
-
-Subtotal: 2 templates, 2,620 lines, 0 inline css lines, 7 runtime writes, 0 light-mode literals.
-
-## Tier C, more than 10 runtime writes
-
-Needs the server-rendered fragment work first; a markup-only restyle cannot reach what JavaScript builds.
-
-| template | lines | css | js | writes | light | styled | server | done |
-|---|--:|--:|--:|--:|:--:|:--:|:--:|:--:|
-| `cases.html` | 4973 | 2163 | 2792 | 21 | no | no | no |  |
-
-Subtotal: 1 templates, 4,973 lines, 2,163 inline css lines, 21 runtime writes, 2 light-mode literals.
+Subtotal: 76 templates, 45,259 lines, 0 inline css lines, 0 runtime writes, 0 light-mode literals.
 
 ## Cleanup, so nothing is left behind
 
