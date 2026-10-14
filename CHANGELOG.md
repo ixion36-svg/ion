@@ -1,13 +1,125 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.11 -->
-<!-- ion-doc:version=0.99.11 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.12 -->
+<!-- ion-doc:version=0.99.12 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-10-09 -->
+<!-- ion-doc:date=2026-10-14 -->
 
 # Changelog
+
+## v0.99.12 — 2026-10-14
+
+The UI redesign, finished. Every one of the 80 live templates now passes
+all three measured columns in `docs/UI_REDESIGN.md`: no light-mode
+foreground declared without a background beside it, no CSS left in a
+page's inline `<style>` block, and no markup written into the DOM at
+runtime. It is 233 commits, and the bulk of it is one change made
+repeatedly: markup that JavaScript assembled from strings is now a Jinja
+fragment the server renders.
+
+That matters beyond tidiness. A string built in the browser is a string
+no stylesheet sweep can reach, no template test can render and no
+escaping filter applies to, and the three security findings below were
+all living in exactly that gap.
+
+### Security
+
+* **Stored cross-user scripting in the document viewer.**
+  `renderContent` in `documents.html` dispatched on a document's
+  `output_format`, and three of its four branches sanitised or escaped.
+  The fourth read `return content; // Already HTML` and both callers
+  assigned the result to `innerHTML`. `models/document.py` records who
+  may write that column: everyone can read and add documents. So any
+  authenticated user could store a document declaring itself HTML and
+  have its contents run in every other user's session. ION carries no
+  server-side HTML sanitiser, which `ui/template_render.py` records, so
+  nothing upstream was removing it either. The branch sanitises now, and
+  the test asserts each of the four formats has a treatment so a fifth
+  cannot be added without one.
+
+* **Stored scripting in the case panel's alert rail.** The alert
+  subtitle was emitted as `a.bits | join('<br>') | safe`, which turns
+  autoescaping off for the whole joined string rather than for the
+  separator. A process name is whatever ran on the host and an alert's
+  source address is whatever the document said, so both were injectable.
+  Each bit is emitted on its own now, inside the loop, so autoescaping
+  applies to it. The page this replaced escaped each bit before joining,
+  which is the part the conversion dropped.
+
+* **A fragment answered for a permission it did not hold.**
+  `/ui/pcap/case-options` was gated on `alert:read` and called
+  `list_cases` directly, which is gated on `case:read`. A direct Python
+  call bypasses the callee's FastAPI dependencies, so the gate did not
+  run at all. Fixed, and
+  `tests/unit/test_ui_fragments_respect_called_permissions.py` now fails
+  on the shape rather than the instance: it walks the whole `ui` package
+  and carries four controls proving it distinguishes a real bypass from
+  an alias, a deleted guard and an unrelated mention.
+
+### Fixed
+
+* **Eight pages showed timestamps in the reader's time zone.** ION
+  stores naive UTC, and `new Date(iso)` resolves a string without a zone
+  in the viewer's zone, so an analyst in Sydney and one in London were
+  shown different times for the same row with nothing marking either as
+  converted. The server formats and labels these now, through
+  `parse_instant`, `age_label` and `instant_label` in
+  `ion/web/ui/_shared.py`. `ageLabel` and `fmtDate`, the last two client
+  formatters, are gone with their callers.
+
+* **The add-annotation form opened backwards.** The form was built as a
+  string carrying `class="hidden mt-[0.6rem]"`. The fragment that
+  replaced the string kept the margin and dropped the `hidden`, so the
+  form rendered open and the first click on "+ Add annotation" closed
+  it. `loadAnnotations` had been compensating with an inline
+  `display:none` after every load, which is a second writer of one piece
+  of state in a mechanism that beats the first. The class is restored and
+  the toggle uses that same class, so the two can be checked against
+  each other.
+
+* **A failed read no longer reads as a clean result.** Across the
+  converted pages a fetch that failed and a query that returned nothing
+  were collapsed into one state by `|| 0` and `|| []`, so an unreachable
+  Elasticsearch reported zero findings and a pcap that could not be
+  parsed reported a capture with no threats in it. Every converted
+  fragment distinguishes three outcomes: the read failed, the read
+  succeeded and found nothing, or there is data.
+
+* **Quill is seeded through its own API.** The document editor was
+  loaded by assigning `root.innerHTML`, which leaves Quill's internal
+  model describing the previous contents, since it reads that model back
+  on every edit. It uses `clipboard.dangerouslyPasteHTML` now. The read
+  on the following line stays: it is the baseline the amendment modal
+  compares against to decide whether anything changed.
+
+### Tooling
+
+* **The dead-CSS scanner covers the sheets it claimed to.**
+  `tools/dead_css.py` held a hand-written sheet list, and the comment
+  above it recorded that the list had already been wrong once, when
+  `alerts-queue.css` had never been scanned. It was wrong again and
+  larger: the same comment said that adding the redesign's page sheets
+  was "the point of that column", and only `ion-pages.css` was ever
+  added. Twenty-four page sheets stood outside the scan while both that
+  comment and `docs/UI_REDESIGN.md` said they were inside it. The list
+  is derived from the directory now, the three exclusions each carry a
+  reason, and a test fails if a sheet is neither scanned nor excluded.
+  Deriving it from the served directory alone then dropped
+  ion-legacy.css and ion-pages.css, which are build inputs under
+  frontend/ and the two the tool singles out as most worth scanning, so
+  a further test resolves every scanned name to its file and fails if it
+  is not there. Coverage went from 7 sheets to 34, which surfaced 384
+  further candidate-dead rules. None has been deleted: the scanner warns
+  that it cannot resolve 46 class concatenations, so those candidates
+  need per-rule proof first.
+
+* **The route map distinguishes all-of from any-of.** It rendered a
+  route's gates joined with `+`, meaning every one is required, for
+  gates that are satisfied by any one of them. It also recognises
+  `require_page_permission` and two further gate forms it had been
+  skipping silently. 1,182 routes, 0 dangling references.
 
 ## v0.99.11 — 2026-10-09
 
