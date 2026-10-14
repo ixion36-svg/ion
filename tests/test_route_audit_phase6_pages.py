@@ -141,23 +141,43 @@ def test_retired_templates_are_gone():
 
 
 def test_index_breakdown_ported_into_analytics():
-    """The only section unique to /engineering-analytics moved rather than died."""
+    """The only section unique to /engineering-analytics moved rather than
+    died. It moved once more since, from renderIndexTable() in the page
+    into ui/analytics.py, so the port is asserted there."""
+    module = Path("src/ion/web/ui/analytics.py").read_text(encoding="utf-8")
+    assert "indices" in module
+    assert "IndexRow" in module
     html = (TEMPLATES / "analytics.html").read_text(encoding="utf-8")
-    assert "index-table-container" in html
-    assert "function renderIndexTable(" in html
-    assert "renderIndexTable(data.indices" in html
+    assert "function renderIndexTable(" not in html
 
 
 def test_analytics_bar_widths_are_not_the_dead_migrated_class():
-    """The v0.31.21 inline-style migration hashed `width:${pct}%` into a STATIC
-    class, leaving a literal ${pct} in the CSS — an invalid rule browsers drop,
-    so every bar on this page rendered at zero width."""
+    """The v0.31.21 inline-style migration hashed `width:${pct}%` into a
+    STATIC class, leaving a literal ${pct} in the CSS — an invalid rule
+    browsers drop, so every bar on this page rendered at zero width.
+
+    The repair was a data-pct attribute plus an applyBarWidths() pass.
+    Both are gone: the bars are server-rendered with data-ion-style, which
+    ion-dynamic-styles.js applies on a MutationObserver, so a width lands
+    after an htmx swap without the fragment asking for it. No live
+    data-pct attribute is left in the tree, which is why applyBarWidths
+    had neither an element to find nor a caller, and it is deleted.
+
+    The `is not none` guard is the part to keep an eye on. An unmeasured
+    entity renders no bar at all rather than a zero-width one, because a
+    bar of zero length and a bar that was never measured look identical
+    and mean different things.
+    """
     html = (TEMPLATES / "analytics.html").read_text(encoding="utf-8")
-    # no element should still carry the dead class
     assert 'class="risk-bar ${cls} _ion-s-95aea49e0e"' not in html
     assert "_ion-s-95aea49e0e\"></div>" not in html
-    assert "function applyBarWidths(" in html
-    assert html.count("data-pct=") >= 4
+    assert "function applyBarWidths(" not in html
+    assert 'data-pct="' not in html
+
+    fragment = (TEMPLATES / "_fragments" / "analytics_entity_risk.html"
+                ).read_text(encoding="utf-8")
+    assert 'data-ion-style="width: {{ e.width }}%"' in fragment
+    assert "{%- if e.width is not none %}" in fragment
 
 
 def test_ai_scorecard_kpis_folded_into_alert_prompts():

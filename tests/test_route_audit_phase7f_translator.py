@@ -196,8 +196,29 @@ def test_no_opaque_failed_to_load_throws_left(integrations):
 
 
 def test_every_loader_goes_through_the_helper(integrations):
+    """Nine loaders went through ionFetchJson, and this counted the calls.
+
+    Eight are fragment loads now, through ionLoadFragment in
+    static/js/ion-fragments.js, which does for markup what ionFetchJson
+    does for JSON: it tells a 403 from an empty result and says "Nothing
+    has been measured" rather than drawing a clean panel. ionFetchJson
+    stays for the one read that genuinely wants an object, the webhook
+    being edited.
+
+    So the property is asserted rather than the count: no loader reaches
+    for a bare fetch. The five bare fetches left are mutations, three
+    POSTs, a PUT and a DELETE, which are not loaders and never went
+    through this helper.
+    """
     js = _script_block(integrations)
-    assert js.count("ionFetchJson(") >= 10  # 1 definition + 9 call sites
+    assert "async function ionFetchJson" in js
+    assert js.count("ionLoadFragment(") >= 8, \
+        "a loader stopped going through the fragment helper"
+
+    for call in re.findall(r"(?:await|=)\s*fetch\((.{0,400}?)\)\s*;", js, re.S):
+        assert re.search(r"method:\s*'(POST|PUT|PATCH|DELETE)'", call) \
+            or "options || {}" in call, \
+            f"a bare fetch that is not a mutation: {call[:80]}"
 
 
 def test_helper_distinguishes_the_actionable_cases(integrations):

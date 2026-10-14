@@ -389,16 +389,16 @@ function switchTab(tab) {
 function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
 
 
-// the v0.31.21 inline-style migration hashed `width:${pct}%` into the
-// STATIC class ._ion-s-95aea49e0e, leaving a literal `${pct}` in the CSS. That
-// rule is invalid so browsers drop it — every bar on this page has rendered at
-// zero width since. Apply the width from data-pct instead (CSP-safe: no inline
-// style attribute, set via the style property).
-function applyBarWidths(root) {
-    (root || document).querySelectorAll('[data-pct]').forEach(function (el) {
-        el.style.width = el.getAttribute('data-pct') + '%';
-    });
-}
+// The v0.31.21 inline-style migration hashed a width into the STATIC class
+// ._ion-s-95aea49e0e, leaving a literal ${pct} in the CSS. That rule is
+// invalid, browsers drop it, and every bar on this page rendered at zero
+// width until applyBarWidths() set each one from a data-pct attribute.
+//
+// Both are gone. The bars are server-rendered with data-ion-style, which
+// ion-dynamic-styles.js applies on a MutationObserver, so a width lands
+// after an htmx swap without the fragment asking for it. No data-pct
+// attribute is left in the tree, so applyBarWidths had no element to find
+// and no caller.
 
 function esc(str) {
     if (!str) return '';

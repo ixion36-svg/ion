@@ -162,20 +162,39 @@ def test_cases_board_has_a_status_filter(cases):
     assert 'value=""' in sel, "no way back to all statuses"
 
 
-def test_cases_status_filter_compares_the_serialised_value(cases):
-    """Postgres stores the enum NAME ('OPEN') but the API serialises the VALUE
-    ('open'). Comparing against the stored name matches nothing."""
-    js = _strip_comments(_inline_js(cases))
-    fn = js[js.index("function filterCases()"):]
-    fn = fn[:fn.index("\n}")]
-    assert "c.status !== status" in fn
-    assert "'OPEN'" not in fn and '"OPEN"' not in fn
+def test_cases_status_filter_compares_the_serialised_value():
+    """Postgres stores the enum NAME ('OPEN') but the API serialises the
+    VALUE ('open'). Comparing against the stored name matches nothing.
+
+    This was a string compare inside filterCases(). The board filters
+    server-side now, so the question belongs to case_query_service, which
+    answers it better than a compare could: _valid_statuses maps both the
+    value and the name, upper-cased, onto the enum member, so 'open' and
+    'OPEN' both resolve and neither quietly matches nothing.
+
+    The service also refuses a status it does not recognise rather than
+    ignoring it, which the client compare could not do. There, an
+    unrecognised value simply filtered everything out, which looks
+    identical to a SOC with no open cases.
+    """
+    service = (Path("src/ion/services/case_query_service.py")
+               .read_text(encoding="utf-8"))
+    fn = service[service.index("def _valid_statuses("):]
+    fn = fn[:fn.index("\ndef ", 1)]
+    assert "member.value.upper()" in fn
+    assert "member.name.upper()" in fn
+    assert "refused, not ignored" in service
 
 
 def test_cases_status_filter_is_wired_to_rerender(cases):
+    """filterCases() re-filtered an array the page held. The select asks
+    the server for a new board now, so the action is reloadCaseBoard and
+    the value leaves as the `status` parameter."""
     assert 'id="filter-status"' in cases
     sel = cases[cases.index('id="filter-status"'):]
-    assert 'data-change-action="filterCases"' in sel[:sel.index(">")]
+    assert 'data-change-action="reloadCaseBoard"' in sel[:sel.index(">")]
+    assert "['filter-status','status']" in cases
+    assert "function filterCases()" not in cases
 
 
 # ── /alerts: aggregates follow the filter ────────────────────────────────
