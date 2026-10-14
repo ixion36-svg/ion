@@ -1,23 +1,12 @@
 
-body[data-page="settings"] .settings-layout{
-    display: grid;
-    grid-template-columns: 220px 1fr;
-    gap: 2rem;
-    margin-top: 1.5rem;
-}
+
 
 @media (max-width: 900px) {
-    body[data-page="settings"] .settings-layout{
-        grid-template-columns: 1fr;
-    }
+
 }
 
 /* Sidebar Navigation */
-body[data-page="settings"] .settings-nav{
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
+
 
 body[data-page="settings"] .settings-nav-item{
     padding: 0.75rem 1rem;
@@ -177,14 +166,7 @@ body[data-page="settings"] .package-badge{
 }
 
 /* Environment Variables */
-body[data-page="settings"] .env-vars-list{
-    background: var(--bg-primary);
-    border: 1px solid var(--ion-border);
-    border-radius: var(--radius);
-    padding: 1rem;
-    max-height: 300px;
-    overflow-y: auto;
-}
+
 
 body[data-page="settings"] .env-var-item{
     display: flex;
@@ -224,9 +206,7 @@ body[data-page="settings"] .status-unset{
 }
 
 /* Sessions List */
-body[data-page="settings"] .sessions-actions{
-    margin-bottom: 1rem;
-}
+
 
 body[data-page="settings"] .sessions-list{
     background: var(--bg-primary);

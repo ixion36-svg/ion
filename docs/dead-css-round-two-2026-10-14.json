@@ -1,0 +1,1895 @@
+{
+  "base": "74d034481588bb55cd02612961fa6395f55c82e0",
+  "sheets": {
+    "alerts-page.css": {
+      "original_candidate_classes": [
+        "ad-sys-card-hdr",
+        "alerts-filters",
+        "card-wide",
+        "hbar-host",
+        "hbar-rule",
+        "keyboard-selected",
+        "list-group",
+        "mitre-add-row",
+        "security-banner",
+        "sortable",
+        "stats-cases",
+        "stats-group",
+        "submenu-arrow",
+        "timer-icon"
+      ],
+      "rules": [
+        {
+          "selector": ".alerts-filters select,\n.alerts-filters .search-input",
+          "sha256": "ff3c1e13bef6086252f66c4c661f0bbc585eb1bdaacb3bb1ad5038ce81cb442d",
+          "classes": [
+            "alerts-filters",
+            "search-input"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".alerts-filters .search-input",
+          "sha256": "a1543b43b7aaaddb661d0efeafd917772b76a478162e2da65e7a7a0aec2ee80e",
+          "classes": [
+            "alerts-filters",
+            "search-input"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".stats-group",
+          "sha256": "943363b684f815518143f69b007997ba532ab1a343b880fee4598c33b6ff71d8",
+          "classes": [
+            "stats-group"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".stats-cases",
+          "sha256": "a8a71c1a5f78722bd1711a727c5d01a49e65741f80604946c3ade37d8b85d623",
+          "classes": [
+            "stats-cases"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".context-menu-submenu .submenu-arrow",
+          "sha256": "eaad41e280fe4786b965807bc618662bdf24ad3db669e4fcc0188c30c3c45622",
+          "classes": [
+            "context-menu-submenu",
+            "submenu-arrow"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".timer-icon",
+          "sha256": "a94cab01561a8c790b346bda89a745e47f10caf9be223adec671eea6993e8250",
+          "classes": [
+            "timer-icon"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".alerts-grid .card-wide",
+          "sha256": "1ce6ec67132ac9ddca362e6dfb008746001880f9177ecdd93e610f116ba82d3f",
+          "classes": [
+            "alerts-grid",
+            "card-wide"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".alerts-grid .card-wide .card-body",
+          "sha256": "3f8b65b7dd9327a94d186337af96e88c1e7f9b0552c726c9610f36bde278bf12",
+          "classes": [
+            "alerts-grid",
+            "card-body",
+            "card-wide"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".security-banner",
+          "sha256": "5d5895e393244192493770051438c8f64e1f08f84a69ac3bcba4ea3e35e5f6a8",
+          "classes": [
+            "security-banner"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".ad-sys-card.mapped .ad-sys-card-hdr::before",
+          "sha256": "9be2426ec435cf113532faae17f60d29db58a61385fdd667786138e14d688fab",
+          "classes": [
+            "ad-sys-card",
+            "ad-sys-card-hdr",
+            "mapped"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".ad-sys-card:not(.mapped) .ad-sys-card-hdr::before",
+          "sha256": "135d6fe1dc3e7a3434fcbbd37f4de531f3f76e6913000184debb121163af01fc",
+          "classes": [
+            "ad-sys-card",
+            "ad-sys-card-hdr",
+            "mapped"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".sortable",
+          "sha256": "17c8ae3be09e1cf537245cfd74c213756584312d74f25ebf48c48326c3de7567",
+          "classes": [
+            "sortable"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".sortable:hover",
+          "sha256": "a035fa8f52563e4b00d8789fbf3dc83ee9ad2bd544fbcae3eb561382c80246d7",
+          "classes": [
+            "sortable"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".card-wide .card-body",
+          "sha256": "afb4d8a32fd7f4cb795e2d70a9788e6542892f6c2d198c2c93aa7b5e532ad942",
+          "classes": [
+            "card-body",
+            "card-wide"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".side-panel .list-group",
+          "sha256": "9f603aa5c7dee30318e2ed3a0ab7d81b9a67e5cd2c6d63a0ac00ef102d042e8a",
+          "classes": [
+            "list-group",
+            "side-panel"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".alert-row.keyboard-selected",
+          "sha256": "f2635c459e3b40c865d8ff4c29fdbad17e52e8894ffb5901adaf52700c6d4633",
+          "classes": [
+            "alert-row",
+            "keyboard-selected"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".mitre-add-row input.mitre-name-input",
+          "sha256": "f0eaaf0b6c4e6dd78fc82db2bda35b49ce26c6fba59cae38bba429c3eb10a39d",
+          "classes": [
+            "mitre-add-row",
+            "mitre-name-input"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".hbar-fill.hbar-host",
+          "sha256": "65ace46605a9243fc1d25f70116eee678a2958fe68ec1cc1919c17a9975ab4b8",
+          "classes": [
+            "hbar-fill",
+            "hbar-host"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".hbar-fill.hbar-rule",
+          "sha256": "064b87ec37dfd4eea2473628eb1bd710e5e123bcb6033ea6b3509c0a6bf329a5",
+          "classes": [
+            "hbar-fill",
+            "hbar-rule"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        }
+      ]
+    },
+    "analytics-page.css": {
+      "original_candidate_classes": [
+        "analytics-section",
+        "sys-sev-pill",
+        "sys-stat-label",
+        "sys-stat-val"
+      ],
+      "rules": [
+        {
+          "selector": ".analytics-section .section-header",
+          "sha256": "7428438eee0764b44947c735a4dacab881f31a3e326262a7d57b2caa4f685374",
+          "classes": [
+            "analytics-section",
+            "section-header"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".analytics-section .section-header h2",
+          "sha256": "fdabcb7ea52919537a70b5c89c4669aba6c748b40ea35ca06a3ed4f9696288be",
+          "classes": [
+            "analytics-section",
+            "section-header"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".sys-stat-val",
+          "sha256": "c5aa96a0ffd86131550d32b2240210edea3cdaeac19f970d0c605e03a72edfca",
+          "classes": [
+            "sys-stat-val"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".sys-stat-label",
+          "sha256": "b705b7f440eca47f47e29a43fed8446fa9dc1f20d6ffa2d6d6bbe4b5576ac4b4",
+          "classes": [
+            "sys-stat-label"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".sys-sev-pill",
+          "sha256": "3fe7c3f26c2ee1d79f4c0fdbfd595d9c794d017836558ec6d3cd5be562a31142",
+          "classes": [
+            "sys-sev-pill"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "Live analytics sev_pills macro joins literal sys-sev argument to -pill; browser found style/geometry regression. Restored and scanner regression added."
+        },
+        {
+          "selector": ".sys-sev-pill.crit",
+          "sha256": "4f1ee0562ed3a1231e00856d7193c5fe56f0dea1f6f972cdb7e92034d80c00d5",
+          "classes": [
+            "crit",
+            "sys-sev-pill"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".sys-sev-pill.high",
+          "sha256": "72c048b5e61a8e4190442258b6d1b4fe97b9df9a365d0124ed109a0215bd53a0",
+          "classes": [
+            "high",
+            "sys-sev-pill"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".sys-sev-pill.med",
+          "sha256": "9cfc2d32e4d0887191ac9945e7c5293f1fa3cdf7ce4680def482d8be72a8d2d3",
+          "classes": [
+            "med",
+            "sys-sev-pill"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".sys-sev-pill.low",
+          "sha256": "975bd043fc0fb9ee47ca287590dace7f1317257aedfc768c5fa1b11ed6d575b3",
+          "classes": [
+            "low",
+            "sys-sev-pill"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        }
+      ]
+    },
+    "arkime-traffic.css": {
+      "original_candidate_classes": [
+        "jvectormap-tip"
+      ],
+      "rules": [
+        {
+          "selector": ".jvectormap-tip.active",
+          "sha256": "f9d6ad746c5711d29c2ed990f05ee691ab9952c90a8b713a81fcc2e937469576",
+          "classes": [
+            "active",
+            "jvectormap-tip"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        }
+      ]
+    },
+    "cases-page.css": {
+      "original_candidate_classes": [
+        "awx-cfv",
+        "awx-conf",
+        "cases-modal-body",
+        "cpanel-alert-chevron",
+        "cpanel-alert-evidence",
+        "cpanel-alert-extracted",
+        "cpanel-alert-extracted-title",
+        "cpanel-alert-fields",
+        "cpanel-alert-fields-all",
+        "cpanel-alert-fields-loading",
+        "cpanel-alert-fields-table",
+        "cpanel-alert-item",
+        "cpanel-alert-showall",
+        "cpanel-alert-toggle",
+        "tier-high",
+        "tier-low",
+        "tier-medium"
+      ],
+      "rules": [
+        {
+          "selector": ".cpanel-alert-item",
+          "sha256": "5e2a68526702fe38c92d754a0ad434828d3c81b9e750fe83e39d96d6e9577b1d",
+          "classes": [
+            "cpanel-alert-item"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "Shared inline host prefix is now visible; retain constructed family, including live fields-table and queried showall."
+        },
+        {
+          "selector": ".cpanel-alert-toggle",
+          "sha256": "4d3fbc86e73ca3282a580a86889bc0c994b0b94efda64b2ebf993eb947a96ac3",
+          "classes": [
+            "cpanel-alert-toggle"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "Shared inline host prefix is now visible; retain constructed family, including live fields-table and queried showall."
+        },
+        {
+          "selector": ".cpanel-alert-chevron",
+          "sha256": "26f49e780efd5d3971a82480441ff68edb6793da4ddc3da5bf4435525d9296e7",
+          "classes": [
+            "cpanel-alert-chevron"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "Shared inline host prefix is now visible; retain constructed family, including live fields-table and queried showall."
+        },
+        {
+          "selector": ".cpanel-alert-chevron.expanded",
+          "sha256": "046e571158f13ac5833c214c11f2e2583478a719a1b2f6051d139eabcd0e243f",
+          "classes": [
+            "cpanel-alert-chevron",
+            "expanded"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".cpanel-alert-fields",
+          "sha256": "71c7209807a368605553d35ce236f9167faac44bd8e7137fe4985f8e81784a42",
+          "classes": [
+            "cpanel-alert-fields"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "Shared inline host prefix is now visible; retain constructed family, including live fields-table and queried showall."
+        },
+        {
+          "selector": ".cpanel-alert-fields-table",
+          "sha256": "645ec503cb3c5c64893f9b931a7c6af9c7147661b9604d8f94cd5e1f827f7330",
+          "classes": [
+            "cpanel-alert-fields-table"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "Shared inline host prefix is now visible; retain constructed family, including live fields-table and queried showall."
+        },
+        {
+          "selector": ".cpanel-alert-fields-table td",
+          "sha256": "00d7f903dc362a90b50d8a8b6fb667cfea6acf1ae2e47c7ccce6375b3d4e16d0",
+          "classes": [
+            "cpanel-alert-fields-table"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "Shared inline host prefix is now visible; retain constructed family, including live fields-table and queried showall."
+        },
+        {
+          "selector": ".cpanel-alert-fields-loading,\n.cpanel-alert-fields-empty",
+          "sha256": "9516aedee5041014ea325738f361814c0fa945b9122aaa6f9b1655cd7f99f050",
+          "classes": [
+            "cpanel-alert-fields-empty",
+            "cpanel-alert-fields-loading"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".cpanel-alert-showall",
+          "sha256": "e93b7fdb0bd612b845ce7859c240463a9ffa776868f8dd164fc9cdf298fcaea1",
+          "classes": [
+            "cpanel-alert-showall"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "Shared inline host prefix is now visible; retain constructed family, including live fields-table and queried showall."
+        },
+        {
+          "selector": ".cpanel-alert-showall:hover",
+          "sha256": "6c3491a1f4d91fe0a851484ae59880bb71765c5d1b25eb7fd27bff895bed19f4",
+          "classes": [
+            "cpanel-alert-showall"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "Shared inline host prefix is now visible; retain constructed family, including live fields-table and queried showall."
+        },
+        {
+          "selector": ".cpanel-alert-fields-all",
+          "sha256": "7443e50ea0975ab4c59438681912bbf29829fd693cf582b4f1c336b48a2da818",
+          "classes": [
+            "cpanel-alert-fields-all"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "Shared inline host prefix is now visible; retain constructed family, including live fields-table and queried showall."
+        },
+        {
+          "selector": ".cpanel-alert-evidence",
+          "sha256": "dfcbc1679d42578cdfd00af16bd9ccd2b9702a3ab74b07c0ff91ea5d29c484ca",
+          "classes": [
+            "cpanel-alert-evidence"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "Shared inline host prefix is now visible; retain constructed family, including live fields-table and queried showall."
+        },
+        {
+          "selector": ".cpanel-alert-evidence:hover",
+          "sha256": "d57a7c0d1c4a1453491be22683c4479469552a8720a7f765cec7a46be1f1e8ea",
+          "classes": [
+            "cpanel-alert-evidence"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "Shared inline host prefix is now visible; retain constructed family, including live fields-table and queried showall."
+        },
+        {
+          "selector": ".cpanel-alert-extracted",
+          "sha256": "7ceda5f1ef808f3222e028a3240aa2c540e74cd1f603ebd2ed34f01affef7446",
+          "classes": [
+            "cpanel-alert-extracted"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "Shared inline host prefix is now visible; retain constructed family, including live fields-table and queried showall."
+        },
+        {
+          "selector": ".cpanel-alert-extracted-title",
+          "sha256": "aff01eadc2bb7f07aece154b692423bd71cf608fe7461f0391dfba3289324b9a",
+          "classes": [
+            "cpanel-alert-extracted-title"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "Shared inline host prefix is now visible; retain constructed family, including live fields-table and queried showall."
+        },
+        {
+          "selector": ".cpanel-alert-extracted .caf-key",
+          "sha256": "c5c28ce7001d25277ba4782b6e603dc854f819497d2aefbc416fbbccc7dcee10",
+          "classes": [
+            "caf-key",
+            "cpanel-alert-extracted"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".cases-modal-body .form-group",
+          "sha256": "ee7652dac4b0128c343aacf393289beab18d1f5e6e9ddbea7b92a37aa41d30f4",
+          "classes": [
+            "cases-modal-body",
+            "form-group"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".cases-modal-body .form-control",
+          "sha256": "73d62f096a459d5221712531e759f0600cbd23b40434dd3498ca75d4b79e9ea0",
+          "classes": [
+            "cases-modal-body",
+            "form-control"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".cases-modal-body .form-control:focus",
+          "sha256": "09effadea9854bc309405f7a2e438bd84c06de04b8b0e7533311aed1d7b45169",
+          "classes": [
+            "cases-modal-body",
+            "form-control"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".cases-modal-body textarea.form-control",
+          "sha256": "69757fb8a99ad2ac9720dbe63db0e236563331800a999575e60f1237548a5ee2",
+          "classes": [
+            "cases-modal-body",
+            "form-control"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".awx-cfv.mono",
+          "sha256": "06f0eddb04c27347c14c1feffd8f8be9cf4e72be63a07afe71066718de21f620",
+          "classes": [
+            "awx-cfv",
+            "mono"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".awx-conf .awx-fillb",
+          "sha256": "c95bd2a6d33bc35e540a09430a44f603597087eeb20d4a9ba1118084a15609ef",
+          "classes": [
+            "awx-conf",
+            "awx-fillb"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".awx-conf .awx-fillb.tier-high",
+          "sha256": "e1c8e9dbdbf447d729e18cc11702cb032f761acea6333ab196b2a20ebeff25a7",
+          "classes": [
+            "awx-conf",
+            "awx-fillb",
+            "tier-high"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".awx-conf .awx-fillb.tier-medium",
+          "sha256": "cb2d7b98cfe5520292404f0cba91924818e8922c88c7a4112b4c9590de42ad0f",
+          "classes": [
+            "awx-conf",
+            "awx-fillb",
+            "tier-medium"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".awx-conf .awx-fillb.tier-low",
+          "sha256": "59ae140a1d4b5829fd4eef4a4d745c4318bd3e2bf0d200734c6c2d690db15da8",
+          "classes": [
+            "awx-conf",
+            "awx-fillb",
+            "tier-low"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        }
+      ]
+    },
+    "chat-page.css": {
+      "original_candidate_classes": [
+        "ai-header-icon"
+      ],
+      "rules": [
+        {
+          "selector": ".ai-header-icon.docgen",
+          "sha256": "2692293e561a840604067558fe09502ebf9dc4fd50bd3b79b2645e6b3b228cdd",
+          "classes": [
+            "ai-header-icon",
+            "docgen"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        }
+      ]
+    },
+    "discover-page.css": {
+      "original_candidate_classes": [
+        "field-stats-container",
+        "indices-container",
+        "mappings-container",
+        "saved-search-actions",
+        "saved-searches-actions",
+        "saved-searches-container",
+        "saved-searches-list",
+        "saved-searches-section",
+        "search-results-container"
+      ],
+      "rules": [
+        {
+          "selector": ".search-results-container,\n.indices-container,\n.mappings-container,\n.field-stats-container",
+          "sha256": "9c91909c7abd23f83ee018515ecb4022b49e86778bcec72406d07bfac0768dde",
+          "classes": [
+            "field-stats-container",
+            "indices-container",
+            "mappings-container",
+            "search-results-container"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".saved-searches-actions",
+          "sha256": "2d441b18019e9d1f952cf872660271a8ffc46b0a8a55220414743ddc24e7d248",
+          "classes": [
+            "saved-searches-actions"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".saved-searches-container",
+          "sha256": "d4b31a22c9878aa3905e569e19968dcd6813c36ac06125ca46233d3061a83a6e",
+          "classes": [
+            "saved-searches-container"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".saved-searches-section h4",
+          "sha256": "348e688b29eccdfc75aef80036daeeec8dab1b9dee716ad483f666fecc03a6c8",
+          "classes": [
+            "saved-searches-section"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".saved-searches-list",
+          "sha256": "093e382a66072905ee53c91b800f888df2c9f5fba53828f51a5381a6dfcc8e50",
+          "classes": [
+            "saved-searches-list"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".saved-search-actions",
+          "sha256": "1372afa3649b8c4023b0374196ea0f69b62cd1dce7e4640cf24534245a4b852d",
+          "classes": [
+            "saved-search-actions"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".saved-search-actions .btn",
+          "sha256": "0cc2d618fde8e42c4d10882040ab207ba4ec8a70f0637dabbe6ed7765efef3b0",
+          "classes": [
+            "btn",
+            "saved-search-actions"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        }
+      ]
+    },
+    "forensics-page.css": {
+      "original_candidate_classes": [
+        "editable-title"
+      ],
+      "rules": [
+        {
+          "selector": "body[data-page=\"forensics\"] .editable-title",
+          "sha256": "5b8343f8c103fb1135c2cde61d27b5d43134bb890e123fec43257c30ee18e936",
+          "classes": [
+            "editable-title"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": "body[data-page=\"forensics\"] .editable-title:hover",
+          "sha256": "5ba2e8e9a789afd133b8295d5d3a1cb6433f387f9bbe3428ad654d22d7f29b22",
+          "classes": [
+            "editable-title"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        }
+      ]
+    },
+    "integrations-page.css": {
+      "original_candidate_classes": [
+        "flow-fork-arm-line",
+        "flow-fork-stem",
+        "flow-merge-arm-line",
+        "flow-merge-stem",
+        "topo-detail-icon",
+        "topo-header",
+        "topo-header-actions",
+        "topo-page",
+        "topo-page-wrap"
+      ],
+      "rules": [
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-page-wrap",
+          "sha256": "be26459f8448636bd929c36d7e4b0de4ba64ad20b00d939ea7dc9592d9a52c7f",
+          "classes": [
+            "topo-page-wrap"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-page",
+          "sha256": "f7f11d6892cc8113f86a072982a4326783b896ededcaf5a34cd17582359f89ac",
+          "classes": [
+            "topo-page"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-header",
+          "sha256": "6e91f639ad7335d72f9aad09bc736d15fbe6df9c891a59d46907023ef5d1f03c",
+          "classes": [
+            "topo-header"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-header h1",
+          "sha256": "d52a0dd1d9e0fc605b8f14153778da8467cefcfdd4a680888ac852534e07553e",
+          "classes": [
+            "topo-header"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-header h1 i",
+          "sha256": "9f01d2d1b7bdf8da2ae8a87453adb109785325970b9e77f282eb5767d12bf6b7",
+          "classes": [
+            "topo-header"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-header-actions",
+          "sha256": "a9b3916d64295364320195ef5ccb061e8d8779fa290db1f3b398bbe73d248642",
+          "classes": [
+            "topo-header-actions"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-detail-icon",
+          "sha256": "e4d0e93d3c59dff6d1e88e3e25c96dd718fbfc5c7a088980a15052f1ccb94433",
+          "classes": [
+            "topo-detail-icon"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-detail-icon.healthy",
+          "sha256": "34fe15f72c820c1020a7c3ed701d4245bea0577177e177435056b85f406cfd65",
+          "classes": [
+            "healthy",
+            "topo-detail-icon"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-detail-icon.error",
+          "sha256": "e39e5388f0d6632a95703b812097d67efec63dd00e8823d4e79b95861bea704b",
+          "classes": [
+            "error",
+            "topo-detail-icon"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-detail-icon.disabled",
+          "sha256": "48118fb73aaa2e3592c17c9cfa4aff96310a57b1655e26a81bb65955c2a893e4",
+          "classes": [
+            "disabled",
+            "topo-detail-icon"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-detail-icon.checking",
+          "sha256": "6058db0b8b040738837f923fb4847f8e32e7f67c91fbec058ad8df4bac4de1e2",
+          "classes": [
+            "checking",
+            "topo-detail-icon"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-detail-card[data-service=\"elasticsearch\"] .topo-detail-icon.healthy",
+          "sha256": "af41ade20cbb1e1ecb7fce28d1f208aac9794b372255d46b5410b390bab5dc19",
+          "classes": [
+            "healthy",
+            "topo-detail-card",
+            "topo-detail-icon"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-detail-card[data-service=\"kibana\"] .topo-detail-icon.healthy",
+          "sha256": "4ac426f2efedbf5e3ba3f8fcce9f956d376bd89be42cc882fe83c3b612083a20",
+          "classes": [
+            "healthy",
+            "topo-detail-card",
+            "topo-detail-icon"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-detail-card[data-service=\"gitlab\"] .topo-detail-icon.healthy",
+          "sha256": "937b7e68413e750c438a2687e7ee7de2a74b3c8bd704f0d643c29ccf00bd5ac9",
+          "classes": [
+            "healthy",
+            "topo-detail-card",
+            "topo-detail-icon"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-detail-card[data-service=\"opencti\"] .topo-detail-icon.healthy",
+          "sha256": "e553c4c736f8a0cb478dffb839918a529d1715c21a140380bc6bc88a7e33fa98",
+          "classes": [
+            "healthy",
+            "topo-detail-card",
+            "topo-detail-icon"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-detail-card[data-service=\"tide\"] .topo-detail-icon.healthy",
+          "sha256": "1b58c80b65accd0d7a66098d5334e204091f9b13c0136ae0e329f98aa74212cc",
+          "classes": [
+            "healthy",
+            "topo-detail-card",
+            "topo-detail-icon"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-detail-card[data-service=\"ollama\"] .topo-detail-icon.healthy",
+          "sha256": "6c2399842ee807638ede2f0f7b085d4866ec3437db853c5a63a71aff7cce3cc1",
+          "classes": [
+            "healthy",
+            "topo-detail-card",
+            "topo-detail-icon"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-detail-card[data-service=\"dfir_iris\"] .topo-detail-icon.healthy",
+          "sha256": "a7f1b91f32faefc446e965bb95a04d0f74f15cfd72cc22a7b6aa86a8e9563a91",
+          "classes": [
+            "healthy",
+            "topo-detail-card",
+            "topo-detail-icon"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .flow-pipe-step.active .flow-fork-arm-line, body[data-page=\"integrations\"] .flow-pipe-step.active .flow-fork-stem, body[data-page=\"integrations\"] .flow-pipe-step.active .flow-merge-arm-line, body[data-page=\"integrations\"] .flow-pipe-step.active .flow-merge-stem",
+          "sha256": "ffb86f08e506615ab9edea3d7d3963a824ae39adc83e81f924f41608cb55ad3d",
+          "classes": [
+            "active",
+            "flow-fork-arm-line",
+            "flow-fork-stem",
+            "flow-merge-arm-line",
+            "flow-merge-stem",
+            "flow-pipe-step"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        }
+      ]
+    },
+    "ion-legacy.css": {
+      "original_candidate_classes": [
+        "nav-dropdown-toggle",
+        "nav-links"
+      ],
+      "rules": [
+        {
+          "selector": ".nav-links",
+          "sha256": "cc93492339d630343c7c891ace6c9b527f173ea07fddf1c48fa6faff2aaab135",
+          "classes": [
+            "nav-links"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".nav-links > li > a:not(.nav-dropdown-toggle)",
+          "sha256": "fd898e55d137f69dbb846cb4878f555245fad6c762643b117b137548184b4b98",
+          "classes": [
+            "nav-dropdown-toggle",
+            "nav-links"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "Complex/negated selector deliberately retained under existing proof policy."
+        },
+        {
+          "selector": ".nav-links > li > a:not(.nav-dropdown-toggle):hover",
+          "sha256": "83442664045db8c45b8e74cdb2664ba545b50340703a9b5a7072165dc0507402",
+          "classes": [
+            "nav-dropdown-toggle",
+            "nav-links"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "Complex/negated selector deliberately retained under existing proof policy."
+        },
+        {
+          "selector": ".nav-links a",
+          "sha256": "cef99296cefdb5cbe341124fb1aea95e92e5bc5f91f197a1c24918af82717308",
+          "classes": [
+            "nav-links"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".nav-links a",
+          "sha256": "4be927b34cae69d0bc082c5945f097cb4ff96f5bb50bc8dc41eadbe1cbefe26e",
+          "classes": [
+            "nav-links"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".nav-links",
+          "sha256": "3bb52fc8e1771c359ef99163b861dbee89ba4597058bb02229a3231a73fd9234",
+          "classes": [
+            "nav-links"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".nav-links a",
+          "sha256": "561c1a00dea9308e6f900ee1e7021eb2254d9195c3486080e9c638cd19466e0c",
+          "classes": [
+            "nav-links"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".nav-links",
+          "sha256": "72a6bfbd1e0e2f64c7ffa4a1f5509d738a95b9722c61f7539d9a2fec38f0c69a",
+          "classes": [
+            "nav-links"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        }
+      ]
+    },
+    "ion-migrated-styles.css": {
+      "original_candidate_classes": [
+        "_ion-s-09b0c9a2e1",
+        "_ion-s-0a1c7436f5",
+        "_ion-s-5eaab7cb30",
+        "_ion-s-78cae35616",
+        "_ion-s-8bc7ebe99c",
+        "_ion-s-a55ef5c079",
+        "_ion-s-b2ff45bb5d",
+        "_ion-s-b76ce82a4d",
+        "_ion-s-d28cf57fed",
+        "_ion-s-e080dc03bc",
+        "_ion-s-e26f061ab9",
+        "_ion-s-e62e34ae9b",
+        "_ion-s-eaadf28b85"
+      ],
+      "rules": [
+        {
+          "selector": "._ion-s-8bc7ebe99c",
+          "sha256": "3e6ccab4914ce86b1e0835fbc3294a36681d227fa5e2eb5c3f7ce2aa32f0d064",
+          "classes": [
+            "_ion-s-8bc7ebe99c"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Existing replaced_by claim verified against live an-dist-track/pb-preview-step/forensic-progress definitions and markup."
+        },
+        {
+          "selector": "._ion-s-0a1c7436f5",
+          "sha256": "5de8ce96aee46d3663a00cc1351826fd589e94d884820bf86d0584929016c20f",
+          "classes": [
+            "_ion-s-0a1c7436f5"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "No recorded independently verified replacement; retain migration rule and map."
+        },
+        {
+          "selector": "._ion-s-e080dc03bc",
+          "sha256": "bdc6797899bdf445e3b5154fa359b98642fa34ba1ac7818d33157e7bdb2e3cc0",
+          "classes": [
+            "_ion-s-e080dc03bc"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "No recorded independently verified replacement; retain migration rule and map."
+        },
+        {
+          "selector": "._ion-s-e62e34ae9b",
+          "sha256": "0570ecb68b99861788876053a156b44d47296d804391a6717202f8646eec27f7",
+          "classes": [
+            "_ion-s-e62e34ae9b"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "No recorded independently verified replacement; retain migration rule and map."
+        },
+        {
+          "selector": "._ion-s-09b0c9a2e1",
+          "sha256": "a4d717b3d811fed0ea53ff71ba437db74930a00dcd28b99b72651c08ff8eed00",
+          "classes": [
+            "_ion-s-09b0c9a2e1"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "No recorded independently verified replacement; retain migration rule and map."
+        },
+        {
+          "selector": "._ion-s-b2ff45bb5d",
+          "sha256": "9c5dcda85dc2c7be9a47a29030fc87dafd26eaaa7d8560abc12a4fc1885fd9ce",
+          "classes": [
+            "_ion-s-b2ff45bb5d"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "No recorded independently verified replacement; retain migration rule and map."
+        },
+        {
+          "selector": "._ion-s-d28cf57fed",
+          "sha256": "ac6ee490935982acd992da8e146dd79b7dd9518ec3a1bf0f8c0911d6fe3a4125",
+          "classes": [
+            "_ion-s-d28cf57fed"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "No recorded independently verified replacement; retain migration rule and map."
+        },
+        {
+          "selector": "._ion-s-eaadf28b85",
+          "sha256": "70c70a6f856f7e68aa5cf2dc1d0c23bde0a4bdcb6c3b87677a885624b39a9471",
+          "classes": [
+            "_ion-s-eaadf28b85"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "No recorded independently verified replacement; retain migration rule and map."
+        },
+        {
+          "selector": "._ion-s-78cae35616",
+          "sha256": "e3559ed2c5a501adc01b39ec72222f22d4f09e71b14d9ac9512e9d4c17c71073",
+          "classes": [
+            "_ion-s-78cae35616"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "No recorded independently verified replacement; retain migration rule and map."
+        },
+        {
+          "selector": "._ion-s-e26f061ab9",
+          "sha256": "0d65f81416bae2b040ea3f7c986784fd357d73ef73f3968eb626d281588f0b45",
+          "classes": [
+            "_ion-s-e26f061ab9"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Existing replaced_by claim verified against live an-dist-track/pb-preview-step/forensic-progress definitions and markup."
+        },
+        {
+          "selector": "._ion-s-b76ce82a4d",
+          "sha256": "73642bfb04b2ef923de6126c6ad08ccd957f960ce3821a57cbffa7b4e49cfce7",
+          "classes": [
+            "_ion-s-b76ce82a4d"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Existing replaced_by claim verified against live an-dist-track/pb-preview-step/forensic-progress definitions and markup."
+        },
+        {
+          "selector": "._ion-s-5eaab7cb30",
+          "sha256": "2f24e02b2b0c2bf5d6780408c678e69e479a968a97ed43a4ccddac2bbc5080f8",
+          "classes": [
+            "_ion-s-5eaab7cb30"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Existing replaced_by claim verified against live an-dist-track/pb-preview-step/forensic-progress definitions and markup."
+        },
+        {
+          "selector": "._ion-s-a55ef5c079",
+          "sha256": "e0c60f15b92e868ee1342e417bd880debc8753c700513438cb6b513cbfe457e2",
+          "classes": [
+            "_ion-s-a55ef5c079"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Existing replaced_by claim verified against live an-dist-track/pb-preview-step/forensic-progress definitions and markup."
+        }
+      ]
+    },
+    "ion-pages.css": {
+      "original_candidate_classes": [
+        "chat-toggle",
+        "chat-widget",
+        "deck-brand-big",
+        "deck-h-gap",
+        "deck-h-row",
+        "deck-kpi",
+        "deck-kpi-label",
+        "deck-kpi-value",
+        "header-actions",
+        "navbar",
+        "se-meta-header",
+        "title-slide"
+      ],
+      "rules": [
+        {
+          "selector": "body[data-page=\"guide\"] .navbar, body[data-page=\"guide\"] .g-role-bar, body[data-page=\"guide\"] .g-quicknav, body[data-page=\"guide\"] .header-actions, body[data-page=\"guide\"] .chat-widget, body[data-page=\"guide\"] .chat-toggle",
+          "sha256": "bc5d5b199861bedf5c7846bf2b50207c0fd926dde473c25e3c594b5c1efff9b3",
+          "classes": [
+            "chat-toggle",
+            "chat-widget",
+            "g-quicknav",
+            "g-role-bar",
+            "header-actions",
+            "navbar"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"daily_standup_slides\"] .deck-brand-mark, body[data-page=\"daily_standup_slides\"] .deck-brand-big",
+          "sha256": "5bca175919b5cbc4c7a88671de29d9ecdb56e818b6564c7d9a868bc80151e367",
+          "classes": [
+            "deck-brand-big",
+            "deck-brand-mark"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"daily_standup_slides\"] .deck-brand-big",
+          "sha256": "5230ff41d9a18ed7993dadb40fde350a13ff06b14a632b7626028203683fd7c2",
+          "classes": [
+            "deck-brand-big"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": "body[data-page=\"daily_standup_slides\"] .deck-slide.title-slide",
+          "sha256": "c9894fa95a155be993a1994b88d277d1a9b6921ce0f00752686b56de135f2475",
+          "classes": [
+            "deck-slide",
+            "title-slide"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"daily_standup_slides\"] .deck-h-gap",
+          "sha256": "7244a4879487c9bffd5f53200fbe372c113b08c05c8e8d5f336911d5e7c4e987",
+          "classes": [
+            "deck-h-gap"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": "body[data-page=\"daily_standup_slides\"] .deck-h-row",
+          "sha256": "711abf75757e1ba849a04659b48a576029d3b2571de99b54f2e0dacaa93e23ba",
+          "classes": [
+            "deck-h-row"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": "body[data-page=\"daily_standup_slides\"] .deck-h-row .deck-h-title",
+          "sha256": "a700d8cadf292ed44245aef3b7fe8be9bd96c2d42e45ba3baf3809011ee219dd",
+          "classes": [
+            "deck-h-row",
+            "deck-h-title"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"daily_standup_slides\"] .deck-kpi",
+          "sha256": "c669e8bffd38f45c8768f26d1281e784215022da9ae04c0168177f31a27fe423",
+          "classes": [
+            "deck-kpi"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": "body[data-page=\"daily_standup_slides\"] .deck-kpi-value",
+          "sha256": "bab9833a61681d6bd2c3878d6cebeb4201367407ab3aa1969efa2cd5d05d2bbf",
+          "classes": [
+            "deck-kpi-value"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": "body[data-page=\"daily_standup_slides\"] .deck-kpi-label",
+          "sha256": "2a12d9db71bcfb1a38d568474bfacdcc2d5c807bdedf1d3ddbbebaf9619a46ef",
+          "classes": [
+            "deck-kpi-label"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": "body[data-page=\"daily_standup_slides\"] .deck-slide.title-slide .deck-title",
+          "sha256": "86425511ea62f7b49d246043778ace0964fdc5329aa4a94b46caef76ef68a9b4",
+          "classes": [
+            "deck-slide",
+            "deck-title",
+            "title-slide"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"executive_report\"] .navbar, body[data-page=\"executive_report\"] .header-actions, body[data-page=\"executive_report\"] .chat-widget, body[data-page=\"executive_report\"] .chat-toggle",
+          "sha256": "517be42992276b5b928220760c74d0ac4fe699963d88090acf88782b240b0ce3",
+          "classes": [
+            "chat-toggle",
+            "chat-widget",
+            "header-actions",
+            "navbar"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": "body[data-page=\"shift_handover\"] .navbar, body[data-page=\"shift_handover\"] .header-actions, body[data-page=\"shift_handover\"] .chat-widget, body[data-page=\"shift_handover\"] .chat-toggle",
+          "sha256": "d57219bff5971f6e131ea1a0716732a5b36dd3e80ba00f48ca84f76a24aca732",
+          "classes": [
+            "chat-toggle",
+            "chat-widget",
+            "header-actions",
+            "navbar"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": "body[data-page=\"template_render\"] .se-meta-header",
+          "sha256": "5c30e935bfe615b1fbab99f050c308bde274395ac98e6a1de3118c939b29551d",
+          "classes": [
+            "se-meta-header"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": "body[data-page=\"template_render\"] .se-meta-header .se-rendered",
+          "sha256": "d8cd659dcdb123661b94af9c8c7100edafaff4c964b4f954fc4705700af1564b",
+          "classes": [
+            "se-meta-header",
+            "se-rendered"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"template_render\"] .se-meta-header .rendered-content",
+          "sha256": "da370dd695ee878a1f7b5cf4afa2d9b5820c839b4fbdce7101122e85d9434163",
+          "classes": [
+            "rendered-content",
+            "se-meta-header"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        }
+      ]
+    },
+    "ion-shell.css": {
+      "original_candidate_classes": [
+        "bg-grid",
+        "bg-ink-950",
+        "bg-white",
+        "border-white"
+      ],
+      "rules": [
+        {
+          "selector": "[data-theme=\"light\"] .ion-tw-page .bg-ink-900\\/50,\n    [data-theme=\"light\"] .ion-tw-page .bg-ink-900\\/40,\n    [data-theme=\"light\"] .ion-tw-page .bg-ink-900\\/60,\n    [data-theme=\"light\"] .ion-tw-page .bg-ink-950\\/60",
+          "sha256": "7f292d347231fc0fe02f3e94dc1071d0bb1b8ae68d382c0ad1439b6fd32c2058",
+          "classes": [
+            "bg-ink-900",
+            "bg-ink-950",
+            "ion-tw-page"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "[data-theme=\"light\"] .ion-tw-page .border-white\\/5,\n    [data-theme=\"light\"] .ion-tw-page .border-white\\/10",
+          "sha256": "144977f76fdb0754b5cc1e93e5cea964dcbe72e525de54569ce62556cfa4184f",
+          "classes": [
+            "border-white",
+            "ion-tw-page"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "[data-theme=\"light\"] .ion-tw-page .bg-white\\/5",
+          "sha256": "3ab8518da4819e76b891735156fff15459a837ac6b132df43db318202f323b96",
+          "classes": [
+            "bg-white",
+            "ion-tw-page"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "[data-theme=\"light\"] .ion-tw-page .bg-grid",
+          "sha256": "29890e791556544ae0d98e40a77f90fd4b6e3120845255dae51aced71085b6ff",
+          "classes": [
+            "bg-grid",
+            "ion-tw-page"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        }
+      ]
+    },
+    "observables-page.css": {
+      "original_candidate_classes": [
+        "ctx-dest",
+        "ctx-host",
+        "ctx-source",
+        "ctx-subject",
+        "ctx-target",
+        "header-actions",
+        "observables-filters"
+      ],
+      "rules": [
+        {
+          "selector": "body[data-page=\"observables\"] .header-actions .badge",
+          "sha256": "786e9a47f6d96b05f3e136306d598fe9ffbe34d8ccb97997325f7ba66c902af1",
+          "classes": [
+            "badge",
+            "header-actions"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"observables\"] .observables-filters select, body[data-page=\"observables\"] .observables-filters .search-input",
+          "sha256": "75804eb6ff930249035d75b6a724486a87daf44d87d7cae6c6d6c7629c2af1c1",
+          "classes": [
+            "observables-filters",
+            "search-input"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"observables\"] .observables-filters .search-input",
+          "sha256": "25d870012c77115bb51e76dc13359cc37115b34e6c0b5c9f95149022d155818a",
+          "classes": [
+            "observables-filters",
+            "search-input"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"observables\"] .context-badge.ctx-source",
+          "sha256": "6e7efe70c62ccccc478430128dc18ff0f8ae73fb9f00b88b823c41e469cb810d",
+          "classes": [
+            "context-badge",
+            "ctx-source"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"observables\"] .context-badge.ctx-dest",
+          "sha256": "6cdef9280ce205ea646e5cf2ab66ecada715c2c41e0a3780b798ec956f3b325e",
+          "classes": [
+            "context-badge",
+            "ctx-dest"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"observables\"] .context-badge.ctx-subject",
+          "sha256": "23a5bbb01e131f4bb099a19a31437169e6d66239d4248c97520172974d8c3790",
+          "classes": [
+            "context-badge",
+            "ctx-subject"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"observables\"] .context-badge.ctx-target",
+          "sha256": "83301a77cddcf98b9ea889494ea5452080c7e52a39e8753901681e01e6dab033",
+          "classes": [
+            "context-badge",
+            "ctx-target"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "body[data-page=\"observables\"] .context-badge.ctx-host",
+          "sha256": "d9b774c958c89c67c5c4ed989585fffa92a5467515c4742e72d59e39e999643f",
+          "classes": [
+            "context-badge",
+            "ctx-host"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        }
+      ]
+    },
+    "pcap-page.css": {
+      "original_candidate_classes": [
+        "progress-bar-inner",
+        "progress-bar-outer",
+        "tone-medium",
+        "upload-icon",
+        "verdict-info"
+      ],
+      "rules": [
+        {
+          "selector": ".pcap-tab-badge.tone-medium",
+          "sha256": "d8dd5285832d2ae923e30e90ece7084650ee0429504388d9d8d385ad5d921b10",
+          "classes": [
+            "pcap-tab-badge",
+            "tone-medium"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".pcap-upload-zone .upload-icon",
+          "sha256": "ed2962c8ea1c9b6d5d2219152ede49a46d0629ec4421e422f29178141eae8478",
+          "classes": [
+            "pcap-upload-zone",
+            "upload-icon"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".pcap-upload-zone.drag-over .upload-icon",
+          "sha256": "c1e9dc8a251a589d9a5a414dccd346c02fbe1c74c1a891d3811a039d8484438f",
+          "classes": [
+            "drag-over",
+            "pcap-upload-zone",
+            "upload-icon"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".pcap-progress .progress-bar-outer",
+          "sha256": "442ad8a5ac373903349dd4387f2bb06c246bc0d97374b00905fd3003ccb7d105",
+          "classes": [
+            "pcap-progress",
+            "progress-bar-outer"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".pcap-progress .progress-bar-inner",
+          "sha256": "f5472333190df78b4e45990e4cd66a40d0a0d1c155e1b5f9a8be5b3e4895b6dc",
+          "classes": [
+            "pcap-progress",
+            "progress-bar-inner"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": ".verdict-info .verdict-confidence",
+          "sha256": "0dc203d38bb448008926d5f62555968668cc812e8b29089176ff21c1aca860b4",
+          "classes": [
+            "verdict-confidence",
+            "verdict-info"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        }
+      ]
+    },
+    "playbooks-page.css": {
+      "original_candidate_classes": [
+        "exec-detail-header"
+      ],
+      "rules": [
+        {
+          "selector": ".exec-detail-header",
+          "sha256": "34f278d564037e76679551c46cf5ced1cd83b8ea4a59a87846a27d279cd3745f",
+          "classes": [
+            "exec-detail-header"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".exec-detail-header h3",
+          "sha256": "3482cd99dd5844bd941dd57a1ff0ae8db890bb4b8ed97c3a3378147bda1bc02f",
+          "classes": [
+            "exec-detail-header"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        }
+      ]
+    },
+    "settings-page.css": {
+      "original_candidate_classes": [
+        "env-vars-list",
+        "sessions-actions",
+        "settings-layout",
+        "settings-nav"
+      ],
+      "rules": [
+        {
+          "selector": "body[data-page=\"settings\"] .settings-layout",
+          "sha256": "0a7b1e98d350886d9634efbf613eb9224208ca62ebef0a6780b4d4a3fddefaf1",
+          "classes": [
+            "settings-layout"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": "body[data-page=\"settings\"] .settings-layout",
+          "sha256": "bf2bb058bf57c23afb25f75f88187c06e3eaf92ffde337f90601ed0d829f00d3",
+          "classes": [
+            "settings-layout"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": "body[data-page=\"settings\"] .settings-nav",
+          "sha256": "dffe941b81a3757f397d335676ab4482135bc70729843d8873732044a8420142",
+          "classes": [
+            "settings-nav"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": "body[data-page=\"settings\"] .env-vars-list",
+          "sha256": "b23c889a10a551b2baf19bcb31d18e018244fdcf9712fb71d5b152d47c72db3f",
+          "classes": [
+            "env-vars-list"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": "body[data-page=\"settings\"] .sessions-actions",
+          "sha256": "911cd41d89e8ad8efd84d74c068b3e3c417be78d859801cffcfb9c4fb949326b",
+          "classes": [
+            "sessions-actions"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        }
+      ]
+    },
+    "threat-intel.css": {
+      "original_candidate_classes": [
+        "ti-header",
+        "ti-page",
+        "ti-search-bar",
+        "ti-search-input",
+        "ti-stat-card",
+        "ti-stat-label",
+        "ti-stat-value",
+        "ti-stats"
+      ],
+      "rules": [
+        {
+          "selector": ".ti-page",
+          "sha256": "f1ca7e0a06f2bd39e8bf7083fab94ca7d7e908dc66182bf5d2bc773acc81e5a9",
+          "classes": [
+            "ti-page"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".ti-header",
+          "sha256": "a6549d34e1a749514520c40a2a49c0ee40da51c256e075861c77facd444f4186",
+          "classes": [
+            "ti-header"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".ti-header h1",
+          "sha256": "811812e1b651239c86a9c714846b996bd1364e7eb828d6bd39277fe6b55f877e",
+          "classes": [
+            "ti-header"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".ti-header p",
+          "sha256": "16e1c934fc7fb02616bffa105818a1d5a75233468dbd6d5663cfc2a26153c488",
+          "classes": [
+            "ti-header"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".ti-stats",
+          "sha256": "d7ff0e38fe78efcdccf7c7fb0013a11c5f5093ca59c3a173c66f101555e842ce",
+          "classes": [
+            "ti-stats"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".ti-stat-card",
+          "sha256": "252dc10d7a60ac4d88c5dbdd70719261f196253e0898d9e04c06b5b285909945",
+          "classes": [
+            "ti-stat-card"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".ti-stat-value",
+          "sha256": "66c48a6d11847350a493baddd3611cb09a1349b908b99a0fd6efd386ce36fbcf",
+          "classes": [
+            "ti-stat-value"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".ti-stat-label",
+          "sha256": "a322a090fdf9df81af3eb797d46b5d070825ddee3e89e0029700c943f4326e91",
+          "classes": [
+            "ti-stat-label"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".ti-search-bar",
+          "sha256": "f19b618fdb10c69fe52b33cab7eadf65f2f298e9ad55d5e7d3d02a1079125611",
+          "classes": [
+            "ti-search-bar"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".ti-search-input",
+          "sha256": "5ae006e9b2b37a37150d0dc4b80e7b27fb3299bf58e51ac9197d2ba736544312",
+          "classes": [
+            "ti-search-input"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".ti-search-input::placeholder",
+          "sha256": "33d499eb445916d794d74ea67d90fdaa19e4f9e816668d6cc39a3c0cd239decf",
+          "classes": [
+            "ti-search-input"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".ti-search-input:focus",
+          "sha256": "c2f395f7e106b1d1119b179b56ff6659e627fc3b6469dbb93c68bf642c9d6b3a",
+          "classes": [
+            "ti-search-input"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        }
+      ]
+    }
+  }
+}

@@ -63,15 +63,9 @@
     flex-wrap: wrap;
 }
 
-.stats-group {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-}
 
-.stats-cases {
-    margin-left: auto;
-}
+
+
 
 /* Stats bar — refreshed in v0.9.72 to use the data_flow tile pattern */
 .stat-item {
@@ -395,9 +389,7 @@
     margin-right: 1rem;
 }
 
-.timer-icon {
-    font-size: 1rem;
-}
+
 
 .timer-display {
     min-width: 50px;
@@ -456,16 +448,7 @@
 }
 
 /* Threat Banner (reuse from security_dashboard) */
-.security-banner {
-    background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-    border-radius: var(--ion-radius-lg);
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: white;
-}
+
 
 .threat-level {
     display: flex;
@@ -738,14 +721,9 @@
 .active-filter-banner:not(.hidden) { display: flex; }
 
 /* Sortable columns */
-.sortable {
-    cursor: pointer;
-    user-select: none;
-}
 
-.sortable:hover {
-    color: var(--primary);
-}
+
+
 
 .sort-arrow {
     font-size: 0.65rem;

@@ -632,21 +632,8 @@
     height: 3px;
     background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
 }
-.sys-stat-val {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--primary);
-    font-family: 'JetBrains Mono', monospace;
-    line-height: 1.2;
-    text-shadow: var(--glow-sm);
-}
-.sys-stat-label {
-    font-size: 0.7rem;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-top: 0.25rem;
-}
+
+
 
 /* System card */
 .sys-card {

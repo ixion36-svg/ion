@@ -257,6 +257,39 @@ def literal_tokens(text: str) -> set[str]:
     return {t for t in out if IDENT.fullmatch(t)}
 
 
+def macro_class_prefixes(text: str) -> set[str]:
+    """Follow literal macro arguments joined to a class suffix in markup."""
+    if not re.search(r"\{%[-+]?\s*macro\b", text):
+        return set()
+    from jinja2 import Environment, nodes
+
+    tree = Environment(extensions=["jinja2.ext.do", "jinja2.ext.loopcontrols"]).parse(text)
+    families: dict[str, list[tuple[int, str, str, object]]] = {}
+    for macro in tree.find_all(nodes.Macro):
+        arguments = [arg.name for arg in macro.args]
+        defaults = dict(zip(arguments[len(arguments) - len(macro.defaults):], macro.defaults))
+        for output in macro.find_all(nodes.Output):
+            for index, node in enumerate(output.nodes[1:-1], 1):
+                before, after = output.nodes[index - 1], output.nodes[index + 1]
+                if (isinstance(node, nodes.Name) and node.name in arguments
+                        and isinstance(before, nodes.TemplateData)
+                        and re.search(r'''\bclass\s*=\s*["'][^"']*$''', before.data)
+                        and isinstance(after, nodes.TemplateData)
+                        and after.data.startswith(("-", "_"))):
+                    families.setdefault(macro.name, []).append(
+                        (arguments.index(node.name), node.name, after.data[0], defaults.get(node.name)))
+    out: set[str] = set()
+    for call in tree.find_all(nodes.Call):
+        name = (call.node.name if isinstance(call.node, nodes.Name)
+                else call.node.attr if isinstance(call.node, nodes.Getattr) else None)
+        keywords = {keyword.key: keyword.value for keyword in call.kwargs}
+        for index, argument, separator, default in families.get(name, []):
+            value = call.args[index] if index < len(call.args) else keywords.get(argument, default)
+            if isinstance(value, nodes.Const) and isinstance(value.value, str) and IDENT.fullmatch(value.value):
+                out.add(value.value + separator)
+    return out
+
+
 def constructed_prefixes(text: str, kind: str = "all") -> set[str]:
     """`'sev-' + x` and `` `sc-cov-${n}` `` mean every sev-*/sc-cov-* is live.
 
@@ -334,9 +367,9 @@ def constructed_prefixes(text: str, kind: str = "all") -> set[str]:
     # harvested `L-`, `n_`, `b_`, `c-` and the like.
     if markup:
         out.update(re.findall(r'''["']([A-Za-z][A-Za-z0-9_-]*[-_])["']''', text))
-    # alert-detail.js joins an injected host prefix to each suffix through
-    # _cls(). Neither the option value nor its default ends with a hyphen.
-    if js:
+        out.update(macro_class_prefixes(text))
+    # The host option is often inline JavaScript inside a template.
+    if js or markup:
         for pattern in (
                 r'''classPrefix\s*:\s*["']([A-Za-z][A-Za-z0-9_-]*)["']''',
                 r'''\.classPrefix\s*\|\|\s*["']([A-Za-z][A-Za-z0-9_-]*)["']'''):

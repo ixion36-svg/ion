@@ -11,14 +11,14 @@ from dead_css import (
     CLASS_IN_SELECTOR,
     RULE,
     constructed_prefixes,
-    corpus,
+    corpus_by_kind,
     literal_tokens,
     mask_comments,
     sheet_path,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-MANIFEST = ROOT / "docs/dead-css-vetting-2026-10-14.json"
+MANIFEST = ROOT / "docs/dead-css-round-two-2026-10-14.json"
 
 
 def baseline(path: Path, revision: str) -> str:
@@ -59,8 +59,10 @@ def expected(css: str, approved: list[dict]) -> str:
 
 def main() -> None:
     data = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    text = corpus()
-    live, prefixes = literal_tokens(text), constructed_prefixes(text)
+    chunks = corpus_by_kind()
+    live = literal_tokens("\n".join(chunks.values()))
+    prefixes = set().union(*(constructed_prefixes(text, kind=kind)
+                             for kind, text in chunks.items()))
     removed = 0
     for sheet, review in data["sheets"].items():
         path = sheet_path(sheet)
@@ -88,7 +90,7 @@ def main() -> None:
         assert actual.count("{") == actual.count("}"), sheet
         removed += len(approved)
         print(f"{sheet}: {len(approved)} approved removals; {len(review['rules']) - len(approved)} candidate rules kept")
-    print(f"VERIFIED: {removed} individual removals; all other stylesheet bytes preserved")
+    print(f"VERIFIED: {removed} individual removals; all other reviewed stylesheet bytes preserved")
 
 
 if __name__ == "__main__":

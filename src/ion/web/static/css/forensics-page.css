@@ -30,8 +30,8 @@ body[data-page="forensics"] .modal-header{
     border-radius: 12px 12px 0 0;
 }
 body[data-page="forensics"] .modal-header h2{ font-size: 1.1rem; margin: 0; }
-body[data-page="forensics"] .editable-title{ cursor: pointer; border-bottom: 1px dashed transparent; transition: border-color .2s; }
-body[data-page="forensics"] .editable-title:hover{ border-bottom-color: var(--accent, var(--primary)); }
+
+
 body[data-page="forensics"] .editable-desc{ border: 1px dashed transparent; padding: 4px; border-radius: 4px; transition: border-color .2s; }
 body[data-page="forensics"] .editable-desc:hover{ border-color: var(--ion-border); }
 body[data-page="forensics"] .editable-desc:empty::after{ content: "Click to add description..."; color: var(--text-secondary); opacity: .5; font-style: italic; }

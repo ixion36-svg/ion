@@ -873,11 +873,7 @@ body[data-page="compliance"] .cmp-fw-bar-fill{ height: 100%; }
     background: linear-gradient(135deg, var(--ion-cyan) 0%, var(--ion-iris) 100%);
   }
   body[data-page="daily_standup_slides"] .deck-brand-mark{ box-shadow: 0 0 24px -6px rgba(109,228,255,0.45); }
-  body[data-page="daily_standup_slides"] .deck-brand-big{
-    box-shadow:
-      0 0 80px -10px rgba(109,228,255,0.55),
-      0 0 40px -8px rgba(167,139,250,0.35);
-  }
+
 
   /* JS toggles .hidden on a flex slide; equal-specificity utilities fight. */
   body[data-page="daily_standup_slides"] .deck-slide.hidden{ display: none; }
@@ -908,21 +904,13 @@ body[data-page="compliance"] .cmp-fw-bar-fill{ height: 100%; }
   body[data-page="daily_standup_slides"] .deck-body{ display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
   body[data-page="daily_standup_slides"] .deck-tablebox{ min-height: 0; flex: 1 1 auto; overflow: auto; }
   body[data-page="daily_standup_slides"] .deck-more{ margin-top: 1.2vh; }
-  body[data-page="daily_standup_slides"] .deck-h-gap{ height: 2.5vh; flex-shrink: 0; }
+
   body[data-page="daily_standup_slides"] .deck-h-title{ margin-bottom: 2.5vh; flex-shrink: 0; }
-  body[data-page="daily_standup_slides"] .deck-h-row{
-    display: flex; align-items: baseline; justify-content: space-between;
-    gap: 4vw; flex-shrink: 0;
-  }
+
   body[data-page="daily_standup_slides"] .deck-h-row .deck-h-title{ margin-bottom: 0; }
-  body[data-page="daily_standup_slides"] .deck-kpi{ text-align: right; flex-shrink: 0; }
-  body[data-page="daily_standup_slides"] .deck-kpi-value{
-    font-size: clamp(40px, 6vw, 80px); line-height: 1; font-weight: 600;
-  }
-  body[data-page="daily_standup_slides"] .deck-kpi-label{
-    font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
-    color: var(--deck-dim); margin-top: 0.4vh;
-  }
+
+
+
 
   /* Title-slide wordmark uses background-clip text. */
   body[data-page="daily_standup_slides"] .deck-slide.title-slide .deck-title{
@@ -1632,7 +1620,7 @@ body[data-page="entity_timeline"] .et-filter.active{
 /* auto-fit minmax has no daisyUI grid equivalent; do not approximate with breakpoints. */
 body[data-page="executive_report"] .er-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
 
-@media print{body[data-page="executive_report"] .navbar, body[data-page="executive_report"] .header-actions, body[data-page="executive_report"] .chat-widget, body[data-page="executive_report"] .chat-toggle{display:none!important}body[data-page="executive_report"]{background:#fff;color:#000}body[data-page="executive_report"] .card, body[data-page="executive_report"] .stat{break-inside:avoid;border-color:#ddd}}
+@media print{body[data-page="executive_report"]{background:#fff;color:#000}body[data-page="executive_report"] .card, body[data-page="executive_report"] .stat{break-inside:avoid;border-color:#ddd}}
 
 /* JS sets .ae-activity-bar height from data-pct; hover .tip has no daisyUI equivalent. */
 body[data-page="executive_report"] .ae-activity-chart{display:flex;align-items:flex-end;gap:2px;height:80px;padding:8px 0}
@@ -1856,7 +1844,7 @@ body[data-page="profile"] #profile-info > .error{
 body[data-page="shift_handover"] .sh-report{ max-width: 1100px; }
 
 @media print {
-    body[data-page="shift_handover"] .navbar, body[data-page="shift_handover"] .header-actions, body[data-page="shift_handover"] .chat-widget, body[data-page="shift_handover"] .chat-toggle{ display: none !important; }
+
     body[data-page="shift_handover"]{ background: #fff; color: #000; }
     body[data-page="shift_handover"] .sh-report{ max-width: 100%; }
     body[data-page="shift_handover"] .card, body[data-page="shift_handover"] .stat, body[data-page="shift_handover"] .alert{ break-inside: avoid; border-color: #ddd; }
@@ -2399,7 +2387,7 @@ body[data-page="template_render"] .se-edit-area textarea:focus{
     border-color: var(--color-primary);
     box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-primary) 20%, transparent);
 }
-body[data-page="template_render"] .se-meta-header{ padding: 0; }
+
 body[data-page="template_render"] .se-meta-header .se-rendered{ padding: 1rem; }
 body[data-page="template_render"] .se-meta-header .rendered-content{ font-size: 0.85rem; }
 
