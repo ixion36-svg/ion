@@ -1842,3 +1842,514 @@ async def cases_attack_path_fragment(
         payload = None
     return render_view(request, ATTACK_PATH_FRAGMENT,
                        attack_path_view(payload))
+
+
+# ---------------------------------------------------------------------------
+# The case detail panel
+# ---------------------------------------------------------------------------
+#
+# renderPanelContent was 408 lines returning one string, assigned straight
+# to body.innerHTML, and openCaseDetail wrapped the whole sequence in a
+# single try. Its own comment admits what that cost:
+#
+#     // Name the failure. Everything above runs inside one try, so a
+#     // throw in any of renderPanelContent / applyConfidenceMeters /
+#     // switchPanelTab / selectCaseAlert lands here indistinguishably --
+#     // and the request itself returns 200, so the server log is clean
+#     // and the only evidence was the words "Failed to load case
+#     // details".
+#
+# A render failure is a 500 with a traceback now.
+#
+# TWO COUPLINGS THAT HAD TO SURVIVE
+#
+# renderPanelContent sorted c.alerts *in place*, deliberately, because
+# openCaseDetail then reads c.alerts[0] and passes index 0 to
+# selectCaseAlert. Sorting a copy would have left the rail showing one
+# alert selected while the detail column rendered another. The sort is
+# here now, so the view states which alert is first and the page reads
+# that rather than re-deriving it and disagreeing.
+#
+# _railAlerts[alertId] = a stashed each full alert so selecting a row
+# could hand it to the shared alert-detail component without a refetch.
+# That still happens in the page: openCaseDetail keeps its
+# /api/cases/{id} read for the ten async loaders anyway, so it fills the
+# cache from a payload it already had.
+#
+# AND ONE THING THAT CANNOT MOVE
+#
+# The notes render markdown, and ui/template_render.py records why that
+# stays client-side: ION has no HTML sanitiser in its dependencies. So
+# this sends each note's raw text and the page renders it, through
+# DOMPurify's RETURN_DOM_FRAGMENT and replaceChildren rather than
+# innerHTML, which keeps it off the runtime-write count.
+
+PANEL_FRAGMENT = "_fragments/cases_panel.html"
+
+#: The severity strip's icon per level, from the page's sevIcons.
+PANEL_SEV_ICONS: dict[str, str] = {
+    "critical": "icon-alert-octagon",
+    "high": "icon-alert-triangle",
+    "medium": "icon-info",
+    "low": "icon-minus-circle",
+}
+
+#: The panel's tabs, in the page's order, with the default first.
+PANEL_TABS: tuple[tuple[str, str], ...] = (
+    ("alerts", "Alerts"),
+    ("overview", "Overview"),
+    ("observables", "Observables"),
+    ("timeline", "Timeline"),
+    ("attackpath", "Attack Path"),
+    ("notes", "Notes"),
+    ("actions", "Actions"),
+)
+
+#: The selectable values of the two metadata dropdowns.
+PANEL_STATUSES: tuple[str, ...] = ("open", "acknowledged", "closed")
+PANEL_SEVERITIES: tuple[str, ...] = ("critical", "high", "medium", "low")
+
+#: Triage order for the alert rail. The page reused the board's _sevRank
+#: rather than declaring a second scale, and so does this.
+PANEL_SEV_RANK: dict[str, int] = {
+    "critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4,
+}
+
+#: The alert status badge's classes. These were statusColors, a table of
+#: an rgba and a var per status held in JavaScript and applied through
+#: data-ion-style, so the palette sat where no stylesheet could reach it.
+PANEL_STATUS_CLASSES: tuple[str, ...] = ("open", "acknowledged", "closed")
+
+
+class PanelAlert(TypedDict):
+    alert_id: str
+    index: int
+    name: str
+    severity: str
+    severity_class: Optional[str]
+    status: Optional[str]
+    status_class: Optional[str]
+    bits: list[str]
+
+
+class PanelNote(TypedDict):
+    note_id: str
+    user: Optional[str]
+    when: Optional[str]
+    raw: str
+
+
+class PanelTag(TypedDict):
+    kind: str
+    label: str
+    value: str
+
+
+class KibanaPill(TypedDict):
+    display: str
+
+
+class PanelView(TypedDict):
+    state: str
+    case_id: int
+    case_number: Optional[str]
+    title: Optional[str]
+    severity: str
+    severity_icon: str
+    alert_count: Optional[int]
+    observable_count: Optional[int]
+    age: Optional[str]
+    tabs: list[dict]
+    status: Optional[str]
+    statuses: list[str]
+    severities: list[str]
+    assigned_to_id: Optional[int]
+    users: Optional[list[dict]]
+    users_withheld: bool
+    kibana_pills: Optional[list[KibanaPill]]
+    kibana_mismatch: bool
+    created: Optional[str]
+    tags: Optional[list[PanelTag]]
+    description: Optional[str]
+    observables: Optional[list[dict]]
+    mitre: Optional[list[dict]]
+    alerts: Optional[list[PanelAlert]]
+    first_alert_id: Optional[str]
+    notes: Optional[list[PanelNote]]
+    note_count: Optional[int]
+    kibana_case_id: Optional[str]
+    kibana_url: Optional[str]
+    escalated: bool
+
+
+def _panel_text(value: Any) -> Optional[str]:
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped or None
+    return None
+
+
+def observable_key(raw: Any) -> Optional[tuple[str, str]]:
+    if not isinstance(raw, dict):
+        return None
+    return (str(raw.get("type") or ""), str(raw.get("value") or ""))
+
+
+def panel_observables(case_obs: Any, alerts: Any) -> Optional[list[dict]]:
+    """The case's observables merged with its alerts', duplicates removed.
+
+    The page did this so a multi-alert case never shows the same IP twice
+    and the count matches the list. None here when either list is not a
+    list, because "no observables extracted yet" is a different answer
+    from "I could not read them".
+    """
+    if not isinstance(case_obs, list):
+        return None
+    seen: dict[tuple[str, str], dict] = {}
+
+    def take(entry: Any) -> None:
+        key = observable_key(entry)
+        if key is not None and key not in seen:
+            threat = entry.get("threat_level")
+            seen[key] = {
+                "kind": _panel_text(entry.get("type")),
+                "value": _panel_text(entry.get("value")),
+                "threat_level": (threat if threat is not None
+                                 else entry.get("priority")),
+                "score": entry.get("score"),
+                "source": _panel_text(entry.get("source")),
+            }
+
+    for entry in case_obs:
+        take(entry)
+    if isinstance(alerts, list):
+        for alert in alerts:
+            if not isinstance(alert, dict):
+                continue
+            nested = alert.get("observables")
+            if isinstance(nested, list):
+                for entry in nested:
+                    take(entry)
+    return [observable_chip(v) for v in seen.values()]
+
+
+#: Observable types OpenCTI enrichment can score. Others get a plain
+#: chip, which is what _enrichableObsTypes decided in the page.
+ENRICHABLE_OBS: frozenset[str] = frozenset({
+    "ip", "ipv4", "ipv6", "domain", "url", "sha256", "sha1", "md5",
+    "hash", "email",
+})
+
+#: Where a chip's value is clipped, from the page's 44/41 pair.
+OBS_CHIP_MAX = 44
+OBS_CHIP_KEEP = 41
+
+
+def observable_chip(raw: dict) -> dict:
+    """One typed observable chip.
+
+    Enrichable types carry a threat badge whose label is the score when
+    there is one, `ok` for benign, `?` for unknown, and the level
+    otherwise. The page's own resolution, kept.
+    """
+    kind = (raw.get("kind") or "unknown").lower()
+    value = raw.get("value") or ""
+    score = raw.get("score")
+    has_score = score is not None and score != ""
+    level = str(raw.get("threat_level") or "unknown").lower()
+    label = None
+    if kind in ENRICHABLE_OBS:
+        if has_score:
+            label = str(score)
+        elif level == "benign":
+            label = "ok"
+        elif level == "unknown":
+            label = "?"
+        else:
+            label = level
+    tip = "Threat level: %s" % level
+    if has_score:
+        tip += " · score %s" % score
+    source = raw.get("source")
+    if source:
+        tip += " · %s" % source
+    return {
+        "kind": kind,
+        "value": value,
+        "short": (value[:OBS_CHIP_KEEP] + "…"
+                  if len(value) > OBS_CHIP_MAX else value),
+        "level": level,
+        "label": label,
+        "tip": tip,
+    }
+
+
+def panel_tags(hosts: Any, users: Any, rules: Any) -> Optional[list[PanelTag]]:
+    """The context strip. None when any of the three is not a list."""
+    if not all(isinstance(v, list) for v in (hosts, users, rules)):
+        return None
+    tags: list[PanelTag] = []
+    for values, kind, label in ((hosts, "host", "H"), (users, "user", "U"),
+                                (rules, "rule", "R")):
+        for value in values:
+            text = _panel_text(value) if isinstance(value, str)                 else _panel_text(str(value))
+            if text:
+                tags.append({"kind": kind, "label": label, "value": text})
+    return tags
+
+
+def panel_mitre(alerts: Any) -> Optional[list[dict]]:
+    """Techniques across the case's alerts, first mention winning.
+
+    The page accepted either a string or an object per technique, and so
+    does this.
+    """
+    if not isinstance(alerts, list):
+        return None
+    out: list[dict] = []
+    seen: set[str] = set()
+    for alert in alerts:
+        if not isinstance(alert, dict):
+            continue
+        techniques = alert.get("mitre_techniques")
+        if not isinstance(techniques, list):
+            continue
+        for entry in techniques:
+            if isinstance(entry, str):
+                identifier = _panel_text(entry)
+                name = identifier
+            elif isinstance(entry, dict):
+                identifier = (_panel_text(entry.get("id"))
+                              or _panel_text(entry.get("technique_id")))
+                name = (_panel_text(entry.get("name"))
+                        or _panel_text(entry.get("technique"))
+                        or identifier)
+            else:
+                continue
+            if identifier and identifier not in seen:
+                seen.add(identifier)
+                out.append({"id": identifier, "name": name})
+    return out
+
+
+def panel_alerts(alerts: Any, case_severity: str) -> Optional[list[PanelAlert]]:
+    """The rail, ordered by severity then newest.
+
+    The page sorted c.alerts in place because openCaseDetail read
+    c.alerts[0] afterwards. The order is decided here instead and the
+    view names the first one, so the rail and the detail column cannot
+    disagree.
+    """
+    if not isinstance(alerts, list):
+        return None
+    entries = [a for a in alerts if isinstance(a, dict)]
+
+    def severity_of(alert: dict) -> str:
+        return (_panel_text(alert.get("priority"))
+                or _panel_text(alert.get("severity"))
+                or case_severity)
+
+    # Two stable passes rather than one clever key: newest first, then by
+    # severity, which leaves newest-first inside each severity because
+    # Python's sort is stable. The page broke the tie the same way.
+    entries.sort(key=lambda a: _panel_text(a.get("timestamp")) or "",
+                 reverse=True)
+    entries.sort(key=lambda a: PANEL_SEV_RANK.get(severity_of(a), 9))
+
+    out: list[PanelAlert] = []
+    for index, alert in enumerate(entries):
+        identifier = _panel_text(alert.get("es_alert_id")) or "unknown"
+        name = _panel_text(alert.get("rule_name")) or identifier[:24]
+        severity = (_panel_text(alert.get("priority"))
+                    or _panel_text(alert.get("severity"))
+                    or case_severity)
+        status = _panel_text(alert.get("status")) or "open"
+        bits = []
+        process = _panel_text(alert.get("process_name"))
+        if process:
+            bits.append(process)
+        source = _panel_text(alert.get("source_ip"))
+        if source:
+            destination = _panel_text(alert.get("destination_ip"))
+            bits.append("%s \u2192 %s" % (source, destination)
+                        if destination else source)
+        out.append({
+            "alert_id": identifier,
+            "index": index,
+            "name": name,
+            "severity": severity,
+            "severity_class": (severity if severity in PANEL_SEV_RANK
+                               else None),
+            "status": status,
+            # The badge's palette is a class now, not an rgba pair held
+            # in a JavaScript table and applied through data-ion-style.
+            "status_class": (status if status in PANEL_STATUS_CLASSES
+                             else None),
+            "bits": bits,
+        })
+    return out
+
+
+def panel_notes(notes: Any) -> Optional[list[PanelNote]]:
+    """The notes, raw. Markdown rendering stays client-side because ION
+    has no HTML sanitiser, which ui/template_render.py records."""
+    if not isinstance(notes, list):
+        return None
+    out: list[PanelNote] = []
+    for index, entry in enumerate(notes):
+        if not isinstance(entry, dict):
+            continue
+        identifier = entry.get("id")
+        content = entry.get("content")
+        out.append({
+            "note_id": ("cnote-%s" % identifier if identifier is not None
+                        else "cnote-i%d" % index),
+            "user": _panel_text(entry.get("user")),
+            "when": instant_label(entry.get("created_at")),
+            "raw": content if isinstance(content, str) else "",
+        })
+    return out
+
+
+def kibana_pills(raw: Any,
+                 assigned_to_id: Any) -> tuple[Optional[list[KibanaPill]], bool]:
+    """The linked Kibana case's assignees, and whether they disagree.
+
+    A mismatch means someone edited the case in Kibana since ION last
+    wrote to it.
+    """
+    if not isinstance(raw, list):
+        return None, False
+    pills: list[KibanaPill] = []
+    ion_ids: list[Any] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        display = (_panel_text(entry.get("ion_display_name"))
+                   or _panel_text(entry.get("ion_username"))
+                   or _panel_text(entry.get("full_name"))
+                   or _panel_text(entry.get("username"))
+                   or _panel_text(entry.get("uid"))
+                   or "unnamed")
+        pills.append({"display": display})
+        if entry.get("ion_user_id") is not None:
+            ion_ids.append(entry.get("ion_user_id"))
+    mismatch = bool(pills) and (assigned_to_id is None
+                                or assigned_to_id not in ion_ids)
+    return pills, mismatch
+
+
+def read_case_detail(case_id, current_user, session):
+    """One case with its alerts, observables and notes. case:read, which
+    this page already holds."""
+    from ion.web import case_lifecycle_api
+
+    return case_lifecycle_api.get_case_detail(
+        case_id=case_id, current_user=current_user, session=session)
+
+
+def panel_view(payload: Any, users: Any,
+               users_withheld: bool) -> PanelView:
+    empty: PanelView = {
+        "state": "failed", "case_id": 0, "case_number": None,
+        "title": None, "severity": "medium",
+        "severity_icon": PANEL_SEV_ICONS["medium"],
+        "alert_count": None, "observable_count": None, "age": None,
+        "tabs": [], "status": None,
+        "statuses": list(PANEL_STATUSES),
+        "severities": list(PANEL_SEVERITIES),
+        "assigned_to_id": None, "users": users,
+        "users_withheld": users_withheld,
+        "kibana_pills": None, "kibana_mismatch": False, "created": None,
+        "tags": None, "description": None, "observables": None,
+        "mitre": None, "alerts": None, "first_alert_id": None,
+        "notes": None, "note_count": None, "kibana_case_id": None,
+        "kibana_url": None, "escalated": False,
+    }
+    if not isinstance(payload, dict):
+        return empty
+
+    severity = _panel_text(payload.get("severity")) or "medium"
+    alerts = panel_alerts(payload.get("alerts"), severity)
+    observables = panel_observables(payload.get("observables"),
+                                   payload.get("alerts"))
+    notes = panel_notes(payload.get("notes"))
+    pills, mismatch = kibana_pills(payload.get("kibana_assignees"),
+                                   payload.get("assigned_to_id"))
+    counts = {"alerts": len(alerts) if alerts is not None else None,
+              "observables": (len(observables) if observables is not None
+                              else None)}
+    return {
+        "state": "data",
+        "case_id": _wb_int(payload.get("id")) or 0,
+        "case_number": _panel_text(payload.get("case_number")),
+        "title": _panel_text(payload.get("title")),
+        "severity": severity,
+        "severity_icon": PANEL_SEV_ICONS.get(severity, "icon-info"),
+        "alert_count": counts["alerts"],
+        "observable_count": counts["observables"],
+        "age": age_label(payload.get("created_at")),
+        "tabs": [{"key": k, "label": l,
+                  "count": counts.get(k)} for k, l in PANEL_TABS],
+        "status": _panel_text(payload.get("status")),
+        "statuses": list(PANEL_STATUSES),
+        "severities": list(PANEL_SEVERITIES),
+        "assigned_to_id": _wb_int(payload.get("assigned_to_id")),
+        "users": users,
+        "users_withheld": users_withheld,
+        "kibana_pills": pills,
+        "kibana_mismatch": mismatch,
+        "created": instant_label(payload.get("created_at")),
+        "tags": panel_tags(payload.get("affected_hosts"),
+                           payload.get("affected_users"),
+                           payload.get("triggered_rules")),
+        "description": (_panel_text(payload.get("description"))
+                        or _panel_text(payload.get("evidence_summary"))),
+        "observables": observables,
+        "mitre": panel_mitre(payload.get("alerts")),
+        "alerts": alerts,
+        "first_alert_id": (alerts[0]["alert_id"] if alerts else None),
+        "notes": notes,
+        "note_count": len(notes) if notes is not None else None,
+        "kibana_case_id": _panel_text(payload.get("kibana_case_id")),
+        "kibana_url": _panel_text(payload.get("kibana_url")),
+        "escalated": payload.get("dfir_iris_case_id") is not None,
+    }
+
+
+@router.get(
+    "/cases/{case_id}/panel",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def cases_panel_fragment(
+    request: Request,
+    case_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> Response:
+    """The panel's own markup. The ten lazy sections stay the page's."""
+    from ion.web import api as assignable_api
+    from ion.web.ui._cases_board import assignees_view
+
+    try:
+        result = read_case_detail(case_id, current_user, session)
+        payload = await result if hasattr(result, "__await__") else result
+    except Exception:
+        logger.exception("Case panel could not read case %s", case_id)
+        payload = None
+
+    # The assignee list needs alert:read, which this page does not hold,
+    # so it is withheld rather than fetched for a reader without it. Same
+    # shape as the board's own assignee dropdown.
+    permitted = current_user.has_permission("alert:read")
+    users = None
+    if permitted:
+        try:
+            users = (await assignable_api.list_assignable_users(
+                session=session))
+        except Exception:
+            logger.exception("Case panel could not read the user list")
+    view = panel_view(payload, assignees_view(users, permitted)["users"],
+                      not permitted)
+    return render_view(request, PANEL_FRAGMENT, view)

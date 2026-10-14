@@ -140,22 +140,41 @@ def test_the_checker_passes_a_builder_that_is_in_scope():
     assert problems == []
 
 
-def test_every_dynamic_style_expression_resolves():
+def test_no_template_builds_a_style_expression_in_javascript():
+    """Inverted, because the last one is gone.
+
+    This used to assert every `data-ion-style` expression resolved, and
+    it guarded itself with `checked > 0` so an empty scan could not pass
+    for the wrong reason. That guard fired: the case panel's alert status
+    badge, `background:' + sc.bg + ';color:' + sc.color`, was the last
+    JavaScript-built style attribute in any template, and it is a class
+    now.
+
+    So the assertion is stronger than it was. A style expression built in
+    JavaScript is a declaration no stylesheet sweep can reach and, when
+    the v0.31.21 migration froze such builders into CSS rules, one whose
+    binding had gone missing threw inside a try and surfaced as a generic
+    failure message. None exist, and none should come back.
+
+    The two controls above still run, so the checker is known to
+    distinguish a builder whose binding is gone from one in scope. That
+    is what keeps this from being a test that passes because it looks at
+    nothing.
+    """
     problems = []
-    checked = 0
+    found_any = []
     for path in sorted(TEMPLATES.rglob("*.html")):
         found, bad = _scan(
             path.read_text(encoding="utf-8", errors="replace"), path.name)
-        checked += found
+        if found:
+            found_any.append("%s: %d" % (path.name, found))
         problems += bad
 
-    assert checked > 0, (
-        "no dynamic data-ion-style expression was found at all, so this "
-        "scan proved nothing. The two control tests above still pass on "
-        "their snippets, so the checker itself works: either every site has "
-        "been converted, in which case delete this scan, or the attribute "
-        "has been renamed and ATTR needs updating.")
-    assert not problems, (
-        "data-ion-style expressions referencing names that are not in scope. "
-        "These throw at render time and the surrounding try/catch turns that "
-        "into a generic failure message:\n  " + "\n  ".join(problems))
+    assert not found_any, (
+        "a template builds a data-ion-style value in JavaScript again. "
+        "Put the declaration in a class, or in a Jinja expression the "
+        "server resolves, rather than a string the browser assembles:\n  "
+        + "\n  ".join(found_any))
+    # Kept so the message still exists if the first assertion is ever
+    # relaxed: an expression that does survive must at least resolve.
+    assert not problems, "\n  ".join(problems)
