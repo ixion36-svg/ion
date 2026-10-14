@@ -396,7 +396,12 @@ function initDocQuillEditor(content, format) {
         placeholder: 'Edit document content...'
     });
 
-    docQuillEditor.root.innerHTML = htmlContent;
+    // Quill keeps its own model and reads it back on every edit, so
+    // writing root.innerHTML left that model describing the previous
+    // contents. This is the API Quill documents for seeding it. The
+    // read on the next line is the baseline the amendment modal
+    // compares against, and it stays a read.
+    docQuillEditor.clipboard.dangerouslyPasteHTML(htmlContent);
     docQuillInitialHtml = docQuillEditor.root.innerHTML;
 }
 
@@ -614,7 +619,14 @@ function renderContent(content, format) {
         case 'markdown':
             return renderMarkdown(content);
         case 'html':
-            return content; // Already HTML
+            // Was "return content" with a comment saying it was already
+            // HTML. It is already HTML and it is also already somebody
+            // else's: models/document.py records that everyone can add a
+            // document, and both callers put this straight into
+            // innerHTML. chat.html had the same branch and the same
+            // comment. ION has no server-side sanitiser, so this is the
+            // only place it can happen.
+            return safeHtml(content);
         case 'csv':
             return renderCSV(content);
         default:
@@ -711,7 +723,7 @@ async function viewDocument(id) {
         renderDocumentTags();
 
         // Render content based on format
-        document.getElementById('rendered-view').innerHTML = renderContent(doc.rendered_content, doc.output_format);
+        ionSetSafeHtml(document.getElementById('rendered-view'), renderContent(doc.rendered_content, doc.output_format));
         document.getElementById('modal-doc-content').textContent = doc.rendered_content;
         initDocQuillEditor(doc.rendered_content, doc.output_format);
 
@@ -923,7 +935,7 @@ async function previewVersion(versionNumber) {
             });
         }
 
-        document.getElementById('version-content').innerHTML = renderContent(version.rendered_content, currentDocFormat);
+        ionSetSafeHtml(document.getElementById('version-content'), renderContent(version.rendered_content, currentDocFormat));
 
 
         document.getElementById('version-modal').style.display = 'flex';
