@@ -193,3 +193,48 @@ def test_sees_shared_alert_details_host_prefix_and_default():
         var p = _opts.classPrefix || 'alert-parsed';
         return p + '-' + suffix;'''
     assert {"cpanel-alert-", "alert-parsed-"} <= constructed_prefixes(source)
+
+
+# ---------------------------------------------------------------------------
+# A pattern that is an idiom in one language and a coincidence in another
+# ---------------------------------------------------------------------------
+#
+# The two tests below are the other direction from the rest of this file.
+# Every case above is a class the scanner failed to SEE; these are strings the
+# scanner saw as a class family when they were nothing of the kind. That
+# direction is safe, because an over-broad prefix keeps a rule rather than
+# deleting a live one, but a one-character prefix marks every class starting
+# with that letter live. Sixteen prefixes of two characters or fewer came in
+# this way and masked 54 classes, including the rule for topo-page-wrap, which
+# no element has ever carried.
+
+
+def test_a_javascript_modulo_is_not_a_python_format_string():
+    """`t%s==0` in a minified bundle made `t` a live prefix, so every
+    ti-*, table-* and topo-* class read as live."""
+    from tools.dead_css import constructed_prefixes
+
+    source = "function W(t){const i=Math.sqrt(t);for(s=1;s<i;s++)t%s==0&&e.push(s)}"
+    assert "t" not in constructed_prefixes(source, kind="js")
+    assert "s" not in constructed_prefixes(source, kind="js")
+
+
+def test_an_svg_path_is_not_a_set_of_class_families():
+    """`f"M{x},{y} A{r},{r}"` is a path, and M, A and L are its commands.
+    ns-p, the case the f-string pattern exists for, is still seen."""
+    from tools.dead_css import constructed_prefixes
+
+    path = 'return f"M{x1:.2f},{y1:.2f} A{r},{r} 0 {large},1 L{x2:.2f},{y2:.2f}"'
+    found = constructed_prefixes(path, kind="py")
+    assert not {"M", "A", "L"} & found, sorted(found)
+    assert "ns-p" in constructed_prefixes('return f"ns-p{n}"', kind="py")
+
+
+def test_the_corpus_still_reaches_every_language():
+    """Scoping the patterns must not drop a language from the scan."""
+    from tools.dead_css import corpus_by_kind
+
+    by_kind = corpus_by_kind()
+    assert set(by_kind) == {"markup", "js", "py"}
+    for kind, text in by_kind.items():
+        assert len(text) > 10_000, kind

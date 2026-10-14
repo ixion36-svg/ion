@@ -120,16 +120,37 @@ def mask_comments(css: str) -> str:
     return "".join(out)
 
 
-def corpus() -> str:
-    parts = []
+#: Which `constructed_prefixes` kind each source extension speaks.
+SOURCE_KINDS = {".html": "markup", ".js": "js", ".py": "py"}
+
+
+def corpus_by_kind() -> dict[str, str]:
+    """The searched sources, grouped by language.
+
+    `constructed_prefixes` has patterns that are idioms of one language and
+    coincidences in another, so it needs to know which it is reading. See the
+    note on that function.
+    """
+    parts: dict[str, list[str]] = {k: [] for k in set(SOURCE_KINDS.values())}
     for d in SEARCH_DIRS:
         if not d.is_dir():
             continue
         for p in sorted(d.rglob("*")):
-            if p.suffix not in {".html", ".js", ".py"} or not p.is_file():
+            kind = SOURCE_KINDS.get(p.suffix)
+            if kind is None or not p.is_file():
                 continue
-            parts.append(p.read_text(encoding="utf-8", errors="replace"))
-    return "\n".join(parts)
+            parts[kind].append(p.read_text(encoding="utf-8", errors="replace"))
+    return {k: "\n".join(v) for k, v in parts.items()}
+
+
+def corpus() -> str:
+    """Every searched source, for the reference scan.
+
+    Order is by kind and then by path, so it is stable but no longer file
+    order. Nothing downstream depends on position.
+    """
+    by_kind = corpus_by_kind()
+    return "\n".join(by_kind[k] for k in sorted(by_kind))
 
 
 # `${...}` in a JS template literal, `{{...}}`/`{%...%}` in a Jinja template.
@@ -236,9 +257,30 @@ def literal_tokens(text: str) -> set[str]:
     return {t for t in out if IDENT.fullmatch(t)}
 
 
-def constructed_prefixes(text: str) -> set[str]:
-    """`'sev-' + x` and `` `sc-cov-${n}` `` mean every sev-*/sc-cov-* is live."""
+def constructed_prefixes(text: str, kind: str = "all") -> set[str]:
+    """`'sev-' + x` and `` `sc-cov-${n}` `` mean every sev-*/sc-cov-* is live.
+
+    `kind` scopes the language-specific patterns to the language they come
+    from: "py", "markup", "js", or "all" to run everything. The default is
+    "all" so a caller can hand this one snippet and get every pattern, which
+    is how the unit tests read.
+
+    SCOPING IS NOT TIDINESS. A Python `%s` format and a JavaScript modulo are
+    the same three characters. `t%s==0` inside a minified bundle made `t` a
+    live prefix, and a one-character prefix marks every class beginning with
+    `t` live: `ti-*`, `table-*`, `tag-*`, and `topo-page-wrap`, which has a
+    rule no element has ever carried. Sixteen prefixes of two characters or
+    fewer came in this way, `e`, `s`, `t`, `A`, `L`, `M` and friends, and
+    they masked 54 classes that would otherwise have been candidates.
+
+    The error was in the safe direction, since an over-broad prefix keeps a
+    rule rather than deleting a live one, but it blunts the scanner badly,
+    and a scanner that under-reports is the one nobody re-runs.
+    """
     out: set[str] = set()
+    py = kind in ("all", "py")
+    markup = kind in ("all", "markup")
+    js = kind in ("all", "js")
     # The prefix is the TRAILING identifier of the string being concatenated,
     # not the whole string. cases.html builds severity rails as
     #     '<span class="rail-sev rail-sev-' + esc(sev) + '"></span>'
@@ -265,19 +307,40 @@ def constructed_prefixes(text: str) -> set[str]:
         out.add(m.group(1))
     # Python supplies classes too: namespace_kind returns "ns-p%d" and
     # f-strings can build a name without ever spelling its final token.
-    for m in re.finditer(r"([A-Za-z][A-Za-z0-9_-]*)%[-+0-9.]*[sdi]", text):
-        out.add(m.group(1))
-    for m in re.finditer(r'''\bf["']([^"'\n]*)''', text):
-        out.update(re.findall(r"([A-Za-z][A-Za-z0-9_-]*)\{(?!\{)", m.group(1)))
+    #
+    # Both are Python idioms and are read from Python only. `%s` is also
+    # JavaScript's modulo and `f"` is also a call to a function named f, so
+    # against a minified bundle these harvest single letters.
+    if py:
+        for m in re.finditer(r"([A-Za-z][A-Za-z0-9_-]*)%[-+0-9.]*[sdi]", text):
+            out.add(m.group(1))
+        for m in re.finditer(r'''\bf["']([^"'\n]*)''', text):
+            for stem in re.findall(r"([A-Za-z][A-Za-z0-9_-]*)\{(?!\{)",
+                                   m.group(1)):
+                # An SVG path is built the same way, and its commands are
+                # single letters: f"M{x},{y} A{r},{r} 0 {large},1 ..." offered
+                # A, L and M as class families, and a one-letter prefix marks
+                # every class starting with that letter live. A real prefix
+                # either ends in a separator or is longer than two characters;
+                # ns-p, the case this pattern was added for, is four.
+                if stem[-1] in "-_" or len(stem) > 2:
+                    out.add(stem)
     # Jinja macros receive a literal prefix, then join two expressions:
     # closure_bars(..., 'cl-') emits {{ prefix }}{{ s.key }}. Conservatively
     # keep every family named by a standalone prefix argument or mapping value.
-    out.update(re.findall(r'''["']([A-Za-z][A-Za-z0-9_-]*[-_])["']''', text))
+    #
+    # Markup only, and it is still the broadest rule here: any quoted string
+    # ending in a separator becomes a live family. In minified JavaScript that
+    # harvested `L-`, `n_`, `b_`, `c-` and the like.
+    if markup:
+        out.update(re.findall(r'''["']([A-Za-z][A-Za-z0-9_-]*[-_])["']''', text))
     # alert-detail.js joins an injected host prefix to each suffix through
     # _cls(). Neither the option value nor its default ends with a hyphen.
-    for pattern in (r'''classPrefix\s*:\s*["']([A-Za-z][A-Za-z0-9_-]*)["']''',
-                    r'''\.classPrefix\s*\|\|\s*["']([A-Za-z][A-Za-z0-9_-]*)["']'''):
-        out.update(value + "-" for value in re.findall(pattern, text))
+    if js:
+        for pattern in (
+                r'''classPrefix\s*:\s*["']([A-Za-z][A-Za-z0-9_-]*)["']''',
+                r'''\.classPrefix\s*\|\|\s*["']([A-Za-z][A-Za-z0-9_-]*)["']'''):
+            out.update(value + "-" for value in re.findall(pattern, text))
     # Also `className = base + '-' + x` style: a lone '-' joiner means we cannot
     # know the prefix, so treat every class in that file as live is too blunt --
     # instead flag it for the operator.
@@ -454,9 +517,14 @@ def main() -> int:
                     help="drop a selector if ANY of its classes is dead")
     args = ap.parse_args()
 
-    text = corpus()
+    by_kind = corpus_by_kind()
+    text = "\n".join(by_kind[k] for k in sorted(by_kind))
     live = literal_tokens(text)
-    prefixes = constructed_prefixes(text)
+    # Per language, so a Python format string and a JavaScript modulo are not
+    # read as the same thing.
+    prefixes: set[str] = set()
+    for kind, chunk in by_kind.items():
+        prefixes |= constructed_prefixes(chunk, kind=kind)
     print(f"corpus: {len(live)} literal token(s), "
           f"{len(prefixes)} constructed prefix(es) treated as live")
     joiners = lone_joiner_sites(text)
