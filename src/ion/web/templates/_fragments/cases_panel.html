@@ -234,7 +234,17 @@
             {{- a.status -}}</span>
         </div>
         {%- if a.bits %}
-        <div class="cpanel-rail-alert-sub">{{ a.bits | join('<br>') | safe }}</div>
+        {#- Each bit is emitted on its own so autoescaping applies to it.
+            This was `a.bits | join('<br>') | safe`, which turned the
+            escaping off for the whole joined string: a process name is
+            whatever ran on the host, so that was injectable. The page it
+            replaced escaped each bit before joining, which is the part I
+            dropped. -#}
+        <div class="cpanel-rail-alert-sub">
+          {%- for bit in a.bits %}
+          {%- if not loop.first %}<br>{% endif %}{{ bit }}
+          {%- endfor %}
+        </div>
         {%- endif %}
       </div>
       {%- endfor %}

@@ -570,3 +570,29 @@ def test_ageLabel_is_gone_and_fmtDate_has_one_caller_left():
     # One definition line plus exactly one call.
     assert len(callers) == 2, callers
     assert "loadKibanaComments" in body
+
+
+def test_a_rail_subtitle_cannot_inject_markup(case):
+    """I shipped this as `a.bits | join('<br>') | safe`, which turns
+    autoescaping off for the whole joined string. A process name is
+    whatever ran on the host, and an alert's source IP is whatever the
+    document said, so both are injectable. Four security reviews flagged
+    it on the commit.
+
+    The page this replaced escaped each bit before joining, which is the
+    part I dropped. Each bit is emitted separately now so autoescaping
+    applies, and the <br> between them is still real markup.
+    """
+    case(payload=_case(alerts=[_alert(
+        process_name="<img src=x onerror=alert(1)>",
+        source_ip="<script>alert(2)</script>",
+        destination_ip="10.0.0.9")]))
+    html = _get(_reader()).text
+    assert "<img src=x" not in html
+    assert "<script>alert(2)" not in html
+    assert "&lt;img src=x onerror=alert(1)&gt;" in html
+    # And the separator survives, so two bits still render on two lines.
+    sub = re.search(r'<div class="cpanel-rail-alert-sub">(.*?)</div>',
+                    html, re.S)
+    assert sub, html[:400]
+    assert "<br>" in sub.group(1)

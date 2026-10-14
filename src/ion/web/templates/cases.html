@@ -2724,7 +2724,7 @@ function selectCaseAlert(alertId, idx, caseId) {
     _selectedRailAlert = alertId;
 
     if (typeof window.ionAlertDetail === 'undefined') {
-        host.innerHTML = '<div class="error">Alert detail component failed to load.</div>';
+        host.replaceChildren(ionCaseTpl('tpl-alert-detail-failed'));
         return;
     }
 
@@ -2760,41 +2760,47 @@ function selectCaseAlert(alertId, idx, caseId) {
     _appendCaseOnlySections(host, alertId, caseId, alert);
 }
 
+// The guide's three sections are tpl-alert-guide. They were a string with
+// two generated ids in it, and the pin button's arguments went through
+// esc() into a single-quoted data-args:
+//
+//   data-args='[' + caseId + ',"' + esc(alertId) + '","'
+//           + esc(pinTitle) + '","' + esc(pinSev) + '"]'
+//
+// esc turns a double quote into &quot;, which is right for an attribute
+// and wrong for JSON inside one: the parser decodes it back and the array
+// ends early, so a rule name containing a quote truncated the button's
+// arguments. The playbook Start button had the identical bug.
+//
+// Setting dataset.args from JSON.stringify removes the question: a DOM
+// property assignment stores the value literally, with no HTML escaping
+// between the JSON and the handler that parses it.
 function _appendCaseOnlySections(host, alertId, caseId, alert) {
     const rgId = 'rule-guide-' + _railSeq;
     const ptId = 'proc-tree-' + _railSeq;
     _railSeq += 1;
 
-    const pinTitle = alert.rule_name || String(alertId).substring(0, 24);
-    const pinSev = alert.priority || '';
+    const node = ionCaseTpl('tpl-alert-guide');
+    node.querySelector('[data-rule-guide]').id = rgId;
+    node.querySelector('[data-proc-tree]').id = ptId;
+    node.querySelector('.cpanel-pin-btn').dataset.args = JSON.stringify([
+        caseId,
+        alertId,
+        alert.rule_name || String(alertId).substring(0, 24),
+        alert.priority || '',
+    ]);
 
-    // Renders into the side panel; falls back to appending if it is absent.
+    // Replaces the previous alert's guide, so selecting a second alert
+    // does not leave the first one's sections behind. Falls back to the
+    // detail column when the side panel is absent.
     const aside = document.getElementById('cpanel-alert-guide');
-    const target = aside || host;
-
-    const html =
-        '<section class="cpanel-guide-sec"><h4 class="cpanel-guide-title">Investigation guide</h4>'
-      +   '<div class="cpanel-rule-guide-box" id="' + rgId + '"><div class="loading">Loading rule guide…</div></div>'
-      + '</section>'
-      + '<section class="cpanel-guide-sec"><h4 class="cpanel-guide-title">Process tree</h4>'
-      +   '<div class="cpanel-proc-tree" id="' + ptId + '"><div class="loading">Loading process tree…</div></div>'
-      + '</section>'
-      + '<section class="cpanel-guide-sec">'
-      +   '<button class="cpanel-pin-btn" type="button" '
-      +     'data-click-action="pinAlertToCase" data-args=\'[' + caseId + ',"' + esc(alertId) + '","'
-      +       esc(pinTitle) + '","' + esc(pinSev) + '"]\'>'
-      +     '<i class="icon-bookmark text-[0.6rem] mr-[0.2rem]"></i>Pin as evidence</button>'
-      + '</section>';
-
     if (aside) {
-        aside.innerHTML = html;           // replaces the previous alert's guide
+        aside.replaceChildren(node);
     } else {
-        const extra = document.createElement('div');
-        extra.innerHTML = html;
-        while (extra.firstChild) host.appendChild(extra.firstChild);
+        host.appendChild(node);
     }
 
-    // Shares the component's coalesced /raw request — no extra round trip.
+    // Shares the component's coalesced /raw request -- no extra round trip.
     if (typeof loadRuleGuideInto === 'function') loadRuleGuideInto(alertId, rgId);
     if (typeof loadProcessTreeInto === 'function') loadProcessTreeInto(alertId, ptId, caseId);
 }
@@ -2993,77 +2999,12 @@ function copyProcCmd(key) {
 // plain chip. Degrades gracefully when threat_level/score are null/missing.
 
 // One "Common fields" key/value row for an alert widget.
-function _cfRow(k, v, extraClass) {
-    return '<div class="awx-cf"><span class="awx-cfk">' + esc(k) + '</span>'
-        + '<span class="awx-cfv mono' + (extraClass ? ' ' + extraClass : '') + '">' + esc(v) + '</span></div>';
-}
 
 // the alert-widget body appended to each linked-alert card:
 // common ES fields, enriched observables (threat badges), Bob suggested
 // verdict + confidence meter (or an amber auto-escalated badge), and an
 // analyst-note preview. Every block is optional; a lighter alert row that
 // lacks a field simply omits that block.
-function _alertWidgetExtras(a) {
-    let h = '';
-
-    // Common ES fields (ElasticsearchAlert.to_dict): flow / proc / parent / cmd / hash.
-    const srcIp = a.source_ip || a.src_ip || '';
-    const dstIp = a.destination_ip || a.dest_ip || a.dst_ip || '';
-    const proc = a.process_name || a.process || '';
-    const parent = a.parent_process_name || a.parent_process || '';
-    const cmd = a.command_line || a.process_command_line || '';
-    const hash = a.file_hash || a.sha256 || a.hash || '';
-    const cfRows = [];
-    if (srcIp) cfRows.push(_cfRow('flow', srcIp + (dstIp ? ' → ' + dstIp : '')));
-    if (proc) cfRows.push(_cfRow('proc', proc));
-    if (parent) cfRows.push(_cfRow('parent', parent));
-    if (cmd) cfRows.push(_cfRow('cmd', cmd, 'cmdline'));
-    if (hash) cfRows.push(_cfRow('sha256', hash));
-    if (cfRows.length) {
-        h += '<div class="awx-common"><div class="awx-lab">Common fields</div>' + cfRows.join('') + '</div>';
-    }
-
-    // Enriched observables (data contract v0.59.0).
-    const obs = a.observables || [];
-    if (obs.length) {
-        h += '<div class="awx-obs"><div class="awx-lab">Observables <span class="awx-obscount">' + obs.length + '</span></div>'
-            + '<div class="awx-obsrow">' + obs.map(_obsChipHtml).join('') + '</div></div>';
-    }
-
-    // Bob suggested-verdict + confidence, OR auto-escalated badge.
-    if (a.bob_escalation_badge) {
-        h += '<div class="awx-escbadge"><span>⚠</span><div><b>Auto-escalated</b> — Bob abstained (circuit-breaker); verdict suppressed for human triage.</div></div>';
-    } else if (a.suggested_verdict) {
-        const v = a.suggested_verdict;
-        let conf = null;
-        if (a.suggested_verdict_confidence_int != null) {
-            conf = a.suggested_verdict_confidence_int;
-        } else if (a.suggested_verdict_confidence != null) {
-            const raw = a.suggested_verdict_confidence;
-            conf = Math.round(raw <= 1 ? raw * 100 : raw);
-        }
-        let tier = a.confidence_tier || '';
-        if (!tier && conf != null) tier = conf >= 80 ? 'high' : (conf >= 50 ? 'medium' : 'low');
-        let meter = '';
-        if (conf != null) {
-            const pct = Math.max(0, Math.min(100, conf));
-            // width applied post-insert (CSP blocks inline style attrs).
-            meter = '<span class="awx-conf"><span class="awx-track">'
-                + '<span class="awx-fillb tier-' + esc(tier) + '" data-pct="' + pct + '"></span></span>'
-                + '<span class="awx-pctv">' + conf + '</span><span class="awx-tier">' + esc(tier) + '</span></span>';
-        }
-        h += '<div class="awx-bob"><span class="awx-bl"><span class="awx-bd"></span>Bob</span>'
-            + '<span class="awx-verdict v-' + esc(v) + '">' + esc(verdictLabels[v] || v) + '</span>' + meter + '</div>';
-    }
-
-    // Analyst-note preview.
-    if (a.analyst_notes) {
-        const note = String(a.analyst_notes).trim();
-        if (note) h += '<div class="awx-note">"' + esc(note) + '"</div>';
-    }
-
-    return h;
-}
 
 // Apply the confidence-meter widths after the panel HTML is inserted
 // (CSSOM, not an inline style attribute — the strict CSP blocks the latter).
@@ -3087,7 +3028,6 @@ function applyConfidenceMeters(root) {
 // fragments fixed, so they go when their last caller does rather than
 // being left as dead code now.
 
-const _enrichableObsTypes = { ip: 1, ipv4: 1, ipv6: 1, domain: 1, url: 1, sha256: 1, sha1: 1, md5: 1, hash: 1, email: 1 };
 
 function fmtDate(dateStr) {
     if (!dateStr) return '-';
@@ -3095,28 +3035,6 @@ function fmtDate(dateStr) {
     return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-function _obsChipHtml(o) {
-    if (!o) return '';
-    const type = String(o.type || 'unknown').toLowerCase();
-    const value = o.value || '';
-    const shortVal = value.length > 44 ? value.substring(0, 41) + '…' : value;
-    let tl = '';
-    if (_enrichableObsTypes[type]) {
-        const lvl = String(o.threat_level || 'unknown').toLowerCase();
-        let label;
-        if (o.score != null && o.score !== '') label = o.score;
-        else if (lvl === 'benign') label = 'ok';
-        else if (lvl === 'unknown') label = '?';
-        else label = lvl;
-        const tip = 'Threat level: ' + lvl
-            + (o.score != null && o.score !== '' ? ' · score ' + o.score : '')
-            + (o.source ? ' · ' + o.source : '');
-        tl = '<span class="awx-tl tl-' + esc(lvl) + '" title="' + esc(tip) + '">'
-            + '<span class="awx-td"></span>' + esc(String(label)) + '</span>';
-    }
-    return '<span class="awx-obschip" title="' + esc(value) + '">'
-        + '<span class="awx-ot t-' + esc(type) + '">' + esc(type) + '</span>' + esc(shortVal) + tl + '</span>';
-}
 
 function renderCaseMarkdown(root) {
     (root || document).querySelectorAll('[data-note-raw]').forEach(function (el) {
@@ -4521,4 +4439,32 @@ if (window.__initialCaseId) {
 <template id="tpl-closure-ai-idle"><i class="icon-sparkles"></i> AI rewrite</template>
 <template id="tpl-closure-ai-busy"><i class="icon-sparkles"></i> Rewriting&hellip;</template>
 <template id="tpl-closure-ai-revert"><i class="icon-rotate-ccw"></i> Revert</template>
+
+{#- The alert guide's three sections and the rail's failure message. Both
+    were innerHTML assignments from string literals, so the structure and
+    its wording sat where no stylesheet sweep reaches them. -#}
+<template id="tpl-alert-guide">
+  <div>
+    <section class="cpanel-guide-sec">
+      <h4 class="cpanel-guide-title">Investigation guide</h4>
+      <div class="cpanel-rule-guide-box" data-rule-guide>
+        <div class="loading">Loading rule guide&hellip;</div>
+      </div>
+    </section>
+    <section class="cpanel-guide-sec">
+      <h4 class="cpanel-guide-title">Process tree</h4>
+      <div class="cpanel-proc-tree" data-proc-tree>
+        <div class="loading">Loading process tree&hellip;</div>
+      </div>
+    </section>
+    <section class="cpanel-guide-sec">
+      <button class="cpanel-pin-btn" type="button"
+              data-click-action="pinAlertToCase">
+        <i class="icon-bookmark text-[0.6rem] mr-[0.2rem]"></i>Pin as evidence</button>
+    </section>
+  </div>
+</template>
+<template id="tpl-alert-detail-failed">
+  <div class="error">Alert detail component failed to load.</div>
+</template>
 {% endblock %}
