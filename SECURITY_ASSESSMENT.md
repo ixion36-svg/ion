@@ -20,6 +20,19 @@
 
 ## Executive Summary
 
+### Unreleased cases detail subpanels conversion, 2026-10-14
+
+Eight authenticated fragment routes require `case:read`. Process-tree and rule-guide
+reads and note translation additionally require `alert:read`; sync status retains
+`integration:read` or `alert:read`; response catalogue/log reads retain
+`playbook:read` and the feature gate. Existing mutation APIs retain their write
+permissions. POST rendering accepts already-held raw data and observables; note
+translation delegates to the existing translator and its existing external sink.
+Escaped Jinja and single-quoted JSON carriers, sanitized Markdown and cloned note
+nodes preserve rendering protections. Failed reads remain distinct from empty
+collections where source APIs expose that distinction. No new credential store,
+configuration key, permission grant, dependency or external sink is added.
+
 ### Unreleased browser verification repairs, 2026-10-14
 
 Restored PCAP attachment controls require `case:read` and `case:update`;

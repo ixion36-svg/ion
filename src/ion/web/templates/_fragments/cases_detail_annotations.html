@@ -1,0 +1,31 @@
+{% if state == 'failed' %}
+<div class="cpanel-empty-hint">Failed to load annotations</div>
+{% else %}
+{% for annotation in annotations %}
+<div class="cpanel-ann-card border-l-[3px] border-l-[#6366f1] pt-2 pr-2 pb-2 pl-3 mb-2 bg-[rgba(99,102,241,0.06)] rounded-[0_4px_4px_0]" id="ann-card-{{ case_id }}-{{ annotation.id }}">
+    <div class="flex items-center gap-2 text-xs text-[var(--text-secondary)] mb-1">
+        <span class="text-[#818cf8] font-semibold">{{ annotation.timestamp if annotation.timestamp is not none else 'Unknown time' }}</span>
+        <span>&middot;</span><span>{{ annotation.author }}</span>
+        {% if can_update and annotation.id is not none %}
+        <span class="ml-[auto] flex gap-[0.35rem]">
+            <button class="bg-transparent border-0 text-[#94a3b8] cursor-pointer py-0 px-[0.2rem] text-[0.8rem]" type="button" title="Edit" data-click-action="editAnnotation" data-args='{{ [case_id, annotation.id]|tojson }}'>&#9998;</button>
+            <button class="bg-transparent border-0 text-[#94a3b8] cursor-pointer py-0 px-[0.2rem] text-[0.8rem]" type="button" title="Delete" data-click-action="deleteAnnotation" data-args='{{ [case_id, annotation.id]|tojson }}'>&times;</button>
+        </span>
+        {% endif %}
+    </div>
+    <div class="text-[0.8rem] text-[var(--text-primary)] whitespace-pre-wrap">{{ annotation.body }}</div>
+</div>
+{% endfor %}
+{% if can_update %}
+<div class="mt-2"><button type="button" class="btn btn-secondary text-xs py-[0.3rem] px-[0.65rem]" data-click-action="toggleAnnotationForm" data-args='{{ [case_id]|tojson }}'>+ Add annotation</button></div>
+<div class="mt-[0.6rem]" id="annotation-form-{{ case_id }}" data-annotation-form>
+    <input class="w-full mb-[0.4rem] bg-[var(--bg-secondary)] border border-[rgba(255,255,255,.12)] rounded-[4px] py-[0.3rem] px-2 text-[var(--text-primary)] text-[0.8rem]" type="datetime-local" id="ann-ts-{{ case_id }}">
+    <textarea class="w-full bg-[var(--bg-secondary)] border border-[rgba(255,255,255,.12)] rounded-[4px] py-[0.4rem] px-[0.6rem] text-[var(--text-primary)] text-[0.8rem] resize-y box-border" id="ann-body-{{ case_id }}" rows="3" placeholder="Add a timeline annotation..."></textarea>
+    <div class="flex gap-[0.4rem] mt-[0.35rem]">
+        <button type="button" class="btn btn-primary text-xs py-[0.3rem] px-[0.7rem]" data-click-action="submitAnnotation" data-args='{{ [case_id]|tojson }}'>Save</button>
+        <button type="button" class="btn text-xs py-[0.3rem] px-[0.7rem]" data-click-action="toggleAnnotationForm" data-args='{{ [case_id]|tojson }}'>Cancel</button>
+    </div>
+</div>
+{% endif %}
+{% endif %}
+<span id="annotations-count-{{ case_id }}" hx-swap-oob="innerHTML">{{ count if count is not none else '-' }}</span>

@@ -94,6 +94,9 @@ from ion.models.alert_triage import AlertCase, AlertCaseStatus
 from ion.models.user import User
 from ion.storage.database import get_db_session
 from ion.web.ui._cases_board import router as board_router
+from ion.web.ui._cases_detail_notes import router as detail_notes_router
+from ion.web.ui._cases_detail_process import router as detail_process_router
+from ion.web.ui._cases_detail_response import router as detail_response_router
 from ion.web.ui._shared import (
     age_label,
     closure_label,
@@ -1267,6 +1270,9 @@ def cases_observables_fragment(
 
 router.include_router(board_router)
 
+router.include_router(detail_process_router)
+router.include_router(detail_notes_router)
+router.include_router(detail_response_router)
 
 # ---------------------------------------------------------------------------
 # The workbench kanban and the playbook browser

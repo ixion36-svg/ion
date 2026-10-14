@@ -2560,48 +2560,7 @@ function cancelClosure() {
    analyst is already looking. "Still retrying" and "given up" are shown
    separately because they call for different actions. */
 async function loadCaseSyncStatus(caseId) {
-    const host = document.getElementById('case-sync-status');
-    if (!host) return;
-    try {
-        const r = await fetch('/api/integrations/sync-journal/cases/' + encodeURIComponent(caseId));
-        if (!r.ok) { host.replaceChildren(); return; }
-        const d = await r.json();
-        if (!d.has_problems) { host.replaceChildren(); return; }
-
-        const rows = (d.unresolved || []).map(a => {
-            const gaveUp = a.status === 'abandoned';
-            const when = gaveUp
-                ? 'not retrying any more'
-                : (a.next_retry_at ? 'next attempt ' + new Date(a.next_retry_at).toLocaleString()
-                                   : 'queued');
-            return '<li>'
-                + '<strong>' + escapeHtml(a.target) + '</strong> '
-                + escapeHtml(a.operation.replace(/_/g, ' '))
-                + ' &mdash; ' + escapeHtml(a.last_error || 'no error recorded')
-                + ' <span class="opacity-60">(' + escapeHtml(when)
-                + ', ' + a.attempt_count + ' attempt' + (a.attempt_count === 1 ? '' : 's')
-                + (gaveUp ? '' : ', ' + a.attempts_remaining + ' left') + ')</span>'
-                + '</li>';
-        }).join('');
-
-        const headline = d.abandoned_count
-            ? d.abandoned_count + ' sync' + (d.abandoned_count === 1 ? '' : 's')
-              + ' to external systems gave up'
-              + (d.retrying_count ? ', ' + d.retrying_count + ' still retrying' : '')
-            : d.retrying_count + ' sync' + (d.retrying_count === 1 ? '' : 's')
-              + ' to external systems ' + (d.retrying_count === 1 ? 'is' : 'are') + ' retrying';
-
-        host.innerHTML = '<div class="alert ' + (d.abandoned_count ? 'alert-error' : 'alert-warning') + '">'
-            + '<div>'
-            + '<div class="font-semibold">' + escapeHtml(headline) + '</div>'
-            + '<div class="text-sm opacity-80 mt-1">This case may not match what the external system shows.</div>'
-            + '<ul class="text-sm mt-2 list-disc ml-5">' + rows + '</ul>'
-            + '</div></div>';
-    } catch (e) {
-        // Diagnostics for a problem elsewhere. Failing to fetch them must
-        // not take a working case panel down with it.
-        host.replaceChildren();
-    }
+    return ionLoadFragment('/ui/cases/' + encodeURIComponent(caseId) + '/sync-status', 'case-sync-status', 'Loading sync status...', {failure:'Sync status could not be read. Counts are unknown.'});
 }
 
 // GET /ui/cases/{id}/panel renders the panel. The ten lazy sections still
@@ -2844,27 +2803,34 @@ function renderRuleGuide(raw) {
 }
 
 async function loadRuleGuideInto(alertId, rgId) {
-    // was toggleRuleGuide() — an accordion. Nothing on the case-detail
-    // alert workspace is behind a toggle any more, so this only loads.
     const el = document.getElementById(rgId);
     if (!el || el.dataset.loaded === '1') return;
+    let raw = null;
+    let state = 'failed';
     try {
-        // share the component's coalesced /raw request. This used to
-        // issue its own, so selecting an alert fetched the SAME document three
-        // times — here, in the Fields section and in Raw Data — all at once,
-        // all against Elasticsearch. That was the /cases slowness.
-        const raw = (typeof window.ionAlertDetailFetchRaw === 'function')
-            ? await window.ionAlertDetailFetchRaw(alertId)
-            : await fetch('/api/elasticsearch/alerts/' + encodeURIComponent(alertId) + '/raw')
-                .then(r => r.json()).then(d => d && d.raw_data);
-        el.innerHTML = raw
-            ? renderRuleGuide(raw)
-            : '<div class="cpanel-alert-fields-empty">No raw data available for this alert.</div>';
-        el.dataset.loaded = '1';
-    } catch (e) {
-        el.innerHTML = '<div class="cpanel-alert-fields-empty">Failed to load rule guide: '
-            + esc(String((e && e.message) || e)) + '</div>';
+        if (typeof window.ionAlertDetailFetchRaw === 'function') {
+            raw = await window.ionAlertDetailFetchRaw(alertId);
+        } else {
+            const response = await fetch('/api/elasticsearch/alerts/' + encodeURIComponent(alertId) + '/raw');
+            if (!response.ok) throw new Error('Raw alert read failed');
+            raw = (await response.json()).raw_data;
+        }
+        state = raw ? 'data' : 'empty';
+    } catch (error) { state = 'failed'; }
+    const loaded = await ionLoadFragment('/ui/cases/detail/rule-guide', el, 'Loading rule guide...', {
+        method:'POST', values:{state,raw:JSON.stringify(raw)}, failure:'Failed to load rule guide.'
+    });
+    if (!loaded) return;
+    const markdown = el.querySelector('[data-case-rule-markdown]');
+    const guide = el.querySelector('[data-case-rule-guide]');
+    if (markdown && guide) {
+        if (typeof safeMarkdown === 'function') {
+            const parsed = new DOMParser().parseFromString(safeMarkdown(markdown.value), 'text/html');
+            guide.replaceChildren(...parsed.body.childNodes);
+        } else { guide.textContent = markdown.value; }
+        markdown.remove();
     }
+    if (el.querySelector('[data-case-rule-state]')?.dataset.caseRuleState !== 'failed') el.dataset.loaded = '1';
 }
 
 
@@ -2940,23 +2906,15 @@ function renderProcessTree(data, caseId) {
 // Toggle (and lazy-load) a linked alert's process tree. No leading event param
 // (event-delegation.js applies data-args directly).
 async function loadProcessTreeInto(alertId, ptId, caseId) {
-    // was toggleProcessTree() — an accordion. See loadRuleGuideInto.
     const el = document.getElementById(ptId);
     if (!el || el.dataset.loaded === '1') return;
-    try {
-        const r = await fetch('/api/elasticsearch/alerts/' + encodeURIComponent(alertId) + '/process-tree');
-        if (r.status === 503) {
-            el.innerHTML = '<div class="cpanel-alert-fields-empty">Process tree needs a live Elasticsearch connection.</div>';
-            el.dataset.loaded = '1';
-            return;
-        }
-        const data = await r.json().catch(() => ({}));
-        el.innerHTML = renderProcessTree(data, caseId);
-        el.dataset.loaded = '1';
-    } catch (e) {
-        el.innerHTML = '<div class="cpanel-alert-fields-empty">Failed to load process tree: '
-            + esc(String((e && e.message) || e)) + '</div>';
-    }
+    const query = caseId ? '?' + new URLSearchParams({case_id:caseId}) : '';
+    const loaded = await ionLoadFragment('/ui/cases/detail/process-tree/' + encodeURIComponent(alertId) + query, el, 'Loading process tree...', {failure:'Failed to load process tree.'});
+    if (!loaded) return;
+    const carrier = el.querySelector('[data-case-process-commands]');
+    if (!carrier) return;
+    Object.assign(_procCmdById, JSON.parse(carrier.dataset.caseProcessCommands));
+    if (carrier.dataset.caseProcessState !== 'failed' || carrier.dataset.caseProcessUnavailable === 'true') el.dataset.loaded = '1';
 }
 
 
@@ -3286,33 +3244,13 @@ function loadSimilarObservables(caseId) {
 // ── Load Kibana Comments ───────────────────────────────────
 async function loadKibanaComments(kibanaId) {
     const container = document.getElementById('kibana-comments-container');
-    const badge = document.getElementById('kibana-comment-count');
     if (!container) return;
-
-    try {
-        const resp = await fetch('/api/kibana/cases/' + kibanaId);
-        if (!resp.ok) throw new Error('Failed');
-        const data = await resp.json();
-        const comments = data.comments || [];
-
-        if (badge) badge.textContent = comments.length;
-
-        if (!comments.length) {
-            container.innerHTML = '<div class="cpanel-empty-hint">No comments in Kibana</div>';
-            return;
-        }
-
-        container.innerHTML = comments.map(cm => {
-            return '<div class="cpanel-comment">'
-                + '<div class="cpanel-comment-header">'
-                +   '<span class="cpanel-comment-user"><i class="icon-message-square text-[0.65rem] mr-[0.2rem]"></i>' + esc(cm.created_by || 'kibana') + '</span>'
-                +   '<span class="cpanel-comment-time">' + fmtDate(cm.created_at) + '</span>'
-                + '</div>'
-                + '<div class="cpanel-comment-body">' + esc(cm.comment || '') + '</div>'
-                + '</div>';
-        }).join('');
-    } catch (e) {
-        container.innerHTML = '<div class="cpanel-empty-hint text-[var(--text-secondary)]">Could not load Kibana comments</div>';
+    const token = {};
+    container._ionCommentsRequest = token;
+    const loaded = await ionLoadFragment('/ui/cases/kibana/' + encodeURIComponent(kibanaId) + '/comments', container, 'Loading Kibana comments...', {failure:'Could not load Kibana comments'});
+    if (container._ionCommentsRequest !== token) return;
+    if (!loaded) {
+        const badge = document.getElementById('kibana-comment-count');
         if (badge) badge.textContent = '-';
     }
 }
@@ -3337,66 +3275,21 @@ const _RESPONSE_APPLIES = {
 async function loadResponseActions(caseId, observables) {
     const container = document.getElementById('response-actions-container');
     if (!container) return;
-    let catalog;
-    try {
-        const r = await fetch('/api/response/actions');
-        if (r.status === 404) {   // feature disabled — drop the tab + section
-            const btn = document.getElementById('cpanel-actions-tab-btn');
-            if (btn) btn.remove();
-            const sec = document.querySelector('.cpanel-section[data-tab="actions"]');
-            if (sec) sec.remove();
-            return;
-        }
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        catalog = (await r.json()).actions || [];
-    } catch (e) {
-        container.textContent = 'Could not load response actions.';
+    const loaded = await ionLoadFragment('/ui/cases/' + caseId + '/response-actions', container, 'Loading response actions...', {
+        method:'POST', values:{observables:JSON.stringify(observables ?? null)}, failure:'Could not load response actions.'
+    });
+    if (!loaded) return;
+    const state = container.querySelector('[data-response-actions-state]')?.dataset.responseActionsState;
+    if (state === 'disabled') {
+        document.getElementById('cpanel-actions-tab-btn')?.remove();
+        container.closest('.cpanel-section[data-tab="actions"]')?.remove();
         return;
     }
-    const byType = {};
-    catalog.forEach(function (a) { byType[a.action_type] = a; });
-    const seen = {};
-    const rows = [];
-    (observables || []).forEach(function (o) {
-        const key = (o.type || '') + '|' + (o.value || '');
-        if (seen[key]) return;
-        seen[key] = 1;
-        const acts = (_RESPONSE_APPLIES[(o.type || '').toLowerCase()] || [])
-            .map(function (t) { return byType[t]; }).filter(Boolean);
-        if (acts.length) rows.push({ o: o, acts: acts });
-    });
-    let html = '';
-    if (!rows.length) {
-        html += '<div class="cpanel-empty-hint"><i class="icon-search"></i> No actionable observables on this case</div>';
-    } else {
-        rows.forEach(function (row) {
-            html += '<div class="awx-obsrow"><code>' + esc(row.o.type) + '</code> ' + esc(row.o.value) + ' ';
-            row.acts.forEach(function (a) {
-                html += '<button type="button" class="btn" data-click-action="requestResponseAction" data-args=\'['
-                    + a.id + ',' + JSON.stringify(String(row.o.value)) + ',' + caseId + ']\'>'
-                    + esc(a.name) + (a.requires_approval ? ' ⚠' : '') + '</button> ';
-            });
-            html += '</div>';
-        });
-    }
-    html += '<div class="cpanel-section-title">Action log</div><div id="response-actions-log">…</div>';
-    container.innerHTML = html;
-    loadResponseActionLog(caseId);
+    if (state === 'data' || state === 'empty') return loadResponseActionLog(caseId);
 }
 
 async function loadResponseActionLog(caseId) {
-    const el = document.getElementById('response-actions-log');
-    if (!el) return;
-    try {
-        const r = await fetch('/api/response/actions/log?case_id=' + caseId);
-        const rows = r.ok ? ((await r.json()).log || []) : [];
-        if (!rows.length) { el.innerHTML = '<div class="cpanel-empty-hint">No actions requested yet</div>'; return; }
-        el.innerHTML = rows.map(function (l) {
-            return '<div class="awx-obsrow"><code>' + esc(l.status) + '</code> <code>'
-                + esc(l.action_type || '') + '</code> ' + esc(l.target || '')
-                + (l.result && l.result.dry_run ? ' (dry-run)' : '') + '</div>';
-        }).join('');
-    } catch (e) { el.textContent = 'Could not load action log.'; }
+    return ionLoadFragment('/ui/cases/' + caseId + '/response-log', 'response-actions-log', 'Loading action log...', {failure:'Could not load action log.'});
 }
 
 async function requestResponseAction(actionId, target, caseId) {
@@ -3834,29 +3727,29 @@ async function panelUpdateField(caseId, field, value) {
 async function translateCaseNote(noteId) {
     const el = document.getElementById(noteId);
     if (!el) return;
-    if (el.dataset.translated === '1') {
-        // Toggle off — restore the original rendered markdown.
-        el.innerHTML = el.dataset.renderedHtml || '';
+    if (el.dataset.translated === '1' && el._ionNoteOriginal) {
+        el.replaceChildren(...el._ionNoteOriginal.nodes.map(node => node.cloneNode(true)));
         el.dataset.translated = '0';
         return;
     }
-    const original = el.dataset.originalRaw || el.textContent;
-    if (!original.trim()) return;
+    if (!el._ionNoteOriginal) {
+        el._ionNoteOriginal = {raw:el.dataset.originalRaw || el.textContent,nodes:[...el.childNodes].map(node => node.cloneNode(true))};
+    }
+    if (!el._ionNoteOriginal.raw.trim()) return;
+    const token = {};
+    el._ionTranslationRequest = token;
     el.style.opacity = '0.6';
     try {
-        const r = await fetch('/api/translator/translate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: original, source: 'auto', target: 'en' }),
+        const loaded = await ionLoadFragment('/ui/cases/note-translation', el, 'Translating...', {
+            method:'POST', values:{text:el._ionNoteOriginal.raw,source:'auto',target:'en'}, failure:'Translation request failed.'
         });
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status));
-        el.textContent = d.translation;
-        el.dataset.translated = '1';
-    } catch (e) {
-        el.textContent = '[translation failed: ' + (e.message || e) + ']';
+        if (el._ionTranslationRequest !== token) return;
+        const marker = el.querySelector('[data-note-translation]');
+        const state = marker ? JSON.parse(marker.dataset.noteTranslation).state : 'failed';
+        el.dataset.translated = loaded && state !== 'failed' ? '1' : '0';
+        if (!loaded) el.textContent = '[translation failed: request could not be completed]';
     } finally {
-        el.style.opacity = '';
+        if (el._ionTranslationRequest === token) el.style.opacity = '';
     }
 }
 
@@ -4271,27 +4164,20 @@ async function dismissWorkbenchPin(caseId, pinId) {
 // =============================================================================
 
 async function loadAnnotations(caseId) {
-    var body = document.getElementById('annotations-body-' + caseId);
-    var countEl = document.getElementById('annotations-count-' + caseId);
+    const body = document.getElementById('annotations-body-' + caseId);
     if (!body) return;
-    try {
-        var resp = await fetch('/api/alert-cases/' + caseId + '/annotations');
-        if (!resp.ok) { body.innerHTML = '<div class="cpanel-empty-hint">Failed to load annotations</div>'; return; }
-        var data = await resp.json();
-        var annotations = data.annotations || [];
-        if (countEl) countEl.textContent = String(annotations.length);
-        renderAnnotations(caseId, annotations);
-    } catch (e) { body.innerHTML = '<div class="cpanel-empty-hint">Failed to load annotations</div>'; }
+    const token = {};
+    body._ionAnnotationsRequest = token;
+    const loaded = await ionLoadFragment('/ui/cases/' + caseId + '/annotations', body, 'Loading annotations...', {failure:'Failed to load annotations'});
+    if (body._ionAnnotationsRequest !== token) return;
+    if (!loaded) {
+        const count = document.getElementById('annotations-count-' + caseId);
+        if (count) count.textContent = '-';
+    }
+    body.querySelectorAll('[data-annotation-form]').forEach(form => form.style.display = 'none');
 }
 
-function renderAnnotations(caseId, annotations) {
-    var body = document.getElementById('annotations-body-' + caseId);
-    if (!body) return;
-    var html = annotations.map(function(a) { return renderAnnotationCard(caseId, a); }).join('');
-    html += '<div class="mt-2"><button type="button" class="btn btn-secondary text-xs py-[0.3rem] px-[0.65rem]" data-click-action="toggleAnnotationForm" data-args=\'[' + caseId + ']\'>+ Add annotation</button></div>';
-    html += renderAnnotationFormHtml(caseId);
-    body.innerHTML = html;
-}
+
 
 function renderAnnotationFormHtml(caseId) {
     return '<div class="hidden mt-[0.6rem]" id="annotation-form-' + caseId + '">'
