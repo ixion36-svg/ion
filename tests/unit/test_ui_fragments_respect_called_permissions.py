@@ -53,6 +53,16 @@ NEEDS = re.compile(r"""require_permission\(\s*['"]([^'"]+)['"]""")
 CHECKS = re.compile(r"""has_permission\(\s*['"]([^'"]+)['"]""")
 CONSTS = re.compile(r"""^\s*PERMISSION\w*\s*=\s*['"]([^'"]+)['"]""", re.M)
 
+#: Any module-level constant holding something that looks like a
+#: permission, so `has_permission(PINS_PERMISSION)` counts. Without this
+#: the check missed a guard written against a named constant, which is
+#: how the cases module's own guard first read as absent.
+NAMED = re.compile(
+    r"""^\s*([A-Z][A-Z0-9_]*)\s*=\s*['"]([a-z_]+:[a-z_]+)['"]""", re.M)
+#: The same two calls, taking a name rather than a literal.
+BY_NAME = re.compile(
+    r"""(?:has_permission|require_permission)\(\s*([A-Z][A-Z0-9_]*)\s*\)""")
+
 
 def _api_permissions(module_name: str) -> dict[str, set[str]]:
     """Every function in an api module mapped to the permissions its own
@@ -123,6 +133,13 @@ def _unguarded_calls(path: Path) -> list[str]:
         for name, permission in aliases.items():
             if re.search(r"Depends\(\s*%s\s*\)" % re.escape(name), source):
                 held.add(permission)
+        # has_permission(PINS_PERMISSION), where the constant holds the
+        # name. A guard written against a constant read as absent before
+        # this, which is how the cases module failed its own check.
+        named = dict(NAMED.findall(text))
+        for name in BY_NAME.findall(source):
+            if name in named:
+                held.add(named[name])
 
         for api_module, fn in re.findall(
                 r"(?:await\s+)?(\w+_api)\.(\w+)\s*\(", source):
@@ -195,6 +212,29 @@ def test_a_module_level_alias_counts_as_holding_the_permission(tmp_path):
         '    return await case_lifecycle_api.list_cases()\n',
         encoding="utf-8")
     assert _unguarded_calls(other) != []
+
+
+def test_a_guard_written_against_a_constant_is_recognised(tmp_path):
+    """`has_permission(PINS_PERMISSION)` rather than a literal.
+
+    The cases module guards its pins read that way, and the check read it
+    as absent until constants resolved, which made it fail on working
+    code. The other half of the control is that removing that guard still
+    fails, so resolving the constant did not just silence it.
+    """
+    real = (UI / "cases.py").read_text(encoding="utf-8")
+    assert "if not current_user.has_permission(PINS_PERMISSION):" in real, (
+        "the guard moved; this control no longer reproduces the case")
+    assert _unguarded_calls(UI / "cases.py") == []
+
+    broken = tmp_path / "cases.py"
+    broken.write_text(
+        real.replace(
+            "if not current_user.has_permission(PINS_PERMISSION):",
+            "if False:"),
+        encoding="utf-8")
+    unmet = _unguarded_calls(broken)
+    assert any("list_pins_endpoint" in u for u in unmet), unmet
 
 
 def test_both_quote_styles_are_recognised():

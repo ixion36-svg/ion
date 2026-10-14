@@ -1,0 +1,67 @@
+{% macro item(p, case_id, active) %}
+<div class="cpanel-pb-item">
+  <div class="cpanel-pb-item-info">
+    <div class="cpanel-pb-item-name">{{ p.name }}</div>
+    <div class="cpanel-pb-item-desc">
+      {%- if p.description %}{{ p.description }}{% if p.truncated %}...{% endif %}{% endif %}
+      &middot;
+      {%- if p.steps is not none %} {{ p.steps }} steps
+      {%- else %} <span class="an-absent"
+          title="No step count was recorded for this playbook"></span> steps
+      {%- endif %}
+    </div>
+  </div>
+  <span class="cpanel-pb-badge {{ 'active' if active else 'inactive' }}">
+    {{- 'Active' if active else 'Library' -}}</span>
+  {#- Through tojson, not esc(). `esc` turns a double quote into &quot;,
+      which the parser decodes back inside this single-quoted attribute
+      and ends the JSON array early, so a playbook named Say "hello" broke
+      its own Start button. -#}
+  <button class="btn text-xs py-1 px-2" data-click-action="startPlaybookForCase"
+          data-args='{{ [case_id, p.playbook_id, p.name]|tojson }}'>Start</button>
+</div>
+{% endmacro %}
+{% macro search(case_id, needle) %}
+<div class="cpanel-playbook-browser-search">
+  <input type="text" placeholder="Filter playbooks..."
+         data-input-action="filterCasePlaybooks"
+         data-args='{{ [case_id, "$value"]|tojson }}'
+         value="{{ needle }}">
+</div>
+{% endmacro %}
+{# The case playbook browser, from ui/cases.py's playbooks_view.
+
+   `p.name.toLowerCase()` threw on a nameless playbook, inside the filter,
+   so one bad row took the whole browser into the catch and the message
+   then blamed the load. `p.description` on the same line was guarded.
+
+   The filter runs on the server now, which is also why an unreadable
+   library and a filter that matches nothing are different states: the
+   page rendered both as "No matching playbooks".
+#}
+<div class="cpanel-playbook-browser">
+{%- if state == 'withheld' %}
+  <div class="cpanel-pb-message">The playbook library needs the
+    playbook:read permission.</div>
+{%- elif state == 'failed' %}
+  <div class="cpanel-pb-message">The playbook library could not be read.</div>
+{%- elif state == 'unreadable' %}
+  <div class="cpanel-pb-message">The playbook library is not in a shape
+    this page can read.</div>
+{%- elif state == 'empty' %}
+  <div class="cpanel-pb-message">No playbooks in the library.</div>
+{%- elif state == 'no_match' %}
+  {{ search(case_id, filter) }}
+  <div class="cpanel-pb-message">No matching playbooks</div>
+{%- else %}
+  {{ search(case_id, filter) }}
+  {%- if active %}
+  <div class="cpanel-pb-group-header">Active Playbooks</div>
+  {%- for p in active %}{{ item(p, case_id, true) }}{% endfor %}
+  {%- endif %}
+  {%- if inactive %}
+  <div class="cpanel-pb-group-header">Library Playbooks</div>
+  {%- for p in inactive %}{{ item(p, case_id, false) }}{% endfor %}
+  {%- endif %}
+{%- endif %}
+</div>

@@ -1266,3 +1266,319 @@ def cases_observables_fragment(
                        observables_view(payload))
 
 router.include_router(board_router)
+
+
+# ---------------------------------------------------------------------------
+# The workbench kanban and the playbook browser
+# ---------------------------------------------------------------------------
+#
+# A FAILED PINS READ SHOWED AN EMPTY EVIDENCE WORKBENCH
+#
+#     const pins = pinsResp.ok ? (await pinsResp.json()).pins || [] : [];
+#     renderWorkbenchKanban(caseId, pins);
+#
+# Three columns, each reading "no pins". The workbench is the case's
+# evidence board and the ledger behind it is tamper-evident, so "nothing
+# has been pinned" is a claim about an investigation, and it was being
+# made on the strength of a read that returned 403 or 500.
+#
+# The verify banner beside it is already right: `if (!verify)` renders
+# "verify unavailable" under wb-verify-unknown rather than claiming a
+# valid chain. It stays in the page, untouched, and a test pins it there.
+#
+# A PLAYBOOK WITH NO NAME TOOK THE BROWSER DOWN
+#
+#     playbooks.filter(p => p.name.toLowerCase().includes(q)
+#                           || (p.description || '').toLowerCase()...)
+#
+# `p.description` is guarded and `p.name` is not, so one nameless
+# playbook threw inside the filter and the whole browser fell into the
+# catch, which then blamed the load.
+#
+# A PLAYBOOK NAME WITH A DOUBLE QUOTE BROKE ITS ACTION ARGUMENTS
+#
+# `esc(p.name)` turns a double quote into &quot;, which is right for an
+# attribute and wrong for JSON inside one: the parser decodes it back and
+# the array ends early. `|tojson` is the escaping that holds.
+#
+# BOTH READS NEED A PERMISSION THIS PAGE DOES NOT HAVE
+#
+# GET /api/alert-cases/{id}/pins takes forensic:read and GET
+# /api/playbooks takes playbook:read, where this page is case:read. The
+# page reached them over HTTP, so FastAPI applied those dependencies and
+# a reader without them got a 403 the catch turned into "Failed to load".
+# A fragment calls the function directly, which runs the body with none of
+# its Depends(...) applied, so each permission is checked here explicitly.
+# tests/unit/test_ui_fragments_respect_called_permissions.py enforces that
+# across the package, after I shipped exactly this bug on the pcap page.
+
+WORKBENCH_FRAGMENT = "_fragments/cases_workbench.html"
+PLAYBOOKS_FRAGMENT = "_fragments/cases_playbooks.html"
+
+#: What the pins read requires, from forensic_workbench_api.
+PINS_PERMISSION = "forensic:read"
+
+#: What the playbook library read requires, from api.list_playbooks.
+PLAYBOOKS_PERMISSION = "playbook:read"
+
+#: The kanban's columns, from the page's WB_COLUMNS.
+WB_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("triage", "Triage"),
+    ("confirmed", "Confirmed"),
+    ("reported", "Reported"),
+)
+
+#: How much of a pin summary and a playbook description the cards show,
+#: from the page's slice(0, 200) and substring(0, 80).
+PIN_SUMMARY = 200
+PLAYBOOK_DESC = 80
+
+
+def read_case_pins(case_id, current_user, session):
+    """The pins read, in one place so a test can stand in for it.
+
+    The permission is checked here and not only at the route. Calling the
+    endpoint function directly runs its body with none of its
+    Depends(...) applied, so the guarantee has to be local to whatever
+    makes the call rather than resting on its one current caller.
+    """
+    from ion.web import forensic_workbench_api
+
+    if not current_user.has_permission(PINS_PERMISSION):
+        raise PermissionError(PINS_PERMISSION)
+    return forensic_workbench_api.list_pins_endpoint(
+        case_id=case_id, include_dismissed=False, user=current_user,
+        session=session)
+
+
+def read_playbooks(current_user=None, session=None):
+    """The playbook library read, likewise, and guarded for the same
+    reason."""
+    from ion.web import api as playbook_api
+
+    if current_user is None or not current_user.has_permission(
+            PLAYBOOKS_PERMISSION):
+        raise PermissionError(PLAYBOOKS_PERMISSION)
+    return playbook_api.list_playbooks(
+        active_only=False, current_user=current_user, session=session)
+
+
+def _wb_text(value: Any) -> Optional[str]:
+    if isinstance(value, str):
+        stripped = value.strip()
+        return stripped or None
+    return None
+
+
+def _wb_int(value: Any) -> Optional[int]:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return int(value)
+
+
+class PinCard(TypedDict):
+    pin_id: Optional[int]
+    severity: Optional[str]
+    source_label: str
+    title: str
+    summary: Optional[str]
+    truncated: bool
+    pinned_by: str
+    pinned_at: Optional[str]
+
+
+class WorkbenchColumn(TypedDict):
+    key: str
+    label: str
+    pins: list[PinCard]
+
+
+class WorkbenchView(TypedDict):
+    state: str
+    case_id: int
+    columns: list[WorkbenchColumn]
+    visible: Optional[int]
+    uncategorised: list[PinCard]
+
+
+def pin_card(raw: Any) -> Optional[PinCard]:
+    if not isinstance(raw, dict):
+        return None
+    summary = raw.get("summary")
+    summary = summary if isinstance(summary, str) else None
+    source = _wb_text(raw.get("source_type")) or "note"
+    return {
+        "pin_id": _wb_int(raw.get("id")),
+        "severity": _wb_text(raw.get("severity")),
+        "source_label": source.upper(),
+        "title": _wb_text(raw.get("title")) or "(untitled)",
+        "summary": (None if summary is None
+                    else summary[:PIN_SUMMARY]),
+        "truncated": bool(summary and len(summary) > PIN_SUMMARY),
+        "pinned_by": _wb_text(raw.get("pinned_by_username")) or "unknown",
+        "pinned_at": instant_label(raw.get("pinned_at")),
+    }
+
+
+def workbench_view(payload: Any, case_id: int) -> WorkbenchView:
+    empty: WorkbenchView = {
+        "state": "failed", "case_id": case_id,
+        "columns": [{"key": k, "label": l, "pins": []}
+                    for k, l in WB_COLUMNS],
+        "visible": None, "uncategorised": [],
+    }
+    if not isinstance(payload, dict):
+        return empty
+    raw = payload.get("pins")
+    if not isinstance(raw, list):
+        return {**empty, "state": "unreadable"}
+
+    cards: dict[str, list[PinCard]] = {k: [] for k, _ in WB_COLUMNS}
+    other: list[PinCard] = []
+    visible = 0
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        status = _wb_text(entry.get("finding_status"))
+        if status == "dismissed":
+            continue
+        card = pin_card(entry)
+        if card is None:
+            continue
+        visible += 1
+        # A status outside the three columns belonged to no column, so
+        # the pin vanished from a tamper-evident evidence board.
+        if status in cards:
+            cards[status].append(card)
+        else:
+            other.append(card)
+
+    return {
+        "state": "data",
+        "case_id": case_id,
+        "columns": [{"key": k, "label": l, "pins": cards[k]}
+                    for k, l in WB_COLUMNS],
+        "visible": visible,
+        "uncategorised": other,
+    }
+
+
+class PlaybookItem(TypedDict):
+    playbook_id: Optional[int]
+    name: str
+    description: Optional[str]
+    truncated: bool
+    steps: Optional[int]
+    is_active: bool
+
+
+class PlaybooksView(TypedDict):
+    state: str
+    case_id: int
+    filter: str
+    active: list[PlaybookItem]
+    inactive: list[PlaybookItem]
+
+
+def playbook_item(raw: Any) -> Optional[PlaybookItem]:
+    if not isinstance(raw, dict):
+        return None
+    description = raw.get("description")
+    description = description if isinstance(description, str) else None
+    return {
+        "playbook_id": _wb_int(raw.get("id")),
+        # `p.name.toLowerCase()` threw on a nameless playbook, inside the
+        # filter, so one bad row cost the whole browser.
+        "name": _wb_text(raw.get("name")) or "unnamed playbook",
+        "description": (None if description is None
+                        else description[:PLAYBOOK_DESC]),
+        "truncated": bool(description
+                          and len(description) > PLAYBOOK_DESC),
+        "steps": _wb_int(raw.get("step_count")),
+        "is_active": raw.get("is_active") is True,
+    }
+
+
+def playbooks_view(payload: Any, case_id: int,
+                   needle: str = "") -> PlaybooksView:
+    empty: PlaybooksView = {
+        "state": "failed", "case_id": case_id, "filter": needle,
+        "active": [], "inactive": [],
+    }
+    if not isinstance(payload, dict):
+        return empty
+    raw = payload.get("playbooks")
+    if not isinstance(raw, list):
+        return {**empty, "state": "unreadable"}
+
+    items = [i for i in (playbook_item(e) for e in raw) if i is not None]
+    total = len(items)
+    if needle:
+        lowered = needle.lower()
+        items = [i for i in items
+                 if lowered in i["name"].lower()
+                 or lowered in (i["description"] or "").lower()]
+
+    if not total:
+        state = "empty"
+    elif not items:
+        state = "no_match"
+    else:
+        state = "data"
+    return {
+        "state": state, "case_id": case_id, "filter": needle,
+        "active": [i for i in items if i["is_active"]],
+        "inactive": [i for i in items if not i["is_active"]],
+    }
+
+
+@router.get(
+    "/cases/{case_id}/workbench",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+def cases_workbench_fragment(
+    request: Request,
+    case_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> Response:
+    """The evidence kanban."""
+    if not current_user.has_permission(PINS_PERMISSION):
+        view = workbench_view(None, case_id)
+        view["state"] = "withheld"
+        return render_view(request, WORKBENCH_FRAGMENT, view)
+    try:
+        payload = read_case_pins(case_id, current_user, session)
+    except Exception:
+        logger.exception("Case workbench could not read its pins")
+        payload = None
+    return render_view(request, WORKBENCH_FRAGMENT,
+                       workbench_view(payload, case_id))
+
+
+@router.get(
+    "/cases/{case_id}/playbooks",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+def cases_playbooks_fragment(
+    request: Request,
+    case_id: int,
+    filter: str = "",
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> Response:
+    """The playbook browser, filtered server side."""
+    if not current_user.has_permission(PLAYBOOKS_PERMISSION):
+        view = playbooks_view(None, case_id, filter)
+        view["state"] = "withheld"
+        return render_view(request, PLAYBOOKS_FRAGMENT, view)
+    try:
+        payload = read_playbooks(current_user=current_user,
+                                 session=session)
+    except Exception:
+        logger.exception("Case playbook browser could not read the library")
+        payload = None
+    return render_view(request, PLAYBOOKS_FRAGMENT,
+                       playbooks_view(payload, case_id, filter))

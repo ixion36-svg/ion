@@ -2433,13 +2433,21 @@ async function updateCaseStatus(caseId, status, closureReason, closureNotes) {
 // Reset the AI-rewrite button to its idle state whenever the closure modal
 // opens, so a stale "Revert" label / cached draft from a prior close doesn't
 // leak into a fresh one.
+// Clone one of the page's <template> elements. The closure button's
+// three labels were innerHTML assignments from string literals, so an
+// icon and its wording lived where no stylesheet sweep reaches them.
+function ionCaseTpl(id) {
+    const tpl = document.getElementById(id);
+    return tpl ? tpl.content.cloneNode(true) : document.createDocumentFragment();
+}
+
 function resetClosureAiButton() {
     const btn = document.getElementById('closure-ai-rewrite');
     if (!btn) return;
     delete btn.dataset.original;
     delete btn.dataset.rewritten;
     btn.disabled = false;
-    btn.innerHTML = '<i class="icon-sparkles"></i> AI rewrite';
+    btn.replaceChildren(ionCaseTpl('tpl-closure-ai-idle'));
 }
 
 // AI-polish the analyst's draft closing comment. Sends the current draft +
@@ -2456,7 +2464,7 @@ async function rewriteClosureNotes() {
         ta.value = btn.dataset.original;
         delete btn.dataset.original;
         delete btn.dataset.rewritten;
-        btn.innerHTML = '<i class="icon-sparkles"></i> AI rewrite';
+        btn.replaceChildren(ionCaseTpl('tpl-closure-ai-idle'));
         return;
     }
 
@@ -2467,8 +2475,7 @@ async function rewriteClosureNotes() {
 
     const orig = ta.value;
     btn.disabled = true;
-    const prevLabel = btn.innerHTML;
-    btn.innerHTML = '<i class="icon-sparkles"></i> Rewriting…';
+    btn.replaceChildren(ionCaseTpl('tpl-closure-ai-busy'));
     try {
         const resp = await fetch('/api/ai/closure/rewrite', {
             method: 'POST',
@@ -2487,10 +2494,12 @@ async function rewriteClosureNotes() {
         ta.value = rewritten;
         btn.dataset.original = orig;
         btn.dataset.rewritten = rewritten;
-        btn.innerHTML = '<i class="icon-rotate-ccw"></i> Revert';
+        btn.replaceChildren(ionCaseTpl('tpl-closure-ai-revert'));
         showToast('Closing comment rewritten — review before confirming', 'success');
     } catch (e) {
-        btn.innerHTML = prevLabel;
+        // prevLabel was always the idle label, captured one line
+        // before it was overwritten.
+        btn.replaceChildren(ionCaseTpl('tpl-closure-ai-idle'));
         showToast('AI rewrite failed: ' + e.message, 'error');
     } finally {
         btn.disabled = false;
@@ -4473,87 +4482,44 @@ async function escalateCase(caseId) {
 // =============================================================================
 // Start Playbook (Browser Panel)
 // =============================================================================
-let casePlaybookData = {};  // caseId -> playbooks array
 
-async function toggleCasePlaybookBrowser(caseId) {
+// GET /ui/cases/{id}/playbooks renders the browser and does the
+// filtering, which is why an unreadable library and a filter that
+// matches nothing are now different states: the page rendered both as
+// "No matching playbooks".
+//
+// `p.name.toLowerCase()` threw on a nameless playbook, inside the
+// filter, so one bad row took the whole browser into the catch and the
+// message then blamed the load. `p.description` on the same line was
+// guarded. The failure colour was #f44336, a literal in a JavaScript
+// string, which is a colour no stylesheet can reach.
+function loadCasePlaybookBrowser(caseId, filter) {
     const panel = document.getElementById('case-playbook-browser-' + caseId);
     if (!panel) return;
+    return htmx.ajax('GET', '/ui/cases/' + caseId + '/playbooks', {
+        source: panel, target: panel, swap: 'innerHTML',
+        values: filter ? { filter: filter } : {},
+    });
+}
 
-    // Only collapse when it's actually shown. The panel starts hidden via the
-    // _ion-s-c8be1ccba6 class (inline display is ''), so testing `!== 'none'`
-    // treated the first click as "hide" and the browser needed two clicks to open.
+function filterCasePlaybooks(caseId, query) {
+    loadCasePlaybookBrowser(caseId, query);
+}
+
+function toggleCasePlaybookBrowser(caseId) {
+    const panel = document.getElementById('case-playbook-browser-' + caseId);
+    if (!panel) return;
+    // Only collapse when it is actually shown. The panel starts hidden
+    // via a class with no inline display, so testing `!== 'none'` treated
+    // the first click as "hide" and it took two clicks to open.
     if (panel.style.display === 'block') {
         panel.style.display = 'none';
         return;
     }
-
-    panel.innerHTML = '<div class="p-2 text-[0.8125rem] text-[var(--text-muted)]">Loading playbooks...</div>';
     panel.style.display = 'block';
-
-    try {
-        const resp = await fetch('/api/playbooks?active_only=false');
-        if (!resp.ok) throw new Error('Failed to load playbooks');
-        const data = await resp.json();
-        const playbooks = data.playbooks || [];
-        casePlaybookData[caseId] = playbooks;
-        renderCasePlaybookBrowser(caseId, playbooks);
-    } catch (e) {
-        panel.innerHTML = '<div class="p-2 text-[0.8125rem] text-[#f44336]">Failed to load playbooks</div>';
-    }
+    loadCasePlaybookBrowser(caseId, '');
 }
 
-function renderCasePlaybookBrowser(caseId, playbooks, filter) {
-    const panel = document.getElementById('case-playbook-browser-' + caseId);
-    if (!panel) return;
-
-    let filtered = playbooks;
-    if (filter) {
-        const q = filter.toLowerCase();
-        filtered = playbooks.filter(p => p.name.toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q));
-    }
-
-    const active = filtered.filter(p => p.is_active);
-    const inactive = filtered.filter(p => !p.is_active);
-
-    if (!filtered.length) {
-        panel.innerHTML = '<div class="cpanel-playbook-browser">'
-            + '<div class="cpanel-playbook-browser-search"><input type="text" placeholder="Filter playbooks..." data-input-action="filterCasePlaybooks" data-args=\'[' + caseId + ',"$value"]\' value="' + (filter || '') + '"></div>'
-            + '<div class="p-2 text-[0.8125rem] text-[var(--text-muted)]">No matching playbooks</div></div>';
-        return;
-    }
-
-    let html = '<div class="cpanel-playbook-browser">';
-    html += '<div class="cpanel-playbook-browser-search"><input type="text" placeholder="Filter playbooks..." data-input-action="filterCasePlaybooks" data-args=\'[' + caseId + ',"$value"]\' value="' + (filter || '') + '"></div>';
-
-    if (active.length > 0) {
-        html += '<div class="cpanel-pb-group-header">Active Playbooks</div>';
-        html += active.map(p => renderCasePlaybookItem(caseId, p, true)).join('');
-    }
-    if (inactive.length > 0) {
-        html += '<div class="cpanel-pb-group-header">Library Playbooks</div>';
-        html += inactive.map(p => renderCasePlaybookItem(caseId, p, false)).join('');
-    }
-
-    html += '</div>';
-    panel.innerHTML = html;
-}
-
-function renderCasePlaybookItem(caseId, p, isActive) {
-    const desc = p.description ? esc(p.description.substring(0, 80)) + (p.description.length > 80 ? '...' : '') : '';
-    return '<div class="cpanel-pb-item">'
-        + '<div class="cpanel-pb-item-info">'
-        + '<div class="cpanel-pb-item-name">' + esc(p.name) + '</div>'
-        + '<div class="cpanel-pb-item-desc">' + desc + ' &middot; ' + p.step_count + ' steps</div>'
-        + '</div>'
-        + '<span class="cpanel-pb-badge ' + (isActive ? 'active' : 'inactive') + '">' + (isActive ? 'Active' : 'Library') + '</span>'
-        + '<button class="btn text-xs py-1 px-2" data-click-action="startPlaybookForCase" data-args=\'[' + caseId + ',' + p.id + ',"' + esc(p.name) + '"]\'>Start</button>'
-        + '</div>';
-}
-
-function filterCasePlaybooks(caseId, query) {
-    const playbooks = casePlaybookData[caseId] || [];
-    renderCasePlaybookBrowser(caseId, playbooks, query);
-}
 
 async function startPlaybookForCase(caseId, playbookId, playbookName) {
     try {
@@ -4719,80 +4685,33 @@ const WB_COLUMNS = [
     { key: 'reported',  label: 'Reported' },
 ];
 
+// GET /ui/cases/{id}/workbench renders the kanban. The verify banner
+// stays here: it is a textContent write, it is already right, and a
+// tamper check that could not be read must not read as verified.
+//
+// `pinsResp.ok ? (await pinsResp.json()).pins || [] : []` drew three
+// columns each reading "no pins" when the read returned 403 or 500. The
+// workbench is the case's evidence board and the ledger behind it is
+// tamper-evident, so "nothing has been pinned" is a claim about an
+// investigation, and it was being made on a failed read.
+//
+// A pin whose finding_status is none of the three columns belonged to no
+// column and vanished from the board; it gets one of its own now.
 async function loadWorkbench(caseId) {
-    // Two parallel fetches: pins for the kanban, ledger/verify for the
-    // tamper-evidence banner. Both render independently so a slow verify
-    // doesn't hide the pins (or vice versa).
-    try {
-        const [pinsResp, verifyResp] = await Promise.all([
-            fetch('/api/alert-cases/' + caseId + '/pins'),
-            fetch('/api/alert-cases/' + caseId + '/ledger/verify'),
-        ]);
-        const pins = pinsResp.ok ? (await pinsResp.json()).pins || [] : [];
-        const verify = verifyResp.ok ? await verifyResp.json() : null;
-        renderWorkbenchKanban(caseId, pins);
-        renderWorkbenchVerifyBanner(caseId, verify);
-    } catch (e) {
-        const kanban = document.getElementById('workbench-kanban-' + caseId);
-        if (kanban) kanban.innerHTML = '<div class="cpanel-empty-hint col-span-full">Failed to load workbench</div>';
-    }
-}
-
-function renderWorkbenchKanban(caseId, pins) {
     const kanban = document.getElementById('workbench-kanban-' + caseId);
-    const countEl = document.getElementById('workbench-pin-count-' + caseId);
-    if (!kanban) return;
-
-    const visible = pins.filter(p => p.finding_status !== 'dismissed');
-    if (countEl) countEl.textContent = String(visible.length);
-
-    let html = '';
-    WB_COLUMNS.forEach(col => {
-        const colPins = visible.filter(p => p.finding_status === col.key);
-        html += '<div class="workbench-col" data-col="' + col.key + '" data-case="' + caseId + '"'
-            +   ' data-dragover-action="wbDragOver" data-dragleave-action="wbDragLeave"'
-            +   ' data-drop-action="wbDrop" data-args=\'["$event",' + caseId + ',"' + col.key + '"]\'>'
-            +   '<div class="workbench-col-header">'
-            +     '<span>' + esc(col.label) + '</span>'
-            +     '<span class="workbench-col-count">' + colPins.length + '</span>'
-            +   '</div>'
-            +   '<div class="workbench-col-body">';
-        if (!colPins.length) {
-            html += '<div class="workbench-empty">no pins</div>';
-        } else {
-            colPins.forEach(p => {
-                html += renderWorkbenchPinCard(caseId, p);
-            });
-        }
-        html +=   '</div>'
-            + '</div>';
-    });
-    kanban.innerHTML = html;
-}
-
-function renderWorkbenchPinCard(caseId, p) {
-    const sev = p.severity || '';
-    const sevClass = sev ? ('wb-sev-' + sev) : '';
-    const srcLabel = (p.source_type || 'note').toUpperCase();
-    const summarySnippet = p.summary
-        ? '<div class="workbench-pin-summary">' + esc(String(p.summary).slice(0, 200)) + (p.summary.length > 200 ? '…' : '') + '</div>'
-        : '';
-    return '<div class="workbench-pin ' + sevClass + '" draggable="true"'
-        +   ' data-pin="' + p.id + '" data-case="' + caseId + '"'
-        +   ' data-dragstart-action="wbDragStart" data-args=\'["$event",' + p.id + ']\'>'
-        +   '<div class="workbench-pin-head">'
-        +     '<span class="workbench-pin-src">' + esc(srcLabel) + '</span>'
-        +     (sev ? '<span class="workbench-pin-sev">' + esc(sev) + '</span>' : '')
-        +     '<button type="button" class="workbench-pin-x" title="Dismiss"'
-        +       ' data-click-action="dismissWorkbenchPin" data-args=\'[' + caseId + ',' + p.id + ']\'>&times;</button>'
-        +   '</div>'
-        +   '<div class="workbench-pin-title">' + esc(p.title || '(untitled)') + '</div>'
-        +   summarySnippet
-        +   '<div class="workbench-pin-foot">'
-        +     '<span>' + esc(p.pinned_by_username || 'unknown') + '</span>'
-        +     '<span>' + (p.pinned_at ? fmtDate(p.pinned_at) : '') + '</span>'
-        +   '</div>'
-        + '</div>';
+    if (kanban) {
+        htmx.ajax('GET', '/ui/cases/' + caseId + '/workbench', {
+            source: kanban, target: kanban, swap: 'innerHTML',
+        });
+    }
+    // The ledger verify is a separate read so a slow verify does not hold
+    // up the pins, which is why it is not part of that fragment.
+    try {
+        const resp = await fetch('/api/alert-cases/' + caseId + '/ledger/verify');
+        renderWorkbenchVerifyBanner(caseId, resp.ok ? await resp.json() : null);
+    } catch (e) {
+        renderWorkbenchVerifyBanner(caseId, null);
+    }
 }
 
 function renderWorkbenchVerifyBanner(caseId, verify) {
@@ -5084,4 +5003,10 @@ if (window.__initialCaseId) {
     });
 }
 </script>
+
+{#- The closure button's three states. They were innerHTML assignments
+    from string literals in the script block. -#}
+<template id="tpl-closure-ai-idle"><i class="icon-sparkles"></i> AI rewrite</template>
+<template id="tpl-closure-ai-busy"><i class="icon-sparkles"></i> Rewriting&hellip;</template>
+<template id="tpl-closure-ai-revert"><i class="icon-rotate-ccw"></i> Revert</template>
 {% endblock %}
