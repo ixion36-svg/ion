@@ -74,9 +74,11 @@
     </div>
   </div>
 
-<!-- Filled by renderCaseLoadNotice() only when the load was capped, so the
+<!-- Filled by _fragments/cases_board.html through an hx-swap-oob, so the
      board never silently shows a subset of the cases (review 2026-10-08,
-     stage 5). -->
+     stage 5). This said renderCaseLoadNotice() filled it; that function
+     went when the board moved to /ui/cases/board, and the notice is the
+     server's to write now, as are #cases-total and #cases-shown. -->
 <div id="cases-load-notice" class="mb-4"></div>
 
 <!-- Filters Bar -->
