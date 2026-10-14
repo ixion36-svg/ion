@@ -64,11 +64,11 @@ Server-rendered fragments. `render_view` routes also answer the view model as JS
 | GET | `/ui/cases/assignees` | `case:read` | [_cases_board.py:189](src/ion/web/ui/_cases_board.py#L189) | `_fragments/cases_assignees.html` | `cases.html` |
 | GET | `/ui/cases/board` | `case:read` | [_cases_board.py:156](src/ion/web/ui/_cases_board.py#L156) | `_fragments/cases_board.html` | `cases.html` |
 | GET | `/ui/cases/summary` | `case:read` | [cases.py:676](src/ion/web/ui/cases.py#L676) | `_fragments/cases_summary.html` | `cases_summary.html`, `cases.html` |
-| GET | `/ui/cases/{case_id}/playbooks` | `case:read` | [cases.py:1548](src/ion/web/ui/cases.py#L1548) | `_fragments/cases_playbooks.html` | `cases.html` |
+| GET | `/ui/cases/{case_id}/playbooks` | `case:read` | [cases.py:1560](src/ion/web/ui/cases.py#L1560) | `_fragments/cases_playbooks.html` | `cases.html` |
 | GET | `/ui/cases/{case_id}/similar` | `case:read` | [cases.py:807](src/ion/web/ui/cases.py#L807) | `_fragments/cases_similar.html` | `cases.html` |
 | GET | `/ui/cases/{case_id}/similar-observables` | `case:read` | [cases.py:1242](src/ion/web/ui/cases.py#L1242) | `_fragments/cases_observables.html` | `cases.html` |
 | GET | `/ui/cases/{case_id}/timeline` | `case:read` | [cases.py:1058](src/ion/web/ui/cases.py#L1058) | `_fragments/cases_timeline.html` | `cases.html` |
-| GET | `/ui/cases/{case_id}/workbench` | `case:read` | [cases.py:1523](src/ion/web/ui/cases.py#L1523) | `_fragments/cases_workbench.html` | `cases.html` |
+| GET | `/ui/cases/{case_id}/workbench` | `case:read` | [cases.py:1535](src/ion/web/ui/cases.py#L1535) | `_fragments/cases_workbench.html` | `cases.html` |
 | GET | `/ui/change-requests` | `system:settings` | [change_requests.py:106](src/ion/web/ui/change_requests.py#L106) | `_fragments/change_requests.html` | `change_requests.html` |
 | POST | `/ui/chat/answer-meta` | `ai:chat` | [chat.py:194](src/ion/web/ui/chat.py#L194) | `_fragments/chat_answer_meta.html` | `chat.html` |
 | GET | `/ui/chat/files` | `ai:chat` | [chat.py:399](src/ion/web/ui/chat.py#L399) | `_fragments/chat_files.html` | `chat.html` |
