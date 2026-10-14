@@ -3572,28 +3572,29 @@ function loadSimilarCases(caseId) {
 
 // Edge type → CSS suffix (colour + arrowhead marker are keyed off this).
 const _APG_EDGE_TYPES = ['process_lineage', 'network_flow', 'auth_presence', 'shared_observable'];
-const _APG_EDGE_LABELS = {
-    process_lineage: 'Process lineage',
-    network_flow: 'Network flow',
-    auth_presence: 'Auth / presence',
-    shared_observable: 'Shared observable',
-};
 // Node type → short glyph label shown on the card.
-const _APG_TYPE_GLYPH = {
-    host: 'H', user: 'U', process: 'P', ip: 'IP', domain: 'D', file: 'F', hash: '#',
-};
 
 // Module-level handle so switchPanelTab / ResizeObserver can trigger a repaint
 // without re-fetching. Reset on every load.
 let _apgState = { redraw: null, ro: null };
 
-function _apgTacticLabel(slug) {
-    if (!slug) return 'Unattributed';
-    return String(slug).split('-').map(function (w) {
-        return w ? w.charAt(0).toUpperCase() + w.slice(1) : w;
-    }).join(' ');
-}
 
+// GET /ui/cases/{id}/attack-path renders the stats strip, the legend and
+// the lanes. Only the edge overlay stays here: drawAttackPathEdges places
+// each curve from getBoundingClientRect and the graph's scroll offsets,
+// so it needs a laid-out DOM, and it draws SVG with createElementNS
+// rather than markup, so there is nothing in it a stylesheet sweep could
+// reach.
+//
+// `data.nodes || []` then `if (nodes.length === 0)` rendered "No attack
+// path derived yet" for a 200 whose body was the wrong shape. The HTTP
+// failures were handled; that one was not, and it is the sentence that
+// says this case has no established chain of activity.
+//
+// The edges ride back on .apg-graph in data-apg-edges, so the overlay
+// does not fetch them again. An edge missing an endpoint is already
+// dropped server side, which is what this function would do anyway, for
+// the right reason: skip, never fabricate.
 async function loadAttackPath(caseId) {
     const container = document.getElementById('attack-path-container');
     if (!container) return;
@@ -3601,136 +3602,35 @@ async function loadAttackPath(caseId) {
     if (_apgState.ro) { try { _apgState.ro.disconnect(); } catch (e) {} }
     _apgState = { redraw: null, ro: null };
 
-    try {
-        const resp = await fetch('/api/cases/' + caseId + '/attack-path');
-        if (!resp.ok) {
-            container.innerHTML = '<div class="cpanel-empty-hint">Attack path unavailable</div>';
-            return;
-        }
-        const data = await resp.json();
-        const nodes = data.nodes || [];
-        const edges = data.edges || [];
-        const phases = data.phases || [];
-        const stats = data.stats || {};
+    await htmx.ajax('GET', '/ui/cases/' + caseId + '/attack-path', {
+        source: container, target: container, swap: 'innerHTML',
+    });
 
-        if (nodes.length === 0) {
-            container.innerHTML = '<div class="cpanel-empty-hint">'
-                + '<i class="icon-share-2"></i> No attack path derived yet</div>';
-            return;
-        }
+    const graph = container.querySelector('.apg-graph');
+    if (!graph) return;
 
-        // ── Stats header strip ───────────────────────────────
-        const edgeStats = stats.edges || {};
-        const reached = (stats.tactics_reached || []).map(_apgTacticLabel);
-        let html = '<div class="apg-stats">';
-        html += '<span class="apg-stat"><b>' + (stats.nodes != null ? stats.nodes : nodes.length) + '</b> nodes</span>';
-        html += '<span class="apg-stat"><b>' + (edgeStats.total != null ? edgeStats.total : edges.length) + '</b> edges</span>';
-        html += '<span class="apg-stat"><b>' + (stats.alerts != null ? stats.alerts : 0) + '</b> alerts</span>';
-        if (reached.length) {
-            html += '<span class="apg-stat apg-stat-tactics" title="MITRE tactics reached, kill-chain order">'
-                + reached.map(esc).join(' <span class="apg-arrow-sep">→</span> ') + '</span>';
-        }
-        if (stats.reaches_impact) {
-            html += '<span class="apg-impact-badge" title="This path reaches an impact-class MITRE tactic">'
-                + '<i class="icon-alert-triangle"></i> reaches impact</span>';
-        }
-        html += '</div>';
+    let edges = [];
+    try { edges = JSON.parse(graph.dataset.apgEdges || '[]'); }
+    catch (e) { edges = []; }
 
-        // ── Legend (edge types) ──────────────────────────────
-        html += '<div class="apg-legend">';
-        _APG_EDGE_TYPES.forEach(function (t) {
-            html += '<span class="apg-legend-item">'
-                + '<span class="apg-legend-swatch apg-sw-' + t + '"></span>'
-                + esc(_APG_EDGE_LABELS[t]) + '</span>';
-        });
-        html += '</div>';
+    const cardMap = {};
+    graph.querySelectorAll('.apg-node[data-apg-node]').forEach(function (el) {
+        cardMap[el.getAttribute('data-apg-node')] = el;
+    });
 
-        // ── Node → lane placement ────────────────────────────
-        // A node's lane = the earliest phase (rank order) whose node_ids
-        // contains it. Nodes absent from every phase fall into a trailing
-        // "Unattributed" lane so the graph still renders everything.
-        const laneOf = {};
-        phases.forEach(function (ph, idx) {
-            (ph.node_ids || []).forEach(function (nid) {
-                if (laneOf[nid] === undefined) laneOf[nid] = idx;
-            });
-        });
-        const lanes = phases.map(function (ph) {
-            return { tactic: ph.tactic, nodes: [] };
-        });
-        let unattributed = null;
-        const nodeById = {};
-        nodes.forEach(function (n) {
-            nodeById[n.id] = n;
-            const li = laneOf[n.id];
-            if (li !== undefined && lanes[li]) {
-                lanes[li].nodes.push(n);
-            } else {
-                if (!unattributed) { unattributed = { tactic: null, nodes: [] }; }
-                unattributed.nodes.push(n);
-            }
-        });
-        const laneList = lanes.slice();
-        if (unattributed) laneList.push(unattributed);
+    const redraw = function () { drawAttackPathEdges(graph, edges, cardMap); };
+    _apgState.redraw = redraw;
+    // First paint on rAF so layout has settled. If the tab is hidden the
+    // rects are zero and switchPanelTab repaints on reveal.
+    requestAnimationFrame(redraw);
 
-        // ── Lanes + node cards ───────────────────────────────
-        html += '<div class="apg-graph"><div class="apg-lanes">';
-        laneList.forEach(function (lane) {
-            html += '<div class="apg-lane">';
-            html += '<div class="apg-lane-head" title="MITRE tactic">' + esc(_apgTacticLabel(lane.tactic)) + '</div>';
-            html += '<div class="apg-lane-body">';
-            if (lane.nodes.length === 0) {
-                html += '<div class="apg-lane-empty">—</div>';
-            }
-            lane.nodes.forEach(function (n) {
-                const type = String(n.type || 'unknown').toLowerCase();
-                const tl = n.threat_level ? String(n.threat_level).toLowerCase() : 'unknown';
-                const glyph = _APG_TYPE_GLYPH[type] || '?';
-                const val = n.label || n.value || n.id || '';
-                html += '<div class="apg-node tl-' + esc(tl) + '" data-apg-node="' + esc(n.id) + '"'
-                    + ' title="' + esc(type + ' · ' + val + ' · threat: ' + tl) + '">'
-                    + '<span class="apg-node-dot"></span>'
-                    + '<span class="apg-node-type t-' + esc(type) + '">' + esc(glyph) + '</span>'
-                    + '<span class="apg-node-val">' + esc(val) + '</span>'
-                    + '</div>';
-            });
-            html += '</div></div>';
-        });
-        html += '</div></div>';
-
-        container.innerHTML = html;
-
-        // ── Edge overlay ─────────────────────────────────────
-        const graph = container.querySelector('.apg-graph');
-        if (!graph) return;
-        // Build node-id → card element map for edge endpoint lookup.
-        const cardMap = {};
-        graph.querySelectorAll('.apg-node[data-apg-node]').forEach(function (el) {
-            cardMap[el.getAttribute('data-apg-node')] = el;
-        });
-
-        const redraw = function () { drawAttackPathEdges(graph, edges, cardMap); };
-        _apgState.redraw = redraw;
-        // First paint (rAF so layout has settled). If the tab is currently
-        // hidden the rects are zero — switchPanelTab repaints on reveal.
-        requestAnimationFrame(redraw);
-
-        // Repaint on container resize (panel width change, font load, etc.).
-        if (typeof ResizeObserver !== 'undefined') {
-            const ro = new ResizeObserver(function () { requestAnimationFrame(redraw); });
-            ro.observe(graph);
-            _apgState.ro = ro;
-        }
-    } catch (e) {
-        container.innerHTML = '<div class="cpanel-empty-hint">Attack path failed to load</div>';
+    if (typeof ResizeObserver !== 'undefined') {
+        const ro = new ResizeObserver(function () { requestAnimationFrame(redraw); });
+        ro.observe(graph);
+        _apgState.ro = ro;
     }
 }
 
-// Draw the SVG connectors. Coordinates are computed relative to the graph
-// container's content box (accounting for scroll) from each card's
-// getBoundingClientRect, so the overlay tracks the cards on resize/scroll.
-// Every coord is applied via setAttribute — no inline style= (strict CSP);
-// stroke colours come from the .apg-edge-<type> / .apg-mk-<type> CSS classes.
 function drawAttackPathEdges(graph, edges, cardMap) {
     if (!graph) return;
     const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -3799,7 +3699,9 @@ function drawAttackPathEdges(graph, edges, cardMap) {
         path.setAttribute('class', 'apg-edge apg-edge-' + type);
         path.setAttribute('fill', 'none');
         path.setAttribute('marker-end', 'url(#apg-arrow-' + type + ')');
-        const lbl = e.label || _APG_EDGE_LABELS[type] || e.type;
+        // The fragment resolves this from the legend table,
+        // which moved there with the legend markup.
+        const lbl = e.label || e.type;
         if (lbl) {
             const titleEl = document.createElementNS(SVG_NS, 'title');
             titleEl.textContent = String(lbl);

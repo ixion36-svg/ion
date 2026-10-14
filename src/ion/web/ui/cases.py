@@ -1582,3 +1582,263 @@ def cases_playbooks_fragment(
         payload = None
     return render_view(request, PLAYBOOKS_FRAGMENT,
                        playbooks_view(payload, case_id, filter))
+
+
+# ---------------------------------------------------------------------------
+# The attack-path graph's lanes, stats and legend
+# ---------------------------------------------------------------------------
+#
+# AN UNREADABLE PAYLOAD READ AS "NO ATTACK PATH DERIVED YET"
+#
+#     const nodes = data.nodes || [];
+#     ...
+#     if (nodes.length === 0) {
+#         container.innerHTML = '... No attack path derived yet</div>';
+#
+# The HTTP failures were handled, unusually for this project: a non-ok
+# response said "Attack path unavailable" and the catch said "Attack path
+# failed to load". What was not handled is a 200 whose body is the wrong
+# shape, which became an empty node list and then the sentence saying
+# this case has no established chain of activity.
+#
+# The edge overlay stays in the page. drawAttackPathEdges places each
+# curve from getBoundingClientRect and the graph's scroll offsets, so it
+# needs a laid-out DOM, and it draws SVG with createElementNS rather than
+# markup, so there is nothing in it for a stylesheet to reach. The
+# fragment hands it the edges on the graph element instead of making it
+# fetch again, and drops any edge missing an endpoint, which the overlay
+# would refuse to draw anyway for the right reason: skip, never fabricate.
+
+ATTACK_PATH_FRAGMENT = "_fragments/cases_attack_path.html"
+
+#: The node glyphs, from the page's _APG_TYPE_GLYPH.
+APG_GLYPHS: dict[str, str] = {
+    "host": "H", "user": "U", "process": "P", "ip": "IP",
+    "domain": "D", "file": "F", "hash": "#",
+}
+
+#: The four edge types and their legend labels, in the page's order.
+APG_EDGES: tuple[tuple[str, str], ...] = (
+    ("process_lineage", "Process lineage"),
+    ("network_flow", "Network flow"),
+    ("auth_presence", "Auth / presence"),
+    ("shared_observable", "Shared observable"),
+)
+
+#: Threat levels the node card has a class for. One outside this set keeps
+#: its text and takes no class, as elsewhere on this page.
+APG_THREAT_LEVELS: tuple[str, ...] = (
+    "critical", "high", "medium", "low", "unknown",
+)
+
+
+def tactic_label(slug: Any) -> str:
+    """`initial-access` to `Initial Access`, and None to Unattributed."""
+    text = _wb_text(slug)
+    if text is None:
+        return "Unattributed"
+    return " ".join(w.capitalize() if w else w for w in text.split("-"))
+
+
+class ApgNode(TypedDict):
+    node_id: str
+    kind: str
+    glyph: str
+    threat: str
+    threat_class: Optional[str]
+    label: str
+    title: str
+
+
+class ApgLane(TypedDict):
+    tactic_label: str
+    nodes: list[ApgNode]
+
+
+class ApgStats(TypedDict):
+    nodes: Optional[int]
+    edges: Optional[int]
+    alerts: Optional[int]
+    tactics: Optional[list[str]]
+    reaches_impact: bool
+
+
+class AttackPathView(TypedDict):
+    state: str
+    lanes: list[ApgLane]
+    stats: ApgStats
+    legend: list[dict]
+    edges: list[dict]
+    edges_readable: bool
+
+
+def apg_node(raw: Any) -> Optional[ApgNode]:
+    if not isinstance(raw, dict):
+        return None
+    identifier = raw.get("id")
+    if identifier is None:
+        return None
+    kind = (_wb_text(raw.get("type")) or "unknown").lower()
+    threat = (_wb_text(raw.get("threat_level")) or "unknown").lower()
+    label = (_wb_text(raw.get("label")) or _wb_text(raw.get("value"))
+             or str(identifier))
+    return {
+        "node_id": str(identifier),
+        "kind": kind,
+        "glyph": APG_GLYPHS.get(kind, "?"),
+        "threat": threat,
+        # None when the stylesheet has no class for it.
+        "threat_class": (threat if threat in APG_THREAT_LEVELS else None),
+        "label": label,
+        "title": "%s \u00b7 %s \u00b7 threat: %s" % (kind, label, threat),
+    }
+
+
+def apg_lanes(nodes: Any, phases: Any) -> Optional[list[ApgLane]]:
+    """Nodes placed in the earliest phase that names them.
+
+    A node named by no phase falls into a trailing Unattributed lane, so
+    the graph still renders everything, which is the page's own rule.
+    """
+    if not isinstance(nodes, list) or not isinstance(phases, list):
+        return None
+    cards: list[ApgNode] = [c for c in (apg_node(n) for n in nodes)
+                            if c is not None]
+
+    lane_of: dict[str, int] = {}
+    ordered: list[tuple[Optional[str], list[ApgNode]]] = []
+    for index, phase in enumerate(phases):
+        if not isinstance(phase, dict):
+            ordered.append((None, []))
+            continue
+        ordered.append((phase.get("tactic"), []))
+        ids = phase.get("node_ids")
+        if isinstance(ids, list):
+            for nid in ids:
+                key = str(nid)
+                if key not in lane_of:
+                    lane_of[key] = index
+
+    unattributed: list[ApgNode] = []
+    for card in cards:
+        index = lane_of.get(card["node_id"])
+        if index is not None and 0 <= index < len(ordered):
+            ordered[index][1].append(card)
+        else:
+            unattributed.append(card)
+
+    lanes: list[ApgLane] = [
+        {"tactic_label": tactic_label(tactic), "nodes": found}
+        for tactic, found in ordered]
+    if unattributed:
+        lanes.append({"tactic_label": tactic_label(None),
+                      "nodes": unattributed})
+    return lanes
+
+
+def apg_stats(raw: Any, nodes: Any, edges: Any) -> ApgStats:
+    stats = raw if isinstance(raw, dict) else {}
+    edge_stats = stats.get("edges")
+    edge_stats = edge_stats if isinstance(edge_stats, dict) else {}
+    tactics = stats.get("tactics_reached")
+    return {
+        # A missing count falls back to the list length, which the page
+        # did and which is the better answer.
+        "nodes": (_wb_int(stats.get("nodes"))
+                  if _wb_int(stats.get("nodes")) is not None
+                  else (len(nodes) if isinstance(nodes, list) else None)),
+        "edges": (_wb_int(edge_stats.get("total"))
+                  if _wb_int(edge_stats.get("total")) is not None
+                  else (len(edges) if isinstance(edges, list) else None)),
+        # `stats.alerts != null ? stats.alerts : 0` said no alerts fed
+        # this path when the count was simply not recorded.
+        "alerts": _wb_int(stats.get("alerts")),
+        "tactics": (None if not isinstance(tactics, list) else
+                    [tactic_label(t) for t in tactics]),
+        "reaches_impact": stats.get("reaches_impact") is True,
+    }
+
+
+def apg_edges(raw: Any) -> tuple[list[dict], bool]:
+    """The edges the overlay needs, and whether the list was readable.
+
+    An edge missing an endpoint is dropped: the overlay refuses to draw
+    one anyway, and its reason is the right one.
+    """
+    if not isinstance(raw, list):
+        return [], False
+    out = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            continue
+        source = entry.get("source")
+        target = entry.get("target")
+        if source is None or target is None:
+            continue
+        kind = _wb_text(entry.get("type")) or "unknown"
+        out.append({
+            "source": str(source), "target": str(target), "type": kind,
+            # The overlay used to look this up in its own _APG_EDGE_LABELS
+            # table, which moved here with the legend. It already prefers
+            # e.label, so resolving it once on the way out keeps the
+            # labels in one place.
+            "label": (_wb_text(entry.get("label"))
+                      or dict(APG_EDGES).get(kind) or kind),
+        })
+    return out, True
+
+
+def read_attack_path(case_id, current_user, session):
+    """The attack-path read. case:read, which this page already holds."""
+    from ion.web import case_lifecycle_api
+
+    return case_lifecycle_api.get_case_attack_path(
+        case_id=case_id, current_user=current_user, session=session)
+
+
+def attack_path_view(payload: Any) -> AttackPathView:
+    legend = [{"key": k, "label": l} for k, l in APG_EDGES]
+    empty: AttackPathView = {
+        "state": "failed", "lanes": [],
+        "stats": apg_stats(None, None, None), "legend": legend,
+        "edges": [], "edges_readable": True,
+    }
+    if not isinstance(payload, dict):
+        return empty
+    lanes = apg_lanes(payload.get("nodes"), payload.get("phases"))
+    if lanes is None:
+        return {**empty, "state": "unreadable"}
+    edges, edges_readable = apg_edges(payload.get("edges"))
+    if not any(lane["nodes"] for lane in lanes):
+        return {**empty, "state": "empty"}
+    return {
+        "state": "data",
+        "lanes": lanes,
+        "stats": apg_stats(payload.get("stats"), payload.get("nodes"),
+                           payload.get("edges")),
+        "legend": legend,
+        "edges": edges,
+        "edges_readable": edges_readable,
+    }
+
+
+@router.get(
+    "/cases/{case_id}/attack-path",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+async def cases_attack_path_fragment(
+    request: Request,
+    case_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+) -> Response:
+    """The lanes, the stats strip and the legend."""
+    try:
+        result = read_attack_path(case_id, current_user, session)
+        payload = await result if hasattr(result, "__await__") else result
+    except Exception:
+        logger.exception("Case attack path could not be read")
+        payload = None
+    return render_view(request, ATTACK_PATH_FRAGMENT,
+                       attack_path_view(payload))

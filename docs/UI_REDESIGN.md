@@ -22,9 +22,9 @@ page cannot be forgotten. Status is measured, never set by hand.
 | measure | remaining |
 |---|---|
 | templates | 80 |
-| total lines | 48,620 |
+| total lines | 48,522 |
 | inline `<style>` lines | 2,163 |
-| runtime DOM writes | 33 |
+| runtime DOM writes | 29 |
 | literal light-on-dark colours | 2 |
 
 ## Shell and partials
@@ -139,9 +139,9 @@ Needs the server-rendered fragment work first; a markup-only restyle cannot reac
 
 | template | lines | css | js | writes | light | styled | server | done |
 |---|--:|--:|--:|--:|:--:|:--:|:--:|:--:|
-| `cases.html` | 5012 | 2163 | 2825 | 26 | no | no | no |  |
+| `cases.html` | 4914 | 2163 | 2727 | 22 | no | no | no |  |
 
-Subtotal: 1 templates, 5,012 lines, 2,163 inline css lines, 26 runtime writes, 2 light-mode literals.
+Subtotal: 1 templates, 4,914 lines, 2,163 inline css lines, 22 runtime writes, 2 light-mode literals.
 
 ## Cleanup, so nothing is left behind
 
