@@ -82,6 +82,16 @@ def _run_export(tmp_path: Path, search_state: dict) -> dict:
         globalThis.URLSearchParams = class { get() { return null; } };
         globalThis.fetch = () => Promise.reject(new Error('no network in test'));
 
+        // discover.html's script block now opens with
+        //   htmx.config.useTemplateFragments = true;
+        // which the page may do because base.html loads htmx.min.js at the
+        // top of head and renders the scripts block far below it. Node has
+        // no htmx, so without this stub the harness died on that first line
+        // and all 28 tests here failed before reaching any export logic.
+        // The failures read as a broken export; nothing about the export
+        // had changed.
+        globalThis.htmx = { config: {}, ajax: () => Promise.resolve() };
+
         // ---- the page's own code ---------------------------------------
         __PAGE_JS__
 
@@ -314,6 +324,16 @@ def _resolve(tmp_path: Path, expr, reference: str):
         globalThis.window = { location: { search: '' }, addEventListener() {} };
         globalThis.URLSearchParams = class { get() { return null; } };
         globalThis.fetch = () => Promise.reject(new Error('no network in test'));
+
+        // discover.html's script block now opens with
+        //   htmx.config.useTemplateFragments = true;
+        // which the page may do because base.html loads htmx.min.js at the
+        // top of head and renders the scripts block far below it. Node has
+        // no htmx, so without this stub the harness died on that first line
+        // and all 28 tests here failed before reaching any export logic.
+        // The failures read as a broken export; nothing about the export
+        // had changed.
+        globalThis.htmx = { config: {}, ajax: () => Promise.resolve() };
         globalThis.Blob = class { constructor() {} };
         globalThis.URL = { createObjectURL: () => '', revokeObjectURL() {} };
 
