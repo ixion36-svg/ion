@@ -80,10 +80,10 @@ Server-rendered fragments. `render_view` routes also answer the view model as JS
 | GET | `/ui/cases/{case_id}/timeline` | `case:read` | [cases.py:1061](src/ion/web/ui/cases.py#L1061) | `_fragments/cases_timeline.html` | `cases.html` |
 | GET | `/ui/cases/{case_id}/workbench` | `case:read` | [cases.py:1541](src/ion/web/ui/cases.py#L1541) | `_fragments/cases_workbench.html` | `cases.html` |
 | GET | `/ui/change-requests` | `system:settings` | [change_requests.py:106](src/ion/web/ui/change_requests.py#L106) | `_fragments/change_requests.html` | `change_requests.html` |
-| POST | `/ui/chat/answer-meta` | `ai:chat` | [chat.py:194](src/ion/web/ui/chat.py#L194) | `_fragments/chat_answer_meta.html` | `chat.html` |
-| GET | `/ui/chat/files` | `ai:chat` | [chat.py:399](src/ion/web/ui/chat.py#L399) | `_fragments/chat_files.html` | `chat.html` |
-| GET | `/ui/chat/files/{file_id}` | `ai:chat` | [chat.py:423](src/ion/web/ui/chat.py#L423) | `_fragments/chat_file_viewer.html` |  |
-| GET | `/ui/chat/quick-prompts` | `ai:chat` | [chat.py:450](src/ion/web/ui/chat.py#L450) | `_fragments/chat_quick_prompts.html` | `chat.html` |
+| POST | `/ui/chat/answer-meta` | `ai:chat` | [chat.py:200](src/ion/web/ui/chat.py#L200) | `_fragments/chat_answer_meta.html` | `chat.html` |
+| GET | `/ui/chat/files` | `ai:chat` | [chat.py:405](src/ion/web/ui/chat.py#L405) | `_fragments/chat_files.html` | `chat.html` |
+| GET | `/ui/chat/files/{file_id}` | `ai:chat` | [chat.py:429](src/ion/web/ui/chat.py#L429) | `_fragments/chat_file_viewer.html` |  |
+| GET | `/ui/chat/quick-prompts` | `ai:chat` | [chat.py:456](src/ion/web/ui/chat.py#L456) | `_fragments/chat_quick_prompts.html` | `chat.html` |
 | GET | `/ui/compliance/posture` | `alert:read` | [compliance.py:427](src/ion/web/ui/compliance.py#L427) | `_fragments/compliance_posture.html` | `compliance_posture.html`, `compliance.html` |
 | GET | `/ui/daily-standup/arkime/countries` | `alert:read` | [daily_standup.py:911](src/ion/web/ui/daily_standup.py#L911) | `_fragments/daily_standup_countries.html` | `daily_standup.html` |
 | GET | `/ui/daily-standup/arkime/nodes` | `alert:read` | [daily_standup.py:982](src/ion/web/ui/daily_standup.py#L982) | `_fragments/daily_standup_nodes.html` | `daily_standup.html` |
