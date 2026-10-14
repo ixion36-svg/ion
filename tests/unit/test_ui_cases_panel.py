@@ -545,10 +545,36 @@ def test_the_page_reads_the_first_alert_from_the_fragment():
 
 def test_the_note_render_uses_a_fragment_not_inner_html():
     """DOMPurify can return a DocumentFragment, so the one thing that
-    cannot move server-side need not be a runtime write."""
+    cannot move server-side need not be a runtime write.
+
+    RETURN_DOM_FRAGMENT was asserted here, in the page. It is in app.js
+    now, inside safeMarkdownFragment: this page had been calling
+    DOMPurify.sanitize itself, and although it did pass
+    ION_SANITIZE_CONFIG, that made it a second place where the policy is
+    assembled. test_ithc_hardening holds the invariant that there is one.
+    """
     body = _scripts()
-    assert "RETURN_DOM_FRAGMENT" in body
+    assert "safeMarkdownFragment(" in body
     assert "replaceChildren" in body
+    assert "DOMPurify" not in body, "the policy lives in app.js"
+
+    app = (ROOT / "src/ion/web/static/js/app.js").read_text(encoding="utf-8")
+    helper = re.search(r"function safeMarkdownFragment\(.*?\n\}", app, re.S)
+    assert helper, "safeMarkdownFragment"
+    assert "RETURN_DOM_FRAGMENT" in helper.group(0)
+    assert "ION_SANITIZE_CONFIG" in helper.group(0)
+
+
+def test_a_note_that_cannot_be_sanitised_renders_as_text():
+    """safeMarkdownFragment returns null rather than something that looks
+    sanitised, and the caller has to treat that as text. Rendering the raw
+    note as markup on the failure path would be the whole hole."""
+    body = _scripts()
+    render = re.search(r"function renderCaseMarkdown\(.*?\n\}", body, re.S)
+    assert render, "renderCaseMarkdown"
+    source = render.group(0)
+    assert "el.textContent = raw" in source
+    assert "if (fragment)" in source
 
 
 def test_both_client_date_formatters_are_gone():

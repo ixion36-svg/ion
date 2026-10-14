@@ -53,29 +53,87 @@ class TestCspNonce:
         """If the glob finds nothing, every test here passes vacuously."""
         assert len(_template_files()) > 30
 
-    def test_no_template_has_a_script_tag_without_the_nonce(self):
-        """A bare <script> is silently dead under ION's CSP.
+    @staticmethod
+    def _nonceless_executable_scripts(text: str) -> list[int]:
+        """Lines holding an inline <script> that CSP would execute, with no
+        nonce on it.
 
-        Comments are stripped first. A Jinja comment in the architecture
-        fragment explains why the workflow edges are rendered as elements
-        rather than as a `<script>` data block, and the guard flagged the
-        explanation. Rewording the comment to satisfy the regex would be
-        the wrong way round: that file contains no script tag at all.
+        Comments are masked rather than deleted. Deleting them collapsed
+        their newlines, so every line number after the first comment in a
+        file was wrong, and three of the five offenders this once reported
+        pointed at a Jinja tag or a closing div rather than at any script.
+        A guard that sends you to the wrong line is worse than one that
+        only names the file.
+
+        `type="application/json"` is exempt. A JSON block is data: the
+        browser never executes it, script-src does not gate it, and a
+        nonce on it would mean nothing. All five of those offenders were
+        such blocks, and every executable inline script in the tree did
+        carry the nonce, so the report was false from end to end.
+
+        `/* */` is masked as well, because the words "<script>" turn up in
+        CSS and JS comment prose: daily_standup.html explains that
+        cloneTemplate returns null if a template is "ever moved inside a
+        <script>", and that sentence was the last false offender. The cost
+        is that a bare script sitting between two unrelated `/*` and `*/`
+        would be missed, which is why the three controls below exist.
         """
-        offenders = []
-        for path in _template_files():
-            text = path.read_text(encoding="utf-8")
-            text = re.sub(r"\{#.*?#\}", "", text, flags=re.S)
-            text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
-            for match in re.finditer(r"<script(?![^>]*\bsrc\s*=)([^>]*)>", text):
-                attrs = match.group(1)
-                if "csp_nonce" not in attrs:
-                    line = text[: match.start()].count("\n") + 1
-                    offenders.append(f"{path.name}:{line}")
+        masked = re.sub(
+            r"\{#.*?#\}|<!--.*?-->|/\*.*?\*/",
+            lambda m: "\n" * m.group(0).count("\n"),
+            text, flags=re.S)
+        lines = []
+        for match in re.finditer(r"<script(?![^>]*\bsrc\s*=)([^>]*)>", masked):
+            attrs = match.group(1)
+            if re.search(r"""type\s*=\s*["']application/json["']""", attrs):
+                continue
+            if "csp_nonce" not in attrs:
+                lines.append(masked[: match.start()].count("\n") + 1)
+        return lines
+
+    def test_no_template_has_a_script_tag_without_the_nonce(self):
+        """A bare <script> is silently dead under ION's CSP."""
+        offenders = [
+            f"{path.name}:{line}"
+            for path in _template_files()
+            for line in self._nonceless_executable_scripts(
+                path.read_text(encoding="utf-8"))
+        ]
         assert not offenders, (
             "inline <script> without nonce=\"{{ csp_nonce }}\" — ION's CSP "
             f"blocks these and the page's JS never runs: {offenders}"
         )
+
+    def test_the_guard_still_catches_a_bare_script(self):
+        """The assertion above passes on an empty list, so it would also
+        pass if the detector had stopped detecting."""
+        assert self._nonceless_executable_scripts(
+            "<div>\n<script>\nalert(1)\n</script>\n</div>") == [2]
+
+    def test_the_guard_exempts_a_json_block_but_not_another_type(self):
+        assert self._nonceless_executable_scripts(
+            '<script type="application/json">{"a":1}</script>') == []
+        assert self._nonceless_executable_scripts(
+            '<script type="module">import x from "y"</script>') == [1]
+
+    def test_the_reported_line_survives_a_multiline_comment(self):
+        """The defect that made the old report unusable. The script is on
+        line 6, and deleting the comment's newlines first called it 3."""
+        text = ("<div>\n"
+                "{# one\n"
+                "   two\n"
+                "   three #}\n"
+                "<p>x</p>\n"
+                "<script>alert(1)</script>\n")
+        assert self._nonceless_executable_scripts(text) == [6]
+
+    def test_the_words_script_in_comment_prose_are_not_offenders(self):
+        """Each of these was a real false positive from this guard, in a
+        Jinja comment, an HTML comment and a JS block comment in turn."""
+        for comment in ('{# rendered as elements, not a <script> block #}',
+                        '<!-- not a <script> either -->',
+                        '/* null if one is moved inside a <script>. */'):
+            assert self._nonceless_executable_scripts(comment) == [], comment
 
     def test_external_scripts_are_not_required_to_carry_one(self):
         """A <script src=...> is covered by 'self', so the rule above

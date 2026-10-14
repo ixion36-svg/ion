@@ -40,6 +40,36 @@ function safeMarkdown(content) {
 }
 
 /**
+ * Render markdown to a sanitized DOM fragment rather than a string, under
+ * the same ION_SANITIZE_CONFIG as everything else.
+ *
+ * cases.html needed a fragment, because a sanitized STRING has to be
+ * assigned somewhere and the redesign counts that as a runtime write, so
+ * it called DOMPurify.sanitize itself with RETURN_DOM_FRAGMENT. That call
+ * did pass ION_SANITIZE_CONFIG, so it was not a policy bypass, but it was
+ * a second place where the policy is assembled, and
+ * tests/test_ithc_hardening.py holds the invariant that there is exactly
+ * one: a bare sanitize() loses FORBID_ATTR, and an attacker-set id is a
+ * DOM-clobbering primitive on stored cross-user content like a case note.
+ *
+ * Returns null when it cannot sanitize, rather than something that looks
+ * sanitized. The caller falls back to textContent.
+ */
+function safeMarkdownFragment(content) {
+    if (typeof marked === 'undefined' || typeof DOMPurify === 'undefined') {
+        return null;
+    }
+    try {
+        return DOMPurify.sanitize(
+            marked.parse(content == null ? '' : String(content)),
+            Object.assign({}, ION_SANITIZE_CONFIG,
+                          { RETURN_DOM_FRAGMENT: true }));
+    } catch (error) {
+        return null;
+    }
+}
+
+/**
  * Replace an element's children with markup that is ALREADY safe, meaning
  * it came from safeHtml, safeMarkdown, or escapeHtml. This does not
  * sanitize. Passing it raw user content is the same hole as innerHTML.

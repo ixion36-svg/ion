@@ -1046,18 +1046,17 @@ function applyConfidenceMeters(root) {
 function renderCaseMarkdown(root) {
     (root || document).querySelectorAll('[data-note-raw]').forEach(function (el) {
         const raw = el.getAttribute('data-note-raw') || '';
-        if (typeof marked === 'undefined' || typeof DOMPurify === 'undefined') {
-            el.textContent = raw;
-            return;
-        }
-        try {
-            el.replaceChildren(DOMPurify.sanitize(
-                marked.parse(raw),
-                Object.assign({}, ION_SANITIZE_CONFIG,
-                              { RETURN_DOM_FRAGMENT: true })));
-        } catch (e) {
-            el.textContent = raw;
-        }
+        // safeMarkdownFragment is in app.js, with the policy. This used to
+        // call DOMPurify.sanitize here. It did pass ION_SANITIZE_CONFIG, so
+        // it was not a bypass, but it was a second place assembling the
+        // policy, and test_ithc_hardening holds the invariant that there is
+        // one: a bare sanitize() loses FORBID_ATTR, and an attacker-set id
+        // is a DOM-clobbering primitive on a stored cross-user case note.
+        const fragment = (typeof safeMarkdownFragment === 'function')
+            ? safeMarkdownFragment(raw) : null;
+        // Null means it could not sanitise, so the raw text is shown as
+        // text. Never as markup.
+        if (fragment) el.replaceChildren(fragment); else el.textContent = raw;
     });
 }
 
