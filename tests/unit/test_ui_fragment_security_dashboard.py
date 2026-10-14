@@ -844,9 +844,20 @@ def test_a_quiet_estate_renders_measured_zeros(app):
 
 def test_the_banner_level_is_the_json_endpoints(app, session):
     """get_threat_summary owns the thresholds. A second copy here would
-    keep saying normal after those moved."""
+    keep saying normal after those moved.
+
+    The event was pinned to datetime(2026, 10, 12, 15, 4, 0), and
+    get_threat_summary derives the level from a rolling 24-hour window.
+    That date was inside the window in the week this was written and has
+    since aged out of it, after which the level read normal and this
+    failed as though the thresholds had broken. It is two hours before now
+    instead, and the rendered timestamp is derived from the same value
+    rather than written out a second time, so the test stays deterministic
+    without depending on the calendar.
+    """
+    occurred = datetime.utcnow().replace(microsecond=0) - timedelta(hours=2)
     _event(session, severity=SecurityEventSeverity.CRITICAL, title="crit-probe",
-           created_at=datetime(2026, 10, 12, 15, 4, 0))
+           created_at=occurred)
     from ion.web.security_api import get_threat_summary
 
     level = get_threat_summary(session=session, current_user=None)["threat_level"]
@@ -858,7 +869,7 @@ def test_the_banner_level_is_the_json_endpoints(app, session):
     assert "threat-level flex items-center gap-4 critical" in resp.text
     assert "crit-probe" in resp.text
     assert "SecurityEventSeverity" not in resp.text
-    assert '<time datetime="2026-10-12T15:04:00"' in resp.text
+    assert f'<time datetime="{occurred.isoformat()}"' in resp.text
 
 
 def test_the_cards_are_the_24h_statistics_not_the_table_window(app, session):
