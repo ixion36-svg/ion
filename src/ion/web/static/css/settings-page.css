@@ -131,11 +131,7 @@ body[data-page="settings"] .form-actions{
 }
 
 /* Info Grid for System Info */
-body[data-page="settings"] .info-grid{
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 1rem;
-}
+
 
 body[data-page="settings"] .info-card{
     background: var(--bg-primary);
@@ -280,28 +276,13 @@ body[data-page="settings"] .role-badge{
 }
 
 /* Database Sections */
-body[data-page="settings"] .db-section{
-    margin-bottom: 2rem;
-    padding-bottom: 1.5rem;
-    border-bottom: 1px solid var(--ion-border);
-}
 
-body[data-page="settings"] .db-section:last-child{
-    border-bottom: none;
-    margin-bottom: 0;
-    padding-bottom: 0;
-}
 
-body[data-page="settings"] .db-section h3{
-    font-size: 1rem;
-    margin-bottom: 1rem;
-}
 
-body[data-page="settings"] .db-actions{
-    display: flex;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-}
+
+
+
+
 
 body[data-page="settings"] .backups-list{
     background: var(--bg-primary);
@@ -343,11 +324,7 @@ body[data-page="settings"] .backup-actions{
     gap: 0.5rem;
 }
 
-body[data-page="settings"] .cleanup-form{
-    display: flex;
-    align-items: flex-end;
-    gap: 1rem;
-}
+
 
 body[data-page="settings"] .btn-warning{
     background: var(--warning);
@@ -385,11 +362,7 @@ body[data-page="settings"] .table-stat-count{
 }
 
 /* Nav Divider */
-body[data-page="settings"] .nav-divider{
-    height: 1px;
-    background: var(--ion-border);
-    margin: 0.5rem 0;
-}
+
 
 /* Wizard Nav Item */
 body[data-page="settings"] .wizard-nav-item{
@@ -402,9 +375,7 @@ body[data-page="settings"] .wizard-nav-item:hover{
     background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple));
 }
 
-body[data-page="settings"] .nav-icon{
-    margin-right: 0.25rem;
-}
+
 
 /* Wizard Launcher Section */
 body[data-page="settings"] .wizard-launcher{
@@ -1107,25 +1078,9 @@ body[data-page="settings"] .wizard-resume li{
 }
 
 /* System Logs */
-body[data-page="settings"] .logs-toolbar{
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    flex-wrap: wrap;
-    margin-bottom: 1rem;
-}
-body[data-page="settings"] .logs-toolbar select, body[data-page="settings"] .logs-toolbar input[type="text"]{
-    padding: 0.4rem 0.6rem;
-    border: 1px solid var(--ion-border);
-    border-radius: var(--radius);
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    font-size: 0.85rem;
-}
-body[data-page="settings"] .logs-toolbar input[type="text"]{
-    flex: 1;
-    min-width: 150px;
-}
+
+
+
 body[data-page="settings"] .logs-container{
     background: var(--bg-primary, #0d1117);
     border: 1px solid var(--ion-border);

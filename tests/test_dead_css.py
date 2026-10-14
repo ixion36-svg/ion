@@ -152,3 +152,44 @@ def test_jinja_and_javascript_construction_are_both_seen():
         "'rail-sev-' + esc(sev)"
     )
     assert {"aq-sev-", "sr-c-", "rail-sev-"} <= both
+
+
+def test_corpus_reads_python_view_model_class_names(tmp_path, monkeypatch):
+    from tools import dead_css
+
+    ui = tmp_path / "ui"
+    ui.mkdir()
+    (ui / "analytics.py").write_text(
+        'PANEL_STATUS_CLASSES = {"error": "fp-error"}', encoding="utf-8")
+    monkeypatch.setattr(dead_css, "SEARCH_DIRS", [ui])
+    assert "fp-error" in dead_css.literal_tokens(dead_css.corpus())
+
+
+def test_sees_the_real_namespace_percent_format():
+    from tools.dead_css import constructed_prefixes
+
+    source = 'return "ns-p%d" % (digest[0] % NAMESPACE_FALLBACKS)'
+    assert "ns-p" in constructed_prefixes(source)
+
+
+def test_sees_python_fstring_class_prefix():
+    from tools.dead_css import constructed_prefixes
+
+    assert "severity-" in constructed_prefixes('return f"severity-{level}"')
+
+
+def test_keeps_literal_prefix_arguments_to_jinja_macros():
+    from tools.dead_css import constructed_prefixes
+
+    source = '''{{ closure_bars(slices, total, 'cl-') }}
+        <div class="closure-bar-fill {{ prefix }}{{ s.key }}"></div>'''
+    assert "cl-" in constructed_prefixes(source)
+
+
+def test_sees_shared_alert_details_host_prefix_and_default():
+    from tools.dead_css import constructed_prefixes
+
+    source = '''IonAlertDetail.init({ classPrefix:'cpanel-alert' });
+        var p = _opts.classPrefix || 'alert-parsed';
+        return p + '-' + suffix;'''
+    assert {"cpanel-alert-", "alert-parsed-"} <= constructed_prefixes(source)

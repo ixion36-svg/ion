@@ -39,7 +39,7 @@
     font-size: 0.85rem;
 }
 
-.pcap-page { max-width: 1400px; margin: 0 auto; }
+
 
 /* Upload zone */
 .pcap-upload-zone {
@@ -85,7 +85,7 @@
 .verdict-banner.benign .verdict-icon { color: var(--success); }
 .verdict-banner.elevated .verdict-icon { color: var(--warning, #d29922); }
 .verdict-banner.investigate .verdict-icon { color: var(--danger); }
-.verdict-info h2 { margin: 0 0 4px; font-size: 1.15rem; }
+
 .verdict-info .verdict-confidence { font-size: .82rem; color: var(--text-secondary); }
 .verdict-reasons { margin-top: 8px; padding-left: 18px; }
 .verdict-reasons li { font-size: .82rem; color: var(--text-primary); margin-bottom: 3px; }
@@ -161,8 +161,8 @@
 .finding-detail { font-size: .78rem; color: var(--text-secondary); line-height: 1.4; }
 
 /* Findings triage widget */
-.findings-widget-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
-.findings-widget-head h3 { margin: 0; font-size: 1rem; }
+
+
 .findings-hint { font-size: .72rem; color: var(--text-secondary); }
 .findings-triage { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 10px; margin-bottom: 16px; }
 .triage-chip {
@@ -261,7 +261,7 @@
 .ike-status.incomplete { background: rgba(210,153,34,.15); color: var(--warning); }
 
 /* Reset button */
-.pcap-reset { margin-bottom: 16px; }
+
 
 /* The threat intel label chip and observable link.
 

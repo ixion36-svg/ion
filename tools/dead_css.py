@@ -7,7 +7,7 @@ class LIVE.
 
 WHAT COUNTS AS A REFERENCE
 --------------------------
-Templates and static/js are both searched, and four kinds of reference count:
+Templates, static/js and Python view models are searched, and four kinds of reference count:
 
   1. A literal token in a class attribute.            class="foo bar"
   2. A literal token in any quoted string.            querySelector('.foo')
@@ -39,7 +39,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 CSS_DIR = REPO / "src/ion/web/static/css"
-SEARCH_DIRS = [REPO / "src/ion/web/templates", REPO / "src/ion/web/static/js"]
+SEARCH_DIRS = [REPO / "src/ion/web/templates", REPO / "src/ion/web/static/js",
+               REPO / "src/ion/web/ui"]
 # This was a hand-written list, and it was wrong twice.
 #
 # First alerts-queue.css, which had never been scanned: it is loaded by
@@ -124,7 +125,9 @@ def corpus() -> str:
     for d in SEARCH_DIRS:
         if not d.is_dir():
             continue
-        for p in list(d.rglob("*.html")) + list(d.rglob("*.js")):
+        for p in sorted(d.rglob("*")):
+            if p.suffix not in {".html", ".js", ".py"} or not p.is_file():
+                continue
             parts.append(p.read_text(encoding="utf-8", errors="replace"))
     return "\n".join(parts)
 
@@ -260,6 +263,21 @@ def constructed_prefixes(text: str) -> set[str]:
     # Jinja filters, since only the text before `{{` matters here.
     for m in re.finditer(r"([A-Za-z][A-Za-z0-9_-]*[-_])\{\{", text):
         out.add(m.group(1))
+    # Python supplies classes too: namespace_kind returns "ns-p%d" and
+    # f-strings can build a name without ever spelling its final token.
+    for m in re.finditer(r"([A-Za-z][A-Za-z0-9_-]*)%[-+0-9.]*[sdi]", text):
+        out.add(m.group(1))
+    for m in re.finditer(r'''\bf["']([^"'\n]*)''', text):
+        out.update(re.findall(r"([A-Za-z][A-Za-z0-9_-]*)\{(?!\{)", m.group(1)))
+    # Jinja macros receive a literal prefix, then join two expressions:
+    # closure_bars(..., 'cl-') emits {{ prefix }}{{ s.key }}. Conservatively
+    # keep every family named by a standalone prefix argument or mapping value.
+    out.update(re.findall(r'''["']([A-Za-z][A-Za-z0-9_-]*[-_])["']''', text))
+    # alert-detail.js joins an injected host prefix to each suffix through
+    # _cls(). Neither the option value nor its default ends with a hyphen.
+    for pattern in (r'''classPrefix\s*:\s*["']([A-Za-z][A-Za-z0-9_-]*)["']''',
+                    r'''\.classPrefix\s*\|\|\s*["']([A-Za-z][A-Za-z0-9_-]*)["']'''):
+        out.update(value + "-" for value in re.findall(pattern, text))
     # Also `className = base + '-' + x` style: a lone '-' joiner means we cannot
     # know the prefix, so treat every class in that file as live is too blunt --
     # instead flag it for the operator.

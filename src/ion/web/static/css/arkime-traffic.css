@@ -158,22 +158,10 @@
 
 /* ── jsvectormap plugin chrome. No daisyUI equivalent. ── */
 
-.jvectormap-tip {
-  position: fixed;
-  display: none;
-  background: var(--color-base-100);
-  border: 1px solid var(--color-base-300);
-  color: var(--color-base-content);
-  padding: 5px 10px;
-  font-size: 12px;
-  border-radius: 4px;
-  pointer-events: none;
-  z-index: 200;
-  white-space: nowrap;
-}
+
 
 .jvectormap-tip.active { display: block; }
-.jvectormap-zoomin, .jvectormap-zoomout { display: none; }
+
 
 /* ── Busy cue on the buttons that issue a fragment request ────────────── */
 
