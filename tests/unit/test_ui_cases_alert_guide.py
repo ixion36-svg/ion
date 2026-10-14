@@ -61,8 +61,27 @@ def test_the_rail_failure_message_is_a_template():
 def test_neither_is_built_from_a_string_any_more():
     body = _scripts()
     assert "cpanel-guide-title" not in body
-    assert "Loading rule guide" not in body
     assert "Alert detail component failed to load" not in body
+
+
+def test_the_loading_wording_is_a_label_not_markup():
+    """"Loading rule guide" is still in the page's JavaScript, and should
+    be. It is the third argument to `ionLoadFragment`, which hands it to
+    `ionMessage`, which clones `ion-fragment-loading-template` and sets
+    `textContent`. That is a label, not a structure.
+
+    This test used to assert the wording was absent, as a proxy for "the
+    guide is not assembled as a string". The proxy went wrong when the
+    loader started taking the wording as an argument, so it is pinned to
+    the thing it was standing for: a label carries no tag, and markup
+    built in JavaScript does. Rebuilding
+    `'<div class="loading">Loading rule guide</div>'` fails this; passing
+    the words to a loader does not.
+    """
+    for literal in re.findall(r"'([^'\n]*)'|\"([^\"\n]*)\"", _scripts()):
+        text = literal[0] or literal[1]
+        if "Loading rule guide" in text:
+            assert "<" not in text, text
 
 
 # ---------------------------------------------------------------------------

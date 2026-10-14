@@ -13,12 +13,12 @@
         </span>
         {% endif %}
     </div>
-    <div class="text-[0.8rem] text-[var(--text-primary)] whitespace-pre-wrap">{{ annotation.body }}</div>
+    <div class="text-[0.8rem] text-[var(--text-primary)] whitespace-pre-wrap" data-annotation-body>{{ annotation.body }}</div>
 </div>
 {% endfor %}
 {% if can_update %}
 <div class="mt-2"><button type="button" class="btn btn-secondary text-xs py-[0.3rem] px-[0.65rem]" data-click-action="toggleAnnotationForm" data-args='{{ [case_id]|tojson }}'>+ Add annotation</button></div>
-<div class="mt-[0.6rem]" id="annotation-form-{{ case_id }}" data-annotation-form>
+<div class="hidden mt-[0.6rem]" id="annotation-form-{{ case_id }}" data-annotation-form>
     <input class="w-full mb-[0.4rem] bg-[var(--bg-secondary)] border border-[rgba(255,255,255,.12)] rounded-[4px] py-[0.3rem] px-2 text-[var(--text-primary)] text-[0.8rem]" type="datetime-local" id="ann-ts-{{ case_id }}">
     <textarea class="w-full bg-[var(--bg-secondary)] border border-[rgba(255,255,255,.12)] rounded-[4px] py-[0.4rem] px-[0.6rem] text-[var(--text-primary)] text-[0.8rem] resize-y box-border" id="ann-body-{{ case_id }}" rows="3" placeholder="Add a timeline annotation..."></textarea>
     <div class="flex gap-[0.4rem] mt-[0.35rem]">

@@ -551,24 +551,27 @@ def test_the_note_render_uses_a_fragment_not_inner_html():
     assert "replaceChildren" in body
 
 
-def test_ageLabel_is_gone_and_fmtDate_has_one_caller_left():
-    """The panel was ageLabel's only caller, so it goes with it.
+def test_both_client_date_formatters_are_gone():
+    """ageLabel went with the panel, and fmtDate with loadKibanaComments.
 
-    fmtDate still has one, in loadKibanaComments, which belongs to a
-    tranche that has not landed. Leaving it is deliberate: deleting a
-    function with a live caller is how I removed sixteen of them by
-    accident earlier. This asserts the position rather than the wish, and
-    it will fail when that last caller goes, which is the right moment to
-    delete the formatter.
+    This asserted fmtDate had exactly one caller left and said that it
+    would fail when that caller went, which is the right moment to delete
+    the formatter. It failed: loadKibanaComments renders through
+    /ui/cases/kibana/{id}/comments now, so nothing called fmtDate and it
+    was dead rather than deliberately kept.
+
+    Both read a naive UTC column through `new Date(iso)`, which the
+    browser resolves in the viewer's zone, so an analyst in Sydney and
+    one in London were shown different times for the same row. The server
+    formats and labels them now.
+
+    loadKibanaComments is still asserted present because it is the caller
+    whose conversion made the deletion correct. If it goes too, this test
+    should say so rather than quietly covering less.
     """
-    import re as _re
-
     body = _scripts()
     assert "function ageLabel" not in body
-    assert "function fmtDate" in body
-    callers = _re.findall(r"fmtDate\(", body)
-    # One definition line plus exactly one call.
-    assert len(callers) == 2, callers
+    assert "fmtDate" not in body
     assert "loadKibanaComments" in body
 
 
