@@ -586,7 +586,7 @@
                         if (parsed.grounding) pendingGrounding = parsed.grounding;
                         if (parsed.content) {
                             fullResponse += parsed.content;
-                            contentEl.innerHTML = formatMessage(fullResponse);
+                            ionSetSafeHtml(contentEl, formatMessage(fullResponse));
                             scrollToBottom();
                         }
                     } catch (e) {
@@ -661,7 +661,7 @@
             role === 'user' ? getUserInitial() : '\u{1F916}';
         const body = msg.querySelector('.ai-msg-body');
         body.id = msgId;
-        body.innerHTML = formatMessage(content);
+        ionSetSafeHtml(body, formatMessage(content));
         container.appendChild(node);
         scrollToBottom();
         return msgId;
@@ -762,7 +762,7 @@
                             docgenContent += parsed.content;
                             // Render preview based on format
                             if (format === 'markdown' && typeof marked !== 'undefined') {
-                                previewContent.innerHTML = safeMarkdown(docgenContent);
+                                ionSetSafeHtml(previewContent, safeMarkdown(docgenContent));
                             } else if (format === 'html') {
                                 // This branch assigned model output
                                 // straight to innerHTML while the two
@@ -770,7 +770,7 @@
                                 // states the rule above the helper it
                                 // bypassed: all user-controlled markup
                                 // must go through it.
-                                previewContent.innerHTML = safeHtml(docgenContent);
+                                ionSetSafeHtml(previewContent, safeHtml(docgenContent));
                             } else {
                                 const plain = ionTpl('tpl-ai-preview-plain');
                                 plain.querySelector('pre').textContent = docgenContent;

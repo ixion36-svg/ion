@@ -39,6 +39,23 @@ function safeMarkdown(content) {
     return safeHtml(marked.parse(content));
 }
 
+/**
+ * Replace an element's children with markup that is ALREADY safe, meaning
+ * it came from safeHtml, safeMarkdown, or escapeHtml. This does not
+ * sanitize. Passing it raw user content is the same hole as innerHTML.
+ *
+ * It exists so a sanitized string never has to be assigned to a live
+ * element. DOMParser's document is inert: its scripts do not run and its
+ * img and iframe do not fetch, so markup that got past DOMPurify has
+ * nothing to act on while it is being read. replaceChildren then adopts
+ * the parsed nodes.
+ */
+function ionSetSafeHtml(target, html) {
+    if (!target) return;
+    const parsed = new DOMParser().parseFromString(String(html ?? ''), 'text/html');
+    target.replaceChildren(...parsed.body.childNodes);
+}
+
 // API helper
 const api = {
     async request(method, url, data = null) {
