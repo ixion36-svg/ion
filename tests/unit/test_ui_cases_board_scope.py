@@ -26,10 +26,34 @@ def test_board_uses_server_filters_without_prefetch_loop():
     assert "async function loadAllCases()" in source
 
 
-def test_styles_and_later_formatters_stay_in_place():
+def test_the_styles_and_the_date_formatters_have_gone():
+    """This asserted the opposite, as that tranche's scope marker: the
+    board conversion deliberately left the inline <style> block and the
+    two client date formatters alone, and pinning them proved the tranche
+    had not reached them.
+
+    All three have since moved, and this test failing is how that was
+    noticed. The page's 1,926 lines of CSS are in
+    static/css/cases-page.css, and ageLabel and fmtDate went with their
+    last callers, which render server-side now. Each read a naive UTC
+    column through `new Date(iso)`, which the browser resolves in the
+    viewer's zone.
+
+    It pins the finished position instead, which is the stronger
+    direction: a style block or a client date formatter coming back is a
+    regression, where before either one merely marked work not yet done.
+    """
     source = PAGE.read_text(encoding="utf-8")
-    assert '<style nonce="{{ csp_nonce }}">' in source
+    assert '<style nonce="{{ csp_nonce }}">' not in source
+    assert not STYLE.search(source)
+    assert "function ageLabel" not in source
+    assert "fmtDate" not in source
+
+
+def test_the_page_still_escapes_and_reads_back_quoted_attributes():
+    """Not part of that move. `esc` is the page's attribute escaper and
+    the `.innerHTML.replace` is a read rather than a write, so both are
+    untouched by the CSS and formatter changes above."""
+    source = PAGE.read_text(encoding="utf-8")
     assert "function esc(s)" in source
-    assert "function ageLabel(dateStr)" in source
-    assert "function fmtDate(dateStr)" in source
     assert '.innerHTML.replace(/"/g' in source

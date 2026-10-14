@@ -688,12 +688,23 @@ def test_the_shell_placeholders_do_not_read_as_measured_zero():
 
 
 def test_the_classes_the_fragment_emits_have_rules_in_the_page_stylesheet():
-    """A class with no rule is invisible, not wrong."""
+    """A class with no rule is invisible, not wrong.
+
+    This read the page, because the rules lived in its inline <style>
+    block. They are in static/css/cases-page.css now and the sheet is the
+    only place they can be, so the page is checked for the absence
+    instead. Being in a linked sheet is also what brings them under
+    tools/dead_css.py, which asks the opposite question: whether a rule
+    has any class still using it.
+    """
+    sheet = (ROOT / "src/ion/web/static/css/cases-page.css").read_text(
+        encoding="utf-8")
     page = PAGE.read_text(encoding="utf-8")
+    assert "<style nonce" not in page
     for cls in (".age-bar-seg", ".cases-stat-sub", ".cases-card-failed",
                 ".sla-row", ".hbar-track", ".rclosure-row", ".summary-chip",
                 ".donut-legend-list", ".donut-center-text"):
-        assert cls + " {" in page or cls + "{" in page, cls
+        assert cls + " {" in sheet or cls + "{" in sheet, cls
 
 
 def test_the_fragment_carries_no_inline_style_and_no_script():

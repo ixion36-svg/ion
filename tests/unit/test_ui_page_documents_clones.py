@@ -1,4 +1,4 @@
-"""The client-state renders on documents.html, and the three writes that stay.
+"""The client-state renders on documents.html, and the writes that went.
 
 The rail, the jump nav and the tag chips are built from data the page
 already holds, so none of them is a server read. They are template clones
@@ -7,9 +7,19 @@ and which also fixes the third instance of one defect: the tag chips put
 `JSON.stringify(tag)` inside a single-quoted attribute, and tags are free
 text.
 
-The file also pins the floor. Three writes stay and are meant to, and a
-later reader with the measure in hand would otherwise "finish" the page by
-escaping a document body.
+The file also pinned a floor of three writes, said to be meant to stay,
+because ION ships no HTML sanitiser and escaping a document body would make
+this a viewer that does not show documents. That warning is the right one
+and the floor was not. The bodies did not have to be escaped, and they also
+did not have to be assigned to a live element: ionSetSafeHtml parses with
+DOMParser, whose document is inert, and hands the nodes to replaceChildren,
+so the page reaches zero without a body being escaped.
+
+One of the three was not safe to render at all. renderContent dispatched on
+output_format, and its html branch read `return content; // Already HTML`
+where the other three sanitised or escaped. models/document.py records that
+everyone can add a document, so that was any authenticated user storing
+markup that ran in every reader's session.
 """
 from __future__ import annotations
 
@@ -62,22 +72,40 @@ def templates_block() -> str:
 
 
 # ---------------------------------------------------------------------------
-# The three writes that stay
+# The three writes that went
 # ---------------------------------------------------------------------------
 
 
-def test_exactly_three_writes_remain_and_they_are_the_document_bodies():
-    """ION ships no HTML sanitiser and the decision not to add one is
-    recorded in ui/template_render.py. Escaping a document body would make
-    this a viewer that does not show documents, so these stay under the
-    strict CSP. This asserts the count so a fourth cannot arrive quietly.
+def test_no_writes_remain_and_the_bodies_are_still_not_escaped():
+    """This asserted exactly three, so a fourth could not arrive quietly.
+    The right number was zero.
+
+    Both halves matter here. A body escaped to reach zero would be a
+    viewer that does not show documents, which is what the old floor was
+    guarding against, so the second half asserts the two renderers still
+    emit markup through the node helper rather than being escaped away.
     """
     writes = re.findall(r"^.*\.innerHTML\s*=.*$", page(), re.M)
-    assert len(writes) == 3, writes
-    joined = "\n".join(writes)
-    assert "docQuillEditor.root" in joined
+    assert writes == [], writes
+
+    body = page()
+    sites = re.findall(r"ionSetSafeHtml\([^;]*\);", body)
+    assert len(sites) == 2, sites
+    joined = "\n".join(sites)
     assert "rendered-view" in joined
     assert "version-content" in joined
+    # Quill owns its editor surface, so it is seeded through its own API
+    # rather than by this page writing into its root.
+    assert "docQuillEditor.clipboard.dangerouslyPasteHTML" in body
+    # The baseline the amendment modal compares against is a read.
+    assert "docQuillInitialHtml = docQuillEditor.root.innerHTML" in body
+
+
+def test_the_html_branch_sanitises_rather_than_passing_through():
+    """The floor had kept a branch that returned the stored column raw."""
+    body = page()
+    assert "safeHtml(content)" in body
+    assert "return content;" not in body
 
 
 def test_the_module_records_why_those_three_stay():

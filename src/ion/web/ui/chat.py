@@ -1,11 +1,17 @@
 """Server-rendered panels for the AI chat page.
 
 The chat page is not like the rest of the redesign. Its centre is a token
-stream: `contentEl.innerHTML = formatMessage(fullResponse)` runs once per
-chunk, and serving that from a fragment would mean a round trip per token.
-So this module does not try to take the stream. It takes everything around it
-that is built from server data, and chat.html documents the writes that
-stay and why.
+stream: `formatMessage(fullResponse)` runs once per chunk, and serving that
+from a fragment would mean a round trip per token. So this module does not
+try to take the stream. It takes everything around it that is built from
+server data.
+
+That argument was once written down as a floor of writes the page could not
+get below, which was a step too far: it argues against rendering each token
+on the server, not for innerHTML. The stream's markup is built in the
+browser either way, and `ionSetSafeHtml` in app.js parses it with DOMParser,
+whose document is inert, then hands the nodes to `replaceChildren`. One
+parse per token as before, and no write, so the page reaches zero.
 
 What it takes, and what was wrong with it.
 

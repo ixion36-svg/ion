@@ -1,14 +1,24 @@
-"""What chat.html is allowed to still write at runtime, and why.
+"""chat.html's write floor turned out to be zero.
 
-The chat page cannot reach zero runtime writes the way the rest of the
-redesign does. Its centre is a token stream:
+This file said the page could not reach zero the way the rest of the
+redesign does, because its centre is a token stream:
 
     contentEl.innerHTML = formatMessage(fullResponse);
 
-runs once per chunk, and a server fragment per token would be a round trip
-per token. So three writes stay. This file pins which three, so the next
-sweep of the stylesheet knows what it cannot reach, and checks that each
-one goes through the project's own sanitiser.
+runs once per chunk, and a server fragment per token would be a round
+trip per token. That reasoning is right and it reached the wrong
+conclusion. It argues against rendering each token on the server, not for
+innerHTML: the markup does have to be built in the browser, but it does
+not have to be assigned to a live element as a string.
+
+`ionSetSafeHtml` in app.js parses with DOMParser, whose document is
+inert, and gives the nodes to `replaceChildren`. One parse per token
+either way, so the same work, and no write. The floor is zero and all
+four sites are converted.
+
+What the floor was protecting is still protected here: a stylesheet sweep
+cannot reach markup built as a string, and every site still has to go
+through the project's own sanitiser.
 
 THE DOCGEN PREVIEW HAD ONE BRANCH THAT DID NOT
 
@@ -59,30 +69,49 @@ def _writes() -> list[str]:
                       r"|outerHTML\s*\+?=)[^\n]*", _scripts())
 
 
+def _render_sites() -> list[str]:
+    """The calls that replaced those writes."""
+    return re.findall(r"ionSetSafeHtml\([^;]*\);", _scripts())
+
+
 # ---------------------------------------------------------------------------
 # The floor
 # ---------------------------------------------------------------------------
 
 
-def test_the_page_keeps_exactly_the_streaming_writes():
-    """Four: the message body as it is created and again on every chunk,
-    and the docgen preview's two sanitising branches."""
+def test_the_page_keeps_no_writes_at_all():
+    """This asserted exactly four, as the floor. The floor was wrong, and
+    the four sites are `ionSetSafeHtml` now."""
     writes = _writes()
-    assert len(writes) == 4, writes
+    assert writes == [], writes
 
 
-def test_every_surviving_write_is_a_message_or_preview_body():
-    for write in _writes():
-        assert ("contentEl" in write or "previewContent" in write
-                or "body.innerHTML" in write), write
+def test_the_four_render_sites_are_still_four():
+    """The pair below would both pass on an empty page, since a loop over
+    nothing asserts nothing. Counting the sites first is what stops that:
+    if a render site disappeared, this fails rather than the checks
+    quietly covering less.
+    """
+    assert len(_render_sites()) == 4, _render_sites()
 
 
-def test_every_surviving_write_goes_through_the_sanitiser():
-    """safeMarkdown and safeHtml both route through DOMPurify. The one
-    branch that did neither assigned model output raw."""
-    for write in _writes():
-        assert ("formatMessage(" in write or "safeMarkdown(" in write
-                or "safeHtml(" in write), write
+def test_every_render_site_is_a_message_or_preview_body():
+    for site in _render_sites():
+        assert ("contentEl" in site or "previewContent" in site
+                or "(body," in site), site
+
+
+def test_every_render_site_goes_through_the_sanitiser():
+    """safeMarkdown and safeHtml both route through DOMPurify, and
+    formatMessage calls safeMarkdown or escapes first. The one branch that
+    did neither assigned model output raw.
+
+    ionSetSafeHtml does not sanitize, so losing the sanitiser on the way
+    in would leave the markup inert and still hostile.
+    """
+    for site in _render_sites():
+        assert ("formatMessage(" in site or "safeMarkdown(" in site
+                or "safeHtml(" in site), site
 
 
 def test_the_html_preview_branch_no_longer_assigns_raw_model_output():

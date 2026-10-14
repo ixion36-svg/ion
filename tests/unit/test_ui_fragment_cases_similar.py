@@ -314,23 +314,43 @@ def test_the_similarity_badge_is_themeable():
 
 
 def test_nothing_later_in_the_cascade_paints_the_badge_itself():
-    """The chips are a single class, and so is `.cpanel-alert-badge`, which
-    still lives in the page's in-body `<style>` block. That block loads
-    after `head_css`, so at equal specificity it would win: if it ever sets
-    a background or a colour, every verdict chip silently goes one colour
-    and no route test can see it.
+    """The chips are a single class, and so is `.cpanel-alert-badge`. If
+    that rule ever sets a background or a colour, every verdict chip
+    silently goes one colour and no route test can see it.
 
-    The rule sets geometry and type only today. This fails if that changes,
-    which is the point at which the chips need `.cpanel-alert-badge.case-
-    closure-x` or the block needs to finish moving to the sheet.
+    This used to read the page, and said the fix was for the in-body
+    `<style>` block to "finish moving to the sheet". The block has moved,
+    and that did not resolve this: it was appended, so
+    `.cpanel-alert-badge` now sits at the end of cases-page.css, far
+    after the `.case-closure-*` rules near the top. At equal specificity
+    the later rule still wins. The hazard is the same one, relocated from
+    "an in-body block beats head_css" to "later in one sheet beats
+    earlier", so the guard is unchanged and only its address is.
+
+    The rule sets geometry and type only today. This fails if that
+    changes, which is the point at which the chips need
+    `.cpanel-alert-badge.case-closure-x`, or the two groups need to swap
+    order in the sheet.
     """
-    page = (ROOT / "src/ion/web/templates/cases.html").read_text(
-        encoding="utf-8")
-    block = re.search(r"\.cpanel-alert-badge\s*\{([^}]*)\}", page)
+    sheet = SHEET.read_text(encoding="utf-8")
+    block = re.search(r"\.cpanel-alert-badge\s*\{([^}]*)\}", sheet)
     assert block, "the rule the chips sit on top of"
     declarations = block.group(1)
     assert "background" not in declarations
     assert not re.search(r"(^|[;\s])color\s*:", declarations)
+
+
+def test_the_badge_rule_is_still_the_later_one_so_the_guard_above_is_needed():
+    """If the order ever reverses, the guard above becomes unnecessary and
+    should be deleted rather than left looking load-bearing. Asserting the
+    order is what makes the difference visible."""
+    sheet = SHEET.read_text(encoding="utf-8")
+    badge = re.search(r"\.cpanel-alert-badge\s*\{", sheet)
+    closure = re.search(r"\.case-closure-\w+", sheet)
+    assert badge and closure
+    assert badge.start() > closure.start(), (
+        "the closure chips now come after .cpanel-alert-badge, so that rule "
+        "no longer overrides them and the guard above is moot")
 
 
 # ---------------------------------------------------------------------------
