@@ -43,6 +43,14 @@ class SessionRepository:
             user_id=user_id,
             session_token_hash=_hash_session_token(session_token),
             expires_at=expires_at,
+            # Stamped from the application clock rather than left to the
+            # column's func.now() default. The absolute session ceiling
+            # (AuthService.validate_session) measures from created_at and
+            # compares against expires_at, which is minted from
+            # datetime.utcnow() -- a row whose created_at came from the
+            # database clock would move the ceiling by whatever the two
+            # clocks disagree about.
+            created_at=datetime.utcnow(),
             ip_address=ip_address,
             user_agent=user_agent,
         )
@@ -128,6 +136,24 @@ class SessionRepository:
     def delete_all_for_user(self, user_id: int) -> int:
         """Delete all sessions for a user."""
         stmt = delete(UserSession).where(UserSession.user_id == user_id)
+        result = self.session.execute(stmt)
+        self.session.flush()
+        return result.rowcount
+
+    def delete_all_for_user_except(self, user_id: int, session_token: str) -> int:
+        """Delete every session for a user except the one holding this token.
+
+        The user-initiated password change needs this: a credential change
+        must kill every *other* session, but logging the changer out of the
+        tab they are standing in turns the one remediation they can perform
+        themselves into something that looks like a failure. The token is
+        hashed before the comparison, same as every other lookup here, so a
+        caller that does not hold the plaintext cannot spare a session.
+        """
+        stmt = delete(UserSession).where(
+            UserSession.user_id == user_id,
+            UserSession.session_token_hash != _hash_session_token(session_token),
+        )
         result = self.session.execute(stmt)
         self.session.flush()
         return result.rowcount

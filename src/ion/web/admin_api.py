@@ -1405,10 +1405,26 @@ async def revoke_user_session(
     user_id: int,
     current_user: User = Depends(require_admin),
 ):
-    """Revoke a user's session by deactivating their account temporarily."""
+    """Delete every session row for a user, so their next request is refused.
+
+    Two defects, both load-bearing. The handler deleted nothing -- it wrote a
+    log line saying the session had been "marked for revocation" and told the
+    admin the user would have to authenticate again, while the stolen cookie
+    they were reacting to kept working. And that log call could not run
+    anyway: ``IntegrationLogService`` takes no constructor argument and has no
+    ``log_event``, so every request to this route raised TypeError and came
+    back 500. The logging is gone rather than repaired, because a session
+    revocation is an auth event and belongs in ``audit_logs``, where
+    ``AuthService.revoke_sessions`` now records it with a count and an actor.
+
+    On an estate authenticating through Keycloak this was the worst possible
+    route to be a no-op on: deleting the session rows is the only control ION
+    has over a caller who already holds one.
+    """
     if user_id == current_user.id:
         raise HTTPException(400, "Cannot revoke your own session")
 
+    from ion.auth.service import AuthService
     from ion.models.user import User as UserModel
     from ion.storage.database import get_engine, get_session
 
@@ -1421,15 +1437,10 @@ async def revoke_user_session(
             if not user:
                 raise HTTPException(404, "User not found")
 
-            # Log the session revocation
-            from ion.services.integration_log_service import IntegrationLogService
-            log_service = IntegrationLogService(db)
-            log_service.log_event(
-                integration_type="system",
-                action="session_revoke",
-                message=f"Session revoked for user {user.username} by {current_user.username}",
-                level="warning",
-                user_id=current_user.id,
+            revoked = AuthService(db).revoke_sessions(
+                user,
+                reason="admin_revoke",
+                actor_user_id=current_user.id,
             )
 
             db.commit()
@@ -1438,7 +1449,10 @@ async def revoke_user_session(
                 "status": "revoked",
                 "user_id": user_id,
                 "username": user.username,
-                "message": "User session has been marked for revocation. User will need to re-authenticate.",
+                "sessions_revoked": revoked,
+                "message": (
+                    f"{revoked} session(s) revoked. The user must authenticate again."
+                ),
             }
     except HTTPException:
         raise

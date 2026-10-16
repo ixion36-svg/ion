@@ -56,6 +56,13 @@ class Config:
     webhook_require_signature: bool = True  # Reject inbound webhooks with no HMAC secret configured
     enforce_password_change: bool = True  # Block must_change_password users from APIs until they change it
     password_min_length: int = 0  # Minimum password length on set/change; 0 = policy disabled (opt-in)
+    # Absolute ceiling on an interactive session, measured from the row's
+    # created_at. validate_session slides expires_at forward on every request
+    # made in the second half of the window, so without a ceiling a session in
+    # continuous use never expires and a stolen cookie is good forever. The
+    # ceiling is what makes revocation durable: 7 days is the longest a session
+    # that nobody revoked can outlive the login that minted it. 0 disables it.
+    session_absolute_lifetime_hours: int = 168
     security_scan_authenticated: bool = False  # Run payload-pattern WAF checks on authenticated traffic too (default off — analysts legitimately handle malicious content)
     authz_alert_enabled: bool = True  # Record 401/403 and alert on repeated unauthorized-access attempts
     authz_alert_threshold: int = 5  # 401/403 responses from one actor within the window that escalate to a HIGH event
@@ -344,6 +351,7 @@ class Config:
             webhook_require_signature=data.get("webhook_require_signature", True),
             enforce_password_change=data.get("enforce_password_change", True),
             password_min_length=data.get("password_min_length", 0),
+            session_absolute_lifetime_hours=data.get("session_absolute_lifetime_hours", 168),
             security_scan_authenticated=data.get("security_scan_authenticated", False),
             authz_alert_enabled=data.get("authz_alert_enabled", True),
             authz_alert_threshold=data.get("authz_alert_threshold", 5),
@@ -625,6 +633,13 @@ def get_config() -> Config:
                 _config.password_min_length = int(os.environ["ION_PASSWORD_MIN_LENGTH"])
             except ValueError:
                 pass  # keep default (disabled) on a non-integer value
+        if os.environ.get("ION_SESSION_ABSOLUTE_LIFETIME_HOURS"):
+            try:
+                _config.session_absolute_lifetime_hours = int(
+                    os.environ["ION_SESSION_ABSOLUTE_LIFETIME_HOURS"]
+                )
+            except ValueError:
+                pass  # keep the 168h default on a non-integer value
         if os.environ.get("ION_SECURITY_SCAN_AUTHENTICATED"):
             _config.security_scan_authenticated = _get_env_bool("ION_SECURITY_SCAN_AUTHENTICATED")
         if os.environ.get("ION_AUTHZ_ALERT_ENABLED"):
@@ -1128,6 +1143,7 @@ ENV_FIELD_MAP: dict[str, str] = {
     "scheduler_enabled": "ION_SCHEDULER_ENABLED",
     "scheduler_interval_s": "ION_SCHEDULER_INTERVAL_S",
     "security_scan_authenticated": "ION_SECURITY_SCAN_AUTHENTICATED",
+    "session_absolute_lifetime_hours": "ION_SESSION_ABSOLUTE_LIFETIME_HOURS",
     "shodan_api_key": "ION_SHODAN_API_KEY",
     "shodan_enabled": "ION_SHODAN_ENABLED",
     "shodan_timeout": "ION_SHODAN_TIMEOUT",

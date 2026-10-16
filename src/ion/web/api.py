@@ -83,6 +83,7 @@ limiter = Limiter(
 OIDC_STATE_COOKIE_NAME = "oidc_state"
 from ion.auth.dependencies import (
     SESSION_COOKIE_NAME,
+    audit_refusal,
     get_auth_service,
     get_client_ip,
     get_current_user,
@@ -553,8 +554,13 @@ async def change_password(
     request: Request,
     current_user: User = Depends(get_current_user),
     auth_service: AuthService = Depends(get_auth_service),
+    session_token: Optional[str] = Depends(get_session_token),
 ):
-    """Change current user's password."""
+    """Change current user's password.
+
+    A successful change revokes the user's other sessions; this caller's own
+    token is passed through so the tab they are standing in survives.
+    """
     ip_address = get_client_ip(request)
 
     success, error = auth_service.change_password(
@@ -562,6 +568,7 @@ async def change_password(
         current_password=password_request.current_password,
         new_password=password_request.new_password,
         ip_address=ip_address,
+        current_session_token=session_token,
     )
 
     if not success:
@@ -995,6 +1002,8 @@ def update_user(
         if existing:
             raise HTTPException(status_code=400, detail="Email already exists")
 
+    was_active = user.is_active
+
     user_repo.update(
         user=user,
         username=user_update.username,
@@ -1002,6 +1011,21 @@ def update_user(
         display_name=user_update.display_name,
         is_active=user_update.is_active,
     )
+
+    # Deactivation is the one account action that works on every kind of
+    # account, and on an OIDC estate it is the only lever an admin has: the
+    # password reset below is refused for an account Keycloak holds the
+    # credential for, and must_change_password does nothing to a user who
+    # never types an ION password. validate_session already refuses an
+    # inactive user, but the rows survive, so reactivating the account would
+    # hand a stolen cookie back its access. Delete them.
+    if was_active and user.is_active is False:
+        AuthService(session).revoke_sessions(
+            user,
+            reason="account_deactivated",
+            actor_user_id=current_user.id,
+            ip_address=get_client_ip(request),
+        )
 
     # Update employment type if provided
     if user_update.employment_type and user_update.employment_type in ("cs", "contractor", "military", "other"):
@@ -1124,12 +1148,24 @@ def reset_user_password(
             ip_address=get_client_ip(request),
         )
     except ValueError as exc:
-        # Password-policy violation (opt-in F6) — surface as a 400 rather than 500.
+        # Either the target has no ION-local password (an OIDC or service
+        # account — see AuthService.reset_password) or the new password
+        # violates the opt-in F6 policy. Both are the admin's mistake to fix,
+        # so a 400 rather than a 500. Recorded on its own committed session,
+        # because the raise abandons this one and "who tried to put a local
+        # password on an SSO account" is worth being able to answer.
+        audit_refusal(
+            "password_reset_refused",
+            current_user,
+            request,
+            target_user=user.username,
+            reason=str(exc),
+        )
         raise HTTPException(status_code=400, detail=str(exc))
 
     session.commit()
 
-    return {"message": "Password reset successfully"}
+    return {"message": "Password reset successfully; the account's sessions were revoked"}
 
 
 # =============================================================================

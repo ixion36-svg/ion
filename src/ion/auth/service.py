@@ -242,6 +242,62 @@ class AuthService:
 
         return count
 
+    def revoke_sessions(
+        self,
+        user: User,
+        *,
+        reason: str,
+        keep_session_token: str | None = None,
+        actor_user_id: int | None = None,
+        ip_address: str | None = None,
+    ) -> int:
+        """Kill a user's ION sessions after an account-security event.
+
+        ION authenticates its analysts through Keycloak: the only local-password
+        account is admin, and OIDC users are created with an empty password_hash
+        (``ion.auth.oidc``). So ``must_change_password`` -- the flag the rest of
+        this file treats as the post-credential-change brake -- does nothing at
+        all on the estate ION is actually built for. Deleting the session rows
+        is the only control ION owns over an already-authenticated attacker,
+        which is why every path that reacts to a credential or account change
+        comes through here.
+
+        Args:
+            user: whose sessions to revoke.
+            reason: audited; the event that triggered the revocation.
+            keep_session_token: spare the session holding this token. Used by
+                the user-initiated password change so the analyst is not logged
+                out of the tab they are standing in.
+            actor_user_id: the admin acting, when this is not the user's own
+                doing. Defaults to the user themselves.
+            ip_address: client IP for audit.
+
+        Returns:
+            Number of sessions deleted.
+        """
+        if keep_session_token:
+            count = self.session_repo.delete_all_for_user_except(
+                user.id, keep_session_token
+            )
+        else:
+            count = self.session_repo.delete_all_for_user(user.id)
+
+        self.audit_repo.create(
+            user_id=user.id if actor_user_id is None else actor_user_id,
+            action="sessions_revoked",
+            resource_type="user",
+            resource_id=user.id,
+            details={
+                "reason": reason,
+                "username": user.username,
+                "sessions_revoked": count,
+                "kept_current_session": bool(keep_session_token),
+            },
+            ip_address=ip_address,
+        )
+
+        return count
+
     def validate_session(self, session_token: str) -> Optional[User]:
         """Validate a session token and return the user.
 
@@ -272,11 +328,37 @@ class AuthService:
             remaining = (user_session.expires_at - now).total_seconds()
             half_lifetime = (self.session_lifetime_hours * 3600) / 2
             if remaining < half_lifetime:
-                user_session.expires_at = now + timedelta(hours=self.session_lifetime_hours)
-                try:
-                    self.session_repo.session.commit()
-                except Exception:
-                    self.session_repo.session.rollback()
+                renewed = now + timedelta(hours=self.session_lifetime_hours)
+
+                # Absolute ceiling. The slide above has no fixed point on its
+                # own: a session used at least once every twelve hours renews
+                # for ever, so a stolen cookie outlives the login that minted
+                # it indefinitely and revocation becomes the ONLY thing that
+                # can end it. Measured from created_at, so renewal can push
+                # expires_at forward but never past that bound; 0 disables.
+                # Clamping can also move expires_at backwards -- a session
+                # already past its ceiling is cut to the ceiling and dies on
+                # the next request rather than drifting another half-window.
+                # A negative value is read as "disabled" rather than applied:
+                # it would clamp every session into the past and log the whole
+                # estate out, which is an outage a typo should not cause.
+                ceiling_hours = get_config().session_absolute_lifetime_hours
+                if ceiling_hours > 0 and user_session.created_at is not None:
+                    renewed = min(
+                        renewed,
+                        user_session.created_at + timedelta(hours=ceiling_hours),
+                    )
+
+                # Only write when the value actually moves: once a session is
+                # pinned at its ceiling every subsequent request would
+                # otherwise re-commit the same timestamp, which is the SQLite
+                # lock contention the half-lifetime threshold exists to avoid.
+                if renewed != user_session.expires_at:
+                    user_session.expires_at = renewed
+                    try:
+                        self.session_repo.session.commit()
+                    except Exception:
+                        self.session_repo.session.rollback()
 
         user = user_session.user
 
@@ -294,14 +376,24 @@ class AuthService:
         current_password: str,
         new_password: str,
         ip_address: str | None = None,
+        current_session_token: str | None = None,
     ) -> Tuple[bool, Optional[str]]:
         """Change user's password.
+
+        On success every OTHER session for the user is revoked. "I think I was
+        compromised, so I changed my password" is the one remediation a user
+        can perform unaided, and without this it left the attacker's session
+        valid -- and, before the absolute ceiling landed alongside this, valid
+        for ever, since an actively used session renewed itself indefinitely.
 
         Args:
             user: User to change password for
             current_password: Current password for verification
             new_password: New password
             ip_address: Client IP address for audit
+            current_session_token: The caller's own session token. Spared from
+                the revocation, so changing your password does not log you out
+                of the tab you are in. Omitting it revokes every session.
 
         Returns:
             Tuple of (success, error_message)
@@ -344,7 +436,26 @@ class AuthService:
             ip_address=ip_address,
         )
 
+        self.revoke_sessions(
+            user,
+            reason="password_changed",
+            keep_session_token=current_session_token,
+            ip_address=ip_address,
+        )
+
         return True, None
+
+    def _has_local_password(self, user: User) -> bool:
+        """Whether ION holds a password for this account at all.
+
+        Two kinds of account do not have one. OIDC users are created with
+        ``password_hash=""`` (``ion.auth.oidc``) because Keycloak holds their
+        credential. Service accounts carry ``_SERVICE_ACCOUNT_HASH_SENTINEL``,
+        a deliberately unparseable string, because they have no login path.
+        Neither should be handed a local password by an admin reset.
+        """
+        password_hash = getattr(user, "password_hash", "") or ""
+        return bool(password_hash) and password_hash != self._SERVICE_ACCOUNT_HASH_SENTINEL
 
     def reset_password(
         self,
@@ -364,8 +475,30 @@ class AuthService:
             ip_address: Client IP address for audit
 
         Raises:
-            ValueError: if the new password violates the (opt-in) password policy
+            ValueError: if the target has no ION-local password, or if the new
+                password violates the (opt-in) password policy.
         """
+        # An account with no local password hash is one ION does not hold a
+        # credential for: OIDC users are created with password_hash="" and
+        # service accounts carry the no-login sentinel. Refused rather than
+        # fulfilled, for two reasons. Issuing a local password to an
+        # IdP-backed account creates a second way in that Keycloak's MFA and
+        # password policy never see. And must_change_password, which this
+        # method sets, is checked on every request regardless of HOW the user
+        # authenticated -- so the next Keycloak login lands them in
+        # password_change_blocks with no way out but an ION-local password
+        # change, on an estate that deliberately has no local passwords.
+        # The lever an admin actually wants here is deactivation, which
+        # revokes the account's sessions.
+        if not self._has_local_password(user):
+            raise ValueError(
+                f"{user.username} has no ION-local password - it authenticates "
+                "through the identity provider. Setting one here would create a "
+                "credential outside the IdP and lock the account out of ION on "
+                "its next login. Deactivate the account instead; that revokes "
+                "its sessions."
+            )
+
         # F6 (opt-in ION_PASSWORD_MIN_LENGTH): enforce the same policy as
         # change_password / create_user so the admin reset path can't be used to
         # set a weak/common password while the policy is enabled. No-op by default.
@@ -386,6 +519,18 @@ class AuthService:
             resource_type="user",
             resource_id=user.id,
             details={"target_user": user.username, "must_change": must_change},
+            ip_address=ip_address,
+        )
+
+        # An admin resetting a password is reacting to a suspected compromise
+        # or a departure. Leaving the account's existing sessions alive makes
+        # the reset cosmetic: the holder of a stolen cookie never needs the
+        # password again. No token is spared here -- the admin is acting on
+        # somebody else's account.
+        self.revoke_sessions(
+            user,
+            reason="password_reset",
+            actor_user_id=admin_user_id,
             ip_address=ip_address,
         )
 
