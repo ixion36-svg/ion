@@ -1,0 +1,153 @@
+{# The Bob improvement body for /de/bob.
+
+   Replaces the ten innerHTML sites in de_bob.html: the scorecard, the
+   disagreement-class table, the proposals table, and the loading, empty
+   and failure markup each of them wrote. The markup is the same shape the
+   JavaScript produced, so the move is checkable rather than a redesign.
+
+   The window select, the status select and Refresh live in the page shell,
+   outside this swap target. A failed render cannot take away the control
+   that retries. They send their state with hx-include, which is why this
+   fragment renders no filter of its own.
+
+   Each section fails on its own. A scorecard that could not be read is not
+   a rate of zero, an unreadable class list is not "the analysts agree",
+   and an unreadable proposal queue is not an empty one. The module being
+   licence-gated off never reaches this template: the route answers 404
+   and static/js/htmx-errors.js words it.
+
+   `digits` trims a trailing .0 the way the JavaScript's string
+   concatenation did: a rate of 100.0 rendered as "100%", and 85.5 stayed
+   "85.5". It is only called once the value is known to be a number.
+   None never reaches it, because None is not zero. #}
+
+{% macro digits(value) -%}
+{%- if value == (value|int) -%}{{ value|int }}{%- else -%}{{ value }}{%- endif -%}
+{%- endmacro %}
+
+<div id="bb-scorecard">
+{% if scorecard_failed %}
+  <div role="alert" class="alert alert-error">
+    The Bob scorecard could not be read. This is not a measured zero: the
+    query failed, so the agreement rate is unknown rather than zero.
+    Refresh to try again.
+  </div>
+{% else %}
+  <div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow">
+    <div class="stat">
+      <div class="stat-title">Agreement rate</div>
+      {# `is not none`, not truthiness. A rate of 0 is every scored closure
+         disagreeing, and the service returns None when nothing was scored,
+         because there is nothing to divide. The JavaScript kept those
+         apart with an explicit null check; `{% if card.agreement_rate %}`
+         would fold the measured zero into the dash. #}
+      <div class="stat-value">{% if card.agreement_rate is not none %}{{ digits(card.agreement_rate) }}%{% else %}—{% endif %}</div>
+      <div class="stat-desc">{% if card.agreed is not none %}{{ digits(card.agreed) }}{% else %}—{% endif %} / {% if card.scored is not none %}{{ digits(card.scored) }}{% else %}—{% endif %} scored closures</div>
+    </div>
+    <div class="stat">
+      <div class="stat-title">Drift (recent vs older)</div>
+      {# Missing is not flat. The JavaScript's `d.direction || 'flat'` said
+         a direction nobody computed was a direction of flat. #}
+      <div class="stat-value {% if card.direction == 'improving' %}text-success{% elif card.direction == 'declining' %}text-error{% else %}opacity-50{% endif %}">{% if card.direction is not none %}{{ card.direction }}{% else %}—{% endif %}</div>
+      <div class="stat-desc">{% if card.delta is not none %}{% if card.delta > 0 %}+{% endif %}{{ digits(card.delta) }} pts{% elif card.direction is none %}not computed{% endif %}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-title">Disagreement classes</div>
+      <div class="stat-value">{% if card.disagreement_classes is not none %}{{ digits(card.disagreement_classes) }}{% else %}—{% endif %}</div>
+      <div class="stat-desc">{% if card.total_disagreements is not none %}{{ digits(card.total_disagreements) }}{% else %}—{% endif %} total disagreements</div>
+    </div>
+  </div>
+  {# Three states stay three. `{% if card.few_shot_enabled %}` renders an
+     unreported flag as disabled, which is a claim that retrieval is off. #}
+  <div role="alert" class="alert alert-info mt-4"><span><strong>Gold-exemplar retrieval:</strong> {% if card.few_shot_enabled is true %}enabled{% elif card.few_shot_enabled is false %}disabled{% else %}unknown{% endif %}. {{ card.few_shot_note }}</span></div>
+{% endif %}
+</div>
+
+<h2 class="text-lg font-bold mt-8 mb-1">Bob feedback items</h2>
+<p class="text-sm text-base-content/60 mb-3 max-w-5xl">Scored closures where Bob disagreed with the analyst, grouped by rule and verdict shift. Draft a tuning proposal from a class to weigh the analyst reasoning.</p>
+<div id="bb-feedback">
+{% if feedback_failed %}
+  <div class="card bg-base-200 shadow">
+    <div class="card-body">
+      <div role="alert" class="alert alert-error">
+        Bob feedback could not be read. This is not an empty list: the query
+        failed, so how many scored disagreements are in this window is
+        unknown rather than zero. Refresh to try again.
+      </div>
+    </div>
+  </div>
+{% elif not classes %}
+  <div class="card bg-base-200 shadow"><div class="card-body items-center text-center py-14"><p class="opacity-60">No scored disagreements in this window — Bob and the analysts agree.</p></div></div>
+{% else %}
+  <div class="card bg-base-200 shadow"><div class="card-body p-0"><div class="overflow-x-auto"><table class="table table-sm"><thead><tr>
+    <th>Rule</th><th>Bob → Analyst</th><th>Count</th><th>Sample analyst reasons</th><th></th>
+  </tr></thead><tbody>
+    {% for c in classes %}
+      <tr>
+        <td><strong>{{ c.rule_name if c.rule_name is not none else '' }}</strong></td>
+        <td><span class="badge badge-ghost badge-sm">{{ c.bob_verdict if c.bob_verdict is not none else '' }}</span> → <span class="badge badge-ghost badge-sm">{{ c.human_verdict if c.human_verdict is not none else '' }}</span></td>
+        <td>{% if c.count is not none %}{{ digits(c.count) }}{% else %}—{% endif %}</td>
+        <td class="text-sm opacity-60">{% if c.sample_reasons %}{% for reason in c.sample_reasons %}{% if not loop.first %}<br>{% endif %}{{ reason }}{% endfor %}{% else %}<span class="opacity-50">—</span>{% endif %}</td>
+        <td><button class="btn btn-ghost btn-sm" data-click-action="bbDraft" data-args='{{ c.draft_args|tojson }}'>Draft tuning proposal</button></td>
+      </tr>
+    {% endfor %}
+  </tbody></table></div></div></div>
+{% endif %}
+</div>
+
+<h2 class="text-lg font-bold mt-8 mb-1">Tuning proposals</h2>
+<p class="text-sm text-base-content/60 mb-3 max-w-5xl">A draft applies to Bob's live prompt only when a different person approves it. Approve / reject / revert require the <span class="font-mono text-sm">de:approve</span> permission.</p>
+<div id="bb-proposals">
+{% if proposals_failed %}
+  <div class="card bg-base-200 shadow">
+    <div class="card-body">
+      <div role="alert" class="alert alert-error">
+        Tuning proposals could not be read. This is not an empty list: the
+        query failed, so how many drafts are waiting is unknown rather than
+        zero. Refresh to try again.
+      </div>
+    </div>
+  </div>
+{% elif not proposals %}
+  <div class="card bg-base-200 shadow"><div class="card-body items-center text-center py-14"><p class="opacity-60">
+    {# "Nothing recorded" and "nothing under this filter" are different
+       claims. The JavaScript said "No tuning proposals yet" either way,
+       which is wrong the moment Approved is selected and a draft exists. #}
+    {% if status == 'all' %}
+      No tuning proposals yet. Draft one from a feedback item above.
+    {% else %}
+      No {{ status }} proposals. The filter is set to {{ status }}; other statuses may have some.
+    {% endif %}
+  </p></div></div>
+{% else %}
+  <div class="card bg-base-200 shadow"><div class="card-body p-0"><div class="overflow-x-auto"><table class="table table-sm"><thead><tr>
+    <th>Proposal</th><th>Rule</th><th>Status</th><th>Drafted / Decided</th><th>Actions</th>
+  </tr></thead><tbody>
+    {% for p in proposals %}
+      <tr>
+        <td><strong>{{ p.title }}</strong>{% if p.problem_statement %}<div class="text-sm opacity-50 mt-1">{{ p.problem_statement }}</div>{% endif %}</td>
+        <td class="text-sm opacity-60">{{ p.rule_name or '—' }}</td>
+        <td>
+          {% if p.status is not none %}
+            <span class="badge badge-sm {{ p.status_css }}">{{ p.status }}</span>
+          {% else %}
+            <span class="opacity-50">—</span>
+          {% endif %}
+        </td>
+        {# Usernames, not timestamps. The JavaScript showed who drafted and
+           who decided, and the instants on the row were not rendered. A
+           server-formatted clock would be the server's, not the analyst's;
+           the day one of these is shown it has to go through the ts macro. #}
+        <td class="text-sm opacity-60">drafted: {{ p.created_by_username or '—' }}{% if p.decided_by_username %}<br>decided: {{ p.decided_by_username }}{% endif %}{% if p.reverted_by_username %}<br>reverted: {{ p.reverted_by_username }}{% endif %}</td>
+        <td>
+          {% if p.actions %}
+            {% for a in p.actions %}<button class="btn {{ a.css }} btn-sm" data-click-action="{{ a.action }}" data-args='[{{ p.id }}]'>{{ a.label }}</button>{% endfor %}
+          {% else %}
+            <span class="opacity-50">—</span>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+  </tbody></table></div></div></div>
+{% endif %}
+</div>

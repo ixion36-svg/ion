@@ -1,125 +1,18 @@
 {% extends "base.html" %}
 {% block title %}ION - Threat Intel{% endblock %}
+{% block head_css %}
+<link rel="stylesheet" href="/static/css/threat-intel.css?v={{ ion_version }}">
+{% endblock %}
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+{# data-can-manage-watches carries the viewer's observable:enrich to the
+   script, which still builds the actor and campaign result tables. It is a
+   data attribute rather than a Jinja expression inside <script>, because
+   that block currently contains no Jinja at all and keeping it that way
+   means it stays checkable with `node --check`. #}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden"
+     id="ti-root"
+     data-can-manage-watches="{{ 'true' if can_manage_watches else 'false' }}">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
-<style nonce="{{ csp_nonce }}">
-.ti-page { max-width: 1400px; margin: 0 auto; }
-.ti-header { margin-bottom: 24px; }
-.ti-header h1 { font-size: 1.5rem; margin: 0 0 4px; }
-.ti-header p { color: var(--text-secondary); font-size: .85rem; margin: 0; }
-
-/* v0.27.0: pill-style tabs with cyan active state — ported from
-   the old /threat-landscape colour palette. The cards / cells inside
-   tabs keep using the existing ti-* CSS, but the strip itself is
-   Tailwind-driven so it picks up the brand colours. */
-.ti-tab {
-    background: transparent; border: none; cursor: pointer;
-    color: rgb(148 163 184); /* slate-400 */
-}
-.ti-tab:hover { color: #fff; }
-.ti-tab.active {
-    background: var(--ion-cyan, #6de4ff);
-    color: #0a0c12; /* ink-950 */
-    box-shadow: 0 0 18px -4px rgba(109,228,255,0.8);
-}
-.ti-panel { display: none; }
-.ti-panel.active { display: block; }
-
-/* Stat cards */
-.ti-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
-.ti-stat-card {
-    background: var(--bg-secondary); border: 1px solid var(--ion-border);
-    border-radius: var(--ion-radius-lg); padding: 16px 20px; text-align: center;
-}
-.ti-stat-value { font-size: 1.8rem; font-weight: 700; color: var(--accent); }
-.ti-stat-label { font-size: .78rem; color: var(--text-secondary); margin-top: 4px; }
-
-/* Search bar */
-.ti-search-bar { display: flex; gap: 10px; margin-bottom: 20px; }
-.ti-search-input {
-    flex: 1; padding: 8px 14px; background: var(--bg-secondary);
-    border: 1px solid var(--ion-border); border-radius: var(--radius);
-    color: var(--text-primary); font-size: .85rem;
-}
-.ti-search-input::placeholder { color: var(--text-secondary); }
-.ti-search-input:focus { outline: none; border-color: var(--accent); }
-.ti-btn {
-    padding: 8px 16px; background: var(--accent); color: #000; border: none;
-    border-radius: var(--radius); cursor: pointer; font-size: .82rem; font-weight: 600; white-space: nowrap;
-}
-.ti-btn:hover { opacity: .85; }
-.ti-btn:disabled { opacity: .4; cursor: not-allowed; }
-.ti-btn-outline {
-    padding: 6px 14px; background: transparent; border: 1px solid var(--ion-border);
-    border-radius: var(--radius); color: var(--text-secondary); cursor: pointer; font-size: .8rem;
-}
-.ti-btn-outline:hover { color: var(--text-primary); border-color: var(--text-secondary); }
-.ti-btn-danger { background: var(--danger); color: #fff; }
-.ti-btn-sm { padding: 4px 10px; font-size: .78rem; }
-.ti-btn-watch { background: var(--neon-orange); }
-.ti-btn-watched { background: transparent; border: 1px solid var(--success); color: var(--success); }
-
-/* Tables */
-.ti-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
-.ti-table th {
-    text-align: left; padding: 10px 12px; color: var(--text-secondary);
-    border-bottom: 1px solid var(--ion-border); font-weight: 600; font-size: .78rem;
-    text-transform: uppercase; letter-spacing: .5px;
-}
-.ti-table td { padding: 10px 12px; border-bottom: 1px solid var(--ion-border); vertical-align: top; }
-.ti-table tr:hover td { background: rgba(255,255,255,.02); }
-.ti-table .ti-name-cell { cursor: pointer; color: var(--accent); font-weight: 600; }
-.ti-table .ti-name-cell:hover { text-decoration: underline; }
-
-/* Detail row */
-.ti-detail-row { display: none; }
-.ti-detail-row.open { display: table-row; }
-.ti-detail-row td { padding: 16px 20px; background: var(--bg-secondary); }
-.ti-detail-section { margin-bottom: 12px; }
-.ti-detail-section h4 { font-size: .82rem; color: var(--text-secondary); margin: 0 0 6px; text-transform: uppercase; letter-spacing: .5px; }
-.ti-detail-section p { margin: 0; font-size: .82rem; line-height: 1.5; color: var(--text-primary); }
-.ti-detail-tags { display: flex; flex-wrap: wrap; gap: 4px; }
-.ti-tag {
-    display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: .72rem; font-weight: 600;
-    background: rgba(0,229,255,.12); color: var(--accent);
-}
-.ti-ttp-list { display: flex; flex-wrap: wrap; gap: 4px; }
-.ti-ttp {
-    display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: .72rem;
-    background: rgba(210,153,34,.12); color: var(--warning); border: 1px solid rgba(210,153,34,.25);
-}
-
-/* Labels */
-.ti-label {
-    display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: .7rem; font-weight: 600;
-    margin-right: 3px; margin-bottom: 2px;
-}
-
-/* Confidence badge */
-.ti-confidence { font-size: .75rem; font-weight: 600; }
-.ti-confidence.high { color: var(--danger); }
-.ti-confidence.medium { color: var(--warning); }
-.ti-confidence.low { color: var(--success); }
-
-/* Loading / empty states */
-.ti-loading, .ti-empty { text-align: center; padding: 40px; color: var(--text-secondary); font-size: .85rem; }
-.ti-spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--ion-border); border-top-color: var(--accent); border-radius: 50%; animation: ti-spin .6s linear infinite; margin-right: 8px; vertical-align: middle; }
-@keyframes ti-spin { to { transform: rotate(360deg); } }
-
-/* Unread indicator */
-.ti-unread td { border-left: 3px solid var(--accent); }
-.ti-badge {  min-width: 18px; height: 18px; line-height: 18px; text-align: center; border-radius: 10px; background: var(--danger); color: #fff; font-size: .7rem; font-weight: 700; padding: 0 5px; margin-left: 6px; }
-/* `display` is conditional: this element is also written with Tailwind's `hidden`, and an unconditional display here beats it. */
-.ti-badge:not(.hidden) { display: inline-block; }
-
-/* Report cards — clickable */
-.ti-report-card { cursor: pointer; transition: border-color .15s; }
-.ti-report-card:hover { border-color: var(--accent); }
-.ti-report-body { margin: 0; font-size: .82rem; line-height: 1.6; color: var(--text-primary); white-space: pre-wrap; max-height: 320px; overflow-y: auto; }
-.ti-ttp[data-click-action] { cursor: pointer; }
-.ti-ttp[data-click-action]:hover { opacity: .8; }
-</style>
 
 <div class="max-w-[1400px] mx-auto">
     <section class="mb-8 rise d-1">
@@ -134,12 +27,18 @@
     <!-- global search bar — hits /api/threat-intel/unified-search.
          Fans out to actors + campaigns (OpenCTI) + IOCs + cases. Results
          grouped by kind under the bar. Press Enter or click Search. -->
-    <div class="flex items-center gap-2.5 mb-5 mb-6">
-        <input type="text" class="input flex-1" id="ti-global-search"
+    {# A form, so Enter submits natively. hx-trigger cannot express Enter
+       here: an event filter is compiled with Function() and this CSP has
+       no unsafe-eval. The results panel reveals itself on the swap. #}
+    <form class="flex items-center gap-2.5 mb-5 mb-6"
+          hx-get="/ui/threat-intel/unified-search"
+          hx-target="#ti-global-search-results"
+          hx-swap="innerHTML">
+        <input type="text" class="input flex-1" id="ti-global-search" name="q"
                placeholder="Search across actors, campaigns, IOCs, cases (e.g. APT28, evil.com, 10.0.0.1)…">
-        <button class="btn btn-primary" data-click-action="tiUnifiedSearch">Search</button>
-        <button class="btn btn-ghost hidden" data-click-action="tiClearSearch" id="ti-global-search-clear">Clear</button>
-    </div>
+        <button type="submit" class="btn btn-primary">Search</button>
+        <button type="button" class="btn btn-ghost hidden" data-click-action="tiClearSearch" id="ti-global-search-clear">Clear</button>
+    </form>
     <div class="hidden mb-6" id="ti-global-search-results"></div>
 
     <!-- Tabs (v0.27.0: 4 → 7 tabs after merging /threat-landscape +
@@ -152,11 +51,20 @@
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="ioc">IOC Feed</button>
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="reports">Reports</button>
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="watchlist">Watchlist <span id="ti-unread-badge" class="ti-badge hidden">0</span></button>
+        {# Attack Stories reads /api/attack-stories and KEV reads /api/kev.
+           Both require alert:read. This page requires observable:read,
+           which does not imply it, so both tabs used to be offered to
+           everyone who could open the page: Stories answered 403, and KEV
+           rendered the refusal as "Search failed: HTTP 403". Withheld
+           instead, the way security_dashboard withholds Block and
+           Unblock. #}
+        {% if can_read_alerts %}
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="stories">Attack Stories</button>
         {# CISA KEV, shipped as a snapshot inside the image. Lives here
            rather than under Reporting because "is this being exploited right
            now" is a triage question, not a metric. #}
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="kev">KEV Catalog</button>
+        {% endif %}
     </div>
 
     <!-- Overview Panel -->
@@ -174,7 +82,16 @@
                 <span class="text-ion-amber text-base">★</span>
                 <span class="text-[11px] uppercase tracking-wider text-ion-amber font-semibold">AI Threat Briefing</span>
               </div>
-              <button id="ai-brief-btn" data-click-action="tiLoadAISummary"
+              {# A POST, because generating a briefing costs a model
+                 call and POST /api/threat-landscape/ai-summary is one.
+                 The fragment swaps this button out of band, so its
+                 label carries the panel state: Generate, Regenerate
+                 after a summary, Retry after a failure. #}
+              <button id="ai-brief-btn"
+                      hx-post="/ui/threat-intel/ai-brief"
+                      hx-target="#ai-brief-content"
+                      hx-swap="innerHTML"
+                      hx-indicator="#ai-brief-content"
                       class="px-3 py-1.5 rounded-md text-xs font-medium bg-ion-amber/10 text-ion-amber border border-ion-amber/30 hover:bg-ion-amber/20 transition">
                 Generate Briefing
               </button>
@@ -186,29 +103,18 @@
           </div>
         </section>
 
-        <!-- KPI cards — coloured. Stat values keep the
-             existing ids so the original ``loadOverview`` JS keeps
-             working unchanged. -->
-        <section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-                <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Watched Actors</div>
-                <div id="stat-actors" class="text-[28px] font-semibold text-white font-mono">—</div>
-                <div class="text-[11px] text-slate-500 mt-1">on the watchlist</div>
-            </div>
-            <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-                <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Watched Campaigns</div>
-                <div id="stat-campaigns" class="text-[28px] font-semibold text-ion-cyan font-mono">—</div>
-                <div class="text-[11px] text-slate-500 mt-1">on the watchlist</div>
-            </div>
-            <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-                <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Matches (7d)</div>
-                <div id="stat-matches" class="text-[28px] font-semibold text-ion-coral font-mono">—</div>
-                <div class="text-[11px] text-slate-500 mt-1">across alerts</div>
-            </div>
-            <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-                <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Unread Alerts</div>
-                <div id="stat-unread" class="text-[28px] font-semibold text-ion-amber font-mono">—</div>
-                <div class="text-[11px] text-slate-500 mt-1">match alerts pending</div>
+        {# KPI cards, rendered by /ui/threat-intel/overview-stats. The tiles
+           used to be written by loadOverview with textContent and no guard,
+           and its catch was a console.error that rendered nothing, so a
+           failed read left all four showing this dash and the page looked
+           like it was still loading. The fragment says unknown instead. #}
+        <section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"
+                 id="ti-overview-stats"
+                 hx-get="/ui/threat-intel/overview-stats"
+                 hx-trigger="load, ti-show"
+                 hx-swap="innerHTML">
+            <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5 col-span-2 md:col-span-4">
+                <div class="text-[11px] uppercase tracking-wider text-slate-500">Loading overview…</div>
             </div>
         </section>
 
@@ -220,7 +126,15 @@
               <h3 class="font-sans font-semibold text-base text-white">Top Threat Actors</h3>
               <button data-click-action="tiSwitchTab" data-args='["actors"]' class="text-[11px] text-ion-cyan hover:text-white transition">View all →</button>
             </div>
-            <div id="ti-overview-actors" class="rounded-xl border border-white/5 bg-ink-900/50 p-4 min-h-[140px]">
+            {# Rendered by /ui/threat-intel/landscape-actors, which separates
+               OpenCTI being unconfigured from OpenCTI failing. The old catch
+               rendered "Actors unavailable, OpenCTI not configured?" for
+               both, a guess with a question mark in it, while the 503 that
+               caused it says exactly which. #}
+            <div id="ti-overview-actors" class="rounded-xl border border-white/5 bg-ink-900/50 p-4 min-h-[140px]"
+                 hx-get="/ui/threat-intel/landscape-actors"
+                 hx-trigger="load, ti-show"
+                 hx-swap="innerHTML">
               <div class="text-slate-500 text-sm animate-pulse">Loading actors…</div>
             </div>
           </div>
@@ -229,7 +143,10 @@
               <h3 class="font-sans font-semibold text-base text-white">Latest High-Score IOCs</h3>
               <button data-click-action="tiSwitchTab" data-args='["ioc"]' class="text-[11px] text-ion-cyan hover:text-white transition">View feed →</button>
             </div>
-            <div id="ti-overview-iocs" class="rounded-xl border border-white/5 bg-ink-900/50 p-4 min-h-[140px]">
+            <div id="ti-overview-iocs" class="rounded-xl border border-white/5 bg-ink-900/50 p-4 min-h-[140px]"
+                 hx-get="/ui/threat-intel/landscape-iocs"
+                 hx-trigger="load, ti-show"
+                 hx-swap="innerHTML">
               <div class="text-slate-500 text-sm animate-pulse">Loading IOCs…</div>
             </div>
           </div>
@@ -242,7 +159,32 @@
             <div class="flex items-center justify-between mb-3">
               <h3 class="font-sans font-semibold text-base text-white">Recently Active Observables <span class="text-[11px] text-slate-500 font-normal">— last 30d in cases</span></h3>
               <label class="text-[11px] text-slate-400 inline-flex items-center gap-1.5 cursor-pointer" title="Hide rule-field / command-content items (process names, command lines, file paths, registry) — not trackable IOCs">
-                <input type="checkbox" class="checkbox checkbox-xs" id="ti-hide-rule-obs" checked data-change-action="loadRecentlyActive"> Hide rule-field
+                {# The control that filters the lists is the control that
+                   requests them. Both lists come back as out-of-band swaps
+                   into #ti-recent-obs and #ti-recent-tech, so this element
+                   swaps nothing itself.
+
+                   Two inputs for one boolean, because a checkbox sends its
+                   value only when checked. Unchecked on its own would send
+                   no parameter at all and the route's default of true would
+                   reassert the filter the reader just turned off.
+
+                   So the hidden input always sends false and the checkbox
+                   sends true on top of it when checked. That puts the
+                   parameter in twice, and FastAPI reads the LAST copy,
+                   measured elsewhere in this project as `?days=7&days=180`
+                   resolving to 180. hx-include lists them in that order
+                   deliberately: hidden first, checkbox second, so checked
+                   wins. This is the one place a duplicated parameter is the
+                   mechanism rather than the bug. #}
+                <input type="hidden" id="ti-hide-rule-obs-off"
+                       name="hide_rule_observables" value="false">
+                <input type="checkbox" class="checkbox checkbox-xs" id="ti-hide-rule-obs"
+                       name="hide_rule_observables" value="true" checked
+                       hx-get="/ui/threat-intel/recently-active"
+                       hx-trigger="load, change, ti-show"
+                       hx-include="#ti-hide-rule-obs-off, #ti-hide-rule-obs"
+                       hx-swap="none"> Hide rule-field
               </label>
             </div>
             <div id="ti-recent-obs" class="text-sm text-slate-400">Loading…</div>
@@ -258,17 +200,36 @@
             <h3 class="font-sans font-semibold text-base text-white mb-3">Recent Matches</h3>
             <table class="ti-table" id="overview-matches-table">
                 <thead><tr><th>Time</th><th>Observable</th><th>Matched Entity</th><th>Type</th><th>Actions</th></tr></thead>
-                <tbody id="overview-matches-body"><tr><td colspan="5" class="ti-empty">Loading...</td></tr></tbody>
+                {# The same fragment the Watchlist tab uses, with its own
+                   ten-row limit and show_type for this table's fourth
+                   column. renderMatchRows was a second definition of a
+                   match row and the two had already drifted. #}
+                <tbody id="overview-matches-body"
+                       hx-get="/ui/threat-intel/matches?limit=10&amp;show_type=true"
+                       hx-trigger="load, ti-show"
+                       hx-swap="innerHTML"><tr><td colspan="5" class="ti-empty">Loading...</td></tr></tbody>
             </table>
         </section>
     </div>
 
     <!-- Threat Actors Panel -->
     <div class="ti-panel" id="panel-actors">
-        <div class="flex items-center gap-2.5 mb-5">
-            <input type="text" class="input flex-1" id="actor-search" placeholder="Search threat actors in OpenCTI (e.g. APT, Lazarus, FIN7)...">
-            <button class="btn btn-primary" id="actor-search-btn" data-click-action="searchActors">Search</button>
-        </div>
+        {# A real form, so Enter submits natively. The page bound a keydown
+           listener, which works, but hx-trigger cannot express the same
+           thing: an event filter like [key=='Enter'] is compiled with
+           Function() and this CSP carries no unsafe-eval, so it would
+           throw silently. A form needs neither.
+
+           The form sits outside #actor-results, so a failed search cannot
+           remove the box that would retry it. #}
+        <form class="flex items-center gap-2.5 mb-5"
+              hx-get="/ui/threat-intel/actor-search"
+              hx-target="#actor-results"
+              hx-swap="innerHTML">
+            <input type="text" class="input flex-1" id="actor-search" name="q"
+                   placeholder="Search threat actors in OpenCTI (e.g. APT, Lazarus, FIN7)...">
+            <button type="submit" class="btn btn-primary" id="actor-search-btn">Search</button>
+        </form>
         <div id="actor-results">
             <div class="ti-empty">Enter a search term to query OpenCTI for threat actors.</div>
         </div>
@@ -276,10 +237,14 @@
 
     <!-- Campaigns Panel -->
     <div class="ti-panel" id="panel-campaigns">
-        <div class="flex items-center gap-2.5 mb-5">
-            <input type="text" class="input flex-1" id="campaign-search" placeholder="Search campaigns in OpenCTI (e.g. SolarWinds, NotPetya)...">
-            <button class="btn btn-primary" id="campaign-search-btn" data-click-action="searchCampaigns">Search</button>
-        </div>
+        <form class="flex items-center gap-2.5 mb-5"
+              hx-get="/ui/threat-intel/campaign-search"
+              hx-target="#campaign-results"
+              hx-swap="innerHTML">
+            <input type="text" class="input flex-1" id="campaign-search" name="q"
+                   placeholder="Search campaigns in OpenCTI (e.g. SolarWinds, NotPetya)...">
+            <button type="submit" class="btn btn-primary" id="campaign-search-btn">Search</button>
+        </form>
         <div id="campaign-results">
             <div class="ti-empty">Enter a search term to query OpenCTI for campaigns.</div>
         </div>
@@ -288,46 +253,100 @@
     <!-- Watchlist Panel -->
     <div class="ti-panel" id="panel-watchlist">
         <h3 class="text-[.95rem] mt-0 mr-0 mb-4 ml-0">Active Watches</h3>
+        {# Rows arrive from /ui/threat-intel/watchlist. The table and its
+           header stay here, outside the swap target, so no render of the
+           fragment can remove the structure that names the columns.
+
+           ti-show is dispatched by the tab switcher on each [hx-get] inside
+           the panel being activated, so a tab that is never opened costs no
+           request. hx-trigger cannot use an event filter here: the CSP
+           carries no unsafe-eval, and htmx compiles a filter expression
+           with Function(), which throws silently. A plain event name is
+           native and fine. #}
         <table class="ti-table" id="watchlist-table">
             <thead><tr><th>Name</th><th>Origin</th><th>Type</th><th>Matches</th><th>Last Match</th><th>Watched By</th><th>Reason</th><th>Actions</th></tr></thead>
-            <tbody id="watchlist-body"><tr><td colspan="8" class="ti-empty">Loading...</td></tr></tbody>
+            <tbody id="watchlist-body"
+                   hx-get="/ui/threat-intel/watchlist"
+                   hx-trigger="ti-show"
+                   hx-swap="innerHTML">
+              <tr><td colspan="8" class="ti-empty">Loading...</td></tr>
+            </tbody>
         </table>
 
         <h3 class="text-[.95rem] mt-6 mr-0 mb-3 ml-0">
             Match Alerts
             <button class="btn btn-ghost ti-btn-sm ml-2.5" id="match-filter-btn" data-click-action="toggleMatchFilter">Show Unread Only</button>
         </h3>
+        {# The toggle's state lives in this input rather than in a script
+           variable, so the server receives it with the request and the
+           fragment can word its empty state for the filter that was
+           actually applied. hx-include takes it by name. #}
+        <input type="hidden" id="ti-matches-unread" name="unread_only" value="false">
         <table class="ti-table" id="matches-table">
             <thead><tr><th>Time</th><th>Observable</th><th>Matched Entity</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody id="matches-body"><tr><td colspan="5" class="ti-empty">Loading...</td></tr></tbody>
+            <tbody id="matches-body"
+                   hx-get="/ui/threat-intel/matches"
+                   hx-trigger="ti-show"
+                   hx-include="#ti-matches-unread"
+                   hx-swap="innerHTML">
+              <tr><td colspan="5" class="ti-empty">Loading...</td></tr>
+            </tbody>
         </table>
     </div>
 
     <!-- IOC Feed Panel — ported from /threat-landscape. -->
     <div class="ti-panel" id="panel-ioc">
         <div class="flex items-center gap-2.5 mb-5">
-            <select id="ti-ioc-min-score" class="select flex-1 flex-[0_0_auto] w-[auto]" data-change-action="tiLoadIOCFeed">
+            {# `name` so hx-include sends it. The threshold is a request
+               parameter the server bounds now, rather than a value only
+               the script knew. #}
+            <select id="ti-ioc-min-score" name="min_score" class="select flex-1 flex-[0_0_auto] w-[auto]"
+                    hx-get="/ui/threat-intel/ioc-feed"
+                    hx-target="#ioc-body"
+                    hx-trigger="change"
+                    hx-include="#ti-ioc-min-score">
                 <option value="0">All scores</option>
                 <option value="50">Score ≥ 50</option>
                 <option value="75" selected>Score ≥ 75</option>
                 <option value="90">Score ≥ 90</option>
             </select>
-            <button class="btn btn-primary" data-click-action="tiLoadIOCFeed">Refresh</button>
+            <button class="btn btn-primary"
+                    hx-get="/ui/threat-intel/ioc-feed"
+                    hx-target="#ioc-body"
+                    hx-include="#ti-ioc-min-score">Refresh</button>
         </div>
         <table class="ti-table" id="ioc-table">
             <thead><tr><th>Score</th><th>Type</th><th>Value</th><th>Labels</th><th>Source</th><th title="Local sightings over the last 12 months">Sightings</th><th>Actions</th></tr></thead>
-            <tbody id="ioc-body"><tr><td colspan="7" class="ti-empty">Click Refresh to load OpenCTI indicators.</td></tr></tbody>
+            {# The table and its header stay outside this target, so no
+               render can remove the structure that names the columns,
+               and the threshold control stays outside it too so a
+               failed read cannot remove the control that would retry. #}
+            <tbody id="ioc-body"
+                   hx-get="/ui/threat-intel/ioc-feed"
+                   hx-trigger="ti-show"
+                   hx-include="#ti-ioc-min-score"
+                   hx-swap="innerHTML"><tr><td colspan="7" class="ti-empty">Loading indicators&hellip;</td></tr></tbody>
         </table>
     </div>
 
     <!-- Reports Panel — ported from /threat-landscape. -->
     <div class="ti-panel" id="panel-reports">
-        <div class="flex items-center gap-2.5 mb-5">
-            <input type="text" class="input flex-1" id="ti-report-filter" placeholder="Filter reports by title…">
-            <button class="btn btn-primary" data-click-action="tiLoadReports">Refresh</button>
-        </div>
-        <div id="ti-reports-list">
-            <div class="ti-empty">Click Refresh to load latest threat reports from OpenCTI.</div>
+        {# A form, so Enter applies the filter natively. hx-trigger
+           cannot express Enter: an event filter is compiled with
+           Function() and this CSP carries no unsafe-eval. #}
+        <form class="flex items-center gap-2.5 mb-5"
+              hx-get="/ui/threat-intel/reports"
+              hx-target="#ti-reports-list"
+              hx-swap="innerHTML">
+            <input type="text" class="input flex-1" id="ti-report-filter" name="q" placeholder="Filter reports by title…">
+            <button type="submit" class="btn btn-primary">Refresh</button>
+        </form>
+        <div id="ti-reports-list"
+             hx-get="/ui/threat-intel/reports"
+             hx-trigger="ti-show"
+             hx-include="#ti-report-filter"
+             hx-swap="innerHTML">
+            <div class="ti-empty">Loading reports&hellip;</div>
         </div>
     </div>
 
@@ -366,17 +385,34 @@ data-click-action="tiCloseReport"></div>
     <!-- Attack Stories Panel — ported from /attack-stories. -->
     <div class="ti-panel" id="panel-stories">
         <div class="flex items-center gap-2.5 mb-5">
-            <select id="ti-stories-hours" class="select flex-1 flex-[0_0_auto] w-[auto]" data-change-action="tiLoadStories">
+            {# `name` so hx-include can send it. The window is now a request
+               parameter the server bounds, rather than a value only the
+               script knew. #}
+            <select id="ti-stories-hours" name="hours" class="select flex-1 flex-[0_0_auto] w-[auto]"
+                    hx-get="/ui/threat-intel/stories"
+                    hx-target="#ti-stories-list"
+                    hx-trigger="change"
+                    hx-include="#ti-stories-hours">
                 <option value="4">Last 4h</option>
                 <option value="12">Last 12h</option>
                 <option value="24" selected>Last 24h</option>
                 <option value="72">Last 3 days</option>
                 <option value="168">Last 7 days</option>
             </select>
-            <button class="btn btn-primary" data-click-action="tiLoadStories">Refresh</button>
+            <button class="btn btn-primary"
+                    hx-get="/ui/threat-intel/stories"
+                    hx-target="#ti-stories-list"
+                    hx-include="#ti-stories-hours">Refresh</button>
         </div>
-        <div id="ti-stories-list">
-            <div class="ti-empty">Click Refresh to correlate recent alerts into attack stories.</div>
+        {# The window control and Refresh are outside this target, so a
+           failed correlation cannot remove the control that would retry
+           it. #}
+        <div id="ti-stories-list"
+             hx-get="/ui/threat-intel/stories"
+             hx-trigger="ti-show"
+             hx-include="#ti-stories-hours"
+             hx-swap="innerHTML">
+            <div class="ti-empty">Loading...</div>
         </div>
     </div>
 
@@ -386,15 +422,31 @@ data-click-action="tiCloseReport"></div>
        loaded, so the version and its age are stated on every view. #}
     <div class="ti-panel" id="panel-kev">
         <div id="kev-status-bar" class="mb-4"></div>
-        <div class="flex items-center gap-2.5 mb-5">
-            <input id="kev-search" class="input flex-1" type="text"
+        <form class="flex items-center gap-2.5 mb-5"
+              hx-get="/ui/threat-intel/kev"
+              hx-target="#kev-results"
+              hx-swap="innerHTML">
+            <input id="kev-search" class="input flex-1" type="text" name="q"
                    placeholder="CVE, vendor or product — e.g. CVE-2026-8037, Fortinet, LoadMaster">
             <label class="flex items-center gap-2 text-xs text-slate-400 whitespace-nowrap">
-                <input type="checkbox" class="checkbox checkbox-xs" id="kev-ransomware-only"> Ransomware-linked only
+                {# Two inputs for one boolean, the same pattern the Hide
+                   rule-field toggle uses: a checkbox sends nothing when
+                   unchecked, so the hidden companion always sends false
+                   and this sends true on top of it. FastAPI reads the
+                   last copy. #}
+                <input type="hidden" name="ransomware_only" value="false">
+                <input type="checkbox" class="checkbox checkbox-xs" id="kev-ransomware-only"
+                       name="ransomware_only" value="true"> Ransomware-linked only
             </label>
-            <button class="btn btn-primary" data-click-action="kevSearch">Search</button>
-        </div>
-        <div id="kev-results">
+            <button type="submit" class="btn btn-primary">Search</button>
+        </form>
+        {# The status bar above stays outside this target, so a failed
+           lookup cannot remove the catalog age, which is what makes "not
+           in KEV" mean anything. #}
+        <div id="kev-results"
+             hx-get="/ui/threat-intel/kev"
+             hx-trigger="ti-show"
+             hx-swap="innerHTML">
             <div class="ti-empty">Loading catalog…</div>
         </div>
     </div>
@@ -409,8 +461,14 @@ data-click-action="tiCloseReport"></div>
 <script nonce="{{ csp_nonce }}">
 (function(){
     const API = '/api/threat-intel';
-    let watchedIds = new Set();
     let matchUnreadOnly = false;
+
+    // The viewer's observable:enrich, decided on the server and read off
+    // the page root. The script never asks the API whether it may write;
+    // a control whose POST is going to answer 403 is a worse answer than
+    // no control.
+    const canManageWatches =
+        document.getElementById('ti-root').dataset.canManageWatches === 'true';
 
     // ── Tab switching ──────────────────────────
     document.getElementById('ti-tabs').addEventListener('click', function(e) {
@@ -422,100 +480,69 @@ data-click-action="tiCloseReport"></div>
         const panel = document.getElementById('panel-' + tab.dataset.panel);
         if (panel) panel.classList.add('active');
 
-        if (tab.dataset.panel === 'overview') loadOverview();
-        if (tab.dataset.panel === 'watchlist') { loadWatches(); loadMatches(); }
+        // Server-rendered regions in the panel being shown load themselves.
+        // Dispatching the event the fragments listen for keeps the lazy
+        // behaviour the panels already had: a tab nobody opens costs no
+        // request. Re-dispatching on every visit refreshes the panel, which
+        // the old per-tab _tiXLoaded flags deliberately did not do, so a
+        // watchlist changed in another window stayed stale until reload.
+        if (panel) {
+            panel.querySelectorAll('[hx-get]').forEach(
+                el => el.dispatchEvent(new Event('ti-show')));
+        }
+
+        // The overview tab needs no special case: the ti-show dispatch
+        // above reaches all five of its server-rendered regions.
         // lazy-load the merged tabs.
-        if (tab.dataset.panel === 'ioc' && !window._tiIOCLoaded) { tiLoadIOCFeed(); window._tiIOCLoaded = true; }
-        if (tab.dataset.panel === 'reports' && !window._tiReportsLoaded) { tiLoadReports(); window._tiReportsLoaded = true; }
-        if (tab.dataset.panel === 'stories' && !window._tiStoriesLoaded) { tiLoadStories(); window._tiStoriesLoaded = true; }
-        if (tab.dataset.panel === 'kev' && !window._tiKevLoaded) { kevSearch(); window._tiKevLoaded = true; }
+        // No tab needs a special case any more: every server-rendered
+        // region in the panel being shown carries hx-trigger="ti-show"
+        // and the dispatch above reaches all of them.
+        // The KEV tab needs no special case: #kev-results carries
+        // hx-trigger="ti-show" and the dispatch above reaches it.
     });
 
     // ── KEV catalog ──────────────────────────────────────────
     // The catalog is a snapshot shipped in the image, so its AGE is part of
     // every answer: "CVE-X is not in KEV" means nothing without "…according
     // to a catalog from N days ago".
-    function kevRenderStatus(st) {
-        const bar = document.getElementById('kev-status-bar');
-        if (!bar) return;
-        if (!st || !st.loaded) {
-            bar.innerHTML = '<div class="rounded-lg border border-ion-amber/30 bg-ion-amber/[0.06] px-4 py-3 text-xs text-ion-amber">'
-                          + 'No KEV catalog loaded. An operator can import one from Settings.</div>';
-            return;
+    // ── KEV catalog and the global search bar ─────────────
+    // kevRenderStatus, kevRansomware, kevRow, kevDetail, kevSearch and
+    // tiUnifiedSearch are gone. The KEV tab is rendered by
+    // /ui/threat-intel/kev and the search bar by
+    // /ui/threat-intel/unified-search.
+    //
+    // Both rendered their failures into the ti-empty class, which is the
+    // no-results styling, so "Search failed: HTTP 403" and "no matches"
+    // looked alike. On the KEV panel that is the worst confusion
+    // available, because the panel exists to answer whether a CVE is
+    // being exploited right now and an empty catalog reads as no.
+    //
+    // Three judgements in the old KEV code were deliberate and are kept
+    // word for word in the fragment: the empty state names which catalog
+    // version found nothing, "ransomware: unknown" is worded as CISA not
+    // having established use rather than having ruled it out, and
+    // references are selectable text rather than links because ION ships
+    // to air-gapped sites where an external anchor looks broken.
+
+    // Reveal the global search results once a swap has filled them, and
+    // the Clear control with them. The page set style.display directly; a
+    // class keeps the decision in the stylesheet.
+    document.body.addEventListener('htmx:afterSwap', function(e) {
+        if (e.target && e.target.id === 'ti-global-search-results') {
+            e.target.classList.remove('hidden');
+            const clear = document.getElementById('ti-global-search-clear');
+            if (clear) clear.classList.remove('hidden');
         }
-        const age = st.age_days;
-        // Bands, not a hard cutoff: CISA publishes irregularly, so "30 days"
-        // is a prompt to check, not a failure.
-        const tone = (age == null) ? 'slate'
-                   : age <= 30 ? 'ion-lime' : age <= 90 ? 'ion-amber' : 'ion-coral';
-        const ahead = st.ahead_of_bundle
-            ? ' <span class="text-slate-500">(operator import, newer than this build)</span>' : '';
-        bar.innerHTML =
-          `<div class="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
-             <span class="text-slate-400">Catalog <b class="text-white">${escapeHtml(st.catalog_version || '—')}</b>${ahead}</span>
-             <span class="text-slate-400"><b class="text-white">${st.count}</b> known-exploited CVEs</span>
-             <span class="text-${tone}">${age == null ? 'age unknown' : age + ' days old'}</span>
-             <span class="text-slate-500">snapshot — ION does not fetch this at runtime</span>
-           </div>`;
-    }
+    });
 
     // CISA publishes "Known" / "Unknown", never "No". Unknown means NOT
     // ESTABLISHED, so rendering it the same as a definitive negative — which a
     // bare "no badge" does — asserts something the catalogue does not. 1,324 of
     // the 1,662 entries are Unknown, so this is the common case, not an edge one.
-    function kevRansomware(e) {
-        const raw = e.known_ransomware_raw || (e.known_ransomware ? 'Known' : 'Unknown');
-        if (e.known_ransomware) {
-            return '<span class="ti-badge ti-badge-ransomware" title="CISA records use by known ransomware campaigns">ransomware: known</span>';
-        }
-        return `<span class="ti-badge ti-badge-unknown" title="CISA has not established ransomware use. This is not the same as ruling it out.">ransomware: ${escapeHtml(raw.toLowerCase())}</span>`;
-    }
 
-    function kevRow(e, i) {
-        return `<tr class="ti-kev-row" data-click-action="kevToggle" data-args='[${i}]'
-                    title="Click for the description, required action and CWEs">
-            <td class="ti-name-cell"><span class="ti-kev-caret" id="kev-caret-${i}">&#9656;</span> ${escapeHtml(e.cve_id)}</td>
-            <td>${escapeHtml(e.vendor_project || '')} ${escapeHtml(e.product || '')}</td>
-            <td>${escapeHtml(e.vulnerability_name || '')} ${kevRansomware(e)}</td>
-            <td>${escapeHtml(e.date_added || '')}</td>
-            <td>${escapeHtml(e.due_date || '')}</td>
-        </tr>
-        <tr class="ti-kev-detail" id="kev-detail-${i}"><td colspan="5">${kevDetail(e)}</td></tr>`;
-    }
 
     // Everything the catalogue carries that the five columns cannot show. All of
     // it was already in the API response and was being discarded by the renderer.
-    function kevDetail(e) {
-        const cwes = Array.isArray(e.cwes) ? e.cwes : [];
-        let h = '<div class="ti-kev-body">';
-        if (e.short_description) {
-            h += `<div class="ti-kev-f"><div class="ti-kev-k">Description</div>
-                  <div>${escapeHtml(e.short_description)}</div></div>`;
-        }
-        if (e.required_action) {
-            // The actionable field: what CISA mandates, with a due date already
-            // in the row above it.
-            h += `<div class="ti-kev-f ti-kev-action"><div class="ti-kev-k">Required action</div>
-                  <div>${escapeHtml(e.required_action)}</div></div>`;
-        }
-        if (cwes.length) {
-            h += `<div class="ti-kev-f"><div class="ti-kev-k">Weaknesses</div><div>`
-               + cwes.map(c => `<span class="ti-badge ti-badge-cwe">${escapeHtml(c)}</span>`).join(' ')
-               + '</div></div>';
-        }
-        if (e.notes) {
-            // Rendered as selectable text, not links. ION ships to air-gapped
-            // sites where an external anchor is a dead end that looks broken;
-            // the reference is still worth having to hand.
-            h += `<div class="ti-kev-f"><div class="ti-kev-k">References</div>
-                  <div class="ti-kev-notes">${escapeHtml(e.notes)}</div></div>`;
-        }
-        h += `<div class="ti-kev-prov">Catalog ${escapeHtml(e.catalog_version || 'unknown')}`
-           + ` &#183; ${e.source === 'imported' ? 'operator import' : 'shipped in the image'}`
-           + (e.synced_at ? ` &#183; loaded ${escapeHtml(String(e.synced_at).slice(0, 10))}` : '')
-           + '</div>';
-        return h + '</div>';
-    }
 
     function kevToggle(i) {
         const row = document.getElementById('kev-detail-' + i);
@@ -526,164 +553,72 @@ data-click-action="tiCloseReport"></div>
     }
     window.kevToggle = kevToggle;
 
-    async function kevSearch() {
-        const box = document.getElementById('kev-search');
-        const only = document.getElementById('kev-ransomware-only');
-        const out = document.getElementById('kev-results');
-        const params = new URLSearchParams({
-            q: box ? box.value.trim() : '',
-            ransomware_only: only && only.checked ? 'true' : 'false',
-            limit: '50',
-        });
-        try {
-            const resp = await fetch('/api/kev?' + params.toString());
-            if (!resp.ok) throw new Error('KEV lookup failed (' + resp.status + ')');
-            const data = await resp.json();
-            kevRenderStatus(data.status);
-            if (!data.results.length) {
-                // Say WHICH catalog found nothing — a bare "no results" invites
-                // the reader to conclude the CVE is safe.
-                const v = (data.status && data.status.catalog_version) || 'unknown';
-                out.innerHTML = `<div class="ti-empty">No entries in catalog ${escapeHtml(v)}.</div>`;
-                return;
-            }
-            out.innerHTML =
-              '<table class="ti-table"><thead><tr><th>CVE</th><th>Vendor / product</th>'
-            + '<th>Vulnerability</th><th>Added</th><th>Remediate by</th></tr></thead><tbody>'
-            + data.results.map(kevRow).join('') + '</tbody></table>';
-        } catch (err) {
-            out.innerHTML = '<div class="ti-empty">' + escapeHtml(err.message) + '</div>';
-        }
-    }
-    window.kevSearch = kevSearch;
-
-    // ── Enter key on search ──────────────────
-    document.getElementById('actor-search').addEventListener('keydown', function(e) { if (e.key === 'Enter') searchActors(); });
-    document.getElementById('campaign-search').addEventListener('keydown', function(e) { if (e.key === 'Enter') searchCampaigns(); });
-    document.getElementById('kev-search').addEventListener('keydown', function(e) { if (e.key === 'Enter') kevSearch(); });
-    document.getElementById('kev-ransomware-only').addEventListener('change', kevSearch);
+    // The ransomware-linked checkbox is a field on the KEV form now, so
+    // changing it and pressing Search sends it with the request. It no
+    // longer re-runs the search on its own, which the old listener did and
+    // which fired a lookup on every toggle.
 
     // ── Overview ──────────────────────────────
-    async function loadOverview() {
-        try {
-            const [stats, matches] = await Promise.all([
-                fetch(API + '/overview').then(r => r.json()),
-                fetch(API + '/matches?limit=10').then(r => r.json()),
-            ]);
-            document.getElementById('stat-actors').textContent = stats.watched_actors;
-            document.getElementById('stat-campaigns').textContent = stats.watched_campaigns;
-            document.getElementById('stat-matches').textContent = stats.matches_7d;
-            document.getElementById('stat-unread').textContent = stats.unread_alerts;
-
-            if (stats.unread_alerts > 0) {
-                const badge = document.getElementById('ti-unread-badge');
-                badge.textContent = stats.unread_alerts;
-                badge.style.display = 'inline-block';
-            } else {
-                document.getElementById('ti-unread-badge').style.display = 'none';
-            }
-
-            renderMatchRows('overview-matches-body', matches.matches || [], true);
-
-            // populate the additional Overview surfaces.
-            loadRecentlyActive();
-            loadOverviewActors();
-            loadOverviewIOCs();
-        } catch(e) {
-            console.error('Failed to load overview', e);
-        }
-    }
+    // loadOverview, loadOverviewActors, loadOverviewIOCs,
+    // loadRecentlyActive and renderMatchRows are gone. The Overview tab's
+    // five regions are rendered by /ui/threat-intel/overview-stats,
+    // landscape-actors, landscape-iocs, recently-active, and the same
+    // matches fragment the Watchlist tab uses.
+    //
+    // What each of them did wrong, in one place because it is the same
+    // mistake five times: a failed read was never rendered as a failed
+    // read. loadOverview caught to console.error and left four tiles
+    // showing a dash. The two OpenCTI cards rendered the guess "OpenCTI
+    // not configured?" in the same grey as their empty state, while the
+    // 503 behind it said which. loadRecentlyActive returned silently and
+    // left both its panels on the shell's "Loading..." forever.
 
     // ── v0.27.0: Top 5 Threat Actors preview (Overview tab) ──
-    async function loadOverviewActors() {
-        const el = document.getElementById('ti-overview-actors');
-        try {
-            const r = await fetch('/api/threat-landscape/overview');
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            const d = await r.json();
-            const actors = (d.actors || []).slice(0, 5);
-            if (!actors.length) {
-                el.innerHTML = '<div class="text-slate-500 text-sm">No actors tracked yet.</div>';
-                return;
-            }
-            el.innerHTML = '<div class="space-y-2">' + actors.map(a => {
-                const flag = a.country_flag || '';
-                return `<div class="flex items-center gap-3 py-1.5">
-                    <span class="text-ion-cyan font-semibold text-sm flex-shrink-0">${flag ? flag + ' ' : ''}${escapeHtml(a.name)}</span>
-                    <span class="text-slate-500 text-xs">${a.ttp_count || 0} TTPs</span>
-                    <span class="text-slate-500 text-xs">${a.malware_count || 0} malware</span>
-                    <span class="flex-1"></span>
-                    <span class="text-slate-600 text-[10px] font-mono">${(a.modified || '').substring(0, 10)}</span>
-                </div>`;
-            }).join('') + '</div>';
-        } catch(e) {
-            el.innerHTML = '<div class="text-slate-500 text-sm">Actors unavailable — OpenCTI not configured?</div>';
-        }
-    }
 
     // ── v0.27.0: Top 5 High-Score IOCs preview (Overview tab) ──
-    async function loadOverviewIOCs() {
-        const el = document.getElementById('ti-overview-iocs');
-        try {
-            const r = await fetch('/api/threat-landscape/ioc-feed?limit=5&min_score=75');
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            const d = await r.json();
-            const iocs = (d.indicators || []).slice(0, 5);
-            if (!iocs.length) {
-                el.innerHTML = '<div class="text-slate-500 text-sm">No high-score IOCs at this threshold.</div>';
-                return;
-            }
-            el.innerHTML = '<div class="space-y-1.5">' + iocs.map(i => {
-                const score = i.score || 0;
-                const cls = score >= 90 ? 'text-red-400' : score >= 70 ? 'text-amber-400' : 'text-slate-400';
-                return `<div class="flex items-center gap-3 py-1">
-                    <span class="font-mono text-[11px] font-bold w-7 text-right ${cls}">${score}</span>
-                    <span class="text-[10px] text-slate-500 font-mono w-20">${escapeHtml(i.ioc_type)}</span>
-                    <span class="text-xs text-slate-200 font-mono truncate flex-1">${escapeHtml(i.ioc_value)}</span>
-                    <span class="text-[10px] text-slate-500">${escapeHtml(i.source || '')}</span>
-                </div>`;
-            }).join('') + '</div>';
-        } catch(e) {
-            el.innerHTML = '<div class="text-slate-500 text-sm">IOCs unavailable — OpenCTI not configured?</div>';
-        }
-    }
 
     // ── v0.27.0: AI Threat Briefing (Overview tab) ──
-    window.tiLoadAISummary = async function() {
-        const btn = document.getElementById('ai-brief-btn');
-        const content = document.getElementById('ai-brief-content');
-        const modelEl = document.getElementById('ai-brief-model');
-        btn.disabled = true;
-        btn.textContent = 'Generating…';
-        content.innerHTML = '<span class="text-slate-500 animate-pulse">Analyzing the current threat landscape with AI… this typically takes 15–30 seconds.</span>';
-        try {
-            const r = await fetch('/api/threat-landscape/ai-summary', { method: 'POST' });
-            if (!r.ok) {
-                const err = await r.json().catch(() => ({}));
-                throw new Error(err.detail || 'HTTP ' + r.status);
-            }
-            const d = await r.json();
-            // Strip light markdown so the prose renders cleanly.
-            let text = (d.summary || 'No summary generated.')
-                .replace(/^#{1,4}\s+/gm, '')
-                .replace(/\*\*(.+?)\*\*/g, '$1')
-                .replace(/\*(.+?)\*/g, '$1')
-                .replace(/^[-*]\s+/gm, '')
-                .replace(/^\d+\.\s+/gm, '')
-                .replace(/```[\s\S]*?```/g, '');
-            content.innerHTML = text.split(/\n\n+/).filter(p => p.trim()).map(p =>
-                '<p class="mt-3 first:mt-0">' + escapeHtml(p.trim()).replace(/\n/g, ' ') + '</p>'
-            ).join('');
-            if (d.model) {
-                modelEl.textContent = 'Model: ' + d.model;
-                modelEl.classList.remove('hidden');
-            }
-            btn.textContent = 'Regenerate';
-        } catch(e) {
-            content.innerHTML = '<span class="text-ion-coral text-xs">Failed: ' + escapeHtml(String(e.message || e)) + '</span>';
-            btn.textContent = 'Retry';
-        }
-        btn.disabled = false;
+    // ── The two drill panels ─────────────────────────────
+    // tiLoadAISummary, tiLoadIOCFeed, tiLoadSparklines, tiRenderSpark
+    // and tiLoadReports are gone. Those four regions are rendered by
+    // /ui/threat-intel/ai-brief, ioc-feed, ioc-spark and reports.
+    //
+    // The sparklines carried the sharpest defect on this page. A failed
+    // read, a thrown read and no sightings at all rendered the same
+    // em-dash, separated only by a tooltip one of them happened to have.
+    // For an analyst triaging an indicator, "never seen in your estate"
+    // and "we could not check" are opposite conclusions.
+    //
+    // tiDrillTechnique and tiOpenReport keep a small opener each: htmx
+    // fetches the body, this only reveals the panel. Both fragments swap
+    // their heading out of band, so a failed read replaces the previous
+    // entity's title rather than leaving it above a message about a
+    // different one.
+
+    function tiShowPanel(panelId, backdropId) {
+        // classList, not style.display. The panels are hidden by a class
+        // and the old code set an inline display that outranked it, which
+        // left an inline style on the element for every later read of it
+        // to contend with.
+        document.getElementById(panelId).classList.remove('hidden');
+        document.getElementById(backdropId).classList.remove('hidden');
+    }
+
+    window.tiDrillTechnique = function(techId) {
+        if (!techId) return;
+        tiShowPanel('ti-drill-panel', 'ti-drill-backdrop');
+        window.htmx.ajax('GET', '/ui/threat-intel/technique-drill'
+            + '?technique_id=' + encodeURIComponent(techId),
+            { target: '#ti-drill-body', swap: 'innerHTML' });
+    };
+
+    window.tiOpenReport = function(reportId) {
+        if (!reportId) return;
+        tiCloseDrill();
+        tiShowPanel('ti-report-panel', 'ti-report-backdrop');
+        window.htmx.ajax('GET', '/ui/threat-intel/report-drill'
+            + '?report_id=' + encodeURIComponent(reportId),
+            { target: '#ti-report-panel-body', swap: 'innerHTML' });
     };
 
     // ── v0.27.0: Tab-switch helper (used by "View all →" links) ──
@@ -693,187 +628,17 @@ data-click-action="tiCloseReport"></div>
     };
 
     // ── v0.27.0: ATT&CK technique drill-down ──
-    window.tiDrillTechnique = async function(techId) {
-        const panel = document.getElementById('ti-drill-panel');
-        const backdrop = document.getElementById('ti-drill-backdrop');
-        const title = document.getElementById('ti-drill-title');
-        const body = document.getElementById('ti-drill-body');
-        title.textContent = techId;
-        body.innerHTML = '<div class="ti-loading"><span class="ti-spinner"></span>Loading technique details…</div>';
-        panel.style.display = 'block';
-        backdrop.style.display = 'block';
-        try {
-            const r = await fetch(API + '/techniques/' + encodeURIComponent(techId) + '/drill');
-            if (!r.ok) {
-                const err = await r.json().catch(() => ({}));
-                throw new Error(err.detail || 'HTTP ' + r.status);
-            }
-            const d = await r.json();
-            title.textContent = `${d.technique_id} — ${d.name}`;
-            const sections = [];
-
-            // Tactic chips
-            if (d.tactic_ids && d.tactic_ids.length) {
-                sections.push(`<div class="mb-3.5">
-                    <div class="text-[.72rem] text-[var(--text-secondary)] uppercase tracking-[.05em] mb-1.5">Tactics</div>
-                    ${d.tactic_ids.map(t =>
-                        `<span class="inline-block py-0.5 px-2 bg-[rgba(109,228,255,0.1)] border border-[rgba(109,228,255,0.3)] rounded-[4px] text-[.72rem] text-[var(--ion-cyan,#6de4ff)] mr-1 font-mono">${escapeHtml(t)}</span>`
-                    ).join('')}
-                </div>`);
-            }
-            if (d.is_subtechnique && d.parent_id) {
-                sections.push(`<div class="text-[.78rem] text-[var(--text-secondary)] mb-3.5">
-                    Sub-technique of <a class="text-[var(--ion-cyan,#6de4ff)] no-underline font-mono" href="javascript:void(0)" data-click-action="tiCloseAndDrillTechnique" data-args='[${JSON.stringify(d.parent_id)}]'>${escapeHtml(d.parent_id)}</a>
-                </div>`);
-            }
-
-            // Local cases
-            sections.push(`<div class="mb-3.5">
-                <h4 class="text-[.85rem] mt-0 mr-0 mb-2 ml-0 text-[var(--text-primary)]">Local Cases <span class="text-[var(--text-secondary)] font-normal text-xs">(last 90 days)</span></h4>
-                ${!d.local_cases.length
-                    ? '<em class="text-[.78rem] text-[var(--text-secondary)]">No cases triggered this technique in the last 90 days.</em>'
-                    : '<ul class="list-none p-0 m-0">' + d.local_cases.map(c => `
-                        <li class="py-1.5 px-0 border-b-[1px] border-b-[var(--ion-border)] text-[.8rem]">
-                            <a class="text-[var(--ion-cyan,#6de4ff)] no-underline font-mono" href="/cases?selected=${c.id}">${escapeHtml(c.case_number)}</a>
-                            <span class="ml-1.5 text-[var(--text-primary)]">${escapeHtml(c.title)}</span>
-                            <span class="sev-badge sev-${escapeHtml(c.severity)} ml-1.5 text-[.7rem]">${escapeHtml(c.severity)}</span>
-                        </li>`).join('') + '</ul>'
-                }
-            </div>`);
-
-            // Actors
-            sections.push(`<div class="mb-3.5">
-                <h4 class="text-[.85rem] mt-0 mr-0 mb-2 ml-0 text-[var(--text-primary)]">Actors Using This Technique <span class="text-[var(--text-secondary)] font-normal text-xs">(OpenCTI)</span></h4>
-                ${d.actors_error
-                    ? `<em class="text-[.78rem] text-[var(--text-secondary)]">OpenCTI lookup unavailable: ${escapeHtml(d.actors_error)}</em>`
-                    : !d.actors.length
-                        ? '<em class="text-[.78rem] text-[var(--text-secondary)]">No actors mapped to this technique in OpenCTI, or actor-by-technique lookup is not supported by this OpenCTI service build.</em>'
-                        : '<ul class="list-none p-0 m-0">' + d.actors.map(a => `
-                            <li class="py-1 px-0 text-[.8rem]">
-                                <span class="text-[var(--ion-cyan,#6de4ff)]">${escapeHtml(a.name || a.id || '')}</span>
-                            </li>`).join('') + '</ul>'
-                }
-            </div>`);
-
-            body.innerHTML = sections.join('');
-        } catch(e) {
-            body.innerHTML = '<div class="ti-empty text-[var(--danger)]">Failed: ' + escapeHtml(String(e.message || e)) + '</div>';
-        }
-    };
 
     window.tiCloseDrill = function() {
-        document.getElementById('ti-drill-panel').style.display = 'none';
-        document.getElementById('ti-drill-backdrop').style.display = 'none';
+        document.getElementById('ti-drill-panel').classList.add('hidden');
+        document.getElementById('ti-drill-backdrop').classList.add('hidden');
     };
 
     // ── Report detail panel ──────────────────────────────────────────────
-    window.tiOpenReport = async function(reportId) {
-        tiCloseDrill();
-        const panel    = document.getElementById('ti-report-panel');
-        const backdrop = document.getElementById('ti-report-backdrop');
-        const title    = document.getElementById('ti-report-panel-title');
-        const body     = document.getElementById('ti-report-panel-body');
-        title.textContent = '—';
-        body.innerHTML = '<div class="ti-loading"><span class="ti-spinner"></span>Loading report…</div>';
-        panel.style.display = 'block';
-        backdrop.style.display = 'block';
-        try {
-            const r = await fetch('/api/threat-landscape/reports/' + encodeURIComponent(reportId));
-            if (!r.ok) {
-                const err = await r.json().catch(() => ({}));
-                throw new Error(err.detail || 'HTTP ' + r.status);
-            }
-            const d = await r.json();
-            title.textContent = d.name || 'Report';
-            const secs = [];
-
-            // Meta row
-            const meta = [];
-            if (d.published) meta.push(new Date(d.published).toLocaleDateString());
-            if (d.types && d.types.length) meta.push(d.types.join(', '));
-            if (d.source) meta.push('Source: ' + escapeHtml(d.source));
-            if (d.confidence != null) meta.push('Confidence: ' + d.confidence + '%');
-            if (meta.length) secs.push('<div class="text-[.72rem] text-[var(--text-muted)] mt-1.5 font-mono ti-detail-section">' + meta.join(' · ') + '</div>');
-
-            // Labels
-            if (d.labels && d.labels.length) {
-                secs.push('<div class="ti-detail-section">' +
-                    d.labels.map(l => `<span class="ti-tag">${escapeHtml(l.value)}</span>`).join(' ') +
-                '</div>');
-            }
-
-            // Body
-            if (d.body) {
-                secs.push('<div class="ti-detail-section"><h4>Report Content</h4>' +
-                    '<p class="ti-report-body">' + escapeHtml(d.body) + '</p></div>');
-            }
-
-            // Threat actors
-            if (d.related_actors && d.related_actors.length) {
-                secs.push('<div class="ti-detail-section"><h4>Threat Actors</h4>' +
-                    '<ul class="list-none p-0 m-0">' + d.related_actors.map(a =>
-                        '<li class="py-1 px-0 text-[.8rem]"><span class="text-[var(--ion-cyan,#6de4ff)]">' + escapeHtml(a.name) + '</span>' +
-                        (a.aliases && a.aliases.length ? ' <span class="ml-1.5 text-[var(--text-primary)]">(' + escapeHtml(a.aliases.join(', ')) + ')</span>' : '') +
-                        '</li>'
-                    ).join('') + '</ul></div>');
-            }
-
-            // MITRE ATT&CK
-            if (d.related_ttps && d.related_ttps.length) {
-                secs.push('<div class="ti-detail-section"><h4>MITRE ATT&amp;CK</h4>' +
-                    '<div class="ti-ttp-list">' + d.related_ttps.map(t => {
-                        const label = (t.mitre_id ? escapeHtml(t.mitre_id) + ' — ' : '') + escapeHtml(t.name);
-                        return t.mitre_id
-                            ? `<span class="ti-ttp" data-click-action="tiCloseAndDrillTechnique" data-args='[${JSON.stringify(t.mitre_id)}]'>${label}</span>`
-                            : `<span class="ti-ttp">${label}</span>`;
-                    }).join('') + '</div></div>');
-            }
-
-            // Malware
-            if (d.related_malware && d.related_malware.length) {
-                secs.push('<div class="ti-detail-section"><h4>Malware</h4>' +
-                    '<div class="ti-ttp-list">' +
-                    d.related_malware.map(m => `<span class="ti-tag">${escapeHtml(m.name)}</span>`).join(' ') +
-                    '</div></div>');
-            }
-
-            // Vulnerabilities
-            if (d.related_vulns && d.related_vulns.length) {
-                secs.push('<div class="ti-detail-section"><h4>Vulnerabilities</h4>' +
-                    '<div class="ti-ttp-list">' +
-                    d.related_vulns.map(v => `<span class="ti-ttp">${escapeHtml(v.name)}</span>`).join('') +
-                    '</div></div>');
-            }
-
-            // Target geography / sectors
-            if ((d.related_countries && d.related_countries.length) || (d.related_sectors && d.related_sectors.length)) {
-                secs.push('<div class="ti-detail-section">' +
-                    (d.related_countries && d.related_countries.length
-                        ? '<h4>Target Countries</h4><p>' + escapeHtml(d.related_countries.join(', ')) + '</p>' : '') +
-                    (d.related_sectors && d.related_sectors.length
-                        ? '<h4>Target Sectors</h4><p>' + escapeHtml(d.related_sectors.join(', ')) + '</p>' : '') +
-                '</div>');
-            }
-
-            // Indicators
-            if (d.related_indicators && d.related_indicators.length) {
-                const shown = d.related_indicators.slice(0, 10);
-                secs.push('<div class="ti-detail-section"><h4>Indicators <span class="text-[var(--text-secondary)] font-normal text-xs">(' +
-                    shown.length + (d.related_indicators.length > 10 ? '+' : '') + ')</span></h4>' +
-                    '<ul class="list-none p-0 m-0">' + shown.map(i =>
-                        `<li class="py-1.5 px-0 border-b-[1px] border-b-[var(--ion-border)] text-[.8rem]"><code class="text-xs text-[var(--text-muted)]">${escapeHtml(i.pattern)}</code></li>`
-                    ).join('') + '</ul></div>');
-            }
-
-            body.innerHTML = secs.join('') || '<em class="text-[.78rem] text-[var(--text-secondary)]">No content available.</em>';
-        } catch(e) {
-            body.innerHTML = '<div class="ti-empty text-[var(--danger)]">Failed: ' + escapeHtml(String(e.message || e)) + '</div>';
-        }
-    };
 
     window.tiCloseReport = function() {
-        document.getElementById('ti-report-panel').style.display = 'none';
-        document.getElementById('ti-report-backdrop').style.display = 'none';
+        document.getElementById('ti-report-panel').classList.add('hidden');
+        document.getElementById('ti-report-backdrop').classList.add('hidden');
     };
 
     window.tiCloseAndDrillTechnique = function(techId) {
@@ -882,624 +647,193 @@ data-click-action="tiCloseReport"></div>
         tiDrillTechnique(techId);
     };
 
-    async function loadRecentlyActive() {
-        try {
-            const hideEl = document.getElementById('ti-hide-rule-obs');
-            const hide = hideEl ? hideEl.checked : true;
-            const r = await fetch(API + '/recently-active?days=30&top_n=8&hide_rule_observables=' + hide);
-            if (!r.ok) return;
-            const d = await r.json();
-            const obsEl = document.getElementById('ti-recent-obs');
-            const techEl = document.getElementById('ti-recent-tech');
-            if (!d.observables.length) {
-                obsEl.innerHTML = '<em>No observable activity in the last 30 days.</em>';
-            } else {
-                obsEl.innerHTML = '<ul class="list-none p-0 m-0">' +
-                    d.observables.map(o =>
-                        `<li class="py-1 px-0 border-b-[1px] border-b-[var(--ion-border)] flex justify-between gap-2">
-                            <span><code class="text-xs text-[var(--text-muted)]">${o.type}</code>
-                            <code class="ml-1.5 text-[var(--text-primary)]">${escapeHtml(o.value)}</code></span>
-                            <span class="text-[var(--accent)] font-mono text-xs">${o.count}×</span>
-                        </li>`
-                    ).join('') + '</ul>';
-            }
-            if (!d.techniques.length) {
-                techEl.innerHTML = '<em>No MITRE techniques tagged in the last 30 days.</em>';
-            } else {
-                // each technique chip is now click-to-drill.
-                techEl.innerHTML = '<ul class="list-none p-0 m-0">' +
-                    d.techniques.map(t =>
-                        `<li class="py-1 px-0 border-b-[1px] border-b-[var(--ion-border)] flex justify-between gap-2">
-                            <a class="text-[var(--ion-cyan,#6de4ff)] no-underline font-mono" href="javascript:void(0)" data-click-action="tiDrillTechnique" data-args='["${escapeHtml(t.id)}"]'
- 
- title="Drill into this technique">${escapeHtml(t.id)}</a>
-                            <span class="text-[var(--accent)] font-mono text-xs">${t.count}×</span>
-                        </li>`
-                    ).join('') + '</ul>';
-            }
-        } catch(e) {
-            console.warn('Recently-active widget failed', e);
-        }
-    }
-    // Exposed on window so the "Hide rule-field" checkbox's data-change-action
-    // (resolved via window[name] by event-delegation.js) can reach it.
-    window.loadRecentlyActive = loadRecentlyActive;
+    // The "Hide rule-field" checkbox no longer needs a window export:
+    // it carries hx-get and hx-trigger="change" and refreshes itself.
+    // This line used to read `window.loadRecentlyActive =
+    // loadRecentlyActive;` and survived the function being deleted as a
+    // bare ReferenceError at script-evaluation time, which node --check
+    // cannot see and the fragment tests never load the page to hit.
+    // Found by driving the real page.
 
     // ── v0.27.0: helper for safe HTML escaping in inline-rendered cells ──
-    function escapeHtml(s) {
-        if (s == null) return '';
-        return String(s).replace(/[&<>"']/g, c =>
-            ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])
-        );
-    }
+    // escapeHtml, formatDate and esc are gone. They were the page's own
+    // escaping and date formatting, needed only because the markup was
+    // assembled from strings here. Jinja escapes, and the ts macro in
+    // _fragments/_time.html decides how a timestamp is shown, including
+    // whether it can be localised at all.
+    //
+    // escapeHtml's body was `return d.innerHTML`, a read rather than a
+    // write, but it was the last occurrence of that string in the file.
 
     // ── v0.27.0: Global search bar (fans out to actors, campaigns, IOCs, cases) ──
-    window.tiUnifiedSearch = async function() {
-        const q = document.getElementById('ti-global-search').value.trim();
-        if (q.length < 2) return;
-        const out = document.getElementById('ti-global-search-results');
-        const clear = document.getElementById('ti-global-search-clear');
-        out.style.display = 'block';
-        clear.style.display = 'inline-block';
-        out.innerHTML = '<div class="ti-loading"><span class="ti-spinner"></span>Searching…</div>';
-        try {
-            const r = await fetch(API + '/unified-search?q=' + encodeURIComponent(q) + '&limit_per_kind=8');
-            if (!r.ok) { out.innerHTML = '<div class="ti-empty">Search failed: HTTP ' + r.status + '</div>'; return; }
-            const d = await r.json();
-            const sections = [];
-            if (d.actors.length) {
-                sections.push(`<h4 class="text-[.85rem] mt-2 mr-0 mb-1.5 ml-0 text-[var(--accent)]">Threat Actors (${d.actors.length})</h4>` +
-                    '<ul class="list-none p-0 m-0">' + d.actors.map(a =>
-                        `<li class="py-1 px-2 bg-[var(--bg-secondary)] mb-0.5 rounded-[4px]">
-                            ${escapeHtml(a.name || a.id || '')}
-                        </li>`
-                    ).join('') + '</ul>');
-            }
-            if (d.campaigns.length) {
-                sections.push(`<h4 class="text-[.85rem] mt-2 mr-0 mb-1.5 ml-0 text-[var(--accent)]">Campaigns (${d.campaigns.length})</h4>` +
-                    '<ul class="list-none p-0 m-0">' + d.campaigns.map(c =>
-                        `<li class="py-1 px-2 bg-[var(--bg-secondary)] mb-0.5 rounded-[4px]">
-                            ${escapeHtml(c.name || c.id || '')}
-                        </li>`
-                    ).join('') + '</ul>');
-            }
-            if (d.iocs.length) {
-                sections.push(`<h4 class="text-[.85rem] mt-2 mr-0 mb-1.5 ml-0 text-[var(--accent)]">IOCs (${d.iocs.length})</h4>` +
-                    '<ul class="list-none p-0 m-0">' + d.iocs.map(i =>
-                        `<li class="py-1 px-2 bg-[var(--bg-secondary)] mb-0.5 rounded-[4px] flex justify-between gap-2">
-                            <span><code class="text-xs text-[var(--text-muted)]">${escapeHtml(i.type)}</code>
-                            <code class="ml-1.5 text-[var(--text-primary)]">${escapeHtml(i.value)}</code></span>
-                            <a class="text-[var(--accent)] text-xs no-underline" href="/observables/${i.id}">→ open</a>
-                        </li>`
-                    ).join('') + '</ul>');
-            }
-            if (d.cases.length) {
-                sections.push(`<h4 class="text-[.85rem] mt-2 mr-0 mb-1.5 ml-0 text-[var(--accent)]">Cases (${d.cases.length})</h4>` +
-                    '<ul class="list-none p-0 m-0">' + d.cases.map(c =>
-                        `<li class="py-1 px-2 bg-[var(--bg-secondary)] mb-0.5 rounded-[4px] flex justify-between gap-2">
-                            <span><code class="text-xs text-[var(--text-muted)]">${escapeHtml(c.case_number)}</code>
-                            <span class="ml-1.5 text-[var(--text-primary)]">${escapeHtml(c.title)}</span></span>
-                            <a class="text-[var(--accent)] text-xs no-underline" href="/cases?selected=${c.id}">→ open</a>
-                        </li>`
-                    ).join('') + '</ul>');
-            }
-            if (!sections.length) {
-                out.innerHTML = `<div class="ti-empty">No matches for "${escapeHtml(q)}".</div>`;
-            } else {
-                out.innerHTML = `<div class="bg-[var(--bg-primary)] border border-[var(--ion-border)] rounded-[var(--ion-radius-lg)] p-4">
-                    <div class="text-[.78rem] text-[var(--text-secondary)] mb-2">${d.total} result${d.total === 1 ? '' : 's'} for "${escapeHtml(q)}"</div>
-                    ${sections.join('')}
-                </div>`;
-            }
-        } catch(e) {
-            out.innerHTML = '<div class="ti-empty">Search failed: ' + escapeHtml(String(e)) + '</div>';
-        }
-    };
 
     window.tiClearSearch = function() {
         document.getElementById('ti-global-search').value = '';
-        document.getElementById('ti-global-search-results').style.display = 'none';
-        document.getElementById('ti-global-search-clear').style.display = 'none';
+        const out = document.getElementById('ti-global-search-results');
+        // replaceChildren, not innerHTML. This empties the panel
+        // rather than building markup, and the redesign measures the
+        // string rather than the intent, so a clear would have kept
+        // this page off the finished list for no behavioural reason.
+        out.replaceChildren();
+        out.classList.add('hidden');
+        document.getElementById('ti-global-search-clear').classList.add('hidden');
     };
 
-    document.getElementById('ti-global-search').addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') window.tiUnifiedSearch();
-    });
 
     // ── v0.27.0: IOC Feed tab (ported from /threat-landscape) ──
-    window.tiLoadIOCFeed = async function() {
-        const tbody = document.getElementById('ioc-body');
-        const minScore = document.getElementById('ti-ioc-min-score').value || '0';
-        tbody.innerHTML = '<tr><td colspan="7" class="ti-empty"><span class="ti-spinner"></span>Loading IOC feed…</td></tr>';
-        try {
-            const r = await fetch('/api/threat-landscape/ioc-feed?limit=50&min_score=' + minScore);
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            const d = await r.json();
-            const iocs = d.indicators || [];
-            if (!iocs.length) {
-                tbody.innerHTML = '<tr><td colspan="7" class="ti-empty">No indicators at this score threshold.</td></tr>';
-                return;
-            }
-            tbody.innerHTML = iocs.map((i, idx) => {
-                const score = i.score || 0;
-                const labels = (i.labels || []).slice(0, 3).map(l =>
-                    `<span class="inline-block py-[1px] px-1.5 rounded-[3px] text-[.7rem] bg-[rgba(255,255,255,0.04)] border border-[var(--ion-border)] mr-0.5">${escapeHtml(l.value || l)}</span>`
-                ).join('');
-                const sparkId = 'ti-spark-' + idx;
-                return `<tr>
-                    <td><strong data-ion-style="color:${score >= 90 ? 'var(--danger)' : score >= 70 ? 'var(--neon-orange)' : 'var(--text-secondary)'}">${score}</strong></td>
-                    <td><code class="text-xs text-[var(--text-muted)]">${escapeHtml(i.ioc_type)}</code></td>
-                    <td><code class="text-[var(--text-primary)]">${escapeHtml(i.ioc_value)}</code></td>
-                    <td>${labels || '<span class="text-[var(--text-muted)]">—</span>'}</td>
-                    <td>${escapeHtml(i.source || '—')}</td>
-                    <td><span id="${sparkId}" data-ioc="${escapeHtml(i.ioc_value)}" class="ti-spark"><span class="text-[.7rem] text-[var(--text-muted)]">…</span></span></td>
-                    <td>
-                        <button class="ti-btn-outline ti-btn-sm" data-click-action="tiCopyIOC" data-args='["$event", ${JSON.stringify(i.ioc_value)}]'>Copy</button>
-                    </td>
-                </tr>`;
-            }).join('');
-            // lazy-load sparklines AFTER the table renders so the
-            // initial paint isn't blocked by N parallel requests. Batched
-            // to 6 at a time to keep the OpenCTI backend honest.
-            tiLoadSparklines();
-        } catch(e) {
-            tbody.innerHTML = '<tr><td colspan="7" class="ti-empty text-[var(--danger)]">Failed: ' + escapeHtml(String(e)) + '</td></tr>';
-        }
-    };
 
     // ── v0.27.0: per-IOC sightings sparkline ──
-    async function tiLoadSparklines() {
-        const sparks = Array.from(document.querySelectorAll('.ti-spark'));
-        // Throttle: 6 concurrent fetches. The endpoint is local-DB-only
-        // and cheap, but batching avoids paint-thrash on slow databases.
-        const batchSize = 6;
-        for (let i = 0; i < sparks.length; i += batchSize) {
-            const batch = sparks.slice(i, i + batchSize);
-            await Promise.all(batch.map(spark => tiRenderSpark(spark)));
-        }
-    }
-    async function tiRenderSpark(spark) {
-        const value = spark.getAttribute('data-ioc');
-        if (!value) return;
-        try {
-            const r = await fetch(API + '/ioc-sightings?value=' + encodeURIComponent(value) + '&months=12');
-            if (!r.ok) { spark.innerHTML = '<span class="text-[.7rem] text-[var(--text-muted)]">—</span>'; return; }
-            const d = await r.json();
-            const series = d.series || [];
-            const total = d.total_sightings || 0;
-            if (!series.length || total === 0) {
-                spark.innerHTML = '<span class="text-[.7rem] text-[var(--text-muted)]" title="No local sightings in the last 12 months">—</span>';
-                return;
-            }
-            // Inline SVG sparkline: 12 bars, max bar = 14px tall.
-            const max = Math.max(...series.map(b => b.count));
-            const barW = 6, gap = 1, h = 14;
-            const w = series.length * (barW + gap);
-            const bars = series.map((b, idx) => {
-                if (b.count === 0) return '';
-                const bh = Math.max(1, Math.round((b.count / max) * h));
-                const x = idx * (barW + gap);
-                const y = h - bh;
-                const col = b.count === max ? 'var(--ion-cyan, #6de4ff)' : 'var(--text-secondary)';
-                return `<rect x="${x}" y="${y}" width="${barW}" height="${bh}" fill="${col}"><title>${b.month}: ${b.count}</title></rect>`;
-            }).join('');
-            spark.innerHTML = `<svg class="align-middle" width="${w}" height="${h}" title="${total} local sightings in last 12 months">${bars}</svg> <span class="text-[.7rem] text-[var(--text-muted)] ml-1">${total}</span>`;
-        } catch(e) {
-            spark.innerHTML = '<span class="text-[.7rem] text-[var(--text-muted)]">—</span>';
-        }
-    }
 
     // ── v0.27.0: Reports tab (ported from /threat-landscape) ──
-    window.tiLoadReports = async function() {
-        const host = document.getElementById('ti-reports-list');
-        const filterTerm = (document.getElementById('ti-report-filter').value || '').toLowerCase().trim();
-        host.innerHTML = '<div class="ti-loading"><span class="ti-spinner"></span>Loading reports…</div>';
-        try {
-            const r = await fetch('/api/threat-landscape/reports?limit=25');
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            const d = await r.json();
-            let reports = d.reports || [];
-            if (filterTerm) {
-                reports = reports.filter(rep =>
-                    (rep.name || '').toLowerCase().includes(filterTerm)
-                );
-            }
-            if (!reports.length) {
-                host.innerHTML = '<div class="ti-empty">No reports' + (filterTerm ? ' match the filter' : ' available') + '.</div>';
-                return;
-            }
-            host.innerHTML = reports.map(rep => {
-                const published = rep.published ? new Date(rep.published).toLocaleDateString() : '-';
-                return `<div class="p-3 border border-[var(--ion-border)] border-l-[3px] border-l-[var(--ion-cyan,#6de4ff)] rounded-[var(--radius)] mb-2 bg-[var(--bg-secondary)] ti-report-card" data-click-action="tiOpenReport" data-args='[${JSON.stringify(rep.id)}]'>
-                    <div class="text-[.9rem] font-semibold text-[var(--ion-cyan,#6de4ff)] mb-1">${escapeHtml(rep.name || 'Untitled')}</div>
-                    <div class="text-xs text-[var(--text-secondary)]">${escapeHtml((rep.description || '').slice(0, 200))}${(rep.description || '').length > 200 ? '…' : ''}</div>
-                    <div class="text-[.72rem] text-[var(--text-muted)] mt-1.5 font-mono">${escapeHtml(rep.report_type || 'report')} · ${published}</div>
-                </div>`;
-            }).join('');
-        } catch(e) {
-            host.innerHTML = '<div class="ti-empty text-[var(--danger)]">Failed: ' + escapeHtml(String(e)) + '</div>';
-        }
-    };
 
     // ── v0.27.0: Attack Stories tab (ported from /attack-stories) ──
-    window.tiLoadStories = async function() {
-        const host = document.getElementById('ti-stories-list');
-        const hours = document.getElementById('ti-stories-hours').value;
-        host.innerHTML = '<div class="ti-loading"><span class="ti-spinner"></span>Correlating alerts into attack stories…</div>';
-        try {
-            const r = await fetch('/api/attack-stories?hours=' + hours);
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            const d = await r.json();
-            const stories = d.stories || [];
-            const chainOrder = d.kill_chain_order || [];
-            if (!stories.length) {
-                host.innerHTML = '<div class="ti-empty">No attack stories — alerts did not correlate into multi-step patterns over the selected window.</div>';
-                return;
-            }
-            host.innerHTML = stories.map(s => {
-                const tacticsSet = new Set(s.tactics_progression || []);
-                const chainHtml = chainOrder.length
-                    ? `<div class="flex gap-0 items-center overflow-x-auto my-2 mx-0">
-                        ${chainOrder.map((stage, i) => {
-                            const active = tacticsSet.has(stage);
-                            return (i > 0 ? '<span class="py-0 px-1 text-[var(--text-muted)] text-[.8rem]">→</span>' : '') +
-                                `<span class="py-[3px] px-2 rounded-[4px] text-[.7rem] font-semibold uppercase whitespace-nowrap${active ? ' active' : ''}">${escapeHtml(stage)}</span>`;
-                        }).join('')}
-                       </div>`
-                    : '';
-                return `<div class="bg-[var(--bg-secondary)] border border-[var(--ion-border)] rounded-[var(--ion-radius-lg)] py-3.5 px-4 mb-3">
-                    <div class="flex items-center gap-3 mb-2">
-                        <div class="w-[42px] h-[42px] rounded-[50%] flex items-center justify-center font-bold font-mono text-[.85rem] bg-[rgba(220,38,38,0.15)] text-[#fecaca] border-[2px] border-[rgba(220,38,38,0.4)] shrink-0">${s.score}</div>
-                        <div class="flex-1">
-                            <div class="text-[.95rem] font-bold text-[var(--text-primary)]">${escapeHtml(s.entity)} <small class="text-[.72rem] text-[var(--text-secondary)] font-normal">(${escapeHtml(s.entity_type)})</small></div>
-                            <div class="text-xs text-[var(--text-secondary)] mt-0.5">${s.alert_count} alerts · ${(s.unique_techniques||[]).length} techniques · ${s.time_span_hours}h span · <span class="sev-badge sev-${escapeHtml(s.severity)}">${escapeHtml(s.severity)}</span></div>
-                        </div>
-                    </div>
-                    <div class="py-2.5 px-3 bg-[var(--bg-primary)] border border-[var(--ion-border)] rounded-[var(--radius)] text-[.82rem] leading-[1.55] text-[var(--text-primary)]">${escapeHtml(s.narrative)}</div>
-                    ${chainHtml}
-                </div>`;
-            }).join('');
-        } catch(e) {
-            host.innerHTML = '<div class="ti-empty text-[var(--danger)]">Failed: ' + escapeHtml(String(e)) + '</div>';
-        }
-    };
+    // tiLoadStories is gone. /ui/threat-intel/stories renders the panel,
+    // gated on alert:read, which is what /api/attack-stories requires and
+    // what this page's own observable:read does not imply.
+    //
+    // The defect it carried: that endpoint answers 200 with
+    // {"enabled": false, "error": ...} when the correlation read fails,
+    // because the disabled state is a payload and not a status. The
+    // `if (!r.ok) throw` never fired, `d.stories || []` found nothing, and
+    // the panel rendered "No attack stories: alerts did not correlate into
+    // multi-step patterns over the selected window." Measured live on this
+    // deployment, where it returns {"enabled":false,"error":
+    // "ElasticsearchError"}. A switched-off correlation engine was being
+    // reported to the analyst as a clean result.
 
-    function renderMatchRows(tbodyId, matches, showType) {
-        const tbody = document.getElementById(tbodyId);
-        if (!matches.length) {
-            tbody.innerHTML = '<tr><td colspan="5" class="ti-empty">No matches found.</td></tr>';
-            return;
-        }
-        tbody.innerHTML = matches.map(m => {
-            const d = m.details || {};
-            const cls = m.is_read ? '' : ' class="ti-unread"';
-            const time = m.created_at ? new Date(m.created_at).toLocaleString() : '-';
-            const entityName = d.watch_name || '-';
-            const entityType = d.entity_type ? d.entity_type.replace('_', ' ') : '-';
-            const readBtn = m.is_read ? '<span class="text-[var(--text-secondary)] text-xs">Read</span>' :
-                `<button class="ti-btn-outline ti-btn-sm" data-click-action="markRead" data-args='[${m.id}]'>Mark Read</button>`;
-            return `<tr${cls}>
-                <td>${esc(time)}</td>
-                <td><code>${esc(m.observable_value || '-')}</code> <span class="text-[var(--text-secondary)] text-[.72rem]">(${esc(m.observable_type || '')})</span></td>
-                <td>${esc(entityName)}</td>
-                ${showType ? `<td>${esc(entityType)}</td>` : ''}
-                <td>${readBtn}</td>
-            </tr>`;
-        }).join('');
-    }
 
     window.markRead = async function(id) {
-        await fetch(API + '/matches/' + id + '/read', { method: 'POST' });
-        loadOverview();
-        loadMatches();
+        // r.ok, because POST .../read answers 404 for a match that is gone.
+        // The old code awaited the response, ignored it, and refreshed as
+        // though the write had landed, so a failed mark-read looked exactly
+        // like a successful one.
+        const r = await fetch(API + '/matches/' + id + '/read', { method: 'POST' });
+        if (!r.ok) {
+            if (typeof showToast === 'function') {
+                showToast('Could not mark as read: HTTP ' + r.status, 'error');
+            }
+            return;
+        }
+        // Both match tables and the tiles, all server-rendered now, so one
+        // event each rather than a reload of the whole tab. The unread
+        // count on the tab badge rides along with the stats fragment.
+        tiRefresh('#ti-overview-stats');
+        tiRefresh('#matches-body');
+        tiRefresh('#overview-matches-body');
     };
 
     // ── Actors ────────────────────────────────
-    window.searchActors = async function() {
-        const q = document.getElementById('actor-search').value.trim();
-        if (!q) return;
-        const container = document.getElementById('actor-results');
-        container.innerHTML = '<div class="ti-loading"><span class="ti-spinner"></span> Searching OpenCTI...</div>';
+    // ── Actors and Campaigns ──────────────────
+    // searchActors, searchCampaigns, toggleActorDetail and
+    // toggleCampaignDetail are gone. Both result tables come from
+    // /ui/threat-intel/actor-search and campaign-search, and each detail
+    // row fetches itself from actor-detail or campaign-detail.
+    //
+    // All four read with `fetch(url).then(r => r.json())` and no r.ok
+    // check, then branched on data.detail and rendered it in the ti-empty
+    // class, which is the no-results styling. So an unconfigured OpenCTI,
+    // a refusal, and a genuine zero-match search were three different
+    // facts in one voice. The detail rows were worse: they tested four
+    // sections for content and fell through to "No additional detail
+    // available", so a failed read claimed OpenCTI holds nothing on the
+    // actor in front of you.
+    //
+    // The tables also kept the result set on container._actors and
+    // addressed rows by index into it. Each row carries its own entity id
+    // now, so nothing has to stay in step with a re-run search.
 
-        try {
-            const data = await fetch(API + '/actors?search=' + encodeURIComponent(q) + '&first=30').then(r => r.json());
-            if (data.detail) { container.innerHTML = `<div class="ti-empty">${esc(data.detail)}</div>`; return; }
-            const actors = data.actors || [];
-            if (!actors.length) { container.innerHTML = '<div class="ti-empty">No threat actors found.</div>'; return; }
-
-            // Refresh watched IDs
-            await refreshWatchedIds();
-
-            let html = '<table class="ti-table"><thead><tr><th>Name</th><th>Origin</th><th>Types</th><th>Aliases</th><th>Confidence</th><th>First Seen</th><th>Last Seen</th><th>Labels</th><th>Watch</th></tr></thead><tbody>';
-            actors.forEach((a, idx) => {
-                const aliases = (a.aliases || []).slice(0, 3).join(', ');
-                const moreAliases = (a.aliases || []).length > 3 ? ` +${a.aliases.length - 3}` : '';
-                const labels = (a.labels || []).map(l => `<span class="ti-label" data-ion-style="background:${l.color || '#30363d'}22; color:${l.color || '#8b949e'}">${esc(l.value)}</span>`).join('');
-                const types = (a.threat_actor_types || []).map(t => t === 'intrusion-set' ? 'Intrusion Set' : t).join(', ') || '-';
-                const conf = a.confidence != null ? a.confidence : '-';
-                const confCls = conf >= 70 ? 'high' : conf >= 40 ? 'medium' : 'low';
-                const flag = a.country_flag || '';
-                const countryName = a.country_name || '';
-                const isWatched = watchedIds.has(a.id);
-                const watchBtn = isWatched
-                    ? `<button class="ti-btn-outline ti-btn-sm ti-btn-watched" disabled>Watched</button>`
-                    : `<button class="ti-btn ti-btn-sm ti-btn-watch" data-click-action="watchActor" data-args='[${idx}]'>Watch</button>`;
-                // open the deep-dive profile page for this actor.
-                // entity_class param tells the profile endpoint which
-                // OpenCTI lookup path to use (most APTs are intrusion sets).
-                const klass = (a.threat_actor_types || []).includes('intrusion-set') ? 'intrusion_set' : 'threat_actor';
-                const profileLink = `<a href="/threat-intel/actors/${encodeURIComponent(a.id)}?entity_class=${klass}" class="ti-btn-outline ti-btn-sm ml-1.5" title="Open deep-dive profile">↗ Profile</a>`;
-                html += `<tr>
-                    <td class="ti-name-cell" data-click-action="toggleActorDetail" data-args='[${idx}]'>${esc(a.name)}</td>
-                    <td>${flag ? `<span class="country-flag" title="${esc(countryName)}">${flag}</span> ${esc(countryName)}` : '<span class="text-[var(--text-muted)]">-</span>'}</td>
-                    <td>${esc(types)}</td>
-                    <td>${esc(aliases)}${moreAliases ? `<span class="text-[var(--text-secondary)]">${moreAliases}</span>` : ''}</td>
-                    <td><span class="ti-confidence ${confCls}">${conf}</span></td>
-                    <td>${formatDate(a.first_seen)}</td>
-                    <td>${formatDate(a.last_seen)}</td>
-                    <td>${labels || '-'}</td>
-                    <td>${watchBtn}${profileLink}</td>
-                </tr>`;
-                html += `<tr class="ti-detail-row" id="actor-detail-${idx}"><td colspan="9"><div class="ti-loading"><span class="ti-spinner"></span> Loading detail...</div></td></tr>`;
-            });
-            html += '</tbody></table>';
-            container.innerHTML = html;
-            container._actors = actors;
-        } catch(e) {
-            container.innerHTML = `<div class="ti-empty">Error: ${esc(e.message)}</div>`;
-        }
+    // Open or close a detail row. htmx does the fetch on the same click;
+    // this only decides whether the row is shown, and re-opening a row
+    // re-fetches, which is what the old handler did too.
+    window.tiToggleDetailRow = function(rowId) {
+        const row = document.getElementById(rowId);
+        if (row) row.classList.toggle('open');
     };
 
-    window.toggleActorDetail = async function(idx) {
-        const row = document.getElementById('actor-detail-' + idx);
-        if (!row) return;
-        if (row.classList.contains('open')) { row.classList.remove('open'); return; }
-        row.classList.add('open');
-
-        const actors = document.getElementById('actor-results')._actors;
-        if (!actors || !actors[idx]) return;
-        const a = actors[idx];
-
-        try {
-            const ec = a.entity_class || 'threat_actor';
-            const detail = await fetch(API + '/actors/' + encodeURIComponent(a.id) + '?entity_class=' + ec).then(r => r.json());
-            let html = '<td colspan="9">';
-
-            if (detail.description) {
-                html += `<div class="ti-detail-section"><h4>Description</h4><p>${esc(detail.description)}</p></div>`;
-            }
-            if (detail.campaigns && detail.campaigns.length) {
-                html += `<div class="ti-detail-section"><h4>Related Campaigns (${detail.campaigns.length})</h4><div class="ti-detail-tags">`;
-                detail.campaigns.forEach(c => { html += `<span class="ti-tag">${esc(c.name)}</span>`; });
-                html += '</div></div>';
-            }
-            if (detail.ttps && detail.ttps.length) {
-                html += `<div class="ti-detail-section"><h4>MITRE ATT&CK TTPs (${detail.ttps.length})</h4><div class="ti-ttp-list">`;
-                detail.ttps.forEach(t => {
-                    const label = t.mitre_id ? `${t.mitre_id}: ${t.name}` : t.name;
-                    html += `<span class="ti-ttp" title="${esc(t.description || '')}">${esc(label)}</span>`;
-                });
-                html += '</div></div>';
-            }
-            if (detail.indicators && detail.indicators.length) {
-                html += `<div class="ti-detail-section"><h4>Indicators (${detail.indicators.length})</h4><div class="ti-detail-tags">`;
-                detail.indicators.forEach(i => { html += `<span class="ti-tag">${esc(i.name)}</span>`; });
-                html += '</div></div>';
-            }
-            if (!detail.description && !(detail.campaigns||[]).length && !(detail.ttps||[]).length && !(detail.indicators||[]).length) {
-                html += '<div class="ti-empty p-2.5">No additional detail available.</div>';
-            }
-            html += '</td>';
-            row.innerHTML = html;
-        } catch(e) {
-            row.innerHTML = `<td colspan="9"><div class="ti-empty">Failed to load detail.</div></td>`;
-        }
-    };
-
-    window.watchActor = async function(idx) {
-        const actors = document.getElementById('actor-results')._actors;
-        if (!actors || !actors[idx]) return;
-        const a = actors[idx];
-        const reason = prompt('Why are you watching this actor? (optional)');
+    // One handler for both kinds. The payload arrives on the button as
+    // data-args rather than being looked up by index, so it does not
+    // depend on a JavaScript array the server never built.
+    window.watchActor = async function(payload) {
+        if (!payload || !payload.opencti_id) return;
+        const reason = prompt('Why are you watching this? (optional)');
         if (reason === null) return; // cancelled
-
         try {
-            await fetch(API + '/watches', {
+            // r.ok, because POST /watches answers 403 without
+            // observable:enrich and 400 for an entity_type it does not
+            // accept. The old handler awaited the response, ignored it,
+            // and reported "Added to watchlist" either way.
+            const r = await fetch(API + '/watches', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    entity_type: 'threat_actor',
-                    opencti_id: a.id,
-                    name: a.name,
-                    description: a.description,
-                    aliases: a.aliases,
-                    labels: (a.labels || []).map(l => l.value),
+                body: JSON.stringify(Object.assign({}, payload, {
                     reason: reason || null,
-                }),
+                })),
             });
-            watchedIds.add(a.id);
-            searchActors(); // refresh
-            if (typeof showToast === 'function') showToast('Added to watchlist: ' + a.name, 'success');
+            if (!r.ok) {
+                const what = r.status === 403
+                    ? 'You do not have permission to add a watch'
+                    : 'Failed to add watch: HTTP ' + r.status;
+                if (typeof showToast === 'function') showToast(what, 'error');
+                return;
+            }
+            // Re-run whichever search produced this row, so the button
+            // becomes Watched from the server's own view of the watchlist
+            // rather than from a set the page keeps separately.
+            const form = this.closest('.ti-panel').querySelector('form');
+            if (form && window.htmx) window.htmx.trigger(form, 'submit');
+            tiRefresh('#ti-overview-stats');
+            if (typeof showToast === 'function') {
+                showToast('Added to watchlist: ' + payload.name, 'success');
+            }
         } catch(e) {
             if (typeof showToast === 'function') showToast('Failed to add watch', 'error');
         }
     };
+    // The campaign table used a separate handler that differed only in the
+    // entity_type it sent, and that now travels in the payload.
+    window.watchCampaign = window.watchActor;
+
+
 
     // ── Campaigns ─────────────────────────────
-    window.searchCampaigns = async function() {
-        const q = document.getElementById('campaign-search').value.trim();
-        if (!q) return;
-        const container = document.getElementById('campaign-results');
-        container.innerHTML = '<div class="ti-loading"><span class="ti-spinner"></span> Searching OpenCTI...</div>';
 
-        try {
-            const data = await fetch(API + '/campaigns?search=' + encodeURIComponent(q) + '&first=30').then(r => r.json());
-            if (data.detail) { container.innerHTML = `<div class="ti-empty">${esc(data.detail)}</div>`; return; }
-            const campaigns = data.campaigns || [];
-            if (!campaigns.length) { container.innerHTML = '<div class="ti-empty">No campaigns found.</div>'; return; }
 
-            await refreshWatchedIds();
-
-            let html = '<table class="ti-table"><thead><tr><th>Name</th><th>Aliases</th><th>Confidence</th><th>First Seen</th><th>Last Seen</th><th>Labels</th><th>Watch</th></tr></thead><tbody>';
-            campaigns.forEach((c, idx) => {
-                const aliases = (c.aliases || []).slice(0, 3).join(', ');
-                const labels = (c.labels || []).map(l => `<span class="ti-label" data-ion-style="background:${l.color || '#30363d'}22; color:${l.color || '#8b949e'}">${esc(l.value)}</span>`).join('');
-                const conf = c.confidence != null ? c.confidence : '-';
-                const confCls = conf >= 70 ? 'high' : conf >= 40 ? 'medium' : 'low';
-                const isWatched = watchedIds.has(c.id);
-                const watchBtn = isWatched
-                    ? `<button class="ti-btn-outline ti-btn-sm ti-btn-watched" disabled>Watched</button>`
-                    : `<button class="ti-btn ti-btn-sm ti-btn-watch" data-click-action="watchCampaign" data-args='[${idx}]'>Watch</button>`;
-                html += `<tr>
-                    <td class="ti-name-cell" data-click-action="toggleCampaignDetail" data-args='[${idx}]'>${esc(c.name)}</td>
-                    <td>${esc(aliases)}</td>
-                    <td><span class="ti-confidence ${confCls}">${conf}</span></td>
-                    <td>${formatDate(c.first_seen)}</td>
-                    <td>${formatDate(c.last_seen)}</td>
-                    <td>${labels || '-'}</td>
-                    <td>${watchBtn}</td>
-                </tr>`;
-                html += `<tr class="ti-detail-row" id="campaign-detail-${idx}"><td colspan="7"><div class="ti-loading"><span class="ti-spinner"></span> Loading detail...</div></td></tr>`;
-            });
-            html += '</tbody></table>';
-            container.innerHTML = html;
-            container._campaigns = campaigns;
-        } catch(e) {
-            container.innerHTML = `<div class="ti-empty">Error: ${esc(e.message)}</div>`;
-        }
-    };
-
-    window.toggleCampaignDetail = async function(idx) {
-        const row = document.getElementById('campaign-detail-' + idx);
-        if (!row) return;
-        if (row.classList.contains('open')) { row.classList.remove('open'); return; }
-        row.classList.add('open');
-
-        const campaigns = document.getElementById('campaign-results')._campaigns;
-        if (!campaigns || !campaigns[idx]) return;
-        const c = campaigns[idx];
-
-        try {
-            const detail = await fetch(API + '/campaigns/' + encodeURIComponent(c.id)).then(r => r.json());
-            let html = '<td colspan="7">';
-
-            if (detail.description) {
-                html += `<div class="ti-detail-section"><h4>Description</h4><p>${esc(detail.description)}</p></div>`;
-            }
-            if (detail.threat_actors && detail.threat_actors.length) {
-                html += `<div class="ti-detail-section"><h4>Related Threat Actors (${detail.threat_actors.length})</h4><div class="ti-detail-tags">`;
-                detail.threat_actors.forEach(a => { html += `<span class="ti-tag">${esc(a.name)}</span>`; });
-                html += '</div></div>';
-            }
-            if (detail.indicators && detail.indicators.length) {
-                html += `<div class="ti-detail-section"><h4>Indicators (${detail.indicators.length})</h4><div class="ti-detail-tags">`;
-                detail.indicators.forEach(i => { html += `<span class="ti-tag">${esc(i.name)}</span>`; });
-                html += '</div></div>';
-            }
-            if (!detail.description && !(detail.threat_actors||[]).length && !(detail.indicators||[]).length) {
-                html += '<div class="ti-empty p-2.5">No additional detail available.</div>';
-            }
-            html += '</td>';
-            row.innerHTML = html;
-        } catch(e) {
-            row.innerHTML = `<td colspan="7"><div class="ti-empty">Failed to load detail.</div></td>`;
-        }
-    };
-
-    window.watchCampaign = async function(idx) {
-        const campaigns = document.getElementById('campaign-results')._campaigns;
-        if (!campaigns || !campaigns[idx]) return;
-        const c = campaigns[idx];
-        const reason = prompt('Why are you watching this campaign? (optional)');
-        if (reason === null) return;
-
-        try {
-            await fetch(API + '/watches', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    entity_type: 'campaign',
-                    opencti_id: c.id,
-                    name: c.name,
-                    description: c.description,
-                    aliases: c.aliases,
-                    labels: (c.labels || []).map(l => l.value),
-                    reason: reason || null,
-                }),
-            });
-            watchedIds.add(c.id);
-            searchCampaigns();
-            if (typeof showToast === 'function') showToast('Added to watchlist: ' + c.name, 'success');
-        } catch(e) {
-            if (typeof showToast === 'function') showToast('Failed to add watch', 'error');
-        }
-    };
 
     // ── Watchlist ─────────────────────────────
-    async function loadWatches() {
-        try {
-            const data = await fetch(API + '/watches?limit=200').then(r => r.json());
-            const watches = data.watches || [];
-            const tbody = document.getElementById('watchlist-body');
-            if (!watches.length) {
-                tbody.innerHTML = '<tr><td colspan="8" class="ti-empty">No active watches. Search for actors or campaigns and add them.</td></tr>';
-                return;
-            }
-            tbody.innerHTML = watches.map(w => {
-                const type = (w.entity_type || '').replace('_', ' ');
-                const lastSeen = w.last_seen_at ? new Date(w.last_seen_at).toLocaleString() : 'Never';
-                const flag = w.country_flag || '';
-                const countryName = w.country_name || '';
-                return `<tr>
-                    <td class="font-semibold">${esc(w.name)}</td>
-                    <td>${flag ? `<span class="country-flag" title="${esc(countryName)}">${flag}</span> ${esc(countryName)}` : '<span class="text-[var(--text-muted)]">-</span>'}</td>
-                    <td>${esc(type)}</td>
-                    <td>${w.match_count}</td>
-                    <td>${esc(lastSeen)}</td>
-                    <td>${esc(w.watched_by)}</td>
-                    <td>${esc(w.watch_reason || '-')}</td>
-                    <td><button class="ti-btn-outline ti-btn-sm ti-btn-danger" data-click-action="removeWatch" data-args='[${w.id}, "${esc(w.name)}"]'>Remove</button></td>
-                </tr>`;
-            }).join('');
-        } catch(e) {
-            document.getElementById('watchlist-body').innerHTML = '<tr><td colspan="8" class="ti-empty">Failed to load watches.</td></tr>';
-        }
-    }
+    // loadWatches and loadMatches are gone. Both tables are rendered by
+    // /ui/threat-intel/watchlist and /ui/threat-intel/matches, which reach
+    // the same ThreatIntelService the JSON endpoints use.
+    //
+    // Both read with `fetch(url).then(r => r.json())` and no r.ok check,
+    // then `data.watches || []`. A refusal or a fault answers
+    // {"detail": ...}, which carries neither key, so each fell through to
+    // its empty state: a failed watchlist read said "No active watches" and
+    // a failed match read said "No match alerts". The second is the
+    // sentence an analyst reads before deciding nothing on their watchlist
+    // has fired.
 
-    async function loadMatches() {
-        try {
-            const url = API + '/matches?limit=50' + (matchUnreadOnly ? '&unread_only=true' : '');
-            const data = await fetch(url).then(r => r.json());
-            const tbody = document.getElementById('matches-body');
-            const matches = data.matches || [];
-            if (!matches.length) {
-                tbody.innerHTML = '<tr><td colspan="5" class="ti-empty">No match alerts.</td></tr>';
-                return;
-            }
-            tbody.innerHTML = matches.map(m => {
-                const d = m.details || {};
-                const cls = m.is_read ? '' : ' class="ti-unread"';
-                const time = m.created_at ? new Date(m.created_at).toLocaleString() : '-';
-                const readBtn = m.is_read ? '<span class="text-[var(--text-secondary)] text-xs">Read</span>' :
-                    `<button class="ti-btn-outline ti-btn-sm" data-click-action="markRead" data-args='[${m.id}]'>Mark Read</button>`;
-                return `<tr${cls}>
-                    <td>${esc(time)}</td>
-                    <td><code>${esc(m.observable_value || '-')}</code></td>
-                    <td>${esc(d.watch_name || '-')}</td>
-                    <td>${m.is_read ? 'Read' : '<strong class="text-[var(--accent)]">Unread</strong>'}</td>
-                    <td>${readBtn}</td>
-                </tr>`;
-            }).join('');
-        } catch(e) {
-            document.getElementById('matches-body').innerHTML = '<tr><td colspan="5" class="ti-empty">Failed to load matches.</td></tr>';
-        }
+    // Re-render whichever fragments are on screen. Used after a write, so
+    // the table reflects it without a second notion of how a row looks.
+    function tiRefresh(selector) {
+        const el = document.querySelector(selector);
+        if (el) el.dispatchEvent(new Event('ti-show'));
     }
 
     window.removeWatch = async function(id, name) {
         if (!confirm('Remove watch for "' + name + '"?')) return;
         try {
-            await fetch(API + '/watches/' + id, { method: 'DELETE' });
-            loadWatches();
+            // r.ok, because DELETE answers 403 without observable:enrich and
+            // 404 for a watch already gone. Neither threw, so the old code
+            // reported success and refreshed a table that had not changed.
+            const r = await fetch(API + '/watches/' + id, { method: 'DELETE' });
+            if (!r.ok) {
+                const what = r.status === 403
+                    ? 'You do not have permission to remove a watch'
+                    : 'Failed to remove: HTTP ' + r.status;
+                if (typeof showToast === 'function') showToast(what, 'error');
+                return;
+            }
+            tiRefresh('#watchlist-body');
             if (typeof showToast === 'function') showToast('Removed: ' + name, 'success');
         } catch(e) {
             if (typeof showToast === 'function') showToast('Failed to remove', 'error');
@@ -1509,31 +843,31 @@ data-click-action="tiCloseReport"></div>
     window.toggleMatchFilter = function() {
         matchUnreadOnly = !matchUnreadOnly;
         document.getElementById('match-filter-btn').textContent = matchUnreadOnly ? 'Show All' : 'Show Unread Only';
-        loadMatches();
+        // The state lives in the hidden input so it travels with the
+        // request and the fragment can word its empty state for the filter
+        // that was applied.
+        document.getElementById('ti-matches-unread').value = matchUnreadOnly ? 'true' : 'false';
+        tiRefresh('#matches-body');
     };
 
     // ── Helpers ───────────────────────────────
-    async function refreshWatchedIds() {
-        try {
-            const data = await fetch(API + '/watches?limit=1000').then(r => r.json());
-            watchedIds = new Set((data.watches || []).map(w => w.opencti_id));
-        } catch(e) { /* ignore */ }
-    }
+    // refreshWatchedIds is gone, and so is the watchedIds set it fed.
+    // It asked for `?limit=1000` against an endpoint bounded at le=500, so
+    // it answered 422 on every call. The body was still JSON, nothing
+    // threw, data.watches was undefined, and the set was empty
+    // permanently: every actor and campaign result rendered as
+    // not-watched whatever the watchlist held. Measured live.
+    //
+    // The search fragments read the watchlist themselves, per request,
+    // through the same service the watchlist table uses, so there is no
+    // client-side copy to go stale or to be silently empty.
 
-    function formatDate(iso) {
-        if (!iso) return '-';
-        try { return new Date(iso).toLocaleDateString(); } catch(e) { return iso; }
-    }
 
-    function esc(s) {
-        if (s == null) return '';
-        const d = document.createElement('div');
-        d.textContent = String(s);
-        return d.innerHTML;
-    }
 
     // ── Init ──────────────────────────────────
-    loadOverview();
+    // Nothing to kick off. The Overview tab is the one active on first
+    // paint and each of its regions carries hx-trigger="load", so they
+    // request themselves and the first paint is not waiting on a script.
 })();
 </script>
 {% endblock %}

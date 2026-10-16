@@ -20,8 +20,20 @@
     <div class="card-body p-0">
         <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-base-300">
             <h2 class="card-title text-base basis-full md:basis-auto">Activity Log</h2>
+            {# The filters live here, not in the fragment, so a swap cannot
+               reset the viewer's choice. Each one requests the fragment
+               itself and sends both values, and neither sends an offset, so
+               changing a filter returns to the first page. That is the
+               behaviour the old JavaScript had, by way of a currentPage
+               variable it reset by hand. #}
             <div class="flex items-center gap-2 flex-wrap">
-                <select id="filter-action" class="select select-sm w-auto" data-change-action="loadLogs">
+                <select id="filter-action" name="action"
+                        class="select select-sm w-auto"
+                        hx-get="/ui/audit-logs"
+                        hx-trigger="change"
+                        hx-include="#filter-action, #filter-resource"
+                        hx-target="#logs-panel"
+                        hx-swap="innerHTML">
                     <option value="">All Actions</option>
                     <option value="login">Login</option>
                     <option value="logout">Logout</option>
@@ -33,37 +45,46 @@
                     <option value="user_roles_updated">Roles Updated</option>
                     <option value="password_reset">Password Reset</option>
                 </select>
-                <select id="filter-resource" class="select select-sm w-auto" data-change-action="loadLogs">
+                <select id="filter-resource" name="resource_type"
+                        class="select select-sm w-auto"
+                        hx-get="/ui/audit-logs"
+                        hx-trigger="change"
+                        hx-include="#filter-action, #filter-resource"
+                        hx-target="#logs-panel"
+                        hx-swap="innerHTML">
                     <option value="">All Resources</option>
                     <option value="user">User</option>
                     <option value="template">Template</option>
                     <option value="document">Document</option>
                 </select>
-                <button class="btn btn-primary btn-sm" data-click-action="loadLogs">Refresh</button>
+                <button class="btn btn-primary btn-sm"
+                        hx-get="/ui/audit-logs"
+                        hx-include="#filter-action, #filter-resource"
+                        hx-target="#logs-panel"
+                        hx-swap="innerHTML">Refresh</button>
             </div>
         </div>
-        <div class="overflow-x-auto">
-            <table class="table table-sm" id="logs-table">
-                <thead>
-                    <tr>
-                        <th>Timestamp</th>
-                        <th>User</th>
-                        <th>Action</th>
-                        <th>Resource</th>
-                        <th>Details</th>
-                        <th>IP Address</th>
-                    </tr>
-                </thead>
-                <tbody id="logs-tbody">
-                    <tr><td colspan="6"><div class="flex justify-center items-center gap-2 py-8 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading audit logs...</div></td></tr>
-                </tbody>
-            </table>
+
+        {# Rendered by ion.web.ui.audit_logs. The rows, the details badges
+           and the pager used to be built from template literals, with the
+           secret filter running in a browser that already held the values
+           it was hiding. #}
+        {# A failed request is handled by static/js/htmx-errors.js, which
+           clones the alert template in base.html into this container. It used
+           to be a page-local htmx:responseError listener plus two hidden
+           divs, which is one copy per page of a decision about what an
+           expired session means. #}
+        <div id="logs-panel"
+             hx-get="/ui/audit-logs"
+             hx-trigger="load"
+             hx-include="#filter-action, #filter-resource"
+             hx-swap="innerHTML">
+          <div class="flex justify-center items-center gap-2 py-8 text-center opacity-50">
+            <span class="loading loading-spinner loading-sm text-primary"></span>
+            Loading audit logs...
+          </div>
         </div>
-        <div class="flex flex-wrap items-center justify-center gap-3 px-4 py-3 border-t border-base-300" id="pagination">
-            <button class="btn btn-ghost btn-sm" id="prev-page" data-click-action="prevPage" disabled>Previous</button>
-            <span id="page-info" class="text-sm opacity-70">Page 1</span>
-            <button class="btn btn-ghost btn-sm" id="next-page" data-click-action="nextPage">Next</button>
-        </div>
+
     </div>
 </div>
 
@@ -71,122 +92,3 @@
 </div><!-- /ion-tw -->
 {% endblock %}
 
-{% block scripts %}
-<script nonce="{{ csp_nonce }}">
-let currentPage = 0;
-const pageSize = 50;
-let hasMoreLogs = true;
-
-const ACTION_BADGE = {
-    login: 'badge-success',
-    logout: 'badge-ghost',
-    login_failed: 'badge-error',
-    password_changed: 'badge-info',
-    password_reset: 'badge-info',
-    user_created: 'badge-warning',
-    user_updated: 'badge-warning',
-    user_deleted: 'badge-warning',
-    user_roles_updated: 'badge-warning',
-};
-
-async function loadLogs() {
-    const action = document.getElementById('filter-action').value;
-    const resourceType = document.getElementById('filter-resource').value;
-    const tbody = document.getElementById('logs-tbody');
-
-    tbody.innerHTML = '<tr><td colspan="6"><div class="flex justify-center items-center gap-2 py-8 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading audit logs...</div></td></tr>';
-
-    const params = new URLSearchParams({
-        limit: pageSize,
-        offset: currentPage * pageSize
-    });
-    if (action) params.append('action', action);
-    if (resourceType) params.append('resource_type', resourceType);
-
-    try {
-        const response = await fetch(`/api/audit-logs?${params}`);
-
-        if (response.status === 401) {
-            window.location.href = '/login?redirect=/audit-logs';
-            return;
-        }
-        if (response.status === 403) {
-            tbody.innerHTML = '<tr><td colspan="6"><div class="alert alert-warning m-4">Access denied. Admin privileges required.</div></td></tr>';
-            return;
-        }
-
-        const logs = await response.json();
-        hasMoreLogs = logs.length === pageSize;
-
-        if (logs.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center opacity-50 py-8">No audit logs found</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = logs.map(log => `
-            <tr>
-                <td class="whitespace-nowrap font-mono text-xs">${new Date(log.timestamp).toLocaleString()}</td>
-                <td>${log.username ? escapeHtml(log.username) : '<em class="opacity-60">System</em>'}</td>
-                <!-- action and resource fields are normally
-                     internal strings, but a future audit producer that
-                     stores user-supplied resource names (case titles,
-                     custom checklist items, etc.) could land attacker-
-                     controlled content here. Escape defensively. -->
-                <td><span class="badge badge-sm ${ACTION_BADGE[log.action] || 'badge-ghost'}">${escapeHtml(formatAction(log.action))}</span></td>
-                <td>${log.resource_type ? `${escapeHtml(String(log.resource_type))}${log.resource_id ? ' #' + escapeHtml(String(log.resource_id)) : ''}` : '-'}</td>
-                <td class="max-w-xs"><div class="flex flex-wrap gap-1">${formatDetails(log.details)}</div></td>
-                <td class="font-mono text-xs">${escapeHtml(String(log.ip_address || '-'))}</td>
-            </tr>
-        `).join('');
-
-        updatePagination();
-    } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="6"><div class="alert alert-error m-4">Error loading audit logs</div></td></tr>';
-    }
-}
-
-function formatAction(action) {
-    return action.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-}
-
-function formatDetails(details) {
-    if (!details) return '-';
-
-    if (typeof details === 'object') {
-        const items = Object.entries(details)
-            .filter(([key]) => !['password', 'token', 'hash'].some(s => key.toLowerCase().includes(s)))
-            .map(([key, value]) => {
-                const formattedKey = key.replace(/_/g, ' ');
-                const formattedValue = typeof value === 'object' ? JSON.stringify(value) : value;
-                return `<span class="badge badge-ghost badge-sm font-normal h-auto py-1 whitespace-normal"><strong>${formattedKey}:</strong> ${escapeHtml(String(formattedValue))}</span>`;
-            });
-        return items.join(' ');
-    }
-
-    return escapeHtml(String(details));
-}
-
-function updatePagination() {
-    document.getElementById('page-info').textContent = `Page ${currentPage + 1}`;
-    document.getElementById('prev-page').disabled = currentPage === 0;
-    document.getElementById('next-page').disabled = !hasMoreLogs;
-}
-
-function prevPage() {
-    if (currentPage > 0) {
-        currentPage--;
-        loadLogs();
-    }
-}
-
-function nextPage() {
-    if (hasMoreLogs) {
-        currentPage++;
-        loadLogs();
-    }
-}
-
-// Initialize
-loadLogs();
-</script>
-{% endblock %}

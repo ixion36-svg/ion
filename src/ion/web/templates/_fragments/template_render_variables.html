@@ -1,0 +1,157 @@
+{# The template's variables as a form, and the three buttons that act on it.
+
+   Replaces two of template_render.html's eight innerHTML sites: the whole
+   variables form and its "this template has no variables" state. With them
+   went a nine-regex field-type guesser, three hard-coded option lists, a
+   36-word list deciding which variables get a textarea, and a label
+   formatter, all of which now live in ion.web.ui.template_render.
+
+   The three buttons are here rather than in the page shell, against the
+   usual rule, because all three act on this form: there is nothing to
+   auto-fill, preview or save when the form did not render. The page shell
+   keeps Reload, which is the control that recovers from that.
+
+   Save as Document is rendered only for a viewer who holds
+   document:create, which is what POST /api/templates/{id}/render requires.
+   The page offered the button to every viewer and let the server answer
+   403, so the only way to find out was to click it.
+
+   The template's name is swapped into the page heading out of band. The
+   heading is at the top of the page, nowhere near this target, and a second
+   request for one word would be a second thing that can fail. Every branch
+   below swaps it, so the heading never keeps saying "Loading..." after a
+   read that will not finish.
+
+   No timestamp and no SQLEnum column reach this fragment, so the `ts` macro
+   and `ui._shared.plain` have no site: a variable row is a name, a type
+   string, a boolean and two text columns. The `safe_url` filter has no site
+   either, because nothing here is a stored link. #}
+
+{% if failed %}
+  <span id="template-name" hx-swap-oob="true">could not be read</span>
+  <div role="alert" class="alert alert-error">
+    <div>
+      <p class="font-semibold mb-1">This template could not be read.</p>
+      <p>
+        So its variables are unknown, which is not the same as the template
+        having none. Nothing can be rendered or saved from this form. Use
+        Reload to try the read again.
+      </p>
+    </div>
+  </div>
+{% elif not_found %}
+  <span id="template-name" hx-swap-oob="true">no such template</span>
+  <div role="alert" class="alert alert-warning">
+    <div>
+      <p class="font-semibold mb-1">There is no template {{ template_id }}.</p>
+      <p>The read succeeded and found nothing, which is different from a read
+      that failed. It may have been deleted.</p>
+    </div>
+  </div>
+{% else %}
+  <span id="template-name" hx-swap-oob="true">{{ name }}</span>
+
+  {% if not variables.fields %}
+    <p class="text-base-content/60">This template has no variables. The content
+    will render as-is.</p>
+  {% else %}
+    {# A count, never truthiness. Zero undescribed variables is the good
+       news this line exists to deliver, and `{% if variables.undescribed %}`
+       renders that case identically to never having counted. #}
+    {% if variables.undescribed is not none and variables.undescribed > 0 %}
+      <p class="text-xs text-base-content/60 mb-3">
+        {{ variables.undescribed }} of these {{ variables.total }} fields are
+        used by the template but not declared by it, so their input type is
+        guessed from the variable's name and nothing is known about whether
+        they are required.
+      </p>
+    {% endif %}
+
+    {% for field in variables.fields %}
+      {# data-autofill marks a field Auto-fill Defaults clears and refills,
+         so the button has one selector instead of re-deriving the field
+         kind from the variable's name the way the page did. #}
+      <div class="form-group variable-field" data-field-type="{{ field.kind }}"
+           {% if field.auto_fill %}data-autofill{% endif %}>
+        <label for="var-{{ field.name }}">{{ field.label }}
+          {# Three states, because the template declares three different
+             things. Required; declared and not required; and not declared at
+             all, which the page rendered the same as not required. Deleting
+             the middle branch is what a mutation has to do to break this:
+             weakening the first condition changes nothing while `is false`
+             still catches the undeclared case. #}
+          {% if field.required is true %}
+            <span class="required" title="The template declares this variable as required">*</span>
+          {% elif field.required is false %}
+            <span class="text-xs opacity-50" title="The template declares this variable as optional">optional</span>
+          {% endif %}
+          {% if field.auto_fill %}
+            <span class="auto-badge">Auto</span>
+          {% endif %}
+        </label>
+
+        {% if field.input == 'date' %}
+          <input type="date" id="var-{{ field.name }}" name="{{ field.name }}"
+                 class="variable-input" value="{{ field.default if field.default is not none else '' }}"
+                 {% if field.default is not none %}data-autofill-default="{{ field.default }}"{% endif %}
+                 data-input-action="syncFormToJson" data-change-action="syncFormToJson">
+        {% elif field.input == 'number' %}
+          <input type="number" id="var-{{ field.name }}" name="{{ field.name }}"
+                 min="0" class="variable-input" placeholder="0"
+                 value="{{ field.default if field.default is not none else '' }}"
+                 {% if field.default is not none %}data-autofill-default="{{ field.default }}"{% endif %}
+                 data-input-action="syncFormToJson" data-change-action="syncFormToJson">
+        {% elif field.input == 'textarea' %}
+          <textarea id="var-{{ field.name }}" name="{{ field.name }}" rows="6"
+                    placeholder="{{ field.placeholder }}" class="variable-input"
+                    {% if field.default is not none %}data-autofill-default="{{ field.default }}"{% endif %}
+                    data-input-action="syncFormToJson"
+                    data-change-action="syncFormToJson">{{ field.default if field.default is not none else '' }}</textarea>
+        {% elif field.input in ('select', 'options') %}
+          <select id="var-{{ field.name }}" name="{{ field.name }}" class="variable-input"
+                  {% if field.default is not none %}data-autofill-default="{{ field.default }}"{% endif %}
+                  data-change-action="syncFormToJson">
+            <option value="">{{ field.prompt }}</option>
+            {% for option in field.options %}
+              <option value="{{ option }}"
+                      {% if field.default is not none and option == field.default %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+          </select>
+        {% else %}
+          <input type="text" id="var-{{ field.name }}" name="{{ field.name }}"
+                 placeholder="{{ field.placeholder }}" class="variable-input"
+                 value="{{ field.default if field.default is not none else '' }}"
+                 {% if field.default is not none %}data-autofill-default="{{ field.default }}"{% endif %}
+                 data-input-action="syncFormToJson" data-change-action="syncFormToJson">
+        {% endif %}
+
+        {% if field.hint %}
+          <span class="field-hint">{{ field.hint }}</span>
+        {% endif %}
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="flex flex-wrap gap-2 mt-6">
+    {# Auto-fill restores the defaults this render computed, read off each
+       field's own data-autofill-default, so the button cannot put in a
+       different value from the one the first paint showed. The page
+       recomputed them from a second call to detectFieldType. #}
+    <button type="button" id="autofill-btn" class="btn btn-ghost"
+            data-click-action="autoFillDefaults">Auto-fill Defaults</button>
+    <button type="button" class="btn btn-primary"
+            hx-post="/ui/template-render/output"
+            hx-include="#render-template-id"
+            hx-target="#output-container"
+            hx-swap="innerHTML">Preview</button>
+    {% if can_save %}
+      <button type="button" class="btn btn-success"
+              data-click-action="saveAsDocument">Save as Document</button>
+    {% else %}
+      <p class="text-xs opacity-60 self-center">
+        Saving a rendered document needs the document:create permission,
+        which this account does not hold.
+      </p>
+    {% endif %}
+  </div>
+{% endif %}

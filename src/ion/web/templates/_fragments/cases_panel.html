@@ -1,0 +1,347 @@
+{% macro fig(value, why) %}
+{%- if value is not none %}{{ value }}
+{%- else %}<span class="an-absent" title="{{ why }}"></span>{% endif %}
+{% endmacro %}
+{% macro unreadable(what) %}
+<div class="cpanel-empty-hint">The {{ what }} is not in a shape this page
+  can read, so whether this case has any is unknown.</div>
+{% endmacro %}
+{# The case detail panel, from ui/cases.py's panel_view.
+
+   renderPanelContent was 408 lines returning one string into
+   body.innerHTML, inside a try that also covered applyConfidenceMeters,
+   switchPanelTab and selectCaseAlert. Its own comment admitted a throw in
+   any of them landed indistinguishably, on a request that returned 200.
+
+   Two couplings survive deliberately. The alert rail's order is decided
+   server-side, so data-first-alert-id tells the page which alert to
+   select rather than it re-deriving the sort and disagreeing with the
+   rail. And the notes carry their raw text, because markdown rendering
+   stays client-side: ION has no HTML sanitiser, which
+   ui/template_render.py records.
+#}
+{%- if state != 'data' %}
+<div class="cpanel-empty-hint">This case could not be read.</div>
+{%- else %}
+<div class="cpanel-sev-strip sev-{{ severity }}">
+  <span class="cpanel-sev-icon"><i class="{{ severity_icon }}"></i></span>
+  <span class="cpanel-sev-text">{{ severity }} severity</span>
+  <span class="cpanel-sev-detail">
+    {%- if alert_count is not none %}{{ alert_count }}
+      alert{% if alert_count != 1 %}s{% endif %}
+    {%- else %}<span class="an-absent" title="The alert list is not readable"></span>
+      alerts{% endif %}
+    &middot;
+    {%- if observable_count is not none %} {{ observable_count }}
+      observable{% if observable_count != 1 %}s{% endif %}
+    {%- else %} <span class="an-absent"
+        title="The observable list is not readable"></span> observables
+    {%- endif %}
+    &middot; {{ fig(age, 'No creation time recorded') }} old
+  </span>
+</div>
+{#- Filled by loadCaseSyncStatus, and empty when nothing has drifted.
+    Above the tabs on purpose: a case whose Kibana mirror is behind is
+    misleading on every tab, not just one. -#}
+<div id="case-sync-status"></div>
+<div class="cpanel-tab-nav">
+  {%- for t in tabs %}
+  <button type="button" class="cpanel-tab-btn{% if loop.first %} active{% endif %}"
+          data-tab="{{ t.key }}" data-click-action="switchPanelTab"
+          data-args='{{ [t.key]|tojson }}'
+          {% if t.key == 'actions' %}id="cpanel-actions-tab-btn"{% endif %}>
+    {{- t.label }}{% if t.count is not none %} ({{ t.count }}){% endif -%}
+  </button>
+  {%- endfor %}
+</div>
+<div class="cpanel-section" data-tab="overview">
+  <div class="cpanel-section-title">Metadata</div>
+  <div class="cpanel-meta-grid">
+    <div class="cpanel-meta-item"><label>Status</label>
+      <select data-change-action="panelUpdateField"
+              data-args='{{ [case_id, "status", "$value"]|tojson }}'>
+        {%- for s in statuses %}
+        <option value="{{ s }}"{% if status == s %} selected{% endif %}>{{ s }}</option>
+        {%- endfor %}
+      </select></div>
+    <div class="cpanel-meta-item"><label>Severity</label>
+      <select data-change-action="panelUpdateField"
+              data-args='{{ [case_id, "severity", "$value"]|tojson }}'>
+        {%- for s in severities %}
+        <option value="{{ s }}"{% if severity == s %} selected{% endif %}>{{ s }}</option>
+        {%- endfor %}
+      </select></div>
+    <div class="cpanel-meta-item"><label>Assigned To</label>
+      {#- The value is the ION user.id and the field is assigned_to_id, so
+          the PATCH endpoint's CaseUpdate receives it and resolves the
+          elastic_uid itself. -#}
+      <select data-change-action="panelUpdateField"
+              data-args='{{ [case_id, "assigned_to_id", "$value"]|tojson }}'
+              {% if users_withheld or users is none %}disabled{% endif %}>
+        {%- if users_withheld %}
+        <option value="">Assignees withheld: alert permission required</option>
+        {%- elif users is none %}
+        <option value="">Assignees unavailable</option>
+        {%- else %}
+        <option value=""{% if assigned_to_id is none %} selected{% endif %}>Unassigned</option>
+        {%- for u in users %}
+        <option value="{{ u.id }}"{% if assigned_to_id == u.id %} selected{% endif %}>
+          {{- u.display_name or u.username }}
+          {%- if u.has_elastic_profile is sameas false %} (no Kibana profile){% endif -%}
+        </option>
+        {%- endfor %}
+        {%- endif %}
+      </select>
+      {%- if kibana_pills is none %}
+      <div class="cpanel-kibana-assignees"><span class="an-absent"
+          title="The Kibana assignees are not in a readable shape"></span></div>
+      {%- elif kibana_pills %}
+      {#- A mismatch means someone edited the case in Kibana since ION
+          last wrote to it. -#}
+      <div class="cpanel-kibana-assignees"
+           title="Live state from the linked Kibana case">
+        <span class="cpanel-kibana-label">Kibana:</span>
+        {%- for p in kibana_pills %}
+        <span class="cpanel-kibana-pill{% if kibana_mismatch %} mismatch{% endif %}">{{ p.display }}</span>
+        {%- endfor %}
+        {%- if kibana_mismatch %}
+        <span class="cpanel-kibana-warn"
+              title="ION and Kibana disagree on the assignee">&#9888; mismatch</span>
+        {%- endif %}
+      </div>
+      {%- endif %}
+    </div>
+    <div class="cpanel-meta-item"><label>Created</label>
+      <input type="text" value="{{ created or '' }}" disabled>
+      {%- if created is none %}<span class="an-absent"
+          title="No creation time recorded"></span>{% endif %}</div>
+  </div>
+</div>
+{%- if tags is none %}
+<div class="cpanel-section" data-tab="overview">
+  <div class="cpanel-section-title">Context</div>
+  {{ unreadable('context list') }}
+</div>
+{%- elif tags %}
+<div class="cpanel-section" data-tab="overview">
+  <div class="cpanel-section-title">Context</div>
+  <div class="cpanel-tags">
+    {%- for t in tags %}
+    <span class="cpanel-tag cpanel-tag-{{ t.kind }}" title="{{ t.kind|capitalize }}">
+      <span class="cpanel-tag-label">{{ t.label }}</span>{{ t.value }}</span>
+    {%- endfor %}
+  </div>
+</div>
+{%- endif %}
+{%- if description %}
+<div class="cpanel-section" data-tab="overview">
+  <div class="cpanel-section-title">Description</div>
+  {#- Markdown, so the page renders it for the same reason the notes are
+      rendered there: no server-side sanitiser. -#}
+  <div class="cpanel-description cpanel-note-markdown"
+       data-note-raw="{{ description }}"></div>
+</div>
+{%- endif %}
+<div class="cpanel-section" data-tab="observables">
+  <div class="cpanel-section-title">Observables
+    ({{ observable_count if observable_count is not none else '?' }})</div>
+  {%- if observables is none %}{{ unreadable('observable list') }}
+  {%- elif not observables %}
+  <div class="cpanel-empty-hint"><i class="icon-search"></i> No observables
+    extracted yet</div>
+  {%- else %}
+  <div class="awx-obsrow">
+    {%- for o in observables %}
+    {#- Enrichable types carry a threat badge; the rest get a plain chip.
+        The threat level reaches a class, so it comes from the level the
+        chip resolved rather than straight off the payload. -#}
+    <span class="awx-obschip" title="{{ o.value }}">
+      <span class="awx-ot t-{{ o.kind }}">{{ o.kind }}</span>{{ o.short }}
+      {%- if o.label is not none %}
+      <span class="awx-tl tl-{{ o.level }}" title="{{ o.tip }}">
+        <span class="awx-td"></span>{{ o.label }}</span>
+      {%- endif %}
+    </span>
+    {%- endfor %}
+  </div>
+  {%- endif %}
+</div>
+<div class="cpanel-section" data-tab="actions">
+  <div class="cpanel-section-title">Response Actions</div>
+  <div id="response-actions-container">Loading&hellip;</div>
+</div>
+{%- if mitre is none %}
+<div class="cpanel-section" data-tab="overview">
+  <div class="cpanel-section-title">MITRE ATT&amp;CK</div>
+  {{ unreadable('technique list') }}
+</div>
+{%- elif mitre %}
+<div class="cpanel-section" data-tab="overview">
+  <div class="cpanel-section-title">MITRE ATT&amp;CK ({{ mitre | length }})</div>
+  <div class="cpanel-tags">
+    {%- for t in mitre %}
+    <span class="cpanel-tag cpanel-tag-mitre" title="{{ t.name }}">
+      {{- t.id }}{% if t.name != t.id %} &mdash; {{ t.name }}{% endif -%}
+    </span>
+    {%- endfor %}
+  </div>
+</div>
+{%- endif %}
+<div class="cpanel-section" data-tab="timeline">
+  <div class="cpanel-section-title">Attack Story Timeline</div>
+  <div class="text-[0.8rem] text-[var(--text-secondary)]"
+       id="case-timeline-container">Loading&hellip;</div>
+</div>
+<div class="cpanel-section" data-tab="attackpath">
+  <div class="cpanel-section-title">Attack Path</div>
+  <div class="apg-root" id="attack-path-container">Loading&hellip;</div>
+</div>
+<div class="cpanel-section" data-tab="overview">
+  <div class="cpanel-section-title">Similar Closed Cases</div>
+  <div class="text-[0.8rem] text-[var(--text-secondary)]"
+       id="similar-cases-container">Loading&hellip;</div>
+</div>
+<div class="cpanel-section" data-tab="observables">
+  <div class="cpanel-section-title">Cross-Case Observable Sightings</div>
+  <div class="text-[0.8rem] text-[var(--text-secondary)]"
+       id="similar-observables-container">Loading&hellip;</div>
+</div>
+<div class="cpanel-section" data-tab="alerts" data-workspace="1">
+  {%- if alerts is none %}{{ unreadable('alert list') }}
+  {%- elif not alerts %}
+  <div class="cpanel-empty-hint"><i class="icon-shield"></i> No linked
+    alerts</div>
+  {%- else %}
+  {#- data-first-alert-id is new. The page used to read c.alerts[0] after
+      this function had sorted that array in place; the order is decided
+      here now, so it is told instead of guessing. -#}
+  <div class="cpanel-workspace" data-first-alert-id="{{ first_alert_id }}"
+       data-first-alert-index="0">
+    <div class="cpanel-rail">
+      <div class="cpanel-section-title">Alerts in case ({{ alerts | length }})</div>
+      {%- for a in alerts %}
+      <div class="cpanel-rail-alert{% if loop.first %} selected{% endif %}"
+           id="rail-alert-{{ a.index }}"
+           data-click-action="selectCaseAlert"
+           data-args='{{ [a.alert_id, a.index, case_id]|tojson }}'>
+        <span class="rail-sev{% if a.severity_class %} rail-sev-{{ a.severity_class }}{% endif %}"></span>
+        <div class="cpanel-rail-alert-head">
+          <span class="cpanel-rail-alert-name">{{ a.name }}</span>
+          {#- The badge's palette was statusColors, an rgba and a var per
+              status held in JavaScript and applied through
+              data-ion-style. It is a class. -#}
+          <span class="cpanel-alert-badge{% if a.status_class %} status-{{ a.status_class }}{% endif %}">
+            {{- a.status -}}</span>
+        </div>
+        {%- if a.bits %}
+        {#- Each bit is emitted on its own so autoescaping applies to it.
+            This was `a.bits | join('<br>') | safe`, which turned the
+            escaping off for the whole joined string: a process name is
+            whatever ran on the host, so that was injectable. The page it
+            replaced escaped each bit before joining, which is the part I
+            dropped. -#}
+        <div class="cpanel-rail-alert-sub">
+          {%- for bit in a.bits %}
+          {%- if not loop.first %}<br>{% endif %}{{ bit }}
+          {%- endfor %}
+        </div>
+        {%- endif %}
+      </div>
+      {%- endfor %}
+    </div>
+    <div class="cpanel-detail" id="cpanel-alert-workspace">
+      <div class="loading">Loading alert&hellip;</div>
+    </div>
+    <aside class="cpanel-guide" id="cpanel-alert-guide"></aside>
+  </div>
+  {%- endif %}
+</div>
+{%- if kibana_case_id %}
+<div class="cpanel-section" data-tab="notes">
+  <div class="cpanel-section-title">Kibana Comments
+    <span class="cpanel-section-badge" id="kibana-comment-count">...</span></div>
+  <div id="kibana-comments-container">
+    <p class="text-[0.8rem] text-[var(--text-secondary)]">Loading comments...</p>
+  </div>
+</div>
+{%- endif %}
+<div class="cpanel-section" data-tab="notes">
+  <div class="cpanel-section-title">Investigation Notes
+    ({{ note_count if note_count is not none else '?' }})</div>
+  {%- if notes is none %}{{ unreadable('note list') }}
+  {%- else %}
+  {%- for n in notes %}
+  <div class="cpanel-note">
+    <div class="cpanel-note-header flex items-center gap-2">
+      <span class="cpanel-note-user">
+        <i class="icon-user text-[0.65rem] mr-[0.2rem]"></i>
+        {{- n.user or 'Unknown' -}}</span>
+      <span>{{ fig(n.when, 'No time recorded for this note') }}</span>
+      <button class="cpanel-note-translate" type="button"
+              data-click-action="translateCaseNote"
+              data-args='{{ [n.note_id]|tojson }}'>Translate</button>
+    </div>
+    {#- The raw markdown rides in an attribute and the page renders it,
+        because ION has no server-side HTML sanitiser. -#}
+    <div class="cpanel-note-content cpanel-note-markdown" id="{{ n.note_id }}"
+         data-note-raw="{{ n.raw }}" data-original-raw="{{ n.raw }}"></div>
+  </div>
+  {%- endfor %}
+  {%- endif %}
+  <div class="cpanel-add-note">
+    <textarea id="panel-note-input" placeholder="Add a note..." rows="2"></textarea>
+    <button class="btn btn-primary self-end text-[0.8rem] py-[0.4rem] px-3"
+            data-click-action="addPanelNote"
+            data-args='{{ [case_id]|tojson }}'>Add</button>
+  </div>
+</div>
+<div class="cpanel-section" data-tab="timeline" id="workbench-section-{{ case_id }}">
+  <div class="cpanel-section-title flex items-center gap-2">
+    <i class="icon-bookmark"></i> Workbench
+    <span class="cpanel-section-badge" id="workbench-pin-count-{{ case_id }}">&hellip;</span>
+    <span id="workbench-verify-banner-{{ case_id }}"
+          class="workbench-verify-banner ml-[auto]">verifying&hellip;</span>
+  </div>
+  <div id="workbench-add-{{ case_id }}" class="workbench-add-row">
+    <input type="text" id="workbench-add-title-{{ case_id }}"
+           placeholder="Add observation (free-form pin)" maxlength="500">
+    <select id="workbench-add-severity-{{ case_id }}">
+      <option value="">severity</option>
+      {%- for s in ['critical', 'high', 'medium', 'low', 'info'] %}
+      <option value="{{ s }}">{{ s }}</option>
+      {%- endfor %}
+    </select>
+    <button type="button" class="btn btn-primary text-xs py-[0.35rem] px-3"
+            data-click-action="addObservationPin"
+            data-args='{{ [case_id]|tojson }}'>Pin</button>
+  </div>
+  <div id="workbench-kanban-{{ case_id }}" class="workbench-kanban">
+    <div class="cpanel-empty-hint col-span-full">Loading workbench&hellip;</div>
+  </div>
+</div>
+<div class="cpanel-section" data-tab="timeline" id="annotations-section-{{ case_id }}">
+  <div class="cpanel-section-title flex items-center gap-2">
+    <i class="icon-clock"></i> Timeline Annotations
+    <span class="cpanel-section-badge" id="annotations-count-{{ case_id }}"></span>
+  </div>
+  <div id="annotations-body-{{ case_id }}">
+    <div class="cpanel-empty-hint">Loading annotations&hellip;</div>
+  </div>
+</div>
+<div class="cpanel-actions">
+  {%- if escalated %}
+  <button class="btn" disabled title="Already escalated">Escalated to DFIR-IRIS</button>
+  {%- else %}
+  <button class="btn" data-click-action="escalateCase"
+          data-args='{{ [case_id]|tojson }}'>Escalate to DFIR-IRIS</button>
+  {%- endif %}
+  {%- if kibana_url %}
+  <a class="btn" href="{{ kibana_url }}" target="_blank" rel="noopener">View in Kibana</a>
+  {%- endif %}
+  <button class="btn" data-click-action="toggleCasePlaybookBrowser"
+          data-args='{{ [case_id]|tojson }}'>Start Playbook</button>
+  <a class="btn" href="/api/cases/{{ case_id }}/pdf" target="_blank"
+     rel="noopener" title="Export case as PDF">Export PDF</a>
+</div>
+<div class="hidden" id="case-playbook-browser-{{ case_id }}"></div>
+{%- endif %}

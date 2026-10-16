@@ -1,0 +1,4 @@
+{% if state == 'failed' %}<div class="cpanel-empty-hint">Could not load action log.</div>
+{% elif state == 'disabled' %}<div class="cpanel-empty-hint">Response actions are disabled.</div>
+{% elif state == 'empty' %}<div class="cpanel-empty-hint">No actions requested yet</div>
+{% else %}{% for item in items %}<div class="awx-obsrow"><code>{{ item.status if item.status is not none else 'Unknown status' }}</code> <code>{{ item.action_type if item.action_type is not none else 'Unknown action' }}</code> {{ item.target if item.target is not none else 'Unknown target' }}{{ ' (dry-run)' if item.dry_run else '' }}</div>{% endfor %}{% endif %}

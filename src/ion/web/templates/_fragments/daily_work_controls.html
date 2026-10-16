@@ -1,0 +1,20 @@
+<div class="join mb-4" id="dw-toggle">
+  <button type="button" class="btn btn-sm join-item on" data-view="me">My Day</button>
+  {% if can_team %}<button type="button" class="btn btn-sm join-item" data-view="team">Team Day</button>{% endif %}
+</div>
+{% if task_types is none %}
+<div role="alert" class="alert alert-error">Task types could not be read. Retry task types to log activity.</div>
+{% else %}
+<div class="dw-my-controls">
+  <div id="dw-presets" class="flex flex-wrap gap-2 mb-3">
+    {% for t in task_types %}<button type="button" class="ion-chip ion-c-{{ t.color or 'muted' }}" data-task-type="{{ t.key }}" data-task-label="{{ t.label }}">{% if t.glyph %}<span aria-hidden="true">{{ t.glyph }}</span>{% endif %}{{ t.label }}</button>{% endfor %}
+  </div>
+  <div class="flex flex-wrap gap-2 mb-4">
+    <input class="input input-sm flex-1" id="dw-text" maxlength="2000" placeholder="Log something custom" />
+    <input type="time" class="input input-sm w-auto" id="dw-time" />
+    <select class="select select-sm w-auto" id="dw-type">{% for t in task_types %}<option value="{{ t.key }}">{{ t.label }}</option>{% endfor %}</select>
+    <button type="button" class="btn btn-primary btn-sm" id="dw-add">Add</button>
+  </div>
+</div>
+<select id="dw-edit-type" class="select w-full" hx-swap-oob="true">{% for t in task_types %}<option value="{{ t.key }}">{{ t.label }}</option>{% endfor %}</select>
+{% endif %}

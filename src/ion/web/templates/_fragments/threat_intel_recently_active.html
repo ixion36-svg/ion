@@ -1,0 +1,61 @@
+{# Threat Intel Overview: observables and MITRE techniques seen most often
+   in recent case activity.
+
+   Replaces four innerHTML sites in loadRecentlyActive. Both lists come from
+   one read, so they are one fragment and one out-of-band swap rather than
+   two requests that can disagree about the window.
+
+   The defect: loadRecentlyActive did `if (!r.ok) return;`. A silent return.
+   Both panels kept the hardcoded "Loading..." the shell ships with, so a
+   failed read looked like a read still in progress, permanently. Of the
+   three failure behaviours on this tab that is the worst, because a reader
+   waits for a spinner and acts on an empty state, but a permanent spinner
+   gets neither.
+
+   It also did `d.observables.length` with no guard, which raises on a
+   payload that does not carry the key, and interpolated `o.type` and
+   `t.count` into innerHTML unescaped where the neighbouring values went
+   through escapeHtml. #}
+
+<div id="ti-recent-obs" class="text-sm text-slate-400" hx-swap-oob="innerHTML">
+  {%- if failed or observables is none -%}
+    <span class="text-ion-coral" role="alert">Recent observable activity could not be read. This is not a quiet estate: the last {{ days }} days of case activity are still recorded and will appear once this read succeeds.</span>
+  {%- elif not observables -%}
+    <em>No observable activity in the last {{ days }} days.</em>
+  {%- else -%}
+    <ul class="list-none p-0 m-0">
+      {%- for o in observables -%}
+        <li class="py-1 px-0 border-b-[1px] border-b-[var(--ion-border)] flex justify-between gap-2">
+          <span><code class="text-xs text-[var(--text-muted)]">{{ o.type }}</code>
+          <code class="ml-1.5 text-[var(--text-primary)]">{{ o.value }}</code></span>
+          <span class="text-[var(--accent)] font-mono text-xs">{% if o.count is not none %}{{ o.count }}&times;{% else %}not counted{% endif %}</span>
+        </li>
+      {%- endfor -%}
+    </ul>
+  {%- endif -%}
+</div>
+
+<div id="ti-recent-tech" class="text-sm text-slate-400" hx-swap-oob="innerHTML">
+  {%- if failed or techniques is none -%}
+    <span class="text-ion-coral" role="alert">Recent technique activity could not be read, so this panel cannot say which techniques have been seen in the last {{ days }} days.</span>
+  {%- elif not techniques -%}
+    <em>No MITRE techniques tagged in the last {{ days }} days.</em>
+  {%- else -%}
+    <ul class="list-none p-0 m-0">
+      {%- for t in techniques -%}
+        <li class="py-1 px-0 border-b-[1px] border-b-[var(--ion-border)] flex justify-between gap-2">
+          {# A button, not an <a href="javascript:void(0)">. The href form is
+             what the page used, and it is both a dead link in the
+             accessibility tree and a navigation the CSP has no reason to
+             permit. The click handler is unchanged. #}
+          <button type="button"
+                  class="text-[var(--ion-cyan,#6de4ff)] no-underline font-mono bg-transparent border-0 p-0 cursor-pointer"
+                  data-click-action="tiDrillTechnique"
+                  data-args='[{{ t.id|tojson }}]'
+                  title="Drill into this technique">{{ t.id }}</button>
+          <span class="text-[var(--accent)] font-mono text-xs">{% if t.count is not none %}{{ t.count }}&times;{% else %}not counted{% endif %}</span>
+        </li>
+      {%- endfor -%}
+    </ul>
+  {%- endif -%}
+</div>

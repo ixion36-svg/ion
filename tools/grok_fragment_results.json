@@ -1,0 +1,35 @@
+[
+  {
+    "page": "gitlab.html",
+    "writes_before": 23,
+    "exit": 0,
+    "kept": true,
+    "notes": [
+      "writes=0",
+      "mounted ['/gitlab/status', '/gitlab/issues', '/gitlab/issues/{issue_iid}', '/gitlab/issues/{issue_iid}/comments', '/gitlab/catalog']",
+      "node --check exit=0",
+      "85 passed, 1 warning in 2.09s"
+    ],
+    "tail": " `tests/unit/test_ui_fragment_gitlab.py` and `tests/unit/test_ui_fragment_registry.py` pass. The two GitLab route-audit checks pass, the htmx \"no eval\" guard passes, and `node --check` accepts the script that remains. Two failures in `tests/test_route_audit_phase6_pages.py` are on other pages (`alert_prompt_templates`, `executive_report`) and were not touched.\n\nI could not click through the page in a browser, so I have not seen the swap, the `gitlab-ready` event, or the markdown paint run live.\n",
+    "stderr": "Memory flush started.\nMemory flush completed.\nMemory flush started.\nMemory flush completed.\nMemory flush started.\nMemory flush completed.\nMemory flush started.\nMemory flush completed.\nAuto-compacting conversation (84% full)...\nMemory flush started.\nMemory flush completed.\nConversation compacted.\nMemory flush started.\nMemory flush completed.\nMemory flush started.\nMemory flush completed.\nMemory flush started.\nMemory flush completed.\nMemory flush started.\nMemory flush completed.\nMemory flush started.\n",
+    "writes_after": 0,
+    "seconds": 2744
+  },
+  {
+    "page": "analyst.html",
+    "writes_before": 17,
+    "exit": "timeout",
+    "kept": false,
+    "notes": [
+      "timed out",
+      "rejected work kept in .grok-rejected\\analyst-20261012-212533",
+      "restored analyst.html",
+      "deleted analyst.py",
+      "deleted test_ui_fragment_analyst.py",
+      "deleted analyst.html"
+    ],
+    "tail": "",
+    "stderr": "",
+    "seconds": 3401
+  }
+]

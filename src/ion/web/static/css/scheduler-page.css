@@ -1,0 +1,60 @@
+/* The /scheduler page's own stylesheet.
+ *
+ * These rules were the inline <style> block at the end of scheduler.html
+ * until 2026-10-13. They are page-scoped: scheduler.html is the only
+ * template that links this file, and it is linked from
+ * {% block head_css %}.
+ *
+ * Cascade note. The inline block sat in {% block scripts %}, at the end of
+ * <body>, so it loaded after every linked sheet and after base.html's own
+ * two inline blocks. From head_css it now loads before ion-workspace.css
+ * and those two. Measured before the move: of the 17 (at-rule, selector)
+ * pairs here, zero appear in ion-workspace.css or either base.html block,
+ * so no rule changes winner at equal specificity. What these rules do
+ * override is daisyUI in ion.css -- the `.show` bridge reveals a
+ * `.modal` that daisyUI keeps hidden -- and ion.css still loads first.
+ */
+/* JS toggles .show, not daisyUI .modal-open. Bridge the two. */
+#sch-modal-bg.show,
+#sch-exec-bg.show {
+  pointer-events: auto;
+  visibility: visible;
+  opacity: 1;
+  background-color: oklch(0% 0 0 / 0.4);
+}
+#sch-modal-bg.show > .modal-box,
+#sch-exec-bg.show > .modal-box {
+  opacity: 1;
+  scale: 1;
+  translate: 0;
+  max-width: 720px;
+  max-height: 90vh;
+}
+
+/* Job-card / exec-row left stripe has no daisyUI equivalent. */
+.sch-card,
+.sch-exec-row {
+  border-left-width: 4px;
+  border-left-style: solid;
+  border-left-color: var(--color-base-300);
+}
+.sch-card.ok, .sch-exec-row.ok { border-left-color: var(--color-success); }
+.sch-card.err, .sch-exec-row.err { border-left-color: var(--color-error); }
+.sch-card.run, .sch-exec-row.run { border-left-color: var(--color-warning); }
+.sch-card.off {
+  border-left-color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  opacity: 0.7;
+}
+
+/* auto-fit card grid: minmax(340px) is not a daisyUI token. */
+.sch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .sch-grid { grid-template-columns: 1fr; }
+  #sch-modal-bg.show > .modal-box,
+  #sch-exec-bg.show > .modal-box { max-height: 95vh; }
+}

@@ -1,0 +1,5 @@
+{% from "_fragments/_time.html" import ts %}
+{% from "_fragments/investigation_memory_macros.html" import number, pill, duration %}
+{% if data is none %}<tr><td colspan="7" class="text-error">Could not read IOC sightings. Retry the read.</td></tr>
+{% else %}{% for r in data.iocs %}<tr><td>{{ pill(plain(r.ioc_type)) }}</td><td class="font-mono">{{ r.ioc_value }}</td><td>{{ number(r.seen_count) }}</td><td>{{ ts(r.first_seen_at) }}</td><td>{{ ts(r.last_seen_at) }}</td><td>{% if r.is_known_bad is true %}{{ pill('bad') }}{% elif r.is_known_bad is none %}{{ pill('bad: unknown') }}{% endif %}{% if r.is_known_good is true %}{{ pill('good') }}{% elif r.is_known_good is none %}{{ pill('good: unknown') }}{% endif %}</td><td>{% if r.last_investigation_id is not none %}#{{ r.last_investigation_id }}{% else %}-{% endif %}</td></tr>
+{% else %}<tr><td colspan="7">No IOC sightings yet.</td></tr>{% endfor %}{% endif %}

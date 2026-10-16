@@ -412,6 +412,13 @@ app.include_router(arkime_router, prefix="/api")
 # ION_WISE_TOKEN is set)
 from ion.web.wise_api import router as wise_router  # noqa: E402, I001
 app.include_router(wise_router, prefix="/api")
+
+# Server-rendered htmx fragments. The router carries its own /ui prefix, so
+# no prefix is passed here: /api is a JSON contract and a fragment is a view
+# versioned with its template, not with the API. See ion/web/ui.py.
+from ion.web.ui import router as ui_router  # noqa: E402
+
+app.include_router(ui_router)
 app.include_router(forensics_router, prefix="/api/forensics")
 # ForensicCase Workbench — pinned evidence + tamper-evident ledger
 app.include_router(forensic_workbench_router, prefix="/api/forensics")
@@ -1277,7 +1284,9 @@ _PAGES: list[tuple[str, str, str]] = [
     ("/audit-logs",             "audit_logs.html",                 "system:audit_view"),
     ("/security",               "security_dashboard.html",         "security:read"),
     ("/observables",            "observables.html",                "observable:read"),
-    ("/threat-intel",           "threat_intel.html",               "observable:read"),
+    # /threat-intel is a dedicated handler below: it has to pass the
+    # viewer's alert:read and observable:enrich into the template, and this
+    # table passes no context.
     ("/tools",                  "tools.html",                      "alert:read"),
     ("/discover",               "discover.html",                   "alert:read"),
     ("/analyst",                "analyst.html",                    "alert:read"),
@@ -1317,7 +1326,28 @@ def _register_pages() -> None:
             user: User = Depends(require_page_permission(_permission)),
             _name: str = _template,
         ):
-            return templates.TemplateResponse(request=request, name=_name)
+            # Every page gets the request's own authenticated user, so a
+            # template can gate a control on a permission without this
+            # loop having to know which templates those are.
+            #
+            # This was a set of template names, and it had to be: the
+            # conversions that needed `current_user` added themselves to
+            # it one at a time. Two of them did so independently and the
+            # second conflicted with the first here, which is the signal
+            # that the condition was the wrong shape rather than the
+            # wrong contents. A template that does not use the name
+            # ignores it, and the value is the user's own identity, so
+            # passing it everywhere discloses nothing.
+            #
+            # Hiding a control is not authorization. Every action behind
+            # one of these gates is also gated server-side: the database
+            # backup and cleanup endpoints take require_admin, and the
+            # integration endpoints take
+            # require_permission("integration:manage").
+            return templates.TemplateResponse(
+                request=request, name=_name,
+                context={"current_user": user},
+            )
 
         _page.__name__ = "page_" + (_path.strip("/").replace("/", "_").replace("-", "_") or "root")
         app.get(_path, response_class=HTMLResponse)(_page)
@@ -1496,7 +1526,18 @@ async def profile_page(request: Request, user: User = Depends(require_page_auth)
 
 @app.get("/alerts", response_class=HTMLResponse)
 async def alerts_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the alerts investigation page."""
+    """Render the alerts investigation page.
+
+    `can_create_case` is what POST /api/cases requires, passed as a fact
+    about the viewer so the page does not open a create-case form whose
+    submit would answer 403. The page's own alert:read does not imply it.
+
+    `can_read_playbooks` is what GET .../recommended-playbooks requires and
+    what the /ui/alerts/playbooks fragment is gated on, so the detail
+    modal's playbook section says it is withheld instead of requesting a
+    fragment that answers 403, which htmx would not swap, leaving
+    "Loading playbooks..." on screen for the life of the modal.
+    """
     return templates.TemplateResponse(
         request=request,
         name="alerts.html",
@@ -1504,6 +1545,8 @@ async def alerts_page(request: Request, user: User = Depends(require_page_permis
             "alert_detail_v2": get_config().alert_detail_v2,
             "alert_field_pins": get_config().alert_field_pins,
             "bob_custom_templates": get_config().bob_custom_templates,
+            "can_create_case": user.has_permission("case:create"),
+            "can_read_playbooks": user.has_permission("playbook:read"),
         },
     )
 
@@ -1611,19 +1654,69 @@ async def case_page(
 
 
 
+@app.get("/threat-intel", response_class=HTMLResponse)
+async def threat_intel_page(
+    request: Request,
+    user: User = Depends(require_page_permission("observable:read")),
+):
+    """The unified threat intel page: eight tabs over OpenCTI, KEV and alerts.
+
+    Lifted out of the _PAGES table because it needs context. That table
+    renders a template behind a page guard and passes nothing, and two of
+    this page's tabs and three of its controls depend on permissions this
+    page's own guard does not imply.
+
+    `can_read_alerts`: the Stories and KEV tabs read /api/attack-stories
+    and /api/kev, which require `alert:read`. This page requires
+    `observable:read`, which does not imply it, so both tabs were offered
+    to everyone who could open the page and KEV rendered the refusal as
+    "Search failed: HTTP 403". The tabs are withheld instead.
+
+    `can_manage_watches`: adding and removing a watch requires
+    `observable:enrich`. The page offered Remove on every watchlist row and
+    Add on every actor and campaign result without checking, so a
+    read-only analyst reached a 403 only after confirming a dialog. Same
+    reasoning as security_dashboard's Block and Unblock.
+
+    Both come from the permissions the routes actually declare rather than
+    from the endpoint names, and both are passed as facts about the viewer
+    rather than re-derived in the template.
+    """
+    return templates.TemplateResponse(
+        request=request,
+        name="threat_intel.html",
+        context={
+            "can_read_alerts": bool(user and user.has_permission("alert:read")),
+            "can_manage_watches": bool(
+                user and user.has_permission("observable:enrich")
+            ),
+        },
+    )
+
+
 @app.get("/threat-intel/actors/{entity_id}", response_class=HTMLResponse)
 async def threat_intel_actor_profile_page(
     entity_id: str,
     request: Request,
+    entity_class: str = "intrusion_set",
     user: User = Depends(require_page_permission("observable:read")),
 ):
-    """v0.27.0: actor deep-dive page. Data loaded client-side from
-    /api/threat-intel/actors/{id}/profile so the page renders fast
-    while OpenCTI roundtrips."""
+    """v0.27.0: actor deep-dive page.
+
+    The shell renders immediately and the profile arrives as a fragment
+    from /ui/threat-intel/actors/{id}, so OpenCTI's roundtrip still does
+    not block the first paint. It used to be fetched and assembled by the
+    page's own JavaScript.
+
+    `entity_class` is read here rather than in the browser. The page pulled
+    it off window.location.search, so the server could not build the
+    fragment URL and the only thing that knew which class was being viewed
+    was the script. Same default as the API this mirrors.
+    """
     return templates.TemplateResponse(
         request=request,
         name="threat_intel_actor.html",
-        context={"entity_id": entity_id},
+        context={"entity_id": entity_id, "entity_class": entity_class},
     )
 
 

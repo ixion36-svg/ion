@@ -1911,7 +1911,11 @@
   "_ion-s-56b5cc5749": {
     "css": "flex:1;background:var(--bg-secondary);border:1px solid var(--ion-border);color:var(--text-primary);padding:8px 12px;border-radius:var(--radius);font:inherit;font-size:.85rem;",
     "kind": "manual",
+    "note": "The assessment title input, #mat-title. The control survived the conversion on daisyUI's .input, which is a different chrome. The eight declarations are body[data-page=\"maturity\"] .mat-title in static/css/maturity-page.css. The notes inputs on the same form were never this rule.",
     "partial_do_not_apply": "flex-1 bg-[var(--bg-secondary)] border border-[var(--ion-border)] text-[var(--text-primary)] py-2 px-3 rounded-[var(--radius)] text-[.85rem]",
+    "replaced_by": [
+      "body[data-page=\"maturity\"] .mat-title"
+    ],
     "tailwind": "",
     "unmapped": [
       "font:inherit"
@@ -2088,7 +2092,11 @@
   "_ion-s-5eaab7cb30": {
     "css": "display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;padding:8px;background:var(--bg-secondary,#0d1117);border-radius:6px;",
     "kind": "manual",
+    "note": "The playbook step preview became a <template> clone. Its container rule is .pb-preview-step in static/css/forensics-page.css, arranged as a column because the clone puts the title and description in sequence. Pinned by tests/test_forensics_playbook_preview.py.",
     "partial_do_not_apply": "flex items-start gap-2 mb-1.5 p-2 rounded-[6px]",
+    "replaced_by": [
+      ".pb-preview-step"
+    ],
     "tailwind": "",
     "unmapped": [
       "background:var(--bg-secondary,#0d1117)"
@@ -2479,6 +2487,10 @@
     "unmapped": []
   },
   "_ion-s-7554583028": {
+    "note": "The threat intel label chip on /pcap. Same move as _ion-s-b17605f04d: the four declarations are .pcap-ti-chip in static/css/pcap-page.css.",
+    "replaced_by": [
+      ".pcap-ti-chip"
+    ],
     "css": "background:' + color + '20;color:' + color + ';padding:1px 6px;border-radius:3px;font-size:.75rem;margin-right:3px;",
     "kind": "manual",
     "partial_do_not_apply": "text-['_+_color_+_'] py-[1px] px-1.5 rounded-[3px] text-xs mr-[3px]",
@@ -2568,12 +2580,10 @@
   },
   "_ion-s-78cae35616": {
     "css": "background:var(--bg-tertiary);border:1px dashed var(--ion-border);border-radius:6px;padding:10px 14px;margin-top:10px;",
-    "kind": "manual",
-    "partial_do_not_apply": "bg-[var(--bg-tertiary)] rounded-[6px] py-2.5 px-3.5 mt-2.5",
-    "tailwind": "",
-    "unmapped": [
-      "border:1px dashed var(--ion-border)"
-    ]
+    "kind": "exact",
+    "note": "border:1px dashed var(--ion-border) was recorded as having no utility; border border-dashed border-[var(--ion-border)] expresses it exactly, so the entry was incomplete rather than the declaration unmappable.",
+    "tailwind": "mt-2.5 py-2.5 px-3.5 rounded-[6px] bg-[var(--bg-tertiary)] border border-dashed border-[var(--ion-border)]",
+    "unmapped": []
   },
   "_ion-s-78f8e7f1d2": {
     "css": "font-size:.7rem;",
@@ -2978,7 +2988,11 @@
   "_ion-s-8bc7ebe99c": {
     "css": "flex:1;background:var(--bg-code, rgba(0,0,0,0.08));border-radius:3px;height:14px;overflow:hidden;",
     "kind": "manual",
+    "note": "The threat distribution bar track. My first pass at the velocity panel replaced this markup with a shared macro and dropped it; the rewrite audit caught that by its contents rather than its exit code. The rule is .an-dist-track in static/css/analytics-page.css, declaration for declaration.",
     "partial_do_not_apply": "flex-1 rounded-[3px] h-[14px] overflow-hidden",
+    "replaced_by": [
+      ".an-dist-track"
+    ],
     "tailwind": "",
     "unmapped": [
       "background:var(--bg-code, rgba(0,0,0,0.08))"
@@ -3173,6 +3187,10 @@
   "_ion-s-92fb99917f": {
     "css": "font-weight:900;",
     "kind": "manual",
+    "note": "Event ID in the data-flow source mock-up. The hashed class lost to body[data-page=data_flow] .df-winlog-row .val {font-weight:600} on specificity, so 900 never painted. The winning rule is body[data-page=\"data_flow\"] .df-winlog-row .df-event-id in static/css/data-flow-page.css, which loads from head_css after ion.css. The other .val cells stay at 600.",
+    "replaced_by": [
+      "body[data-page=\"data_flow\"] .df-winlog-row .df-event-id"
+    ],
     "tailwind": "",
     "unmapped": [
       "font-weight:900"
@@ -3360,6 +3378,15 @@
     "kind": "arbitrary",
     "tailwind": "text-[var(--text-secondary)] text-[0.8rem]",
     "unmapped": []
+  },
+  "_ion-s-9ce2eb0cde": {
+    "css": "height:${pct}%;",
+    "kind": "manual",
+    "note": "Dropped from ion-migrated-styles.css in c21d790c because the body is the literal JavaScript from an inline style, which no browser applies. The bar height survived as data-ion-style=\"height:{{ row.pct }}%\" on .ae-activity-bar in _fragments/executive_report_team.html. There is no static selector to claim: a stylesheet rule containing ${pct} would be the original defect.",
+    "tailwind": "",
+    "unmapped": [
+      "JS-concatenated value \u2014 not real CSS"
+    ]
   },
   "_ion-s-9d185facbd": {
     "css": "font-size:.78rem;color:var(--text-secondary);margin-bottom:12px;",
@@ -3556,7 +3583,11 @@
   "_ion-s-a55ef5c079": {
     "css": "flex:1;background:var(--border-color,#30363d);border-radius:3px;height:4px;min-width:40px;overflow:hidden;",
     "kind": "manual",
+    "note": "The hand-built div progress bar (track, fill, and a runtime width) became a native <progress class=\"forensic-progress\">, styled in static/css/forensics-page.css including ::-webkit-progress-value and ::-moz-progress-bar. The element announces itself to a screen reader and the runtime width is its value attribute rather than an inline style, so this is a better destination than a utility would have been.",
     "partial_do_not_apply": "flex-1 rounded-[3px] h-[4px] min-w-[40px] overflow-hidden",
+    "replaced_by": [
+      ".forensic-progress"
+    ],
     "tailwind": "",
     "unmapped": [
       "background:var(--border-color,#30363d)"
@@ -3875,6 +3906,10 @@
     "unmapped": []
   },
   "_ion-s-b17605f04d": {
+    "note": "The threat intel observable link on /pcap. After the conversion no template referenced the hashed class and no other page used it, so the same two declarations are .pcap-ti-link in static/css/pcap-page.css, which head_css loads after ion.css.",
+    "replaced_by": [
+      ".pcap-ti-link"
+    ],
     "css": "color:var(--text-primary);text-decoration:underline dotted;",
     "kind": "manual",
     "partial_do_not_apply": "text-[var(--text-primary)]",
@@ -3995,7 +4030,11 @@
   "_ion-s-b76ce82a4d": {
     "css": "height:100%;background:var(--accent,#00e5ff);border-radius:4px;transition:width .3s;width:0%;",
     "kind": "manual",
+    "note": "The hand-built div progress bar (track, fill, and a runtime width) became a native <progress class=\"forensic-progress\">, styled in static/css/forensics-page.css including ::-webkit-progress-value and ::-moz-progress-bar. The element announces itself to a screen reader and the runtime width is its value attribute rather than an inline style, so this is a better destination than a utility would have been.",
     "partial_do_not_apply": "h-full rounded-[4px] [transition:width_.3s] w-[0%]",
+    "replaced_by": [
+      ".forensic-progress"
+    ],
     "tailwind": "",
     "unmapped": [
       "background:var(--accent,#00e5ff)"
@@ -4994,7 +5033,11 @@
   "_ion-s-e26f061ab9": {
     "css": "background:var(--border-color,#30363d);border-radius:4px;height:6px;overflow:hidden;",
     "kind": "manual",
+    "note": "The hand-built div progress bar (track, fill, and a runtime width) became a native <progress class=\"forensic-progress\">, styled in static/css/forensics-page.css including ::-webkit-progress-value and ::-moz-progress-bar. The element announces itself to a screen reader and the runtime width is its value attribute rather than an inline style, so this is a better destination than a utility would have been.",
     "partial_do_not_apply": "rounded-[4px] h-[6px] overflow-hidden",
+    "replaced_by": [
+      ".forensic-progress"
+    ],
     "tailwind": "",
     "unmapped": [
       "background:var(--border-color,#30363d)"

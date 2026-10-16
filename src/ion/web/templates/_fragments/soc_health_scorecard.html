@@ -1,0 +1,149 @@
+{# The SOC maturity scorecard: grade ring, legend, five dimension cards and
+   the recommendations list.
+
+   Replaces three innerHTML writes and 151 lines of inline JavaScript in
+   soc_health.html, including a hand-rolled `esc()` that Jinja's autoescaping
+   retires.
+
+   Every number here is tested with `is not none`, never truthiness. The
+   service deliberately reports an unmeasured figure as None and an
+   unscorable dimension as score None, so a truthiness port would put this
+   page back to showing a confident zero for something nobody looked at.
+   Zero is a measurement. Unknown is not healthy.
+
+   The colours arrive precomputed from ion.web.ui.soc_health.grade_colour,
+   which is total over None: there is no branch here that could paint an
+   unmeasured figure with a healthy band colour by being forgotten.
+
+   This fragment does not carry card chrome the way _fragments/bob_eval_samples
+   does, because the only control on this page is Refresh and that lives in
+   the page header, outside #sh-content. No swap of this fragment can remove
+   its own escape hatch. Checked in a browser, not inferred from here. #}
+
+{% if failed %}
+  <div role="alert" class="alert alert-error">
+    <span>
+      The SOC health scorecard could not be computed. Nothing is shown below
+      rather than zeros: the read failed, so every figure is unknown, which is
+      not the same as a SOC that scores badly. Use Refresh to try again.
+    </span>
+  </div>
+{% else %}
+
+{# The grade ring. When the overall score is unmeasured the ring is hatched
+   rather than drawn as a conic gradient stopping at 0%, which is the picture
+   a genuinely measured zero produces. The hatch is the one thing on this page
+   a real score can never make, and the legend below says so. #}
+<div class="card bg-base-200 shadow mb-6">
+  <div class="card-body flex-col sm:flex-row items-center gap-6">
+    {# sh-legend-hatch is this page's hatch token and sets background only, so
+       the ring keeps its geometry. It is named for the legend because that is
+       where it was first needed. The class and the gradient are chosen before
+       the tag is opened so neither branch owns half a `<div>`. #}
+    {% if overall.measured %}
+      {% set ring_class = 'sh-grade-ring' %}
+      {% set ring_style = 'background:conic-gradient(' ~ overall.colour ~ ' ' ~ overall.score
+                          ~ '%, rgba(99,110,123,.2) ' ~ overall.score ~ '%)' %}
+    {% else %}
+      {% set ring_class = 'sh-grade-ring sh-legend-hatch' %}
+      {% set ring_style = none %}
+    {% endif %}
+    <div class="{{ ring_class }}"{% if ring_style %} data-ion-style="{{ ring_style }}"{% endif %}>
+      <div class="sh-grade-inner">
+        <div class="font-mono text-4xl font-bold" data-ion-style="color:{{ overall.colour }}">{{ overall.grade or '—' }}</div>
+        <div class="text-xs opacity-60">{{ (overall.score ~ '/100') if overall.measured else 'unmeasured' }}</div>
+      </div>
+    </div>
+    <div>
+      <div class="stat-title">SOC Maturity Score</div>
+      <div class="stat-value">{{ (overall.score ~ '/100') if overall.measured else 'Not assessed' }}</div>
+      <div class="stat-desc">
+        {% if overall.measured %}
+          Grade <strong data-ion-style="color:{{ overall.colour }}">{{ overall.grade }}</strong>, {{ overall.verdict }}
+        {% else %}
+          No dimension could be measured, so no overall score is shown.
+        {% endif %}
+      </div>
+      {# How much of the weighting the score actually rests on. A missing
+         weight basis is stated as unrecorded, never printed as 0%: the
+         JavaScript's `|| 0` claimed a denominator it had not read. #}
+      <div class="stat-desc opacity-60 mt-1">
+        {% if not overall.unavailable %}
+          All five dimensions measured.
+        {% elif overall.weight_pct is not none %}
+          Weighted over {{ overall.weight_pct }}% of the scorecard;
+          {{ overall.unavailable|length }} dimension{{ 's' if overall.unavailable|length > 1 }}
+          could not be measured ({{ overall.unavailable|join(', ') }}).
+        {% else %}
+          The share of the scorecard this rests on was not recorded;
+          {{ overall.unavailable|length }} dimension{{ 's' if overall.unavailable|length > 1 }}
+          could not be measured ({{ overall.unavailable|join(', ') }}).
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Permanent furniture, not a tooltip. A reader should not have to hover to
+   learn that hatching means nobody checked. #}
+<div class="sh-legend">
+  <span><span class="sh-legend-swatch" data-ion-style="background:{{ measured_swatch }}"></span>measured</span>
+  <span><span class="sh-legend-swatch sh-legend-hatch"></span>not measured, which is not the same as zero</span>
+</div>
+
+<div class="sh-dims">
+  {% for dim in dims %}
+    <div class="card bg-base-200 shadow relative overflow-hidden" data-ion-style="--dim-color:{{ dim.colour }}">
+      <div class="absolute top-0 left-0 right-0 h-[3px]" data-ion-style="background:{{ dim.colour }}"></div>
+      <div class="stat">
+        <div class="stat-title"><i class="icon-{{ dim.icon }}"></i> {{ dim.label }}</div>
+        {# `dim.measured`, not `dim.score`, because a measured 0 is falsy and
+           would otherwise read as "not measured". #}
+        <div class="stat-value font-mono{{ '' if dim.measured else ' sh-value-text' }}"
+             data-ion-style="color:{{ dim.colour }}">{{ dim.score if dim.measured else 'not measured' }}</div>
+        {% if dim.measured %}
+          <div class="sh-basis sh-basis-measured">measured</div>
+        {% else %}
+          <div class="sh-basis sh-basis-unmeasured">not measured</div>
+        {% endif %}
+        <div class="h-1.5 bg-base-300 rounded overflow-hidden my-2">
+          {% if dim.measured %}
+            <div class="sh-dim-bar-fill" data-ion-style="width:{{ dim.score }}%; background:{{ dim.colour }}"></div>
+          {% else %}
+            {# Full-width hatch, not a bar at width 0. A bar at 0 is the same
+               picture as a dimension measured at zero. #}
+            <div class="sh-dim-bar-unmeasured"></div>
+          {% endif %}
+        </div>
+        <div class="stat-desc">
+          {% for row in dim.details %}
+            <div>
+              <strong>{{ row.name }}:</strong>
+              {% if row.measured %}{{ row.value }}{% else %}<span class="sh-basis sh-basis-unmeasured">not measured</span>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+{% if recommendations %}
+  <div class="card bg-base-200 shadow">
+    <div class="card-body">
+      <h2 class="card-title text-sm uppercase tracking-wide opacity-60"><i class="icon-zap"></i> Improvement Recommendations</h2>
+      {% for rec in recommendations %}
+        {# A visibility gap is not a low-priority improvement. It says ION
+           cannot see the thing at all, so it carries the dashed treatment of
+           the unmeasured card rather than a severity colour that would rank
+           it against findings ION actually measured. #}
+        <div role="alert" class="alert {{ 'sh-rec-unseen' if rec.unseen else 'alert-' ~ rec.kind }}">
+          <span class="badge badge-sm {{ 'sh-badge-unseen' if rec.unseen else 'badge-' ~ rec.kind }}">{{ rec.area }}</span>
+          <span>{{ rec.message }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endif %}
+
+{% endif %}

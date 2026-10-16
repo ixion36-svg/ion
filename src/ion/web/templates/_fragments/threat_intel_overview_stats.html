@@ -1,0 +1,56 @@
+{# Threat Intel Overview: the four watch-and-match tiles.
+
+   Replaces the four textContent writes in loadOverview plus the unread
+   badge toggle. The tiles are this fragment's target; the badge swaps out
+   of band, because it lives in the tab strip and no other read knows the
+   count.
+
+   The defect: loadOverview's catch was console.error and rendered nothing
+   at all, so a failed read left all four tiles showing the dash they ship
+   with and the page looked like it was still loading. The figures went in
+   as `stats.watched_actors` with no guard, so a payload missing a key
+   printed the string "undefined" into the tile.
+
+   Every figure is guarded with `is not none`. Zero watched actors is a
+   finding about this estate. An unmeasured count is not, and a confident
+   zero in its place is the thing this whole conversion exists to stop. #}
+
+{% macro tile(label, value, colour, sub) -%}
+<div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
+  <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">{{ label }}</div>
+  <div class="text-[28px] font-semibold {{ colour }} font-mono">
+    {%- if failed or stats is none -%}
+      <span class="text-slate-600 text-base font-sans font-normal">unknown</span>
+    {%- elif value is not none -%}
+      {{ value }}
+    {%- else -%}
+      <span class="text-slate-600 text-base font-sans font-normal">not recorded</span>
+    {%- endif -%}
+  </div>
+  <div class="text-[11px] text-slate-500 mt-1">{{ sub }}</div>
+</div>
+{%- endmacro %}
+
+{% if failed or stats is none %}
+  <div role="alert" class="col-span-2 md:col-span-4 rounded-xl border border-ion-coral/30 bg-ion-coral/[0.06] p-3 text-xs text-ion-coral">
+    The threat intel overview could not be read, so the counts below say
+    unknown rather than zero. A watchlist with nothing on it and a watchlist
+    nobody could read are different situations, and only one of them means
+    there is nothing to look at.
+  </div>
+{% endif %}
+
+{{ tile('Watched Actors', (stats or {}).get('watched_actors'), 'text-white', 'on the watchlist') }}
+{{ tile('Watched Campaigns', (stats or {}).get('watched_campaigns'), 'text-ion-cyan', 'on the watchlist') }}
+{{ tile('Matches (7d)', (stats or {}).get('matches_7d'), 'text-ion-coral', 'across alerts') }}
+{{ tile('Unread Alerts', (stats or {}).get('unread_alerts'), 'text-ion-amber', 'match alerts pending') }}
+
+{# Out of band, so one read keeps the tab badge in step with the tiles.
+   `> 0`, so an unread count of zero and an unmeasured one both hide the
+   badge rather than painting a zero on the tab: the badge exists to draw
+   the eye, and one reading 0 does that for nothing. #}
+{% set unread = (stats or {}).get('unread_alerts') %}
+<span id="ti-unread-badge" hx-swap-oob="outerHTML"
+      class="ti-badge{% if not (unread is number and unread > 0) %} hidden{% endif %}">
+  {{- unread if unread is number and unread > 0 else 0 -}}
+</span>

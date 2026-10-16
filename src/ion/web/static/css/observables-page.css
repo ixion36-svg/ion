@@ -1,0 +1,828 @@
+
+/* Stats Banner */
+body[data-page="observables"] .stats-banner{
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+body[data-page="observables"] .stat-card{
+    background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+    border: 1px solid var(--ion-border);
+    border-radius: var(--ion-radius-lg);
+    padding: 1rem 1.5rem;
+    min-width: 120px;
+    text-align: center;
+}
+
+body[data-page="observables"] .stat-card-threat{
+    border-color: rgba(239, 68, 68, 0.12);
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, var(--bg-secondary) 100%);
+}
+
+body[data-page="observables"] .stat-value{
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+body[data-page="observables"] .stat-card-threat .stat-value{
+    color: var(--danger);
+}
+
+body[data-page="observables"] .stat-card-watched{
+    border-color: rgba(245, 158, 11, 0.12);
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, var(--bg-secondary) 100%);
+}
+
+body[data-page="observables"] .stat-card-watched .stat-value{
+    color: var(--warning);
+}
+
+/* Watchlist Banner */
+body[data-page="observables"] .watchlist-banner{
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(245, 158, 11, 0.06) 100%);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    border-radius: var(--ion-radius-lg);
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+}
+
+body[data-page="observables"] .watchlist-alert-icon{
+    background: var(--warning);
+    color: #000;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+/* Import Modal Styles */
+body[data-page="observables"] .import-tabs{
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--ion-border);
+    padding-bottom: 0.5rem;
+}
+
+body[data-page="observables"] .import-tab{
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    border-radius: 4px 4px 0 0;
+}
+
+body[data-page="observables"] .import-tab.active{
+    color: var(--primary);
+    background: var(--bg-secondary);
+}
+
+body[data-page="observables"] .import-example{
+    background: var(--bg-secondary);
+    padding: 0.75rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    overflow-x: auto;
+    margin-bottom: 1rem;
+}
+
+body[data-page="observables"] .import-tab-content .form-group{
+    margin-bottom: 1rem;
+}
+
+body[data-page="observables"] .import-tab-content textarea{
+    width: 100%;
+    font-family: monospace;
+    background: var(--bg-secondary);
+    border: 1px solid var(--ion-border);
+    border-radius: 4px;
+    padding: 0.5rem;
+    color: var(--text);
+}
+
+/* Watchlist Alerts */
+body[data-page="observables"] .watchlist-alerts-filter{
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+body[data-page="observables"] .watchlist-alerts-list{
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+body[data-page="observables"] .watchlist-alert-item{
+    background: var(--bg-secondary);
+    border: 1px solid var(--ion-border);
+    border-radius: var(--ion-radius-lg);
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+body[data-page="observables"] .watchlist-alert-item.unread{
+    border-color: rgba(245, 158, 11, 0.3);
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, var(--bg-secondary) 100%);
+}
+
+body[data-page="observables"] .watchlist-alert-header{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+body[data-page="observables"] .watchlist-alert-type{
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+}
+
+body[data-page="observables"] .watchlist-alert-time{
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* Timeline Styles */
+body[data-page="observables"] .timeline-heatmap{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: var(--ion-radius-lg);
+}
+
+body[data-page="observables"] .heatmap-day{
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    background: var(--bg-secondary);
+}
+
+body[data-page="observables"] .heatmap-day.level-1{ background: rgba(34, 197, 94, 0.12); }
+body[data-page="observables"] .heatmap-day.level-2{ background: rgba(34, 197, 94, 0.35); }
+body[data-page="observables"] .heatmap-day.level-3{ background: rgba(34, 197, 94, 0.6); }
+body[data-page="observables"] .heatmap-day.level-4{ background: var(--success); }
+
+body[data-page="observables"] .timeline-events{
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+body[data-page="observables"] .timeline-event{
+    display: flex;
+    gap: 1rem;
+    padding: 0.75rem;
+    margin-left: 1rem;
+    margin-bottom: 0.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--ion-border);
+    border-radius: var(--ion-radius-lg);
+}
+
+body[data-page="observables"] .timeline-event-icon{
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+}
+
+body[data-page="observables"] .timeline-event.sighting .timeline-event-icon{
+    background: rgba(59, 130, 246, 0.12);
+    color: var(--primary);
+}
+
+body[data-page="observables"] .timeline-event.enrichment .timeline-event-icon{
+    background: rgba(139, 92, 246, 0.12);
+    color: var(--info);
+}
+
+body[data-page="observables"] .timeline-event-content{
+    flex: 1;
+}
+
+body[data-page="observables"] .timeline-event-time{
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+/* Badge for watchlist count */
+body[data-page="observables"] .header-actions .badge{
+    background: var(--warning);
+    color: #000;
+    padding: 0.15rem 0.4rem;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    margin-left: 0.3rem;
+}
+
+body[data-page="observables"] .stat-label{
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 0.25rem;
+}
+
+/* Filters */
+body[data-page="observables"] .observables-filters{
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+body[data-page="observables"] .observables-filters select, body[data-page="observables"] .observables-filters .search-input{
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--ion-border);
+    border-radius: var(--radius);
+    font-size: 0.875rem;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    transition: border-color 0.2s;
+}
+
+body[data-page="observables"] .observables-filters .search-input{
+    flex: 1;
+    min-width: 250px;
+}
+
+/* Observable Type Badges */
+body[data-page="observables"] .obs-type-badge{
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    min-width: 60px;
+    text-align: center;
+}
+
+body[data-page="observables"] .obs-type-badge.ipv4, body[data-page="observables"] .obs-type-badge.ipv6{ background: rgba(255,108,108,.14); color: var(--danger); }
+body[data-page="observables"] .obs-type-badge.domain{ background: rgba(154,140,255,.16); color: var(--neon-purple); }
+body[data-page="observables"] .obs-type-badge.hostname{ background: rgba(96,165,250,.14); color: var(--neon-blue); }
+body[data-page="observables"] .obs-type-badge.url{ background: rgba(134,240,160,.14); color: var(--success); }
+body[data-page="observables"] .obs-type-badge.email{ background: rgba(248,179,58,.14); color: var(--warning); }
+body[data-page="observables"] .obs-type-badge.sha256, body[data-page="observables"] .obs-type-badge.sha1, body[data-page="observables"] .obs-type-badge.md5{ background: rgba(139,148,158,.14); color: var(--text-secondary); }
+body[data-page="observables"] .obs-type-badge.filename{ background: rgba(248,179,58,.14); color: var(--warning); }
+body[data-page="observables"] .obs-type-badge.user_account{ background: rgba(109,228,255,.14); color: var(--primary); }
+body[data-page="observables"] .obs-type-badge.mac{ background: rgba(154,140,255,.16); color: var(--neon-purple); }
+body[data-page="observables"] .obs-type-badge.cve{ background: rgba(236,72,153,.16); color: var(--neon-pink); }
+
+/* Threat Level Badges */
+body[data-page="observables"] .threat-badge{
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+body[data-page="observables"] .threat-badge.critical{ background: rgba(239, 68, 68, 0.12); color: var(--danger); }
+body[data-page="observables"] .threat-badge.high{ background: rgba(249, 115, 22, 0.12); color: var(--neon-orange); }
+body[data-page="observables"] .threat-badge.medium{ background: rgba(234, 179, 8, 0.12); color: var(--warning); }
+body[data-page="observables"] .threat-badge.low{ background: rgba(59, 130, 246, 0.12); color: var(--info); }
+body[data-page="observables"] .threat-badge.benign{ background: rgba(34, 197, 94, 0.12); color: var(--success); }
+body[data-page="observables"] .threat-badge.unknown{ background: rgba(156, 163, 175, 0.12); color: var(--text-secondary); }
+
+/* Enrichment indicator */
+body[data-page="observables"] .enriched-indicator{
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+}
+
+body[data-page="observables"] .enriched-dot{
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+body[data-page="observables"] .enriched-dot.yes{ background: var(--info); }
+body[data-page="observables"] .enriched-dot.no{ background: var(--ion-border); }
+
+/* Observable Value Display */
+body[data-page="observables"] .obs-value{
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: monospace;
+    font-size: 0.8125rem;
+}
+
+body[data-page="observables"] .obs-value.whitelisted{
+    opacity: 0.6;
+    text-decoration: line-through;
+}
+
+body[data-page="observables"] .obs-value.ignored{
+    opacity: 0.45;
+    font-style: italic;
+}
+
+body[data-page="observables"] .obs-value.watched{
+    background: rgba(245, 158, 11, 0.1);
+    padding: 0.1rem 0.25rem;
+    border-radius: 3px;
+}
+
+body[data-page="observables"] .watched-icon{
+    margin-right: 0.25rem;
+}
+
+body[data-page="observables"] .actions-cell{
+    display: flex;
+    gap: 0.25rem;
+}
+
+body[data-page="observables"] .btn-warning{
+    background: rgba(245, 158, 11, 0.12);
+    border-color: var(--warning);
+}
+
+/* Pagination */
+body[data-page="observables"] .pagination{
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(99, 110, 123, 0.15);
+}
+
+body[data-page="observables"] .pagination button{
+    padding: 0.375rem 0.75rem;
+    border: 1px solid var(--ion-border);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 0.8125rem;
+    transition: border-color 0.2s;
+}
+
+body[data-page="observables"] .pagination button:hover:not(:disabled){
+    background: var(--primary-dim);
+}
+
+body[data-page="observables"] .pagination button:disabled{
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+body[data-page="observables"] .pagination button.active{
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+/* Detail Modal Sections */
+body[data-page="observables"] .detail-header{
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--ion-border);
+}
+
+body[data-page="observables"] .detail-value{
+    font-family: monospace;
+    font-size: 1.25rem;
+    font-weight: 600;
+    word-break: break-all;
+}
+
+body[data-page="observables"] .detail-meta{
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+}
+
+body[data-page="observables"] .detail-actions{
+    display: flex;
+    gap: 0.5rem;
+}
+
+body[data-page="observables"] .detail-section{
+    margin-bottom: 1.5rem;
+}
+
+body[data-page="observables"] .detail-section h4{
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--ion-border);
+}
+
+body[data-page="observables"] .detail-enrichment{
+    background: var(--bg-secondary);
+    border: 1px solid var(--ion-border);
+    border-radius: var(--radius);
+    padding: 1rem;
+}
+
+body[data-page="observables"] .enrichment-header{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+body[data-page="observables"] .enrichment-source{
+    font-weight: 600;
+    color: var(--info);
+}
+
+body[data-page="observables"] .enrichment-time{
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+body[data-page="observables"] .enrichment-score{
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+body[data-page="observables"] .score-bar{
+    flex: 1;
+    height: 8px;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+body[data-page="observables"] .score-fill{
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.2s;
+}
+
+body[data-page="observables"] .score-fill.critical{ background: var(--danger); }
+body[data-page="observables"] .score-fill.high{ background: var(--neon-orange); }
+body[data-page="observables"] .score-fill.medium{ background: var(--warning); }
+body[data-page="observables"] .score-fill.low{ background: var(--info); }
+body[data-page="observables"] .score-fill.benign{ background: var(--success); }
+
+body[data-page="observables"] .enrichment-labels{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-bottom: 0.75rem;
+}
+
+body[data-page="observables"] .enrichment-label{
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    background: rgba(139, 92, 246, 0.12);
+    color: var(--info);
+}
+
+body[data-page="observables"] .threat-actor-tag{
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    background: rgba(239, 68, 68, 0.12);
+    color: var(--danger);
+    margin-right: 0.25rem;
+    margin-bottom: 0.25rem;
+}
+
+body[data-page="observables"] .related-list{
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+body[data-page="observables"] .related-item{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    border-bottom: 1px solid rgba(99, 110, 123, 0.15);
+    font-size: 0.8125rem;
+}
+
+body[data-page="observables"] .related-item:last-child{
+    border-bottom: none;
+}
+
+body[data-page="observables"] .related-item:hover{
+    background: var(--primary-dim);
+}
+
+body[data-page="observables"] .co-occur-badge{
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--ion-border);
+    margin: 0.25rem;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+body[data-page="observables"] .co-occur-badge:hover{
+    border-color: var(--primary);
+}
+
+body[data-page="observables"] .notes-textarea{
+    width: 100%;
+    min-height: 80px;
+    padding: 0.5rem;
+    border: 1px solid var(--ion-border);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.8125rem;
+    resize: vertical;
+    transition: border-color 0.2s;
+}
+
+body[data-page="observables"] .tags-input-container{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    padding: 0.5rem;
+    border: 1px solid var(--ion-border);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    min-height: 40px;
+}
+
+body[data-page="observables"] .tag-chip{
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    background: var(--primary);
+    color: white;
+}
+
+body[data-page="observables"] .tag-chip .remove{
+    cursor: pointer;
+    opacity: 0.7;
+}
+
+body[data-page="observables"] .tag-chip .remove:hover{
+    opacity: 1;
+}
+
+body[data-page="observables"] .tags-input-container input{
+    flex: 1;
+    min-width: 100px;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    outline: none;
+    font-size: 0.75rem;
+}
+
+body[data-page="observables"] .empty-state{
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+}
+
+/* Graph Modal */
+body[data-page="observables"] .modal-xlarge{
+    max-width: 95vw;
+    width: 1400px;
+    height: 85vh;
+}
+
+body[data-page="observables"] .modal-xlarge .modal-body{
+    height: calc(100% - 60px);
+    display: flex;
+    flex-direction: column;
+}
+
+body[data-page="observables"] .graph-controls{
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+}
+
+body[data-page="observables"] .graph-controls label{
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+}
+
+body[data-page="observables"] .graph-controls input{
+    width: 60px;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--ion-border);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+body[data-page="observables"] .graph-legend{
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.75rem;
+    flex-wrap: wrap;
+}
+
+body[data-page="observables"] .legend-item{
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+body[data-page="observables"] .legend-dot{
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+body[data-page="observables"] .graph-container{
+    flex: 1;
+    border: 1px solid var(--ion-border);
+    border-radius: var(--ion-radius-lg);
+    background: var(--bg-secondary);
+    min-height: 400px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+
+/* Patterns */
+body[data-page="observables"] .patterns-controls{
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+body[data-page="observables"] .patterns-controls label{
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+}
+
+body[data-page="observables"] .patterns-controls input{
+    width: 60px;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--ion-border);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+body[data-page="observables"] .patterns-desc{
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+}
+
+body[data-page="observables"] .patterns-list{
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+body[data-page="observables"] .pattern-card{
+    background: var(--bg-secondary);
+    border: 1px solid var(--ion-border);
+    border-radius: var(--ion-radius-lg);
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+body[data-page="observables"] .pattern-header{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+body[data-page="observables"] .pattern-count{
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+body[data-page="observables"] .pattern-count-label{
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+body[data-page="observables"] .pattern-meta{
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+body[data-page="observables"] .pattern-observables{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+body[data-page="observables"] .pattern-observable{
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.375rem 0.625rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--ion-border);
+    border-radius: 4px;
+    font-size: 0.8125rem;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+body[data-page="observables"] .pattern-observable:hover{
+    border-color: var(--primary);
+}
+
+body[data-page="observables"] .pattern-observable .obs-type-badge{
+    min-width: auto;
+    padding: 0.0625rem 0.25rem;
+    font-size: 0.625rem;
+}
+
+body[data-page="observables"] .pattern-actions{
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(99, 110, 123, 0.15);
+}
+
+/* Toast animations */
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+body[data-page="observables"] .context-badge{
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    margin-left: 0.4rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    vertical-align: middle;
+}
+body[data-page="observables"] .context-badge.ctx-source{ background: rgba(59, 130, 246, 0.12); color: #60a5fa; }
+body[data-page="observables"] .context-badge.ctx-dest{ background: rgba(249, 115, 22, 0.12); color: var(--neon-orange); }
+body[data-page="observables"] .context-badge.ctx-subject{ background: rgba(168, 85, 247, 0.12); color: var(--neon-purple); }
+body[data-page="observables"] .context-badge.ctx-target{ background: rgba(239, 68, 68, 0.12); color: var(--danger); }
+body[data-page="observables"] .context-badge.ctx-host{ background: rgba(34, 197, 94, 0.12); color: var(--success); }
+body[data-page="observables"] .context-badge.ctx-generic{ background: rgba(156, 163, 175, 0.12); color: var(--text-secondary); }
+
+body[data-page="observables"] .ion-fragment-loading, body[data-page="observables"] .ion-fragment-message{text-align:center;padding:2rem;color:var(--text-secondary);}
+body[data-page="observables"] .observable-toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 10000; }
+body[data-page="observables"] .ion-toast { background: var(--bg-secondary); color: var(--text-primary); padding: 12px 20px; border-radius: 8px; margin-top: 10px; box-shadow: 0 4px 12px rgba(0,0,0,.3); animation: slideIn .3s ease; }
+body[data-page="observables"] .toast-error { border: 1px solid var(--danger); }
+body[data-page="observables"] .toast-success { border: 1px solid var(--success); }
+body[data-page="observables"] .toast-info { border: 1px solid var(--info); }
+body[data-page="observables"] .observable-toast-exit { animation: fadeOut .3s ease; }

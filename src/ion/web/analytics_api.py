@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ion.auth.dependencies import get_current_user
+from ion.auth.dependencies import require_permission
 from ion.core.safe_errors import safe_error
 from ion.models.analytics import AnalyticsJob, AnalyticsSnapshot
 from ion.models.user import User
@@ -24,7 +24,7 @@ class AnalyticsJobUpdate(BaseModel):
 
 @router.get("/jobs")
 def list_analytics_jobs(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ):
     """List all analytics jobs with their latest results."""
@@ -52,7 +52,7 @@ def list_analytics_jobs(
 @router.get("/jobs/{job_type}")
 def get_analytics_job(
     job_type: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ):
     """Get a single analytics job with its full latest result."""
@@ -78,7 +78,7 @@ def get_analytics_job(
 @router.post("/jobs/{job_type}/run")
 def run_analytics_job(
     job_type: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("system:settings")),
     session: Session = Depends(get_db_session),
 ):
     """Manually trigger an analytics job."""
@@ -94,7 +94,7 @@ def run_analytics_job(
 def update_analytics_job(
     job_type: str,
     data: AnalyticsJobUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("system:settings")),
     session: Session = Depends(get_db_session),
 ):
     """Update an analytics job's schedule or enabled state."""
@@ -120,7 +120,7 @@ def update_analytics_job(
 def get_analytics_snapshots(
     job_type: str,
     days: int = 7,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ):
     """Get historical snapshots for a job (for trend charts)."""
@@ -145,7 +145,7 @@ def get_analytics_snapshots(
 
 @router.get("/dashboard")
 def get_analytics_dashboard(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ):
     """Get aggregated dashboard data from all analytics jobs."""
@@ -198,7 +198,7 @@ def get_analytics_dashboard(
 @router.get("/system-overview")
 async def get_system_overview(
     hours: int = 168,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ):
     """Combined system analytics: ES alert data + CyAB namespace mappings + TIDE coverage.
@@ -212,15 +212,36 @@ async def get_system_overview(
     from ion.services.tide_service import get_tide_service
 
     # 1. Load ES system analytics
+    #
+    # Three ways this does not happen: no url configured, a service that
+    # reports itself not configured, and a read that throws. All three left
+    # the empty default in place, and only the third recorded anything, an
+    # `error` key no consumer read. A caller could not tell an estate with no
+    # systems from an Elasticsearch nobody could reach, so the alerts page's
+    # systems tab advised connecting Elasticsearch as the explanation for a
+    # panel that was empty because Elasticsearch was not connected.
+    #
+    # es_failed below says whether the alert figures in this payload are a
+    # reading or the placeholder. The system list is a separate question: it
+    # merges these with the CyAB namespace mappings out of ION's own
+    # database, so it can be a real answer even when this half failed.
     es_data = {"systems": [], "total": 0, "total_severity": {}, "total_timeline": []}
+    es_read = False
+    es_error = None
     config = get_elasticsearch_config()
-    if config.get("url"):
+    if not config.get("url"):
+        es_error = "Elasticsearch is not configured"
+    else:
         try:
             es = ElasticsearchService()
             if es.is_configured:
                 es_data = await es.get_system_analytics(hours=hours)
+                es_read = True
+            else:
+                es_error = "Elasticsearch is not configured"
         except Exception as e:
-            es_data["error"] = safe_error(e, "analytics_es")
+            es_error = safe_error(e, "analytics_es")
+            es_data["error"] = es_error
 
     # 2. Load CyAB namespace mappings
     sources = session.query(CyabDataSource).filter(
@@ -340,5 +361,9 @@ async def get_system_overview(
         "indices": es_data.get("indices", []),
         "hours": hours,
         "interval": es_data.get("interval", "1h"),
-        "error": es_data.get("error"),
+        "error": es_data.get("error") or es_error,
+        # Whether the Elasticsearch half of this payload happened. The
+        # figures above that come from it are placeholders when this is
+        # true, not measurements of a quiet estate.
+        "es_failed": not es_read,
     }

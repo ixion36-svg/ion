@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}AI Document Analysis - ION{% endblock %}
+{% block page_id %}document_analysis{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
@@ -73,15 +74,6 @@
   </div>
 </section>
 
-<style nonce="{{ csp_nonce }}">
-/* JS toggles .dw-hidden (not Tailwind .hidden). Combined selectors so daisyUI
-   .alert / .card display values cannot win on source order. */
-.dw-hidden { display: none; }
-#disabled-banner.dw-hidden,
-#da-custom-wrap.dw-hidden,
-#da-progress-card.dw-hidden,
-#da-result-card.dw-hidden { display: none; }
-</style>
 
 <script nonce="{{ csp_nonce }}">
 function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }

@@ -345,11 +345,19 @@ async def logout(
     return {"message": "Logout successful"}
 
 
-@router.get("/auth/me")
-async def get_current_user_info(
-    current_user: User = Depends(get_current_user),
-):
-    """Get current user information."""
+def current_user_payload(current_user: User) -> dict:
+    """Everything GET /api/auth/me answers with, for one caller or two.
+
+    Extracted so /ui/profile renders the account card from this rather than
+    from a second copy. The permission set is the part that must not be
+    duplicated: it unions over ``effective_roles``, which is focus-mode
+    filtered, so a second copy reading ``roles`` would show an analyst in
+    focus mode permissions their session does not currently carry.
+
+    Takes the already-authenticated user and nothing else. There is no
+    account selector here or in either caller, which is how a profile read
+    cannot be pointed at somebody else's row.
+    """
     focus_role = getattr(current_user, '_focus_role', None)
     return {
         "id": current_user.id,
@@ -370,6 +378,14 @@ async def get_current_user_info(
         "elastic_uid": getattr(current_user, "elastic_uid", None),
         "keycloak_sub": getattr(current_user, "keycloak_sub", None),
     }
+
+
+@router.get("/auth/me")
+async def get_current_user_info(
+    current_user: User = Depends(get_current_user),
+):
+    """Get current user information."""
+    return current_user_payload(current_user)
 
 
 class FocusModeRequest(BaseModel):
@@ -473,15 +489,20 @@ def update_own_profile(
     }
 
 
-@router.post("/auth/profile/resolve-elastic")
-def resolve_elastic_uid(
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db_session),
-):
+def resolve_elastic_payload(current_user: User, session: Session) -> dict:
     """Resolve the current user's Elastic/Kibana user profile UID.
 
     Tries: elastic_username → ION username → email prefix.
     Queries Kibana's user profile suggest API.
+
+    Extracted so POST /ui/profile/resolve-elastic runs this and not a second
+    copy of the candidate order. It raises HTTPException(400) when Kibana is
+    not configured, which is deliberately not the same answer as "no match":
+    the fragment words those two differently because they lead to different
+    actions, and keeping the gate here means both callers see it the same way.
+
+    The write is scoped by ``id=current_user.id``, so the only row this can
+    touch is the caller's own.
     """
 
     kb_svc = get_kibana_cases_service()
@@ -545,6 +566,15 @@ def resolve_elastic_uid(
         "candidates_tried": candidates,
         "profiles_found": all_profiles,
     }
+
+
+@router.post("/auth/profile/resolve-elastic")
+def resolve_elastic_uid(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Resolve the current user's Elastic/Kibana user profile UID."""
+    return resolve_elastic_payload(current_user, session)
 
 
 @router.post("/auth/change-password")
@@ -874,35 +904,69 @@ async def list_assignable_users(
     return await asyncio.to_thread(_query_assignable)
 
 
+def users_list_payload(
+    session: Session, include_inactive: bool = False
+) -> list[dict]:
+    """The user list both `GET /api/users` and `/ui/users` are built from.
+
+    Extracted so the fragment cannot grow a second copy of the row shape or
+    of `list_all`'s inactive filter. There is no per-caller scoping to
+    reimplement here either: `UserRepository.list_all` returns every row and
+    the only thing it filters on is `is_active`.
+
+    `last_login` stays an ISO string rather than a datetime because the
+    fragment's `ts` macro and FastAPI's serialiser both want the same value,
+    and a naive datetime leaving this function would let one of them format
+    it on the server's clock.
+    """
+    user_repo = UserRepository(session)
+    users = user_repo.list_all(include_inactive=include_inactive)
+    return [
+        {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "display_name": u.display_name,
+            "is_active": u.is_active,
+            "last_login": u.last_login.isoformat() if u.last_login else None,
+            "roles": [r.name for r in u.roles],
+            "employment_type": getattr(u, "employment_type", None) or "cs",
+            "elastic_username": getattr(u, "elastic_username", None),
+            "elastic_uid": getattr(u, "elastic_uid", None),
+            "keycloak_sub": getattr(u, "keycloak_sub", None),
+            "gitlab_username": getattr(u, "gitlab_username", None),
+            "created_at": u.created_at.isoformat() if u.created_at else None,
+        }
+        for u in users
+    ]
+
+
+def user_delete_refusal(target_user_id, actor_user_id) -> str | None:
+    """Why `DELETE /api/users/{user_id}` would refuse, or None to proceed.
+
+    One definition, so the Delete button on /users can be derived from the
+    rule rather than restating it. The page used to render Delete on every
+    row including the viewer's own, and clicking was the only way to find
+    out that the server refuses it.
+
+    `is not None` on both ids rather than a bare equality: a row with no id
+    and a viewer with no id would otherwise compare equal and withhold the
+    button for a reason that does not exist.
+    """
+    if target_user_id is None or actor_user_id is None:
+        return None
+    if target_user_id == actor_user_id:
+        return "Cannot delete your own account"
+    return None
+
+
 @router.get("/users", dependencies=[Depends(require_permission("user:read"))])
 async def list_users(
     include_inactive: bool = False,
     session: Session = Depends(get_db_session),
 ):
     """List all users (admin only)."""
-    def _query_users():
-        user_repo = UserRepository(session)
-        users = user_repo.list_all(include_inactive=include_inactive)
-        return [
-            {
-                "id": u.id,
-                "username": u.username,
-                "email": u.email,
-                "display_name": u.display_name,
-                "is_active": u.is_active,
-                "last_login": u.last_login.isoformat() if u.last_login else None,
-                "roles": [r.name for r in u.roles],
-                "employment_type": getattr(u, "employment_type", None) or "cs",
-                "elastic_username": getattr(u, "elastic_username", None),
-                "elastic_uid": getattr(u, "elastic_uid", None),
-                "keycloak_sub": getattr(u, "keycloak_sub", None),
-                "gitlab_username": getattr(u, "gitlab_username", None),
-                "created_at": u.created_at.isoformat() if u.created_at else None,
-            }
-            for u in users
-        ]
-
-    return await asyncio.to_thread(_query_users)
+    return await asyncio.to_thread(users_list_payload, session, include_inactive)
 
 
 @router.post("/users", dependencies=[Depends(require_permission("user:create"))])
@@ -1064,8 +1128,12 @@ def delete_user(
     session: Session = Depends(get_db_session),
 ):
     """Delete a user (admin only)."""
-    if user_id == current_user.id:
-        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+    # The predicate rather than the comparison, so the Delete button the
+    # /users fragment renders is derived from this rule instead of restating
+    # it. Same status and same detail string as before.
+    refusal = user_delete_refusal(user_id, current_user.id)
+    if refusal is not None:
+        raise HTTPException(status_code=400, detail=refusal)
 
     user_repo = UserRepository(session)
     audit_repo = AuditLogRepository(session)
@@ -1172,6 +1240,31 @@ def reset_user_password(
 # Roles endpoint
 # =============================================================================
 
+def roles_list_payload(session: Session) -> list[dict]:
+    """The role list both `GET /api/roles` and `/ui/users/role-options` use.
+
+    Extracted for the same reason as `users_list_payload`: the role picker on
+    /users is server-rendered now, and a second copy of this row shape would
+    let the picker and the API disagree about what a role is.
+
+    `permissions` is always a list here, even when empty. A role with no
+    permissions is a real measurement, and the picker it feeds counts that
+    list, so a missing key arriving as a confident "0 permissions" is the
+    one thing this shape must not allow.
+    """
+    role_repo = RoleRepository(session)
+    return [
+        {
+            "id": r.id,
+            "name": r.name,
+            "description": r.description,
+            "is_system": r.is_system,
+            "permissions": [p.name for p in r.permissions],
+        }
+        for r in role_repo.list_all()
+    ]
+
+
 @router.get("/roles", dependencies=[Depends(require_permission("user:read"))])
 def list_roles(
     current_user: User = Depends(get_current_user),
@@ -1185,19 +1278,7 @@ def list_roles(
     analysts have no legitimate reason to enumerate roles; admins
     and team leads who do will already have user:read.
     """
-    role_repo = RoleRepository(session)
-    roles = role_repo.list_all()
-
-    return [
-        {
-            "id": r.id,
-            "name": r.name,
-            "description": r.description,
-            "is_system": r.is_system,
-            "permissions": [p.name for p in r.permissions],
-        }
-        for r in roles
-    ]
+    return roles_list_payload(session)
 
 
 # =============================================================================
@@ -1464,16 +1545,8 @@ async def remove_document_from_collection(
 # =============================================================================
 # Template endpoints (protected)
 # =============================================================================
-@router.get("/templates", dependencies=[Depends(require_permission("template:read"))])
-async def list_templates(
-    format: Optional[str] = None,
-    tag: Optional[str] = None,
-    search: Optional[str] = None,
-    collection_id: Optional[int] = None,
-    document_type: Optional[str] = None,
-    services: Services = Depends(get_services),
-):
-    """List all templates."""
+def templates_payload(services: Services, format=None, tag=None, search=None, collection_id=None, document_type=None):
+    """The unchanged template-list response shared by JSON and HTML readers."""
     if search:
         templates = services.template.search_templates(search)
     else:
@@ -1501,6 +1574,20 @@ async def list_templates(
     ]
 
 
+
+@router.get("/templates", dependencies=[Depends(require_permission("template:read"))])
+async def list_templates(
+    format: Optional[str] = None,
+    tag: Optional[str] = None,
+    search: Optional[str] = None,
+    collection_id: Optional[int] = None,
+    document_type: Optional[str] = None,
+    services: Services = Depends(get_services),
+):
+    """List all templates."""
+    return templates_payload(services, format=format, tag=tag, search=search,
+                             collection_id=collection_id, document_type=document_type)
+
 @router.post("/templates", dependencies=[Depends(require_permission("template:create"))])
 async def create_template(template: TemplateCreate, services: Services = Depends(get_services)):
     """Create a new template."""
@@ -1527,43 +1614,60 @@ async def get_section_types():
     return SECTION_TYPES
 
 
+def template_payload(services: Services, template_id: int) -> dict:
+    """One template as GET /api/templates/{id} returns it.
+
+    Extracted so the /ui/template-form and /ui/template-render fragments read
+    the template through the same function the JSON endpoint does. Both pages
+    drive this one endpoint, so without this there would be three definitions
+    of what a template row is, and `has_sections` is the one field a fragment
+    cannot afford to get wrong: it decides whether the section editor opens on
+    the stored sections or offers to convert a legacy raw template.
+
+    Raises TemplateNotFoundError, which the JSON route turns into a 404 and a
+    fragment turns into a "no such template" render. Those are different
+    answers to different questions, so the translation stays at each caller.
+    """
+    t = services.template.get_template(template_id)
+    sections_json = None
+    has_sections = False
+    if t.sections_json:
+        try:
+            sections_json = json.loads(t.sections_json)
+            has_sections = True
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return {
+        "id": t.id,
+        "name": t.name,
+        "content": t.content,
+        "format": t.format,
+        "description": t.description,
+        "document_type": t.document_type,
+        "current_version": t.current_version,
+        "tags": [tag.name for tag in t.tags],
+        "variables": [
+            {
+                "name": v.name,
+                "var_type": v.var_type,
+                "required": v.required,
+                "default_value": v.default_value,
+                "description": v.description,
+            }
+            for v in t.variables
+        ],
+        "sections": sections_json,
+        "has_sections": has_sections,
+        "created_at": t.created_at.isoformat() if t.created_at else None,
+        "updated_at": t.updated_at.isoformat() if t.updated_at else None,
+    }
+
+
 @router.get("/templates/{template_id}", dependencies=[Depends(require_permission("template:read"))])
 async def get_template(template_id: int, services: Services = Depends(get_services)):
     """Get a template by ID."""
     try:
-        t = services.template.get_template(template_id)
-        sections_json = None
-        has_sections = False
-        if t.sections_json:
-            try:
-                sections_json = json.loads(t.sections_json)
-                has_sections = True
-            except (json.JSONDecodeError, TypeError):
-                pass
-        return {
-            "id": t.id,
-            "name": t.name,
-            "content": t.content,
-            "format": t.format,
-            "description": t.description,
-            "document_type": t.document_type,
-            "current_version": t.current_version,
-            "tags": [tag.name for tag in t.tags],
-            "variables": [
-                {
-                    "name": v.name,
-                    "var_type": v.var_type,
-                    "required": v.required,
-                    "default_value": v.default_value,
-                    "description": v.description,
-                }
-                for v in t.variables
-            ],
-            "sections": sections_json,
-            "has_sections": has_sections,
-            "created_at": t.created_at.isoformat() if t.created_at else None,
-            "updated_at": t.updated_at.isoformat() if t.updated_at else None,
-        }
+        return template_payload(services, template_id)
     except TemplateNotFoundError:
         raise HTTPException(status_code=404, detail="Template not found")
 
@@ -1880,36 +1984,50 @@ async def batch_render_template(
         raise HTTPException(status_code=400, detail=safe_error(e))
 
 
+def template_variables_payload(services: Services, template_id: int) -> dict:
+    """A template's variables as GET /api/templates/{id}/variables returns them.
+
+    Extracted for /ui/template-render, whose variables form is built from
+    exactly this pair of lists. `extracted` is what the content actually
+    references and `defined` is what the template declares about those names,
+    and the form needs both: a name in `extracted` with no entry in `defined`
+    is a variable nobody described, not a variable that is optional.
+
+    Raises TemplateNotFoundError, translated by each caller.
+    """
+    t = services.template.get_template(template_id)
+
+    from ion.engine.renderer import TemplateRenderer
+    renderer = TemplateRenderer()
+    extracted = renderer.extract_variables(t.content)
+
+    import json as _json
+    defined = []
+    for v in t.variables:
+        d = {
+            "name": v.name,
+            "var_type": v.var_type,
+            "required": v.required,
+            "default_value": v.default_value,
+        }
+        if v.options:
+            try:
+                d["options"] = _json.loads(v.options)
+            except (ValueError, TypeError):
+                pass
+        defined.append(d)
+
+    return {
+        "extracted": list(extracted),
+        "defined": defined,
+    }
+
+
 @router.get("/templates/{template_id}/variables", dependencies=[Depends(require_permission("template:read"))])
 async def get_template_variables(template_id: int, services: Services = Depends(get_services)):
     """Get variables used in a template."""
     try:
-        t = services.template.get_template(template_id)
-
-        from ion.engine.renderer import TemplateRenderer
-        renderer = TemplateRenderer()
-        extracted = renderer.extract_variables(t.content)
-
-        import json as _json
-        defined = []
-        for v in t.variables:
-            d = {
-                "name": v.name,
-                "var_type": v.var_type,
-                "required": v.required,
-                "default_value": v.default_value,
-            }
-            if v.options:
-                try:
-                    d["options"] = _json.loads(v.options)
-                except (ValueError, TypeError):
-                    pass
-            defined.append(d)
-
-        return {
-            "extracted": list(extracted),
-            "defined": defined,
-        }
+        return template_variables_payload(services, template_id)
     except TemplateNotFoundError:
         raise HTTPException(status_code=404, detail="Template not found")
 
@@ -2425,6 +2543,77 @@ async def get_stats(
     }
 
 
+#: How long either half of the dashboard's integration fetch gets before the
+#: page is served without it. Named rather than repeated so the fragment and
+#: the JSON endpoint cannot time out at different lengths.
+DASHBOARD_FETCH_TIMEOUT = 8.0
+
+
+async def dashboard_elasticsearch_payload() -> dict:
+    """The ``elasticsearch`` block of GET /api/dashboard, unchanged.
+
+    Extracted for the reason the five payload functions above it were: the
+    landing page's alert feed is rendered by ``ion.web.ui.dashboard_v2`` now,
+    and a second copy of this would be a second answer to how many alerts are
+    open. The severity counting, the 8-second ceiling and the three states
+    this returns are the part worth sharing.
+
+    Three outcomes, which the caller has to keep apart:
+
+      ``enabled`` false   Elasticsearch is not configured. The counts in the
+                          dict are the initialiser's zeros and mean nothing
+                          was asked, which is not the same as nothing found.
+      ``connected`` false Configured and the query did not come back. Same
+                          zeros, same warning, and an ``error`` saying so.
+      ``connected`` true  The counts are measurements.
+    """
+    data = {
+        "enabled": False,
+        "connected": False,
+        "alerts": [],
+        "total_alerts": 0,
+        "critical_count": 0,
+        "high_count": 0,
+        "alerts_histogram": [],
+    }
+
+    async def _fetch() -> dict:
+        es_config = get_elasticsearch_config()
+        if es_config.get("enabled") and es_config.get("url"):
+            data["enabled"] = True
+            try:
+                from ion.services.elasticsearch_service import ElasticsearchService
+                es_service = ElasticsearchService()
+                if es_service.is_configured:
+                    # Skip test_connection() — the alerts query itself will
+                    # fail fast if ES is down, saving a redundant round-trip.
+                    try:
+                        alerts, histogram = await asyncio.gather(
+                            es_service.get_alerts(hours=24, limit=10),
+                            es_service.get_alerts_histogram(hours=24, interval="1h"),
+                        )
+                        data["connected"] = True
+                        data["alerts"] = [a.to_dict(include_raw=False) for a in alerts]
+                        data["total_alerts"] = len(alerts)
+                        data["critical_count"] = sum(1 for a in alerts if a.severity == "critical")
+                        data["high_count"] = sum(1 for a in alerts if a.severity == "high")
+                        data["alerts_histogram"] = histogram or []
+                    except Exception:
+                        data["error"] = "Elasticsearch connection failed"
+            except Exception as e:
+                data["error"] = safe_error(e)
+        return data
+
+    try:
+        return await asyncio.wait_for(_fetch(), timeout=DASHBOARD_FETCH_TIMEOUT)
+    except asyncio.TimeoutError:
+        return {
+            "enabled": True, "connected": False, "alerts": [],
+            "total_alerts": 0, "critical_count": 0, "high_count": 0,
+            "error": "Connection timed out",
+        }
+
+
 @router.get("/dashboard")
 async def get_dashboard(
     current_user: User = Depends(get_current_user),
@@ -2494,62 +2683,21 @@ async def get_dashboard(
                 data["error"] = safe_error(e)
         return data
 
-    async def fetch_elasticsearch_data():
-        data = {
-            "enabled": False,
-            "connected": False,
-            "alerts": [],
-            "total_alerts": 0,
-            "critical_count": 0,
-            "high_count": 0,
-            "alerts_histogram": [],
-        }
-        es_config = get_elasticsearch_config()
-        if es_config.get("enabled") and es_config.get("url"):
-            data["enabled"] = True
-            try:
-                from ion.services.elasticsearch_service import ElasticsearchService
-                es_service = ElasticsearchService()
-                if es_service.is_configured:
-                    # Skip test_connection() — the alerts query itself will
-                    # fail fast if ES is down, saving a redundant round-trip.
-                    try:
-                        alerts, histogram = await asyncio.gather(
-                            es_service.get_alerts(hours=24, limit=10),
-                            es_service.get_alerts_histogram(hours=24, interval="1h"),
-                        )
-                        data["connected"] = True
-                        data["alerts"] = [a.to_dict(include_raw=False) for a in alerts]
-                        data["total_alerts"] = len(alerts)
-                        data["critical_count"] = sum(1 for a in alerts if a.severity == "critical")
-                        data["high_count"] = sum(1 for a in alerts if a.severity == "high")
-                        data["alerts_histogram"] = histogram or []
-                    except Exception:
-                        data["error"] = "Elasticsearch connection failed"
-            except Exception as e:
-                data["error"] = safe_error(e)
-        return data
-
     # Run both with 8 second timeouts so dashboard loads quickly
     async def safe_fetch(coro):
         try:
-            return await asyncio.wait_for(coro, timeout=8.0)
+            return await asyncio.wait_for(coro, timeout=DASHBOARD_FETCH_TIMEOUT)
         except asyncio.TimeoutError:
             return None
 
-    gitlab_result, es_result = await asyncio.gather(
+    gitlab_result, elasticsearch_data = await asyncio.gather(
         safe_fetch(fetch_gitlab_data()),
-        safe_fetch(fetch_elasticsearch_data()),
+        dashboard_elasticsearch_payload(),
     )
 
     gitlab_data = gitlab_result or {
         "enabled": True, "connected": False, "open_issues": [],
         "assigned_to_me": [], "total_open": 0, "error": "Connection timed out",
-    }
-    elasticsearch_data = es_result or {
-        "enabled": True, "connected": False, "alerts": [],
-        "total_alerts": 0, "critical_count": 0, "high_count": 0,
-        "error": "Connection timed out",
     }
 
     focus_role = getattr(current_user, '_focus_role', None)
@@ -2574,6 +2722,146 @@ async def get_dashboard(
     }
 
 
+def team_metrics_payload(session: Session) -> dict:
+    """The whole body of GET /api/dashboard/team-metrics.
+
+    Extracted so the landing page's mean-time-to-resolve and closure-rate
+    tiles are the same two numbers the endpoint reports. Both of them can be
+    None here and mean something specific: ``mttr_hours`` is None when no case
+    closed in the last thirty days, and ``closure_rate_7d`` is None when no
+    case was opened in the last seven, because there is nothing to divide by.
+    Neither is zero, and a second copy of this arithmetic is how a page starts
+    printing one for the other.
+
+    Synchronous. The route runs it in a thread because it is 8+ queries that
+    would otherwise block the loop, and a caller already on a thread calls it
+    directly.
+    """
+    from sqlalchemy import func as sqlfunc
+
+    from ion.models.alert_triage import (
+        AlertCase,
+        AlertCaseStatus,
+        AlertTriage,
+        AlertTriageStatus,
+    )
+
+    now = datetime.utcnow()
+
+    open_cases = session.query(sqlfunc.count(AlertCase.id)).filter(
+        AlertCase.status != AlertCaseStatus.CLOSED
+    ).scalar() or 0
+
+    unassigned_alerts = session.query(sqlfunc.count(AlertTriage.id)).filter(
+        AlertTriage.case_id.is_(None),
+        AlertTriage.status == AlertTriageStatus.OPEN,
+    ).scalar() or 0
+
+    thirty_days_ago = now - timedelta(days=30)
+    closed_cases_30d = session.query(AlertCase).filter(
+        AlertCase.closed_at >= thirty_days_ago,
+        AlertCase.closed_at.isnot(None),
+    ).all()
+
+    mttr = None
+    if closed_cases_30d:
+        durations = [(c.closed_at - c.created_at).total_seconds() / 3600 for c in closed_cases_30d]
+        mttr = round(sum(durations) / len(durations), 1)
+
+    seven_days_ago = now - timedelta(days=7)
+    created_7d = session.query(sqlfunc.count(AlertCase.id)).filter(
+        AlertCase.created_at >= seven_days_ago
+    ).scalar() or 0
+    closed_7d = session.query(sqlfunc.count(AlertCase.id)).filter(
+        AlertCase.closed_at >= seven_days_ago
+    ).scalar() or 0
+
+    severity_rows = session.query(
+        AlertCase.severity, sqlfunc.count(AlertCase.id)
+    ).filter(
+        AlertCase.status != AlertCaseStatus.CLOSED
+    ).group_by(AlertCase.severity).all()
+    severity_counts = dict(severity_rows)
+
+    assignee_rows = session.query(
+        AlertCase.assigned_to_id,
+        sqlfunc.count(AlertCase.id),
+    ).filter(
+        AlertCase.status != AlertCaseStatus.CLOSED
+    ).group_by(AlertCase.assigned_to_id).all()
+
+    closed_by_assignee_rows = session.query(
+        AlertCase.assigned_to_id,
+        sqlfunc.count(AlertCase.id),
+    ).filter(
+        AlertCase.closed_at >= seven_days_ago,
+    ).group_by(AlertCase.assigned_to_id).all()
+    closed_by_assignee = dict(closed_by_assignee_rows)
+
+    recent_closures_q = session.query(AlertCase).filter(
+        AlertCase.closed_at.isnot(None)
+    ).order_by(AlertCase.closed_at.desc()).limit(10).all()
+
+    # One lookup for both loops below — each used to query User per row.
+    user_ids = {uid for uid, _ in assignee_rows if uid is not None}
+    user_ids.update(c.closed_by_id for c in recent_closures_q if c.closed_by_id)
+    users_by_id = {
+        u.id: u
+        for u in (
+            session.query(User).filter(User.id.in_(user_ids)).all()
+            if user_ids else []
+        )
+    }
+
+    cases_by_assignee = []
+    for user_id, open_count in assignee_rows:
+        if user_id is None:
+            cases_by_assignee.append({
+                "username": "Unassigned",
+                "display_name": "Unassigned",
+                "open_count": open_count,
+                "closed_7d": closed_by_assignee.get(None, 0),
+            })
+        else:
+            user = users_by_id.get(user_id)
+            cases_by_assignee.append({
+                "username": user.username if user else "Unknown",
+                "display_name": user.display_name if user else "Unknown",
+                "open_count": open_count,
+                "closed_7d": closed_by_assignee.get(user_id, 0),
+            })
+
+    recent_closures = []
+    for c in recent_closures_q:
+        closed_by_user = users_by_id.get(c.closed_by_id) if c.closed_by_id else None
+        recent_closures.append({
+            "id": c.id,
+            "case_number": c.case_number,
+            "title": c.title,
+            "severity": c.severity,
+            "closure_reason": c.closure_reason,
+            "closed_by": closed_by_user.display_name if closed_by_user else "Unknown",
+            "closed_at": c.closed_at.isoformat() if c.closed_at else None,
+        })
+
+    return {
+        "open_cases": open_cases,
+        "unassigned_alerts": unassigned_alerts,
+        "mttr_hours": mttr,
+        "closure_rate_7d": round(closed_7d / created_7d * 100, 1) if created_7d > 0 else None,
+        "created_7d": created_7d,
+        "closed_7d": closed_7d,
+        "cases_by_severity": {
+            "critical": severity_counts.get("critical", 0),
+            "high": severity_counts.get("high", 0),
+            "medium": severity_counts.get("medium", 0),
+            "low": severity_counts.get("low", 0),
+        },
+        "cases_by_assignee": cases_by_assignee,
+        "recent_closures": recent_closures,
+    }
+
+
 @router.get("/dashboard/team-metrics", dependencies=[Depends(require_permission("alert:read"))])
 async def get_team_metrics(
     current_user: User = Depends(require_permission("alert:read")),
@@ -2582,132 +2870,7 @@ async def get_team_metrics(
     """Team performance metrics for Lead dashboard."""
     # Wrapped in to_thread — this endpoint runs 8+ DB queries (counts,
     # aggregations, per-assignee lookups) that would block the loop.
-    def _compute_team_metrics():
-        from sqlalchemy import func as sqlfunc
-
-        from ion.models.alert_triage import (
-            AlertCase,
-            AlertCaseStatus,
-            AlertTriage,
-            AlertTriageStatus,
-        )
-
-        now = datetime.utcnow()
-
-        open_cases = session.query(sqlfunc.count(AlertCase.id)).filter(
-            AlertCase.status != AlertCaseStatus.CLOSED
-        ).scalar() or 0
-
-        unassigned_alerts = session.query(sqlfunc.count(AlertTriage.id)).filter(
-            AlertTriage.case_id.is_(None),
-            AlertTriage.status == AlertTriageStatus.OPEN,
-        ).scalar() or 0
-
-        thirty_days_ago = now - timedelta(days=30)
-        closed_cases_30d = session.query(AlertCase).filter(
-            AlertCase.closed_at >= thirty_days_ago,
-            AlertCase.closed_at.isnot(None),
-        ).all()
-
-        mttr = None
-        if closed_cases_30d:
-            durations = [(c.closed_at - c.created_at).total_seconds() / 3600 for c in closed_cases_30d]
-            mttr = round(sum(durations) / len(durations), 1)
-
-        seven_days_ago = now - timedelta(days=7)
-        created_7d = session.query(sqlfunc.count(AlertCase.id)).filter(
-            AlertCase.created_at >= seven_days_ago
-        ).scalar() or 0
-        closed_7d = session.query(sqlfunc.count(AlertCase.id)).filter(
-            AlertCase.closed_at >= seven_days_ago
-        ).scalar() or 0
-
-        severity_rows = session.query(
-            AlertCase.severity, sqlfunc.count(AlertCase.id)
-        ).filter(
-            AlertCase.status != AlertCaseStatus.CLOSED
-        ).group_by(AlertCase.severity).all()
-        severity_counts = dict(severity_rows)
-
-        assignee_rows = session.query(
-            AlertCase.assigned_to_id,
-            sqlfunc.count(AlertCase.id),
-        ).filter(
-            AlertCase.status != AlertCaseStatus.CLOSED
-        ).group_by(AlertCase.assigned_to_id).all()
-
-        closed_by_assignee_rows = session.query(
-            AlertCase.assigned_to_id,
-            sqlfunc.count(AlertCase.id),
-        ).filter(
-            AlertCase.closed_at >= seven_days_ago,
-        ).group_by(AlertCase.assigned_to_id).all()
-        closed_by_assignee = dict(closed_by_assignee_rows)
-
-        recent_closures_q = session.query(AlertCase).filter(
-            AlertCase.closed_at.isnot(None)
-        ).order_by(AlertCase.closed_at.desc()).limit(10).all()
-
-        # One lookup for both loops below — each used to query User per row.
-        user_ids = {uid for uid, _ in assignee_rows if uid is not None}
-        user_ids.update(c.closed_by_id for c in recent_closures_q if c.closed_by_id)
-        users_by_id = {
-            u.id: u
-            for u in (
-                session.query(User).filter(User.id.in_(user_ids)).all()
-                if user_ids else []
-            )
-        }
-
-        cases_by_assignee = []
-        for user_id, open_count in assignee_rows:
-            if user_id is None:
-                cases_by_assignee.append({
-                    "username": "Unassigned",
-                    "display_name": "Unassigned",
-                    "open_count": open_count,
-                    "closed_7d": closed_by_assignee.get(None, 0),
-                })
-            else:
-                user = users_by_id.get(user_id)
-                cases_by_assignee.append({
-                    "username": user.username if user else "Unknown",
-                    "display_name": user.display_name if user else "Unknown",
-                    "open_count": open_count,
-                    "closed_7d": closed_by_assignee.get(user_id, 0),
-                })
-
-        recent_closures = []
-        for c in recent_closures_q:
-            closed_by_user = users_by_id.get(c.closed_by_id) if c.closed_by_id else None
-            recent_closures.append({
-                "id": c.id,
-                "case_number": c.case_number,
-                "title": c.title,
-                "severity": c.severity,
-                "closure_reason": c.closure_reason,
-                "closed_by": closed_by_user.display_name if closed_by_user else "Unknown",
-                "closed_at": c.closed_at.isoformat() if c.closed_at else None,
-            })
-
-        return {
-            "open_cases": open_cases,
-            "unassigned_alerts": unassigned_alerts,
-            "mttr_hours": mttr,
-            "closure_rate_7d": round(closed_7d / created_7d * 100, 1) if created_7d > 0 else None,
-            "created_7d": created_7d,
-            "closed_7d": closed_7d,
-            "cases_by_severity": {
-                "critical": severity_counts.get("critical", 0),
-                "high": severity_counts.get("high", 0),
-                "medium": severity_counts.get("medium", 0),
-                "low": severity_counts.get("low", 0),
-            },
-            "cases_by_assignee": cases_by_assignee,
-            "recent_closures": recent_closures,
-        }
-
-    return await asyncio.to_thread(_compute_team_metrics)
+    return await asyncio.to_thread(team_metrics_payload, session)
 
 
 # Sample templates endpoint
@@ -3407,9 +3570,25 @@ async def get_batch_triage(
     If es_statuses is provided, syncs Kibana/ES status changes into ION triage
     records (Kibana → ION direction). This handles the case where someone changes
     alert status directly in Kibana.
+
+    That sync is a write, and this endpoint is reached with alert:read, which
+    two seeded roles hold without alert:triage: `forensic`, and `metis`, the
+    service account auth/service.py scopes to "read + propose only" with
+    approval "reserved for human reviewers". Either could set any alert's
+    triage status, and create triage rows that did not exist, by naming them
+    in es_statuses. The sync needs alert:triage now.
+
+    A caller without it is not refused, because the read itself is
+    legitimate: alerts.html's loadTriageBatch sends es_statuses on every page
+    load for every viewer and drops the whole response on a non-ok status, so
+    a 403 would take the triage map away from the queue for a forensic user.
+    The sync is skipped instead, and `synced` reports whether it ran, so a
+    reconciliation nobody performed is not left looking done.
     """
+    may_sync = current_user.has_permission("alert:triage")
+
     if not data.alert_ids:
-        return {"triage": {}}
+        return {"triage": {}, "synced": False}
 
     # Wrapped in to_thread — multiple DB queries + potential writes per alert
     # in the batch would block the event loop for the entire batch duration.
@@ -3429,8 +3608,9 @@ async def get_batch_triage(
         )
         triage_map = {t.es_alert_id: t for t in triages}
 
-        # Sync ES status → ION triage (Kibana → ION direction)
-        if data.es_statuses:
+        # Sync ES status → ION triage (Kibana → ION direction), for a caller
+        # allowed to triage. See the docstring.
+        if data.es_statuses and may_sync:
             valid_statuses = {"open", "acknowledged", "closed"}
             for alert_id, es_status in data.es_statuses.items():
                 es_status_lower = es_status.lower() if es_status else "open"
@@ -3482,7 +3662,7 @@ async def get_batch_triage(
                 "observable_threat": _worst_observable_threat(obs, threat_levels),
             }
 
-        return {"triage": result}
+        return {"triage": result, "synced": bool(data.es_statuses) and may_sync}
 
     return await asyncio.to_thread(_batch_triage)
 

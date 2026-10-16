@@ -1,0 +1,41 @@
+{% if state == 'empty' %}
+<tr><td colspan="6">No playbooks found</td></tr>
+{% elif state != 'data' %}
+<tr><td colspan="6">The playbooks could not be read.</td></tr>
+{% else %}
+{% for row in playbooks %}
+<tr data-args='{{ [row.id]|tojson }}'>
+    <td>
+        <strong>{{ row.name }}</strong>
+        {% if row.snippet is not none %}<br><small class="text-secondary">{{ row.snippet }}</small>{% endif %}
+    </td>
+    <td>
+        {% if row.triggers_state == 'unreadable' %}
+        could not be read
+        {% else %}
+        <div class="trigger-tags">{% for label in row.trigger_labels %}<span class="trigger-tag">{{ label }}</span>{% endfor %}</div>
+        {% endif %}
+    </td>
+    <td>{% if row.step_label is not none %}{{ row.step_label }}{% else %}unknown{% endif %}</td>
+    <td>{% if row.priority_label is not none %}{{ row.priority_label }}{% else %}unknown{% endif %}</td>
+    <td>
+        {% if row.active_state == 'active' %}
+        <span class="status-badge status-active">Active</span>
+        {% elif row.active_state == 'inactive' %}
+        <span class="status-badge status-inactive">Inactive</span>
+        {% else %}
+        <span class="status-badge">unknown</span>
+        {% endif %}
+    </td>
+    <td>
+        <button type="button" class="btn btn-sm" data-click-action="viewPlaybook" data-args='{{ [row.id]|tojson }}'>View</button>
+        {% if can_update %}
+        <button type="button" class="btn btn-sm" data-click-action="editPlaybook" data-args='{{ [row.id]|tojson }}'>Edit</button>
+        {% endif %}
+        {% if can_delete %}
+        <button type="button" class="btn btn-sm" data-click-action="deletePlaybook" data-args='{{ [row.id, row.name]|tojson }}'>Delete</button>
+        {% endif %}
+    </td>
+</tr>
+{% endfor %}
+{% endif %}

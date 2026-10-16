@@ -1,0 +1,27 @@
+{#
+  The shared exclusion chips.
+
+  Read only. The delete button still posts to DELETE
+  /api/arkime/traffic/exclusions/{id}, which requires security:read, so a
+  reader sees the list and a lead sees a control that works; the id travels
+  in a data attribute rather than being concatenated into markup.
+
+  An empty list and a failed read are different: the chips say what is
+  filtering every chart on the page, so "no exclusions" and "we do not
+  know what is being filtered" lead to opposite conclusions about the
+  numbers beside them.
+#}
+{% if failed %}
+<span role="alert" class="atf-state-failed text-xs px-2 py-0.5 rounded">Exclusions could not be read &mdash; what these charts filter out is unknown</span>
+{% elif not exclusions %}
+<span class="text-xs text-base-content/50">No exclusions</span>
+{% else %}
+{%- for e in exclusions %}
+<span class="atf-chip">
+  <span class="font-mono text-xs">{{ e.cidr }}</span>
+  {%- if e.note %}<span class="text-xs text-base-content/50">{{ e.note }}</span>{% endif %}
+  <button type="button" class="excl-del atf-chip-del" data-excl-id="{{ e.id }}"
+          aria-label="Remove exclusion {{ e.cidr }}">&times;</button>
+</span>
+{%- endfor %}
+{% endif %}

@@ -1,0 +1,16 @@
+{% if state == 'failed' %}
+<div class="cpanel-empty-hint text-[var(--text-secondary)]">Could not load Kibana comments</div>
+{% elif state == 'empty' %}
+<div class="cpanel-empty-hint">No comments in Kibana</div>
+{% else %}
+{% for comment in comments %}
+<div class="cpanel-comment">
+    <div class="cpanel-comment-header">
+        <span class="cpanel-comment-user"><i class="icon-message-square text-[0.65rem] mr-[0.2rem]"></i>{{ comment.author }}</span>
+        <span class="cpanel-comment-time">{{ comment.created if comment.created is not none else 'Unknown time' }}</span>
+    </div>
+    <div class="cpanel-comment-body">{{ comment.body }}</div>
+</div>
+{% endfor %}
+{% endif %}
+<span id="kibana-comment-count" hx-swap-oob="innerHTML">{{ count if count is not none else '-' }}</span>

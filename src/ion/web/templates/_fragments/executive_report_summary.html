@@ -1,0 +1,220 @@
+{# The Executive Report's Summary tab: the period line, seven stat cards,
+   the daily trend chart, the closure-reason breakdown, the notable-incidents
+   table and the Team Performance table.
+
+   Replaces three of the five `innerHTML` writes in executive_report.html and
+   the bulk of its 188 lines of inline JavaScript, including a hand-rolled
+   `esc()` that Jinja's autoescaping retires.
+
+   This is a stakeholder brief, so every number here is tested with
+   `is not none`, never truthiness, and nothing is defaulted. The JavaScript
+   read five of the seven stats as `x||0` and both sections as `d.cases||{}`,
+   which printed figures it had never read as measured zeros. Zero is a
+   measurement. Unmeasured is not zero, and in a board pack the two lead to
+   opposite conclusions with no way for the reader to check.
+
+   The tones arrive precomputed from ion.web.ui.executive_report.stat_tone,
+   which is total over None: there is no branch here that could paint an
+   unmeasured figure in a healthy colour by being forgotten.
+
+   No control lives in here. The days select, Generate, PDF, Print and the
+   tab strip are all in the page shell outside #er-content, so no swap of
+   this fragment, success or failure, can remove the reader's way to retry.
+   Checked in a browser, not inferred from here. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% if failed %}
+  <div role="alert" class="alert alert-error">
+    <span>
+      The executive report could not be computed. No figure is shown below
+      rather than zeros: the read failed, so every number is unknown, which
+      is not the same as a report of zeros for a quiet week. Change the
+      window or press Generate to try again.
+    </span>
+  </div>
+{% else %}
+
+{# The window the figures actually cover. Three states, because they are
+   three different things to a reader: the service measured the window the
+   select asked for, it measured a different one, or it did not say which.
+   The dates go through the `ts` macro, so they land on the viewer's clock
+   rather than the server's. #}
+<div class="text-[.85rem] text-[var(--text-secondary)] mb-4">
+  {{ ts(period.start, 'date', fallback='No start date recorded') }}
+  to
+  {{ ts(period.end, 'date', fallback='No end date recorded') }}
+  {% if period.stated and period.matches %}
+    ({{ period.days }} days)
+  {% elif period.stated %}
+    <span class="badge badge-sm badge-warning">window changed</span>
+    You asked for {{ period.requested_days }} days; the figures below
+    cover {{ period.days }} days, which is the window the service measured.
+  {% else %}
+    <span class="badge badge-sm badge-ghost">window not stated</span>
+    The service did not state the period it measured, so the number of days
+    these figures cover is unknown.
+  {% endif %}
+</div>
+
+<div class="er-stats">
+  {% for stat in stats %}
+    <div class="stat bg-base-200 shadow rounded-box text-center">
+      {# `stat.measured`, not `stat.value`, because a measured 0 is falsy
+         and would otherwise read as "not computed". #}
+      <div class="stat-value font-mono text-2xl {{ stat.tone }}">{% if stat.measured %}{{ stat.value }}{% else %}not computed{% endif %}</div>
+      <div class="stat-title">{{ stat.label }}</div>
+      {% if stat.basis %}
+        <div class="stat-desc">{{ stat.basis }}</div>
+      {% endif %}
+      {% if not stat.measured %}
+        <div class="stat-desc">The service reported no value for this, which
+          is not a measurement of zero.</div>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
+
+{# The daily trend. A bar is drawn at its real height, including zero: the
+   JavaScript's `Math.max(day.opened/maxVal*80, 2)` floored every bar at
+   2px, so a day with nothing drew the same stub as a day with one case and
+   a dead-quiet window read as a trickle of work. `_compute_trends` always
+   returns one bucket per day, which also made the old `if(daily.length)`
+   guard always true, so nothing ever said a window was empty. #}
+<div class="card bg-base-200 shadow mb-4">
+  <div class="card-body">
+    <h3 class="card-title text-xs uppercase tracking-wider opacity-70"><i class="icon-trending-up text-primary"></i> Daily Trend</h3>
+    {% if not trend.measured %}
+      <p class="text-[.78rem] text-[var(--text-secondary)]">
+        The service returned no daily buckets for this window, so no trend
+        could be drawn. That is not a window in which nothing happened.
+      </p>
+    {% else %}
+      {% if not trend.any_activity %}
+        <p class="text-[.78rem] text-[var(--text-secondary)]">
+          No case was opened or closed on any day in this window. The bars
+          below are drawn at zero, which is what was measured.
+        </p>
+      {% endif %}
+      <div class="flex items-end gap-1.5 h-[100px] py-2">
+        {% for day in trend.rows %}
+          <div class="flex flex-col items-center gap-0.5 flex-1">
+            {% if day.measured %}
+              <div class="flex gap-0.5 items-end h-20">
+                <div class="w-3 rounded-t bg-[var(--sev-high)]" data-ion-style="height:{{ day.opened_pct }}%" title="Opened: {{ day.opened }}"></div>
+                <div class="w-3 rounded-t bg-[var(--mitre-covered)]" data-ion-style="height:{{ day.closed_pct }}%" title="Closed: {{ day.closed }}"></div>
+              </div>
+            {% else %}
+              {# A question mark, not a bar at zero. A bar at zero is the
+                 picture a day measured at zero produces. #}
+              <div class="flex gap-0.5 items-end h-20" title="This day's counts were not recorded, so no bar is drawn.">
+                <span class="text-[0.6rem] opacity-50">?</span>
+              </div>
+            {% endif %}
+            <span class="text-[0.6rem] opacity-50 whitespace-nowrap">{{ day.date[5:] if day.date else '?' }}</span>
+          </div>
+        {% endfor %}
+      </div>
+      <div class="flex gap-3 text-[.72rem] text-[var(--text-secondary)] mt-2">
+        <span class="flex items-center gap-1"><span class="w-[10px] h-[10px] bg-[var(--sev-high)] rounded-[2px]"></span>Opened</span>
+        <span class="flex items-center gap-1"><span class="w-[10px] h-[10px] bg-[var(--mitre-covered)] rounded-[2px]"></span>Closed</span>
+      </div>
+      {# What one bar covers. `_compute_trends` buckets by `cutoff + i days`,
+         so the bar labelled 10-05 runs from 10-05 at the generation time to
+         10-06 at the generation time. The JavaScript printed the date with
+         nothing to say that, so a reader would take it for a calendar day. #}
+      <p class="text-xs opacity-50 mt-2">
+        Each bar is a 24-hour window starting at the time the report was
+        generated on the date shown, not a calendar day. A bar marked ?
+        is a day whose counts were not recorded, not a day with none.
+      </p>
+    {% endif %}
+  </div>
+</div>
+
+{# Omitted entirely when nothing was closed, which is the only way
+   `closure_reasons` comes back empty. The Cases Closed card above is the
+   measurement in that case, so an empty breakdown here would be a second,
+   vaguer statement of the same fact. #}
+{% if closures %}
+  <div class="card bg-base-200 shadow mb-4">
+    <div class="card-body">
+      <h3 class="card-title text-xs uppercase tracking-wider opacity-70"><i class="icon-pie-chart text-primary"></i> Closure Reasons</h3>
+      <div class="flex gap-5 flex-wrap">
+        {% for closure in closures %}
+          <div class="text-center">
+            <div class="font-mono text-[1.1rem] font-bold" data-ion-style="color:{{ closure.colour }}">{{ closure.count }}</div>
+            <div class="text-[.72rem] text-[var(--text-secondary)]">
+              {{ closure.reason }}
+              {% if closure.pct is not none %}({{ closure.pct }}%){% else %}(share not computed){% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+{% if incidents %}
+  <div class="card bg-base-200 shadow mb-4">
+    <div class="card-body">
+      <h3 class="card-title text-xs uppercase tracking-wider opacity-70"><i class="icon-alert-triangle text-primary"></i> Notable Incidents</h3>
+      <div class="overflow-x-auto">
+        <table class="table table-sm">
+          <thead><tr><th>Case</th><th>Title</th><th>Severity</th><th>Status</th><th>Date</th></tr></thead>
+          <tbody>
+            {% for incident in incidents %}
+              <tr>
+                <td class="font-mono">{{ incident.case_number }}</td>
+                <td>{{ incident.title }}</td>
+                {# An unrecorded severity takes badge-ghost and says so,
+                   rather than borrowing a severity colour. #}
+                <td><span class="badge badge-sm {{ incident.badge }}">{% if incident.severity is not none %}{{ incident.severity }}{% else %}not recorded{% endif %}</span></td>
+                {# `status` came through ui._shared.plain: AlertCase.status is
+                   an SQLEnum column, so the row carries the member and a
+                   template would otherwise render AlertCaseStatus.CLOSED. #}
+                <td>{{ incident.status if incident.status is not none else 'not recorded' }}</td>
+                <td class="text-[.78rem]">{{ ts(incident.created_at, 'date', fallback='No date recorded') }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+{# Team Performance stayed on this tab when the per-analyst breakdown moved
+   to the Team tab (route audit phase 7), so both are still rendered. This
+   one's membership rule is now stated: `_team_metrics` keeps only analysts
+   with at least one audit-log action in the window, which silently excluded
+   anybody who closed cases and logged nothing. #}
+{% if team %}
+  <div class="card bg-base-200 shadow mb-4">
+    <div class="card-body">
+      <h3 class="card-title text-xs uppercase tracking-wider opacity-70"><i class="icon-users text-primary"></i> Team Performance</h3>
+      <div class="overflow-x-auto">
+        <table class="table table-sm">
+          <thead><tr><th>Analyst</th><th>Cases Closed</th><th>Total Actions</th></tr></thead>
+          <tbody>
+            {% for member in team %}
+              <tr>
+                <td class="font-semibold">{{ member.username }}</td>
+                <td class="font-mono">{{ member.cases_closed if member.cases_closed is not none else 'not computed' }}</td>
+                <td class="font-mono">{{ member.total_actions if member.total_actions is not none else 'not computed' }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-xs opacity-50 mt-2">
+        Lists only analysts with at least one audit-log action in this
+        window, so an analyst who closed cases and logged nothing is absent
+        from this table and so are their closures. The Team tab counts
+        anyone with any recorded activity.
+      </p>
+    </div>
+  </div>
+{% endif %}
+
+{% endif %}

@@ -1,0 +1,5 @@
+{% from '_fragments/forensics_macros.html' import label, text %}
+{% if state == 'failed' %}<div class="empty-state">Investigation summary unavailable</div>{% else %}
+<div id="cd-lock-indicator">{% if case.is_locked is sameas true %}Locked by {{ text(case.locked_by_username) }} ({{ text(case.locked_at) }}){% elif case.is_locked is sameas false %}Unlocked{% else %}Lock state unknown{% endif %}</div>
+<div id="cd-sla-badges">{% if milestones is none %}<span>SLA unavailable</span>{% else %}{% for m in milestones %}<span class="sla-badge {{ 'sla-' ~ m.status|replace('_','-') if m.status in ['met','on_track','at_risk','breached','breached_met'] else '' }}" title="{{ m.due|default('',true) }}">{{ label(m.name) }}: {{ label(m.status) }}</span>{% endfor %}{% endif %}</div>
+<div id="cd-progress-bar">{% if progress is none %}Section progress unavailable{% else %}<div id="cd-progress-label">Sections: {{ done }}/{{ total }} complete</div><span id="cd-progress-pct">{{ progress }}%</span><progress class="forensic-progress" max="100" value="{{ progress }}" aria-label="Completed sections"></progress>{% endif %}</div>{% endif %}

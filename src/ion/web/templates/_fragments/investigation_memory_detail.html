@@ -1,0 +1,10 @@
+{% from "_fragments/_time.html" import ts %}
+{% from "_fragments/investigation_memory_macros.html" import number, pill, duration %}
+{% if data is none %}<div class="alert alert-error">Could not read investigation detail. Retry the read.</div>
+{% else %}{% set r = data %}<div class="grid grid-cols-2 gap-3">
+{% for label,key in [('Alert ref','alert_id_ref'),('Signature','alert_signature'),('Host','host'),('User','user_name'),('Model','llm_model_used')] %}<div>{{ label }}: {{ r[key] or '-' }}</div>{% endfor %}
+<div>Status: {{ pill(plain(r.status)) }}</div><div>Verdict: {{ pill(plain(r.verdict)) }}</div><div>Severity: {{ pill(plain(r.severity_assessment)) }}</div><div>Tokens: {{ number(r.tokens_used) }}</div><div>Duration: {{ duration(r.duration_ms) }}</div><div>Started: {{ ts(r.created_at) }}</div><div>Completed: {{ ts(r.completed_at) }}</div></div>
+<h3>Summary</h3><div class="whitespace-pre-wrap">{{ r.summary_text or '(none)' }}</div>
+<h3>Key observations (grounded evidence)</h3><ul>{% for o in r.key_observations or [] %}<li><code>{{ o.field }}</code>: {{ o.value if o.value is not none else '' }}<p>{{ o.significance }}</p></li>{% else %}<li>No grounded observations recorded.</li>{% endfor %}</ul>
+<h3>Recommended actions</h3><pre>{{ r.recommended_actions|tojson(indent=2) if r.recommended_actions is not none else '(none)' }}</pre>
+<h3>IOC snapshot</h3><pre>{{ r.ioc_snapshot|tojson(indent=2) if r.ioc_snapshot is not none else '(none)' }}</pre>{% endif %}

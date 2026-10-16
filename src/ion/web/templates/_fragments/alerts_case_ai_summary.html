@@ -1,0 +1,35 @@
+{# Alerts: the AI case summary, swapped into #ai-case-summary-{id}.
+
+   Replaces the three innerHTML sites in aiSummarizeCase (the loading
+   spinner, the result, and the catch). The loading state is a CSS rule on
+   the container while htmx-busy.js marks it in flight; nothing is written
+   for it.
+
+   Four outcomes where the JavaScript had one error string. "AI summary
+   failed: <exception message>" covered a case that no longer exists, an
+   AI service that is not configured or refused, and a fault, and those
+   lead to different actions. #}
+
+{% if missing %}
+  <div class="ai-error" role="alert">Case {{ case_id }} no longer exists, so there is nothing to summarise.</div>
+{% elif unavailable %}
+  <div class="ai-error" role="alert">
+    AI summary unavailable: {{ unavailable }}. No summary was produced, which
+    says nothing about the case itself.
+  </div>
+{% elif failed %}
+  <div class="ai-error" role="alert">
+    The AI summary could not be produced. Nothing below is a finding about
+    the case; use AI Summary to try again.
+  </div>
+{% elif analysis is none %}
+  <div class="ai-error" role="alert">The model answered with no text. Use AI Summary to try again.</div>
+{% else %}
+  <div class="ai-result-header">
+    <span>AI Case Summary</span>
+    <span class="ai-model-tag">{% if model %}{{ model }}{% else %}model not reported{% endif %}</span>
+  </div>
+  {# `analysis` is Markup produced by format_ai_content, which escaped the
+     model's text before adding its own tags. #}
+  <div class="ai-result-body">{{ analysis }}</div>
+{% endif %}

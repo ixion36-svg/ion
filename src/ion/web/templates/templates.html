@@ -2,6 +2,10 @@
 
 {% block title %}Templates - ION{% endblock %}
 
+{% block head_css %}
+<link rel="stylesheet" href="/static/css/templates-page.css?v={{ ion_version }}">
+{% endblock %}
+
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
@@ -23,665 +27,99 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Document templates for playbooks and reports.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="btn btn-ghost" data-click-action="showFoldersModal">Manage Folders</button>
-        <a href="/templates/new" class="btn btn-primary">New Template</a>
+        <div id="templates-controls" hx-get="/ui/templates-page/controls" hx-trigger="load"></div>
     </div>
 </section>
 
 <div class="flex flex-col lg:flex-row gap-6">
-    <!-- Folder Sidebar -->
-    <aside class="card bg-base-200 shadow w-full lg:w-[250px] lg:shrink-0">
-        <div class="card-body p-4">
-            <h3 class="text-sm font-semibold uppercase tracking-wide opacity-60">Folders</h3>
-            <div id="folder-tree" class="folder-tree">
-                <div class="folder-item active" data-id="" data-click-action="selectFolder" data-args='[null]'>
-                    <span class="folder-icon"><i class="icon-folder"></i></span>
-                    <span class="folder-name">All Templates</span>
-                </div>
-                <div class="folder-item" data-id="uncategorized" data-click-action="selectFolder" data-args='["uncategorized"]'>
-                    <span class="folder-icon"><i class="icon-file-text"></i></span>
-                    <span class="folder-name">Uncategorized</span>
-                </div>
-                <div id="folder-list"></div>
-            </div>
-        </div>
-    </aside>
-
-    <!-- Main Content -->
-    <div class="flex-1 min-w-0">
-        <div class="flex flex-wrap items-center gap-2 mb-4">
-            <input type="text" id="search-input" placeholder="Search templates..." class="input input-sm flex-1 min-w-48">
-            <select id="format-filter" class="select select-sm">
-                <option value="">All Formats</option>
-                <option value="markdown">Markdown</option>
-                <option value="html">HTML</option>
-                <option value="text">Plain Text</option>
-            </select>
-            <select id="doctype-filter" class="select select-sm">
-                <option value="">All Types</option>
-            </select>
-        </div>
-
-        <div id="current-folder-path" class="folder-path text-sm opacity-60 mb-4"></div>
-
-        <div id="templates-list" class="card-list flex flex-col gap-4">
-            <p class="loading">Loading...</p>
-        </div>
-    </div>
-</div>
-
-<!-- Manage Folders Modal -->
-<div id="folders-modal" class="modal hidden">
-    <div class="modal-box w-11/12 max-w-3xl">
-        <div class="flex items-center justify-between gap-4">
-            <h2 class="text-lg font-semibold">Manage Folders</h2>
-            <button class="btn btn-ghost btn-sm btn-circle" data-click-action="closeFoldersModal">&times;</button>
-        </div>
-        <div class="py-4">
-            <fieldset class="fieldset">
-                <legend class="fieldset-legend">Create New Folder</legend>
-                <div class="folder-create-form flex flex-wrap items-center gap-2">
-                    <select id="new-folder-parent" class="select select-sm w-full sm:w-36">
-                        <option value="">Root Level</option>
-                    </select>
-                    <input type="text" id="new-folder-name" placeholder="Folder name (e.g., SOP, KB, WI)" class="input input-sm flex-1 min-w-40">
-                    <input type="text" id="new-folder-desc" placeholder="Description" class="input input-sm flex-1 min-w-40">
-                    <button class="btn btn-primary btn-sm" data-click-action="createFolder">Create</button>
-                </div>
-            </fieldset>
-            <h3 class="font-semibold mt-4">Existing Folders</h3>
-            <div id="folders-tree-manage" class="folders-manage-tree mt-4"></div>
-        </div>
-    </div>
-</div>
-
-<!-- Move Template Modal -->
-<div id="move-modal" class="modal hidden">
-    <div class="modal-box max-w-md">
-        <div class="flex items-center justify-between gap-4">
-            <h2 class="text-lg font-semibold">Move to Folder</h2>
-            <button class="btn btn-ghost btn-sm btn-circle" data-click-action="closeMoveModal">&times;</button>
-        </div>
-        <div class="py-4">
-            <select id="move-folder-select" class="select w-full">
-                <option value="">No Folder (Root)</option>
-            </select>
-            <div class="modal-action">
-                <button class="btn btn-ghost" data-click-action="closeMoveModal">Cancel</button>
-                <button class="btn btn-primary" data-click-action="moveTemplate">Move</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-</div><!-- /ion-tw inner -->
-</div><!-- /ion-tw -->
+<aside class="card bg-base-200 shadow w-full lg:w-[250px] lg:shrink-0"><div class="card-body p-4"><h3>Folders</h3><button id="folders-refresh" class="btn btn-sm" hx-get="/ui/templates-page/folders" hx-target="#folder-list" hx-include="#template-filters">Refresh folders</button><div id="folder-list" class="folder-tree" hx-get="/ui/templates-page/folders" hx-trigger="load, foldersRefresh" hx-include="#template-filters"></div></div></aside>
+<div class="flex-1 min-w-0">
+<form id="template-filters" class="flex flex-wrap items-center gap-2 mb-4" hx-get="/ui/templates-page/list" hx-target="#templates-list">
+<input id="search-input" name="search" placeholder="Search templates..." class="input input-sm flex-1 min-w-48"><select id="format-filter" name="format" class="select select-sm"><option value="">All Formats</option><option value="markdown">Markdown</option><option value="html">HTML</option><option value="text">Plain Text</option></select>
+<input id="folder-value" type="hidden" name="folder" value=""><input id="doctype-value" type="hidden" name="document_type" value="">
+<button id="types-refresh" type="button" class="btn btn-sm" hx-get="/ui/templates-page/types" hx-target="#doctype-host" hx-include="#doctype-value">Retry types</button><span id="doctype-host" hx-get="/ui/templates-page/types" hx-trigger="load" hx-target="this" hx-include="#doctype-value"></span>
+<button id="templates-refresh" type="submit" class="btn btn-primary">Refresh templates</button></form>
+<div id="templates-list" class="card-list flex flex-col gap-4" hx-get="/ui/templates-page/list" hx-trigger="load, catalogueRefresh" hx-include="#template-filters"><p>Loading templates...</p></div>
+</div></div>
+<dialog id="folders-modal" class="rounded-box bg-base-200 text-base-content p-6 w-full max-w-3xl"><div class="flex items-center justify-between gap-4"><h2>Manage Folders</h2><button class="btn btn-sm" data-click-action="closeFoldersModal">Close folders</button><button id="manage-refresh" class="btn btn-sm" hx-get="/ui/templates-page/manage" hx-target="#folders-tree-manage">Refresh management</button></div><div id="folders-tree-manage"></div></dialog>
+<dialog id="move-modal" class="rounded-box bg-base-200 text-base-content p-6 w-full max-w-md"><h2>Move to Folder</h2><button class="btn btn-sm" data-click-action="closeMoveModal">Cancel</button><button id="move-refresh" class="btn btn-sm" data-click-action="refreshMove">Retry destinations</button><div id="move-options"></div></dialog>
+</div></div>
 {% endblock %}
-
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* JS showFoldersModal()/showMoveModal() set style.display = 'flex', not daisyUI
-   .modal-open. The hashed display:none class on each overlay keeps them hidden
-   until then. Bridge so daisyUI .modal still presents when display is flex. */
-#folders-modal.modal,
-#move-modal.modal {
-    visibility: visible;
-    pointer-events: auto;
-    opacity: 1;
-    align-items: center;
-    justify-content: center;
-    background-color: oklch(0% 0 0 / 0.4);
-}
-#folders-modal .modal-box,
-#move-modal .modal-box {
-    opacity: 1;
-    scale: 1;
-    translate: 0;
-}
-
-/* JS querySelectorAll('.folder-item') toggles .active; innerHTML emits these. */
-.folder-tree { font-size: 0.9rem; }
-.folder-item {
-    display: flex;
-    align-items: center;
-    padding: 0.5rem 0.75rem;
-    border-radius: var(--radius-selector, 0.25rem);
-    cursor: pointer;
-    margin-bottom: 2px;
-}
-.folder-item:hover { background: var(--color-base-300); }
-.folder-item.active {
-    background: var(--color-primary);
-    color: var(--color-primary-content);
-}
-.folder-icon { margin-right: 0.5rem; }
-.folder-name {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.folder-children {
-    margin-left: 1.25rem;
-    border-left: 1px solid var(--color-base-300);
-    padding-left: 0.5rem;
-}
-
-/* JS writes breadcrumb <span>s into #current-folder-path. */
-.folder-path span { cursor: pointer; }
-.folder-path span:hover { color: var(--color-primary); }
-
-/* JS innerHTML: collection-badge / doc-type-${type} — class names are concatenated. */
-.collection-badge {
-    background: var(--color-primary);
-    color: var(--color-primary-content);
-    padding: 2px 8px;
-    border-radius: var(--radius-selector, 0.25rem);
-    font-size: 0.75rem;
-    margin-left: 0.5rem;
-}
-.doc-type-badge {
-    padding: 2px 8px;
-    border-radius: var(--radius-selector, 0.25rem);
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: #fff;
-    margin-left: 0.5rem;
-}
-.doc-type-SOP { background: var(--color-info); color: var(--color-info-content); }
-.doc-type-SOI { background: var(--color-success); color: var(--color-success-content); }
-.doc-type-WI { background: #6366f1; color: #fff; }
-.doc-type-KB { background: var(--color-success); color: var(--color-success-content); }
-.doc-type-RUNBOOK { background: #a855f7; color: #fff; }
-.doc-type-IRP { background: var(--color-error); color: var(--color-error-content); }
-.doc-type-AAR { background: var(--neon-orange); color: var(--color-warning-content); }
-.doc-type-THREAT_ADVISORY { background: var(--color-warning); color: var(--color-warning-content); }
-.doc-type-DETECTION_RULE { background: var(--color-info); color: var(--color-info-content); }
-
-/* JS renderFolderManageItems() / renderFolderItems() emit these class names. */
-.folder-manage-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem;
-    border: 1px solid var(--color-base-300);
-    border-radius: var(--radius-selector, 0.25rem);
-    margin-bottom: 0.5rem;
-}
-.folder-manage-item:hover { background: var(--color-base-300); }
-.folder-manage-info {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-.folder-manage-path {
-    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
-    font-size: 0.8rem;
-}
-.folder-manage-counts {
-    font-size: 0.75rem;
-    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
-}
-.folder-manage-children { margin-left: 1.5rem; }
-
-/* JS renderTemplates() emits .card / .card-header / .card-body / .card-footer /
-   .move-btn / .tag — class names are fixed in script, so restyle them here. */
-#templates-list > .card {
-    background: var(--color-base-200);
-    border: 1px solid var(--color-base-300);
-    border-radius: var(--radius-box);
-    padding: 1rem 1.25rem;
-    box-shadow: none;
-}
-.card-header {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-}
-#templates-list .card-title { color: var(--color-base-content); }
-#templates-list .card-title:hover { color: var(--color-primary); }
-#templates-list .card-body { padding: 0; gap: 0; }
-#templates-list .card-description {
-    font-size: 0.875rem;
-    opacity: 0.8;
-}
-#templates-list .card-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-    font-size: 0.75rem;
-    opacity: 0.6;
-    margin-top: 0.5rem;
-}
-#templates-list .card-tags { margin-top: 0.75rem; }
-#templates-list .tag {
-    display: inline-block;
-    padding: 0.15rem 0.5rem;
-    font-size: 0.7rem;
-    border-radius: var(--radius-selector, 0.25rem);
-    background: color-mix(in oklab, var(--color-primary) 15%, transparent);
-    color: var(--color-primary);
-    margin-right: 0.25rem;
-}
-#templates-list .card-footer {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    border-top: 1px solid var(--color-base-300);
-    padding-top: 0.75rem;
-    margin-top: 0.75rem;
-}
-.move-btn {
-    font-size: 0.75rem;
-    padding: 2px 6px;
-}
-</style>
 <script nonce="{{ csp_nonce }}">
-{% raw %}
-let allTemplates = [];
-let allCollections = [];
-let documentTypes = {};
-let selectedFolderId = null;
 let moveTemplateId = null;
-
-async function loadDocumentTypes() {
-    try {
-        const resp = await api.get('/api/document-types');
-        documentTypes = resp.types || {};
-        const select = document.getElementById('doctype-filter');
-        select.innerHTML = '<option value="">All Types</option>';
-        Object.entries(documentTypes).forEach(([key, label]) => {
-            const opt = document.createElement('option');
-            opt.value = key;
-            opt.textContent = key + ' - ' + label;
-            select.appendChild(opt);
-        });
-    } catch (e) {
-        console.error('Failed to load document types:', e);
-    }
-}
-
-async function loadTemplates() {
-    try {
-        allTemplates = await api.get('/api/templates');
-        renderTemplates(filterTemplates());
-    } catch (e) {
-        document.getElementById('templates-list').innerHTML = '<p class="error">Failed to load templates</p>';
-    }
-}
-
-async function loadCollections() {
-    try {
-        // Get flat list for easier processing
-        allCollections = await api.get('/api/collections?flat=true');
-        renderFolderTree();
-        updateFolderSelects();
-    } catch (e) {
-        console.error('Failed to load collections:', e);
-    }
-}
-
-function buildFolderTree(collections, parentId = null) {
-    return collections
-        .filter(c => c.parent_id === parentId)
-        .map(c => ({
-            ...c,
-            children: buildFolderTree(collections, c.id)
-        }));
-}
-
-function renderFolderTree() {
-    const container = document.getElementById('folder-list');
-    const tree = buildFolderTree(allCollections);
-    container.innerHTML = renderFolderItems(tree, 0);
-}
-
-function renderFolderItems(folders, depth) {
-    if (!folders.length) return '';
-
-    let html = '';
-    folders.forEach(f => {
-        const isActive = selectedFolderId === f.id;
-        const indent = depth > 0 ? 'folder-children' : '';
-
-        html += '<div class="' + indent + '">';
-        html += `<div class="folder-item${isActive ? ' active' : ''}" data-id="${f.id}" data-click-action="selectFolder" data-args='[${f.id}]'>`;
-        html += '<span class="folder-icon">' + (f.children.length > 0 ? '<i class="icon-folder-open"></i>' : '<i class="icon-folder"></i>') + '</span>';
-        html += '<span class="folder-name">' + escapeHtml(f.name) + '</span>';
-        html += '<span class="folder-manage-counts">(' + f.template_count + ')</span>';
-        html += '</div>';
-
-        if (f.children.length > 0) {
-            html += renderFolderItems(f.children, depth + 1);
-        }
-        html += '</div>';
-    });
-    return html;
-}
-
-function selectFolder(folderId) {
-    selectedFolderId = folderId;
-
-    // Update active state
-    document.querySelectorAll('.folder-item').forEach(el => {
-        el.classList.remove('active');
-        if (el.dataset.id === String(folderId || '')) {
-            el.classList.add('active');
-        }
-    });
-
-    // Update path display
-    updateFolderPath();
-
-    // Re-render templates
-    renderTemplates(filterTemplates());
-}
-
-function updateFolderPath() {
-    const pathEl = document.getElementById('current-folder-path');
-
-    if (selectedFolderId === null) {
-        pathEl.innerHTML = '';
-        return;
-    }
-
-    if (selectedFolderId === 'uncategorized') {
-        pathEl.innerHTML = `<span data-click-action="selectFolder" data-args='[null]'>All</span> / <span>Uncategorized</span>`;
-        return;
-    }
-
-    const folder = allCollections.find(c => c.id === selectedFolderId);
-    if (folder) {
-        pathEl.innerHTML = `<span data-click-action="selectFolder" data-args='[null]'>All</span> / <span>${escapeHtml(folder.full_path)}</span>`;
-    }
-}
-
-function filterTemplates() {
-    const search = document.getElementById('search-input').value.toLowerCase();
-    const format = document.getElementById('format-filter').value;
-    const docType = document.getElementById('doctype-filter').value;
-
-    return allTemplates.filter(t => {
-        const matchesSearch = !search ||
-            t.name.toLowerCase().includes(search) ||
-            (t.description && t.description.toLowerCase().includes(search));
-        const matchesFormat = !format || t.format === format;
-        const matchesDocType = !docType || t.document_type === docType;
-
-        let matchesFolder = true;
-        if (selectedFolderId === 'uncategorized') {
-            matchesFolder = !t.collection_id;
-        } else if (selectedFolderId !== null) {
-            // Include templates in this folder or any subfolder
-            matchesFolder = isInFolderOrSubfolder(t.collection_id, selectedFolderId);
-        }
-
-        return matchesSearch && matchesFormat && matchesDocType && matchesFolder;
-    });
-}
-
-function isInFolderOrSubfolder(templateCollectionId, targetFolderId) {
-    if (templateCollectionId === targetFolderId) return true;
-    if (!templateCollectionId) return false;
-
-    // Check if template's folder is a descendant of target
-    const folder = allCollections.find(c => c.id === templateCollectionId);
-    if (!folder) return false;
-
-    let current = folder;
-    while (current.parent_id) {
-        if (current.parent_id === targetFolderId) return true;
-        current = allCollections.find(c => c.id === current.parent_id);
-        if (!current) break;
-    }
-    return false;
-}
-
-function renderTemplates(templates) {
-    const container = document.getElementById('templates-list');
-
-    if (templates.length === 0) {
-        container.innerHTML = '<p class="empty-state">No templates found. <a href="/templates/new">Create one!</a></p>';
-        return;
-    }
-
-    let html = '';
-    templates.forEach(function(t) {
-        const folder = allCollections.find(c => c.id === t.collection_id);
-        const folderBadge = folder
-            ? '<span class="collection-badge">' + escapeHtml(folder.name) + '</span>'
-            : '';
-        const docTypeBadge = t.document_type
-            ? '<span class="doc-type-badge doc-type-' + t.document_type + '">' + t.document_type + '</span>'
-            : '';
-
-        html += '<div class="card">';
-        html += '<div class="card-header">';
-        html += '<a href="/templates/' + t.id + '" class="card-title">' + escapeHtml(t.name) + '</a>';
-        html += docTypeBadge;
-        html += folderBadge;
-        html += '<span class="badge">' + t.format + '</span>';
-        html += '</div>';
-        html += '<div class="card-body">';
-        html += '<p class="card-description">' + escapeHtml(t.description || 'No description') + '</p>';
-        html += '<div class="card-meta">';
-        html += '<span>Version: ' + t.current_version + '</span>';
-        html += '<span>Updated: ' + formatDate(t.updated_at) + '</span>';
-        html += '</div>';
-        html += '<div class="card-tags">';
-        t.tags.forEach(function(tag) {
-            html += '<span class="tag">' + escapeHtml(tag) + '</span>';
-        });
-        html += '</div>';
-        html += '</div>';
-        html += '<div class="card-footer">';
-        html += '<a href="/templates/' + t.id + '/render" class="btn btn-sm btn-primary">Render</a>';
-        html += '<a href="/templates/' + t.id + '/edit" class="btn btn-sm">Edit</a>';
-        html += `<button class="btn btn-sm move-btn" data-click-action="showMoveModal" data-args='[${t.id}, ${t.collection_id || 'null'}]'>Move</button>`;
-        html += `<button class="btn btn-sm btn-danger" data-click-action="deleteTemplate" data-args='[${t.id}, ${JSON.stringify(t.name)}]'>Delete</button>`;
-        html += '</div>';
-        html += '</div>';
-    });
-    container.innerHTML = html;
-}
-
-function applyFilters() {
-    renderTemplates(filterTemplates());
-}
-
-async function deleteTemplate(id, name) {
-    if (!confirm('Delete template "' + name + '"? This cannot be undone.')) return;
-
-    try {
-        await api.delete('/api/templates/' + id);
-        showToast('Template deleted', 'success');
-        loadTemplates();
-    } catch (e) {
-        showToast('Failed to delete template', 'error');
-    }
-}
-
-// Folder Management
+let moveCollectionId = '';
+const el = id => document.getElementById(id);
+function loadTemplates() { return htmx.trigger(el('templates-list'), 'catalogueRefresh'); }
+function loadCollections() { return htmx.trigger(el('folder-list'), 'foldersRefresh'); }
+function applyFilters() { loadTemplates(); }
 function showFoldersModal() {
-    document.getElementById('folders-modal').style.display = 'flex';
-    renderFoldersManageTree();
-    updateParentSelect();
+    el('folders-modal').showModal();
+    htmx.ajax('GET', '/ui/templates-page/manage', {target:'#folders-tree-manage'});
 }
-
-function closeFoldersModal() {
-    document.getElementById('folders-modal').style.display = 'none';
-}
-
-function updateParentSelect() {
-    const select = document.getElementById('new-folder-parent');
-    select.innerHTML = '<option value="">Root Level</option>';
-
-    function addOptions(folders, prefix = '') {
-        folders.forEach(f => {
-            const option = document.createElement('option');
-            option.value = f.id;
-            option.textContent = prefix + f.name;
-            select.appendChild(option);
-            if (f.children.length > 0) {
-                addOptions(f.children, prefix + '  ');
-            }
-        });
-    }
-
-    const tree = buildFolderTree(allCollections);
-    addOptions(tree);
-}
-
-function updateFolderSelects() {
-    const moveSelect = document.getElementById('move-folder-select');
-    moveSelect.innerHTML = '<option value="">No Folder (Root)</option>';
-
-    function addOptions(folders, prefix = '') {
-        folders.forEach(f => {
-            const option = document.createElement('option');
-            option.value = f.id;
-            option.textContent = prefix + f.name;
-            moveSelect.appendChild(option);
-            if (f.children.length > 0) {
-                addOptions(f.children, prefix + '  ');
-            }
-        });
-    }
-
-    const tree = buildFolderTree(allCollections);
-    addOptions(tree);
-}
-
-function renderFoldersManageTree() {
-    const container = document.getElementById('folders-tree-manage');
-    const tree = buildFolderTree(allCollections);
-
-    if (tree.length === 0) {
-        container.innerHTML = '<p class="empty-state">No folders yet. Create one above!</p>';
-        return;
-    }
-
-    container.innerHTML = renderFolderManageItems(tree);
-}
-
-function renderFolderManageItems(folders, depth = 0) {
-    let html = '';
-    folders.forEach(f => {
-        const indent = depth > 0 ? 'folder-manage-children' : '';
-
-        html += '<div class="' + indent + '">';
-        html += '<div class="folder-manage-item">';
-        html += '<div class="folder-manage-info">';
-        html += '<span>' + (f.children.length > 0 ? '<i class="icon-folder-open"></i>' : '<i class="icon-folder"></i>') + '</span>';
-        html += '<span>' + escapeHtml(f.name) + '</span>';
-        html += '<span class="folder-manage-counts">' + f.template_count + ' templates, ' + (f.document_count || 0) + ' docs</span>';
-        html += '</div>';
-        html += '<div>';
-        html += `<button class="btn btn-sm btn-danger" data-click-action="deleteFolder" data-args='[${f.id}, ${JSON.stringify(f.name)}]'>Delete</button>`;
-        html += '</div>';
-        html += '</div>';
-
-        if (f.children.length > 0) {
-            html += renderFolderManageItems(f.children, depth + 1);
-        }
-        html += '</div>';
-    });
-    return html;
-}
-
-async function createFolder() {
-    const parentId = document.getElementById('new-folder-parent').value || null;
-    const name = document.getElementById('new-folder-name').value.trim();
-    const description = document.getElementById('new-folder-desc').value.trim();
-
-    if (!name) {
-        showToast('Please enter a folder name', 'error');
-        return;
-    }
-
-    try {
-        await api.post('/api/collections', {
-            name,
-            description: description || null,
-            parent_id: parentId ? parseInt(parentId) : null
-        });
-        showToast('Folder created', 'success');
-        document.getElementById('new-folder-name').value = '';
-        document.getElementById('new-folder-desc').value = '';
-        await loadCollections();
-        renderFoldersManageTree();
-        updateParentSelect();
-    } catch (e) {
-        showToast(e.message || 'Failed to create folder', 'error');
-    }
-}
-
-async function deleteFolder(id, name) {
-    const folder = allCollections.find(c => c.id === id);
-    const msg = folder && folder.template_count > 0
-        ? 'Delete folder "' + name + '"? ' + folder.template_count + ' templates will be moved to parent folder.'
-        : 'Delete folder "' + name + '"?';
-
-    if (!confirm(msg)) return;
-
-    try {
-        await api.delete('/api/collections/' + id);
-        showToast('Folder deleted', 'success');
-        await loadCollections();
-        await loadTemplates();
-        renderFoldersManageTree();
-        updateParentSelect();
-    } catch (e) {
-        showToast('Failed to delete folder', 'error');
-    }
-}
-
-// Move Template Modal
+function closeFoldersModal() { el('folders-modal').close(); }
 function showMoveModal(templateId, currentCollectionId) {
     moveTemplateId = templateId;
-    document.getElementById('move-folder-select').value = currentCollectionId || '';
-    document.getElementById('move-modal').style.display = 'flex';
+    moveCollectionId = currentCollectionId === null ? '' : String(currentCollectionId);
+    el('move-modal').showModal();
+    refreshMove();
 }
-
-function closeMoveModal() {
-    document.getElementById('move-modal').style.display = 'none';
-    moveTemplateId = null;
+function refreshMove() {
+    return htmx.ajax('GET', '/ui/templates-page/move?selected=' + encodeURIComponent(moveCollectionId), {target:'#move-options'});
 }
-
-async function moveTemplate() {
-    const collectionId = document.getElementById('move-folder-select').value;
-
+function closeMoveModal() { el('move-modal').close(); moveTemplateId = null; }
+async function refreshAfterMutation() {
+    loadTemplates(); loadCollections();
+    if (el('folders-modal').open) await htmx.ajax('GET','/ui/templates-page/manage',{target:'#folders-tree-manage'});
+}
+async function deleteTemplate(id, name) {
+    if (!confirm('Delete template "' + name + '"? This cannot be undone.')) return;
+    try { await api.delete('/api/templates/' + id); await refreshAfterMutation(); showToast('Template deleted','success'); }
+    catch (e) { showToast(e.message || 'Failed to delete template','error'); }
+}
+async function createFolder() {
+    const name = el('new-folder-name').value.trim();
+    if (!name) { showToast('Please enter a folder name','error'); return; }
+    const parent = el('new-folder-parent').value;
     try {
-        if (collectionId) {
-            await api.post('/api/collections/' + collectionId + '/templates/' + moveTemplateId);
-        } else {
-            await api.put('/api/templates/' + moveTemplateId, { collection_id: null });
-        }
-        showToast('Template moved', 'success');
-        closeMoveModal();
-        await loadCollections();
-        await loadTemplates();
-    } catch (e) {
-        showToast(e.message || 'Failed to move template', 'error');
-    }
+        await api.post('/api/collections',{name,description:el('new-folder-desc').value.trim() || null,parent_id:parent ? Number(parent) : null});
+        await refreshAfterMutation(); showToast('Folder created','success');
+    } catch (e) { showToast(e.message || 'Failed to create folder','error'); }
 }
-
-document.addEventListener('DOMContentLoaded', async () => {
-    await loadDocumentTypes();
-    await loadCollections();
-    await loadTemplates();
-    document.getElementById('search-input').addEventListener('input', applyFilters);
-    document.getElementById('format-filter').addEventListener('change', applyFilters);
-    document.getElementById('doctype-filter').addEventListener('change', applyFilters);
+async function renameFolder(id, name) {
+    const replacement = prompt('Rename folder', name);
+    if (!replacement || !replacement.trim()) return;
+    try { await api.put('/api/collections/' + id,{name:replacement.trim()}); await refreshAfterMutation(); }
+    catch (e) { showToast(e.message || 'Failed to rename folder','error'); }
+}
+async function deleteFolder(id, name, count) {
+    if (!confirm('Delete folder "' + name + '"? Templates will be unlinked; child folders will move to the parent.')) return;
+    try { await api.delete('/api/collections/' + id); await refreshAfterMutation(); }
+    catch (e) { showToast(e.message || 'Failed to delete folder','error'); }
+}
+async function moveTemplate() {
+    const select = el('move-folder-select');
+    if (!select || moveTemplateId === null) return;
+    try {
+        if (select.value) await api.post('/api/collections/' + select.value + '/templates/' + moveTemplateId);
+        else await api.delete('/api/templates/' + moveTemplateId + '/collection');
+        closeMoveModal(); await refreshAfterMutation(); showToast('Template moved','success');
+    } catch (e) { showToast(e.message || 'Failed to move template','error'); }
+}
+let filterTimer;
+document.addEventListener('input', event => {
+    if (event.target.id !== 'search-input') return;
+    clearTimeout(filterTimer); filterTimer = setTimeout(applyFilters,200);
 });
-
-// Close modal on outside click
-document.addEventListener('click', (e) => {
-    if (e.target.classList.contains('modal')) {
-        e.target.style.display = 'none';
-    }
+document.addEventListener('change', event => {
+    if (event.target.id === 'doctype-filter') el('doctype-value').value = event.target.value;
+    if (['format-filter','doctype-filter'].includes(event.target.id)) applyFilters();
 });
-{% endraw %}
+document.addEventListener('click', event => {
+    const folder = event.target.closest('[data-folder]');
+    if (!folder) return;
+    el('folder-value').value = folder.dataset.folder;
+    loadCollections(); loadTemplates();
+});
 </script>
 {% endblock %}

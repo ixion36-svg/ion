@@ -1,0 +1,88 @@
+{# The version detail modal, for one version or for a pair being compared.
+
+   Replaces the other two innerHTML sites in versions.html, both in
+   `#modal-meta`: the metadata bar built by viewVersion() and the
+   "Comparing versions" line written by showDiff().
+
+   Why the modal body is a fragment rather than client-side DOM work. Its
+   metadata is the same three fields the row shows, with the same three
+   rules behind them, so leaving it in JavaScript meant a second copy of
+   each. The copies had already drifted once: viewVersion escaped the
+   checkpoint name and not the message, and loadVersions escaped neither.
+   The timestamp settles it. There is one honest rendering of a stored time,
+   the `ts` macro, and JavaScript cannot reach it, so a client-side modal
+   would have kept formatDate and left this page with two answers to "what
+   time is this" while its list used the other one.
+
+   The chrome is written once, around the branch, and the Close button
+   renders in every state. bob_eval learned that the hard way: an error swap
+   that returned a bare alert left the panel open with no way out but a
+   reload. Close and the backdrop are the two built-in delegations in
+   static/js/event-delegation.js, so neither needs a line of page script.
+
+   Rollback is offered only when there is a version to roll back to. In the
+   failed and missing states `rollback_to` is None, because a button that
+   acts on a version the server could not read is a button that lies. #}
+{# `modal show`, not daisyUI's `modal modal-open`. The compiled ion.css
+   carries two modal systems and the legacy one wins: its `.modal{display:
+   none}` is unlayered, so it beats daisyUI's layered `.modal{display:grid}`,
+   and `.modal.show{display:flex}` is the only thing that reveals one.
+   Measured in a browser on this page rather than reasoned about, because
+   `modal-open` reasons perfectly and computes to display:none:
+
+     modal                  display:none   visibility:visible
+     modal show             display:flex   visibility:visible
+     modal modal-open       display:none   visibility:visible
+     modal modal-open show  display:flex   opacity:0
+
+   It is also what the rest of ION does: canaries.html and the other legacy
+   modals toggle `show`, and the page this replaces revealed its own modal
+   with showModal()'s classList.add('show'). #}
+{% import "_fragments/versions_meta.html" as meta %}
+<div class="modal show" id="version-modal" data-remove-self-on-self-click>
+  <div class="modal-box w-11/12 max-w-5xl max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between gap-4">
+      <h2 class="text-lg font-semibold">
+        {%- if kind == 'diff' %}Version {{ from_version }} &rarr; {{ to_version }}
+        {%- elif version_number is not none %}Version {{ version_number }}
+        {%- else %}Version{% endif %}
+      </h2>
+      <button type="button" class="btn btn-ghost btn-sm btn-circle"
+              data-remove-closest=".modal" aria-label="Close">&times;</button>
+    </div>
+
+    <div class="py-4">
+{% if state == 'failed' %}
+      <p class="error">This version could not be read. This is a failure to look, not an empty version.</p>
+{% elif state == 'missing' %}
+      <p class="error">That version no longer exists. It may have been deleted since this page loaded.</p>
+{% elif kind == 'diff' %}
+      <div class="meta-bar flex flex-wrap items-center gap-3 text-sm mb-4">
+        <span class="opacity-60">Comparing versions</span>
+      </div>
+      <h4 class="font-semibold mb-2">Changes (Diff)</h4>
+      {# diff_versions returns a str, so empty is the only falsy value it
+         can hand back and it means the two versions have identical content.
+         "No changes" is that claim, not a stand-in for a missing read: the
+         read failing lands in the branch above instead. #}
+      <pre class="code-block diff ion-mono bg-base-300 p-4 rounded-box overflow-x-auto text-sm whitespace-pre-wrap">{% if diff %}{{ diff }}{% else %}No changes{% endif %}</pre>
+{% else %}
+      <div class="meta-bar flex flex-wrap items-center gap-3 text-sm mb-4">
+        {{ meta.checkpoint_badge(version) }}
+        {{ meta.message(version) }}
+        {{ meta.created(version) }}
+      </div>
+      <h4 class="font-semibold mb-2">Content</h4>
+      <pre class="code-block ion-mono bg-base-300 p-4 rounded-box overflow-x-auto text-sm whitespace-pre-wrap">{{ version.content }}</pre>
+{% endif %}
+    </div>
+
+    <div class="modal-action">
+      {% if rollback_to is not none %}
+      <button type="button" class="btn btn-error" data-click-action="rollbackToVersion"
+              data-args='[{{ rollback_to }}]'>Rollback to This Version</button>
+      {% endif %}
+      <button type="button" class="btn btn-ghost" data-remove-closest=".modal">Close</button>
+    </div>
+  </div>
+</div>

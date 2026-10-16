@@ -1,0 +1,103 @@
+{# The System Quirks table for /de/quirks.
+
+   Replaces four innerHTML sites in de_quirks.html: the loading placeholder,
+   the load-failure alert, the empty state and the table itself, plus the
+   hand-rolled `qkEsc()` those needed. The markup is deliberately the same
+   as what that JavaScript produced, so the page looks identical and the
+   move is checkable with tools/style_snapshot.py rather than by eye.
+
+   The card chrome is here and the controls are not. The status select, the
+   Refresh button and Raise quirk live in the page shell, outside this swap
+   target, so a failed render cannot take away the control that retries.
+   They send their state with hx-include, which is also why this fragment
+   renders no filter of its own.
+
+   Three outcomes, three renders. The module being licence-gated off is a
+   fourth, and it never reaches this template: the route answers 404 and
+   static/js/htmx-errors.js words it. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+<div class="card bg-base-200 shadow">
+{% if failed %}
+  <div class="card-body">
+    <div role="alert" class="alert alert-error">
+      System quirks could not be read. This is not an empty list: the query
+      failed, so how many known-benign annotations are live is unknown
+      rather than zero. Refresh to try again.
+    </div>
+  </div>
+{% elif not quirks %}
+  <div class="card-body items-center text-center py-14">
+    {# "Nothing recorded" and "nothing under this filter" are different
+       claims. The JavaScript said "No quirks yet" either way, which is
+       wrong the moment the Pending filter is on and active quirks exist. #}
+    {% if status == 'all' %}
+      <p class="opacity-60">No quirks yet. Raise one, then a different teammate verifies it.</p>
+    {% else %}
+      <p class="opacity-60">No {{ status }} quirks. The filter is set to {{ status }}; other statuses may have some.</p>
+    {% endif %}
+  </div>
+{% else %}
+  <div class="card-body p-0">
+    <div class="overflow-x-auto">
+      <table class="table table-sm" id="qk-table">
+        <thead>
+          <tr>
+            <th>Quirk</th><th>Scope</th><th>Status</th>
+            <th>Raised / Verified</th><th>Review</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for q in quirks %}
+            <tr>
+              <td>
+                <strong>{{ q.title }}</strong>
+                <div class="text-sm opacity-50 mt-1">{{ q.annotation }}{#
+                  #}{% if q.priority_nudge is not none %} · nudge {{ q.priority_nudge }}{% endif %}</div>
+                {# `is not none`, not truthiness. A nudge of 0 is a recorded
+                   decision not to deprioritise, and the JavaScript's
+                   `q.priority_nudge ? ...` printed nothing for it, which
+                   reads the same as a row that never recorded one. #}
+              </td>
+              <td>
+                {% if q.scope_chips %}
+                  {% for chip in q.scope_chips %}<span class="badge badge-ghost badge-sm mr-1 mb-1">{{ chip }}</span>{% endfor %}
+                {% else %}
+                  <span class="opacity-50">—</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if q.expired_badge %}
+                  <span class="badge badge-ghost badge-sm">expired</span>
+                {% else %}
+                  <span class="badge badge-sm {{ q.status_css }}">{{ q.status }}</span>
+                {% endif %}
+              </td>
+              <td class="text-sm opacity-60">
+                raised: {{ q.raised_by_username or '—' }}
+                {% if q.verified_by_username %}<br>verified: {{ q.verified_by_username }}{% endif %}
+                {% if q.reverted_by_username %}<br>reverted: {{ q.reverted_by_username }}{% endif %}
+              </td>
+              {# `datetime`, not `date`. The token is inert while review_date
+                 is a naive column, because a zoneless value cannot be moved
+                 to another clock and local-time.js leaves the text alone. It
+                 would bite the day the column gains a timezone: `date` would
+                 strip the time of day, and the time of day is the point,
+                 since quirk_match compares against the instant. #}
+              <td class="font-mono text-sm opacity-60">{{ ts(q.review_date, 'datetime', fallback='No review date') }}</td>
+              <td>
+                {% if q.actions %}
+                  {% for a in q.actions %}<button class="btn {{ a.css }} btn-sm" data-click-action="{{ a.action }}" data-args='[{{ q.id }}]'>{{ a.label }}</button>{% endfor %}
+                {% else %}
+                  <span class="opacity-50">—</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endif %}
+</div>

@@ -108,7 +108,10 @@ class TestNavigatorLayer:
 
         assert layer["techniques"] == []
         assert layer["domain"] == "enterprise-attack"
-        assert "0/0 techniques covered" in layer["description"]
+        # Was "0/0 techniques covered". A failed read has no denominator, and
+        # printing one as 0 publishes a ratio nobody measured.
+        assert "not return a technique total" in layer["description"]
+        assert "0/0" not in layer["description"]
 
     def test_no_coverage_data_is_treated_the_same(self):
         assert svc.generate_navigator_layer(_Tide(None))["techniques"] == []
@@ -125,20 +128,42 @@ class TestNavigatorLayer:
         entry = svc.generate_navigator_layer(tide)["techniques"][0]
 
         assert entry["techniqueID"] == "T1059"
-        assert entry["score"] == 5
+        # Scored on the 4 rules that run, not the 5 that exist. A Navigator
+        # layer is read as a picture of what the SOC detects, and it leaves
+        # ION, so a rule nobody enabled must not paint a cell.
+        assert entry["score"] == 4
         assert entry["color"] == "#3fb950"
         assert entry["enabled"] is True
-        assert "5 rules, avg quality: 32.5" in entry["comment"]
+        assert "4 of 5 rules enabled" in entry["comment"]
+        assert "avg quality: 32.5" in entry["comment"]
 
-    def test_metadata_carries_rules_enabled_and_quality(self):
+    def test_a_technique_whose_rules_are_all_disabled_scores_nothing(self):
+        """Measured on the live TIDE tenant: T1611 carries 41 rules with none
+        switched on, and this exported it in the best-covered colour."""
+        tide = _Tide({"techniques": {
+            "T1611": {"rule_count": 41, "avg_quality": 2.0, "enabled_rules": 0},
+        }})
+
+        entry = svc.generate_navigator_layer(tide)["techniques"][0]
+
+        assert entry["score"] == 0
+        assert entry["color"] != "#3fb950"
+        assert "NOT RUNNING" in entry["comment"]
+        assert "0 of 41 rules enabled" in entry["comment"]
+
+    def test_metadata_separates_rules_written_from_rules_enabled(self):
+        """"Rules" unqualified is the ambiguity that caused the bug, and this
+        metadata shows on hover in Navigator, outside ION."""
         tide = _Tide({"techniques": {
             "T1059": {"rule_count": 5, "avg_quality": 32.5, "enabled_rules": 4},
         }})
 
         meta = svc.generate_navigator_layer(tide)["techniques"][0]["metadata"]
+        by_name = {m["name"]: m["value"] for m in meta}
 
-        assert {m["name"] for m in meta} == {"Rules", "Enabled", "Quality"}
-        assert {m["name"]: m["value"] for m in meta}["Enabled"] == "4"
+        assert set(by_name) == {"Rules written", "Rules enabled", "Quality"}
+        assert by_name["Rules written"] == "5"
+        assert by_name["Rules enabled"] == "4"
 
     def test_missing_per_technique_fields_default_to_zero(self):
         """A sparse TIDE row must not break the layer."""
@@ -151,7 +176,9 @@ class TestNavigatorLayer:
     def test_the_description_reports_the_coverage_ratio(self):
         tide = _Tide({"techniques": {}, "total_techniques": 200,
                       "covered_techniques": 47})
-        assert "47/200 techniques covered" in \
+        # "covered" became "have an enabled rule", because that is what the
+        # numerator now counts and the layer is read outside ION.
+        assert "47/200 techniques have an enabled rule" in \
             svc.generate_navigator_layer(tide)["description"]
 
     def test_the_layer_name_is_configurable(self):

@@ -1,0 +1,136 @@
+{# The Detection Proposals table for /de-proposals.
+
+   Replaces four innerHTML sites in de_proposals.html: the loading
+   placeholder, the load-failure alert, the empty state and the table
+   itself, plus the hand-rolled dpEsc() those needed. The markup is the
+   table the JavaScript built, so a row has one definition.
+
+   The card chrome is here and the controls are not. The status select,
+   the source select and Refresh live in the page shell, outside this
+   swap target, so a failed render cannot take away the control that
+   retries. They send their state with hx-include, which is also why
+   this fragment renders no filter of its own.
+
+   Four outcomes. The module being licence-gated off never reaches this
+   template: the route answers 404 and static/js/htmx-errors.js words it.
+   A failed read, an empty list, and a filtered-empty list are the three
+   that do, and they are different sentences because they lead to
+   different actions. #}
+
+<div class="card bg-base-200 shadow">
+{% if failed %}
+  <div class="card-body">
+    <div role="alert" class="alert alert-error">
+      Detection proposals could not be read. This is not an empty list: the
+      query failed, so how many tuning drafts are waiting is unknown rather
+      than zero. Refresh to try again.
+    </div>
+  </div>
+{% elif not proposals %}
+  <div class="card-body items-center text-center py-14">
+    {# "Nothing drafted" and "nothing under this filter" are different
+       claims. The JavaScript said "No proposals yet" either way, which is
+       wrong the moment Draft is selected and applied proposals exist. #}
+    {% if status == 'all' and source == 'all' %}
+      <p class="opacity-60">No proposals yet. Draft one from a campaign on the <a href="/de-metrics" class="link link-primary">DE Metrics</a> page.</p>
+    {% elif source == 'all' %}
+      <p class="opacity-60">No {{ status }} proposals. The filter is set to {{ status }}; other statuses may have some.</p>
+    {% elif status == 'all' %}
+      <p class="opacity-60">No proposals from {{ 'Bob' if source == 'bob' else 'an analyst' }}. The source filter is set to {{ source }}; the other source may have some.</p>
+    {% else %}
+      <p class="opacity-60">No {{ status }} proposals from {{ 'Bob' if source == 'bob' else 'an analyst' }}. The filters are set to {{ status }} and {{ source }}; other combinations may have some.</p>
+    {% endif %}
+  </div>
+{% else %}
+  <div class="card-body p-0">
+    <div class="overflow-x-auto">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Rule</th><th>Type</th><th>Proposal</th>
+            <th>Expected</th><th>Status</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in proposals %}
+            {% set o = p.outcome_view %}
+            <tr>
+              <td class="font-mono text-sm">{{ p.rule_name if p.rule_name else '—' }}</td>
+              <td><span class="badge badge-ghost badge-sm">{{ p.change_type if p.change_type is not none else '—' }}</span></td>
+              <td>
+                <strong>{{ p.title }}</strong>
+                {% if p.is_bob %} <span class="badge badge-ghost badge-sm" title="Drafted automatically by Bob{% if p.alert_id is not none and p.alert_id != '' %} from alert {{ p.alert_id }}{% endif %}. Review the evidence before applying.">Bob</span>{% endif %}
+                <div class="whitespace-pre-wrap text-sm mt-1">{{ p.suggested_change }}</div>
+                {% if p.mitre %}
+                  <div class="flex flex-wrap gap-1 mt-1">{% for m in p.mitre %}<span class="badge badge-sm badge-info font-mono">{{ m }}</span> {% endfor %}</div>
+                {% endif %}
+                {# Quote the equal-window comparison, never the top-level
+                   drop_pct. That one divides a full baseline by however
+                   little time has passed, so it flatters a change that
+                   landed yesterday. The view already dropped it.
+
+                   Counts use `is not none`. A window with 0 false positives
+                   before the change is a measurement, and printing nothing
+                   there reads as "we did not count". #}
+                {% if o.kind == 'unmeasured' %}
+                  <div class="bg-base-300 rounded p-2 mt-2 text-sm opacity-60">Not yet measured.</div>
+                {% elif o.kind == 'legacy' %}
+                  <div class="bg-base-300 rounded p-2 mt-2 text-sm opacity-70">Legacy measurement: {% if o.legacy_drop_pct is not none %}{{ o.legacy_drop_text }}%{% else %}n/a{% endif %} (uneven windows — re-measure for a comparable figure)</div>
+                {% elif o.kind == 'insufficient' %}
+                  <div class="bg-base-300 rounded p-2 mt-2 text-sm">
+                    <strong>Not enough observation yet</strong> —
+                    {{ o.before_count if o.before_count is not none else '—' }} FP before vs {{ o.after_count if o.after_count is not none else '—' }} after over {{ o.window_text if o.window_days_exact is not none else '—' }}d each way
+                    {% if o.reason %}<div class="opacity-70 mt-1">{{ o.reason }}</div>{% endif %}
+                  </div>
+                {% elif o.kind == 'no_percentage' %}
+                  {# sufficient_observation is True and drop_pct is None:
+                     the windows were long enough and there was still no
+                     baseline to divide by. That is not "not enough
+                     observation", and it is not a drop of zero. #}
+                  <div class="bg-base-300 rounded p-2 mt-2 text-sm">
+                    <strong>No percentage to quote</strong> —
+                    {{ o.before_count if o.before_count is not none else '—' }} FP before vs {{ o.after_count if o.after_count is not none else '—' }} after over {{ o.window_text if o.window_days_exact is not none else '—' }}d each way
+                    {% if o.reason %}<div class="opacity-70 mt-1">{{ o.reason }}</div>{% endif %}
+                  </div>
+                {% elif o.kind == 'unjudged' %}
+                  {# sufficient_observation was neither true nor false.
+                     Folding that into "not enough observation" would turn
+                     "declined to judge" into "watched, and it was too
+                     short". No drop is quoted, including a drop that
+                     happens to be sitting on the row. #}
+                  <div class="bg-base-300 rounded p-2 mt-2 text-sm">
+                    <strong>Comparable window not judged</strong> — whether the
+                    observation was long enough was not recorded, so no drop
+                    is quoted. This is not a measured zero and not a short window.
+                  </div>
+                {% elif o.kind == 'quoted' %}
+                  <div class="bg-base-300 rounded p-2 mt-2 text-sm">Noise drop <strong>{% if o.drop_pct is not none %}{{ o.drop_text }}%{% else %}—{% endif %}</strong> —
+                    {{ o.before_count if o.before_count is not none else '—' }} FP before vs {{ o.after_count if o.after_count is not none else '—' }} after, matched
+                    {{ o.window_text if o.window_days_exact is not none else '—' }}d windows
+                    ({% if o.before_per_day is not none %}{{ o.before_rate_text }}{% else %}—{% endif %}/d → {% if o.after_per_day is not none %}{{ o.after_rate_text }}{% else %}—{% endif %}/d)
+                    {% if o.lost is true %}
+                      <div class="text-warning mt-1">No confirmed threats from this rule since the change ({{ o.lost_before if o.lost_before is not none else '—' }} in the matched window before) — check it has not silenced a real detection.</div>
+                    {% endif %}
+                  </div>
+                {% endif %}
+              </td>
+              <td class="font-mono text-sm">{% if p.expected_fp_reduction is not none %}{{ p.fp_text }} FP · {% if p.expected_hours_reclaimed is not none %}{{ p.hours_text }}h{% endif %}{% else %}—{% endif %}</td>
+              <td>
+                <span class="badge badge-sm {{ p.status_css }}">{{ p.status }}</span>
+                {% if p.decided_by_username %}<div class="text-xs opacity-60 mt-1">by {{ p.decided_by_username }}</div>{% endif %}
+              </td>
+              <td>
+                {% if p.actions %}
+                  {% for a in p.actions %}{% if a.decision %}<button class="btn {{ a.css }} btn-sm" data-click-action="{{ a.action }}" data-args='[{{ p.id }}, "{{ a.decision }}"]'>{{ a.label }}</button>{% else %}<button class="btn {{ a.css }} btn-sm" data-click-action="{{ a.action }}" data-args='[{{ p.id }}]'>{{ a.label }}</button>{% endif %}{% endfor %}
+                {% else %}
+                  <span class="opacity-50">—</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endif %}
+</div>

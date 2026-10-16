@@ -2,9 +2,42 @@
 
 {% block title %}Arkime Traffic Analytics - ION{% endblock %}
 
+{% block head_css %}
+{# The page's own rules, lifted out of this template's inline style block.
+   See the header of arkime-traffic.css for the cascade check. #}
+<link rel="stylesheet" href="/static/css/arkime-traffic.css?v={{ ion_version }}">
+{% endblock %}
+
 {% block content %}
+{#
+  Traffic analytics. Five regions are pulled from /ui/arkime-traffic/* with
+  hx-get and rendered by Jinja: the first three stats tiles with their
+  trend deltas, the top-talker table, the packet hunts, the exclusion chips
+  and the AI review. See ion.web.ui.arkime_traffic for the gate on each and
+  for what the old JavaScript got wrong.
+
+  Three regions stay client-drawn, and deliberately. The geographic map,
+  the per-sensor bar chart and the RTMON doughnuts are canvas and SVG drawn
+  by Chart.js and jsvectormap from JSON; there is no markup for a partial
+  to own. The volume and protocol charts are the same, but their series now
+  arrive inside the overview fragment rather than from a second fetch, so a
+  figure in the stats bar and the shape beside it come from one read.
+
+  Every control that reloads a region sits outside that region's swap
+  target: the range tabs, the direction tabs, the exclusion form and the
+  hunt form are all above or beside what they refresh.
+#}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+
+{# ── Client-state templates ──
+   Both of these say something only this browser knows: that the form is
+   incomplete, and that a request it just issued is in flight. They are
+   cloned and filled with textContent. They sit here, outside the <script>
+   block: a <template> inside a script is inert text, cloneTemplate returns
+   null and the control built from it vanishes with no error. #}
+<template id="atf-ai-pick-node-template"><span class="atf-state-pending">Select a node first.</span></template>
+<template id="atf-ai-pending-template"><span class="text-base-content/60">Bob is reviewing <span data-atf-node></span> over <span data-atf-range></span>… (can take 30–90s)</span></template>
 
 <!-- Header -->
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
@@ -16,7 +49,8 @@
     <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Traffic Analytics</h1>
     <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Arkime ingress/egress volume, protocol distribution, and top talkers.</p>
   </div>
-  <!-- Range tabs: JS toggles .atf-tab-active (not daisyUI .btn-active). -->
+  <!-- Range tabs: JS toggles .atf-tab-active (not daisyUI .btn-active).
+       Outside every panel they reload. -->
   <div class="join" id="range-tabs" role="tablist">
     <button class="btn btn-sm join-item atf-tab atf-tab-active" data-range="24h" role="tab">24h</button>
     <button class="btn btn-sm join-item atf-tab" data-range="7d" role="tab">7d</button>
@@ -42,7 +76,11 @@
                class="input input-sm w-64" />
         <button id="excl-add" class="btn btn-sm">Add filter</button>
       </div>
-      <div id="excl-chips" class="flex flex-wrap gap-1.5 flex-1"></div>
+      {# Adding and removing an exclusion requires security:read, so those
+         two stay direct API calls; only the list is a fragment. #}
+      <div id="excl-chips" class="flex flex-wrap gap-1.5 flex-1"
+           hx-get="/ui/arkime-traffic/exclusions" hx-trigger="load, atfExclusions from:body"
+           hx-swap="innerHTML"></div>
       <a href="/api/network-correlation-report/html?days=7" target="_blank" rel="noopener"
          class="btn btn-primary btn-sm">Correlation report ↗</a>
     </div>
@@ -56,10 +94,20 @@
     <div class="flex flex-wrap items-center justify-between gap-3">
       <h2 class="card-title text-base basis-full md:basis-auto md:flex-1">AI traffic review</h2>
       <div class="flex items-center gap-2 flex-wrap">
-        <select id="ai-node" class="select select-sm">
+        {# The placeholder option is authored markup and is never rebuilt:
+           populateNodeSelect removes the options after it and appends new
+           ones with createElement and textContent. Resetting the select by
+           assigning this one option as a markup string is what put the same
+           sentence in two places. #}
+        <select id="ai-node" name="node" class="select select-sm">
           <option value="">Select a sensor node…</option>
         </select>
-        <button id="ai-review-btn" class="btn btn-primary btn-sm">Review patterns</button>
+        {# Outside #ai-review-out, so a render saying the review failed
+           cannot remove the button that asks again. #}
+        <button id="ai-review-btn" class="btn btn-primary btn-sm gap-2">
+          <span class="atf-idle">Review patterns</span>
+          <span class="atf-busy items-center gap-2"><span class="loading loading-spinner loading-xs"></span> Reviewing…</span>
+        </button>
       </div>
     </div>
     <p class="text-xs text-base-content/50">Bob (Foundation-Sec) reviews the selected node's traffic over the current range and flags anomalies + PCAP-pull recommendations.</p>
@@ -69,22 +117,24 @@
   </div>
 </div>
 
-<!-- Stats bar -->
+<!-- Stats bar. Six tiles across three reads: the first three come with the
+     overview fragment, the fourth with the top talkers, and the two
+     country tiles are set from the geo JSON the map is drawn from. -->
 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8" id="atf-stats">
-  <div class="stat bg-base-200 rounded-box shadow p-4">
-    <div class="stat-value font-mono text-2xl" id="stat-sessions">—</div>
-    <div class="stat-title">Total Sessions <span id="stat-sessions-delta" class="text-xs normal-case tracking-normal"></span></div>
+  <div id="atf-tile-sessions" class="stat bg-base-200 rounded-box shadow p-4">
+    <div class="stat-value font-mono text-2xl">—</div>
+    <div class="stat-title">Total Sessions</div>
   </div>
-  <div class="stat bg-base-200 rounded-box shadow p-4">
-    <div class="stat-value font-mono text-2xl" id="stat-bytes">—</div>
-    <div class="stat-title">Total Volume <span id="stat-bytes-delta" class="text-xs normal-case tracking-normal"></span></div>
+  <div id="atf-tile-bytes" class="stat bg-base-200 rounded-box shadow p-4">
+    <div class="stat-value font-mono text-2xl">—</div>
+    <div class="stat-title">Total Volume</div>
   </div>
-  <div class="stat bg-base-200 rounded-box shadow p-4">
-    <div class="stat-value font-mono text-2xl text-primary" id="stat-top-proto">—</div>
+  <div id="atf-tile-proto" class="stat bg-base-200 rounded-box shadow p-4">
+    <div class="stat-value font-mono text-2xl text-primary">—</div>
     <div class="stat-title">Top Protocol</div>
   </div>
-  <div class="stat bg-base-200 rounded-box shadow p-4">
-    <div class="stat-value font-mono text-2xl" id="stat-top-src">—</div>
+  <div id="atf-tile-top-src" class="stat bg-base-200 rounded-box shadow p-4">
+    <div class="stat-value font-mono text-2xl">—</div>
     <div class="stat-title">Top Source IP</div>
   </div>
   <div class="stat bg-base-200 rounded-box shadow p-4">
@@ -97,7 +147,9 @@
   </div>
 </div>
 
-<!-- Volume chart -->
+<!-- Volume chart. #atf-overview is the fragment's slot: it carries the
+     series for Chart.js and whatever the read had to say about itself. The
+     canvas is a drawing surface and stays in the shell. -->
 <div class="card bg-base-200 shadow relative overflow-hidden atf-card mb-6">
   <div class="card-body">
     <div class="flex flex-wrap items-center justify-between gap-3">
@@ -106,10 +158,11 @@
     </div>
     <div class="relative atf-chart-h-260">
       <canvas id="vol-chart"></canvas>
-      <div id="vol-loading" class="atf-overlay">
-        <span class="loading loading-spinner loading-md text-primary"></span>
+      <div id="atf-overview"
+           hx-get="/ui/arkime-traffic/overview" hx-trigger="load, atfReload from:body"
+           hx-swap="innerHTML">
+        <div class="atf-overlay"><span class="loading loading-spinner loading-md text-primary"></span></div>
       </div>
-      <div id="vol-empty" class="atf-overlay hidden text-base-content/50 text-sm">No data for this range</div>
     </div>
   </div>
 </div>
@@ -117,46 +170,40 @@
 <!-- Protocol mix + Top talkers -->
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
 
-  <!-- Protocol doughnut -->
+  <!-- Protocol doughnut. Its state slot is filled by the overview fragment,
+       so the doughnut cannot say "No data" while the Top Protocol tile
+       names one. -->
   <div class="card bg-base-200 shadow relative overflow-hidden atf-card">
     <div class="card-body">
       <h2 class="card-title text-base">Protocol Mix</h2>
       <div class="relative atf-chart-h-220">
         <canvas id="proto-chart"></canvas>
-        <div id="proto-loading" class="atf-overlay">
-          <span class="loading loading-spinner loading-md text-primary"></span>
+        <div id="atf-protocols">
+          <div class="atf-overlay"><span class="loading loading-spinner loading-md text-primary"></span></div>
         </div>
-        <div id="proto-empty" class="atf-overlay hidden text-base-content/50 text-sm">No data</div>
       </div>
     </div>
   </div>
 
-  <!-- Top talkers: JS binds via talkers-table.closest('.atf-card') -->
-  <div class="card bg-base-200 shadow relative overflow-hidden atf-card lg:col-span-2">
+  <!-- Top talkers -->
+  <div class="card bg-base-200 shadow relative overflow-hidden atf-card lg:col-span-2" id="talkers-card">
     <div class="card-body">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div class="basis-full md:basis-auto md:flex-1">
           <h2 class="card-title text-base">Top Talkers</h2>
           <p class="text-xs text-base-content/50 mt-0.5" id="talkers-method"></p>
         </div>
+        {# Direction is control state: both directions arrive in one read
+           and the tab toggles between the two tbodies. #}
         <div class="join">
           <button class="btn btn-sm join-item atf-talker-tab atf-talker-active" data-dir="src">By Source</button>
           <button class="btn btn-sm join-item atf-talker-tab" data-dir="dst">By Destination</button>
         </div>
       </div>
-      <div id="talkers-loading" class="atf-overlay"><span class="loading loading-spinner loading-md text-primary"></span></div>
-      <div id="talkers-empty" class="hidden text-base-content/50 text-sm text-center py-8">No data for this range</div>
-      <div class="overflow-x-auto">
-        <table class="table table-sm" id="talkers-table">
-          <thead>
-            <tr>
-              <th>IP Address</th>
-              <th class="text-right">Volume</th>
-              <th class="text-right">Sessions</th>
-            </tr>
-          </thead>
-          <tbody id="talkers-body"></tbody>
-        </table>
+      <div id="atf-talkers"
+           hx-get="/ui/arkime-traffic/talkers" hx-trigger="load, atfReload from:body"
+           hx-swap="innerHTML">
+        <p class="text-base-content/50 text-sm text-center py-8"><span class="loading loading-spinner loading-md text-primary"></span></p>
       </div>
     </div>
   </div>
@@ -246,6 +293,8 @@
       <h2 class="card-title text-base">Packet Hunts</h2>
       <p class="text-xs text-base-content/50 mt-0.5">Arkime packet-search jobs submitted from ION (submitting requires lead permission; the Arkime service user needs packetSearch)</p>
     </div>
+    {# Submitting requires security:read, so the form posts to the API
+       directly and then asks the fragment to reload. #}
     <div class="flex flex-wrap items-center gap-2">
       <input id="hunt-name" type="text" placeholder="Hunt name" maxlength="120"
              class="input input-sm w-44" />
@@ -267,21 +316,10 @@
              class="input input-sm w-72" />
       <button id="hunt-submit" class="btn btn-primary btn-sm">Launch hunt</button>
     </div>
-    <div id="hunts-empty" class="hidden text-base-content/50 text-sm text-center py-6">No hunts submitted yet.</div>
-    <div class="overflow-x-auto">
-      <table class="table table-sm" id="hunts-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Search</th>
-            <th>Status</th>
-            <th class="text-right">Matched</th>
-            <th>Submitted</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="hunts-body"></tbody>
-      </table>
+    <div id="atf-hunts"
+         hx-get="/ui/arkime-traffic/hunts" hx-trigger="load, atfHunts from:body"
+         hx-swap="innerHTML">
+      <p class="text-base-content/50 text-sm text-center py-6"><span class="loading loading-spinner loading-md text-primary"></span></p>
     </div>
   </div>
 </div>
@@ -291,76 +329,19 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* JS toggles these classes, not daisyUI .btn-active. */
-.atf-tab-active,
-.atf-talker-active,
-.atf-country-active {
-  background-color: var(--color-primary);
-  color: var(--color-primary-content);
-  font-weight: 600;
-  border-color: var(--color-primary);
-}
-
-/* Overlay must beat Tailwind .hidden via the compound selector; JS also
-   sets element.style.display on #talkers-loading. z-index: 5 has no
-   compiled utility equivalent. */
-.atf-overlay {
-  position: absolute;
-  inset: 0;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-base-200);
-  border-radius: var(--radius-box);
-  z-index: 5;
-}
-/* `display` is conditional: this element is also written with Tailwind's `hidden`, and an unconditional display here beats it. */
-.atf-overlay:not(.hidden) { display: flex; }
-.atf-overlay.hidden { display: none; }
-
-/* Chart/map heights have no compiled utility at these exact px values. */
-.atf-chart-h-260 { height: 260px; }
-.atf-chart-h-220 { height: 220px; }
-.atf-map-container { height: 420px; }
-#world-map { width: 100%; height: 420px; }
-
-/* JS renderTalkers() emits .ip-cell / .bytes-cell without utility classes. */
-#talkers-body .ip-cell {
-  font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 0.8rem;
-  color: var(--color-primary);
-}
-#talkers-body .bytes-cell {
-  color: var(--color-secondary);
-  font-variant-numeric: tabular-nums;
-}
-#talkers-body td:not(:first-child) { text-align: right; }
-
-/* jsvectormap plugin chrome — no daisyUI equivalent. */
-.jvectormap-tip {
-  position: fixed;
-  display: none;
-  background: var(--color-base-100);
-  border: 1px solid var(--color-base-300);
-  color: var(--color-base-content);
-  padding: 5px 10px;
-  font-size: 12px;
-  border-radius: 4px;
-  pointer-events: none;
-  z-index: 200;
-  white-space: nowrap;
-}
-.jvectormap-tip.active { display: block; }
-.jvectormap-zoomin, .jvectormap-zoomout { display: none; }
-#world-map svg { max-width: 100%; }
-</style>
-
 <script nonce="{{ csp_nonce }}" src="/static/js/chart.umd.min.js"></script>
 <script nonce="{{ csp_nonce }}" src="/static/js/jsvectormap.min.js"></script>
 <script nonce="{{ csp_nonce }}" src="/static/js/jsvectormap-world.js"></script>
 <script nonce="{{ csp_nonce }}">
 (function () {
   'use strict';
+
+  /* What is left in this file draws canvases and an SVG map, and holds the
+   * three pieces of state only the browser has: the selected range, the
+   * selected talker direction and the selected country direction. No
+   * markup is assembled: the five data-driven regions arrive as rendered
+   * fragments, and the two client-only messages are <template> elements in
+   * the page, cloned and filled with textContent. */
 
   // ── State ──────────────────────────────────────────────────────────────────
   let activeRange       = '24h';
@@ -369,12 +350,18 @@
   let volChart    = null;
   let protoChart  = null;
   let worldMap    = null;
-  let talkersData = null;
   let countryData = null;
   let nodeChart   = null;
   let rtmonDetectorChart = null;
   let rtmonSeverityChart = null;
   let rtmonDailyChart    = null;
+
+  // ?demo=1 is read from the URL rather than from the Arkime status check,
+  // so it is known before the first fragment request goes out. An
+  // unconfigured Arkime is detected server-side by every fragment, which
+  // is why that case needs no flag here.
+  const demoRequested =
+    new URLSearchParams(window.location.search).get('demo') === '1';
 
   // ── Utility ────────────────────────────────────────────────────────────────
   function fmtBytes(b) {
@@ -405,35 +392,36 @@
   function showOverlay(id)  { const el = document.getElementById(id); if (el) { el.classList.remove('hidden'); } }
   function hideOverlay(id)  { const el = document.getElementById(id); if (el) { el.classList.add('hidden'); } }
 
+  /* A copy of a <template>'s first element. The markup is Jinja's; nothing
+     here assembles it. Null when the template is not on the page. */
+  function cloneTemplate(id) {
+    const tpl = document.getElementById(id);
+    if (!tpl || !tpl.content || !tpl.content.firstElementChild) return null;
+    return tpl.content.firstElementChild.cloneNode(true);
+  }
+
   // ── Chart helpers ──────────────────────────────────────────────────────────
   function destroyChart(ref) {
     if (ref) { try { ref.destroy(); } catch (_) {} }
     return null;
   }
 
-  function renderVolumeChart(overview) {
+  function renderVolumeChart(series) {
     volChart = destroyChart(volChart);
-    hideOverlay('vol-loading');
 
-    const srcH = overview.src_histo || [];
-    const dstH = overview.dst_histo || [];
-
-    if (srcH.length === 0 && dstH.length === 0) {
-      showOverlay('vol-empty');
-      return;
-    }
-    hideOverlay('vol-empty');
+    // null is "not measured" and draws nothing; [] is a measured empty
+    // window, and the fragment has already said which of the two it was.
+    const srcH = Array.isArray(series.src_histo) ? series.src_histo : [];
+    const dstH = Array.isArray(series.dst_histo) ? series.dst_histo : [];
+    if (srcH.length === 0 && dstH.length === 0) return;
 
     // Build unified time axis (merge both histos, deduplicate)
     const allMs = [...new Set([...srcH.map(p => p[0]), ...dstH.map(p => p[0])])].sort((a,b) => a-b);
     const srcMap = Object.fromEntries(srcH.map(p => [p[0], p[1]]));
     const dstMap = Object.fromEntries(dstH.map(p => [p[0], p[1]]));
-    const labels  = allMs.map(ms => fmtLabel(ms, activeRange));
+    const labels  = allMs.map(ms => fmtLabel(ms, series.range || activeRange));
     const srcData = allMs.map(ms => srcMap[ms] || 0);
     const dstData = allMs.map(ms => dstMap[ms] || 0);
-
-    document.getElementById('vol-subtitle').textContent =
-      allMs.length + ' data points';
 
     const ctx = document.getElementById('vol-chart').getContext('2d');
     volChart = new Chart(ctx, {
@@ -509,14 +497,10 @@
 
   function renderProtoChart(protocols) {
     protoChart = destroyChart(protoChart);
-    hideOverlay('proto-loading');
+    if (!protocols) return;
 
-    const entries = Object.entries(protocols || {}).sort((a,b) => b[1]-a[1]).slice(0, 8);
-    if (entries.length === 0) {
-      showOverlay('proto-empty');
-      return;
-    }
-    hideOverlay('proto-empty');
+    const entries = Object.entries(protocols).sort((a,b) => b[1]-a[1]).slice(0, 8);
+    if (entries.length === 0) return;
 
     const COLORS = ['#60a5fa','#ec4899','#9a8cff','#86f0a0','#f0883e','#f8b33a','#bc8cff','#64748b'];
     const ctx = document.getElementById('proto-chart').getContext('2d');
@@ -560,34 +544,43 @@
     });
   }
 
-  function renderTalkers() {
-    if (!talkersData) return;
-    const rows = activeDir === 'src' ? (talkersData.by_src || []) : (talkersData.by_dst || []);
-    const tbody = document.getElementById('talkers-body');
-    const empty = document.getElementById('talkers-empty');
-    if (rows.length === 0) {
-      tbody.innerHTML = '';
-      empty.classList.remove('hidden');
+  /* The series the overview fragment delivered, or null. JSON.parse, never
+     a string read apart by hand: on a throw this returns null and the
+     charts draw nothing, rather than a chart drawn from half a payload. */
+  function overviewSeries() {
+    const el = document.querySelector('#atf-overview [data-atf-series]');
+    if (!el) return null;
+    try {
+      return JSON.parse(el.getAttribute('data-atf-series'));
+    } catch (e) {
+      console.error('traffic series could not be parsed', e);
+      return null;
+    }
+  }
+
+  function drawOverviewCharts() {
+    const series = overviewSeries();
+    if (!series) {
+      volChart = destroyChart(volChart);
+      protoChart = destroyChart(protoChart);
       return;
     }
-    empty.classList.add('hidden');
-    tbody.innerHTML = rows.map((r, idx) => `
-      <tr>
-        <td class="pr-4">
-          <span class="inline-block w-5 h-5 rounded text-center text-xs leading-5 bg-slate-700 text-slate-400 mr-2">${idx + 1}</span>
-          <span class="ip-cell">${r.ip || '—'}</span>
-        </td>
-        <td class="pr-4 bytes-cell">${fmtBytes(r.bytes)}</td>
-        <td>${fmtNum(r.sessions)}</td>
-      </tr>
-    `).join('');
+    renderVolumeChart(series);
+    renderProtoChart(series.protocols);
+  }
+
+  /* Which talker direction is showing. Both tbodies came down together. */
+  function applyTalkerDirection() {
+    document.querySelectorAll('#atf-talkers [data-atf-dir]').forEach(function (body) {
+      body.classList.toggle('hidden', body.getAttribute('data-atf-dir') !== activeDir);
+    });
   }
 
   // ── World map ──────────────────────────────────────────────────────────────
   function destroyWorldMap() {
     if (worldMap) { try { worldMap.destroy(); } catch (_) {} worldMap = null; }
     var c = document.getElementById('world-map');
-    if (c) c.innerHTML = '';
+    if (c) c.replaceChildren();
   }
 
   function renderWorldMap() {
@@ -618,75 +611,6 @@
         tooltip.text(d ? code + ': ' + fmtBytes(d.bytes) + ' · ' + fmtNum(d.sessions) + ' sessions' : code);
       },
     });
-  }
-
-  // ── Data fetchers ──────────────────────────────────────────────────────────
-  async function loadOverview(range) {
-    showOverlay('vol-loading');
-    showOverlay('proto-loading');
-    hideOverlay('vol-empty');
-    hideOverlay('proto-empty');
-
-    try {
-      const resp = await fetch('/api/arkime/traffic/overview?range=' + range);
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({ detail: resp.statusText }));
-        throw new Error(err.detail || resp.statusText);
-      }
-      const data = await resp.json();
-
-      // Stats bar
-      document.getElementById('stat-sessions').textContent = fmtNum(data.total_sessions || 0);
-      document.getElementById('stat-bytes').textContent    = fmtBytes(data.total_bytes || 0);
-
-      const protos = data.protocols || {};
-      const topProto = Object.entries(protos).sort((a,b) => b[1]-a[1])[0];
-      document.getElementById('stat-top-proto').textContent = topProto ? topProto[0].toUpperCase() : '—';
-
-      renderTrend(data.trend);
-      renderVolumeChart(data);
-      renderProtoChart(protos);
-    } catch (e) {
-      hideOverlay('vol-loading');
-      hideOverlay('proto-loading');
-      showOverlay('vol-empty');
-      showOverlay('proto-empty');
-      document.getElementById('vol-empty').textContent = 'Error: ' + e.message;
-      console.error('Traffic overview error:', e);
-    }
-  }
-
-  async function loadTopTalkers(range) {
-    const loadEl = document.getElementById('talkers-loading');
-    if (loadEl) loadEl.style.display = 'flex';
-    talkersData = null;
-
-    try {
-      const ep = document.getElementById('excl-private');
-      const xp = ep ? ep.checked : true;
-      const resp = await fetch('/api/arkime/traffic/top-talkers?range=' + range + '&exclude_private=' + xp);
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({ detail: resp.statusText }));
-        throw new Error(err.detail || resp.statusText);
-      }
-      talkersData = await resp.json();
-      var tm = document.getElementById('talkers-method');
-      if (tm) tm.textContent = talkersData.method === 'spigraph'
-        ? 'Server-side aggregation over every session in the range'
-        : 'Sampled from top flows (spigraph unavailable — approximate)';
-
-      // Top source IP for stats bar
-      const topSrc = (talkersData.by_src || [])[0];
-      document.getElementById('stat-top-src').textContent = topSrc ? topSrc.ip : '—';
-
-      renderTalkers();
-    } catch (e) {
-      console.error('Top talkers error:', e);
-      document.getElementById('talkers-body').innerHTML =
-        '<tr><td colspan="3" class="py-4 text-slate-500 text-center">Error loading top talkers</td></tr>';
-    } finally {
-      if (loadEl) loadEl.style.display = 'none';
-    }
   }
 
   async function loadTopCountries(range) {
@@ -768,6 +692,22 @@
         },
       },
     });
+  }
+
+  /* The placeholder <option> is authored markup and is never rebuilt: the
+     options after it are removed and new ones appended as elements with
+     textContent, so nothing here concatenates markup. */
+  function populateNodeSelect(nodes) {
+    var sel = document.getElementById('ai-node');
+    if (!sel) return;
+    var cur = sel.value;
+    while (sel.options.length > 1) sel.remove(1);
+    (nodes || []).forEach(function (n) {
+      var o = document.createElement('option');
+      o.value = n.node; o.textContent = n.node;
+      sel.appendChild(o);
+    });
+    if (cur) sel.value = cur;
   }
 
   async function loadPerNode(range) {
@@ -852,7 +792,6 @@
     if (empty) empty.classList.add('hidden');
     if (sub) sub.textContent = fmtNum(data.total) + ' detection' + (data.total === 1 ? '' : 's');
 
-    // Detector breakdown (doughnut)
     var dets = data.by_detector || [];
     rtmonDetectorChart = _rtmonDoughnut(
       'rtmon-detector-chart',
@@ -861,7 +800,6 @@
       dets.map(function (_, i) { return _RTMON_DET_COLORS[i % _RTMON_DET_COLORS.length]; })
     );
 
-    // Severity breakdown (doughnut, semantic colours)
     var sevs = data.by_severity || [];
     rtmonSeverityChart = _rtmonDoughnut(
       'rtmon-severity-chart',
@@ -870,7 +808,6 @@
       sevs.map(function (s) { return _SEV_COLORS[s.severity] || _SEV_COLORS.unknown; })
     );
 
-    // Daily timeline (bar)
     var daily = data.daily || [];
     var ctx = document.getElementById('rtmon-daily-chart').getContext('2d');
     rtmonDailyChart = new Chart(ctx, {
@@ -925,12 +862,19 @@
     }
   }
 
-  async function loadAll(range) {
-    await Promise.all([loadOverview(range), loadTopTalkers(range), loadTopCountries(range), loadPerNode(range), loadRtmon(range)]);
+  /* The three canvas/SVG panels that are not fragments, reloaded together.
+     The two that are fragments listen for atfReload on <body>. */
+  async function loadCharts(range) {
+    await Promise.all([loadTopCountries(range), loadPerNode(range), loadRtmon(range)]);
+  }
+
+  function reloadAll(range) {
+    htmx.trigger(document.body, 'atfReload');
+    if (demoRequested) { loadDemoCharts(range); return; }
+    loadCharts(range);
   }
 
   // ── PCAP retention horizon ──────────────────────────────────────────────────
-  var arkimeWebUrl = '';
   function _relDays(epochS) {
     var d = (Date.now() / 1000 - epochS) / 86400;
     return d >= 1 ? d.toFixed(1) + 'd' : Math.max(1, Math.round(d * 24)) + 'h';
@@ -939,7 +883,6 @@
     return fetch('/api/arkime/traffic/retention').then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
         if (!d) return;
-        arkimeWebUrl = d.web_url || '';
         var el = document.getElementById('retention-note');
         if (!el || !d.horizons) return;
         var cluster = d.horizons['*'];
@@ -951,39 +894,8 @@
       .catch(function () {});
   }
 
-  // ── Packet hunts ────────────────────────────────────────────────────────────
-  var _HUNT_STATUS_COLORS = { running: 'text-amber-300', submitted: 'text-amber-300', finished: 'text-emerald-400', failed: 'text-rose-400' };
-  function renderHunts(hunts) {
-    var body = document.getElementById('hunts-body');
-    var empty = document.getElementById('hunts-empty');
-    if (!body) return;
-    if (!hunts || !hunts.length) {
-      body.innerHTML = '';
-      if (empty) empty.classList.remove('hidden');
-      return;
-    }
-    if (empty) empty.classList.add('hidden');
-    body.innerHTML = hunts.map(function (h) {
-      var link = '';
-      if (arkimeWebUrl && h.arkime_hunt_id && h.status === 'finished') {
-        var expr = encodeURIComponent('huntId == ' + h.arkime_hunt_id);
-        link = '<a href="' + escHtml(arkimeWebUrl) + '/sessions?expression=' + expr +
-          '" target="_blank" rel="noopener" class="text-ion-cyan hover:brightness-125 text-xs">Open in Arkime ↗</a>';
-      }
-      return '<tr class="border-b border-slate-800/60">' +
-        '<td class="py-2 pr-4 text-slate-200">' + escHtml(h.name) + '</td>' +
-        '<td class="py-2 pr-4 font-mono text-xs text-slate-400">' + escHtml(h.search) + ' <span class="text-slate-600">(' + escHtml(h.search_type) + ')</span></td>' +
-        '<td class="py-2 pr-4 ' + (_HUNT_STATUS_COLORS[h.status] || 'text-slate-400') + '">' + escHtml(h.status) + '</td>' +
-        '<td class="py-2 pr-4 text-right">' + (h.matched_sessions == null ? '—' : fmtNum(h.matched_sessions)) + '</td>' +
-        '<td class="py-2 pr-4 text-slate-500 text-xs">' + escHtml((h.created_at || '').slice(0, 16).replace('T', ' ')) + '</td>' +
-        '<td class="py-2">' + link + '</td></tr>';
-    }).join('');
-  }
-  function loadHunts() {
-    return fetch('/api/arkime/hunts').then(function (r) { return r.ok ? r.json() : { hunts: [] }; })
-      .then(function (d) { renderHunts(d.hunts || []); })
-      .catch(function () {});
-  }
+  // ── Packet hunts. Submitting needs security:read, so it posts to the API
+  //    and then asks the fragment to re-render. ───────────────────────────────
   function submitHunt() {
     var name = (document.getElementById('hunt-name').value || '').trim();
     var search = (document.getElementById('hunt-search').value || '').trim();
@@ -1014,52 +926,84 @@
     }).then(function () {
       document.getElementById('hunt-name').value = '';
       document.getElementById('hunt-search').value = '';
-      return loadHunts();
+      htmx.trigger(document.body, 'atfHunts');
     }).catch(function (e) {
       if (window.showToast) showToast('Hunt failed: ' + e.message, 'error');
     }).finally(function () { btn.disabled = false; });
   }
 
-  // ── Demo mode ──────────────────────────────────────────────────────────────
-  function _demoOverview(range) {
-    var secs = {'24h':86400,'7d':604800,'30d':2592000}[range]||86400;
-    var ivMs  = {'24h':30*60e3,'7d':3*3600e3,'30d':24*3600e3}[range];
-    var now   = Date.now(), start = now - secs*1000;
-    var src=[],dst=[];
-    for (var t=start; t<=now; t+=ivMs) {
-      var h = new Date(t).getHours();
-      var fac = 1 + 2*Math.max(0, 1-Math.abs(h-13)/6);
-      var noise = 0.65 + 0.7*((Math.sin(t/1e8)*0.5+0.5));
-      var v = Math.floor(1800000*fac*noise);
-      src.push([t,v]); dst.push([t,Math.floor(v*0.62)]);
-    }
-    return {src_histo:src, dst_histo:dst,
-      protocols:{tcp:15420,udp:3210,tls:892,dns:1205,http:445,smb:189},
-      total_sessions:21361,
-      total_bytes:src.reduce(function(s,p){return s+p[1];},0)+dst.reduce(function(s,p){return s+p[1];},0)};
+  // ── Exclusions. Adding and removing need security:read; the list is a
+  //    fragment, so both paths end by asking it to re-render. ───────────────
+  function addExclusion() {
+    var inp = document.getElementById('excl-input');
+    var cidr = (inp.value || '').trim();
+    if (!cidr) return;
+    fetch('/api/arkime/traffic/exclusions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cidr: cidr }),
+    }).then(function (r) {
+      if (!r.ok) return r.json().then(function (d) { throw new Error(d.detail || 'failed'); });
+      inp.value = '';
+      htmx.trigger(document.body, 'atfExclusions');
+      reloadAll(activeRange);
+    }).catch(function (e) { if (window.showToast) showToast('Add filter failed: ' + e.message, 'error'); });
   }
 
-  var _DEMO_TALKERS = {
-    by_src:[
-      {ip:'10.10.45.23',  bytes:8547291648,sessions:2341},
-      {ip:'192.168.1.105',bytes:6213847552,sessions:1876},
-      {ip:'172.16.0.88',  bytes:4102938624,sessions:1234},
-      {ip:'10.0.0.45',    bytes:2847293440,sessions:987},
-      {ip:'203.0.113.67', bytes:1934857216,sessions:543},
-      {ip:'10.20.5.12',   bytes:1247293440,sessions:412},
-      {ip:'172.31.0.100', bytes:934857216, sessions:287},
-    ],
-    by_dst:[
-      {ip:'8.8.8.8',          bytes:12045678592,sessions:4521},
-      {ip:'1.1.1.1',          bytes:8934857216, sessions:3210},
-      {ip:'185.199.108.153',  bytes:5123847168, sessions:1876},
-      {ip:'140.82.121.4',     bytes:3847293440, sessions:1123},
-      {ip:'151.101.193.69',   bytes:2134857216, sessions:876},
-      {ip:'104.21.45.12',     bytes:1547293440, sessions:543},
-      {ip:'172.217.169.46',   bytes:934857216,  sessions:312},
-    ],
-  };
+  function removeExclusion(id) {
+    fetch('/api/arkime/traffic/exclusions/' + id, { method: 'DELETE' })
+      .then(function () {
+        htmx.trigger(document.body, 'atfExclusions');
+        reloadAll(activeRange);
+      })
+      .catch(function () {});
+  }
 
+  // ── AI review. The pending line names the node and the range, which only
+  //    this browser knows, so it is a cloned <template> filled with
+  //    textContent. The request itself is htmx's. ───────────────────────────
+  function runAiReview() {
+    var node = document.getElementById('ai-node').value;
+    var out = document.getElementById('ai-review-out');
+    if (!node) {
+      var warn = cloneTemplate('atf-ai-pick-node-template');
+      if (warn) out.replaceChildren(warn);
+      return;
+    }
+    var pending = cloneTemplate('atf-ai-pending-template');
+    if (pending) {
+      pending.querySelector('[data-atf-node]').textContent = node;
+      pending.querySelector('[data-atf-range]').textContent = activeRange;
+      out.replaceChildren(pending);
+    }
+    htmx.ajax('POST', '/ui/arkime-traffic/ai-review', {
+      target: '#ai-review-out',
+      swap: 'innerHTML',
+      values: { node: node, range: activeRange },
+    });
+  }
+
+  /* Markdown, painted by the browser's own sanitiser. safeMarkdown() in
+     app.js is marked plus DOMPurify, and the result is inserted as parsed
+     nodes rather than with innerHTML. ION ships no HTML sanitiser, so
+     rendering model output on the server and marking it safe would be a
+     scripting hole; this is the call template_render already made. */
+  function paintMarkdown(root) {
+    root.querySelectorAll('[data-md-pane]').forEach(function (pane) {
+      var source = pane.parentElement
+        ? pane.parentElement.querySelector('textarea') : null;
+      if (!source) return;
+      var html = (typeof safeMarkdown === 'function')
+        ? safeMarkdown(source.value) : '';
+      if (!html) { pane.textContent = source.value; return; }
+      var parsed = new DOMParser().parseFromString(html, 'text/html');
+      pane.replaceChildren.apply(
+        pane, Array.prototype.slice.call(parsed.body.childNodes));
+    });
+  }
+
+  // ── Demo charts. The two fragments handle demo mode server-side; these
+  //    three panels are drawn from JSON, so their synthetic payloads stay
+  //    here with the code that draws them. ──────────────────────────────────
   var _DEMO_NODES = {
     nodes:[
       {node:'dc-core-01',     bytes:52847291648, sessions:14231},
@@ -1128,27 +1072,15 @@
     };
   }
 
-  function loadDemoData(range) {
-    var ov = _demoOverview(range);
-    document.getElementById('stat-sessions').textContent = fmtNum(ov.total_sessions);
-    document.getElementById('stat-bytes').textContent    = fmtBytes(ov.total_bytes);
-    var topProto = Object.entries(ov.protocols).sort(function(a,b){return b[1]-a[1];})[0];
-    document.getElementById('stat-top-proto').textContent = topProto ? topProto[0].toUpperCase() : '—';
-    document.getElementById('stat-top-src').textContent   = _DEMO_TALKERS.by_src[0].ip;
+  function loadDemoCharts(range) {
     var srcEl = document.getElementById('stat-top-src-country');
     var dstEl = document.getElementById('stat-top-dst-country');
     if (srcEl) srcEl.textContent = 'US';
     if (dstEl) dstEl.textContent = 'US';
-
-    hideOverlay('vol-loading'); hideOverlay('proto-loading');
-    document.getElementById('talkers-loading').style.display='none';
     hideOverlay('country-loading');
     hideOverlay('node-loading');
-
-    renderVolumeChart(ov);
-    renderProtoChart(ov.protocols);
-    talkersData = _DEMO_TALKERS; renderTalkers();
     renderNodeChart(_DEMO_NODES.nodes);
+    populateNodeSelect(_DEMO_NODES.nodes);
     countryData = _DEMO_COUNTRIES; renderWorldMap();
     hideOverlay('rtmon-loading');
     renderRtmon(_demoRtmon(range));
@@ -1156,121 +1088,57 @@
 
   // ── Init ───────────────────────────────────────────────────────────────────
   async function init() {
-    // Hunt history is ION-side DB state — render it even when Arkime itself
-    // is unreachable/unconfigured (submitting new hunts still needs Arkime).
-    loadHunts();
-    if (new URLSearchParams(window.location.search).get('demo') === '1') {
+    if (demoRequested) {
       document.getElementById('atf-unconfigured').classList.remove('hidden');
-      loadDemoData(activeRange);
+      loadDemoCharts(activeRange);
       return;
     }
-    // Check Arkime is configured
+    // The banner only. Every fragment reads is_configured itself and says
+    // so on its own panel, which is why a failed status check no longer
+    // leaves half the page claiming zero traffic.
     try {
       const st = await fetch('/api/arkime/status');
       if (st.ok) {
         const { configured } = await st.json();
         if (!configured) {
           document.getElementById('atf-unconfigured').classList.remove('hidden');
-          loadDemoData(activeRange);
+          loadDemoCharts(activeRange);
           return;
         }
       }
     } catch (_) {}
 
-    // Retention is range-independent — fire once alongside the range-scoped
-    // panels; it also resolves the viewer web URL, then refreshes hunt rows
-    // so they can deep-link.
-    loadRetention().then(loadHunts);
-    await loadAll(activeRange);
+    loadRetention();
+    await loadCharts(activeRange);
   }
 
-  // ── v0.45.0: trend deltas, exclusions, node AI review ──────────────────────
-  function _deltaHtml(pct) {
-    if (pct === null || pct === undefined) return '';
-    var up = pct >= 0;
-    var col = up ? 'text-emerald-400' : 'text-rose-400';
-    return '<span class="' + col + '">' + (up ? '▲' : '▼') + ' ' + Math.abs(pct) + '%</span>';
-  }
-  function renderTrend(trend) {
-    var sd = document.getElementById('stat-sessions-delta');
-    var bd = document.getElementById('stat-bytes-delta');
-    if (!trend) { if (sd) sd.innerHTML = ''; if (bd) bd.innerHTML = ''; return; }
-    if (sd) sd.innerHTML = _deltaHtml(trend.sessions_pct);
-    if (bd) bd.innerHTML = _deltaHtml(trend.bytes_pct);
-  }
+  // ── Fragment parameters. The range, the private-traffic toggle and the
+  //    demo flag are the browser's, so they are attached per request rather
+  //    than written into hx-get URLs that would then go stale. ─────────────
+  var ATF_PATHS = [
+    '/ui/arkime-traffic/overview',
+    '/ui/arkime-traffic/talkers',
+    '/ui/arkime-traffic/ai-review',
+  ];
+  document.addEventListener('htmx:configRequest', function (evt) {
+    if (!evt.detail || ATF_PATHS.indexOf(evt.detail.path) === -1) return;
+    if (evt.detail.path !== '/ui/arkime-traffic/ai-review') {
+      evt.detail.parameters.range = activeRange;
+    }
+    if (demoRequested) evt.detail.parameters.demo = 'true';
+    if (evt.detail.path === '/ui/arkime-traffic/talkers') {
+      var priv = document.getElementById('excl-private');
+      evt.detail.parameters.exclude_private = (priv ? priv.checked : true)
+        ? 'true' : 'false';
+    }
+  });
 
-  function populateNodeSelect(nodes) {
-    var sel = document.getElementById('ai-node');
-    if (!sel) return;
-    var cur = sel.value;
-    sel.innerHTML = '<option value="">Select a sensor node…</option>';
-    (nodes || []).forEach(function (n) {
-      var o = document.createElement('option');
-      o.value = n.node; o.textContent = n.node;
-      sel.appendChild(o);
-    });
-    if (cur) sel.value = cur;
-  }
-
-  function renderExclChips(items) {
-    var box = document.getElementById('excl-chips');
-    if (!box) return;
-    if (!items || !items.length) { box.innerHTML = '<span class="text-xs text-slate-600">No exclusions</span>'; return; }
-    box.innerHTML = items.map(function (e) {
-      return '<span class="inline-flex items-center gap-1 text-xs bg-slate-800 border border-slate-700 rounded px-2 py-0.5">' +
-        '<span class="font-mono text-slate-300">' + escHtml(e.cidr || '') + '</span>' +
-        '<button data-excl-id="' + escHtml(e.id) + '" class="excl-del text-rose-400 hover:text-rose-300">×</button></span>';
-    }).join('');
-  }
-  function loadExclusions() {
-    return fetch('/api/arkime/traffic/exclusions').then(function (r) { return r.ok ? r.json() : { exclusions: [] }; })
-      .then(function (d) { renderExclChips(d.exclusions || []); })
-      .catch(function () {});
-  }
-  function addExclusion() {
-    var inp = document.getElementById('excl-input');
-    var cidr = (inp.value || '').trim();
-    if (!cidr) return;
-    fetch('/api/arkime/traffic/exclusions', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cidr: cidr }),
-    }).then(function (r) {
-      if (!r.ok) return r.json().then(function (d) { throw new Error(d.detail || 'failed'); });
-      inp.value = '';
-      return loadExclusions().then(function () { loadAll(activeRange); });
-    }).catch(function (e) { if (window.showToast) showToast('Add filter failed: ' + e.message, 'error'); });
-  }
-  function removeExclusion(id) {
-    fetch('/api/arkime/traffic/exclusions/' + id, { method: 'DELETE' })
-      .then(function () { return loadExclusions().then(function () { loadAll(activeRange); }); })
-      .catch(function () {});
-  }
-
-  function escHtml(s) {
-    return String(s == null ? '' : s).replace(/[<>&"']/g, function (c) {
-      return ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' })[c];
-    });
-  }
-
-  function runAiReview() {
-    var node = document.getElementById('ai-node').value;
-    var out = document.getElementById('ai-review-out');
-    var btn = document.getElementById('ai-review-btn');
-    if (!node) { out.innerHTML = '<span class="text-amber-400">Select a node first.</span>'; return; }
-    btn.disabled = true;
-    out.innerHTML = '<span class="text-slate-400">Bob is reviewing ' + escHtml(node) + ' over ' + escHtml(activeRange) + '… (can take 30–90s)</span>';
-    fetch('/api/arkime/traffic/ai-review', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ node: node, range: activeRange }),
-    }).then(function (r) {
-      return r.json().then(function (d) { if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status)); return d; });
-    }).then(function (d) {
-      var md = (typeof safeMarkdown === 'function') ? safeMarkdown(d.analysis || '') : escHtml(d.analysis || '');
-      out.innerHTML = md + '<div class="mt-2 text-xs text-slate-500">model: ' + escHtml(d.model || 'unknown') + ' · node ' + escHtml(node) + ' · ' + escHtml(activeRange) + '</div>';
-    }).catch(function (e) {
-      out.innerHTML = '<span class="text-rose-400">AI review failed: ' + escHtml(e.message) + '</span>';
-    }).finally(function () { btn.disabled = false; });
-  }
+  document.addEventListener('htmx:afterSwap', function (evt) {
+    var id = evt.detail && evt.detail.target ? evt.detail.target.id : '';
+    if (id === 'atf-overview') drawOverviewCharts();
+    if (id === 'atf-talkers') applyTalkerDirection();
+    if (id === 'ai-review-out') paintMarkdown(evt.detail.target);
+  });
 
   // ── Event binding (CSP-safe — no inline handlers) ──────────────────────────
   document.addEventListener('DOMContentLoaded', function () {
@@ -1283,11 +1151,11 @@
       activeRange = range;
       document.querySelectorAll('.atf-tab').forEach(t => t.classList.remove('atf-tab-active'));
       btn.classList.add('atf-tab-active');
-      loadAll(range);
+      reloadAll(range);
     });
 
-    // Talker direction tabs
-    document.getElementById('talkers-table').closest('.atf-card').addEventListener('click', function (e) {
+    // Talker direction tabs. Both directions are already on the page.
+    document.getElementById('talkers-card').addEventListener('click', function (e) {
       const btn = e.target.closest('.atf-talker-tab');
       if (!btn) return;
       const dir = btn.dataset.dir;
@@ -1295,7 +1163,7 @@
       activeDir = dir;
       document.querySelectorAll('.atf-talker-tab').forEach(t => t.classList.remove('atf-talker-active'));
       btn.classList.add('atf-talker-active');
-      renderTalkers();
+      applyTalkerDirection();
     });
 
     // Country direction tabs
@@ -1321,12 +1189,11 @@
       if (b) removeExclusion(b.getAttribute('data-excl-id'));
     });
     var priv = document.getElementById('excl-private');
-    if (priv) priv.addEventListener('change', function () { loadAll(activeRange); });
+    if (priv) priv.addEventListener('change', function () { reloadAll(activeRange); });
     var aiBtn = document.getElementById('ai-review-btn');
     if (aiBtn) aiBtn.addEventListener('click', runAiReview);
     var huntBtn = document.getElementById('hunt-submit');
     if (huntBtn) huntBtn.addEventListener('click', submitHunt);
-    loadExclusions();
 
     init();
   });

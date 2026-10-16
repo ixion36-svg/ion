@@ -1,0 +1,160 @@
+{# The detail pane: the idle prompt, a blank story, or one story's form.
+
+   Replaces two innerHTML sites in stories.html, renderEditor() and the
+   post-delete notice, and the esc() that ran over the name, the description
+   and the serialised DAG.
+
+   One template for all five pane states, because the pane had five and the
+   old page spread them over two writes and a `${s.id ? ... : ''}` ternary.
+   The two failure states are the ones it did not have: a fetch that failed
+   called showToast and left the previous story on screen, so the pane kept
+   showing a story that may since have been deleted.
+
+   The Save, Run and Delete buttons are inside this swap target on purpose:
+   they act on the story this fragment rendered and on the field values it
+   put on screen, so only the fragment knows their state. The control that
+   recovers from a failed render is outside it, in the page shell: the rail
+   and its Refresh button survive any render of this pane.
+
+   A button appears only when the account holds the permission its endpoint
+   requires. This page admits any logged-in user while every write is gated,
+   so an account with `playbook:read` alone is a real account, and a Delete
+   button that can only answer 403 is a worse answer than no button. #}
+
+{% if state == 'idle' %}
+  <p class="text-sm opacity-50">
+    Select a story or click <strong>New story</strong> to start.
+  </p>
+  <div class="mt-4">
+    <h3 class="text-xs font-semibold uppercase tracking-wider opacity-60 mb-2">Step types</h3>
+    {# Its own request, so a failed catalogue read cannot take the prompt
+       above with it. #}
+    <div id="step-types-cat" class="flex flex-col gap-2"
+         hx-get="/ui/stories/step-types"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+      <div class="text-sm opacity-50">
+        <span class="loading loading-spinner loading-xs"></span>
+        Loading step types...
+      </div>
+    </div>
+  </div>
+
+{% elif state == 'missing' %}
+  <div role="alert" class="alert alert-warning text-sm">
+    Story #{{ story_id if story_id is not none else '?' }} no longer exists.
+    It was deleted after this list was drawn. Refresh the list to see what
+    is still there.
+  </div>
+
+{% elif state == 'failed' %}
+  <div role="alert" class="alert alert-error text-sm">
+    Story #{{ story_id if story_id is not none else '?' }} could not be
+    read. This is not a record that it has been deleted: the read failed, so
+    nothing here says whether the story still exists or what is in it. Do
+    not recreate it on the strength of this panel.
+  </div>
+
+{% else %}
+  {# 'new' and 'edit'. One form, because they differ only in whether the
+     story has an id, which decides the button row and whether there is a
+     run history to show. #}
+  {% set story_id_attr = story.id if story.id is not none else '' %}
+  <div class="flex flex-col gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-end">
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Name</legend>
+        <input id="story-name" class="input w-full" value="{{ story.name or '' }}">
+      </fieldset>
+      <label class="label cursor-pointer justify-start gap-2">
+        {# `is true` is the exact test, but a checkbox has only two
+           positions, so an `enabled` of None would still render unticked
+           here and saving would write it off. `Story.enabled` is a
+           non-nullable Boolean, so None cannot arrive from the database;
+           the rail's badge is where that third state is visible if it ever
+           does. Saying so rather than implying a guard that cannot hold. #}
+        <input type="checkbox" class="checkbox checkbox-primary" id="story-enabled"
+               {% if story.enabled is true %}checked{% endif %}>
+        Enabled
+      </label>
+    </div>
+    <fieldset class="fieldset p-0">
+      <legend class="fieldset-legend">Description</legend>
+      <textarea id="story-description" rows="2" class="textarea w-full">{{ story.description or '' }}</textarea>
+    </fieldset>
+    {# A stored DAG that will not parse came back from `_serialise` as `{}`
+       with nothing said about it, so the textarea showed an empty object
+       next to a Save button and read as a story with no steps. `is false`,
+       not truthiness: the key is absent on a blank new story, and absent is
+       not a claim that the text is broken. #}
+    {% if story.dag_readable is false %}
+      <div role="alert" class="alert alert-warning text-sm">
+        The stored DAG for this story is not valid JSON and could not be
+        read, so it is not shown below. The empty object in the box is a
+        placeholder, not this story's steps. Saving it replaces whatever is
+        stored, so copy the original out of the database first if it matters.
+      </div>
+    {% endif %}
+    <fieldset class="fieldset p-0">
+      <legend class="fieldset-legend">DAG (JSON)</legend>
+      <textarea id="story-dag" rows="20" class="textarea w-full font-mono text-sm leading-relaxed" spellcheck="false">{{ dag_text }}</textarea>
+    </fieldset>
+
+    {# The validation block is static markup, not a fragment. It renders
+       errors out of the response the browser just received from its own
+       POST or PUT, so there is nothing for a server to be asked for. The
+       page sets textContent on the slot below, which builds no markup and
+       keeps the chrome here where the stylesheet reaches it. #}
+    <div id="story-validation" class="alert alert-error hidden" role="alert">
+      <div>
+        <strong>Validation errors</strong>
+        <div data-validation-errors class="mt-1 text-sm whitespace-pre-line"></div>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-base-300">
+      {% if story.id is not none %}
+        {% if can.update %}
+          <button data-click-action="storiesSave" data-story-id="{{ story_id_attr }}"
+                  class="btn btn-primary btn-sm">Save</button>
+        {% endif %}
+        {% if can.execute %}
+          <button data-click-action="storiesRun" data-story-id="{{ story_id_attr }}"
+                  class="btn btn-ghost btn-sm">Run...</button>
+        {% endif %}
+        {% if can.delete %}
+          <button data-click-action="storiesDelete" data-story-id="{{ story_id_attr }}"
+                  class="btn btn-error btn-outline btn-sm ml-auto">Delete</button>
+        {% endif %}
+      {% elif can.create %}
+        <button data-click-action="storiesSave" data-story-id=""
+                class="btn btn-primary btn-sm">Create</button>
+      {% endif %}
+      {% if story.id is not none and not can.any_on_a_saved_story %}
+        <span class="text-sm opacity-60">
+          This account can read stories but not change or run them.
+        </span>
+      {% elif story.id is none and not can.create %}
+        <span class="text-sm opacity-60">
+          This account can read stories but not create them.
+        </span>
+      {% endif %}
+    </div>
+
+    {% if story.id is not none %}
+      {# Its own request, and its own swap target, so re-requesting the run
+         table after a run does not replace the textarea above and throw
+         away an edit that has not been saved. #}
+      {% set runs_url = '/ui/stories/runs?story_id=' ~ story.id %}
+      <div id="story-runs"
+           hx-get="{{ runs_url }}"
+           hx-trigger="load, stories:ran from:body"
+           hx-swap="innerHTML">
+        <div class="text-sm opacity-50 mt-3">
+          <span class="loading loading-spinner loading-xs"></span>
+          Loading runs...
+        </div>
+      </div>
+    {% endif %}
+  </div>
+{% endif %}

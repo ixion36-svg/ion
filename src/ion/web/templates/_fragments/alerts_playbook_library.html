@@ -1,0 +1,60 @@
+{# Alerts: the Browse Playbook Library panel under an alert's playbooks.
+
+   Rendered into #playbook-library-panel by togglePlaybookLibrary, whose
+   toggle sits outside the panel: a second click hides it, a third
+   re-requests it, so the control that retries the read is never inside
+   the target it refreshes.
+
+   Replaces renderPlaybookLibraryPanel and renderLibraryItem. The rows are
+   what GET .../suggested-playbooks returns, split as the page split them:
+   active playbooks under Recommended, inactive ones under From Library.
+   Start POSTs .../playbook/{pid}/start (playbook:execute) and is offered
+   only with it.
+
+   Four outcomes. togglePlaybookLibrary had a failure string and
+   `data.playbooks || []`. #}
+
+{% if missing %}
+  <div class="p-2 text-[0.8125rem] text-[var(--danger)]" role="alert">
+    Alert {{ alert_id }} was not found in Elasticsearch, so the library cannot
+    be matched against it.
+  </div>
+{% elif failed %}
+  <div class="p-2 text-[0.8125rem] text-[var(--danger)]" role="alert">
+    The playbook library could not be read{% if error %}: {{ error }}{% endif %}.
+    Click Browse Playbook Library twice to try again.
+  </div>
+{% elif not recommended and not library %}
+  <div class="p-2 text-[0.8125rem] text-[var(--text-muted)]">No matching playbooks in library</div>
+{% else %}
+  <div class="playbook-library-panel">
+    {% if not can_start %}
+      <div class="p-2 text-xs text-[var(--text-muted)]" title="Requires the playbook:execute permission">
+        Starting a playbook requires the playbook:execute permission; this is
+        the library only.
+      </div>
+    {% endif %}
+    {% for label, badge, rows in (('Recommended (Active)', 'recommended', recommended), ('From Library', 'library', library)) if rows %}
+      <div class="playbook-library-group-header">{{ label }}</div>
+      {% for p in rows %}
+        <div class="playbook-library-item">
+          <div class="playbook-library-item-info">
+            <div class="playbook-library-item-name">{{ p.name }}</div>
+            <div class="playbook-library-item-desc">
+              {% if p.short_description %}{{ p.short_description }} &middot; {% endif %}
+              {% if p.step_count is not none %}{{ p.step_count }} steps{% else %}steps not counted{% endif %}
+            </div>
+          </div>
+          <span class="playbook-type-badge {{ badge }}">{{ 'Active' if badge == 'recommended' else 'Library' }}</span>
+          {% if can_start %}
+            {% if p.has_active_execution %}
+              <button class="btn btn-sm btn-primary" disabled title="Already running">Running</button>
+            {% else %}
+              <button class="btn btn-sm btn-primary" data-click-action="startPlaybook" data-args='[{{ alert_id|tojson }}, {{ p.id }}]'>Start</button>
+            {% endif %}
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% endfor %}
+  </div>
+{% endif %}

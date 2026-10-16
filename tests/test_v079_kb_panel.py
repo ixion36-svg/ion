@@ -43,6 +43,22 @@ def analyst() -> str:
     return (TEMPLATES / "analyst.html").read_text(encoding="utf-8")
 
 
+# The KB panel was built in analyst.html's JavaScript, by loadKBBrowse and
+# doKBSearch. It is server-rendered now: the page carries the htmx wiring,
+# and _fragments/analyst.html with ui/analyst.py carry the panel. Every
+# guarantee below survived, and two are enforced more directly than
+# before, so the tests follow the guarantee rather than the old string.
+@pytest.fixture(scope="module")
+def kb_fragment() -> str:
+    return (TEMPLATES / "_fragments" / "analyst.html").read_text(
+        encoding="utf-8")
+
+
+@pytest.fixture(scope="module")
+def kb_module() -> str:
+    return Path("src/ion/web/ui/analyst.py").read_text(encoding="utf-8")
+
+
 @pytest.fixture(scope="module")
 def documents() -> str:
     return (TEMPLATES / "documents.html").read_text(encoding="utf-8")
@@ -103,8 +119,9 @@ def test_hash_open_happens_after_the_list_loads(documents):
     assert init.index("await loadDocuments();") < init.index("await openDocumentFromHash();")
 
 
-def test_kb_panel_still_links_to_the_hash_route(analyst):
-    assert "/documents#doc-${a.id}" in analyst
+def test_kb_panel_still_links_to_the_hash_route(kb_module):
+    """A template literal in the page; an f-string in the view model now."""
+    assert "/documents#doc-{doc_id}" in kb_module
 
 
 # ── 2. search covers article text ────────────────────────────────────────
@@ -150,32 +167,52 @@ def test_browse_endpoint_offers_recent_articles(browse_fn):
 
 
 def test_panel_loads_browse_on_page_load(analyst):
-    assert "loadKBBrowse" in analyst
-    assert re.search(r"loadKBBrowse\(\);", analyst)
+    """loadKBBrowse() is hx-trigger="load" on the panel container now, so
+    the browse view arrives with the page rather than after a script."""
+    container = analyst[analyst.index('id="kb-content"'):]
+    container = container[:container.index(">")]
+    assert 'hx-get="/ui/analyst/kb"' in container
+    assert 'hx-trigger="load"' in container
+    assert "loadKBBrowse" not in analyst
 
 
-def test_panel_caps_the_topic_chips(analyst):
+def test_panel_caps_the_topic_chips(kb_module, kb_fragment):
     """All ~55 topics as chips buries the rest of the workspace."""
-    assert "TOPIC_CHIPS = 12" in analyst
-    assert "more</a>" in analyst, "no overflow affordance for the topics that are not shown"
+    assert "TOPIC_CHIPS = 12" in kb_module
+    assert "rows[:TOPIC_CHIPS]" in kb_module, "the cap has to be applied"
+    assert "more</a>" in kb_fragment, \
+        "no overflow affordance for the topics that are not shown"
+    assert "{{ hidden }} more" in kb_fragment, \
+        "and it has to say how many were left out"
 
 
 def test_clearing_the_box_returns_to_browsing(analyst):
-    fn = analyst[analyst.index("async function doKBSearch"):]
-    fn = fn[:fn.index("\nasync function loadKBBrowse")]
-    assert "browse.classList.remove('hidden')" in fn
-    assert "browse.classList.add('hidden')" in fn
+    """Two classList calls in doKBSearch did this. The route decides now:
+    the box re-requests on every change and carries its own value, so an
+    empty q is a request the server answers with the browse view."""
+    box = analyst[analyst.index('id="kb-search"'):]
+    box = box[:box.index(">")]
+    assert 'hx-trigger="input changed delay:250ms"' in box
+    assert 'hx-include="#kb-search"' in box
+    assert "doKBSearch" not in analyst
 
 
 # ── 4. the bug the click test found ──────────────────────────────────────
 
 
-def test_topic_chip_lists_by_id_not_by_name(analyst):
+def test_topic_chip_lists_by_id_not_by_name(kb_fragment, kb_module):
     """A topic chip that text-searches for its own label returns NOTHING —
     "Windows & Active Directory" is a shelf label and appears in no article.
-    This looked correct in the diff and only failed when clicked."""
-    assert "data-args='[${c.id}]'" in analyst, "topic chips are passing the collection name again"
-    assert "collection_id=" in analyst
+    This looked correct in the diff and only failed when clicked.
+
+    The chip is a server-rendered hx-get now, so the id is in the URL the
+    button carries and there is no argument-passing step left to get
+    wrong. That is a stronger position than the old data-args, which is
+    the form that produced this bug.
+    """
+    assert "collection_id={{ c.id }}" in kb_fragment, \
+        "topic chips are passing the collection name again"
+    assert "collection_id" in kb_module
 
 
 def test_search_endpoint_accepts_a_collection_filter(search_fn):

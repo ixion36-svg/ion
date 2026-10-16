@@ -1,0 +1,82 @@
+{# The role picker for one of the two user modals.
+
+   Replaces the sixth innerHTML site in users.html, renderRoleCheckboxes(),
+   which built the same widget list into both `#new-user-roles` and
+   `#edit-user-roles` from one `/api/roles` fetch.
+
+   Three things it did that this does not.
+
+   `loadRoles()` called renderRoleCheckboxes() only inside `if
+   (response.ok)`, and its catch reached no further than console.error, so a
+   role list that could not be read left both containers as empty `<div>`s.
+   An administrator creating an account then saw a Roles fieldset with
+   nothing in it, which reads as "this deployment defines no roles" and is
+   the opposite instruction. The failed branch below says which it is, and
+   it is the whole of what the container holds, so there is no half-filled
+   picker to submit from.
+
+   `(role.permissions || []).length` printed "0 permissions" for a role
+   whose permission list never arrived. On a role-assignment widget that is
+   the most consequential figure on the page stated confidently out of
+   nothing, so an absent list says so instead.
+
+   `${meta.short}` and `value="${role.name}"` went in unescaped, and for a
+   role the metadata table does not know, `meta.short` is the role's own
+   `description` column: stored text, settable through the role API,
+   interpolated into innerHTML. Jinja escapes both.
+
+   `field_name` is looked up from ion.web.ui.users.ROLE_GROUPS rather than
+   taken from the query string, so this cannot be asked to emit an attribute
+   of the caller's choosing. #}
+
+{% if failed %}
+  {# The attribute, not the wording, is what the two form handlers in the
+     page shell check before they submit. A picker that could not be read
+     holds no checked boxes, and `roles: []` on PUT /api/users/{id}/roles is
+     not "no change", it strips every role the user holds. The read failing
+     must not be a way to do that silently. #}
+  <div role="alert" class="alert alert-error text-sm" data-roles-unreadable>
+    The role list could not be read, so this is not the set of roles you can
+    assign. It is unknown. Close this dialog and reopen it to retry rather
+    than saving an account with no role by accident.
+  </div>
+{% elif not roles %}
+  <div role="alert" class="alert alert-info text-sm">
+    No roles are defined in this deployment, so there is nothing to assign.
+    The read succeeded and came back empty.
+  </div>
+{% else %}
+<div class="role-widgets">
+  {% for role in roles %}
+    {# --role-color is set through data-ion-style rather than a style
+       attribute: ION serves no unsafe-inline, and
+       static/js/ion-dynamic-styles.js applies these with
+       el.style.setProperty on a MutationObserver, so it reaches markup that
+       arrived in an htmx swap as well as markup in the page. #}
+    <label class="role-widget" data-ion-style="--role-color:{{ role.color }}">
+      <input type="checkbox" value="{{ role.name }}" name="{{ field_name }}" class="role-widget-input">
+      <div class="role-widget-card">
+        <div class="role-widget-header">
+          <span class="role-widget-icon">{{ role.icon }}</span>
+          <span class="role-widget-tier">{{ role.tier }}</span>
+          <span class="role-widget-check">&#10003;</span>
+        </div>
+        <div class="role-widget-name">{{ role.label }}</div>
+        <div class="role-widget-desc">{{ role.short }}</div>
+        <div class="role-widget-caps">{% for cap in role.caps %}<span class="role-cap-pill">{{ cap }}</span>{% endfor %}</div>
+        {# `is not none`, never truthiness. A role that grants nothing is a
+           measurement worth reading before you assign it, and a role whose
+           permission list did not arrive is a different claim. The
+           JavaScript's `|| []` printed 0 for both. #}
+        <div class="role-widget-perms">
+          {%- if role.permission_count is not none -%}
+            {{ role.permission_count }} permissions
+          {%- else -%}
+            permissions unknown
+          {%- endif -%}
+        </div>
+      </div>
+    </label>
+  {% endfor %}
+</div>
+{% endif %}

@@ -1,0 +1,13 @@
+{% from "_fragments/_time.html" import ts %}
+{% from "_fragments/investigation_memory_macros.html" import number, pill, duration %}
+{% set labels = {'expired_quirk':'Lapsed quirk','contradictory_outcome':'Contradictory closure','stale_fp_signature':'Stale FP signature','repeated_uncertainty':'Repeated uncertainty'} %}
+<span id="im-review-badge" hx-swap-oob="true" class="badge badge-sm ml-1">{% if data is not none %}{{ number(data.total) }}{% else %}?{% endif %}</span>
+{% if data is none %}<div class="alert alert-error">Could not read knowledge review inbox. Retry the read.</div>
+{% else %}<div>{% for kind,label in labels.items() %}<span class="badge badge-ghost">{{ number(data.by_kind.get(kind)) }} {{ label }}</span>{% endfor %}<span>Showing {{ data['items']|length }} of {{ number(data.total) }} · {{ number(data.window_days) }}-day window</span></div>
+{% for item in data['items'] %}{% set e = item.evidence or {} %}<article class="card bg-base-200 shadow mb-3"><div class="card-body"><h3 class="card-title">{{ labels.get(item.kind,item.kind) }}: {{ item.title }}</h3><div>{{ 'owner: ' ~ item.owner if item.owner else 'no owner recorded' }}</div><p>{{ item.why }}</p><p>Do: {{ item.action }}</p>
+{% if item.kind == 'expired_quirk' %}<div>Lapsed for {{ number(e.days_lapsed) }} day(s)</div><div>Review date: {{ ts(e.review_date) }}</div><p>{{ e.annotation }}</p>
+{% elif item.kind == 'stale_fp_signature' %}<div>State: {{ e.governance_state }}</div><div>Suppressed: {{ number(e.hit_count) }} alert(s) so far</div><div>Last match: {{ ts(e.last_matched_at) }}</div><div>Review date: {{ ts(e.review_date) }}</div><p>{{ e.reason }}</p>
+{% elif item.kind == 'contradictory_outcome' %}<div>Verdicts: {{ (e.verdicts or [])|join(' vs ') }}</div>{% for c in e.closures or [] %}<div>Closed {{ c.human_verdict }} by {{ c.closed_by or ('user ' ~ number(c.closed_by_id)) }} on {{ ts(c.closed_at) }}</div>{% endfor %}
+{% elif item.kind == 'repeated_uncertainty' %}<div>Abstentions: {{ number(e.abstentions) }} of {{ number(e.sample_size) }} ({% if e.abstention_rate is not none %}{{ (e.abstention_rate * 100)|round|int }}%{% else %}unknown rate{% endif %})</div><div>Window: {{ number(e.window_days) }} day(s)</div><div>Raised above: {{ number(e.min_sample_size) }} closures and {% if e.threshold_rate is not none %}{{ (e.threshold_rate * 100)|round|int }}%{% else %}unknown threshold{% endif %}</div>{% endif %}
+{% set link = item.link|safe_url %}{% if link %}<a class="btn btn-xs" href="{{ link }}">Open</a>{% endif %}</div></article>
+{% else %}<div class="card bg-base-200"><div class="card-body"><h3>Nothing needs review</h3><p>No lapsed quirks, stale FP signatures, contradictory closures or over-abstaining prompts.</p></div></div>{% endfor %}{% endif %}

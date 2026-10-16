@@ -1,0 +1,117 @@
+{# The submitted-reports card for /bug-reports.
+
+   Replaces three innerHTML sites in bug_reports.html: the loaded table, the
+   empty state and the load-failure message, plus the hand-rolled `esc()`
+   and date formatter they needed. The markup is deliberately the same as
+   what that JavaScript produced, so the page looks identical and the move is
+   verifiable with tools/style_snapshot.py rather than by eye.
+
+   The card chrome lives here, not on the page, so the header, the filters
+   and Refresh have one definition. They also wrap BOTH states on purpose:
+   with the failure as a bare alert, a filter change that failed swapped the
+   filters away and left the panel with no way to change the filter back or
+   retry short of reloading.
+
+   The filters are the fragment's own hx-get, and it is the only request
+   that knows which filters are on screen, so everything that reloads the
+   list goes through it: `change` bubbles from the select and the checkbox,
+   `click from:#bugs-refresh` is the Refresh button, and `bugs:changed` is
+   what the page fires after submitting or syncing a report. The page shell
+   requests this fragment once, on load, with the route's defaults.
+
+   hx-include sends the filter values back, which is why the select and the
+   checkbox render their state from `status` and `mine` rather than keeping
+   it in the DOM: the swap replaces them. Driving it in a browser is what
+   confirms that, because a swap that drops the control that triggered it
+   leaves a filtered table with no way back. #}
+
+{% set sev_color = {"low": "ion-c-muted", "medium": "ion-c-cyan",
+                    "high": "ion-c-amber", "critical": "ion-c-red"} %}
+{% set st_color = {"open": "ion-c-amber", "in_progress": "ion-c-cyan",
+                   "resolved": "ion-c-green", "closed": "ion-c-muted"} %}
+
+<section class="card bg-base-200 shadow">
+  <div class="card-body p-0">
+    <div id="bug-filters"
+         class="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-base-300"
+         hx-get="/ui/bug-reports"
+         hx-trigger="change, click from:#bugs-refresh, bugs:changed from:body"
+         hx-include="#bug-filters"
+         hx-target="#bugs-content"
+         hx-swap="innerHTML">
+      <h2 class="card-title text-base">Submitted reports</h2>
+      <div class="flex flex-wrap items-center gap-4">
+        <label class="label cursor-pointer justify-start gap-2 py-0 w-fit">
+          <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
+                 id="filter-mine" name="mine" value="true"
+                 {% if mine %}checked{% endif %}>
+          <span class="label-text">Only mine</span>
+        </label>
+        <label class="flex items-center gap-2 text-sm">
+          <span class="text-base-content/60">Status:</span>
+          <select id="filter-status" name="status" class="select select-sm w-auto">
+            {% for value, label in [("all", "All"), ("open", "Open"),
+                                    ("in_progress", "In progress"),
+                                    ("resolved", "Resolved"), ("closed", "Closed")] %}
+              <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <button id="bugs-refresh" type="button" class="btn btn-ghost btn-sm">Refresh</button>
+      </div>
+    </div>
+{% if failed %}
+    <div class="px-5 py-5">
+      <div role="alert" class="alert alert-error">
+        Bug reports could not be read. This is not an empty queue: the query
+        failed, so how many reports are filed is unknown rather than zero.
+        Refresh to try again.
+      </div>
+    </div>
+{% else %}
+    <div class="overflow-x-auto">
+      <table class="table table-sm" id="bugs-table">
+        <thead>
+          <tr><th>#</th><th>Title</th><th>Severity</th><th>Component</th><th>Status</th><th>GitLab</th><th>Reported by</th><th>Created</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="bugs-body">
+          {% for b in reports %}
+            {% set iid = b.get('gitlab_issue_iid') %}
+            <tr>
+              <td>{{ b.get('id') }}</td>
+              <td>{{ b.get('title') }}</td>
+              <td><span class="ion-pill {{ sev_color.get(b.get('severity'), 'ion-c-muted') }}">{{ b.get('severity') }}</span></td>
+              <td>{{ b.get('component') or '—' }}</td>
+              <td><span class="ion-pill {{ st_color.get(b.get('status'), 'ion-c-muted') }}">{{ b.get('status') }}</span></td>
+              <td>
+                {% if b.get('gitlab_issue_url') %}
+                  <a class="ion-link" href="{{ b.get('gitlab_issue_url')|safe_url }}" target="_blank" rel="noopener">#{{ iid }}</a>
+                  <small class="ion-muted">{{ b.get('gitlab_state') or '' }}</small>
+                {% else %}
+                  <small class="ion-muted">{{ b.get('gitlab_error') or '—' }}</small>
+                {% endif %}
+              </td>
+              <td>{{ b.get('reported_by_username') or '—' }}</td>
+              <td><small class="ion-muted">{{ b.get('created_display') }}</small></td>
+              <td>
+                {# `is not none`: the only value that means "no linked issue"
+                   is None, and a truthiness test would fold an iid of 0 in
+                   with it and hide Sync on a row that has one to sync. #}
+                {% if iid is not none %}
+                  <button class="ion-btn ion-btn-ghost" data-click-action="syncBug"
+                          data-args='[{{ b.get("id") }}]'>Sync</button>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+          {% if not reports %}
+            <tr>
+              <td colspan="9" class="text-center p-6 text-base-content/60">No bug reports.</td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+{% endif %}
+  </div>
+</section>

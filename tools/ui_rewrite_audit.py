@@ -29,6 +29,7 @@ import sys
 from pathlib import Path
 
 TEMPLATES = Path("src/ion/web/templates")
+STYLESHEETS = Path("src/ion/web/static/css")
 BASELINE = Path("tools/ui_rewrite_baseline.json")
 
 # The guard is load-bearing. See module docstring.
@@ -61,6 +62,63 @@ def load_map() -> dict:
     return json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {}
 
 
+def _replaced_by_a_rule(entry: dict | None) -> bool:
+    """Did this class's styling move to a page stylesheet rather than to a
+    utility?
+
+    The audit knew two legitimate destinations: a Tailwind utility, which is
+    `kind` other than manual, and a `data-ion-style` hook, which the
+    gained-hooks offset below covers. The redesign uses a third throughout,
+    and this check was behind it: a page stylesheet, `static/css/<page>.css`,
+    which is where a declaration goes that no utility expresses and that is
+    not computed at runtime. `background:var(--bg-secondary,#0d1117)` is the
+    usual reason, since the map's generator could not express a var() with a
+    fallback.
+
+    An entry claims that destination with `replaced_by`, a list of selectors.
+    The claim is CHECKED rather than trusted: every selector has to exist in
+    a stylesheet, so the field cannot be used to silence a real loss. That is
+    the whole point of it being a list of selectors and not a boolean.
+    """
+    if not entry:
+        return False
+    selectors = entry.get("replaced_by")
+    if not isinstance(selectors, list) or not selectors:
+        return False
+    css = "\n".join(
+        p.read_text(encoding="utf-8", errors="replace")
+        for p in sorted(STYLESHEETS.glob("*.css"))
+    )
+    return all(isinstance(s, str) and s and s in css for s in selectors)
+
+
+def _never_valid_css(entry: dict | None) -> bool:
+    """Was this class's rule something a browser ever applied?
+
+    The v0.31.21 inline-style migration hashed `style="top:' + (cy - r1) +
+    'px"` into a static class whose body is the literal JavaScript, so 25
+    of the 905 mapped classes hold text like
+
+        top:' + (cy - r2 - 55) + 'px;
+
+    which is not CSS. Every browser dropped the whole declaration, so the
+    style was never in effect and its disappearance cannot be a style loss.
+    Reporting it as one reports the repair as the damage, which is the same
+    mistake the gained-hooks offset below already exists to avoid.
+
+    This is a claim about effect, not about need: the page may still want
+    that value computed at runtime, and if it does the replacement is a
+    data-ion-style hook or a direct style.setProperty. Whether it got one
+    is a separate and stronger question, and tools/verify_conversion.py is
+    where it is answered. The marker comes from the map's own analysis
+    rather than from a list kept here, so a new one is covered the day it
+    is recorded.
+    """
+    if not entry:
+        return False
+    return any("JS-concatenated" in str(u) for u in (entry.get("unmapped") or []))
+
+
 def check(baseline: dict, current: dict) -> list[str]:
     """Report only LOSSES and REGRESSIONS, never mere change.
 
@@ -89,7 +147,9 @@ def check(baseline: dict, current: dict) -> list[str]:
         lost = set(base["hashed_classes"]) - set(cur["hashed_classes"])
         unreplaceable = sorted(
             c for c in lost
-            if c not in cmap or cmap[c].get("kind") == "manual"
+            if (c not in cmap or cmap[c].get("kind") == "manual")
+            and not _never_valid_css(cmap.get(c))
+            and not _replaced_by_a_rule(cmap.get(c))
         )
         # A utility is not the only legitimate replacement. Where the original
         # style was computed at runtime -- `flex:' + slaCounts.green + '` -- no

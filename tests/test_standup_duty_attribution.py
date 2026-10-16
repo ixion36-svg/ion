@@ -281,10 +281,29 @@ class TestTheDutyLineLoadsOnItsOwn:
             assert forbidden not in block, forbidden
 
     def test_the_page_loads_it_without_waiting_for_the_checks_sweep(self):
+        """The property, not the URL.
+
+        This asserted `/api/daily-standup/duty` appeared in the page, which
+        stopped being true when daily_standup.html converted to server-
+        rendered fragments: the rota line is now swapped in from
+        /ui/daily-standup/duty, which mirrors that endpoint on the same
+        permission. The behaviour the class exists for is unchanged and is
+        what is checked here instead -- the rota is requested on load, and
+        not from the element the Run Checks button targets.
+
+        Pinning the URL made a conversion that kept the behaviour exactly
+        look like a regression, which is the failure mode worth avoiding in
+        a test that reads a template rather than driving it.
+        """
         page = (_SRC / "ion" / "web" / "templates"
                 / "daily_standup.html").read_text(encoding="utf-8")
-        assert "/api/daily-standup/duty" in page, \
-            "the page must fetch the rota on load, not only via runChecks"
+        assert "daily-standup/duty" in page, \
+            "the page must request the rota, not only reach it via runChecks"
+        # The duty element's own attributes, so a `load` trigger somewhere
+        # else on the page cannot satisfy this.
+        duty = page.split('id="duty-line"', 1)[1].split(">", 1)[0]
+        assert "daily-standup/duty" in duty, duty
+        assert 'hx-trigger="load"' in duty, duty
 
 
 class TestTheWiring:
@@ -305,9 +324,20 @@ class TestTheWiring:
         assert "_standup_attribution(" in block
         assert "attribution=attribution" in block
 
-    def test_checks_reports_who_is_on_duty(self):
-        block = self._source().split("def get_daily_checks(")[1][:2500]
-        assert '"duty":' in block
+    def test_checks_reports_who_is_on_duty(self, monkeypatch):
+        import asyncio
+        import json
+        from unittest.mock import AsyncMock
+        from ion.web import daily_standup_api as api
+
+        expected = {"assigned": True, "user": {"id": 7, "name": "Duty analyst"}}
+        monkeypatch.setattr(api, "_duty_today", lambda: expected)
+        for name in ("_check_cluster_health", "_check_critical_alerts", "_check_stale_cases",
+                     "_check_log_source_health", "_check_rule_failures", "_check_open_alerts_30d",
+                     "_check_alerts_24h", "_check_case_status_counts", "_check_triage_throughput_24h"):
+            monkeypatch.setattr(api, name, AsyncMock(return_value={}))
+        response = asyncio.run(api.get_daily_checks(current_user=object()))
+        assert json.loads(response.body)["duty"] == expected
 
     def test_the_duty_lookup_cannot_break_the_page(self):
         """Every other check in this endpoint is wrapped so one failure

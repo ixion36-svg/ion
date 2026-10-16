@@ -1,0 +1,100 @@
+{# The rendered document split into editable section cards.
+
+   Replaces two of template_render.html's innerHTML sites: the card builder
+   and its "Could not load sections" state, and it removes the markdown
+   section splitter, which is `split_sections` in the module now.
+
+   One fragment, two callers. /ui/template-render/sections renders it for
+   the first paint, and /ui/template-render/output includes it in an
+   out-of-band swap, so the cards and the output pane always describe the
+   same render. The page fetched once and painted both from one response for
+   Preview, but on failure its catch wrote an error into the output pane and
+   then threw inside the catch while rebuilding the cards, leaving the
+   previous render's sections on screen next to an error about this one.
+   Every branch below replaces the cards, so that cannot happen.
+
+   Expand All, Collapse All and the heading stay in the page shell, outside
+   this target, so no render here can remove them.
+
+   The markdown stays markdown. Each card's `.se-rendered` pane is painted
+   in the browser by the page's existing `safeMarkdown` (marked plus
+   DOMPurify) from the textarea beside it. That is the one step that did not
+   move to the server: ION carries no HTML sanitiser,
+   `markdown.markdown` passes raw HTML and `javascript:` hrefs through, and
+   this content is a template filled in with values a user typed. The
+   `.rendered-content` rules in frontend/ion-daisy-theme.css already reach
+   those generated elements by descendant selector, so the restyling reason
+   for moving markup to the server does not apply here.
+
+   The textarea is the card's markdown and the source the pane is painted
+   from, so an edit and its preview cannot disagree. The page kept a third
+   copy in a `renderedSections` array and wrote to all three. #}
+
+{% if data_invalid %}
+  <div role="alert" class="alert alert-error">
+    The data in the JSON view is not valid JSON, so the document was not
+    rendered. Nothing has been lost: fix the JSON and preview again.
+  </div>
+{% elif not_found %}
+  <div role="alert" class="alert alert-warning">
+    This template no longer exists, so there is nothing to render.
+  </div>
+{% elif render_error %}
+  <div role="alert" class="alert alert-error">
+    <div>
+      <p class="font-semibold mb-1">The template could not be rendered with this data.</p>
+      <p class="font-mono text-xs">{{ render_error }}</p>
+    </div>
+  </div>
+{% elif failed %}
+  <div role="alert" class="alert alert-error">
+    The sections could not be read. This is not a document with no sections
+    in it: nothing was rendered, so nothing here says what the document
+    contains. Press Preview to try again.
+  </div>
+{% elif sections is none %}
+  {# Reached only if a caller renders this with no sections and no reason,
+     which would be a route that forgot to say what happened. Saying so is
+     better than an empty panel that reads as a document with no content. #}
+  <div role="alert" class="alert alert-warning">
+    No render has been requested yet, so there are no sections to show.
+  </div>
+{% elif not sections %}
+  <p class="text-base-content/60">This template rendered to an empty
+  document. That is what it contains with the current values, not a failure
+  to render it.</p>
+{% else %}
+  {% for section in sections %}
+    <div class="se-card{% if section.is_header %} se-open{% endif %}" data-idx="{{ section.idx }}">
+      <div class="se-header" data-click-action="toggleSection" data-args='["$target"]'>
+        <span class="se-num">{{ section.label }}</span>
+        <span class="se-title">{{ section.title }}</span>
+        {# data-stop-propagation so the pencil does not also collapse the
+           card. The page did this with a second data-args entry and the
+           same attribute; event-delegation.js honours it on an element
+           between the click and the action element. #}
+        <button type="button" class="se-edit-btn" data-click-action="toggleEdit"
+                data-stop-propagation data-args='["$target"]'
+                title="Edit section">&#9998;</button>
+        <svg class="se-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </div>
+      <div class="se-body">
+        <div class="se-rendered rendered-content" data-pane="rendered"
+             data-md-pane></div>
+        <div class="se-edit-area" data-pane="edit">
+          {# No id on the textarea, and the pane finds it by position. An id
+             here cost a Content Security Policy violation on every swap:
+             htmx matches incoming and existing elements by id and copies
+             the old one's attributes across with setAttribute, and
+             toggleEdit's auto-height had put a `style` attribute on it,
+             which `style-src-attr 'none'` refuses. Setting
+             `element.style.height` is allowed, copying a style attribute
+             is not, and the copy is htmx's, not this page's. #}
+          <textarea data-idx="{{ section.idx }}"
+                    data-input-action="paintSectionPreview">{{ section.markdown }}</textarea>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+{% endif %}

@@ -1,0 +1,1170 @@
+
+body[data-page="settings"] .settings-layout{
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 2rem;
+    margin-top: 1.5rem;
+}
+
+@media (max-width: 900px) {
+    body[data-page="settings"] .settings-layout{
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Sidebar Navigation */
+body[data-page="settings"] .settings-nav{
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+body[data-page="settings"] .settings-nav-item{
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+body[data-page="settings"] .settings-nav-item:hover{
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+body[data-page="settings"] .settings-nav-item.active{
+    background: var(--accent-color);
+    color: var(--accent-contrast);
+}
+
+/* Settings Sections */
+body[data-page="settings"] .settings-section{
+    display: none;
+    background: var(--bg-secondary);
+    border: 1px solid var(--ion-border);
+    border-radius: var(--ion-radius-lg);
+    padding: 1.5rem;
+}
+
+body[data-page="settings"] .settings-section.active{
+    display: block;
+}
+
+body[data-page="settings"] .settings-section h2{
+    margin: 0 0 0.5rem 0;
+    font-size: 1.25rem;
+}
+
+body[data-page="settings"] .section-description{
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+}
+
+/* Form Styles */
+body[data-page="settings"] .form-group{
+    margin-bottom: 1.25rem;
+}
+
+body[data-page="settings"] .form-group label{
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+body[data-page="settings"] .form-group input[type="text"], body[data-page="settings"] .form-group input[type="url"], body[data-page="settings"] .form-group input[type="number"], body[data-page="settings"] .form-group input[type="password"], body[data-page="settings"] .form-group select{
+    width: 100%;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid var(--ion-border);
+    border-radius: var(--radius);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+body[data-page="settings"] .form-group input:focus, body[data-page="settings"] .form-group select:focus{
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+body[data-page="settings"] .form-help{
+    display: block;
+    margin-top: 0.375rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+body[data-page="settings"] .form-row{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+@media (max-width: 600px) {
+    body[data-page="settings"] .form-row{
+        grid-template-columns: 1fr;
+    }
+}
+
+body[data-page="settings"] .checkbox-label{
+    display: flex !important;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+
+body[data-page="settings"] .checkbox-label input[type="checkbox"]{
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+body[data-page="settings"] .form-actions{
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--ion-border);
+}
+
+/* Info Grid for System Info */
+body[data-page="settings"] .info-grid{
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+}
+
+body[data-page="settings"] .info-card{
+    background: var(--bg-primary);
+    border: 1px solid var(--ion-border);
+    border-radius: var(--radius);
+    padding: 1rem;
+}
+
+body[data-page="settings"] .info-card-label{
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.25rem;
+}
+
+body[data-page="settings"] .info-card-value{
+    font-size: 0.9rem;
+    font-weight: 500;
+    word-break: break-all;
+}
+
+body[data-page="settings"] .info-card-value.mono{
+    font-family: monospace;
+    font-size: 0.85rem;
+}
+
+/* Packages List */
+body[data-page="settings"] .packages-list{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+body[data-page="settings"] .package-badge{
+    background: var(--bg-secondary);
+    border: 1px solid var(--ion-border);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-family: monospace;
+}
+
+/* Environment Variables */
+body[data-page="settings"] .env-vars-list{
+    background: var(--bg-primary);
+    border: 1px solid var(--ion-border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+body[data-page="settings"] .env-var-item{
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--ion-border);
+    font-size: 0.85rem;
+}
+
+body[data-page="settings"] .env-var-item:last-child{
+    border-bottom: none;
+}
+
+body[data-page="settings"] .env-var-name{
+    font-family: monospace;
+    color: var(--text-primary);
+}
+
+body[data-page="settings"] .env-var-value{
+    font-family: monospace;
+    color: var(--text-muted);
+}
+
+body[data-page="settings"] .loading{
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+}
+
+/* Status Indicators */
+body[data-page="settings"] .status-set{
+    color: var(--success);
+}
+
+body[data-page="settings"] .status-unset{
+    color: var(--text-muted);
+}
+
+/* Sessions List */
+body[data-page="settings"] .sessions-actions{
+    margin-bottom: 1rem;
+}
+
+body[data-page="settings"] .sessions-list{
+    background: var(--bg-primary);
+    border: 1px solid var(--ion-border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+body[data-page="settings"] .session-item{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid var(--ion-border);
+}
+
+body[data-page="settings"] .session-item:last-child{
+    border-bottom: none;
+}
+
+body[data-page="settings"] .session-info{
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+body[data-page="settings"] .session-user{
+    font-weight: 600;
+}
+
+body[data-page="settings"] .session-meta{
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+body[data-page="settings"] .session-roles{
+    display: flex;
+    gap: 0.25rem;
+    margin-top: 0.25rem;
+}
+
+body[data-page="settings"] .role-badge{
+    background: var(--bg-secondary);
+    padding: 0.125rem 0.375rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+}
+
+/* Database Sections */
+body[data-page="settings"] .db-section{
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--ion-border);
+}
+
+body[data-page="settings"] .db-section:last-child{
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+body[data-page="settings"] .db-section h3{
+    font-size: 1rem;
+    margin-bottom: 1rem;
+}
+
+body[data-page="settings"] .db-actions{
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+body[data-page="settings"] .backups-list{
+    background: var(--bg-primary);
+    border: 1px solid var(--ion-border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+body[data-page="settings"] .backup-item{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--ion-border);
+}
+
+body[data-page="settings"] .backup-item:last-child{
+    border-bottom: none;
+}
+
+body[data-page="settings"] .backup-info{
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+}
+
+body[data-page="settings"] .backup-name{
+    font-family: monospace;
+    font-size: 0.85rem;
+}
+
+body[data-page="settings"] .backup-meta{
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+body[data-page="settings"] .backup-actions{
+    display: flex;
+    gap: 0.5rem;
+}
+
+body[data-page="settings"] .cleanup-form{
+    display: flex;
+    align-items: flex-end;
+    gap: 1rem;
+}
+
+body[data-page="settings"] .btn-warning{
+    background: var(--warning);
+    color: white;
+    border: none;
+}
+
+body[data-page="settings"] .btn-warning:hover{
+    background: var(--neon-orange);
+}
+
+/* Table Stats */
+body[data-page="settings"] .table-stats{
+    margin-top: 1rem;
+}
+
+body[data-page="settings"] .table-stat-item{
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--ion-border);
+    font-size: 0.875rem;
+}
+
+body[data-page="settings"] .table-stat-item:last-child{
+    border-bottom: none;
+}
+
+body[data-page="settings"] .table-stat-name{
+    font-family: monospace;
+}
+
+body[data-page="settings"] .table-stat-count{
+    font-weight: 600;
+}
+
+/* Nav Divider */
+body[data-page="settings"] .nav-divider{
+    height: 1px;
+    background: var(--ion-border);
+    margin: 0.5rem 0;
+}
+
+/* Wizard Nav Item */
+body[data-page="settings"] .wizard-nav-item{
+    background: linear-gradient(135deg, var(--accent-color), var(--neon-purple));
+    color: white !important;
+    font-weight: 600;
+}
+
+body[data-page="settings"] .wizard-nav-item:hover{
+    background: linear-gradient(135deg, var(--neon-blue), var(--neon-purple));
+}
+
+body[data-page="settings"] .nav-icon{
+    margin-right: 0.25rem;
+}
+
+/* Wizard Launcher Section */
+body[data-page="settings"] .wizard-launcher{
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+    border: 1px solid var(--ion-border);
+    border-radius: 12px;
+    padding: 2rem;
+}
+
+body[data-page="settings"] .wizard-launcher-content{
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+body[data-page="settings"] .wizard-launcher-icon{
+    flex-shrink: 0;
+    width: 64px;
+    height: 64px;
+    background: var(--accent-color);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+
+body[data-page="settings"] .wizard-launcher-text{
+    flex: 1;
+}
+
+body[data-page="settings"] .wizard-launcher-text h3{
+    margin: 0 0 0.5rem 0;
+    font-size: 1.25rem;
+}
+
+body[data-page="settings"] .wizard-launcher-text p{
+    margin: 0;
+    color: var(--text-muted);
+}
+
+body[data-page="settings"] .btn-lg{
+    padding: 0.875rem 1.5rem;
+    font-size: 1rem;
+}
+
+body[data-page="settings"] .wizard-status-grid{
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+body[data-page="settings"] .wizard-status-card{
+    background: var(--bg-primary);
+    border: 1px solid var(--ion-border);
+    border-radius: var(--ion-radius-lg);
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+body[data-page="settings"] .wizard-status-icon{
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+}
+
+body[data-page="settings"] .wizard-status-icon.configured{
+    background: rgba(34, 197, 94, 0.1);
+    color: var(--success);
+}
+
+body[data-page="settings"] .wizard-status-icon.not-configured{
+    background: rgba(156, 163, 175, 0.1);
+    color: var(--text-muted);
+}
+
+body[data-page="settings"] .wizard-status-info{
+    flex: 1;
+}
+
+body[data-page="settings"] .wizard-status-name{
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+body[data-page="settings"] .wizard-status-state{
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* Wizard Modal Styles */
+body[data-page="settings"] .wizard-modal-overlay{
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.75);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+}
+
+body[data-page="settings"] .wizard-modal{
+    background: var(--bg-primary);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 700px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+
+body[data-page="settings"] .wizard-header{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--ion-border);
+}
+
+body[data-page="settings"] .wizard-header h2{
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+body[data-page="settings"] .wizard-close{
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-muted);
+    line-height: 1;
+}
+
+body[data-page="settings"] .wizard-close:hover{
+    color: var(--text-primary);
+}
+
+body[data-page="settings"] .wizard-progress{
+    display: flex;
+    padding: 1rem 1.5rem;
+    gap: 0.5rem;
+    border-bottom: 1px solid var(--ion-border);
+}
+
+body[data-page="settings"] .wizard-progress-step{
+    flex: 1;
+    text-align: center;
+    padding: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+}
+
+body[data-page="settings"] .wizard-progress-step.active{
+    background: var(--accent-color);
+    color: var(--accent-contrast);
+}
+
+body[data-page="settings"] .wizard-progress-step.completed{
+    background: var(--success);
+    color: white;
+}
+
+body[data-page="settings"] .wizard-content{
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+}
+
+body[data-page="settings"] .wizard-footer{
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--ion-border);
+}
+
+body[data-page="settings"] .footer-spacer{
+    flex: 1;
+}
+
+/* Wizard Welcome */
+body[data-page="settings"] .wizard-welcome{
+    text-align: center;
+}
+
+body[data-page="settings"] .wizard-welcome-icon{
+    margin-bottom: 1.5rem;
+    color: var(--accent-color);
+}
+
+body[data-page="settings"] .wizard-welcome h3{
+    margin-bottom: 0.5rem;
+}
+
+body[data-page="settings"] .wizard-welcome > p{
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+}
+
+body[data-page="settings"] .wizard-status-overview{
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+body[data-page="settings"] .status-card{
+    text-align: center;
+}
+
+body[data-page="settings"] .status-value{
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent-color);
+}
+
+body[data-page="settings"] .status-label{
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+body[data-page="settings"] .wizard-features{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+body[data-page="settings"] .feature-item{
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+
+body[data-page="settings"] .feature-icon{
+    color: var(--success);
+    font-weight: bold;
+}
+
+/* Wizard Select */
+body[data-page="settings"] .wizard-select h3{
+    margin-bottom: 0.5rem;
+}
+
+body[data-page="settings"] .wizard-select > p{
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+}
+
+body[data-page="settings"] .integration-list{
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+body[data-page="settings"] .integration-select-card{
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border: 2px solid var(--ion-border);
+    border-radius: var(--ion-radius-lg);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+body[data-page="settings"] .integration-select-card:hover{
+    border-color: var(--accent-color);
+}
+
+body[data-page="settings"] .integration-select-card.selected{
+    border-color: var(--accent-color);
+    background: rgba(59, 130, 246, 0.1);
+}
+
+body[data-page="settings"] .integration-checkbox{
+    flex-shrink: 0;
+}
+
+body[data-page="settings"] .integration-checkbox input{
+    width: 18px;
+    height: 18px;
+}
+
+body[data-page="settings"] .integration-info{
+    flex: 1;
+}
+
+body[data-page="settings"] .integration-name{
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+body[data-page="settings"] .integration-desc{
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+body[data-page="settings"] .status-badge{
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+
+body[data-page="settings"] .status-badge.configured{
+    background: rgba(34, 197, 94, 0.1);
+    color: var(--success);
+}
+
+body[data-page="settings"] .status-badge.not-configured{
+    background: rgba(156, 163, 175, 0.1);
+    color: var(--text-muted);
+}
+
+body[data-page="settings"] .quick-actions{
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+/* Wizard Configure */
+body[data-page="settings"] .wizard-integration-header{
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+body[data-page="settings"] .integration-counter{
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+body[data-page="settings"] .wizard-integration-header h3{
+    margin: 0.5rem 0 0.25rem 0;
+}
+
+body[data-page="settings"] .wizard-integration-header p{
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+body[data-page="settings"] .wizard-substeps{
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+body[data-page="settings"] .substep{
+    flex: 1;
+    text-align: center;
+    padding: 0.5rem;
+    font-size: 0.75rem;
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    color: var(--text-muted);
+}
+
+body[data-page="settings"] .substep.active{
+    background: var(--accent-color);
+    color: var(--accent-contrast);
+}
+
+body[data-page="settings"] .substep.completed{
+    background: var(--success);
+    color: white;
+}
+
+body[data-page="settings"] .wizard-form-container{
+    min-height: 200px;
+}
+
+body[data-page="settings"] .wizard-form .form-group{
+    margin-bottom: 1.25rem;
+}
+
+/* Wizard Test */
+body[data-page="settings"] .wizard-test{
+    text-align: center;
+}
+
+body[data-page="settings"] .wizard-test h4{
+    margin-bottom: 0.5rem;
+}
+
+body[data-page="settings"] .wizard-test > p{
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+}
+
+body[data-page="settings"] .test-status{
+    padding: 2rem;
+    border-radius: var(--ion-radius-lg);
+    margin-bottom: 1.5rem;
+}
+
+body[data-page="settings"] .test-status.pending{
+    background: var(--bg-secondary);
+}
+
+body[data-page="settings"] .test-status.success{
+    background: rgba(34, 197, 94, 0.1);
+}
+
+body[data-page="settings"] .test-status.error{
+    background: rgba(239, 68, 68, 0.1);
+}
+
+body[data-page="settings"] .test-icon{
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+}
+
+body[data-page="settings"] .test-status.success .test-icon{
+    color: var(--success);
+}
+
+body[data-page="settings"] .test-status.error .test-icon{
+    color: var(--danger);
+}
+
+body[data-page="settings"] .test-status h4{
+    margin: 0 0 0.5rem 0;
+}
+
+body[data-page="settings"] .error-message{
+    color: var(--danger);
+    font-family: monospace;
+    font-size: 0.85rem;
+    word-break: break-word;
+}
+
+body[data-page="settings"] .test-details{
+    text-align: left;
+    margin-top: 1rem;
+}
+
+body[data-page="settings"] .test-details ul{
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+body[data-page="settings"] .test-details li{
+    padding: 0.25rem 0;
+    font-size: 0.85rem;
+}
+
+/* AI Diagnosis Panel */
+body[data-page="settings"] .diagnosis-panel{
+    margin-top: 1.5rem;
+    border: 1px solid var(--ion-border);
+    border-radius: var(--ion-radius-lg);
+    background: var(--bg-secondary);
+}
+
+body[data-page="settings"] .diagnosis-loading{
+    padding: 2rem;
+    text-align: center;
+}
+
+body[data-page="settings"] .diagnosis-loading .spinner{
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--ion-border);
+    border-top-color: var(--accent-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem auto;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+body[data-page="settings"] .diagnosis-content{
+    padding: 1.25rem;
+}
+
+body[data-page="settings"] .diagnosis-header{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+body[data-page="settings"] .diagnosis-header h4{
+    margin: 0;
+}
+
+body[data-page="settings"] .btn-close{
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    color: var(--text-muted);
+}
+
+body[data-page="settings"] .diagnosis-summary, body[data-page="settings"] .diagnosis-cause{
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
+body[data-page="settings"] .diagnosis-solutions{
+    margin-bottom: 1rem;
+}
+
+body[data-page="settings"] .diagnosis-solutions h5{
+    margin: 0 0 0.5rem 0;
+    font-size: 0.85rem;
+}
+
+body[data-page="settings"] .diagnosis-solutions ul{
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+body[data-page="settings"] .diagnosis-solutions li{
+    font-size: 0.85rem;
+    margin-bottom: 0.25rem;
+}
+
+body[data-page="settings"] .diagnosis-actionable{
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: rgba(245, 158, 11, 0.1);
+    border-radius: var(--radius);
+}
+
+body[data-page="settings"] .diagnosis-actionable h5{
+    margin: 0 0 0.75rem 0;
+    font-size: 0.85rem;
+}
+
+body[data-page="settings"] .diagnosis-security{
+    padding: 0.75rem;
+    background: rgba(239, 68, 68, 0.1);
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+}
+
+body[data-page="settings"] .diagnosis-actions{
+    text-align: center;
+    margin-top: 1rem;
+}
+
+/* Wizard Summary */
+body[data-page="settings"] .wizard-summary h3{
+    margin-bottom: 0.5rem;
+}
+
+body[data-page="settings"] .wizard-summary > p{
+    color: var(--text-muted);
+    margin-bottom: 1.5rem;
+}
+
+body[data-page="settings"] .summary-list{
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+body[data-page="settings"] .summary-item{
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: var(--ion-radius-lg);
+}
+
+body[data-page="settings"] .summary-status{
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+}
+
+body[data-page="settings"] .summary-status.success{
+    background: rgba(34, 197, 94, 0.1);
+    color: var(--success);
+}
+
+body[data-page="settings"] .summary-status.error{
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--danger);
+}
+
+body[data-page="settings"] .summary-status.unknown{
+    background: rgba(156, 163, 175, 0.1);
+    color: var(--text-muted);
+}
+
+body[data-page="settings"] .summary-info{
+    flex: 1;
+}
+
+body[data-page="settings"] .summary-name{
+    font-weight: 600;
+}
+
+body[data-page="settings"] .summary-config{
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+body[data-page="settings"] .summary-note{
+    padding: 1rem;
+    background: rgba(59, 130, 246, 0.1);
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+}
+
+/* Wizard Result */
+body[data-page="settings"] .wizard-result{
+    text-align: center;
+    padding: 2rem;
+}
+
+body[data-page="settings"] .wizard-result.success .success-icon{
+    font-size: 3rem;
+    color: var(--success);
+    margin-bottom: 1rem;
+}
+
+body[data-page="settings"] .wizard-result h3{
+    margin-bottom: 0.5rem;
+}
+
+body[data-page="settings"] .wizard-result p{
+    color: var(--text-muted);
+}
+
+body[data-page="settings"] .wizard-saving{
+    text-align: center;
+    padding: 3rem;
+}
+
+body[data-page="settings"] .wizard-saving .spinner{
+    width: 48px;
+    height: 48px;
+    border: 4px solid var(--ion-border);
+    border-top-color: var(--accent-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem auto;
+}
+
+/* Resume Prompt */
+body[data-page="settings"] .wizard-resume{
+    text-align: center;
+}
+
+body[data-page="settings"] .wizard-resume h3{
+    margin-bottom: 1rem;
+}
+
+body[data-page="settings"] .wizard-resume ul{
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0;
+}
+
+body[data-page="settings"] .wizard-resume li{
+    padding: 0.25rem 0;
+}
+
+@media (max-width: 600px) {
+    body[data-page="settings"] .wizard-launcher-content{
+        flex-direction: column;
+        text-align: center;
+    }
+
+    body[data-page="settings"] .wizard-modal{
+        max-height: 100vh;
+        border-radius: 0;
+    }
+}
+
+/* System Logs */
+body[data-page="settings"] .logs-toolbar{
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+body[data-page="settings"] .logs-toolbar select, body[data-page="settings"] .logs-toolbar input[type="text"]{
+    padding: 0.4rem 0.6rem;
+    border: 1px solid var(--ion-border);
+    border-radius: var(--radius);
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+body[data-page="settings"] .logs-toolbar input[type="text"]{
+    flex: 1;
+    min-width: 150px;
+}
+body[data-page="settings"] .logs-container{
+    background: var(--bg-primary, #0d1117);
+    border: 1px solid var(--ion-border);
+    border-radius: var(--ion-radius-lg);
+    max-height: 600px;
+    overflow-y: auto;
+    font-family: "SF Mono", "Consolas", "Monaco", monospace;
+    font-size: 0.78rem;
+    line-height: 1.5;
+}
+body[data-page="settings"] .log-entry{
+    padding: 0.3rem 0.75rem;
+    border-bottom: 1px solid var(--border-subtle, rgba(255,255,255,0.04));
+    display: grid;
+    grid-template-columns: max-content max-content minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: start;
+}
+body[data-page="settings"] .log-entry:hover{ background: rgba(255,255,255,0.03); }
+body[data-page="settings"] .log-time{ color: var(--text-muted); white-space: nowrap; }
+@media (max-width: 640px) { body[data-page="settings"] .log-entry { grid-template-columns: minmax(0, 1fr); } }
+body[data-page="settings"] .log-level{ font-weight: 600; white-space: nowrap; }
+body[data-page="settings"] .log-level.DEBUG{ color: var(--text-muted); }
+body[data-page="settings"] .log-level.INFO{ color: var(--info); }
+body[data-page="settings"] .log-level.WARNING{ color: var(--warning); }
+body[data-page="settings"] .log-level.ERROR{ color: var(--danger); }
+body[data-page="settings"] .log-level.CRITICAL{ color: var(--danger); background: rgba(248,81,73,0.15); padding: 0 4px; border-radius: 3px; }
+body[data-page="settings"] .log-msg{ color: var(--text-primary); word-break: break-word; }
+body[data-page="settings"] .log-meta{ color: var(--text-muted); font-size: 0.72rem; margin-top: 0.15rem; }
+body[data-page="settings"] .log-exception{
+    color: var(--danger);
+    white-space: pre-wrap;
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+    padding: 0.4rem;
+    background: rgba(248,81,73,0.08);
+    border-radius: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+body[data-page="settings"] .ion-fragment-loading, body[data-page="settings"] .ion-fragment-message{text-align:center;padding:2rem;color:var(--text-secondary);}

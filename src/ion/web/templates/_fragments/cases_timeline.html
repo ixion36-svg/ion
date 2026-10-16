@@ -1,0 +1,78 @@
+{# The Attack Story Timeline, from ui/cases.py's timeline_view.
+
+   Three outcomes. `events is none` means the read failed or answered a
+   shape we could not read, so the counts strip is not drawn either: there
+   is nothing to count. An empty list means we read it and the case has no
+   history yet, and the strip still shows, because zero events is a figure.
+
+   Every colour is in static/css/cases-page.css, keyed by `kind_key` and
+   `verdict_key`. They were two JavaScript maps of rgba() and hex, plus the
+   accent written in as `#6de4ff` in six places, which is why rethemeing
+   the accent left this panel cyan.
+#}
+{% if events is none %}
+<div class="cpanel-empty-hint">Timeline unavailable</div>
+{% else %}
+
+{%- if narrative %}
+<div class="case-tl-narrative">
+  <div class="case-tl-narrative-head">
+    <span class="case-tl-narrative-label">Bob's take</span>
+    {%- if narrative.verdict_label %}
+    <span class="cpanel-alert-badge case-tl-verdict-{{ narrative.verdict_key }}">
+      {{- narrative.verdict_label -}}
+    </span>
+    {%- endif %}
+  </div>
+  {%- if narrative.summary %}
+  <div class="case-tl-narrative-body">{{ narrative.summary }}</div>
+  {%- endif %}
+  {%- if narrative.citations %}
+  <div class="case-tl-citations">
+    {%- for c in narrative.citations %}
+    <div class="case-tl-citation">
+      <code class="case-tl-citation-field">{{ c.field }}</code>
+      {#- The value is printed when it exists, including 0 and False. -#}
+      {%- if c.value is not none %} = <code>{{ c.value }}</code>{% endif %}
+      {%- if c.significance %} <span class="italic">{{ c.significance }}</span>{% endif %}
+    </div>
+    {%- endfor %}
+  </div>
+  {%- endif %}
+</div>
+{%- endif %}
+
+{# Each figure says "unknown" rather than 0 when the payload did not carry
+   a readable one. `counts.total || 0` printed four confident zeros. #}
+<div class="case-tl-counts">
+  <span><strong>{{ counts.total if counts.total is not none else 'unknown' }}</strong> events</span>
+  <span class="case-tl-count-bob"><strong>{{ counts.bob if counts.bob is not none else 'unknown' }}</strong> Bob</span>
+  <span class="case-tl-count-analyst"><strong>{{ counts.analyst if counts.analyst is not none else 'unknown' }}</strong> analyst</span>
+  <span class="case-tl-count-system"><strong>{{ counts.system if counts.system is not none else 'unknown' }}</strong> system</span>
+</div>
+
+{%- if not events %}
+<div class="cpanel-empty-hint">No events yet</div>
+{%- else %}
+<div class="case-tl-rail">
+  {%- for e in events %}
+  <div class="case-tl-event case-tl-{{ e.kind_key }}">
+    <div class="case-tl-marker"></div>
+    <div class="case-tl-event-head">
+      <span class="case-tl-kind">{{ e.kind_label }}</span>
+      {#- No timestamp rather than an invented one. The page rendered
+          `new Date(undefined)` as an empty string. -#}
+      {%- if e.when %}<span class="case-tl-when">{{ e.when }}</span>{% endif %}
+    </div>
+    {%- if e.title %}
+    <div class="case-tl-title">{{ e.title }}</div>
+    {%- endif %}
+    {%- if e.detail %}
+    <div class="case-tl-detail">{{ e.detail }}{% if e.truncated %}&#8230;{% endif %}</div>
+    {%- endif %}
+  </div>
+  {%- endfor %}
+</div>
+{%- endif %}
+
+{% endif %}

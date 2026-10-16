@@ -48,6 +48,13 @@ def module_css() -> str:
 
 
 @pytest.fixture(scope="module")
+def alerts_page_css() -> str:
+    """Where /alerts' own rules live since the UI redesign moved them out of
+    the template's <style> block."""
+    return (STATIC / "css" / "alerts-page.css").read_text(encoding="utf-8")
+
+
+@pytest.fixture(scope="module")
 def alerts() -> str:
     return (TEMPLATES / "alerts.html").read_text(encoding="utf-8")
 
@@ -189,12 +196,28 @@ def test_component_css_moved_out_of_alerts_page(alerts, module_css):
         assert re.search(rf"\.{cls}\s*[,{{]", module_css), f".{cls} missing from the component"
 
 
-def test_alerts_style_block_is_not_corrupted(alerts):
+def test_the_alerts_page_has_no_inline_style_block_left(alerts):
+    """The half of the test above that looks at the page is vacuous now, and
+    a vacuous assertion is worth replacing with the stronger one it became.
+
+    The UI redesign moved every rule out of the template, so the question is
+    no longer whether four classes left the <style> block but whether the
+    block exists at all. It does not, and a new one would be a page-local
+    rule that /cases could not see, which is the regression the test above
+    was written for."""
+    assert _style(alerts) == ""
+
+
+def test_the_alerts_page_stylesheet_is_not_corrupted(alerts_page_css):
     """Moving rules out with a regex that cannot see nesting tore the closing
-    braces off @media wrappers the first time. Guard the invariant."""
-    style = _style(alerts)
-    assert style.count("{") == style.count("}")
-    assert "@media" in style, "the @media blocks must be left where they were"
+    braces off @media wrappers the first time. Guard the invariant.
+
+    This guarded the template's <style> block until the redesign moved those
+    rules to alerts-page.css, at which point it asserted @media inside a
+    block that no longer existed and failed for a move it should have
+    followed. The invariant belongs to wherever the rules live."""
+    assert alerts_page_css.count("{") == alerts_page_css.count("}")
+    assert "@media" in alerts_page_css, "the @media blocks must survive the move"
 
 
 def test_component_css_is_balanced(module_css):
@@ -296,17 +319,30 @@ def test_cases_uses_the_tabbed_layout(cases):
 
 
 def test_selecting_an_alert_needs_no_refetch(cases):
-    """The rail stashes the alert object so selection is instant."""
+    """The rail stashes the alert object so selection is instant.
+
+    Still true and still the page's job: selectCaseAlert hands a whole
+    alert to the shared component, so the objects have to be to hand. Only
+    the key changed, to fall back to 'unknown' rather than index by
+    undefined.
+    """
     js = _inline_js(cases)
-    assert "_railAlerts[alertId] = a" in js
+    assert "_railAlerts[a.es_alert_id || 'unknown'] = a" in js
     assert "_railAlerts[alertId]" in js
 
 
 def test_first_alert_is_rendered_on_open(cases):
-    """Opening a case to an empty right-hand column would reintroduce the very
-    click this rework removed."""
+    """Opening a case to an empty right-hand column would reintroduce the
+    very click this rework removed.
+
+    The fragment names the first alert in data-first-alert-id and the page
+    reads it back, rather than the page picking c.alerts[0] for itself.
+    test_the_rail_order_and_the_detail_column_cannot_disagree below says
+    why that is the stronger arrangement.
+    """
     js = _inline_js(cases)
-    assert "selectCaseAlert(firstAlert.es_alert_id" in js
+    assert "workspace.dataset.firstAlertId" in js
+    assert "selectCaseAlert(firstAlertId, 0, c.id)" in js
 
 
 def test_case_opens_on_the_alerts_tab(cases):
@@ -317,35 +353,63 @@ def test_case_opens_on_the_alerts_tab(cases):
 # ── v0.77.1: the rail is ordered by severity ─────────────────────────────
 
 
-def test_rail_is_sorted_by_severity(cases):
+def _panel_module() -> str:
+    return (Path(__file__).resolve().parent.parent / "src" / "ion" / "web"
+            / "ui" / "cases.py").read_text(encoding="utf-8")
+
+
+def test_rail_is_sorted_by_severity():
     """The alert that auto-renders should be the one worth looking at first,
-    not whichever the API happened to return first."""
+    not whichever the API happened to return first.
+
+    The panel is a fragment now, so the order is the server's. It was
+    alerts.sort() over _sevOf in the page.
+    """
+    module = _panel_module()
+    assert "PANEL_SEV_RANK" in module
+    assert '"critical": 0' in module and '"low": 3' in module
+
+
+def test_rail_sort_reuses_the_board_severity_scale():
+    """A second severity ordering would be one more thing to keep in step.
+
+    The page reused the board's _sevRank rather than declaring its own,
+    and the module says it inherited that decision. Asserting the count is
+    what keeps a second table from being added quietly.
+    """
+    module = _panel_module()
+    assert module.count("PANEL_SEV_RANK: dict[str, int] = {") == 1, \
+        "a second severity scale was declared"
+    assert "info" in module, \
+        "the scale needs a rank for a severity the board does not show"
+
+
+def test_the_rail_order_and_the_detail_column_cannot_disagree(cases):
+    """This was test_rail_sort_is_in_place_so_both_consumers_agree.
+
+    openCaseDetail read c.alerts[0] after renderPanelContent returned and
+    passed index 0 to selectCaseAlert, so the sort had to mutate the
+    caller's own array. A slice or a spread anywhere in between would have
+    shown one alert selected in the rail while the detail column rendered
+    a different one, silently, and only on cases whose API order was not
+    already severity-descending. The test enumerated four ways of copying
+    an array and hoped it had thought of them all.
+
+    None of that can happen now, and not because the copying was fixed.
+    The fragment decides the order and names the first alert in
+    data-first-alert-id, so there is one source for both and no second
+    derivation to diverge from it. Asserting the page does not pick for
+    itself is what holds that.
+    """
     js = _inline_js(cases)
-    assert "alerts.sort(" in js
-    assert "_sevOf" in js
-
-
-def test_rail_sort_reuses_the_board_severity_scale(cases):
-    """A second severity ordering would be one more thing to keep in step."""
-    js = _inline_js(cases)
-    assert js.count("_sevRank = {") == 1, "a second severity scale was declared"
-    assert "_sevRank[a.priority || a.severity || c.severity]" in js
-
-
-def test_rail_sort_is_in_place_so_both_consumers_agree(cases):
-    """openCaseDetail reads c.alerts[0] after renderPanelContent returns and
-    passes index 0 to selectCaseAlert. If the sort produced a local copy, the
-    rail would show one alert selected while the detail column rendered a
-    different one — silently, and only on cases whose API order is not already
-    severity-descending."""
-    js = _inline_js(cases)
-    # sorting the same array the caller holds, not a slice/copy of it
-    assert "const alerts = c.alerts || [];" in js
-    sort_at = js.index("alerts.sort(")
-    decl_at = js.index("const alerts = c.alerts || [];")
-    between = js[decl_at:sort_at]
-    for copier in (".slice(", ".concat(", "[...alerts]", "Array.from("):
-        assert copier not in between, f"alerts was copied via {copier} before sorting"
+    assert "workspace.dataset.firstAlertId" in js
+    # Comments stripped: the note above openCaseDetail quotes the old
+    # c.alerts[0] read to explain why it went, and the assertion is about
+    # code.
+    code = re.sub(r"^\s*//.*$", "", js, flags=re.M)
+    assert "c.alerts[0]" not in code
+    assert "alerts.sort(" not in code, \
+        "the page is deriving the rail order again, so the two can diverge"
 
 
 # ── the accordions must stay gone ────────────────────────────────────────

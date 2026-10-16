@@ -1,0 +1,35 @@
+{% macro value(v, money=false) -%}{% if v is not none %}{% if money %}£{{ '{:,.0f}'.format(v) }}{% else %}{{ v }}{% endif %}{% else %}Unknown{% endif %}{%- endmacro %}
+{% set t = totals or {} %}
+{% if state == 'failed' %}
+<div class="tp-empty" role="alert">Failed to load forecast data.</div>
+{% else %}
+<div class="tp-summary" id="tp-forecast-totals">
+{% for label, v, money in [('Personnel with Plans', plan_count, false), ('Total Certifications', total_certs, false), ('Total Forecast', t.get('total'), true), ('Est. Company Liability', company_liability, true), ('Confirmed Company', t.get('company'), true), ('Self Funded', t.get('self'), true), ('Unclassified (TBD)', t.get('tbd'), true)] %}
+<div class="tp-summary-card"><div class="tp-summary-value">{{ value(v, money) }}</div><div class="tp-summary-label">{{ label }}</div></div>
+{% endfor %}
+<div class="tp-summary-card tp-summary-card-progress">{% if completion is not none %}<div class="tp-progress-bar"><div class="tp-progress-fill" data-ion-style="width:{{ completion }}%"></div></div>{% endif %}<div class="tp-summary-label">{{ value(completion) }}{% if completion is not none %}%{% endif %} Team Completion</div></div>
+</div>
+<h4>Breakdown by Employment Type</h4>
+<div id="tp-forecast-emp-breakdown">
+{% if by_employment_type is none %}<div class="tp-empty">Employment breakdown unavailable.</div>
+{% elif not by_employment_type %}<div class="tp-empty">No data yet.</div>
+{% else %}<div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
+{% for kind, d in by_employment_type.items() %}
+<div class="tp-summary-card"><strong>{{ {'cs':'Civil Servant','contractor':'Contractor','military':'Military','other':'Other'}.get(kind, kind) }}</strong>
+{% for label, key, money in [('Personnel','headcount',false), ('Certifications','certs',false), ('Total Cost','total',true), ('Company','company',true), ('Self','self',true)] %}<div>{{ label }}: {{ value(d.get(key), money) }}</div>{% endfor %}
+<div>Est. Liability: {{ value(d.get('company_liability'), true) }}</div></div>
+{% endfor %}</div>{% endif %}
+</div>
+<h4>Personnel Training Plans</h4>
+<div id="tp-forecast-table">
+{% if state == 'empty' %}<div class="tp-empty">No personnel have active training plans yet.</div>
+{% else %}<div class="overflow-x-auto"><table class="fc-table"><thead><tr><th>Person</th><th>Type</th><th>Plan</th><th>Target Role</th><th>Certs</th><th>Total</th><th>Company</th><th>Self</th><th>Progress</th></tr></thead><tbody>
+{% for f in forecasts %}<tr>
+<td><strong>{{ f.get('display_name') or 'Unknown' }}</strong><br>{{ f.get('username') or 'Unknown' }}</td>
+<td>{{ {'cs':'Civil Servant','contractor':'Contractor','military':'Military','other':'Other'}.get(f.get('employment_type'), f.get('employment_type') or 'Unknown') }}</td>
+<td>{{ f.get('plan_name') or 'Unknown' }}</td><td data-tp-target-role="{{ f.get('target_role') or '' }}">{{ f.get('target_role') or 'Unknown' }}</td>
+<td>{{ value(f.get('item_count')) }}</td>{% for key in ['total_cost','company_cost','self_cost'] %}<td class="fc-cost">{{ value(f.get(key), true) }}</td>{% endfor %}
+<td>{% if f.get('item_count') is not none and f.get('completed_count') is not none %}{% set pct = (f.completed_count / f.item_count * 100)|round|int if f.item_count else 0 %}{{ pct }}%<span class="fc-progress"><span class="fc-progress-bar" data-ion-style="width:{{ pct }}%"></span></span>{% else %}Unknown{% endif %}</td>
+</tr>{% endfor %}</tbody></table></div>{% endif %}
+</div>
+{% endif %}

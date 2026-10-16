@@ -1,0 +1,71 @@
+{% from "_fragments/_time.html" import ts %}
+<h3 id="exec-detail-title" hx-swap-oob="true">{{ title }}</h3>
+{% if state == 'withheld' %}
+<p>This execution is withheld.</p>
+{% elif state == 'missing' %}
+<p>This execution is no longer there.</p>
+{% elif state != 'data' %}
+<p>This execution could not be read.</p>
+{% else %}
+{% if case_number %}
+<div class="mb-4"><strong>Case:</strong> <a class="case-link" href="/alerts">{{ case_number }}{% if case_title %} - {{ case_title }}{% endif %}</a></div>
+{% endif %}
+<div class="mb-4 text-[0.85rem]"><strong>Alert:</strong> <span class="text-secondary">{{ alert_id or '-' }}</span></div>
+{% if progress is not none %}
+<div class="mb-4">
+    <div class="progress-bar-container h-[12px]">
+        <div class="progress-bar-fill{% if status_class %} status-{{ status_class }}{% endif %}" data-ion-style="width:{{ progress.pct }}%"></div>
+    </div>
+    <div class="progress-text">{{ progress.completed }}/{{ progress.total }} steps completed ({{ progress.pct }}%)</div>
+</div>
+{% else %}
+<p>Progress unknown</p>
+{% endif %}
+<div class="mb-2 font-semibold">Steps</div>
+{% if steps_state == 'empty' %}
+<div class="text-secondary">No steps defined</div>
+{% elif steps_state != 'data' %}
+<p>The steps could not be read.</p>
+{% else %}
+{% for step in steps %}
+<div class="exec-step-item{% if step.done %} done{% endif %}">
+    <input type="checkbox" class="exec-step-checkbox"{% if step.done %} checked{% endif %}{% if not step.active %} disabled{% endif %} data-change-action="execUpdateStepWithData" data-args='{{ [execution_id, step.id, "$checked"]|tojson }}'>
+    <span class="exec-step-title">{{ step.title }}</span>
+    {% if step.is_required %}<span class="exec-step-required">Required</span>{% endif %}
+    {% if step.done %}<span class="exec-step-meta">{% if step.status == 'skipped' %}Skipped{% else %}Done{% endif %}{% if step.completed_by %} by {{ step.completed_by }}{% endif %}{% if step.completed_at %} at {{ ts(step.completed_at) }}{% endif %}</span>{% endif %}
+</div>
+<div class="step-action-form" id="step-action-{{ step.id }}">
+    <div class="form-row">
+        <label>Action Taken</label>
+        <input type="text" data-field="action_taken" data-step="{{ step.id }}" value="{{ step.action_taken }}"{% if not step.active %} disabled{% endif %} placeholder="What action was performed?">
+    </div>
+    <div class="form-row">
+        <label>Findings</label>
+        <textarea data-field="findings" data-step="{{ step.id }}"{% if not step.active %} disabled{% endif %} placeholder="What was found?">{{ step.findings }}</textarea>
+    </div>
+    <div class="form-row">
+        <label>Evidence</label>
+        <input type="text" data-field="evidence_collected" data-step="{{ step.id }}" value="{{ step.evidence }}"{% if not step.active %} disabled{% endif %} placeholder="Evidence collected">
+    </div>
+    <div class="form-row">
+        <label>Risk Assessment</label>
+        <select data-field="risk_assessment" data-step="{{ step.id }}"{% if not step.active %} disabled{% endif %}>
+            {% for opt in step.risks %}<option value="{{ opt.value }}"{% if opt.selected %} selected{% endif %}>{{ opt.label }}</option>{% endfor %}
+        </select>
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+{% if show_complete %}
+<div class="exec-actions-bar">
+    <button type="button" class="btn btn-primary btn-sm" data-click-action="showOutcomeModal" data-args='{{ [execution_id]|tojson }}'>Complete & Classify</button>
+    <button type="button" class="btn btn-sm" data-click-action="execFail" data-args='{{ [execution_id]|tojson }}'>Mark Failed</button>
+</div>
+{% elif show_outcome %}
+<div class="exec-actions-bar items-center">
+    {% if outcome_label %}<span class="exec-outcome{% if outcome_class %} {{ outcome_class }}{% endif %}">{{ outcome_label }}</span>{% endif %}
+    {% if report %}<a href="/documents" class="btn btn-sm">View Report</a>{% endif %}
+    {% if report %}<button type="button" class="btn btn-sm" data-click-action="execRegenerateReport" data-args='{{ [execution_id]|tojson }}'>Regenerate Report</button>{% endif %}
+</div>
+{% endif %}
+{% endif %}

@@ -1,0 +1,100 @@
+{# Alerts: the known-false-positive suggestion banner on a case.
+
+   Replaces the innerHTML write in checkKFPMatches.
+
+   The banner is the one place this page tells an analyst a case is probably
+   noise. The old renderer returned early in three different situations and
+   rendered nothing in all of them:
+
+       if (!hosts.length && !users.length && !ips.length && !rules.length) return;
+       if (!resp.ok) return;
+       if (!data.matches || data.matches.length === 0) return;
+
+   So "the check could not run", "there was nothing to check", and "the
+   check ran and this case is clean" were one picture: an empty slot. The
+   first of those is a lie by omission, because an analyst reading a case
+   with no banner concludes it was checked and nothing matched.
+
+   Silence is kept for the two cases where it is honest. A clean case says
+   nothing, because a banner reading "no known false positive matched" on
+   every case is noise in a modal that already has six tabs. A closed case
+   says nothing, because the suggestion is to close it. The other two now
+   speak.
+
+   `match.matched_fields.join(', ')` was also unguarded, so a match whose
+   payload omitted that key raised a TypeError inside the try and was
+   swallowed by the catch, which rendered nothing: a real match reported as
+   a clean case. The module coerces it to a list and the join below cannot
+   throw. #}
+
+{% if missing %}
+  <div class="fp-suggestion-banner" role="alert">
+    <span class="fp-icon"><i class="icon-alert-triangle"></i></span>
+    <span class="fp-text">
+      This case could not be read, so it was not checked against the known
+      false positives. That is not a clean result.
+    </span>
+  </div>
+
+{% elif kfp is none or kfp.failed %}
+  {# A failed check, worded so it cannot be read as a clean one. #}
+  <div class="fp-suggestion-banner" role="alert">
+    <span class="fp-icon"><i class="icon-alert-triangle"></i></span>
+    <span class="fp-text">
+      The known false positive check could not run for this case, so whether
+      it matches one is not known. It has not been ruled out.
+    </span>
+  </div>
+
+{% elif kfp.skipped %}
+  {% if kfp.reason == 'nothing-to-match' %}
+    {# Not a clean result either: there was nothing to match on. The hosts,
+       users, rules and IP observables are all empty, which an analyst can
+       see in the case but would not connect to the absent banner. #}
+    <div class="fp-suggestion-banner">
+      <span class="fp-icon"><i class="icon-alert-triangle"></i></span>
+      <span class="fp-text">
+        This case records no hosts, users, triggered rules or IP observables,
+        so there was nothing to match against the known false positives.
+      </span>
+    </div>
+  {% endif %}
+  {# A closed case renders nothing: the suggestion is to close it. #}
+
+{% elif kfp.match %}
+  <div class="fp-suggestion-banner">
+    <span class="fp-icon"><i class="icon-alert-triangle"></i></span>
+    <span class="fp-text">
+      Matches known false positive: <strong>{{ kfp.match.get('title') or 'untitled entry' }}</strong>
+      {%- set fields = kfp.match.get('matched_fields') or [] %}
+      {%- if fields %}
+      <span class="text-xs text-[var(--text-muted)] ml-1">(matched: {{ fields|join(', ') }})</span>
+      {%- else %}
+      {# The entry matched but did not say on what. Not the same as a match
+         on nothing, and not worth hiding the match over. #}
+      <span class="text-xs text-[var(--text-muted)] ml-1">(the entry did not report which fields matched)</span>
+      {%- endif %}
+      {%- if kfp.total is not none and kfp.total > 1 %}
+      <span class="text-xs text-[var(--text-muted)] ml-1">and {{ kfp.total - 1 }} other{{ '' if kfp.total == 2 else 's' }}</span>
+      {%- endif %}
+    </span>
+    {% if can_triage %}
+      {# `|tojson` on both, never string concatenation. event-delegation.js
+         parses data-args with JSON.parse and on a throw it logs and
+         returns, so a malformed value makes the button look like it works
+         and do nothing. The ids are integers here, but the page built this
+         attribute by interpolation and the same pattern has produced a
+         silently dead control twice on this page already. #}
+      <button class="btn btn-sm btn-warning"
+              data-click-action="closeAsKnownFP"
+              data-args='[{{ case_id|tojson }}, {{ kfp.match.get('id')|tojson }}]'>Close as Known FP</button>
+    {% else %}
+      {# POST /api/cases/{id}/close-as-fp carries alert:triage. The old
+         banner offered this button to every reader, so a viewer with
+         alert:read saw a control whose submit answered 403. #}
+      <span class="text-xs text-[var(--text-muted)]">Closing as a known false positive needs the alert:triage permission.</span>
+    {% endif %}
+    <button class="fp-dismiss" data-remove-closest=".fp-suggestion-banner" title="Dismiss">&times;</button>
+  </div>
+{% endif %}
+{# A clean case renders nothing at all, deliberately. #}

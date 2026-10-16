@@ -1,0 +1,63 @@
+{% from "_fragments/_time.html" import ts %}
+{#
+  One OpenCTI report, in the slide-over.
+
+  The title goes back as an out-of-band swap so it comes from the same read
+  as the body. The old page set it from `d.name` on one line and built nine
+  sections of body markup on the next, all with innerHTML and all inside
+  one try whose catch wrote a red paragraph into the same element, so a
+  refusal left the previous report's title above it.
+
+  `empty` is a report OpenCTI returned with nothing in it. That is not the
+  same as a read that refused, and the two used to print the same sentence
+  because the sections array was empty in both cases.
+#}
+<div hx-swap-oob="innerHTML:#ds-report-title">{% if failed %}Report unavailable{% else %}{{ name }}{% endif %}</div>
+{% if failed %}
+<p role="alert" class="ds-read-failed">This report could not be read. OpenCTI did not answer, so its contents are unknown. Close and try again.</p>
+{% elif empty %}
+<p class="ds-empty">No details available. OpenCTI returned this report with no content, labels or related objects.</p>
+{% else %}
+{%- if meta %}
+<p class="text-[10px] text-base-content/50 font-mono mb-3">
+  {%- for m in meta %}{% if m.kind == 'published' %}{{ ts(m.value, 'date') }}{% else %}{{ m.value }}{% endif %}{% if not loop.last %} &middot; {% endif %}{% endfor %}
+</p>
+{%- endif %}
+{%- if labels %}
+<div class="flex flex-wrap gap-1 mb-3">{% for l in labels %}<span class="ds-rpt-tag">{{ l }}</span>{% endfor %}</div>
+{%- endif %}
+{%- if body %}
+<div class="ds-rpt-sec-hdr">Report Content</div>
+<p class="text-[12px] text-base-content/70 leading-relaxed whitespace-pre-wrap mb-2">{{ body }}</p>
+{%- endif %}
+{%- if actors %}
+<div class="ds-rpt-sec-hdr">Threat Actors</div>
+{%- for a in actors %}
+<div class="text-[12px] text-base-content/80 py-0.5">{{ a.name }}{% if a.aliases %} <span class="text-base-content/50 text-[11px]">({{ a.aliases|join(', ') }})</span>{% endif %}</div>
+{%- endfor %}
+{%- endif %}
+{%- if ttps %}
+<div class="ds-rpt-sec-hdr">MITRE ATT&amp;CK</div>
+<div class="flex flex-wrap gap-1">{% for t in ttps %}<span class="ds-rpt-ttp">{% if t.mitre_id %}{{ t.mitre_id }} &mdash; {% endif %}{{ t.name }}</span>{% endfor %}</div>
+{%- endif %}
+{%- if malware %}
+<div class="ds-rpt-sec-hdr">Malware</div>
+<div class="flex flex-wrap gap-1">{% for m in malware %}<span class="ds-rpt-tag">{{ m }}</span>{% endfor %}</div>
+{%- endif %}
+{%- if vulns %}
+<div class="ds-rpt-sec-hdr">Vulnerabilities</div>
+<div class="flex flex-wrap gap-1">{% for v in vulns %}<span class="ds-rpt-ttp">{{ v }}</span>{% endfor %}</div>
+{%- endif %}
+{%- if countries %}
+<div class="ds-rpt-sec-hdr">Target Countries</div>
+<p class="text-[12px] text-base-content/70">{{ countries|join(', ') }}</p>
+{%- endif %}
+{%- if sectors %}
+<div class="ds-rpt-sec-hdr">Target Sectors</div>
+<p class="text-[12px] text-base-content/70">{{ sectors|join(', ') }}</p>
+{%- endif %}
+{%- if indicators %}
+<div class="ds-rpt-sec-hdr">Indicators ({{ indicators|length }}{% if indicators_total > indicators|length %} of {{ indicators_total }}{% endif %})</div>
+<ul class="space-y-1">{% for i in indicators %}<li class="text-[11px] font-mono text-base-content/60 break-all">{{ i }}</li>{% endfor %}</ul>
+{%- endif %}
+{% endif %}

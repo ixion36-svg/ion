@@ -1,0 +1,416 @@
+{# The wallboard. Replaces the innerHTML and insertAdjacentHTML the page
+   used to build the topology, the status lines, the bars and the
+   threat-landscape paragraph, plus the hand-rolled escHtml() those needed.
+
+   The card chrome is here. The clock and the five-minute poll are not:
+   they live on the page shell, outside this swap, so a failed render
+   cannot take the retry with it. The estate badges and the cache age sit
+   in the header beside the clock, so they are swapped out of band. Every
+   render, including the failure render, includes them. A failure therefore
+   replaces a confident count instead of leaving it next to an error.
+
+   There is no nested request and no filter, so nothing on this fragment
+   sends a parameter the shell also sends.
+
+   A failed read and an empty result are different sentences. A measured
+   zero is printed. The poll on the shell is what tries again. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% macro delta(d, element_id) -%}
+{% if d.kind == 'flat' -%}
+<span id="{{ element_id }}" class="text-slate-500 tabular-nums">±0 vs prev 24h</span>
+{%- elif d.kind == 'move' -%}
+<span id="{{ element_id }}" class="{{ 'text-ion-lime' if d.good is true else 'text-ion-coral' }} font-semibold tabular-nums">{{ '▲' if d.up is true else '▼' }} {{ d.amount }}</span><span class="text-slate-600"> vs prev 24h</span>
+{%- else -%}
+<span id="{{ element_id }}" class="text-slate-500">vs prev 24h not measured</span>
+{%- endif %}
+{%- endmacro %}
+
+{% macro count_bars(bars, empty) -%}
+{% if bars.state == 'empty' %}
+<div class="text-[12px] text-slate-600 italic py-2">{{ empty }}</div>
+{% elif bars.state == 'bars' %}
+{% for bar in bars.rows %}
+<div class="grid grid-cols-[110px_1fr_44px] gap-2.5 items-center text-[12px]">
+  <div class="text-slate-400 capitalize">{{ bar.label }}</div>
+  {# bg-base-300, not bg-white/5. The JavaScript asked for bg-white/5 and
+     the stylesheet has never contained it, so the track was invisible. #}
+  <div class="h-1.5 rounded-full bg-base-300 overflow-hidden">
+    <div class="{{ bar.cls }} h-full rounded-full transition-[width] duration-700" data-ion-style="width:{{ bar.pct }}%"></div>
+  </div>
+  <div class="text-right text-slate-200 tabular-nums font-semibold">{{ bar.text }}</div>
+</div>
+{% endfor %}
+{% else %}
+<div class="text-[12px] text-slate-600 italic py-2">This breakdown could not be read. That is not an empty list.</div>
+{% endif %}
+{%- endmacro %}
+
+{% macro spark(svg_id, fill_id, line_id, grad_id, tone, path) -%}
+{% if path %}
+<svg id="{{ svg_id }}" viewBox="0 0 160 50" preserveAspectRatio="none"
+     class="w-[160px] h-[50px] {{ tone }} shrink-0" aria-hidden="true">
+  <defs>
+    <linearGradient id="{{ grad_id }}" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="currentColor" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <path id="{{ fill_id }}" fill="url(#{{ grad_id }})" d="{{ path.fill }}"/>
+  <path id="{{ line_id }}" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="{{ path.line }}"/>
+</svg>
+{% endif %}
+{%- endmacro %}
+
+{% macro estate() -%}
+<div id="wb-topology-summary" hx-swap-oob="outerHTML" class="flex items-center gap-3">
+  <span class="label-tiny text-base-content/50">Estate</span>
+  {% if topology.failed %}
+  <span class="badge badge-ghost badge-sm">could not be read</span>
+  {% else %}
+  <span id="wb-top-up" class="badge badge-success badge-soft badge-sm tabular-nums font-semibold">{% if topology.header.up is not none %}{{ topology.header.up }} up{% else %}— up{% endif %}</span>
+  <span id="wb-top-down" class="badge badge-error badge-soft badge-sm tabular-nums font-semibold">{% if topology.header.down is not none %}{{ topology.header.down }} down{% else %}— down{% endif %}</span>
+  <span id="wb-top-off" class="badge badge-ghost badge-sm tabular-nums">{% if topology.header.off is not none %}{{ topology.header.off }} off{% else %}— off{% endif %}</span>
+  {% endif %}
+</div>
+<span id="wb-cache-age" hx-swap-oob="outerHTML">{% if age is not none %}refreshed {{ age }}{% else %}not measured{% endif %}</span>
+{%- endmacro %}
+
+{{ estate() }}
+
+{% if failed %}
+<div role="alert" class="alert alert-error">
+  The wallboard snapshot could not be read. This is not an empty estate:
+  alerts, cases and the services behind them were not counted, so none of
+  those figures are zero. The board tries again on its own.
+</div>
+{% else %}
+
+{% if stale %}
+<div role="alert" class="alert alert-warning">
+  The latest read failed, so these figures are the previous snapshot, not
+  a fresh measurement. An old number is not a new zero.
+</div>
+{% endif %}
+
+<div id="wb-attention" class="rounded-[12px] border px-6 py-3 flex items-center gap-4 {% if attention.state == 'critical' %}wb-att-critical{% elif attention.state == 'warning' %}wb-att-warning{% elif attention.state == 'ok' %}wb-att-ok{% else %}border-base-300{% endif %}">
+  <span id="wb-att-dot" class="wb-att-dot {% if attention.state == 'critical' %}bg-ion-coral wb-pulse-down{% elif attention.state == 'warning' %}bg-ion-amber{% elif attention.state == 'ok' %}bg-ion-lime{% else %}bg-base-content/40{% endif %}"></span>
+  {% if attention.state == 'unknown' %}
+  <span id="wb-att-headline" class="font-sans font-semibold text-[18px] tracking-tight text-base-content leading-none">Attention state is unknown</span>
+  <span id="wb-att-sub" class="label-tiny text-base-content/50 ml-auto">
+    {% if attention.why == 'cases' %}Cases could not be read, so this is not an all-clear.
+    {% elif attention.why == 'alerts' %}Alerts could not be read, so the backlog was not counted. This is not an all-clear.
+    {% elif attention.why == 'cases and alerts' %}Cases and alerts could not be read, so this is not an all-clear.
+    {% else %}Attention could not be read. This is not an all-clear.{% endif %}
+  </span>
+  {% else %}
+  <span id="wb-att-headline" class="font-sans font-semibold text-[18px] tracking-tight text-base-content leading-none">{{ attention.headline }}</span>
+  <span id="wb-att-sub" class="label-tiny text-base-content/50 ml-auto tabular-nums">
+    {% if attention.state == 'ok' %}monitoring · all systems
+    {% else %}{% if attention.open_critical is not none %}{{ attention.open_critical }}{% else %}—{% endif %} critical · {% if attention.open_high is not none %}{{ attention.open_high }}{% else %}—{% endif %} high · {% if attention.open_alert_backlog is not none %}{{ attention.open_alert_backlog }}{% else %}—{% endif %} alerts open{% endif %}
+  </span>
+  {% endif %}
+</div>
+
+<main class="flex-1 grid grid-cols-3 grid-rows-2 gap-4 min-h-0">
+
+  <section class="card bg-base-200 shadow border border-base-300 flex flex-col min-h-0 overflow-hidden">
+    <div class="card-body p-6 flex flex-col min-h-0 h-full">
+      <div class="flex items-baseline justify-between">
+        <span class="label-tiny text-base-content/50">Alerts</span>
+        <span id="wb-alerts-stamp" class="label-tiny text-base-content/40">last 24h</span>
+      </div>
+      {% if alerts.failed %}
+      <div role="alert" class="alert alert-error mt-4">Alerts could not be read. This is not zero alerts: the count is unknown.</div>
+      {% else %}
+      <div class="stat px-0 py-2">
+        <div class="stat-figure text-primary">{{ spark('wb-alerts-spark', 'wb-alerts-spark-fill', 'wb-alerts-spark-line', 'wb-spark-cyan', 'text-primary', alerts.spark) }}</div>
+        <div id="wb-alerts-24h" class="stat-value font-sans tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-primary">{% if alerts.total is not none %}{{ alerts.total }}{% else %}—{% endif %}</div>
+        <div id="wb-alerts-status" class="stat-desc">
+          <span id="wb-alerts-open" class="text-ion-coral font-semibold">{% if alerts.open is not none %}{{ alerts.open }}{% else %}—{% endif %}</span> open ·
+          <span id="wb-alerts-ack" class="text-ion-amber font-semibold">{% if alerts.ack is not none %}{{ alerts.ack }}{% else %}—{% endif %}</span> ack ·
+          <span id="wb-alerts-closed" class="text-slate-300">{% if alerts.closed is not none %}{{ alerts.closed }}{% else %}—{% endif %}</span> closed ·
+          {{ delta(alerts.delta, 'wb-alerts-delta') }}
+        </div>
+      </div>
+      <div id="wb-alerts-bars" class="flex flex-col gap-2 mt-auto pt-3 border-t border-base-300">
+        {{ count_bars(alerts.bars, 'No verdicts captured in the last 7d.') }}
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section id="wb-panel-cases" class="card bg-base-200 shadow border border-base-300 flex flex-col min-h-0 overflow-hidden{% if attention.emphasis == 'critical' %} wb-panel-critical{% elif attention.emphasis == 'warning' %} wb-panel-warning{% endif %}">
+    <div class="card-body p-6 flex flex-col min-h-0 h-full">
+      <div class="flex items-baseline justify-between">
+        <span class="label-tiny text-base-content/50">Cases</span>
+        <span id="wb-cases-stamp" class="label-tiny text-base-content/40">open right now</span>
+      </div>
+      {% if cases.failed %}
+      <div role="alert" class="alert alert-error mt-4">Cases could not be read. This is not zero open cases: the count is unknown.</div>
+      {% else %}
+      <div class="stat px-0 py-2">
+        <div class="stat-figure text-warning">{{ spark('wb-cases-spark', 'wb-cases-spark-fill', 'wb-cases-spark-line', 'wb-spark-amber', 'text-warning', cases.spark) }}</div>
+        <div id="wb-cases-open" class="stat-value font-sans tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-warning">{% if cases.open is not none %}{{ cases.open }}{% else %}—{% endif %}</div>
+        <div id="wb-cases-closures" class="stat-desc">
+          <span class="text-ion-lime font-semibold">{% if cases.closures is not none %}{{ cases.closures }}{% else %}—{% endif %}</span> closures in last 24h ·
+          {{ delta(cases.delta, 'wb-cases-delta') }}
+        </div>
+      </div>
+      <div id="wb-cases-bars" class="flex flex-col gap-2 mt-auto pt-3 border-t border-base-300">
+        {{ count_bars(cases.bars, 'No open cases right now.') }}
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="card bg-base-200 shadow border border-base-300 flex flex-col min-h-0 overflow-hidden">
+    <div class="card-body p-6 flex flex-col min-h-0 h-full">
+      <div class="flex items-baseline justify-between">
+        <span class="label-tiny text-base-content/50 flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5"><use href="#i-sparkles"/></svg>
+          Bob — AI Analyst
+        </span>
+        <span id="wb-bob-stamp" class="label-tiny text-base-content/40">last 7d</span>
+      </div>
+      {% if bob.failed %}
+      <div role="alert" class="alert alert-error mt-4">Bob's figures could not be read. This is not zero investigations.</div>
+      {% else %}
+      <div class="stat px-0 py-2">
+        <div class="stat-figure text-secondary">{{ spark('wb-bob-spark', 'wb-bob-spark-fill', 'wb-bob-spark-line', 'wb-spark-iris', 'text-secondary', bob.spark) }}</div>
+        <div id="wb-bob-investigations-24h" class="stat-value font-sans tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-secondary">{% if bob.recent is not none %}{{ bob.recent }}{% else %}—{% endif %}</div>
+        <div id="wb-bob-total" class="stat-desc">
+          <span class="text-slate-300 tabular-nums">{% if bob.investigated is not none %}{{ bob.investigated }}{% else %}—{% endif %}</span> investigations ·
+          <span class="text-slate-300 tabular-nums">{% if bob.feedback is not none %}{{ bob.feedback }}{% else %}—{% endif %}</span> feedback rows ·
+          {{ delta(bob.delta, 'wb-bob-delta') }}
+        </div>
+      </div>
+      <div class="mt-auto pt-3 border-t border-base-300">
+        <div class="flex items-baseline justify-between mb-2">
+          <span class="label-tiny text-base-content/50">Analyst-Bob agreement</span>
+          <span id="wb-bob-agreement-num" class="text-[12px] text-base-content/70 tabular-nums">{{ bob.agreement }}</span>
+        </div>
+        <div class="h-1.5 w-full rounded-full bg-base-300 overflow-hidden">
+          <div id="wb-bob-agreement-fill" class="h-full rounded-full bg-gradient-to-r from-secondary to-primary transition-[width] duration-700" data-ion-style="width:{{ bob.agreement_width }}%"></div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="card bg-base-200 shadow border border-base-300 flex flex-col min-h-0 overflow-hidden">
+    <div class="card-body p-6 flex flex-col min-h-0 h-full">
+      <div class="flex items-baseline justify-between">
+        <span class="label-tiny text-base-content/50">Rules</span>
+        <span id="wb-rules-stamp" class="label-tiny text-base-content/40">posture</span>
+      </div>
+      {% if rules.state == 'failed' %}
+      <div id="wb-rules-enabled" class="stat-value font-sans tabular-nums text-[44px] leading-none text-success">—</div>
+      <div id="wb-rules-of-total" role="alert" class="alert alert-error mt-4">Rule posture could not be read. This is not zero rules, and it does not say whether TIDE is configured.</div>
+      {% elif rules.state == 'unconfigured' %}
+      <div id="wb-rules-enabled" class="stat-value font-sans tabular-nums text-[44px] leading-none text-success">—</div>
+      <div id="wb-rules-of-total" class="stat-desc mt-1">TIDE not configured</div>
+      <div id="wb-rules-bars" class="text-[12px] text-slate-600 italic py-2">No rule posture available.</div>
+      {% elif rules.state == 'unknown' %}
+      <div id="wb-rules-enabled" class="stat-value font-sans tabular-nums text-[44px] leading-none text-success">—</div>
+      <div id="wb-rules-of-total" class="stat-desc mt-1">Rule posture was not reported. This is not zero rules.</div>
+      {% else %}
+      <div class="stat px-0 py-2">
+        <div class="stat-figure text-right">
+          <div class="stat-title">enabled rules</div>
+          <div id="wb-rules-of-total" class="stat-desc mt-1 tabular-nums">of {% if rules.total is not none %}{{ rules.total }}{% else %}—{% endif %} total</div>
+        </div>
+        <div id="wb-rules-enabled" class="stat-value font-sans tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-success">{% if rules.enabled is not none %}{{ rules.enabled }}{% else %}—{% endif %}</div>
+        <div id="wb-rules-coverage" class="stat-desc">
+          MITRE coverage
+          {% if rules.have_total is true %}
+          <span class="text-ion-cyan tabular-nums font-semibold">{{ rules.covered }} / {{ rules.techniques }} ({{ rules.pct }}%)</span>
+          {% else %}
+          <span class="text-ion-cyan tabular-nums font-semibold">{% if rules.covered is not none %}{{ rules.covered }}{% else %}—{% endif %}</span>
+          <span class="text-slate-400">with an enabled rule, share of ATT&amp;CK not reported</span>
+          {% endif %}
+          · avg quality <span id="wb-rules-quality" class="text-ion-lime tabular-nums font-semibold">{% if rules.avg is not none %}{{ rules.avg }}{% else %}—{% endif %}</span>
+        </div>
+      </div>
+      <div id="wb-rules-bars" class="flex flex-col gap-2 mt-auto pt-3 border-t border-base-300">
+        {% if rules.bars.state == 'empty' %}
+        <div class="text-[12px] text-slate-600 italic py-2">No severity data captured.</div>
+        {% elif rules.bars.state == 'bars' %}
+        {% for bar in rules.bars.rows %}
+        <div class="grid grid-cols-[110px_1fr_44px] gap-2.5 items-center text-[12px]">
+          <div class="text-slate-400 capitalize">{{ bar.label }}</div>
+          <div class="h-1.5 rounded-full bg-base-300 overflow-hidden relative">
+            <div class="{{ bar.cls }} h-full rounded-full opacity-30" data-ion-style="width:{{ bar.total_pct }}%"></div>
+            <div class="{{ bar.cls }} h-full rounded-full absolute inset-y-0 left-0" data-ion-style="width:{{ bar.overlay_pct }}%"></div>
+          </div>
+          <div class="text-right text-slate-200 tabular-nums font-semibold">{{ bar.text }}</div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="text-[12px] text-slate-600 italic py-2">Severity could not be read. That is not an empty distribution.</div>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="card bg-base-200 shadow border border-base-300 flex flex-col min-h-0 relative overflow-hidden">
+    <div class="card-body p-5 flex flex-col min-h-0 h-full">
+      <div class="flex items-baseline justify-between">
+        <span class="label-tiny text-base-content/50">Platform Topology</span>
+        <span class="badge badge-success badge-soft badge-sm">live</span>
+      </div>
+      {% if topology.failed %}
+      <div role="alert" class="alert alert-error mt-4">Platform topology could not be read. This is not an estate with nothing up.</div>
+      {% else %}
+      <div class="flex-1 grid place-items-center min-h-0">
+        <svg id="wb-topology" viewBox="0 0 460 280" preserveAspectRatio="xMidYMid meet" class="w-full h-full" aria-hidden="true">
+          <defs>
+            <radialGradient id="wb-hub-glow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="var(--color-primary)" stop-opacity="0.55"/>
+              <stop offset="100%" stop-color="var(--color-primary)" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <g id="wb-topology-edges">
+            {% for node in topology.nodes %}
+            <line x1="230" y1="140" x2="{{ node.x }}" y2="{{ node.y }}" stroke="{{ node.stroke }}" stroke-width="{{ node.width }}" stroke-opacity="{{ node.opacity }}"{% if node.dash %} stroke-dasharray="4 3"{% endif %}/>
+            {% endfor %}
+          </g>
+          <g id="wb-topology-nodes">
+            <circle cx="230" cy="140" r="56" fill="url(#wb-hub-glow)"/>
+            <circle cx="230" cy="140" r="28" fill="#0a0e17" stroke="rgb(109,228,255)" stroke-width="1.5"/>
+            <text x="230" y="138" text-anchor="middle" fill="white" font-size="13" font-weight="700">ION</text>
+            <text x="230" y="151" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="8">HUB</text>
+            {% for node in topology.nodes %}
+            <g{% if node.pulse %} class="wb-pulse-down"{% endif %} data-key="{{ node.key }}">
+              <title>{{ node.label }} — {{ node.details }}</title>
+              <circle cx="{{ node.x }}" cy="{{ node.y }}" r="9" fill="#0a0e17" stroke="{{ node.stroke }}" stroke-width="1.5"/>
+              <circle cx="{{ node.x }}" cy="{{ node.y }}" r="3.5" fill="{{ node.fill }}"/>
+              <text x="{{ node.label_x }}" y="{{ node.label_y }}" text-anchor="{{ node.anchor }}" fill="rgba(226,232,240,0.85)" font-size="11" font-weight="500">{{ node.label }}</text>
+            </g>
+            {% endfor %}
+          </g>
+        </svg>
+      </div>
+      <div class="flex items-center gap-3 mt-1 pt-3 border-t border-base-300">
+        <span class="badge badge-success badge-soft badge-sm gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-success"></span>up</span>
+        <span class="badge badge-error badge-soft badge-sm gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-error wb-pulse-down"></span>down</span>
+        <span class="badge badge-ghost badge-sm gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-base-content/40"></span>not configured</span>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="card bg-base-200 shadow border border-base-300 flex flex-col min-h-0 overflow-hidden">
+    <div class="card-body p-5 flex flex-col min-h-0 h-full">
+      <div class="flex items-baseline justify-between">
+        <span class="label-tiny text-base-content/50 flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5"><use href="#i-sparkles"/></svg>
+          Threat Landscape
+        </span>
+        {% if landscape.state == 'failed' %}
+        <span id="wb-tl-mode" class="badge badge-ghost badge-sm">unavailable</span>
+        {% elif landscape.mode == 'ai' %}
+        <span id="wb-tl-mode" class="badge badge-ghost badge-sm"><span class="text-ion-iris">AI summary</span></span>
+        {% elif landscape.mode == 'stats' %}
+        <span id="wb-tl-mode" class="badge badge-ghost badge-sm"><span class="text-slate-500">stats only</span></span>
+        {% else %}
+        <span id="wb-tl-mode" class="badge badge-ghost badge-sm">summary kind unknown</span>
+        {% endif %}
+      </div>
+      {% if landscape.state == 'failed' %}
+      <div role="alert" class="alert alert-error mt-4">The threat landscape could not be read. This is not a quiet day, and it is not a true-positive rate of zero.</div>
+      {% else %}
+      <div id="wb-tl-summary" class="flex-1 overflow-hidden text-sm leading-relaxed text-base-content">
+        {% if landscape.summary %}
+        <p class="mb-2 text-slate-200">{{ landscape.summary.paragraph }}</p>
+        {% if landscape.summary.bullets %}
+        <ul class="space-y-1 text-[12.5px] text-slate-400">
+          {% for bullet in landscape.summary.bullets %}
+          <li class="flex gap-2"><span class="text-ion-iris shrink-0">•</span><span>{{ bullet }}</span></li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+        {% elif landscape.figures.state == 'unknown' %}
+        <p class="text-slate-600 italic">The figures behind this summary could not be read.</p>
+        {% else %}
+        <p class="mb-2 text-slate-300">
+          Last 24h: <span class="text-base-content font-semibold">{% if landscape.figures.alerts is not none %}{{ landscape.figures.alerts }}{% else %}—{% endif %}</span> alerts
+          ({% if landscape.figures.severity_known is true %}{{ landscape.figures.severity }}{% else %}severity not measured{% endif %}).
+        </p>
+        {% if landscape.figures.closures is none %}
+        <p class="text-[12.5px] text-slate-500">Closure reasons were not measured.</p>
+        {% elif landscape.figures.closures %}
+        <p class="text-[12.5px] text-slate-500">Top closure reasons (7d): {% for row in landscape.figures.closures %}{{ row.reason }} ({{ row.count }}){% if not loop.last %}, {% endif %}{% endfor %}.</p>
+        {% endif %}
+        {% if landscape.mode == 'stats' %}
+        <p class="text-[11px] text-slate-600 mt-2 italic">AI summary unavailable — Ollama offline or not configured.</p>
+        {% elif landscape.mode == 'unknown' %}
+        <p class="text-[11px] text-slate-600 mt-2 italic">Whether an AI summary was produced was not reported.</p>
+        {% endif %}
+        {% endif %}
+      </div>
+      <div id="wb-tl-stats" class="stats stats-horizontal w-full bg-transparent shadow-none mt-auto pt-3 border-t border-base-300">
+        <div class="stat px-0 py-2">
+          <div id="wb-tl-alerts-24h" class="stat-value text-xl text-primary tabular-nums">{% if landscape.figures.state == 'ready' and landscape.figures.alerts is not none %}{{ landscape.figures.alerts }}{% else %}—{% endif %}</div>
+          <div class="stat-desc">alerts 24h</div>
+        </div>
+        <div class="stat px-0 py-2">
+          <div id="wb-tl-tp-rate" class="stat-value text-xl text-error tabular-nums">{% if landscape.figures.state == 'ready' and landscape.figures.rate is not none %}{{ landscape.figures.rate }}{% else %}—{% endif %}</div>
+          <div class="stat-desc">TP rate 7d</div>
+        </div>
+        <div class="stat px-0 py-2">
+          <div id="wb-tl-backlog" class="stat-value text-xl text-warning tabular-nums">{% if landscape.figures.state == 'ready' and landscape.figures.backlog is not none %}{{ landscape.figures.backlog }}{% else %}—{% endif %}</div>
+          <div class="stat-desc">open backlog</div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+</main>
+
+<section id="wb-org" class="shrink-0 rounded-[12px] border border-base-300 bg-base-200 px-5 py-3 flex items-center gap-5 text-[13px]">
+  <span class="label-tiny text-base-content/50 shrink-0">People</span>
+  {% if org.state == 'failed' %}
+  <span id="wb-org-duty" class="font-semibold text-warning">Staffing could not be read. This is not an empty rota, and it is not nobody on duty.</span>
+  {% else %}
+  {% if org.duty_state == 'on' %}
+  <span id="wb-org-duty" class="font-semibold tabular-nums {% if org.ack is true %}text-base-content{% else %}text-warning{% endif %}">{{ org.duty_name }} on duty{% if org.ack is false %} (not acknowledged){% elif org.ack is not true %} (acknowledgement not recorded){% endif %}</span>
+  {% elif org.duty_state == 'nobody' %}
+  <span id="wb-org-duty" class="font-semibold text-warning tabular-nums">Nobody on duty this week</span>
+  {% else %}
+  <span id="wb-org-duty" class="font-semibold text-warning tabular-nums">Duty could not be read</span>
+  {% endif %}
+  <span class="text-base-content/20">·</span>
+  <span id="wb-org-posts" class="text-base-content/70 tabular-nums">{{ org.headline if org.headline is not none else '—' }}</span>
+  {% if org.leads is none %}
+  <span id="wb-org-leads" class="badge badge-ghost badge-sm tabular-nums">leads unknown</span>
+  {% elif org.leads > 0 %}
+  <span id="wb-org-leads" class="badge badge-error badge-sm tabular-nums">{{ org.leads }} with no lead</span>
+  {% endif %}
+  {% if org.measured is true %}
+    {% if org.uncovered is none or org.pillars_total is none %}
+    <span id="wb-org-pillars" class="badge badge-ghost badge-sm tabular-nums">capability unknown</span>
+    {% elif org.uncovered > 0 %}
+    <span id="wb-org-pillars" class="badge badge-error badge-sm tabular-nums">{{ org.uncovered }} of {{ org.pillars_total }} pillars uncovered</span>
+    {% elif org.self_rated is none %}
+    <span id="wb-org-pillars" class="badge badge-ghost badge-sm tabular-nums">self-rated coverage unknown</span>
+    {% elif org.self_rated > 0 %}
+    <span id="wb-org-pillars" class="badge badge-warning badge-sm tabular-nums">{{ org.self_rated }} self-rated only</span>
+    {% endif %}
+  {% elif org.measured is false %}
+  <span id="wb-org-pillars" class="badge badge-ghost badge-sm tabular-nums">capability unmeasured</span>
+  {% else %}
+  <span id="wb-org-pillars" class="badge badge-ghost badge-sm tabular-nums">capability unknown</span>
+  {% endif %}
+  <span id="wb-org-note" class="label-tiny text-base-content/40 ml-auto text-right">
+    {% if org.unfilled is none %}rota ahead not measured
+    {% elif org.unfilled > 0 %}{{ org.unfilled }} week(s) ahead with nobody{% if org.next_unfilled is not none %}, from {{ ts(org.next_unfilled, 'date') }}{% endif %}
+    {% elif org.worst %}shortest: {% for row in org.worst %}{{ row.role }} −{{ row.gap }}{% if not loop.last %}, {% endif %}{% endfor %}
+    {% endif %}
+  </span>
+  {% endif %}
+</section>
+{% endif %}

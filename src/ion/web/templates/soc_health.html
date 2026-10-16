@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}SOC Health - ION{% endblock %}
+{% block page_id %}soc_health{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
@@ -15,184 +16,36 @@
   <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Cluster, ingest and SOC-wide KPIs.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="btn btn-primary" data-click-action="shLoad">Refresh</button>
-    </div>
+  {# Refresh re-requests the same fragment, so "what refresh does" has one
+     definition. It sits outside #sh-content, which is what guarantees no swap
+     of the fragment, success or error, can remove the page's own way out. #}
+  <button class="btn btn-primary"
+          hx-get="/ui/soc-health/scorecard"
+          hx-target="#sh-content"
+          hx-swap="innerHTML">Refresh</button>
+</div>
 </section>
 
-<div id="sh-content"><div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Computing scorecard...</div></div>
+{# The whole scorecard body is one fragment, rendered by
+   ion.web.ui.soc_health.soc_health_scorecard_fragment. It used to be three
+   innerHTML writes fed by 151 lines of inline JavaScript with a hand-rolled
+   esc(): the grade ring, the five dimension cards, the legend and the
+   recommendations. The markup now has one definition, in Jinja, which escapes
+   it, and a restyle of a dimension card reaches it from the stylesheet.
+
+   hx-trigger="load" keeps the shell's first paint immediate with the data
+   arriving in its own request, which is what the fetch it replaces already
+   did. The spinner below is the placeholder until the swap replaces it. #}
+<div id="sh-content"
+     hx-get="/ui/soc-health/scorecard"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+  <div class="flex justify-center items-center gap-2 py-14 text-center opacity-50">
+    <span class="loading loading-spinner loading-sm text-primary"></span>
+    Computing scorecard...
+  </div>
+</div>
 
 </div><!-- /ion-tw inner -->
 </div><!-- /ion-tw -->
-{% endblock %}
-
-{% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* Conic-gradient score ring: daisyUI radial-progress needs a CSS custom
-   property set as a raw attribute, which CSP refuses. Geometry and inner
-   disc have no utility equivalent. */
-.sh-grade-ring {
-    width: 120px;
-    height: 120px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-.sh-grade-inner {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    background: var(--color-base-200);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-}
-
-/* auto-fit minmax has no daisyUI grid equivalent; do not approximate with breakpoints. */
-.sh-dims {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px;
-    margin-bottom: 20px;
-}
-
-/* JS-computed bar width; 0.5s fill is not a compiled utility. */
-.sh-dim-bar-fill {
-    height: 100%;
-    border-radius: 3px;
-    transition: width .5s;
-}
-</style>
-<script nonce="{{ csp_nonce }}">
-const API = '/api/soc-health';
-function $(id){return document.getElementById(id)}
-function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
-
-async function shLoad(){
-    $('sh-content').innerHTML = '<div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Computing scorecard...</div>';
-    try {
-        const r = await fetch(API+'/scorecard');
-        if(!r.ok) throw new Error('Failed');
-        renderScorecard(await r.json());
-    } catch(e) {
-        $('sh-content').innerHTML = `<div role="alert" class="alert alert-error text-[var(--sev-critical)]">${esc(e.message)}</div>`;
-    }
-}
-
-function gradeColor(score) {
-    if (score >= 80) return 'var(--mitre-covered)';
-    if (score >= 65) return 'var(--quality-good)';
-    if (score >= 50) return 'var(--sev-medium)';
-    if (score >= 35) return 'var(--sev-high)';
-    return 'var(--sev-critical)';
-}
-
-// A dimension with no inputs reports score null rather than a neutral or
-// zero number, so every read here has to tell "not measured" apart from
-// "measured badly". `${null}` would otherwise render the text "null".
-function shHasScore(v) { return v !== null && v !== undefined; }
-
-function renderScorecard(d) {
-    let html = '';
-    const scored = shHasScore(d.overall_score);
-    const color = scored ? gradeColor(d.overall_score) : 'rgba(99,110,123,.6)';
-    const pct = scored ? d.overall_score : 0;
-    const shownOverall = scored ? (d.overall_score + '/100') : 'Not assessed';
-
-    // How much of the weighting the overall score actually rests on.
-    const unavailable = d.unavailable_dimensions || [];
-    const basisNote = unavailable.length
-        ? `Weighted over ${Math.round((d.weight_basis || 0) * 100)}% of the scorecard; `
-          + `${unavailable.length} dimension${unavailable.length > 1 ? 's' : ''} `
-          + `could not be measured (${unavailable.map(x => esc(x.replace(/_/g, ' '))).join(', ')}).`
-        : 'All five dimensions measured.';
-
-    // Overall grade
-    html += `<div class="card bg-base-200 shadow mb-6">
-        <div class="card-body flex-col sm:flex-row items-center gap-6">
-        <div class="sh-grade-ring" data-ion-style="background:conic-gradient(${color} ${pct}%, rgba(99,110,123,.2) ${pct}%)">
-            <div class="sh-grade-inner">
-                <div class="font-mono text-4xl font-bold" data-ion-style="color:${color}">${esc(d.grade || '—')}</div>
-                <div class="text-xs opacity-60">${scored ? d.overall_score + '/100' : 'n/a'}</div>
-            </div>
-        </div>
-        <div>
-            <div class="stat-title">SOC Maturity Score</div>
-            <div class="stat-value">${shownOverall}</div>
-            <div class="stat-desc">${scored ? `Grade <strong data-ion-style="color:${color}">${esc(d.grade)}</strong> — ${
-                d.overall_score >= 80 ? 'Excellent maturity across all dimensions' :
-                d.overall_score >= 65 ? 'Good maturity with some areas for improvement' :
-                d.overall_score >= 50 ? 'Moderate maturity — several areas need attention' :
-                d.overall_score >= 35 ? 'Below average — significant improvement needed' :
-                'Critical — immediate action required across multiple dimensions'
-            }` : 'No dimension could be measured, so no overall score is shown.'}</div>
-            <div class="stat-desc opacity-60 mt-1">${basisNote}</div>
-        </div>
-        </div>
-    </div>`;
-
-    // Dimension cards
-    const dims = d.dimensions || {};
-    const dimOrder = ['detection_coverage', 'operational_efficiency', 'team_readiness', 'knowledge_completeness', 'integration_health'];
-    const dimIcons = {
-        detection_coverage: 'shield', operational_efficiency: 'zap',
-        team_readiness: 'users', knowledge_completeness: 'book-open',
-        integration_health: 'plug'
-    };
-
-    html += '<div class="sh-dims">';
-    for (const key of dimOrder) {
-        const dim = dims[key];
-        if (!dim) continue;
-        const dimScored = shHasScore(dim.score);
-        const dc = dimScored ? gradeColor(dim.score) : 'rgba(99,110,123,.6)';
-        const details = dim.details || {};
-        let detailHtml = '';
-        for (const [k, v] of Object.entries(details)) {
-            if (v === null || v === undefined || v === '') continue;
-            // Details now carry definitions and nested breakdowns. Render
-            // them readably, and escape: these values reach the DOM.
-            let shown;
-            if (typeof v === 'object') {
-                shown = Object.entries(v).map(([ik, iv]) => esc(ik) + ': ' + esc(String(iv))).join(', ');
-            } else if (typeof v === 'boolean') {
-                shown = v ? 'yes' : 'no';
-            } else {
-                shown = esc(String(v));
-            }
-            detailHtml += `<div><strong>${esc(k.replace(/_/g,' '))}:</strong> ${shown}</div>`;
-        }
-        html += `<div class="card bg-base-200 shadow relative overflow-hidden" data-ion-data-ion-style="--dim-color:${dc}">
-            <div class="absolute top-0 left-0 right-0 h-[3px]" data-ion-style="background:${dc}"></div>
-            <div class="stat">
-                <div class="stat-title"><i class="icon-${dimIcons[key] || 'circle'}"></i> ${esc(dim.label)}</div>
-                <div class="stat-value font-mono" data-ion-style="color:${dc}">${dimScored ? dim.score : 'n/a'}</div>
-                <div class="h-1.5 bg-base-300 rounded overflow-hidden my-2"><div class="sh-dim-bar-fill" data-ion-style="width:${dimScored ? dim.score : 0}%; background:${dc}"></div></div>
-                <div class="stat-desc">${detailHtml}</div>
-            </div>
-        </div>`;
-    }
-    html += '</div>';
-
-    // Recommendations
-    const recs = d.recommendations || [];
-    if (recs.length) {
-        html += '<div class="card bg-base-200 shadow"><div class="card-body"><h2 class="card-title text-sm uppercase tracking-wide opacity-60"><i class="icon-zap"></i> Improvement Recommendations</h2>';
-        for (const rec of recs) {
-            const recKind = rec.priority === 'high' ? 'error' : rec.priority === 'medium' ? 'warning' : 'info';
-            html += `<div role="alert" class="alert alert-${recKind}">
-                <span class="badge badge-sm badge-${recKind}">${esc(rec.area)}</span>
-                <span>${esc(rec.message)}</span>
-            </div>`;
-        }
-        html += '</div></div>';
-    }
-
-    $('sh-content').innerHTML = html;
-}
-
-document.addEventListener('DOMContentLoaded', shLoad);
-</script>
 {% endblock %}

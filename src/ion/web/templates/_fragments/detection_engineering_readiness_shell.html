@@ -1,0 +1,17 @@
+<div class="de-report-bar">
+<label for="de-readiness-system">System:</label>
+<select id="de-readiness-system" data-change-action="__setSelectedSystemId">
+<option value="">All Systems (Global)</option>
+{% for s in systems or [] %}
+<option value="{{ s.id }}">{{ s.get('name') if s.get('name') is not none else 'Unknown' }}{% if s.classification %} ({{ s.classification }}){% endif %}
+</option>
+{% endfor %}
+</select>
+<input class="flex-1 min-w-[200px] py-1.5 px-2.5 bg-[var(--bg-secondary)] border border-[var(--ion-border)] rounded-[6px] text-[var(--text-primary)] text-[.82rem]" type="text" id="de-readiness-search" placeholder="Search threat actors (e.g. APT29, Lazarus)..." data-enter-key-action="deReadinessSearch">
+<button class="de-btn-report" data-click-action="deReadinessSearch">Search</button>
+</div>
+{% if error %}
+<div role="alert" class="de-empty">{{ error }}</div>
+{% endif %}
+<div id="de-readiness-body">
+</div>

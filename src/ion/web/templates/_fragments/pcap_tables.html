@@ -1,0 +1,98 @@
+{% macro cell(c) %}
+{#- One table cell. The kinds are the ones the page actually used; what
+    changes is that a value it did not carry says so instead of printing
+    "undefined", "NaN GB" or nothing at all. -#}
+{%- if c.kind == 'malware' %}
+  {%- if c.flagged %}<span class="pcap-malware-hit">{{ c.value }}</span>
+  {%- else %}<span class="pcap-malware-clean">clean</span>{% endif %}
+{%- elif c.kind == 'severity' %}
+  {#- The page built the custom property name out of the payload:
+      `color:var(--sev-${a.severity})`. A severity the analyser did not
+      emit resolved to an undefined property and the text kept its
+      inherited colour, so the row read as ordinary. -#}
+  {%- if c.flagged %}<span class="pcap-sev pcap-sev-{{ c.value }}">{{ c.value }}</span>
+  {%- elif c.value %}<span class="pcap-sev">{{ c.value }}</span>
+  {%- else %}<span class="an-absent" title="No severity was recorded"></span>
+  {%- endif %}
+{%- elif c.value is none %}
+  {%- if c.missing %}<span class="an-absent" title="{{ c.missing }}"></span>
+  {%- else %}<span class="an-absent"></span>{% endif %}
+{%- elif c.kind == 'strong' %}<strong>{{ c.value }}</strong>
+{%- elif c.kind == 'code' %}<code{% if c.css_class %} class="{{ c.css_class }}"{% endif %}>{{ c.value }}</code>
+{%- else %}{{ c.value }}{% endif %}
+{% endmacro %}
+{% macro table(t) %}
+{%- if t.state == 'unreadable' %}
+{#- `d.whatever || []` drew this as an empty panel and hid its tab, which
+    claims the capture contained none of whatever it is. -#}
+<div class="pcap-empty">This list is not in a shape this page can read, so
+  whether the capture contained any is unknown.</div>
+{%- elif t.state == 'empty' %}
+<div class="pcap-empty">{{ t.empty or 'None found in this capture.' }}</div>
+{%- else %}
+<h3>{{ t.heading }} ({{ t.count }}{% if t.unit %} {{ t.unit }}{% endif %})</h3>
+{%- if t.note %}
+<p class="text-[var(--text-secondary)] text-[.82rem] mb-3">{{ t.note }}</p>
+{%- endif %}
+<table class="pcap-table">
+  <thead><tr>
+    {%- for h in t.headers %}
+    <th{% if h in ('Count', 'Handshakes', 'Connections', 'Interval') %} class="text-right"{% endif %}>{{ h }}</th>
+    {%- endfor %}
+  </tr></thead>
+  <tbody>
+    {%- for row in t.rows %}
+    <tr>
+      {%- for c in row %}
+      <td class="pcap-cell-{{ c.kind }}{% if c.kind == 'wrap' %} font-mono break-all{% elif c.kind == 'mono' %} font-mono{% elif c.kind in ('num', 'plain_num') %} text-right{% elif c.kind == 'small' %} text-[.78rem]{% endif %}">
+        {{- cell(c) -}}
+      </td>
+      {%- endfor %}
+    </tr>
+    {%- endfor %}
+  </tbody>
+</table>
+{%- endif %}
+{% endmacro %}
+{# Fourteen pcap table panels, from ui/pcap.py's TABLE_PANELS registry.
+
+   They were the same function written fourteen times. The registry holds
+   the only things that differ: a heading, a badge tone and a list of
+   columns.
+
+   Each panel is swapped into its own container out of band, and the tab
+   button and its count badge go with it, so a panel and its tab cannot
+   disagree about whether there is anything to show.
+#}
+{%- if state != 'data' %}
+<div class="pcap-empty" id="pcap-tables-error">
+  {%- if error %}{{ error }}
+  {%- else %}This analysis could not be read.{% endif %}
+</div>
+{%- else %}
+{%- for t in tables %}
+<div id="{{ t.panel }}" class="pcap-panel"
+     hx-swap-oob="innerHTML:#{{ t.panel }}">
+  {{- table(t) -}}
+</div>
+{%- if t.tab %}
+{#- The whole tab button comes back, badge included, because the badge
+    lives inside it.
+
+    The page hid the tab whenever the list was empty, which also hid it
+    when the read had failed, and a hidden tab is the strongest claim this
+    page can make that a capture held none of these. An unreadable list
+    keeps its tab and says so inside the panel. -#}
+<button class="pcap-tab{% if t.state == 'empty' %} hidden{% endif %}"
+        data-panel="{{ t.data_panel }}" id="{{ t.tab }}"
+        hx-swap-oob="outerHTML:#{{ t.tab }}">{{ t.label }}
+  {%- if t.badge %}
+  <span id="{{ t.badge }}"
+        class="badge pcap-tab-badge {{ t.tone or 'tone-info' }}{% if not t.count %} is-empty{% endif %}">
+    {%- if t.count %}{{ t.count }}{% endif %}
+  </span>
+  {%- endif %}
+</button>
+{%- endif %}
+{%- endfor %}
+{%- endif %}

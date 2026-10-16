@@ -1,0 +1,116 @@
+{# The assessment history table, the empty state, and the failed read.
+
+   Replaces three innerHTML writes in maturity.html: the table, the "No
+   assessments yet" card and the error alert, all built from template
+   literals through a hand-rolled matEsc that Jinja's autoescaping retires.
+
+   Every number here is tested with `measured`, which
+   ion.web.ui.maturity sets from `score is not None`, never with truthiness.
+   The JavaScript read each domain as `(s.business||{}).score||'-'`, which
+   collapses the two absences in both directions at once: a domain genuinely
+   scored 0 printed the dash that means not assessed, and a domain missing
+   from the stored scores printed the same dash. Zero is a measurement.
+
+   The colours and badges arrive precomputed from score_colour and
+   score_badge, which are total over None, so no branch here can paint an
+   unassessed row a healthy colour by being forgotten.
+
+   The controls that leave this view live in the page header, outside
+   #mat-content, so no swap of this fragment can remove the reader's way
+   out. The Start Assessment button below is a convenience inside the swap
+   target, not the escape hatch. #}
+
+{% from "_fragments/_time.html" import ts %}
+{% from "_fragments/maturity_failed.html" import read_failed %}
+
+{% if failed %}
+  {{ read_failed('The assessment history') }}
+{% elif not rows %}
+  <div class="card bg-base-200 shadow text-center">
+    <div class="card-body items-center text-center py-14">
+      <h3 class="card-title mb-2">No assessments yet</h3>
+      <p>Run your first SOC maturity assessment to establish a baseline.</p>
+      <button type="button" class="btn btn-primary mt-3.5"
+              hx-get="/ui/maturity/questionnaire"
+              hx-target="#mat-content"
+              hx-swap="innerHTML">Start Assessment</button>
+    </div>
+  </div>
+{% else %}
+  <div role="note" class="alert alert-info mb-4">
+    <span><strong>Assessment History</strong>, tracking SOC maturity progression over time.</span>
+  </div>
+
+  <div class="card bg-base-200 shadow overflow-x-auto">
+    <table class="table table-sm">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Title</th>
+          <th>Score</th>
+          <th>Level</th>
+          {# Generated from the same domain list the cells are read from, so
+             a column cannot end up labelled one domain and filled from
+             another. #}
+          {% for col in columns %}<th>{{ col.name }}</th>{% endfor %}
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr>
+            {# created_at is stored naive, so the macro leaves it on the
+               server's clock with a title saying so rather than converting
+               out of a zone the value was never in. The JavaScript's
+               `new Date(a.created_at).toLocaleDateString()` did convert,
+               which is how a zoneless timestamp reads confidently wrong. #}
+            <td>{{ ts(row.created_at, 'date') }}</td>
+            <td>{{ row.title }}</td>
+            <td>
+              {% if row.measured %}
+                <strong data-ion-style="color:{{ row.colour }}">{{ row.score }}/{{ max_level }}</strong>
+              {% else %}
+                <span class="opacity-70" data-ion-style="color:{{ row.colour }}">n/a</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if row.level is not none %}
+                <span class="badge {{ row.badge }}">{{ row.level }}</span>
+              {% else %}
+                <span class="badge {{ row.badge }}">not assessed</span>
+              {% endif %}
+            </td>
+            {% for dom in row.domains %}
+              <td>
+                {% if dom.measured %}
+                  <span data-ion-style="color:{{ dom.colour }}">{{ dom.score }}</span>
+                {% else %}
+                  <span class="opacity-70">n/a</span>
+                {% endif %}
+              </td>
+            {% endfor %}
+            <td class="whitespace-nowrap">
+              {% if row.id is not none %}
+                <button type="button" class="btn btn-ghost btn-sm py-0.5 px-2 text-[.7rem]"
+                        hx-get="/ui/maturity/assessments/{{ row.id }}"
+                        hx-target="#mat-content"
+                        hx-swap="innerHTML">View</button>
+                {# Still a fetch rather than hx-delete: DELETE
+                   /api/maturity/assessments/{id} is gated on alert:triage,
+                   a stricter permission than this read, and it prompts
+                   first. It writes no markup. #}
+                <button type="button" class="btn btn-ghost btn-sm btn-error py-0.5 px-2 text-[.7rem]"
+                        data-click-action="matDelete"
+                        data-args='[{{ row.id }}]'>Delete</button>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# Permanent furniture, not a tooltip. A reader must not have to hover to
+     learn that a cell reading n/a is not a cell reading zero. #}
+  <div class="mt-3 text-xs opacity-70">{{ unmeasured_note }}</div>
+{% endif %}

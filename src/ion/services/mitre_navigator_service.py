@@ -120,7 +120,11 @@ def generate_navigator_layer(
         coverage = None
 
     techniques_map: dict = coverage.get("techniques", {}) if coverage else {}
-    total_techniques: int = coverage.get("total_techniques", 0) if coverage else 0
+    # None, not 0, when nobody counted: the description below says so in words
+    # rather than claiming "0/0 techniques covered", which reads as a measured
+    # result. TIDE 6 does not serve the technique catalogue to the external
+    # query API at all, so this is the ordinary case, not an edge case.
+    total_techniques = coverage.get("total_techniques") if coverage else None
     covered_techniques: int = coverage.get("covered_techniques", 0) if coverage else 0
 
     # -- Build per-technique entries -------------------------------------------
@@ -131,16 +135,27 @@ def generate_navigator_layer(
         avg_quality: float = info.get("avg_quality", 0)
         enabled_rules: int = info.get("enabled_rules", 0)
 
+        # Colour and score from enabled rules, not from rules written.
+        # Measured on the live TIDE tenant: T1611 carries 41 rules with none
+        # switched on, and this exported it to ATT&CK Navigator in the
+        # best-covered colour. A Navigator layer gets read as a picture of
+        # what the SOC detects, so a rule nobody enabled must not paint a
+        # cell green. The written count stays in the metadata, where it is
+        # the actionable half: the detection exists and needs turning on.
         nav_techniques.append({
             "techniqueID": tid,
             "tactic": "",
-            "color": _coverage_color(rule_count),
-            "comment": f"{rule_count} rules, avg quality: {avg_quality}",
+            "color": _coverage_color(enabled_rules),
+            "comment": (
+                f"{enabled_rules} of {rule_count} rules enabled, "
+                f"avg quality: {avg_quality}"
+                + ("" if enabled_rules else " (NOT RUNNING)")
+            ),
             "enabled": True,
-            "score": rule_count,
+            "score": enabled_rules,
             "metadata": [
-                {"name": "Rules", "value": str(rule_count)},
-                {"name": "Enabled", "value": str(enabled_rules)},
+                {"name": "Rules written", "value": str(rule_count)},
+                {"name": "Rules enabled", "value": str(enabled_rules)},
                 {"name": "Quality", "value": str(avg_quality)},
             ],
         })
@@ -156,7 +171,14 @@ def generate_navigator_layer(
         "domain": "enterprise-attack",
         "description": (
             f"Auto-generated from ION/TIDE. "
-            f"{covered_techniques}/{total_techniques} techniques covered."
+            + (
+                f"{covered_techniques}/{total_techniques} techniques have an "
+                f"enabled rule."
+                if total_techniques
+                else f"{covered_techniques} techniques have an enabled rule. "
+                     f"TIDE did not return a technique total, so the share of "
+                     f"ATT&CK this covers is unknown."
+            )
         ),
         "filters": {
             "platforms": ["Windows", "Linux", "macOS"],

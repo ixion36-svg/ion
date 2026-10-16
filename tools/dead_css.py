@@ -40,14 +40,37 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 CSS_DIR = REPO / "src/ion/web/static/css"
 SEARCH_DIRS = [REPO / "src/ion/web/templates", REPO / "src/ion/web/static/js"]
-# lucide.css is an icon font, not legacy styling.
-# alerts-queue.css was missing from this list and so had never been scanned.
-# It is loaded by alerts.html rather than base.html, which is how it was
-# overlooked; being page-scoped makes it more likely to hold dead rules, not
-# less.
-SHEETS = ["ion-migrated-styles.css", "alert-detail.css",
-          "ai-chat.css", "ion-workspace.css",
-          "alerts-queue.css", "ion-legacy.css"]
+# This was a hand-written list, and it was wrong twice.
+#
+# First alerts-queue.css, which had never been scanned: it is loaded by
+# alerts.html rather than base.html, which is how it was overlooked, and being
+# page-scoped makes it more likely to hold dead rules, not less.
+#
+# Then the redesign. The note left here said of the page sheets that "adding
+# them here is the point of that column: once a page's CSS is in a linked
+# sheet, this tool's vetted scanner covers it." Only ion-pages.css was ever
+# added, so twenty-four page sheets stood outside the scan while this comment
+# and docs/UI_REDESIGN.md both said they were inside it.
+#
+# So the list is derived from the directory and the exclusions are named.
+# A new sheet is scanned by default, and the only way to leave one out is to
+# say here why, which tests/unit/test_dead_css_sheet_coverage.py enforces.
+EXCLUDED = {
+    "lucide.css": "An icon font's class names are the glyph set, not styling.",
+    "quill.snow.css": "Vendored with the Quill editor; not ION's to edit.",
+    "ion.css": ("Compiled Tailwind output. Its utilities are matched by "
+                "construction rather than by name, so a scan would report "
+                "most of a framework as dead."),
+}
+# These two are build inputs under frontend/ rather than served sheets, so a
+# listing of CSS_DIR does not see them. sheet_path() resolves them and says
+# why they are scanned anyway: ion-legacy.css is the largest remaining pile
+# of legacy rules, and ion-pages.css holds CSS lifted out of template <style>
+# blocks. Deriving the list from CSS_DIR alone silently dropped both.
+BUILD_INPUTS = ("ion-legacy.css", "ion-pages.css")
+SHEETS = sorted(
+    [path.name for path in CSS_DIR.glob("*.css") if path.name not in EXCLUDED]
+    + [name for name in BUILD_INPUTS if (REPO / "frontend" / name).exists()])
 
 CLASS_IN_SELECTOR = re.compile(r"\.(_?[A-Za-z][A-Za-z0-9_-]*)")
 RULE = re.compile(r"(?P<sel>[^{}]+)\{(?P<body>[^{}]*)\}", re.S)
@@ -66,8 +89,14 @@ def sheet_path(sheet: str) -> Path:
     what survived style.css, compiled into ion.css from frontend/. It is still
     worth scanning: it is the largest remaining pile of legacy rules, and being
     a build input makes dead code in it easier to overlook, not harder.
+
+    ion-pages.css is the same kind of file: it holds the CSS lifted out of
+    template <style> blocks by the redesign's `styled` column, and covering
+    it here is the point of that column. An inline <style> block was only
+    ever a candidate list needing a per-rule proof; once its rules live in a
+    sheet, this tool's vetted scanner covers them.
     """
-    return (REPO / "frontend" / sheet) if sheet == "ion-legacy.css" \
+    return (REPO / "frontend" / sheet) if sheet in BUILD_INPUTS \
         else (CSS_DIR / sheet)
 
 
@@ -218,6 +247,18 @@ def constructed_prefixes(text: str) -> set[str]:
         out.add(m.group(1))
     # `...prefix-${expr}`
     for m in re.finditer(r"([A-Za-z][A-Za-z0-9_-]*[-_])\$\{", text):
+        out.add(m.group(1))
+    # `...prefix-{{ expr }}` -- Jinja, not JavaScript.
+    #
+    # This blind spot was found by covering ion-pages.css, the sheet the
+    # redesign's `styled` column fills. soc_roles.html builds its deck as
+    #     <div class="card ... sr-role sr-c-{{ r.color }}">
+    # so all eleven .sr-c-* rules read as dead at once and --write would have
+    # removed them. tests/test_v052_soc_roles_page.py asserts every one of
+    # those eleven class names reaches the page, which is how the
+    # contradiction surfaced. The same shape covers {%- -%} trim markers and
+    # Jinja filters, since only the text before `{{` matters here.
+    for m in re.finditer(r"([A-Za-z][A-Za-z0-9_-]*[-_])\{\{", text):
         out.add(m.group(1))
     # Also `className = base + '-' + x` style: a lone '-' joiner means we cannot
     # know the prefix, so treat every class in that file as live is too blunt --

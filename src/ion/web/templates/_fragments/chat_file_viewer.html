@@ -1,0 +1,38 @@
+{# One uploaded file, from ui/chat.py's viewer_view.
+
+   The page's only failure signal was showToast('Failed to load file')
+   with no modal, so a transient failure and a file that no longer exists
+   looked the same and neither said which.
+
+   file.id went raw into three data-args attributes.
+#}
+<div class="ai-file-modal-content">
+  <div class="ai-file-modal-header">
+    <h3>{{ name or 'File' }}</h3>
+    <div class="ai-file-modal-actions">
+      {%- if state == 'data' %}
+      <button class="btn btn-sm" data-click-action="toggleFileEdit"
+              data-args='{{ ["$target"]|tojson }}'>Edit</button>
+      <button class="btn btn-sm btn-primary hidden" id="save-file-btn"
+              data-click-action="saveFileEdit"
+              data-args='{{ [file_id]|tojson }}'>Save</button>
+      <button class="btn btn-sm" data-click-action="downloadFile"
+              data-args='{{ [file_id]|tojson }}'>Download</button>
+      {%- endif %}
+      <button class="btn btn-sm" data-click-action="closeFileModal">Close</button>
+    </div>
+  </div>
+  <div class="ai-file-modal-body">
+    {%- if state != 'data' %}
+    <div class="empty-state">
+      {%- if error %}{{ error }}
+      {%- else %}This file could not be read.{% endif %}
+    </div>
+    {%- elif content is none %}
+    <div class="empty-state">This file has no content recorded.</div>
+    {%- else %}
+    <pre id="file-content-view">{{ content }}</pre>
+    <textarea class="hidden" id="file-content-edit">{{ content }}</textarea>
+    {%- endif %}
+  </div>
+</div>

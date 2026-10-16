@@ -1,0 +1,250 @@
+{# Alerts: the detail modal's case tab.
+
+   Replaces the innerHTML writes in renderCaseTab and the string
+   renderCaseObservables returned for it.
+
+   The old renderer began with `container.innerHTML = '<div class="loading">
+   Loading case...</div>'` and then threw on `!response.ok` into a catch
+   that, in the version measured here, left that loading row on screen. A
+   case that could not be read looked like a case still loading, for the
+   life of the modal.
+
+   The defaults it filled in each hid a distinction:
+
+       c.notes || []            a payload with no note list read as a case
+                                nobody had written a note on
+       c.severity || '-'        a case with no severity recorded rendered
+                                the same dash the loading state used
+       c.assigned_to || 'Unassigned'   not reported became a positive claim
+                                that nobody is assigned
+       c.closed_by || 'unknown'        a closure whose author was not
+                                recorded, and one the payload simply did not
+                                carry, both became the word "unknown"
+       c.alerts.length          read without a guard, so a payload without
+                                an alert list raised a TypeError into the
+                                catch and the whole tab became the loading
+                                row again
+
+   Timestamps go through the ts macro rather than `new Date(...)
+   .toLocaleString()`, which reads a value whose zone the row does not state
+   in the viewer's zone.
+
+   Every data-args goes through `|tojson`. The linked-alert rows built
+   data-args='["${escapeHtml(a.es_alert_id)}", "benign"]', and an alert id
+   holding a double quote becomes &quot;, which the browser decodes to a
+   bare quote inside the JSON string; JSON.parse then throws in
+   event-delegation.js, which logs and returns, so every closure button on
+   that row was silently dead. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% if missing %}
+  <div class="empty-state" role="alert">
+    This case no longer exists, so there is nothing to show for it.
+  </div>
+{% elif failed or case is none or view is none %}
+  <div class="empty-state text-[var(--danger)]" role="alert">
+    This case could not be read. Nothing in this tab is known about it: not
+    its status, not its linked alerts, not its notes.
+  </div>
+{% else %}
+<div class="case-detail-box">
+  <h4 class="flex items-center justify-between">
+    <span>{{ case.get('case_number') or 'case' }}: {{ case.get('title') or 'untitled' }}</span>
+    <div class="flex items-center gap-2">
+      {% if ai_available %}
+        <button class="ai-micro-btn" data-click-action="aiSummarizeCase"
+                data-args='[{{ case_id|tojson }}]' title="AI case summary">AI Summary</button>
+      {% endif %}
+      <button class="btn btn-sm text-xs" data-click-action="showCaseDetail"
+              data-args='[{{ case_id|tojson }}]' title="Open case management modal">Manage Case</button>
+    </div>
+  </h4>
+  <div class="ai-case-summary" id="ai-case-summary-{{ case_id }}"></div>
+
+  {% if not view.closed %}
+    {% if can_close %}
+      <div class="alert-closure-actions my-2 mx-0 p-2 bg-[rgba(255,255,255,0.03)] border border-[var(--ion-border)] rounded-[6px] flex flex-wrap gap-1.5 items-center">
+        <span class="text-xs text-[var(--text-muted)] mr-2">Close Case As:</span>
+        {% for value, glyph, label in [
+             ('true_positive', '&#9650;', 'True Positive'),
+             ('benign_true_positive', '&#10003;', 'Benign True Positive'),
+             ('false_positive', '&#10007;', 'False Positive'),
+             ('duplicate', '&#9866;', 'Duplicate'),
+             ('insufficient_data', '?', 'Insufficient Data'),
+             ('not_applicable', '&#8709;', 'Not Applicable')] %}
+          <button class="alert-closure-btn {{ value|replace('_', '-') }}"
+                  data-click-action="closeCaseWithAlerts"
+                  data-args='[{{ case_id|tojson }}, {{ value|tojson }}]'>{{ glyph|safe }} {{ label }}</button>
+        {% endfor %}
+      </div>
+    {% else %}
+      {# closeCaseWithAlerts closes the first linked alert, which carries
+         alert:triage, and the backend closes the rest and the case; with no
+         linked alerts it PATCHes the case, which carries case:update. The
+         module picks whichever applies. The page offered these to every
+         reader. #}
+      <p class="text-xs text-[var(--text-muted)] my-2">
+        Closing this case needs the
+        {{ 'alert:triage' if view.alert_rows else 'case:update' }} permission.
+      </p>
+    {% endif %}
+  {% endif %}
+
+  {% if view.closed and view.closure %}
+    <div class="closure-info-block">
+      <div class="closure-info-header">
+        <span class="closure-reason-badge reason-{{ case.get('closure_reason') }}">{{ view.closure }}</span>
+      </div>
+      {% if case.get('closure_notes') %}
+        <div class="closure-info-notes whitespace-pre-wrap">{{ case.get('closure_notes') }}</div>
+      {% endif %}
+      <div class="closure-info-meta">
+        {# "not recorded" rather than "unknown": the page printed the same
+           word whether the field was absent or held nothing. #}
+        Closed by {{ case.get('closed_by') or 'an analyst the record does not name' }}
+        {%- if case.get('closed_at') %} on {{ ts(case.get('closed_at')) }}{% endif %}
+      </div>
+    </div>
+  {% elif view.closed %}
+    <div class="closure-info-block">
+      <div class="closure-info-meta">
+        This case is closed and the record does not say why.
+      </div>
+    </div>
+  {% endif %}
+
+  {# The KFP banner, rendered from the same read rather than a second round
+     trip. The page called checkKFPMatchesForTab here, which refetched the
+     case it already had. #}
+  <div id="case-tab-fp-banner-{{ case_id }}">
+    {% include "_fragments/alerts_kfp_banner.html" %}
+  </div>
+
+  <div class="case-meta">
+    <div>
+      <div class="case-meta-label">Status</div>
+      <div>{{ view.status or 'not recorded' }}</div>
+    </div>
+    <div>
+      <div class="case-meta-label">Severity</div>
+      <div>{{ view.severity or 'not recorded' }}</div>
+    </div>
+    <div>
+      <div class="case-meta-label">Created By</div>
+      <div>{{ case.get('created_by') or 'not recorded' }}</div>
+    </div>
+    <div>
+      <div class="case-meta-label">Assigned To</div>
+      {# Three states, not two. The page said "Unassigned" for a field it
+         had not been given, which is a claim rather than an absence. #}
+      <div>{% if case.get('assigned_to') %}{{ case.get('assigned_to') }}{% elif 'assigned_to' in case %}Unassigned{% else %}not reported{% endif %}</div>
+    </div>
+  </div>
+
+  {% if view.groups %}
+    <div class="case-context-tags my-3 mx-0 flex flex-col gap-1.5">
+      {% for g in view.groups %}
+        <div class="case-context-group">
+          <span class="case-context-label">{{ g.label }}:</span>
+          {% for item in g['items'] %}<span class="context-tag {{ g.cls }}">{{ item }}</span>{% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if case.get('evidence_summary') %}
+    <div class="case-evidence-block">
+      <strong>Evidence Summary</strong>
+      <p class="whitespace-pre-wrap">{{ case.get('evidence_summary') }}</p>
+    </div>
+  {% endif %}
+
+  {% if case.get('description') %}
+    {# Escaped text with its line breaks kept. ION has no server-side HTML
+       sanitiser and none is being added, so a case description authored by a
+       person is not rendered as markup. #}
+    <p class="text-sm leading-[1.5] whitespace-pre-wrap">{{ case.get('description') }}</p>
+  {% endif %}
+
+  {% if view.observable_rows %}
+    <div class="observables-section">
+      <label>Observables ({{ view.observable_rows|length }})</label>
+      {% for o in view.observable_rows %}
+        <div class="observable-row{{ ' enriched' if o.enriched else '' }}{{ ' malicious' if o.malicious else '' }}">
+          <span class="observable-badge {{ o.type }}">{{ o.type_label or 'untyped' }}</span>
+          <span class="observable-value observable-link"
+                data-click-action="openObservableDetail"
+                data-args='[{{ o.type|tojson }}, {{ o.value|tojson }}]'
+                title="View in Observables">{{ o.value }}</span>
+          {% if o.threat_level and o.threat_level != 'unknown' %}
+            <span class="threat-indicator {{ o.threat_level }}" title="Threat: {{ o.threat_level }}"></span>
+          {% endif %}
+          {# `is not none`, so an observable scored 0 shows its badge. #}
+          {% if o.score is not none %}
+            <span class="observable-enriched" title="Score: {{ o.score }}"><span class="enrich-dot"></span>{{ o.score }}</span>
+          {% endif %}
+          {% if o.actors %}
+            {%- set names = o.actors|join(', ') %}
+            <span class="text-[0.6875rem] text-[#f97316] ml-1" title="{{ names }}">&#9888; {{ names }}</span>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="case-alerts-list">
+    <h5>Linked Alerts ({{ view.alert_rows|length }})</h5>
+    {% if not view.alert_rows %}
+      <div class="empty-state">No other alerts linked</div>
+    {% else %}
+      {% for a in view.alert_rows %}
+        <div class="related-alert-item flex-wrap">
+          <span class="triage-dot triage-{{ a.status or 'unknown' }}"></span>
+          <span class="text-[0.8125rem] flex-1 cursor-pointer"
+                data-click-action="showAlertDetail"
+                data-args='[{{ a.es_alert_id|tojson }}]'>{{ a.es_alert_id }}</span>
+          <span class="text-xs text-[var(--text-muted)]">{{ a.priority or '' }}</span>
+          {% if can_triage %}
+            <div class="flex gap-1 ml-[auto]">
+              {% for value, glyph in [('benign', '&#10003;'), ('escalated', '&#9650;'), ('false_positive', '&#10007;')] %}
+                <button class="alert-closure-btn {{ value|replace('_', '-') }} py-[0.2rem] px-2 text-[0.6875rem]"
+                        data-click-action="showAlertClosureModal"
+                        data-args='[{{ a.es_alert_id|tojson }}, {{ value|tojson }}]'>{{ glyph|safe }}</button>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+
+  <div class="case-notes-section">
+    <h5>Investigation Notes</h5>
+    {% if not view.notes %}
+      <div class="empty-state">No notes yet</div>
+    {% else %}
+      {% for n in view.notes %}
+        {% if n is mapping %}
+          <div class="comment-item">
+            <div class="comment-header">
+              <span class="comment-user">{{ n.get('user') or 'unknown analyst' }}</span>
+              <span class="comment-time">{{ ts(n.get('created_at'), fallback='') }}</span>
+            </div>
+            <div class="comment-body whitespace-pre-wrap">{{ n.get('content') or '' }}</div>
+          </div>
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+    {% if can_update or can_triage %}
+      <div class="comment-form mt-3">
+        <textarea id="case-note-input" placeholder="Add investigation note..."></textarea>
+        <button class="btn btn-primary" data-click-action="addCaseNote"
+                data-args='[{{ case_id|tojson }}]'>Add Note</button>
+      </div>
+    {% else %}
+      <p class="text-xs text-[var(--text-muted)]">Adding a note needs the case:update permission.</p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}

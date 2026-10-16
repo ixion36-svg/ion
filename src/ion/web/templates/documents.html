@@ -2,6 +2,14 @@
 
 {% block title %}Documents - ION{% endblock %}
 
+{% block head_css %}
+{# The page's own rules, for the classes the server-rendered list emits.
+   head_css loads at base.html line 50, so this beats ion.css and
+   ion-migrated-styles.css and loses to ion-workspace.css. None of the
+   selectors here appears in that sheet, so nothing changes winner. #}
+<link rel="stylesheet" href="/static/css/documents-page.css?v={{ ion_version }}">
+{% endblock %}
+
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
@@ -147,7 +155,11 @@
         </div>
         <div class="doc-panel-actions">
             <button id="save-amendment-btn" class="btn btn-sm btn-success hidden">Save Amendment</button>
-            <button id="export-pdf-btn" class="btn btn-sm btn-primary"><i class="icon-file-text"></i> PDF</button>
+            {# The label is its own element so the busy state can change the
+               words without rebuilding the button from a string, which is
+               what rebuilding the whole button and restoring it did.
+               The spinner is .is-busy in documents-page.css. #}
+            <button id="export-pdf-btn" class="btn btn-sm btn-primary"><i class="icon-file-text"></i> <span data-btn-label>PDF</span></button>
             <button id="download-btn" class="btn btn-sm">Download</button>
             <button id="delete-doc-btn" class="btn btn-sm btn-danger">Delete</button>
             <button class="ion-ws-close" data-click-action="closeModal">&times;</button>
@@ -254,7 +266,9 @@
             <div id="version-content" class="document-content rendered-content"></div>
         </div>
         <div class="modal-action">
-            <button id="revert-version-btn" class="btn btn-warning">Revert to This Version</button>
+            {# Filled out of band by /ui/documents/{id}/versions/{n}/header,
+               which is where whether Revert belongs is decided. #}
+            <span id="revert-version-slot"></span>
             <button class="btn btn-ghost" data-click-action="closeVersionModal">Close</button>
         </div>
     </div>
@@ -305,247 +319,33 @@
     </div>
 </div>
 
+{# Client state, cloned rather than built from strings.
+
+   These four are filled with textContent and setAttribute, so a document
+   name, a tag or a section label is content and never markup. They live
+   here, in the content block, because a <template> inside a <script> is
+   inert text and clones to nothing with no error.
+
+   The tag chip is the reason the remove control is its own element: its
+   data-args was `[${JSON.stringify(tag)}]` inside a single-quoted
+   attribute, and a tag with an apostrophe closed the attribute early. #}
+<template id="doc-rail-item"><div class="ion-ws-rail-item" data-click-action="viewDocument"><div class="ion-ws-rail-item-head"><span class="ion-ws-rail-item-name"></span></div><div class="ion-ws-rail-item-sub"></div></div></template>
+<template id="doc-rail-overflow"><div class="ion-ws-rail-item-sub ion-ws-rail-overflow"></div></template>
+<template id="doc-jump-link"><a class="iad-jump-link" data-click-action="docJumpTo"></a></template>
+<template id="doc-tag-chip"><span class="tag-chip"><span data-tag-name></span> <span class="tag-remove" data-click-action="removeDocTag">&times;</span></span></template>
+<template id="doc-tags-empty"><span class="muted doc-tags-none">No tags</span></template>
+
 </div><!-- /ion-tw inner -->
 </div><!-- /ion-tw -->
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* .folder-item / .active are emitted both by the static markup above and by
-   selectFolder()'s JS re-render (renderFolderItems in the script block below),
-   so the class names stay exactly as JS expects them -- only the colors move
-   to daisyUI tokens. --primary-color and --bg-hover were never defined
-   anywhere in the loaded stylesheets, so the active/hover states were
-   silently no-ops before this pass; --color-primary/--color-base-300 are
-   real daisyUI theme tokens. */
-.folder-item {
-    display: flex;
-    align-items: center;
-    padding: 0.5rem;
-    border-radius: var(--radius-field);
-    cursor: pointer;
-    margin-bottom: 2px;
-}
-.folder-item:hover {
-    background: var(--color-base-300);
-}
-.folder-item.active {
-    background: var(--color-primary);
-    color: var(--color-primary-content);
-}
-.folder-icon {
-    margin-right: 0.5rem;
-}
-.folder-name {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.folder-children {
-    margin-left: 1.25rem;
-    border-left: 1px solid var(--color-base-300);
-    padding-left: 0.5rem;
-}
-.folder-path span {
-    cursor: pointer;
-}
-.folder-path span:hover {
-    color: var(--color-primary);
-}
-.collection-badge {
-    background: var(--color-primary);
-    color: var(--color-primary-content);
-    padding: 2px 8px;
-    border-radius: var(--radius-selector);
-    font-size: 0.75rem;
-    margin-left: 0.5rem;
-}
-.folder-manage-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.5rem;
-    border: 1px solid var(--color-base-300);
-    border-radius: var(--radius-field);
-    margin-bottom: 0.5rem;
-}
-.folder-manage-item:hover {
-    background: var(--color-base-300);
-}
-.folder-manage-info {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-.folder-manage-counts {
-    font-size: 0.75rem;
-    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
-}
-.folder-manage-children {
-    margin-left: 1.5rem;
-}
-.move-btn {
-    font-size: 0.75rem;
-    padding: 2px 6px;
-}
-.tag-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: var(--radius-selector);
-    font-size: 0.7rem;
-    font-weight: 500;
-    background: var(--color-base-300);
-    color: var(--color-base-content);
-    border: 1px solid var(--color-base-300);
-    margin-left: 4px;
-}
-/* .tags-section / .tags-display / .tag-add-inline / #modal-doc-tags live
-   inside the ion-ws-* document panel shared with /cases (see the Jinja
-   comment above #document-modal) and are left exactly as they were -- no
-   daisyUI substitution, no token changes, to keep parity with that shared
-   design. .tag-chip is that panel's own tag pill, JS-generated
-   (renderDocumentTags) -- kept for the same reason, with only the dead
-   --primary-color reference replaced by the real token so the chip actually
-   renders in the theme's primary color instead of doing nothing. */
-.tags-section {
-    margin-top: 0.75rem;
-    padding: 0.75rem;
-    background: var(--bg-secondary);
-    border-radius: 4px;
-}
-.tags-section h4 {
-    margin: 0 0 0.5rem 0;
-    font-size: 0.875rem;
-    color: var(--text-muted);
-}
-.tags-display {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-    align-items: center;
-}
-.tag-add-inline {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-.tag-add-inline input {
-    width: 120px;
-    padding: 2px 6px;
-    font-size: 0.75rem;
-    border: 1px solid var(--ion-border);
-    border-radius: 3px;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-}
-.tag-add-inline button {
-    padding: 2px 8px;
-    font-size: 0.75rem;
-}
-.tag-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 8px;
-    border-radius: 3px;
-    font-size: 0.75rem;
-    background: var(--color-primary);
-    color: white;
-}
-.tag-chip .tag-remove {
-    cursor: pointer;
-    opacity: 0.7;
-    font-size: 0.85rem;
-    line-height: 1;
-}
-.tag-chip .tag-remove:hover {
-    opacity: 1;
-}
-.doc-type-badge {
-    padding: 2px 8px;
-    border-radius: var(--radius-selector);
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: var(--color-white);
-    margin-left: 0.5rem;
-}
-.doc-type-SOP { background: var(--color-info); color: var(--color-info-content); }
-.doc-type-SOI { background: var(--color-primary); color: var(--color-primary-content); }
-.doc-type-WI { background: var(--color-ion-iris); color: var(--color-white); }
-.doc-type-KB { background: var(--color-success); color: var(--color-success-content); }
-.doc-type-RUNBOOK { background: var(--color-ion-iris); color: var(--color-white); }
-.doc-type-IRP { background: var(--color-error); color: var(--color-error-content); }
-.doc-type-AAR { background: var(--neon-orange); color: var(--color-white); }
-.doc-type-THREAT_ADVISORY { background: var(--color-warning); color: var(--color-warning-content); }
-.doc-type-DETECTION_RULE { background: var(--color-info); color: var(--color-info-content); }
-
-/* daisyUI's global .loading is a spinner utility (fixed square size, an SVG
-   mask cutout) that collides with this page's plain-text loading / empty /
-   error messages -- loadDocuments/loadVersions/renderFoldersManageTree/etc.
-   all build literal `<p class="loading">`, `.empty-state`, `.error` strings
-   in the script block below, which is out of scope to touch. A tag-qualified
-   selector out-specifies the bare .loading/.empty-state/.error rules so the
-   text renders instead of being masked into a tiny spinner glyph. */
-p.loading,
-p.empty-state,
-p.error {
-    display: block;
-    width: auto;
-    aspect-ratio: auto;
-    background: none;
-    -webkit-mask-image: none;
-            mask-image: none;
-    text-align: center;
-    padding: 2rem 0;
-    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
-}
-p.error {
-    color: var(--color-error);
-}
-
-/* JS sets style.display = 'flex'/'none' directly on these five plain modals
-   (showFoldersModal/closeFoldersModal, showMoveModal/closeMoveModal,
-   showAmendmentModal/closeAmendmentModal, previewVersion/closeVersionModal,
-   showUploadModal/closeUploadModal) rather than toggling a class -- JS is
-   unchanged, see "what NOT to change" in the rewrite spec. daisyUI's .modal
-   is hidden via visibility/opacity/pointer-events, which a bare inline
-   `display` does not override on its own, so bridge the two here. */
-.modal[style*="flex"] {
-    visibility: visible;
-    opacity: 1;
-    pointer-events: auto;
-    background-color: oklch(0% 0 0 / 0.4);
-}
-.modal[style*="flex"] > .modal-box {
-    opacity: 1;
-    scale: 1;
-    translate: 0;
-}
-
-/* Document Quill editor -- third-party widget CSS that can't be expressed as
-   daisyUI components; re-pointed at daisyUI tokens so it follows the theme.
-   Lives inside the ion-ws-* document panel shared with /cases, so only the
-   colors move here -- the layout rule and DOM structure are untouched. */
-.doc-quill-wrap { display: flex; flex-direction: column; min-height: 400px; }
-.doc-quill-wrap .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid var(--color-base-300); background: var(--color-base-200); }
-.doc-quill-wrap .ql-container.ql-snow { border: none; flex: 1; overflow-y: auto; max-height: 60vh; }
-.doc-quill-wrap .ql-editor { color: var(--color-base-content); font-size: 0.875rem; line-height: 1.7; min-height: 300px; }
-.doc-quill-wrap .ql-editor.ql-blank::before { color: color-mix(in oklab, var(--color-base-content) 60%, transparent); font-style: normal; }
-.doc-quill-wrap .ql-snow .ql-stroke { stroke: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
-.doc-quill-wrap .ql-snow .ql-fill { fill: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
-.doc-quill-wrap .ql-snow .ql-picker-label { color: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
-.doc-quill-wrap .ql-snow .ql-picker-options { background: var(--color-base-100); border-color: var(--color-base-300); }
-.doc-quill-wrap .ql-snow .ql-picker-item { color: var(--color-base-content); }
-.doc-quill-wrap .ql-snow button:hover .ql-stroke { stroke: var(--color-primary); }
-.doc-quill-wrap .ql-snow .ql-picker-label:hover { color: var(--color-primary); }
-.doc-quill-wrap .ql-editor h1, .doc-quill-wrap .ql-editor h2, .doc-quill-wrap .ql-editor h3 { color: var(--color-base-content); }
-.doc-quill-wrap .ql-editor pre.ql-syntax { background: var(--color-base-200); border: 1px solid var(--color-base-300); border-radius: var(--radius-field); padding: 0.75rem; }
-.doc-quill-wrap .ql-editor blockquote { border-left: 3px solid var(--color-primary); padding-left: 1rem; color: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
-.doc-quill-wrap .ql-editor a { color: var(--color-primary); }
-.doc-quill-wrap .ql-editor code { background: var(--color-base-200); padding: 2px 5px; border-radius: 3px; font-size: 0.8125rem; }
-</style>
 <script nonce="{{ csp_nonce }}">
+// Plain modals must sit outside the page wrapper's stacking context.
+for (const id of ['folders-modal','move-modal','amendment-modal','version-modal','upload-modal']) {
+    document.body.appendChild(document.getElementById(id));
+}
+
 {% raw %}
 let currentDocId = null;
 let currentDocContent = '';
@@ -568,7 +368,11 @@ let docQuillInitialHtml = '';
 function initDocQuillEditor(content, format) {
     // Destroy previous instance
     const container = document.getElementById('edit-quill-wrap');
-    container.innerHTML = '<div id="edit-quill-editor"></div>';
+    if (!container) return;
+    // One empty div for Quill to mount into. Built rather than parsed.
+    const mount = document.createElement('div');
+    mount.id = 'edit-quill-editor';
+    container.replaceChildren(mount);
     docQuillEditor = null;
 
     // Convert markdown content to HTML for the editor
@@ -592,22 +396,64 @@ function initDocQuillEditor(content, format) {
         placeholder: 'Edit document content...'
     });
 
-    docQuillEditor.root.innerHTML = htmlContent;
+    // Quill keeps its own model and reads it back on every edit, so
+    // writing root.innerHTML left that model describing the previous
+    // contents. This is the API Quill documents for seeding it. The
+    // read on the next line is the baseline the amendment modal
+    // compares against, and it stays a read.
+    docQuillEditor.clipboard.dangerouslyPasteHTML(htmlContent);
     docQuillInitialHtml = docQuillEditor.root.innerHTML;
 }
 
+// GET /ui/documents/list renders the library, filtered. The five controls
+// the page filtered with are the route's five query parameters, so the
+// filter now runs over the whole library rather than over allDocuments,
+// which GET /api/documents caps: the old filter searched whatever had
+// been loaded and presented the result as the library.
+//
+// Also moved to the server: Delete appears only where the endpoint would
+// allow it, which is ownership or document:delete, so a reader who owns
+// nothing no longer collects a 403 per row; data-args goes through
+// tojson, so a document called "Bob's SOP" no longer closes the
+// attribute early and kills the control; a missing version says so
+// instead of printing v1; the date is formatted from the naive UTC column
+// and labelled, where formatDate read it in the viewer's zone; and a
+// folder filter that cannot be honoured says so, where the page logged
+// the refusal to the console and showed an unfiltered list as filtered.
+function documentFilterQuery() {
+    const value = id => (document.getElementById(id) || {}).value || '';
+    const params = new URLSearchParams({
+        search: value('search-input'),
+        format: value('format-filter'),
+        status: value('status-filter'),
+        tag: value('tag-filter'),
+    });
+    // selectedFolderId is the tree's own state: null, a numeric id, or the
+    // string 'uncategorized'. Only the last two are a filter.
+    if (selectedFolderId !== null && selectedFolderId !== undefined) {
+        params.set('folder', String(selectedFolderId));
+    }
+    return params.toString();
+}
+
+function renderDocuments() {
+    const container = document.getElementById('documents-list');
+    if (!container) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/documents/list?' + documentFilterQuery(), {
+        source: container, target: container, swap: 'innerHTML',
+    });
+}
+
 async function loadDocuments() {
+    // allDocuments still backs the tag list and the folder counts. The
+    // list itself is no longer drawn from it, so a failed read here no
+    // longer decides what the list says: the fragment reads for itself.
     try {
         allDocuments = await api.get('/api/documents');
-        // the Knowledge Base is no longer hidden here. It used to be
-        // filtered out of both the document list and the folder tree, which
-        // meant the ~600 KB articles had NO browsing surface anywhere in ION —
-        // reachable only by searching from the SOC workspace, and this page
-        // read "No documents found" on a library that was almost entirely KB.
-        renderDocuments(filterDocuments());
     } catch (e) {
-        document.getElementById('documents-list').innerHTML = '<p class="error">Failed to load documents</p>';
+        allDocuments = null;
     }
+    return renderDocuments();
 }
 
 async function loadCollections() {
@@ -621,13 +467,44 @@ async function loadCollections() {
             kbCollectionIds = new Set([kbParent.id]);
             allCollections.filter(c => c.parent_id === kbParent.id).forEach(c => kbCollectionIds.add(c.id));
         }
-        renderFolderTree();
         updateFolderSelects();
     } catch (e) {
         console.error('Failed to load collections:', e);
+    } finally {
+        renderFolderTree();
     }
 }
 
+// GET /ui/documents/folders and .../folders/manage render the two trees.
+// Both read the hierarchy, which needs template:read while this page is
+// gated on document:read, so an account can hold the documents and not
+// the folders. The page asked anyway, logged the refusal to the console
+// and carried on, so that account saw an empty sidebar and no reason.
+// The fragments report the refusal instead.
+//
+// Delete, in the manage tree, now needs template:delete, and its
+// argument goes through tojson: it was JSON.stringify inside a
+// single-quoted attribute, so a folder called "Bob's folder" closed the
+// attribute early and the button did nothing.
+function renderFolderTree() {
+    const container = document.getElementById('folder-list');
+    if (!container) return Promise.resolve();
+    // selectedFolderId is the tree's own state: null, an id, or the
+    // string 'uncategorized'. The server decides which row is active.
+    const selected = (selectedFolderId === null || selectedFolderId === undefined)
+        ? '' : String(selectedFolderId);
+    return htmx.ajax('GET', '/ui/documents/folders?selected=' + encodeURIComponent(selected), {
+        source: container, target: container, swap: 'innerHTML',
+    });
+}
+
+function renderFoldersManageTree() {
+    const container = document.getElementById('folders-tree-manage');
+    if (!container) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/documents/folders/manage', {
+        source: container, target: container, swap: 'innerHTML',
+    });
+}
 function buildFolderTree(collections, parentId = null) {
     return collections
         .filter(c => c.parent_id === parentId)
@@ -637,34 +514,7 @@ function buildFolderTree(collections, parentId = null) {
         }));
 }
 
-function renderFolderTree() {
-    const container = document.getElementById('folder-list');
-    const tree = buildFolderTree(allCollections);
-    container.innerHTML = renderFolderItems(tree, 0);
-}
 
-function renderFolderItems(folders, depth) {
-    if (!folders.length) return '';
-
-    let html = '';
-    folders.forEach(f => {
-        const isActive = selectedFolderId === f.id;
-        const indent = depth > 0 ? 'folder-children' : '';
-
-        html += '<div class="' + indent + '">';
-        html += `<div class="folder-item${isActive ? ' active' : ''}" data-id="${f.id}" data-click-action="selectFolder" data-args='[${f.id}]'>`;
-        html += '<span class="folder-icon">' + (f.children.length > 0 ? '<i class="icon-folder-open"></i>' : '<i class="icon-folder"></i>') + '</span>';
-        html += '<span class="folder-name">' + escapeHtml(f.name) + '</span>';
-        html += '<span class="folder-manage-counts">(' + (f.document_count || 0) + ')</span>';
-        html += '</div>';
-
-        if (f.children.length > 0) {
-            html += renderFolderItems(f.children, depth + 1);
-        }
-        html += '</div>';
-    });
-    return html;
-}
 
 function selectFolder(folderId) {
     selectedFolderId = folderId;
@@ -681,25 +531,42 @@ function selectFolder(folderId) {
     updateFolderPath();
 
     // Re-render documents
-    renderDocuments(filterDocuments());
+    renderDocuments();
 }
 
 function updateFolderPath() {
     const pathEl = document.getElementById('current-folder-path');
 
     if (selectedFolderId === null) {
-        pathEl.innerHTML = '';
+        pathEl.replaceChildren();
         return;
     }
+
+    // Built rather than parsed. The leaf is textContent, so a folder whose
+    // name contains markup is a folder name and not markup, which
+    // escapeHtml was doing by hand on one of the two branches.
+    const crumb = leaf => {
+        const all = document.createElement('span');
+        all.textContent = 'All';
+        all.setAttribute('data-click-action', 'selectFolder');
+        all.setAttribute('data-args', '[null]');
+        const tail = document.createElement('span');
+        tail.textContent = leaf;
+        pathEl.replaceChildren(all, document.createTextNode(' / '), tail);
+    };
 
     if (selectedFolderId === 'uncategorized') {
-        pathEl.innerHTML = `<span data-click-action="selectFolder" data-args='[null]'>All</span> / <span>Uncategorized</span>`;
+        crumb('Uncategorized');
         return;
     }
 
-    const folder = allCollections.find(c => c.id === selectedFolderId);
+    const folder = (allCollections || []).find(c => c.id === selectedFolderId);
     if (folder) {
-        pathEl.innerHTML = `<span data-click-action="selectFolder" data-args='[null]'>All</span> / <span>${escapeHtml(folder.full_path)}</span>`;
+        // full_path can be absent on a folder the payload did not fill in,
+        // and `${undefined}` printed the word.
+        crumb(folder.full_path ?? folder.name ?? 'Unnamed folder');
+    } else {
+        pathEl.replaceChildren();
     }
 }
 
@@ -742,64 +609,9 @@ function filterDocuments() {
     });
 }
 
-function renderDocuments(documents) {
-    const container = document.getElementById('documents-list');
-
-    if (documents.length === 0) {
-        container.innerHTML = '<p class="empty-state">No documents found. Render a template to create one!</p>';
-        return;
-    }
-
-    let html = '';
-    documents.forEach(function(d) {
-        const isArchived = d.status === 'archived';
-        const folder = allCollections.find(c => c.id === d.collection_id);
-        const folderBadge = folder
-            ? '<span class="collection-badge">' + escapeHtml(folder.name) + '</span>'
-            : '';
-        const docTypeBadge = d.source_template_document_type
-            ? '<span class="doc-type-badge doc-type-' + d.source_template_document_type + '">' + d.source_template_document_type + '</span>'
-            : '';
-
-        html += '<div class="list-item' + (isArchived ? ' archived' : '') + '">';
-        html += '<div class="list-item-content">';
-        let tagBadges = '';
-        if (d.tags && d.tags.length > 0) {
-            d.tags.forEach(function(tag) {
-                tagBadges += '<span class="tag-badge">' + escapeHtml(tag) + '</span>';
-            });
-        }
-
-        html += '<span class="list-item-title">' + escapeHtml(d.name) + docTypeBadge + folderBadge + tagBadges + '</span>';
-        html += '<div class="list-item-meta">';
-        html += '<span class="badge">' + d.output_format + '</span>';
-        html += '<span class="badge badge-version">v' + (d.current_version || 1) + '</span>';
-        if (isArchived) {
-            html += '<span class="badge badge-archived">Archived</span>';
-        }
-        if (d.source_template_id) {
-            html += '<span>From template #' + d.source_template_id + ' v' + d.source_template_version + '</span>';
-        }
-        html += '<span>' + formatDate(d.created_at) + '</span>';
-        html += '</div>';
-        html += '</div>';
-        html += '<div class="list-item-actions">';
-        html += `<button class="btn btn-sm" data-click-action="viewDocument" data-args='[${d.id}]'>View</button>`;
-        html += `<button class="btn btn-sm move-btn" data-click-action="showMoveModal" data-args='[${d.id}, ${d.collection_id || 'null'}]'>Move</button>`;
-        if (isArchived) {
-            html += `<button class="btn btn-sm btn-success" data-click-action="restoreDocument" data-args='[${d.id}]'>Restore</button>`;
-        } else {
-            html += `<button class="btn btn-sm btn-warning" data-click-action="archiveDocument" data-args='[${d.id}]'>Archive</button>`;
-        }
-        html += `<button class="btn btn-sm btn-danger" data-click-action="deleteDocument" data-args='[${d.id}, ${JSON.stringify(d.name)}]'>Delete</button>`;
-        html += '</div>';
-        html += '</div>';
-    });
-    container.innerHTML = html;
-}
 
 function applyFilters() {
-    renderDocuments(filterDocuments());
+    renderDocuments();
 }
 
 function renderContent(content, format) {
@@ -807,7 +619,14 @@ function renderContent(content, format) {
         case 'markdown':
             return renderMarkdown(content);
         case 'html':
-            return content; // Already HTML
+            // Was "return content" with a comment saying it was already
+            // HTML. It is already HTML and it is also already somebody
+            // else's: models/document.py records that everyone can add a
+            // document, and both callers put this straight into
+            // innerHTML. chat.html had the same branch and the same
+            // comment. ION has no server-side sanitiser, so this is the
+            // only place it can happen.
+            return safeHtml(content);
         case 'csv':
             return renderCSV(content);
         default:
@@ -887,27 +706,24 @@ async function viewDocument(id) {
         currentDocVersion = doc.current_version || 1;
         currentDocInputData = doc.input_data;
 
-        document.getElementById('modal-doc-name').textContent = doc.name;
-        let metaHtml = '<span class="badge">' + doc.output_format + '</span>';
-        metaHtml += '<span class="badge badge-version">v' + currentDocVersion + '</span>';
-        if (doc.status === 'archived') {
-            metaHtml += '<span class="badge badge-archived">Archived</span>';
+        document.getElementById('modal-doc-name').textContent = doc.name ?? 'Untitled document';
+        // GET /ui/documents/{id}/header renders the badge row. It printed
+        // "undefined" for a missing format, "v1" for a missing version,
+        // and both dates through formatDate, which reads a naive UTC
+        // column in the viewer's zone.
+        const metaHost = document.getElementById('modal-doc-meta');
+        if (metaHost) {
+            htmx.ajax('GET', '/ui/documents/' + encodeURIComponent(id) + '/header', {
+                source: metaHost, target: metaHost, swap: 'innerHTML',
+            });
         }
-        if (doc.source_template_id) {
-            metaHtml += '<span>From template #' + doc.source_template_id + ' v' + doc.source_template_version + '</span>';
-        }
-        metaHtml += '<span>Created: ' + formatDate(doc.created_at) + '</span>';
-        if (doc.updated_at && doc.updated_at !== doc.created_at) {
-            metaHtml += '<span>Updated: ' + formatDate(doc.updated_at) + '</span>';
-        }
-        document.getElementById('modal-doc-meta').innerHTML = metaHtml;
 
         // Show tags section
         currentDocTags = doc.tags || [];
         renderDocumentTags();
 
         // Render content based on format
-        document.getElementById('rendered-view').innerHTML = renderContent(doc.rendered_content, doc.output_format);
+        ionSetSafeHtml(document.getElementById('rendered-view'), renderContent(doc.rendered_content, doc.output_format));
         document.getElementById('modal-doc-content').textContent = doc.rendered_content;
         initDocQuillEditor(doc.rendered_content, doc.output_format);
 
@@ -949,7 +765,7 @@ function renderDocRail(activeId) {
     // as the board behind the panel — not every document in the library.
     let docs = [];
     try { docs = filterDocuments() || []; } catch (e) { docs = allDocuments || []; }
-    if (!docs.length) { rail.innerHTML = ''; return; }
+    if (!docs.length) { rail.replaceChildren(); return; }
 
     // Unfiltered, the library is ~600 documents — that many rail rows is a
     // slow panel for no benefit. Cap it, keep the OPEN document in the list
@@ -965,17 +781,34 @@ function renderDocRail(activeId) {
         docs = capped;
     }
 
-    rail.innerHTML = docs.map(d => `
-        <div class="ion-ws-rail-item${d.id === activeId ? ' selected' : ''}"
-             data-click-action="viewDocument" data-args='[${d.id}]'>
-          <div class="ion-ws-rail-item-head">
-            <span class="ion-ws-rail-item-name">${escapeHtml(d.name)}</span>
-          </div>
-          <div class="ion-ws-rail-item-sub">${escapeHtml(d.output_format || '')} · v${d.current_version || 1}</div>
-        </div>`).join('')
-        + (hiddenCount
-            ? `<div class="ion-ws-rail-item-sub ion-ws-rail-overflow">${hiddenCount} more — narrow the folder or filters to see them</div>`
-            : '');
+    // Cloned rather than parsed. data-args goes on with setAttribute, so a
+    // document id that is not a number cannot produce broken JSON, and the
+    // name is textContent rather than escapeHtml by hand.
+    const rows = [];
+    docs.forEach(d => {
+        const row = cloneDocTemplate('doc-rail-item');
+        if (!row) return;
+        if (d.id === activeId) row.classList.add('selected');
+        row.setAttribute('data-args', JSON.stringify([d.id]));
+        row.querySelector('.ion-ws-rail-item-name').textContent =
+            d.name ?? 'Untitled document';
+        // `v${d.current_version || 1}` claimed v1 for a document whose
+        // version the payload did not carry.
+        const version = Number.isInteger(d.current_version)
+            ? 'v' + d.current_version : 'version unknown';
+        row.querySelector('.ion-ws-rail-item-sub').textContent =
+            d.output_format ? d.output_format + ' · ' + version : version;
+        rows.push(row);
+    });
+    if (hiddenCount) {
+        const more = cloneDocTemplate('doc-rail-overflow');
+        if (more) {
+            more.textContent = hiddenCount
+                + ' more. Narrow the folder or filters to see them.';
+            rows.push(more);
+        }
+    }
+    rail.replaceChildren(...rows);
 
     const sel = rail.querySelector('.ion-ws-rail-item.selected');
     if (sel) sel.scrollIntoView({ block: 'nearest' });
@@ -1035,10 +868,18 @@ const DOC_SECTIONS = [
 function renderDocJump(hasInputData) {
     const nav = document.getElementById('doc-jump');
     if (!nav) return;
-    nav.innerHTML = DOC_SECTIONS
+    const links = [];
+    DOC_SECTIONS
         .filter(s => s.id !== 'modal-doc-data-section' || hasInputData)
-        .map(s => `<a class="iad-jump-link" href="#${s.id}" data-click-action="docJumpTo" data-args='["${s.id}"]'>${s.label}</a>`)
-        .join('');
+        .forEach(s => {
+            const link = cloneDocTemplate('doc-jump-link');
+            if (!link) return;
+            link.href = '#' + s.id;
+            link.setAttribute('data-args', JSON.stringify([s.id]));
+            link.textContent = s.label;
+            links.push(link);
+        });
+    nav.replaceChildren(...links);
 }
 
 function docJumpTo(sectionId) {
@@ -1051,41 +892,26 @@ function docJumpTo(sectionId) {
 }
 window.docJumpTo = docJumpTo;
 
-async function loadVersions() {
+// GET /ui/documents/{id}/versions renders the history table. The loading
+// line is htmx's own: the container keeps its content until the swap, so
+// there is nothing to write first.
+//
+// What moved to the server: Revert appears only where the endpoint allows
+// it, which is document:update, so a reader no longer gets a 403 per
+// click; data-args goes through tojson; an amendment with no stated
+// reason reads differently from a field we could not read, where both
+// printed a dash; the date is formatted from the naive UTC column rather
+// than read in the viewer's zone; and `Current` is decided by the
+// document row rather than by currentDocVersion, a page variable set when
+// the modal opened that a stale value would have put on the wrong row.
+function loadVersions() {
     const container = document.getElementById('versions-list');
-    container.innerHTML = '<p class="loading">Loading versions...</p>';
-
-    try {
-        const versions = await api.get('/api/documents/' + currentDocId + '/versions');
-
-        if (versions.length === 0) {
-            container.innerHTML = '<p class="empty-state">No version history available</p>';
-            return;
-        }
-
-        let html = '<table class="table versions-table">';
-        html += '<thead><tr><th>Version</th><th>Reason</th><th>By</th><th>Date</th><th>Actions</th></tr></thead>';
-        html += '<tbody>';
-        versions.forEach(function(v) {
-            const isCurrent = v.version_number === currentDocVersion;
-            html += '<tr' + (isCurrent ? ' class="current-version"' : '') + '>';
-            html += '<td>v' + v.version_number + (isCurrent ? ' <span class="badge badge-current">Current</span>' : '') + '</td>';
-            html += '<td>' + escapeHtml(v.amendment_reason || '-') + '</td>';
-            html += '<td>' + escapeHtml(v.amended_by || '-') + '</td>';
-            html += '<td>' + formatDate(v.created_at) + '</td>';
-            html += '<td>';
-            html += `<button class="btn btn-sm" data-click-action="previewVersion" data-args='[${v.version_number}]'>View</button>`;
-            if (!isCurrent) {
-                html += ` <button class="btn btn-sm btn-warning" data-click-action="confirmRevert" data-args='[${v.version_number}]'>Revert</button>`;
-            }
-            html += '</td>';
-            html += '</tr>';
-        });
-        html += '</tbody></table>';
-        container.innerHTML = html;
-    } catch (e) {
-        container.innerHTML = '<p class="error">Failed to load versions</p>';
+    if (!container || currentDocId === null || currentDocId === undefined) {
+        return Promise.resolve();
     }
+    return htmx.ajax('GET', '/ui/documents/' + encodeURIComponent(currentDocId) + '/versions', {
+        source: container, target: container, swap: 'innerHTML',
+    });
 }
 
 async function previewVersion(versionNumber) {
@@ -1095,21 +921,22 @@ async function previewVersion(versionNumber) {
 
         document.getElementById('version-modal-title').textContent = 'Version ' + versionNumber + ' Preview';
 
-        let metaHtml = '';
-        if (version.amendment_reason) {
-            metaHtml += '<span><strong>Reason:</strong> ' + escapeHtml(version.amendment_reason) + '</span>';
+        // GET /ui/documents/{id}/versions/{n}/header renders the meta row
+        // and decides whether Revert belongs on it, which needs
+        // document:update and whether this is the current version. The
+        // page asked neither: it compared against currentDocVersion, set
+        // when the document modal opened, and showed the button to any
+        // reader.
+        const vMeta = document.getElementById('version-meta');
+        if (vMeta) {
+            htmx.ajax('GET', '/ui/documents/' + encodeURIComponent(currentDocId)
+                + '/versions/' + encodeURIComponent(versionNumber) + '/header', {
+                source: vMeta, target: vMeta, swap: 'innerHTML',
+            });
         }
-        if (version.amended_by) {
-            metaHtml += '<span><strong>By:</strong> ' + escapeHtml(version.amended_by) + '</span>';
-        }
-        metaHtml += '<span><strong>Date:</strong> ' + formatDate(version.created_at) + '</span>';
-        document.getElementById('version-meta').innerHTML = metaHtml;
 
-        document.getElementById('version-content').innerHTML = renderContent(version.rendered_content, currentDocFormat);
+        ionSetSafeHtml(document.getElementById('version-content'), renderContent(version.rendered_content, currentDocFormat));
 
-        // Show/hide revert button
-        document.getElementById('revert-version-btn').style.display =
-            versionNumber === currentDocVersion ? 'none' : 'inline-block';
 
         document.getElementById('version-modal').style.display = 'flex';
     } catch (e) {
@@ -1156,7 +983,7 @@ function closeFoldersModal() {
 
 function updateParentSelect() {
     const select = document.getElementById('new-folder-parent');
-    select.innerHTML = '<option value="">Root Level</option>';
+    if (!seedSelect(select, 'Root Level')) return;
 
     function addOptions(folders, prefix = '') {
         folders.forEach(f => {
@@ -1174,9 +1001,35 @@ function updateParentSelect() {
     addOptions(tree);
 }
 
+// A select's own options are built with createElement below; only the
+// reset-and-seed was innerHTML. An <option> is not markup a stylesheet
+// sweep needs to reach, so this needs no fragment, just the DOM call that
+// does the same thing without parsing a string.
+// static/js/ion-fragments.js has a cloneTemplate, and it also sets
+// htmx.config.useTemplateFragments = true for the whole page. That is the
+// right call on the two pages it was written for and it is a behaviour
+// change this page does not need, so the three lines live here. Worth
+// consolidating once the helper is separated from the config side effect.
+function cloneDocTemplate(id) {
+    const template = document.getElementById(id);
+    return template && template.content.firstElementChild
+        ? template.content.firstElementChild.cloneNode(true)
+        : null;
+}
+
+function seedSelect(select, label, value = '') {
+    if (!select) return null;
+    select.replaceChildren();
+    const first = document.createElement('option');
+    first.value = value;
+    first.textContent = label;
+    select.appendChild(first);
+    return select;
+}
+
 function updateFolderSelects() {
     const moveSelect = document.getElementById('move-folder-select');
-    moveSelect.innerHTML = '<option value="">No Folder (Root)</option>';
+    if (!seedSelect(moveSelect, 'No Folder (Root)')) return;
 
     function addOptions(folders, prefix = '') {
         folders.forEach(f => {
@@ -1194,42 +1047,7 @@ function updateFolderSelects() {
     addOptions(tree);
 }
 
-function renderFoldersManageTree() {
-    const container = document.getElementById('folders-tree-manage');
-    const tree = buildFolderTree(allCollections);
 
-    if (tree.length === 0) {
-        container.innerHTML = '<p class="empty-state">No folders yet. Create one above!</p>';
-        return;
-    }
-
-    container.innerHTML = renderFolderManageItems(tree);
-}
-
-function renderFolderManageItems(folders, depth = 0) {
-    let html = '';
-    folders.forEach(f => {
-        const indent = depth > 0 ? 'folder-manage-children' : '';
-
-        html += '<div class="' + indent + '">';
-        html += '<div class="folder-manage-item">';
-        html += '<div class="folder-manage-info">';
-        html += '<span>' + (f.children.length > 0 ? '<i class="icon-folder-open"></i>' : '<i class="icon-folder"></i>') + '</span>';
-        html += '<span>' + escapeHtml(f.name) + '</span>';
-        html += '<span class="folder-manage-counts">' + (f.template_count || 0) + ' templates, ' + (f.document_count || 0) + ' docs</span>';
-        html += '</div>';
-        html += '<div>';
-        html += `<button class="btn btn-sm btn-danger" data-click-action="deleteFolder" data-args='[${f.id}, ${JSON.stringify(f.name)}]'>Delete</button>`;
-        html += '</div>';
-        html += '</div>';
-
-        if (f.children.length > 0) {
-            html += renderFolderManageItems(f.children, depth + 1);
-        }
-        html += '</div>';
-    });
-    return html;
-}
 
 async function createFolder() {
     const parentId = document.getElementById('new-folder-parent').value || null;
@@ -1406,8 +1224,15 @@ function observeDocSections() {
 document.getElementById('export-pdf-btn').addEventListener('click', async function() {
     if (!currentDocId) return;
     const btn = this;
-    const origText = btn.innerHTML;
-    btn.innerHTML = '<i class="icon-loader"></i> Generating...';
+    // The busy state rebuilt the whole button from a string, spinner
+    // markup and all, saved the original and put it back, so the button
+    // was reparsed twice per export. The
+    // label is the only part that changes, so only the label changes, and
+    // the spinner is a class the stylesheet owns.
+    const label = btn.querySelector('[data-btn-label]') || btn;
+    const origText = label.textContent;
+    label.textContent = 'Generating...';
+    btn.classList.add('is-busy');
     btn.disabled = true;
     try {
         const response = await fetch('/api/documents/' + currentDocId + '/pdf');
@@ -1426,7 +1251,8 @@ document.getElementById('export-pdf-btn').addEventListener('click', async functi
     } catch (e) {
         showToast(e.message || 'PDF export failed', 'error');
     } finally {
-        btn.innerHTML = origText;
+        label.textContent = origText;
+        btn.classList.remove('is-busy');
         btn.disabled = false;
     }
 });
@@ -1487,17 +1313,12 @@ document.getElementById('version-modal').addEventListener('click', function(e) {
     if (e.target.id === 'version-modal') closeVersionModal();
 });
 
-document.getElementById('revert-version-btn').addEventListener('click', function() {
-    if (previewVersionNumber !== null) {
-        confirmRevert(previewVersionNumber);
-    }
-});
 
 // Upload Document Modal
 function showUploadModal() {
     // Populate folder select
     const folderSelect = document.getElementById('upload-folder');
-    folderSelect.innerHTML = '<option value="">No Folder</option>';
+    if (!seedSelect(folderSelect, 'No Folder')) return;
     const tree = buildFolderTree(allCollections);
     function addFolderOptions(folders, prefix) {
         folders.forEach(function(f) {
@@ -1579,16 +1400,25 @@ function renderDocumentTags() {
 
     tagsSection.style.display = 'block';
 
-    if (currentDocTags.length === 0) {
-        tagsList.innerHTML = '<span class="muted text-[0.8rem]">No tags</span> ';
+    if (!Array.isArray(currentDocTags) || currentDocTags.length === 0) {
+        const none = cloneDocTemplate('doc-tags-empty');
+        tagsList.replaceChildren(...(none ? [none] : []));
     } else {
-        let html = '';
+        // `data-args='[${JSON.stringify(tag)}]'` put a JSON string inside a
+        // single-quoted attribute. JSON.stringify escapes " and leaves '
+        // alone, so a tag containing an apostrophe closed the attribute
+        // early and its remove control silently did nothing. Tags are free
+        // text. setAttribute has no HTML to escape, so it cannot happen.
+        const chips = [];
         currentDocTags.forEach(function(tag) {
-            html += '<span class="tag-chip">' + escapeHtml(tag);
-            html += ` <span class="tag-remove" data-click-action="removeDocTag" data-args='[${JSON.stringify(tag)}]'>&times;</span>`;
-            html += '</span> ';
+            const chip = cloneDocTemplate('doc-tag-chip');
+            if (!chip) return;
+            chip.querySelector('[data-tag-name]').textContent = tag;
+            chip.querySelector('.tag-remove')
+                .setAttribute('data-args', JSON.stringify([tag]));
+            chips.push(chip);
         });
-        tagsList.innerHTML = html;
+        tagsList.replaceChildren(...chips);
     }
 }
 
@@ -1611,7 +1441,7 @@ async function addDocTag() {
         // Update the list view
         const doc = allDocuments.find(function(d) { return d.id === currentDocId; });
         if (doc) doc.tags = [...currentDocTags];
-        renderDocuments(filterDocuments());
+        renderDocuments();
         updateTagFilter();
     } catch (e) {
         // Revert on error
@@ -1633,7 +1463,7 @@ async function removeDocTag(tagName) {
         // Update the list view
         const doc = allDocuments.find(function(d) { return d.id === currentDocId; });
         if (doc) doc.tags = [...currentDocTags];
-        renderDocuments(filterDocuments());
+        renderDocuments();
         updateTagFilter();
     } catch (e) {
         showToast('Failed to remove tag', 'error');
@@ -1654,7 +1484,7 @@ function updateTagFilter() {
 
     allTags = Array.from(tagSet).sort();
 
-    select.innerHTML = '<option value="">All Tags</option>';
+    if (!seedSelect(select, 'All Tags')) return;
     allTags.forEach(function(tag) {
         const opt = document.createElement('option');
         opt.value = tag;

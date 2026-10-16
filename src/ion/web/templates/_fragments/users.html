@@ -1,0 +1,163 @@
+{# The user table for /users, rendered whole.
+
+   Replaces five of the six innerHTML writes in users.html: the loading row,
+   the access-denied row, the empty row, the rows themselves and the error
+   row. The sixth, the role picker, is _fragments/users_role_options.html.
+
+   Jinja autoescapes, which retires the page's escapeHtml() calls. It also
+   closes the two sinks escapeHtml was never put in front of: the role names
+   in the Roles column went in raw.
+
+   The card and its two controls (Show inactive, Refresh) stay in the page
+   shell rather than moving in here, so no render of this fragment, including
+   the failed one, can remove the control that retries it. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% set show_actions = can_update or can_delete %}
+
+{# The New User button is swapped out of band so that its presence is a
+   server decision like every other button on this page: POST /api/users
+   needs user:create, which a viewer holding only user:read does not have.
+   Out of band rather than in the page shell because the shell has no way to
+   know: /users renders from server.py's `_PAGES` table, which passes no
+   context at all, so this render is the only place the viewer's permissions
+   are in hand.
+
+   It is computed from the permission alone and sits outside the state
+   branch below, so a failed read re-renders it unchanged rather than taking
+   it away. #}
+<div id="users-create-slot" hx-swap-oob="true">
+  {% if can_create %}
+    <button data-click-action="showCreateUserModal" class="btn btn-primary">
+      <svg class="w-3.5 h-3.5"><use href="#i-plus"/></svg>
+      New User
+    </button>
+  {% endif %}
+</div>
+
+{% if failed %}
+  <div role="alert" class="alert alert-error m-4">
+    The user list could not be read. This is not an empty directory: the
+    query failed, so how many accounts exist is unknown rather than zero.
+    Use Refresh to try again.
+  </div>
+{% elif not rows %}
+  <div class="text-center opacity-50 py-8">
+    {% if include_inactive %}
+      No users found.
+    {% else %}
+      No active users found. Tick "Show inactive users" to include disabled
+      accounts.
+    {% endif %}
+  </div>
+{% else %}
+  {% if not show_actions %}
+    <div role="alert" class="alert alert-info m-4">
+      You can read user accounts but not change them. Editing, resetting a
+      password and deleting need <code>user:update</code> or
+      <code>user:delete</code>.
+    </div>
+  {% endif %}
+  <div class="overflow-x-auto">
+    <table class="table table-sm" id="users-table">
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Email</th>
+          <th>Display Name</th>
+          <th>Roles</th>
+          <th>Elastic UID</th>
+          <th>Keycloak Sub</th>
+          <th>Status</th>
+          <th>Last Login</th>
+          {% if show_actions %}<th>Actions</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody id="users-tbody">
+        {% for row in rows %}
+          {# Truthiness, not `is true`. is_active is a non-nullable Boolean
+             column, so there is no third state to report, and a raw row or
+             a round trip through JSON hands back 1 rather than True. #}
+          <tr class="{{ '' if row.is_active else 'opacity-50' }}">
+            <td>{{ row.username }}</td>
+            <td>{{ row.email }}</td>
+            <td>
+              {% if row.display_name is none %}
+                <span class="opacity-60">Not set</span>
+              {% else %}
+                {{ row.display_name }}
+              {% endif %}
+            </td>
+            <td>
+              {# Three states, not two. A payload with no roles key is a role
+                 list that did not arrive; an empty list is a user who holds
+                 no role. Those lead to different actions. #}
+              {% if row.roles is none %}
+                <span class="opacity-60">Roles unknown</span>
+              {% elif not row.roles %}
+                <span class="opacity-60">No roles assigned</span>
+              {% else %}
+                {% for name in row.roles %}<span class="badge badge-sm badge-ghost">{{ name }}</span>{% if not loop.last %} {% endif %}{% endfor %}
+              {% endif %}
+            </td>
+            <td class="font-mono text-[.72rem] max-w-[180px] overflow-hidden text-ellipsis"
+                data-ion-style="color:{{ 'var(--text-muted)' if row.elastic_uid is none else 'var(--primary)' }}"
+                title="{{ row.elastic_uid if row.elastic_uid is not none else '' }}">
+              {%- if row.elastic_uid is none -%}
+                Not set
+              {%- else -%}
+                {{ row.elastic_uid }}
+              {%- endif -%}
+              {%- if row.elastic_username is not none %}
+                <br><span class="text-[var(--text-secondary)] text-[.65rem]">{{ row.elastic_username }}</span>
+              {%- endif %}
+            </td>
+            <td class="font-mono text-[.72rem] max-w-[180px] overflow-hidden text-ellipsis"
+                data-ion-style="color:{{ 'var(--text-muted)' if row.keycloak_sub is none else 'var(--primary)' }}"
+                title="{{ row.keycloak_sub if row.keycloak_sub is not none else '' }}">
+              {%- if row.keycloak_sub is none -%}
+                Not set
+              {%- else -%}
+                {{ row.keycloak_sub }}
+              {%- endif -%}
+            </td>
+            <td>
+              <span class="badge {{ 'badge-success' if row.is_active else 'badge-ghost' }}">{{ 'Active' if row.is_active else 'Inactive' }}</span>
+            </td>
+            {# The macro emits <time datetime> and local-time.js rewrites it
+               to the viewer's clock, or leaves it alone and labels it when
+               the stored value carries no zone. `last_login` is one of the
+               zoneless ones, which is what made
+               `new Date(last_login).toLocaleString()` wrong by the viewer's
+               offset on every row. A user who has never signed in renders
+               "Never", never a time at the epoch. #}
+            <td>{{ ts(row.last_login, fallback='Never') }}</td>
+            {% if show_actions %}
+              <td>
+                <div class="flex flex-wrap gap-2">
+                  {% if row.show_edit %}
+                    <button class="btn btn-ghost btn-sm" data-click-action="showEditUserModal" data-args='{{ [row.id]|tojson }}'>Edit</button>
+                  {% endif %}
+                  {% if row.show_reset %}
+                    <button class="btn btn-ghost btn-sm" data-click-action="showResetPasswordModal" data-args='{{ [row.id, row.username]|tojson }}'>Reset Password</button>
+                  {% endif %}
+                  {% if row.show_delete %}
+                    <button class="btn btn-error btn-sm" data-click-action="deleteUser" data-args='{{ [row.id, row.username]|tojson }}'>Delete</button>
+                  {% endif %}
+                </div>
+                {# Why a Delete button this viewer would otherwise hold is
+                   missing. Shown only to a viewer who has the permission, so
+                   it answers a question rather than nagging a read-only one.
+                   The page used to render the button and let the 400 explain. #}
+                {% if can_delete and row.delete_refusal is not none %}
+                  <div class="text-[.65rem] opacity-60 mt-1">{{ row.delete_refusal }}</div>
+                {% endif %}
+              </td>
+            {% endif %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}

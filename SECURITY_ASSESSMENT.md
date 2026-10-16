@@ -1,16 +1,16 @@
 ﻿<!-- ion-doc:type=SECURITY ASSESSMENT -->
 <!-- ion-doc:title=ION Security Assessment Report -->
 <!-- ion-doc:subtitle=Per-release security audit with a per-version delta chain; OWASP Top 10 + AI safety + supply chain -->
-<!-- ion-doc:version=0.99.11 -->
+<!-- ion-doc:version=0.99.12 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) + Security Audit Agent -->
 <!-- ion-doc:audience=Customer security, ITHC supplier, compliance, design authority -->
-<!-- ion-doc:date=2026-10-11 -->
+<!-- ion-doc:date=2026-10-14 -->
 
 # ION Security Assessment Report
 
-**Assessment Date:** 2026-10-11 (current: v0.99.11). Per-version deltas and history: see CHANGELOG + git history.
-**Application Version:** v0.99.11 — **Net-new surfaces: one, and it is material: the workforce lifecycle ships enabled.** v0.99.10 turns the module on by default (`workforce_enabled` defaults `True`, overridable by `ION_WORKFORCE_ENABLED`) and adds **39 routes** in `src/ion/web/workforce_api.py`, a persisted entity set in `src/ion/models/workforce.py` and four templates. **Every one of the 39 routes carries a permission dependency; none is unauthenticated.** Three permissions are new — `workforce:read`, `workforce:verify` and `workforce:manage` — and the seeded grants are deliberately uneven: `workforce:read` goes to Principal Analyst, `workforce:read` + `workforce:verify` to SOC Lead and GRC, and **`workforce:manage` is withheld from all three and stays with the ION administrator**, because defining a role profile changes the establishment rather than one person's progress through it. Enabling the module therefore widens what an existing role can *read and verify*; it confers no SOC role by itself, since a journey still has to be assigned and verified. No new external sink and no new dependency. **v0.99.10 also works through an external review of v0.99.9**; the closures are described in the v0.99.10 paragraph below and are not yet severity-classified in this document. **v0.99.11 is a patch release with no security surface** — one large-document analysis worker defect (a thread that died before its exception handler existed, leaving a job readable as `running` for ever; a session factory that ignored its engine argument and wrote terminal status to a different database; colliding worker thread names). No schema, configuration or API change in v0.99.11.
+**Assessment Date:** 2026-10-14 (current: v0.99.12). Per-version deltas and history: see CHANGELOG + git history.
+**Application Version:** v0.99.12. **Three findings closed, all three in client-rendered markup, and no net-new surface.** The UI redesign completes in v0.99.12, and finishing it is what exposed them, because markup JavaScript assembles from strings is markup no escaping filter applies to. (1) STORED CROSS-USER XSS, MEDIUM-HIGH: `renderContent` in `documents.html` returned a document whose `output_format` is html untouched, and both callers assigned it to `innerHTML`; `models/document.py` records that every authenticated user may add a document, so this was any user to every reader. (2) STORED XSS, MEDIUM: the case panel alert subtitle used `join('<br>') | safe`, disabling autoescaping for the joined string rather than the separator, over a process name and a source address. (3) BROKEN ACCESS CONTROL, LOW-MEDIUM: `/ui/pcap/case-options` was gated on `alert:read` and called `list_cases` directly, and a direct Python call bypasses the callee FastAPI dependencies, so the `case:read` gate never ran. Each is fixed and each has a test that fails on the shape rather than the instance. No schema, configuration, dependency or external sink change in v0.99.12. **Application Version:** v0.99.11 — **Net-new surfaces: one, and it is material: the workforce lifecycle ships enabled.** v0.99.10 turns the module on by default (`workforce_enabled` defaults `True`, overridable by `ION_WORKFORCE_ENABLED`) and adds **39 routes** in `src/ion/web/workforce_api.py`, a persisted entity set in `src/ion/models/workforce.py` and four templates. **Every one of the 39 routes carries a permission dependency; none is unauthenticated.** Three permissions are new — `workforce:read`, `workforce:verify` and `workforce:manage` — and the seeded grants are deliberately uneven: `workforce:read` goes to Principal Analyst, `workforce:read` + `workforce:verify` to SOC Lead and GRC, and **`workforce:manage` is withheld from all three and stays with the ION administrator**, because defining a role profile changes the establishment rather than one person's progress through it. Enabling the module therefore widens what an existing role can *read and verify*; it confers no SOC role by itself, since a journey still has to be assigned and verified. No new external sink and no new dependency. **v0.99.10 also works through an external review of v0.99.9**; the closures are described in the v0.99.10 paragraph below and are not yet severity-classified in this document. **v0.99.11 is a patch release with no security surface** — one large-document analysis worker defect (a thread that died before its exception handler existed, leaving a job readable as `running` for ever; a session factory that ignored its engine argument and wrote terminal status to a different database; colliding worker thread names). No schema, configuration or API change in v0.99.11.
 **Previous Assessment Version:** 0.33.0 (2026-05-27)
 **Scope:** Web application security review â€” authenticated internal-user threat model, prompt-injection from adversary-controlled alert content, privilege escalation, data exfiltration, pivot to backend systems (Elastic, Kibana, TIDE, OpenCTI, Arkime, Keycloak).
 **Previous Assessment:** 2026-04-07 (v0.9.43)
@@ -20,12 +20,100 @@
 
 ## Executive Summary
 
+### Unreleased cases detail subpanels conversion, 2026-10-14
+
+Eight authenticated fragment routes require `case:read`. Process-tree and rule-guide
+reads and note translation additionally require `alert:read`; sync status retains
+`integration:read` or `alert:read`; response catalogue/log reads retain
+`playbook:read` and the feature gate. Existing mutation APIs retain their write
+permissions. POST rendering accepts already-held raw data and observables; note
+translation delegates to the existing translator and its existing external sink.
+Escaped Jinja and single-quoted JSON carriers, sanitized Markdown and cloned note
+nodes preserve rendering protections. Failed reads remain distinct from empty
+collections where source APIs expose that distinction. No new credential store,
+configuration key, permission grant, dependency or external sink is added.
+
+### Unreleased browser verification repairs, 2026-10-14
+
+Restored PCAP attachment controls require `case:read` and `case:update`;
+the existing attachment API continues to enforce `case:update`. The case
+picker now checks `case:read` before invoking its source. Escaped JSON action
+arguments and sanitized chat rendering remain intact. Browser checks cover
+CSP, fragmented streams, OOB updates and permission combinations. No new route,
+permission grant, dependency, credential store or external sink is added.
+
+### Unreleased cases board UI conversion, 2026-10-13
+
+The new `GET /ui/cases/board` and `GET /ui/cases/assignees` read fragments
+require `case:read` for HTML and JSON views. Assignee options additionally require
+`alert:read` before querying their existing source. Escaped HTML and JSON action
+carriers retain CSP protections; mutation APIs retain their existing permissions.
+No credential, permission grant, external sink or dependency is added.
+
+### Unreleased observables and forensics UI conversion, 2026-10-13
+
+Authenticated read fragments retain `observable:read` or `forensic:read`, matching
+their source APIs. Forensic analyst options additionally require `user:read`
+before querying users; other readers see an explicit withheld state. Mutation
+controls follow the existing create, update, enrich, close and playbook permissions,
+and the existing APIs continue to enforce writes. HTML and JSON views share the
+same permission dependency. Escaped Jinja text, JSON action arguments, sanitized
+reference markdown and cloned client templates preserve CSP protections. Failed
+reads remain distinct from empty collections and measured zero. No new credential,
+permission grant, external sink or dependency is added.
+
+### Unreleased settings and integrations UI conversion, 2026-10-13
+
+Settings fragments retain `system:settings` and the stronger administrator or
+`integration:manage` dependencies on diagnostic and wizard reads. Integrations
+fragments require the page's `alert:read`; mutation controls require
+`integration:manage`. GitLab topology data additionally requires `template:read`
+before its source is queried. No bare-auth fragment exception is added.
+
+No secret value reaches fragment markup or negotiated JSON view models. Secret
+fields expose only set, unset or unknown status. Explicit field allowlists omit
+credentials and webhook payloads/headers; endpoint addresses omit userinfo and
+query strings, and truncated addresses are withheld. Diagnostic text removes
+configured secrets and labelled credentials. Sensitive redacted address fields
+remain locked so saving another section cannot overwrite a credential-bearing
+address with the display value. Environment precedence badges and explanations
+remain intact, with no change to the `.env`/config.json boundary. Existing write
+APIs remain responsible for authorization and validation. Browser-owned geometry
+and carousel state use DOM nodes and inert templates under the existing CSP.
+No credential store, permission grant, external sink or dependency is added.
+
+### Unreleased detection engineering UI conversion, 2026-10-13
+
+Fourteen authenticated fragment routes are added for detection posture, spaces,
+gaps, use cases, rules, progression, execution, actor/system readiness, D3FEND,
+emulation and vulnerability coverage. Every route requires `alert:read`, matching
+the existing APIs. They carry no DE module licence gate because this page and its
+source APIs are available independently of that module. The system-readiness
+POST delegates the existing assessment read with `generate_ai=False`; it adds no
+mutation. Catalogue mutation controls remain bound to `alert:triage`, which the
+existing write APIs enforce. Each fragment can return its named semantic view
+model as JSON, under the same permission. Jinja escaping, JSON action arguments
+and cloned client templates preserve the existing CSP. No new credential,
+permission grant, external sink or dependency is added.
+
+### Unreleased training UI conversion, 2026-10-13
+
+Two authenticated read surfaces are added. `GET /ui/training/plans/{plan_id}/items`
+requires `alert:read` and resolves the plan through the existing owner-filtered
+training plans API handler. `GET /ui/training/forecast` requires `security:read`,
+matching the existing aggregate forecast API. Both routes return escaped HTML
+fragments by default and the same named view model when the caller explicitly
+requests JSON. Failed reads remain distinct from empty results and measured zero.
+No mutation endpoint, credential, external sink, permission grant or dependency is
+added. Browser-owned computations use cloned inert templates and text nodes;
+delegated action arguments use JSON encoding. The existing CSP remains enforced.
+
 ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy ORM parameterised queries throughout the main codebase, SandboxedEnvironment Jinja2 rendering, DOMPurify XSS mitigation, RBAC with 7-tier role hierarchy, rate limiting on auth endpoints, circuit breakers on all external integrations, and ECS-compliant audit logging. v0.19.17â€“v0.20.0 closed several moderate-to-low findings from the last assessment. v0.21.0-rc added the Bob Eval Harness, per-template confidence threshold overrides, and the `reasoning_text` storage gate. v0.22.0-rc adds two well-gated read/write surfaces (MITRE coverage heatmap and timeline annotations) AND removes a latent SSRF/unvalidated-write path (`POST /api/elasticsearch/config`) along with several legacy-route dead-code surfaces. Net new in v0.22.0: 0C / 0H / 0M / 0L. The removed write path is a findings-quality improvement, not a counted closure.
 
 **Current findings posture (v0.99.11): no open findings at any severity.** ION has held **0 Critical / 0 High** across every release since the v0.9.43 baseline. The Medium (peak 3) and Low (peak 6) findings carried through the v0.2x-v0.33.x line were all closed by **v0.34.0**. Two Low findings have landed since, both introduced by v0.99.7 and both present in the v0.99.7 tag itself: they were found in a review after that tag and closed in **v0.99.8** (see *Fixed Since v0.9.43*). An instance running v0.99.7 carries both, so the position is zero open findings as of v0.99.8, not as of v0.99.7. A further external review of v0.99.8 found four issues — two Medium, two Low — all closed in **v0.99.9**; an instance running v0.99.8 or earlier carries all four. Two further findings — one **Medium**, one **Low** — were found after the v0.99.11 tag while triaging an external scan, both pre-dating it by many releases and neither carried as open before now because neither had been found: a password change that revoked no other session, against a session expiry with no absolute bound, and an admin reset that locked an OIDC-only account out of ION. Both are closed post-v0.99.11 (see *Fixed Since v0.9.43*); **an instance running v0.99.11 or earlier carries both**. Per-release net-new findings are recorded in each `## vX.Y.Z` entry in `CHANGELOG.md`; the full per-version trend is preserved in this file's git history.
 
 
-| Severity | Open findings (v0.99.11) |
+| Severity | Open findings (v0.99.12) |
 |----------|:-----------------------:|
 | Critical | 0 |
 | High | 0 |

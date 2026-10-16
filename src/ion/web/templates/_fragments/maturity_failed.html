@@ -1,0 +1,22 @@
+{# The one wording of a failed maturity read, shared by all three fragments.
+
+   The claim a reader has to take away is the same whichever read failed, so
+   it has one definition. Three copies of it would be three chances for one
+   of them to say "no data", which is the opposite conclusion: a SOC with no
+   assessments and a SOC whose assessments could not be read lead to
+   opposite actions, and a SOC that scores badly leads to a third.
+
+   The sentence names what could not be read and then rules out the two
+   readings an empty panel invites. No figure is printed on this branch, so
+   nothing here can be mistaken for a measurement of zero. #}
+
+{% macro read_failed(what) -%}
+<div role="alert" class="alert alert-error">
+  <span>
+    {{ what }} could not be read. Nothing is shown below rather than zeros:
+    the read failed, so every figure is unknown. That is not a SOC with no
+    assessments, and it is not a SOC that scores badly. Use History or New
+    Assessment above to try again.
+  </span>
+</div>
+{%- endmacro %}

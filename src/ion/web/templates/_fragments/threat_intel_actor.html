@@ -1,0 +1,175 @@
+{# A threat actor's profile: identity, local cases, techniques, campaigns.
+
+   Replaces ten innerHTML sites in threat_intel_actor.html.
+
+   The rule running through all of it: OpenCTI supplies the actor, its
+   techniques and its campaigns, so when the OpenCTI lookup fails none of
+   those three can be reported as absent. The page used to say so once, in
+   the description, and then print "No TTPs surfaced by OpenCTI for this
+   actor" and "No campaigns linked to this actor in OpenCTI" from the same
+   failure. An intelligence page claiming an actor has no known techniques
+   is a finding; claiming it when the lookup failed is a false one. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% if failed %}
+  <div role="alert" class="alert alert-error">
+    This actor's profile could not be read. Nothing below has been
+    established: this is not an actor with no intelligence against it, and
+    nothing here says whether it has been seen in your environment.
+  </div>
+{% else %}
+
+<section class="mb-6">
+  <h1 class="font-sans font-semibold text-[32px] md:text-[40px] leading-[1.05] tracking-[-0.02em]">
+    {% if actor and actor.name %}{{ actor.name }}{% else %}Unknown actor{% endif %}
+  </h1>
+
+  {# Rendered only when there are aliases. An "Also known as:" label with
+     nothing after it reads as aliases that failed to load. #}
+  {% if aliases %}
+    <p class="mt-2 text-[15px]">
+      <span class="text-base-content/60">Also known as:</span>
+      {% for alias in aliases %}<span class="text-ion-cyan">{{ alias }}</span>{% if not loop.last %}, {% endif %}{% endfor %}
+    </p>
+  {% endif %}
+</section>
+
+<section class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+  <div class="card bg-base-200 shadow"><div class="card-body p-4">
+    <div class="label-tiny text-base-content/60">Confidence</div>
+    {# `is not none`: OpenCTI reporting zero confidence in an attribution is
+       a measurement, and the opposite of not having reported one. #}
+    <div class="stat-value text-2xl">
+      {%- if actor and actor.confidence is not none -%}
+        {{ actor.confidence }}%
+      {%- else -%}
+        <span class="opacity-60">&mdash;</span>
+      {%- endif -%}
+    </div>
+  </div></div>
+  <div class="card bg-base-200 shadow"><div class="card-body p-4">
+    <div class="label-tiny text-base-content/60">First seen</div>
+    <div class="text-sm mt-1">{{ ts(actor.first_seen if actor else none, 'date', fallback='Not reported') }}</div>
+  </div></div>
+  <div class="card bg-base-200 shadow"><div class="card-body p-4">
+    <div class="label-tiny text-base-content/60">Last seen</div>
+    <div class="text-sm mt-1">{{ ts(actor.last_seen if actor else none, 'date', fallback='Not reported') }}</div>
+  </div></div>
+  <div class="card bg-base-200 shadow"><div class="card-body p-4">
+    <div class="label-tiny text-base-content/60">Local cases</div>
+    {# A failed search has no count. The page printed
+       `(d.recent_cases || []).length`, so a query that threw showed 0,
+       which on this tile reads as "this actor has not been seen here". #}
+    <div class="stat-value text-2xl">
+      {%- if cases_error -%}
+        <span class="opacity-60" title="{{ cases_error }}">Unknown</span>
+      {%- else -%}
+        {{ cases | length }}
+      {%- endif -%}
+    </div>
+  </div></div>
+</section>
+
+<section class="card bg-base-200 shadow mb-6"><div class="card-body">
+  <h2 class="card-title text-base">Description</h2>
+  {% if actor_error %}
+    <div role="alert" class="alert alert-warning mt-2">
+      The OpenCTI lookup failed, so nothing on this page describes the
+      actor itself: {{ actor_error }}
+    </div>
+  {% elif actor and actor.description %}
+    {# whitespace-pre-line rather than replacing newlines with <br>. The
+       JavaScript escaped the text and then injected markup into it, which
+       works but means the one field most likely to carry attacker-supplied
+       prose is handled by concatenating tags into it. CSS renders the
+       newlines and nothing is injected. #}
+    <p class="mt-2 text-[15px] whitespace-pre-line">{{ actor.description }}</p>
+  {% else %}
+    <p class="mt-2 text-[15px] opacity-60"><em>No description available.</em></p>
+  {% endif %}
+</div></section>
+
+<section class="card bg-base-200 shadow mb-6"><div class="card-body">
+  <h2 class="card-title text-base">Recently active in your cases</h2>
+  {% if cases_error %}
+    <div role="alert" class="alert alert-warning mt-2">
+      The search of your cases failed, so this is not a finding that the
+      actor is absent from your environment: {{ cases_error }}
+    </div>
+  {% elif not cases %}
+    <p class="mt-2 text-sm opacity-60">
+      No matching cases in the last 180 days.
+      <a href="/threat-intel" class="text-ion-cyan">Back to overview</a>
+    </p>
+  {% else %}
+    <ul class="space-y-2 mt-2">
+      {% for c in cases %}
+        <li class="flex items-center gap-3 py-1">
+          <a href="{{ ('/cases?selected=' ~ c.id) | safe_url }}"
+             class="text-ion-cyan font-mono text-xs">{{ c.case_number }}</a>
+          <span class="{{ c.severity_class }} text-[10px]"
+                {% if not c.severity_known %}title="Severity not in the known set"{% endif %}>{{ c.severity or 'unknown' }}</span>
+          <span class="text-sm flex-1">{{ c.title }}</span>
+          <span class="text-[10px] opacity-60 font-mono">{{ ts(c.created_at, 'date', fallback='no date') }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</div></section>
+
+<section class="card bg-base-200 shadow mb-6"><div class="card-body">
+  <h2 class="card-title text-base">Techniques</h2>
+  {% if actor_error %}
+    <p class="mt-2 text-sm opacity-60">
+      Not read. The OpenCTI lookup failed, so this is not an actor with no
+      known techniques.
+    </p>
+  {% elif not ttps %}
+    <p class="mt-2 text-sm opacity-60">No techniques recorded for this actor in OpenCTI.</p>
+  {% else %}
+    <div class="flex flex-wrap gap-2 mt-2">
+      {# A button, not `<a href="javascript:void(0)">`. The href was a
+         javascript: URL in markup, which is the shape |safe_url exists to
+         reject elsewhere, and a link that does not navigate is a button. #}
+      {% for t in ttps %}
+        <button type="button"
+                data-click-action="navigateToTechnique"
+                data-technique="{{ t.id }}"
+                class="px-2 py-1 rounded bg-ion-amber/10 text-ion-amber border border-ion-amber/30 text-[11px] font-mono"
+                title="{{ t.name }}">{{ t.id or '?' }}</button>
+      {% endfor %}
+    </div>
+    {% if ttps_hidden %}
+      <p class="mt-2 text-xs opacity-60">
+        Showing {{ ttps | length }} of {{ ttps | length + ttps_hidden }}
+        techniques. The page used to cut the list here without saying so.
+      </p>
+    {% endif %}
+  {% endif %}
+</div></section>
+
+<section class="card bg-base-200 shadow"><div class="card-body">
+  <h2 class="card-title text-base">Campaigns</h2>
+  {% if actor_error %}
+    <p class="mt-2 text-sm opacity-60">
+      Not read. The OpenCTI lookup failed, so this is not an actor with no
+      linked campaigns.
+    </p>
+  {% elif not campaigns %}
+    <p class="mt-2 text-sm opacity-60">No campaigns linked to this actor in OpenCTI.</p>
+  {% else %}
+    <ul class="space-y-2 mt-2">
+      {% for c in campaigns %}
+        <li class="flex items-center gap-3 py-1.5 border-b border-base-300 last:border-b-0">
+          <span class="text-ion-cyan font-semibold text-sm flex-1">{{ c.name }}</span>
+          <span class="text-[11px] opacity-60 font-mono">
+            {{ ts(c.first_seen, 'date', fallback='?') }} to {{ ts(c.last_seen, 'date', fallback='?') }}
+          </span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</div></section>
+
+{% endif %}

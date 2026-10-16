@@ -1,0 +1,88 @@
+{% macro pin(p, case_id) %}
+<div class="workbench-pin{% if p.severity %} wb-sev-{{ p.severity }}{% endif %}"
+     draggable="true" data-pin="{{ p.pin_id }}" data-case="{{ case_id }}"
+     data-dragstart-action="wbDragStart"
+     data-args='{{ ["$event", p.pin_id]|tojson }}'>
+  <div class="workbench-pin-head">
+    <span class="workbench-pin-src">{{ p.source_label }}</span>
+    {%- if p.severity %}
+    <span class="workbench-pin-sev">{{ p.severity }}</span>
+    {%- endif %}
+    <button type="button" class="workbench-pin-x" title="Dismiss"
+            data-click-action="dismissWorkbenchPin"
+            data-args='{{ [case_id, p.pin_id]|tojson }}'>&times;</button>
+  </div>
+  <div class="workbench-pin-title">{{ p.title }}</div>
+  {%- if p.summary %}
+  <div class="workbench-pin-summary">{{ p.summary }}{% if p.truncated %}&hellip;{% endif %}</div>
+  {%- endif %}
+  <div class="workbench-pin-foot">
+    <span>{{ p.pinned_by }}</span>
+    <span>
+      {%- if p.pinned_at %}{{ p.pinned_at }}
+      {%- else %}<span class="an-absent"
+          title="No pinned time was recorded"></span>{% endif %}
+    </span>
+  </div>
+</div>
+{% endmacro %}
+{# The case evidence kanban, from ui/cases.py's workbench_view.
+
+   `pinsResp.ok ? (await pinsResp.json()).pins || [] : []` drew three
+   columns each reading "no pins" when the read returned 403 or 500. The
+   workbench is the case's evidence board and the ledger behind it is
+   tamper-evident, so "nothing has been pinned" is a claim about an
+   investigation, and it was being made on a failed read.
+
+   The verify banner beside this is still the page's own and is already
+   right: it renders "verify unavailable" rather than claiming a valid
+   chain when its read fails.
+#}
+{%- if state == 'withheld' %}
+<div class="cpanel-empty-hint col-span-full">The evidence workbench needs
+  the forensic:read permission.</div>
+{%- elif state == 'failed' %}
+<div class="cpanel-empty-hint col-span-full">The workbench could not be
+  read. This is not an empty evidence board.</div>
+{%- elif state == 'unreadable' %}
+<div class="cpanel-empty-hint col-span-full">The pin list is not in a
+  shape this page can read, so whether anything is pinned is unknown.</div>
+{%- else %}
+{%- for col in columns %}
+<div class="workbench-col" data-col="{{ col.key }}" data-case="{{ case_id }}"
+     data-dragover-action="wbDragOver" data-dragleave-action="wbDragLeave"
+     data-drop-action="wbDrop"
+     data-args='{{ ["$event", case_id, col.key]|tojson }}'>
+  <div class="workbench-col-header">
+    <span>{{ col.label }}</span>
+    <span class="workbench-col-count">{{ col.pins | length }}</span>
+  </div>
+  <div class="workbench-col-body">
+    {%- if not col.pins %}
+    <div class="workbench-empty">no pins</div>
+    {%- else %}
+    {%- for p in col.pins %}{{ pin(p, case_id) }}{% endfor %}
+    {%- endif %}
+  </div>
+</div>
+{%- endfor %}
+{#- A pin whose status is none of the three belonged to no column and
+    vanished from the board. It gets one of its own rather than being
+    dropped. -#}
+{%- if uncategorised %}
+<div class="workbench-col workbench-col-other col-span-full"
+     data-col="uncategorised" data-case="{{ case_id }}">
+  <div class="workbench-col-header">
+    <span>Not categorised</span>
+    <span class="workbench-col-count">{{ uncategorised | length }}</span>
+  </div>
+  <div class="workbench-col-body">
+    {%- for p in uncategorised %}{{ pin(p, case_id) }}{% endfor %}
+  </div>
+</div>
+{%- endif %}
+<span id="workbench-pin-count-{{ case_id }}"
+      hx-swap-oob="innerHTML:#workbench-pin-count-{{ case_id }}">
+  {{- visible if visible is not none else '' -}}
+</span>
+{%- endif %}

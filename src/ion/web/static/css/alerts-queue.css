@@ -40,6 +40,14 @@ table.aq th {
     text-align: left;
     font-size: 10px;
     letter-spacing: .07em;
+/* --color-ink-* is a SURFACE ramp, and the light-mode block inverts it
+   (--color-ink-500 is #2a2f3a in dark and #cbd5e1 in light) so that
+   `bg-ink-900` panels become white. Used as a TEXT colour it therefore
+   goes light exactly when the page does: measured 1.34:1 on the kbd chips
+   in /alerts, the worst remaining failure on that page. In dark mode the
+   token resolves empty here and the literal fallback carried it, which is
+   why this only broke one way round. --ion-text-muted is a text token and
+   flips the right direction in both modes. */
     text-transform: uppercase;
     color: var(--ion-text-muted, #94a3b8);
     font-weight: 600;
@@ -124,7 +132,7 @@ table.aq tbody tr.aq-cur td:last-child {
 /* the title is what the analyst reads first, so it gets full contrast; the
    identifying columns sit one step down */
 .aq-title .aq-t { color: var(--ion-text, #e6e9ef); font-weight: 500; }
-.aq-host, .aq-user { color: var(--color-ink-500, #cbd5e1); }
+.aq-host, .aq-user { color: var(--ion-text-muted, #cbd5e1); }
 
 .aq-sev-pill {
     display: inline-block;
@@ -214,7 +222,7 @@ tr.aq-grp:hover td { background: rgba(255, 255, 255, .05); }
     margin-left: auto;
     background: color-mix(in srgb, var(--color-ion-cyan) 12%, transparent);
     border: 1px solid color-mix(in srgb, var(--color-ion-cyan) 35%, transparent);
-    color: var(--color-ink-500, #cbd5e1);
+    color: var(--ion-text-muted, #cbd5e1);
     border-radius: 5px;
     padding: 1px 8px;
     font-size: 10.5px;
@@ -282,7 +290,7 @@ tr.aq-row:hover .aq-acts, tr.aq-cur .aq-acts { opacity: 1; }
     background: var(--ion-surface, #0f151d);
     border: 1px solid var(--ion-border-strong, #26313f);
     border-radius: 6px;
-    color: var(--color-ink-500, #a8bacf);
+    color: var(--ion-text-muted, #a8bacf);
     padding: 4px 9px;
     font-size: 11.5px;
     font-family: inherit;
@@ -330,7 +338,7 @@ tr.aq-row:hover .aq-acts, tr.aq-cur .aq-acts { opacity: 1; }
     padding: 5px 9px;
     border-radius: 5px;
     font-size: 12px;
-    color: var(--color-ink-500, #bccbdb);
+    color: var(--ion-text-muted, #bccbdb);
     cursor: pointer;
 }
 .aq-colrow:hover { background: color-mix(in srgb, var(--color-ion-cyan) 12%, transparent); }
@@ -358,7 +366,7 @@ tr.aq-row:hover .aq-acts, tr.aq-cur .aq-acts { opacity: 1; }
     padding: 0 5px;
     font-size: 10px;
     font-family: ui-monospace, Consolas, monospace;
-    color: var(--color-ink-500, #b9cbe0);
+    color: var(--ion-text-muted, #b9cbe0);
     line-height: 16px;
     display: inline-block;
 }
@@ -398,7 +406,7 @@ tr.aq-row:hover .aq-acts, tr.aq-cur .aq-acts { opacity: 1; }
     border-radius: 13px;
     padding: 3px 5px 3px 11px;
     font-size: 11.5px;
-    color: var(--color-ink-500, #a8c0da);
+    color: var(--ion-text-muted, #a8c0da);
 }
 .aq-chip b { color: var(--ion-text, #dbeafe); font-weight: 600; }
 .aq-chip .x {

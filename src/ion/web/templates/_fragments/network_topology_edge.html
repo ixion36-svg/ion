@@ -1,0 +1,22 @@
+<div id="nt-detail" class="nt-detail card bg-base-200 shadow p-4 text-sm">
+{% if state == 'unconfigured' %}
+<p>Arkime is not configured, so this graph was not read.</p>
+{% elif state == 'failed' or state == 'unreadable' %}
+<p>The topology could not be read.</p>
+{% elif state != 'data' %}
+<p>This conversation is not in this graph.</p>
+{% else %}
+<h3>{{ title_from }} to {{ title_to }}</h3>
+<div class="nt-detail-meta">
+  <div>{% if bytes_label is not none %}<b>{{ bytes_label }}</b>{% else %}unknown{% endif %} · {% if sessions is not none %}<b>{{ sessions }}</b> sessions{% else %}unknown{% endif %}</div>
+  <div>{% if protocol %}{{ protocol }}{% if port is not none %}:{{ port }}{% endif %}{% else %}Protocol detail needs the session sample{% endif %}</div>
+  {% if rate_label is not none %}<div>Busiest pair throughput: <b>{{ rate_label }}</b></div>{% endif %}
+  {% if packets is not none %}<div><b>{{ packets }}</b> packets</div>{% endif %}
+  {% if threat %}
+  <div>Threat: <b>{{ threat.level }}</b>{% if threat.malicious %} · malicious endpoint{% endif %}{% if threat.is_ioc %} · IOC{% endif %}</div>
+  {% endif %}
+</div>
+{% if arkime_url %}<a class="nt-link" href="{{ arkime_url|safe_url }}" target="_blank" rel="noopener noreferrer">Open in Arkime</a>{% endif %}
+{% if arkime_pcap_url %}<a class="nt-link" href="{{ arkime_pcap_url|safe_url }}" target="_blank" rel="noopener noreferrer">Flow PCAP</a>{% endif %}
+{% endif %}
+</div>

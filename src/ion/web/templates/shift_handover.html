@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Shift Handover - ION{% endblock %}
+{% block page_id %}shift_handover{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
@@ -22,58 +23,26 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">End-of-shift notes and handover log.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <select id="sh-hours" class="select select-sm w-auto">
+        <select id="sh-hours" name="hours" class="select select-sm w-auto">
             <option value="4">Last 4 hours</option>
             <option value="8" selected>Last 8 hours</option>
             <option value="12">Last 12 hours</option>
             <option value="24">Last 24 hours</option>
         </select>
-        <button class="btn btn-primary" data-click-action="shGenerate">Generate Report</button>
-        <button class="btn" data-click-action="shOpenRaiseModal">Raise Handover</button>
+        <button id="sh-refresh" class="btn btn-primary" hx-get="/ui/shift-handover/report" hx-target="#sh-content" hx-include="#sh-hours">Generate Report</button>
+        <div id="sh-write-controls" hx-get="/ui/shift-handover/controls" hx-trigger="load"></div>
         <button class="btn btn-ghost" data-window-print><i class="icon-printer"></i> Print</button>
     </div>
 </section>
 
 <!-- Persisted transfers. The report below is a live view recomputed on every
      load; a transfer is a frozen snapshot somebody signed for. -->
-<div id="sh-transfers" class="mb-10"></div>
+<button id="sh-transfers-refresh" class="btn btn-sm mb-3" hx-get="/ui/shift-handover/transfers" hx-target="#sh-transfers">Refresh transfers</button>
+<div id="sh-transfers" class="mb-10" hx-get="/ui/shift-handover/transfers" hx-trigger="load"></div>
+<section id="sh-panel" class="mb-8" hidden><div class="flex gap-3"><h2 id="sh-detail-heading">Handover</h2><button id="sh-detail-refresh" class="btn btn-sm" data-click-action="shRefreshDetail">Refresh handover</button><button id="sh-detail-close" class="btn btn-sm" data-click-action="shCloseDetail">Close handover</button></div><div id="sh-detail"></div></section>
 
-<div id="sh-raise-modal" class="modal">
-  <div class="modal-box max-w-2xl">
-    <div class="flex items-center justify-between gap-4">
-      <h3 class="font-semibold text-lg">Raise a handover</h3>
-      <button class="btn btn-ghost btn-sm btn-circle" data-click-action="shCloseRaiseModal" aria-label="Close">&times;</button>
-    </div>
-    <p class="text-sm opacity-60 mt-2">This freezes the shift report as it stands now. The numbers will not move afterwards, which is what makes them accountable.</p>
-    <div class="flex flex-col gap-3 mt-4">
-      <label class="flex flex-col gap-1">
-        <span class="label-tiny opacity-60">Incoming lead</span>
-        <select id="sh-raise-incoming" class="select select-bordered">
-          <option value="">Decide later</option>
-        </select>
-      </label>
-      <label class="flex flex-col gap-1">
-        <span class="label-tiny opacity-60">Shift length</span>
-        <select id="sh-raise-hours" class="select select-bordered">
-          <option value="4">4 hours</option>
-          <option value="8" selected>8 hours</option>
-          <option value="12">12 hours</option>
-          <option value="24">24 hours</option>
-        </select>
-      </label>
-      <label class="flex flex-col gap-1">
-        <span class="label-tiny opacity-60">Summary</span>
-        <textarea id="sh-raise-summary" class="textarea textarea-bordered" rows="3" placeholder="What the incoming shift most needs to know"></textarea>
-      </label>
-    </div>
-    <div class="modal-action">
-      <button class="btn" data-click-action="shCloseRaiseModal">Cancel</button>
-      <button class="btn btn-primary" data-click-action="shRaiseHandover">Raise draft</button>
-    </div>
-  </div>
-</div>
 
-<div id="sh-content">
+<div id="sh-content" hx-get="/ui/shift-handover/report" hx-trigger="load" hx-include="#sh-hours" hx-disinherit="hx-include">
     <div class="flex justify-center items-center gap-2 py-14 text-center opacity-50" id="sh-loading"><span class="loading loading-spinner loading-sm text-primary"></span> Generating shift report...</div>
 </div>
 
@@ -82,280 +51,46 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* Page-specific report cap is not a daisyUI token. */
-.sh-report { max-width: 1100px; }
-
-@media print {
-    .navbar, .header-actions, .chat-widget, .chat-toggle { display: none !important; }
-    body { background: #fff; color: #000; }
-    .sh-report { max-width: 100%; }
-    .card, .stat, .alert { break-inside: avoid; border-color: #ddd; }
-    .stat-value, .card-title i { color: #333 !important; }
-}
-</style>
 <script nonce="{{ csp_nonce }}">
+
 const API = '/api/shift-handover';
-function $(id){return document.getElementById(id)}
-function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
-function fmtTime(iso){if(!iso)return'-';return new Date(iso).toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
-
-async function shGenerate(){
-    const hours = $('sh-hours').value;
-    $('sh-content').innerHTML = '<div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Generating shift report...</div>';
-    try {
-        const r = await fetch(API+'/report?hours='+hours);
-        if(!r.ok) throw new Error('Failed to generate report');
-        const d = await r.json();
-        renderReport(d);
-    } catch(e) {
-        $('sh-content').innerHTML = `<div class="alert alert-error">${esc(e.message)}</div>`;
-    }
-}
-
-function renderReport(d) {
-    let html = '<div class="sh-report">';
-
-    // Meta
-    html += `<div class="card bg-base-200 shadow mb-5">
-        <div class="card-body py-3 px-4 flex-row flex-wrap gap-x-6 gap-y-2 text-sm">
-        <span><strong>Shift Period:</strong> ${fmtTime(d.shift_start)} \u2014 ${fmtTime(d.shift_end)}</span>
-        <span><strong>Duration:</strong> ${d.shift_hours}h</span>
-        <span><strong>Generated by:</strong> ${esc(d.generated_by)}</span>
-        <span><strong>Generated at:</strong> ${fmtTime(d.generated_at)}</span>
-        </div>
-    </div>`;
-
-    // Highlights
-    if (d.highlights && d.highlights.length) {
-        html += '<div class="flex flex-col gap-1.5 mb-5">';
-        for (const h of d.highlights) {
-            const cls = h.level === 'critical' ? 'alert-error' : h.level === 'high' ? 'alert-warning' : h.level === 'warning' ? 'alert-warning' : 'alert-info';
-            const icon = h.level === 'critical' ? 'alert-triangle' : h.level === 'high' ? 'alert-circle' : h.level === 'warning' ? 'info' : 'info';
-            html += `<div class="alert ${cls}"><i class="icon-${icon}"></i> ${esc(h.message)}</div>`;
-        }
-        html += '</div>';
-    }
-
-    // Key stats
-    const a = d.alerts || {};
-    const c = d.cases || {};
-    const p = d.pending || {};
-
-    html += '<div class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3 mb-5">';
-    html += stat(a.total_triaged || 0, 'Alerts Triaged', '');
-    html += stat(c.opened || 0, 'Cases Opened', c.opened > 0 && (c.severity_opened||{}).critical ? 'crit' : '');
-    html += stat(c.closed || 0, 'Cases Closed', 'green');
-    html += stat(c.avg_mttr_hours != null ? c.avg_mttr_hours + 'h' : '-', 'Avg MTTR', '');
-    html += stat(p.open_cases || 0, 'Open Cases', p.open_cases > 10 ? 'warn' : '');
-    html += stat(p.open_alerts || 0, 'Alert Backlog', p.open_alerts > 50 ? 'crit' : p.open_alerts > 20 ? 'warn' : '');
-    html += stat(a.analysts_active || 0, 'Analysts Active', '');
-    html += stat((d.watches||{}).active_count || 0, 'Active Watches', '');
-    html += '</div>';
-
-    // Two-column: Cases Opened + Cases Closed
-    html += '<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">';
-
-    // Cases opened
-    html += '<div class="card bg-base-200 shadow"><div class="card-body"><h3 class="card-title text-xs uppercase tracking-wider opacity-70"><i class="icon-folder-plus text-primary"></i> Cases Opened This Shift</h3>';
-    if ((c.cases_opened||[]).length) {
-        html += '<div class="overflow-x-auto"><table class="table table-sm"><thead><tr><th>Case</th><th>Title</th><th>Severity</th><th>Status</th></tr></thead><tbody>';
-        for (const cs of c.cases_opened) {
-            html += `<tr>
-                <td class="font-mono">${esc(cs.case_number)}</td>
-                <td>${esc(cs.title)}</td>
-                <td>${sevBadge(cs.severity)}</td>
-                <td>${esc(cs.status)}</td>
-            </tr>`;
-        }
-        html += '</tbody></table></div>';
-    } else {
-        html += '<div class="text-sm opacity-50 p-3">No cases opened.</div>';
-    }
-    html += '</div></div>';
-
-    // Cases closed
-    html += '<div class="card bg-base-200 shadow"><div class="card-body"><h3 class="card-title text-xs uppercase tracking-wider opacity-70"><i class="icon-check-circle text-primary"></i> Cases Closed This Shift</h3>';
-    if ((c.cases_closed||[]).length) {
-        html += '<div class="overflow-x-auto"><table class="table table-sm"><thead><tr><th>Case</th><th>Title</th><th>Severity</th><th>Reason</th></tr></thead><tbody>';
-        for (const cs of c.cases_closed) {
-            const reason = (cs.closure_reason||'').replace(/_/g,' ');
-            html += `<tr>
-                <td class="font-mono">${esc(cs.case_number)}</td>
-                <td>${esc(cs.title)}</td>
-                <td>${sevBadge(cs.severity)}</td>
-                <td>${esc(reason||'-')}</td>
-            </tr>`;
-        }
-        html += '</tbody></table></div>';
-    } else {
-        html += '<div class="text-sm opacity-50 p-3">No cases closed.</div>';
-    }
-    html += '</div></div>';
-
-    html += '</div>'; // end grid
-
-    // Closure reason breakdown
-    if (c.closed > 0) {
-        html += '<div class="card bg-base-200 shadow mb-4"><div class="card-body"><h3 class="card-title text-xs uppercase tracking-wider opacity-70"><i class="icon-pie-chart text-primary"></i> Closure Reasons</h3>';
-        html += '<div class="flex gap-4 flex-wrap">';
-        const reasons = c.closure_reasons || {};
-        for (const [reason, count] of Object.entries(reasons)) {
-            const label = reason.replace(/_/g, ' ');
-            const pct = Math.round(count / c.closed * 100);
-            const color = reason === 'true_positive' ? 'var(--mitre-covered)' : reason === 'false_positive' ? 'var(--sev-critical)' : 'var(--text-secondary)';
-            html += `<div class="text-center">
-                <div class="text-xl font-bold font-mono" data-ion-style="color:${color}">${count}</div>
-                <div class="text-xs opacity-50 capitalize">${esc(label)} (${pct}%)</div>
-            </div>`;
-        }
-        html += '</div></div></div>';
-    }
-
-    // Pending for incoming shift
-    html += '<div class="card bg-base-200 shadow mb-4"><div class="card-body"><h3 class="card-title text-xs uppercase tracking-wider opacity-70"><i class="icon-alert-circle text-primary"></i> Pending for Incoming Shift</h3>';
-    html += '<div class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">';
-    const sevOrder = ['critical','high','medium','low','unknown'];
-    for (const sev of sevOrder) {
-        const cnt = (p.open_cases_by_severity||{})[sev];
-        if (cnt) {
-            html += `<div class="flex items-center gap-2">
-                ${sevBadge(sev)}
-                <span class="font-bold font-mono">${cnt}</span> open case${cnt>1?'s':''}
-            </div>`;
-        }
-    }
-    if (p.unassigned_cases > 0) {
-        html += `<div class="flex items-center gap-2 text-warning">
-            <i class="icon-user-x"></i> <strong>${p.unassigned_cases}</strong> unassigned case${p.unassigned_cases>1?'s':''}
-        </div>`;
-    }
-    html += `<div class="flex items-center gap-2">
-        <i class="icon-inbox"></i> <strong>${p.open_alerts||0}</strong> open alerts, <strong>${p.in_progress_alerts||0}</strong> in progress
-    </div>`;
-    html += '</div></div></div>';
-
-    // Analyst activity
-    const activity = d.activity || [];
-    if (activity.length) {
-        html += '<div class="card bg-base-200 shadow mb-4"><div class="card-body"><h3 class="card-title text-xs uppercase tracking-wider opacity-70"><i class="icon-users text-primary"></i> Analyst Activity</h3>';
-        html += '<div class="overflow-x-auto"><table class="table table-sm"><thead><tr><th>Analyst</th><th>Total Actions</th><th>Top Actions</th></tr></thead><tbody>';
-        for (const a of activity) {
-            const topActions = Object.entries(a.actions||{}).sort((x,y)=>y[1]-x[1]).slice(0,4).map(([k,v])=>`${k}: ${v}`).join(', ');
-            html += `<tr>
-                <td class="font-semibold">${esc(a.username)}</td>
-                <td class="font-mono">${a.total}</td>
-                <td class="text-xs opacity-50">${esc(topActions)}</td>
-            </tr>`;
-        }
-        html += '</tbody></table></div></div></div>';
-    }
-
-    // Recent triage
-    const recent = a.recent || [];
-    if (recent.length) {
-        html += '<div class="card bg-base-200 shadow mb-4"><div class="card-body"><h3 class="card-title text-xs uppercase tracking-wider opacity-70"><i class="icon-list-checks text-primary"></i> Recent Triage Activity</h3>';
-        html += '<div class="overflow-x-auto"><table class="table table-sm"><thead><tr><th>Alert ID</th><th>Status</th><th>Priority</th><th>Analyst</th><th>Time</th><th>Notes</th></tr></thead><tbody>';
-        for (const t of recent) {
-            const stKind = t.status==='closed'?'badge-success':t.status==='acknowledged'?'badge-warning':'badge-error';
-            html += `<tr>
-                <td class="font-mono text-xs max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap" title="${esc(t.es_alert_id)}">${esc((t.es_alert_id||'').substring(0,24))}...</td>
-                <td><span class="badge badge-sm ${stKind}">${esc(t.status)}</span></td>
-                <td>${esc(t.priority||'-')}</td>
-                <td>${esc(t.analyst)}</td>
-                <td class="text-xs">${fmtTime(t.updated_at)}</td>
-                <td class="text-[.78rem] max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap" title="${esc(t.notes)}">${esc(t.notes||'-')}</td>
-            </tr>`;
-        }
-        html += '</tbody></table></div></div></div>';
-    }
-
-    // Active watches
-    const w = d.watches || {};
-    if ((w.watches||[]).length) {
-        html += '<div class="card bg-base-200 shadow mb-4"><div class="card-body"><h3 class="card-title text-xs uppercase tracking-wider opacity-70"><i class="icon-eye text-primary"></i> Active Threat Watches</h3>';
-        html += '<div class="overflow-x-auto"><table class="table table-sm"><thead><tr><th>Actor/Campaign</th><th>Type</th><th>Matches</th><th>Watched By</th><th>Last Seen</th></tr></thead><tbody>';
-        for (const watch of w.watches) {
-            html += `<tr>
-                <td class="font-semibold">${esc(watch.name)}</td>
-                <td>${esc((watch.entity_type||'').replace('_',' '))}</td>
-                <td class="font-mono">${watch.match_count}</td>
-                <td>${esc(watch.watched_by)}</td>
-                <td class="text-xs">${fmtTime(watch.last_seen_at)}</td>
-            </tr>`;
-        }
-        html += '</tbody></table></div></div></div>';
-    }
-
-    html += '</div>'; // end sh-report
-    $('sh-content').innerHTML = html;
-}
-
-function sevBadge(sev) {
-    const s = (sev || 'unknown').toLowerCase();
-    const kind = s === 'critical' ? 'badge-error' : s === 'high' ? 'badge-warning' : s === 'medium' ? 'badge-info' : s === 'low' ? 'badge-success' : 'badge-ghost';
-    return `<span class="badge badge-sm ${kind}">${esc(sev || 'unknown')}</span>`;
-}
-
-function stat(val, label, cls) {
-    const tone = cls === 'crit' ? 'text-error' : cls === 'high' ? 'text-warning' : cls === 'green' ? 'text-success' : cls === 'warn' ? 'text-warning' : 'text-primary';
-    return `<div class="stat bg-base-200 shadow rounded-box">
-        <div class="stat-title">${label}</div>
-        <div class="stat-value text-2xl font-mono ${tone}">${val}</div>
-    </div>`;
-}
-
-/* ==================== PERSISTED TRANSFERS ====================
-   The report above this is a live view. A transfer is a record: a frozen
-   snapshot, two named leads, owned actions and an acceptance by somebody
-   other than the person handing over. Every label below comes from the
-   server payload -- the page does not derive status wording itself. */
-
 const SH_TRANSFERS = API + '/handovers';
-let shLeads = [];
+const $ = id => document.getElementById(id);
 let shOpenId = null;
-
-const SH_STATUS_BADGE = {
-    draft: 'badge-ghost',
-    submitted: 'badge-warning',
-    accepted: 'badge-success',
-    rejected: 'badge-error',
-};
-
-async function shLoadLeads() {
-    if (shLeads.length) return shLeads;
-    try {
-        const r = await fetch('/api/users/assignable');
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        shLeads = (await r.json()).users || [];
-    } catch (e) {
-        shLeads = [];
-    }
-    return shLeads;
-}
-
-function shLeadOptions(selectedId) {
-    return shLeads.map(u =>
-        '<option value="' + u.id + '"' + (String(u.id) === String(selectedId) ? ' selected' : '') + '>' +
-        esc(u.display_name || u.username) + '</option>').join('');
-}
-
 function shOpenRaiseModal() {
-    shLoadLeads().then(() => {
-        $('sh-raise-incoming').innerHTML =
-            '<option value="">Decide later</option>' + shLeadOptions(null);
-    });
     $('sh-raise-summary').value = '';
-    $('sh-raise-modal').classList.add('show');
+    $('sh-raise-modal').showModal();
+    htmx.ajax('GET', '/ui/shift-handover/leads', {target: '#sh-leads'});
 }
-
-function shCloseRaiseModal() {
-    $('sh-raise-modal').classList.remove('show');
+function shCloseRaiseModal() { $('sh-raise-modal').close(); }
+function shCloseDetail() { $('sh-panel').hidden = true; shOpenId = null; }
+function shRefreshDetail() {
+    if (shOpenId === null) return;
+    $('sh-panel').hidden = false;
+    $('sh-detail-heading').textContent = 'Handover #' + shOpenId;
+    return htmx.ajax('GET', '/ui/shift-handover/transfers/' + shOpenId, {target: '#sh-detail'});
 }
-
-async function shPost(url, body) {
+async function shLoadTransfers() {
+    await htmx.ajax('GET', '/ui/shift-handover/transfers', {target: '#sh-transfers'});
+    await shRefreshDetail();
+}
+document.addEventListener('click', event => {
+    const row = event.target.closest('[data-sh-open]');
+    if (!row) return;
+    shOpenId = Number(row.dataset.shOpen);
+    shRefreshDetail();
+});
+async function shSetIncoming(id) {
+    const selected = $('sh-incoming-' + id).value;
+    if (!selected) return;
+    try {
+        await shPost(SH_TRANSFERS + '/' + id + '/incoming-lead', {incoming_lead_id: Number(selected)}, 'PATCH');
+        await shLoadTransfers();
+    } catch (e) { alert('Could not set the incoming lead: ' + e.message); }
+}
+async function shPost(url, body, method = 'POST') {
     const r = await fetch(url, {
-        method: 'POST',
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: body === undefined ? undefined : JSON.stringify(body),
     });
@@ -365,6 +100,7 @@ async function shPost(url, body) {
 }
 
 async function shRaiseHandover() {
+    if (!$('sh-raise-incoming')) { alert('Retry incoming leads before raising a draft.'); return; }
     const incoming = $('sh-raise-incoming').value;
     try {
         const data = await shPost(SH_TRANSFERS, {
@@ -378,184 +114,6 @@ async function shRaiseHandover() {
     } catch (e) {
         alert('Could not raise the handover: ' + (e.message || e));
     }
-}
-
-function shDelta(metric) {
-    if (metric.delta === null || metric.direction === 'unknown') {
-        // No comparable baseline. Saying "no change" would invent one.
-        return '<span class="opacity-50">no baseline</span>';
-    }
-    const arrow = metric.direction === 'up' ? '▲'
-                : metric.direction === 'down' ? '▼' : '—';
-    const tone = metric.direction === 'up' ? 'text-warning'
-               : metric.direction === 'down' ? 'text-success' : 'opacity-60';
-    const sign = metric.delta > 0 ? '+' : '';
-    return '<span class="' + tone + '">' + arrow + ' ' + sign + metric.delta + '</span>';
-}
-
-function shActionRow(h, a) {
-    const closed = a.status !== 'open';
-    return `<div class="flex flex-wrap items-center gap-2 py-1.5 border-b border-base-300 last:border-0 text-sm">
-        <span class="badge badge-sm ${closed ? 'badge-ghost' : (a.overdue ? 'badge-error' : 'badge-info')}">${esc(a.status)}</span>
-        <span class="flex-1 min-w-[12rem] ${closed ? 'opacity-50 line-through' : ''}">${esc(a.description)}</span>
-        <span class="opacity-60 text-xs">${a.owner ? esc(a.owner) : '<span class="text-warning">unowned</span>'}</span>
-        <span class="opacity-60 text-xs">${a.due_at ? ('due ' + fmtTime(a.due_at)) : 'no deadline'}</span>
-        ${a.carry_count ? `<span class="badge badge-sm badge-warning" title="shift boundaries crossed">carried &times;${a.carry_count}</span>` : ''}
-        ${a.case_id != null ? `<a class="link link-hover text-xs" href="/cases/${encodeURIComponent(a.case_id)}">case ${a.case_id}</a>` : ''}
-        ${closed ? '' : `<span class="flex gap-1">
-            <button class="btn btn-xs" data-click-action="shCompleteAction" data-args='[${h.id},${a.id}]'>Done</button>
-            <button class="btn btn-xs btn-ghost" data-click-action="shCancelAction" data-args='[${h.id},${a.id}]'>Drop</button>
-        </span>`}
-    </div>`;
-}
-
-function shTransferDetail(h) {
-    const changes = h.changes_since_previous || {};
-    const metrics = changes.metrics || [];
-    const editable = h.status !== 'accepted';
-
-    const changesHtml = changes.baseline == null
-        ? '<p class="text-sm opacity-60">No previously accepted handover to compare against.</p>'
-        : `<div class="grid grid-cols-2 md:grid-cols-4 gap-3">` + metrics.map(m =>
-              `<div>
-                 <div class="label-tiny opacity-50">${esc(m.label)}</div>
-                 <div class="text-sm">${m.current == null ? '&mdash;' : m.current} ${shDelta(m)}</div>
-               </div>`).join('') + `</div>
-           <p class="text-xs opacity-50 mt-2">Against handover #${changes.baseline}, snapshot taken ${fmtTime(changes.baseline_taken_at)}.</p>`;
-
-    const sources = ((h.snapshot || {}).sources || []).map(s =>
-        `<li>${esc(s.name)} &mdash; ${esc(s.detail)} <span class="opacity-50">(${esc(s.freshness)}, ${fmtTime(s.as_of)})</span></li>`
-    ).join('');
-
-    return `<div class="card bg-base-200 shadow mt-3">
-      <div class="card-body gap-4">
-
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="badge ${SH_STATUS_BADGE[h.status] || 'badge-ghost'}">${esc(h.status)}</span>
-          <span class="text-sm"><strong>${esc(h.outgoing_lead || 'unknown')}</strong> &rarr; <strong>${esc(h.incoming_lead || 'nobody yet')}</strong></span>
-          <span class="text-xs opacity-60">${fmtTime(h.shift_start)} &mdash; ${fmtTime(h.shift_end)} (${h.shift_hours}h)</span>
-          <span class="text-xs opacity-60">snapshot ${fmtTime(h.snapshot_taken_at)}</span>
-        </div>
-
-        ${h.summary ? `<p class="text-sm">${esc(h.summary)}</p>` : ''}
-        ${h.rejection_reason ? `<div class="alert alert-error"><div><strong>Sent back:</strong> ${esc(h.rejection_reason)}</div></div>` : ''}
-        ${h.status === 'accepted' && h.accepted_by_designated_lead === false
-            ? `<div class="alert alert-warning"><div>Accepted by ${esc(h.accepted_by)}, who was not the named incoming lead (${esc(h.incoming_lead)}).</div></div>`
-            : ''}
-
-        <div>
-          <h4 class="font-semibold text-sm mb-1">Changes since the last accepted handover</h4>
-          ${changesHtml}
-        </div>
-
-        <div>
-          <div class="flex items-center gap-3 mb-1">
-            <h4 class="font-semibold text-sm">Actions crossing the boundary</h4>
-            <span class="badge badge-sm">${h.open_action_count} open</span>
-            ${h.overdue_action_count ? `<span class="badge badge-sm badge-error">${h.overdue_action_count} overdue</span>` : ''}
-            ${h.unowned_action_count ? `<span class="badge badge-sm badge-warning">${h.unowned_action_count} unowned</span>` : ''}
-          </div>
-          ${(h.actions || []).length
-              ? (h.actions || []).map(a => shActionRow(h, a)).join('')
-              : '<p class="text-sm opacity-60">Nothing recorded as crossing the shift boundary.</p>'}
-          ${editable ? `<div class="flex flex-wrap gap-2 mt-3">
-            <input id="sh-act-desc-${h.id}" class="input input-sm input-bordered flex-1 min-w-[14rem]" placeholder="What needs doing">
-            <select id="sh-act-owner-${h.id}" class="select select-sm select-bordered">
-              <option value="">No owner yet</option>${shLeadOptions(null)}
-            </select>
-            <input id="sh-act-due-${h.id}" type="datetime-local" class="input input-sm input-bordered">
-            <button class="btn btn-sm" data-click-action="shAddAction" data-args='[${h.id}]'>Add</button>
-          </div>` : '<p class="text-xs opacity-50 mt-2">Accepted handovers are closed to edits. Raise new work on the next handover.</p>'}
-        </div>
-
-        ${sources ? `<div>
-          <h4 class="font-semibold text-sm mb-1">Snapshot sources</h4>
-          <ul class="text-xs opacity-70 list-disc ml-5">${sources}</ul>
-        </div>` : ''}
-
-        <div class="flex flex-wrap gap-2">
-          ${h.status === 'draft' || h.status === 'rejected'
-              ? `<button class="btn btn-sm btn-primary" data-click-action="shSubmit" data-args='[${h.id}]'>Submit to incoming shift</button>` : ''}
-          ${h.status === 'submitted'
-              ? `<button class="btn btn-sm btn-success" data-click-action="shAccept" data-args='[${h.id}]'>Accept handover</button>
-                 <button class="btn btn-sm btn-error btn-outline" data-click-action="shReject" data-args='[${h.id}]'>Send back</button>` : ''}
-        </div>
-      </div>
-    </div>`;
-}
-
-function shTransferRow(h) {
-    const isOpen = shOpenId === h.id;
-    return `<div class="mb-2">
-      <div class="card bg-base-300 shadow">
-        <div class="card-body p-3 flex-row flex-wrap items-center gap-3 text-sm cursor-pointer"
-             data-click-action="shToggleTransfer" data-args='[${h.id}]'>
-          <span class="badge ${SH_STATUS_BADGE[h.status] || 'badge-ghost'}">${esc(h.status)}</span>
-          <span class="font-mono text-xs opacity-60">#${h.id}</span>
-          <span>${esc(h.outgoing_lead || 'unknown')} &rarr; ${esc(h.incoming_lead || 'nobody yet')}</span>
-          <span class="opacity-60 text-xs">${fmtTime(h.shift_end)}</span>
-          <span class="ml-auto flex gap-2">
-            ${h.open_action_count ? `<span class="badge badge-sm">${h.open_action_count} open</span>` : ''}
-            ${h.overdue_action_count ? `<span class="badge badge-sm badge-error">${h.overdue_action_count} overdue</span>` : ''}
-            <span class="opacity-50">${isOpen ? '▴' : '▾'}</span>
-          </span>
-        </div>
-      </div>
-      <div id="sh-detail-${h.id}">${isOpen && h._detail ? shTransferDetail(h._detail) : ''}</div>
-    </div>`;
-}
-
-async function shLoadTransfers() {
-    const host = $('sh-transfers');
-    if (!host) return;
-    await shLoadLeads();
-    try {
-        const [listRes, metricsRes] = await Promise.all([
-            fetch(SH_TRANSFERS + '?limit=10'),
-            fetch(SH_TRANSFERS + '/metrics'),
-        ]);
-        if (!listRes.ok) throw new Error('HTTP ' + listRes.status);
-        const rows = (await listRes.json()).handovers || [];
-        const metrics = metricsRes.ok ? await metricsRes.json() : null;
-
-        let detail = null;
-        if (shOpenId != null) {
-            const r = await fetch(SH_TRANSFERS + '/' + shOpenId);
-            if (r.ok) detail = await r.json();
-            else shOpenId = null;
-        }
-        rows.forEach(h => { if (h.id === shOpenId) h._detail = detail; });
-
-        const warn = [];
-        if (metrics && metrics.unaccepted_count) {
-            warn.push(metrics.unaccepted_count + ' handover' +
-                (metrics.unaccepted_count === 1 ? '' : 's') + ' offered and not taken');
-        }
-        if (metrics && metrics.overdue_action_count) {
-            warn.push(metrics.overdue_action_count + ' transferred action' +
-                (metrics.overdue_action_count === 1 ? '' : 's') + ' overdue');
-        }
-        if (metrics && metrics.unowned_action_count) {
-            warn.push(metrics.unowned_action_count + ' open action' +
-                (metrics.unowned_action_count === 1 ? '' : 's') + ' with no owner');
-        }
-
-        host.innerHTML = `
-          <div class="flex items-center gap-3 mb-3">
-            <h2 class="font-semibold text-[20px]">Transfers</h2>
-            <span class="text-sm opacity-60">frozen, signed-for handovers</span>
-          </div>
-          ${warn.length ? `<div class="alert alert-warning mb-3"><div>${esc(warn.join(' · '))}</div></div>` : ''}
-          ${rows.length ? rows.map(shTransferRow).join('')
-                        : '<p class="text-sm opacity-60">No handover has been raised yet. The report below is a live view; raise a handover to freeze it as a record.</p>'}`;
-    } catch (e) {
-        host.innerHTML = `<div class="alert alert-error"><div>${esc(e.message || 'Could not load transfers')}</div></div>`;
-    }
-}
-
-function shToggleTransfer(id) {
-    shOpenId = (shOpenId === id) ? null : id;
-    shLoadTransfers();
 }
 
 async function shAct(url, body, failure) {
@@ -613,10 +171,5 @@ function shCancelAction(handoverId, actionId) {
           { reason: reason.trim() }, 'Could not drop the action');
 }
 
-// Auto-generate on load
-document.addEventListener('DOMContentLoaded', () => {
-    shGenerate();
-    shLoadTransfers();
-});
 </script>
 {% endblock %}

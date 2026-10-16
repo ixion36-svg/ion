@@ -1,0 +1,90 @@
+{# Threat Intel: the Active Watches rows.
+
+   Replaces three innerHTML sites in threat_intel.html (the empty state,
+   the row build, and the catch) plus the hand-rolled `esc()` they needed.
+   The markup is what that JavaScript produced, so the table looks
+   unchanged and the move stays checkable.
+
+   Rows only. The table and its header live in the page shell, outside this
+   swap target, so no render of this fragment can remove the structure that
+   explains the columns, and a failed read still arrives as a row in a
+   table rather than as text where a table used to be.
+
+   Three outcomes, where the JavaScript had two. `loadWatches` read with
+   `fetch(url).then(r => r.json())` and no `r.ok` check, so a refusal or a
+   fault, whose body is `{"detail": ...}` and carries no `watches` key,
+   fell through `data.watches || []` to the empty state and rendered "No
+   active watches. Search for actors or campaigns and add them." That tells
+   an analyst their watchlist is empty when the truth is that it could not
+   be read. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% if failed %}
+  <tr>
+    <td colspan="8" class="ti-empty text-[var(--danger)]" role="alert">
+      The watchlist could not be read. This is not an empty watchlist: any
+      actors and campaigns being watched are still being watched, and any
+      matches against them are still being recorded. Use Refresh to try
+      again.
+    </td>
+  </tr>
+{% elif not watches %}
+  <tr>
+    <td colspan="8" class="ti-empty">
+      No active watches. Search for actors or campaigns and add them.
+    </td>
+  </tr>
+{% else %}
+  {% for w in watches %}
+    <tr>
+      <td class="font-semibold">{{ w.name }}</td>
+      <td>
+        {# The flag and the country name travel together. The JavaScript
+           keyed the whole cell on the flag being present, which is right:
+           country_code_to_flag and get_country_name are both derived from
+           the same country code, so there is no state where one is known
+           and the other is not. #}
+        {%- if w.country_flag -%}
+          <span class="country-flag" title="{{ w.country_name }}">{{ w.country_flag }}</span> {{ w.country_name }}
+        {%- else -%}
+          <span class="text-[var(--text-muted)]">-</span>
+        {%- endif -%}
+      </td>
+      <td>{{ (w.entity_type or '')|replace('_', ' ') }}</td>
+      {# `is not none`. A watch with no recorded match count has not been
+         measured; a watch with zero has been, and means this actor has not
+         been seen in the estate. The JavaScript printed `w.match_count`
+         straight into the cell, so an absent count rendered the string
+         "null". #}
+      <td>{% if w.match_count is not none %}{{ w.match_count }}{% else %}<span class="text-[var(--text-muted)]">not recorded</span>{% endif %}</td>
+      {# 'Never' rather than a dash, which is what the JavaScript said, and
+         it is the more useful word: a watch that has never matched is the
+         normal and desirable state. #}
+      <td>{{ ts(w.last_seen_at, fallback='Never') }}</td>
+      <td>{% if w.watched_by %}{{ w.watched_by }}{% else %}<span class="text-[var(--text-muted)]">-</span>{% endif %}</td>
+      <td>{% if w.watch_reason %}{{ w.watch_reason }}{% else %}<span class="text-[var(--text-muted)]">-</span>{% endif %}</td>
+      <td>
+        {# Withheld without observable:enrich, which is what DELETE
+           /api/threat-intel/watches/{id} requires. The page is gated on
+           observable:read and never checked, so a read-only analyst was
+           offered a Remove button that answers 403 once they have decided
+           to use it and confirmed the dialog.
+
+           data-args carries JSON in a single-quoted attribute. The name is
+           escaped by Jinja, which escapes the double quote as &quot;,
+           where the page's own `esc()` built the string through
+           textContent and innerHTML and so escaped <, > and & but not
+           quotes. A watch named with a double quote broke that attribute's
+           JSON; here it survives attribute parsing as data. #}
+        {%- if can_manage -%}
+          <button class="ti-btn-outline ti-btn-sm ti-btn-danger"
+                  data-click-action="removeWatch"
+                  data-args='[{{ w.id }}, {{ w.name|tojson }}]'>Remove</button>
+        {%- else -%}
+          <span class="text-[var(--text-muted)] text-xs" title="Requires the observable:enrich permission">Read only</span>
+        {%- endif -%}
+      </td>
+    </tr>
+  {% endfor %}
+{% endif %}

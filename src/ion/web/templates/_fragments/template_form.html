@@ -1,0 +1,154 @@
+{# The template editor's form fields and its section editor.
+
+   Replaces template_form.html's DOMContentLoaded block: two fetches, a loop
+   building `<option>` elements for the document-type select, five
+   assignments of `.value`, and the reveal of the legacy notice. The section
+   cards come from template_form_sections.html, included here so the first
+   paint and every later re-render have one definition.
+
+   Four outcomes, where the page had two.
+
+   The page's load did `catch (e) { showToast('Failed to load template') }`
+   and nothing else, so a failed read and a template that does not exist
+   both left every field empty with Save still live. Saving an empty editor
+   sends no sections, which the API turns into `content: ''` and writes over
+   the stored template body: a read that failed could destroy the template
+   it failed to read. Save is rendered here, inside the fragment, so neither
+   of those states has a Save button at all.
+
+   Cancel and Reload are in the page shell, outside this target, because
+   they are the two ways out of a render that says the read failed.
+
+   No timestamp is rendered here, so the `ts` macro has no site: the editor
+   shows what a template is, not when it changed, and created_at and
+   updated_at are in the payload but on the view page rather than this one.
+   `ui._shared.plain` has no site either, because every field this renders
+   is a String or Text column rather than a SQLEnum: `format` and
+   `document_type` are plain strings validated by the service. #}
+
+{% if failed %}
+  <div role="alert" class="alert alert-error">
+    <div>
+      <p class="font-semibold mb-1">This template could not be read.</p>
+      <p>
+        That is not the same as an empty template, and nothing here should be
+        taken as its contents. No form is shown, because saving one filled in
+        from a read that failed would store whatever it happens to contain
+        over the template's real body. Use Reload to try the read again.
+      </p>
+    </div>
+  </div>
+{% elif not_found %}
+  <div role="alert" class="alert alert-warning">
+    <div>
+      <p class="font-semibold mb-1">There is no template {{ template_id }}.</p>
+      <p>
+        The read succeeded and found nothing, which is different from a read
+        that failed. It may have been deleted. Start a new template instead.
+      </p>
+    </div>
+  </div>
+{% else %}
+
+<input type="hidden" name="legacy" value="{{ 1 if legacy else 0 }}">
+
+<div class="card bg-base-200 shadow">
+  <div class="card-body gap-4">
+    <fieldset class="fieldset p-0">
+      <legend class="fieldset-legend">Name <span class="text-error">*</span></legend>
+      <input type="text" id="name" name="name" required placeholder="Enter template name"
+             class="input w-full" value="{{ template.name if template else '' }}">
+    </fieldset>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Format</legend>
+        <select id="format" name="format" class="select w-full">
+          {% set current_format = template.format if template else 'markdown' %}
+          {% for value, label in [('markdown', 'Markdown'), ('html', 'HTML'), ('text', 'Plain Text')] %}
+            <option value="{{ value }}"
+                    {% if current_format == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </fieldset>
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Document Type</legend>
+        <select id="document_type" name="document_type" class="select w-full">
+          {% set current_type = template.document_type if template else None %}
+          <option value="">None</option>
+          {% for key, label in document_types.items() %}
+            <option value="{{ key }}"
+                    {% if current_type == key %}selected{% endif %}>{{ key }} - {{ label }}</option>
+          {% endfor %}
+        </select>
+      </fieldset>
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Tags (comma-separated)</legend>
+        {# The API accepts tags on create only, which is why the page sent
+           them only when there was no template id. The input is still shown
+           when editing because the page showed it, and the tags it shows
+           are the stored ones; what it cannot do is change them, and
+           /api/templates/{id}/tags is where that happens. #}
+        <input type="text" id="tags" name="tags" placeholder="e.g., work, formal, invoice"
+               class="input w-full"
+               value="{{ template.tags | join(', ') if template else '' }}">
+      </fieldset>
+    </div>
+
+    <fieldset class="fieldset p-0">
+      <legend class="fieldset-legend">Description</legend>
+      <textarea id="description" name="description" rows="2"
+                placeholder="Brief description of the template"
+                class="textarea w-full">{{ template.description if template and template.description else '' }}</textarea>
+    </fieldset>
+  </div>
+</div>
+
+<div class="se-builder card bg-base-200 shadow mt-6">
+  <div class="card-body gap-4">
+    <div class="se-header flex flex-wrap items-center justify-between gap-3">
+      <label class="font-semibold basis-full md:basis-auto md:flex-1">Template Sections</label>
+      {# Outside #sections-container, so no render of the cards can remove
+         the control that adds one. -1 means append, which is the contract
+         the page's openLibrary(-1) already had. #}
+      <button type="button" class="btn btn-primary btn-sm"
+              data-click-action="openLibrary" data-args='[-1]'>+ Add Section</button>
+    </div>
+
+    <div id="sections-container" class="se-sections min-h-[60px]">
+      {% include "_fragments/template_form_sections.html" %}
+    </div>
+  </div>
+</div>
+
+{% if template_id %}
+<div class="card bg-base-200 shadow mt-6">
+  <div class="card-body">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Version Message</legend>
+        <input type="text" id="message" name="message" placeholder="Describe your changes" class="input w-full">
+      </fieldset>
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Author</legend>
+        <input type="text" id="author" name="author" placeholder="Your name" class="input w-full">
+      </fieldset>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="form-actions flex flex-wrap gap-3 mt-6">
+  <button type="submit" class="btn btn-primary">{% if template_id %}Save Changes{% else %}Create Template{% endif %}</button>
+  {# Preview posts the editor state and renders the assembled Jinja2 the
+     save would store, by calling the same assemble_jinja2 the service
+     calls. The page assembled its own approximation of fifteen section
+     types in sectionToPreview(). #}
+  <button type="button" class="btn"
+          data-click-action="openPreview"
+          hx-post="/ui/template-form/preview"
+          hx-target="#preview-content"
+          hx-swap="innerHTML">Preview</button>
+</div>
+
+{% endif %}

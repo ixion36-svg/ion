@@ -14,7 +14,6 @@ cyber-range clusters; it read course_api.py, which now lives under archive/.
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Generator
 
 import pytest
@@ -179,8 +178,9 @@ def test_tuning_proposals_queue_is_reachable():
     to /de-proposals?source=bob — which IS linked from the Engineering nav. The
     invariant is unchanged; only the destination moved.
     """
-    base = Path("src/ion/web/templates/base.html").read_text(encoding="utf-8")
-    assert 'href="/de-proposals"' in base, "the governed queue must be in the nav"
+    from tests.nav_render import render
+
+    assert 'href="/de-proposals"' in render(), "the governed queue must be in the nav"
 
     from ion.web.server import app
     paths = {r.path for r in app.routes}

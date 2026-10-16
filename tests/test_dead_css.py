@@ -119,3 +119,36 @@ def test_strict_drops_a_compound_gated_on_one_dead_class():
     out, removed = strip_rules(css, {"ds-badge"}, strict=True)
     assert removed == 1
     assert "ds-badge" not in out
+
+
+def test_sees_a_class_built_by_a_jinja_interpolation():
+    """`class="sr-c-{{ r.color }}"` was invisible: only `${}` was handled.
+
+    Found by covering ion-pages.css, the sheet the redesign's `styled` column
+    fills. soc_roles.html builds its role deck as
+
+        <div class="card bg-base-200 shadow sr-role sr-c-{{ r.color }}">
+
+    so all eleven .sr-c-* rules read as dead at once, and --write would have
+    removed every one. The deck would have rendered with no per-role colour
+    and no error, which is this module's whole subject.
+
+    test_v052_soc_roles_page.py asserts each of those eleven class names
+    reaches the page, so the tool and the suite disagreed. The suite was right.
+    """
+    from tools.dead_css import constructed_prefixes
+
+    src = '<div class="card bg-base-200 shadow sr-role sr-c-{{ r.color }}">'
+    assert "sr-c-" in constructed_prefixes(src)
+
+
+def test_jinja_and_javascript_construction_are_both_seen():
+    """The two forms appear side by side in this codebase, so neither may
+    regress in favour of the other."""
+    from tools.dead_css import constructed_prefixes
+
+    both = constructed_prefixes(
+        'class="aq-sev-${sev}" class="sr-c-{{ color }}" '
+        "'rail-sev-' + esc(sev)"
+    )
+    assert {"aq-sev-", "sr-c-", "rail-sev-"} <= both

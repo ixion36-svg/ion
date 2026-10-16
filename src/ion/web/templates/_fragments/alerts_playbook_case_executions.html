@@ -1,0 +1,65 @@
+{# Alerts: the Playbook Executions list in the case management modal.
+
+   Rendered into #case-playbook-executions-{id}, which the management
+   modal fragment declares with hx-trigger="load, case-playbooks-refresh
+   from:body" so this loads with the modal and again after a playbook is
+   started from it. The reload control sits beside the heading, outside
+   this target, so it survives a response htmx does not swap.
+
+   Replaces the three innerHTML sites in loadCasePlaybookExecutions. The
+   rows are what GET /api/cases/{id}/playbook-executions returns: the
+   playbook, status, the three counts it adds, the outcome and the report.
+
+   Four outcomes. The function had "No playbook executions" for an empty
+   list and for a refusal alike, because `data.executions || []`.
+
+   The progress width is the one genuinely data-driven style and travels
+   on data-ion-style for ion-dynamic-styles.js; the status and outcome
+   colours were six fixed values in the script and are classes in
+   alerts-page.css now. #}
+
+{% if missing %}
+  <span class="text-[0.8125rem] text-[var(--danger)]" role="alert">
+    Case {{ case_id }} no longer exists, so it has no playbook executions to show.
+  </span>
+{% elif failed %}
+  <span class="text-[0.8125rem] text-[var(--danger)]" role="alert">
+    Playbook executions for case {{ case_id }} could not be read. Whether any
+    exist, or one is in progress, is not known from this dialog. Use the
+    reload control beside the heading to try again.
+  </span>
+{% elif not executions %}
+  <span class="text-[0.8125rem] text-[var(--text-muted)]">No playbook executions</span>
+{% else %}
+  {% for e in executions %}
+    <div class="flex items-center gap-2 p-2 bg-[var(--bg-secondary)] rounded-[4px] mb-1.5 case-playbook-exec" data-execution-id="{{ e.id }}">
+      <div class="flex-1">
+        <div class="text-[0.8125rem] font-semibold">
+          {% if e.playbook_name %}{{ e.playbook_name }}{% else %}<span class="text-[var(--text-muted)]">Playbook not recorded</span>{% endif %}
+        </div>
+        <div class="flex items-center gap-2 mt-1">
+          <div class="flex-1 bg-[var(--bg-tertiary)] rounded-[3px] h-[6px] overflow-hidden playbook-progress">
+            {% if e.progress_pct is not none %}
+              <div class="h-full rounded-[3px] playbook-progress-fill {{ e.status_value or '' }}" data-ion-style="width: {{ e.progress_pct }}%"></div>
+            {% endif %}
+          </div>
+          {% if e.completed_steps is not none and e.total_steps is not none %}
+            <span class="text-xs text-[var(--text-muted)]">{{ e.completed_steps }}/{{ e.total_steps }}</span>
+          {% else %}
+            <span class="text-xs text-[var(--text-muted)]" title="The executions endpoint did not report step counts for this row">steps not counted</span>
+          {% endif %}
+          <span class="status-badge{% if e.status_value == 'completed' %} status-active{% elif e.status_value == 'failed' %} status-inactive{% endif %} text-[0.675rem]">{{ (e.status_value or 'status unknown')|replace('_', ' ') }}</span>
+          {% if e.outcome_value %}
+            <span class="py-0.5 px-1.5 rounded-[3px] text-[0.625rem] font-semibold uppercase playbook-outcome-badge outcome-{{ e.outcome_value }}">{{ e.outcome_value|replace('_', ' ') }}</span>
+          {% endif %}
+          {% if e.report_document_id %}
+            <a class="text-[0.675rem] text-[var(--accent-color)]" href="/documents">View Report</a>
+          {% endif %}
+        </div>
+      </div>
+      {% if e.status_value == 'in_progress' %}
+        <a href="/playbooks?execution={{ e.id }}" class="btn btn-sm text-xs">Work</a>
+      {% endif %}
+    </div>
+  {% endfor %}
+{% endif %}

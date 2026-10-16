@@ -1,0 +1,51 @@
+{# The section library's two grids.
+
+   Replaces template_form.html's fourth innerHTML site, the library tile,
+   and the two createElement loops that placed each tile in the generic or
+   the SOC grid.
+
+   The panel's header and its Close button stay in the page shell, outside
+   this target. The library is a full-height overlay, so a render that said
+   the library could not be read and took the Close button with it would
+   leave the user with no way out but a reload.
+
+   Each tile is a `<button>` rather than the page's `<div>` with an onclick.
+   The div was reachable by mouse only: no tabindex, no role and no key
+   handler, so the whole section library was closed to keyboard use.
+
+   A tile carries both an hx-post that adds the section and a click action
+   that shuts the panel, which is the pair the page's addSection() did in
+   one function. `#insert-at` is the shell's hidden input holding which card
+   the new section lands after, so the position travels as a form value
+   rather than as a variable the next render would have to be told about. #}
+
+{% macro tile(entry) -%}
+<button type="button" class="se-library-item"
+        data-click-action="closeLibrary"
+        hx-post="/ui/template-form/sections"
+        hx-vals='{"op": "add", "section_type": {{ entry.key | tojson }}}'
+        hx-include="#insert-at"
+        hx-target="#sections-container"
+        hx-swap="innerHTML">
+  <div class="se-library-item-icon">{{ entry.icon }}</div>
+  <span class="se-library-item-label">{{ entry.label }}</span>
+  <span class="se-library-item-desc">{{ entry.description }}</span>
+</button>
+{%- endmacro %}
+
+{% if failed %}
+  <div role="alert" class="alert alert-error">
+    The section library could not be read, so no section types can be
+    offered. This is not a template system with no section types in it. Close
+    this panel and reopen it to try again.
+  </div>
+{% else %}
+  <h4 class="text-xs uppercase tracking-wide text-base-content/60 mt-0 mb-2">Generic</h4>
+  <div class="se-library-grid grid grid-cols-2 gap-2">
+    {% for entry in generic %}{{ tile(entry) }}{% endfor %}
+  </div>
+  <h4 class="text-xs uppercase tracking-wide text-base-content/60 mt-3 mb-2">SOC-Specific</h4>
+  <div class="se-library-grid grid grid-cols-2 gap-2">
+    {% for entry in soc %}{{ tile(entry) }}{% endfor %}
+  </div>
+{% endif %}

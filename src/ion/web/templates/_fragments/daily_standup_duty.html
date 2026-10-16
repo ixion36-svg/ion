@@ -1,0 +1,24 @@
+{# Who the rota has on duty this week, above the signature box.
+
+   Three renders, because each one sends the reader somewhere different: a
+   name (get on with it), a hole in the rota (the standup still has to
+   happen, so put your own name in), and a lookup that did not answer
+   (which must never read as "nobody"). renderDuty had the same three and
+   built them with innerHTML; the name was the one part it set with
+   textContent, and that is now the whole fragment's property rather than
+   one careful line.
+
+   Rendered into #duty-line both by /ui/daily-standup/duty on page load and
+   by /ui/daily-standup/checks as an out-of-band swap, so a refresh of the
+   sweep refreshes the rota with it. #}
+{% if not available %}
+<span class="text-base-content/50">Duty rota unavailable. Who is on duty this week is unknown, which is not the same as nobody being on it.</span>
+{% elif not assigned %}
+<span class="ds-duty-gap font-semibold">Nobody is on duty this week.</span>
+<span class="text-base-content/50">The standup still needs running &mdash; put your name below.</span>
+{% else %}
+<span class="text-base-content/50">On duty this week:</span>
+<span class="ds-duty-who font-semibold">{{ name or 'someone' }}</span> &middot;
+{% if acknowledged %}<span class="ds-duty-ack">acknowledged</span>
+{% else %}<span class="ds-duty-gap">not acknowledged</span>{% endif %}
+{% endif %}

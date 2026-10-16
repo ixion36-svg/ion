@@ -1,0 +1,286 @@
+{# The compliance posture body: framework cards and, when one is selected,
+   its per-control detection coverage.
+
+   Replaces four innerHTML writes and 142 lines of inline JavaScript in
+   compliance.html, including a hand-rolled `esc()` that Jinja's autoescaping
+   retires.
+
+   This page makes compliance claims, so every number here is tested with
+   `is not none` and never with truthiness, and the states behind a control
+   are kept apart rather than collapsed into "red":
+
+     covered              every mapped technique has an enabled rule
+     partial              some have one, some do not
+     no detection written measured at 0%, no rule exists to enable
+     written, not running measured at 0%, rules exist and none is switched on
+     not measurable       no technique is mapped, so there is nothing to score
+     not measured         TIDE could not be read, so no figure exists at all
+
+   The JavaScript carried three of those. Colours and words arrive
+   precomputed from ion.web.ui.compliance, whose score_colour is total over
+   None, so there is no branch here that could paint an unmeasured figure
+   with a band colour by being forgotten.
+
+   The framework cards live inside the swap because only this render knows
+   which card is open. The page's Refresh button sits outside #cmp-content,
+   which is what guarantees that no render here, success or failure, can
+   remove the reader's way back. Checked in a browser, not inferred. #}
+
+{% if failed %}
+  <div role="alert" class="alert alert-error">
+    <span>
+      <strong>Compliance posture could not be read.</strong>
+      No figure is shown below rather than zeros. This is not a compliant
+      posture and it is not a failing one: the read failed, so nothing about
+      control coverage is known right now. Do not quote this page as
+      evidence of anything until it loads. Use Refresh to try again.
+    </span>
+  </div>
+{% else %}
+
+{% if notice %}
+  <div role="alert" class="alert alert-warning mb-4">
+    <span>
+      <strong>{{ notice }}.</strong>
+      {% if availability_note %}{{ availability_note }}{% endif %}
+      Configure TIDE in <a class="text-[inherit] underline" href="/settings#tide">Settings</a>
+      to compute live coverage.
+    </span>
+  </div>
+{% endif %}
+
+<div role="alert" class="alert alert-info mb-4">
+  <span>
+    ION computes detection coverage per framework by mapping each control to
+    the MITRE ATT&amp;CK techniques an attacker would use against it, then
+    asking the live TIDE rule catalog whether any <strong>enabled</strong>
+    rule detects those techniques. Select a framework card to drill into its
+    controls.
+    {% if measures %}
+      <br>What the figure measures:
+      {% for line in measures %}{{ line }}{% if not loop.last %} {% endif %}{% endfor %}
+    {% endif %}
+  </span>
+</div>
+
+{# Permanent furniture, not a tooltip. A reader should not have to hover to
+   learn that a hatch means nobody measured, nor to learn that this page has
+   no notion of an accepted risk. #}
+<div class="flex flex-wrap gap-x-6 gap-y-1 mb-4 text-[11px] opacity-70">
+  <span class="flex items-center gap-2">
+    <span class="inline-block w-6 h-2 rounded" data-ion-style="background:{{ hatch }}"></span>
+    not measured, which is not the same as measured at zero
+  </span>
+  <span>0% is a measurement. An unmeasured figure reads &ldquo;not measured&rdquo; and never 0%.</span>
+  <span>
+    Accepted risk is not an input here: ION holds no record of a gap anyone
+    has reviewed and accepted, so every gap below is an unexamined gap and
+    nothing below has been signed off.
+  </span>
+</div>
+
+<div class="cmp-fw-list">
+  {% for card in cards %}
+    {# One value, not a literal `&` next to an escaped one: a URL built from
+       template text plus a variable emits `&amp;` for one and `&` for the
+       other. #}
+    {% set drill = '/ui/compliance/posture?framework=' ~ (card.id|urlencode) %}
+    <button type="button"
+            class="card bg-base-200 shadow cmp-fw text-left w-full{{ ' selected' if card.selected }}"
+            {% if card.selectable %}
+            hx-get="{{ drill }}"
+            hx-target="#cmp-content"
+            hx-swap="innerHTML"
+            aria-pressed="{{ 'true' if card.selected else 'false' }}"
+            {% else %}disabled{% endif %}>
+      <div class="card-body p-4 gap-1">
+        <h2 class="card-title text-base">{{ card.name }}</h2>
+        <p class="text-xs uppercase tracking-wide opacity-50">{{ card.version }}</p>
+        <div class="flex justify-between items-center gap-3 mt-2">
+          {# `card.measured`, not `card.score`, because a framework measured
+             at 0% is falsy and would otherwise read as unmeasured. #}
+          {% if card.measured %}
+            <div class="stat-value font-mono text-2xl" data-ion-style="color:{{ card.colour }}">{{ card.score }}%</div>
+          {% else %}
+            <div class="font-mono text-sm whitespace-nowrap" data-ion-style="color:{{ card.colour }}">not measured</div>
+          {% endif %}
+          <div class="stat-desc text-right">
+            {% if card.counted %}
+              {% if card.counts.fully_covered is not none %}{{ card.counts.fully_covered }}{% else %}an unrecorded number{% endif %}
+              / {{ card.counts.scored_controls }} scored controls<br>
+              {% if card.counts.partial is not none %}{{ card.counts.partial }} partial{% else %}partial not recorded{% endif %}
+              &middot;
+              {% if card.counts.no_coverage is not none %}{{ card.counts.no_coverage }} measured at 0%{% else %}0% count not recorded{% endif %}
+              {# Shown only when there is one to mention, and guarded for
+                 None so an unrecorded count can never arrive here as 0. #}
+              {% if card.counts.not_assessable is not none and card.counts.not_assessable > 0 %}
+                <br>{{ card.counts.not_assessable }} not measurable
+              {% endif %}
+            {% else %}
+              coverage not measured
+              {% if card.control_count is not none %}<br>{{ card.control_count }} controls mapped{% endif %}
+            {% endif %}
+          </div>
+        </div>
+        <div class="cmp-fw-bar">
+          {% if card.measured %}
+            <div class="cmp-fw-bar-fill" data-ion-style="width:{{ card.score }}%; background:{{ card.colour }}"></div>
+          {% else %}
+            {# Full-width hatch, not a bar at width 0 in the critical colour,
+               which is the picture a framework measured at 0% produces and
+               is exactly what the JavaScript drew here. #}
+            <div class="cmp-fw-bar-fill" data-ion-style="width:100%; background:{{ hatch }}"></div>
+          {% endif %}
+        </div>
+        <p class="text-[11px] opacity-50 mt-1">Detection coverage, not control implementation or effectiveness.</p>
+      </div>
+    </button>
+  {% endfor %}
+</div>
+
+{% if selected_missing %}
+  <div role="alert" class="alert alert-warning mb-4">
+    <span>That framework is not in this posture, so nothing is shown for it.</span>
+  </div>
+{% endif %}
+
+{% if detail %}
+  {% set c = detail.framework.counts %}
+  <div class="card bg-base-200 shadow">
+    <div class="flex flex-wrap items-center justify-between gap-4 px-5 py-3 border-b border-base-300">
+      <div class="basis-full md:basis-auto md:flex-1">
+        <h2 class="card-title text-base">{{ detail.framework.name }}</h2>
+        <div class="text-xs opacity-50 mt-1">
+          {{ detail.framework.version }}
+          {% set spec = detail.framework.url|safe_url %}
+          {% if spec %}
+            &middot; <a class="text-[var(--primary)] no-underline" href="{{ spec }}" target="_blank" rel="noopener noreferrer">official spec &rarr;</a>
+          {% endif %}
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-4 text-sm items-center">
+        <span class="opacity-70">
+          <strong class="font-mono" data-ion-style="color:{{ detail.framework.colour }}">{% if detail.framework.measured %}{{ detail.framework.score }}%{% else %}not measured{% endif %}</strong>
+          detection coverage
+        </span>
+        <span class="text-success">covered <strong class="font-mono">{% if c.fully_covered is not none %}{{ c.fully_covered }}{% else %}not recorded{% endif %}</strong></span>
+        <span class="text-warning">partial <strong class="font-mono">{% if c.partial is not none %}{{ c.partial }}{% else %}not recorded{% endif %}</strong></span>
+        <span class="text-error">measured at 0% <strong class="font-mono">{% if c.no_coverage is not none %}{{ c.no_coverage }}{% else %}not recorded{% endif %}</strong></span>
+        <span class="opacity-50">not measurable <strong class="font-mono">{% if c.not_assessable is not none %}{{ c.not_assessable }}{% else %}not recorded{% endif %}</strong></span>
+        {# Deselect. The page's Refresh is the guaranteed way out because it
+           sits outside the swap; this is the one that keeps the reader's
+           place. #}
+        <button type="button" class="btn btn-sm btn-ghost"
+                hx-get="/ui/compliance/posture"
+                hx-target="#cmp-content"
+                hx-swap="innerHTML">Close</button>
+      </div>
+    </div>
+
+    <div class="px-5 py-2 border-b border-base-300 text-xs opacity-60">
+      Scored over
+      {% if c.scored_controls is not none %}{{ c.scored_controls }}{% else %}an unrecorded number{% endif %}
+      of
+      {% if c.total_controls is not none %}{{ c.total_controls }}{% else %}an unrecorded number{% endif %}
+      controls.
+      {% if does_not_measure %}
+        It does not measure:
+        <ul class="list-disc ml-5 mt-1">
+          {% for line in does_not_measure %}<li>{{ line }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+
+    {# The legend is generated from the states these rows actually show, so a
+       pill cannot reach a reader without its meaning reaching them too. #}
+    <div class="px-5 py-2 border-b border-base-300 text-xs">
+      <div class="flex flex-col gap-1">
+        {% for state in detail.legend %}
+          <div class="flex items-start gap-2">
+            <span class="badge badge-sm {{ state.badge }} shrink-0"
+                  {% if state.hatched %}data-ion-style="background:{{ hatch }}"{% endif %}>{{ state.label }}</span>
+            <span class="opacity-60">{{ state.meaning }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th class="w-[130px]">Control</th>
+            <th>Name</th>
+            <th class="w-[110px]">Coverage</th>
+            <th class="w-[150px]">State</th>
+            <th>Techniques</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in detail.rows %}
+            <tr>
+              <td><span class="font-mono font-semibold text-primary">{{ row.id }}</span></td>
+              <td>{{ row.name }}</td>
+              <td>
+                {# `row.measured`, not `row.score`. A control measured at 0%
+                   is a finding; one nobody could measure is not, and the
+                   JavaScript printed a dash for the second in the critical
+                   colour, which is the first one's colour. #}
+                <span class="font-mono font-bold" data-ion-style="color:{{ row.colour }}">{% if row.measured %}{{ row.score }}%{% else %}not measured{% endif %}</span>
+                {# The count explains the percentage, so it is shown only
+                   where there is one. "0 of 0 techniques" on a control with
+                   nothing mapped reads as a measurement of no coverage. #}
+                {% if row.measured and row.covered is not none and row.total is not none %}
+                  <div class="text-[11px] opacity-50">{{ row.covered }} of {{ row.total }} techniques</div>
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge badge-sm {{ row.state.badge }}"
+                      {% if row.state.hatched %}data-ion-style="background:{{ hatch }}"{% endif %}>{{ row.state.label }}</span>
+                {# The reason was a `title` attribute in the JavaScript, so
+                   the only way to learn why a control could not be scored
+                   was to hover it. #}
+                {% if row.reason %}<div class="text-[11px] opacity-60 mt-1">{{ row.reason }}</div>{% endif %}
+              </td>
+              <td>
+                {% if row.covered_techniques %}
+                  <div class="mb-1">
+                    <span class="text-[11px] opacity-60">{{ row.covered_label }}:</span>
+                    <span class="inline-flex flex-wrap gap-1 align-middle">
+                      {% for technique in row.covered_techniques %}
+                        <span class="badge badge-sm {{ row.covered_badge }} font-mono">{{ technique }}</span>
+                      {% endfor %}
+                    </span>
+                  </div>
+                {% endif %}
+                {% for group in row.gaps %}
+                  <div class="mb-1">
+                    <span class="text-[11px] opacity-60">{{ group.label }}:</span>
+                    <span class="inline-flex flex-wrap gap-1 align-middle">
+                      {% for technique in group.techniques %}
+                        <span class="badge badge-sm {{ group.badge }} font-mono">{{ technique }}</span>
+                      {% endfor %}
+                    </span>
+                  </div>
+                {% endfor %}
+                {% if not row.covered_techniques and not row.gaps %}
+                  <span class="text-[11px] opacity-60">no techniques mapped</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% elif not selected_missing %}
+  <div class="flex justify-center items-center py-14 text-center opacity-50">
+    {% if cards and cards[0].selectable %}
+      Select a framework above to see per-control coverage.
+    {% else %}
+      No per-control coverage can be shown while no framework could be measured.
+    {% endif %}
+  </div>
+{% endif %}
+
+{% endif %}

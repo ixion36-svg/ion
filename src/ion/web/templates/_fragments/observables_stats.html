@@ -1,0 +1,1 @@
+{% for key in ['total','ips','domains','enriched','critical'] %}<span id="stat-{{ key }}" hx-swap-oob="innerHTML" data-field="{{ key }}">{{ figures[key] if figures[key] is not none else 'Unknown' }}</span>{% endfor %}

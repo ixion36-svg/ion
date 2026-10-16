@@ -1,0 +1,57 @@
+{# Threat Intel Overview: the top tracked actors card.
+
+   Replaces three innerHTML sites in loadOverviewActors.
+
+   The defect this fragment exists for: the catch rendered "Actors
+   unavailable, OpenCTI not configured?" A guess, punctuated with a
+   question mark, in the same muted grey as the empty state. Meanwhile the
+   503 that caused it carries the reason in full: "OpenCTI integration is
+   not configured". Measured live on this deployment, where
+   /api/threat-landscape/overview answers 503 with exactly that.
+
+   So three outcomes, and the first two were previously one sentence with a
+   shrug in it:
+
+     not configured  OpenCTI is not wired up. A deployment decision, not a
+                     fault, and nothing to retry. Said plainly.
+     read failed     OpenCTI is configured and did not answer. Worth
+                     retrying, and worth telling an operator about.
+     no actors       OpenCTI answered and tracks none. The only case where
+                     the card is reporting on the estate rather than on
+                     itself. #}
+
+{% if not configured %}
+  <div class="text-slate-500 text-sm">
+    OpenCTI is not configured, so no actors are tracked here. This is a
+    deployment setting rather than a fault, and there is nothing to retry.
+  </div>
+{% elif failed or rows is none %}
+  <div class="text-ion-coral text-sm" role="alert">
+    Tracked actors could not be read from OpenCTI. OpenCTI is configured, so
+    this is a fault rather than an absence of data.
+    {% if error %}<span class="font-mono text-[10px] opacity-80 ml-1">({{ error }})</span>{% endif %}
+  </div>
+{% elif not rows %}
+  <div class="text-slate-500 text-sm">No actors tracked yet.</div>
+{% else %}
+  <div class="space-y-2">
+    {% for a in rows %}
+      <div class="flex items-center gap-3 py-1.5">
+        <span class="text-ion-cyan font-semibold text-sm flex-shrink-0">
+          {%- if a.country_flag %}{{ a.country_flag }} {% endif -%}
+          {{ a.name }}
+        </span>
+        {# `is not none`. An actor with zero recorded TTPs is a different
+           finding from one whose TTPs were never counted, and `a.ttp_count
+           || 0` printed a confident zero for both. #}
+        <span class="text-slate-500 text-xs">
+          {%- if a.ttp_count is not none -%}
+            {{ a.ttp_count }} TTPs
+          {%- else -%}
+            TTPs not counted
+          {%- endif -%}
+        </span>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}

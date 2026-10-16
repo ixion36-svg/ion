@@ -1,0 +1,35 @@
+/* The /wallboard page's own stylesheet.
+ *
+ * These rules were the inline <style> block in wallboard.html until
+ * 2026-10-13. They are page-scoped: wallboard.html is the only template
+ * that links this file.
+ *
+ * Cascade note. wallboard.html is a standalone page -- it does not extend
+ * base.html and so has no {% block head_css %}. The <link> therefore took
+ * the block's exact position in <head>, after ion.css and
+ * ion-migrated-styles.css and before every script, so nothing changed
+ * order. That matters for `.ion-tw-page`, which overrides the compiled
+ * sheet's nav-subtracting min-height, and for the three `.wb-panel-*`
+ * rules that carry !important against daisyUI's border utilities.
+ *
+ * The rules are reproduced verbatim, including their indentation, so the
+ * move reads as a move.
+ */
+    /* Standalone wall display has no 56px nav; .ion-tw-page subtracts that. */
+    .ion-tw-page { min-height: 100vh; height: 100%; }
+    /* Hide scrollbars on the wall display */
+    html, body { scrollbar-width: none; }
+    ::-webkit-scrollbar { display: none; }
+    .wb-pulse-down { animation: wb-pulse 2s infinite; }
+    @keyframes wb-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+    /* v0.39.6: attention banner + panel-emphasis states (unattended wall).
+       The fragment sets #wb-attention's class and wb-panel-* on the cases
+       card, so these cannot move onto daisyUI utility classes. */
+    #wb-attention { transition: background-color .4s ease, border-color .4s ease; }
+    .wb-att-dot { width: 12px; height: 12px; border-radius: 9999px; flex: none; }
+    .wb-att-ok       { background: color-mix(in oklab, var(--color-success) 10%, transparent); border-color: color-mix(in oklab, var(--color-success) 30%, transparent); }
+    .wb-att-warning  { background: color-mix(in oklab, var(--color-warning) 13%, transparent); border-color: color-mix(in oklab, var(--color-warning) 45%, transparent); }
+    .wb-att-critical { background: color-mix(in oklab, var(--color-error) 18%, transparent);  border-color: color-mix(in oklab, var(--color-error) 65%, transparent); animation: wb-att-flash 1.3s ease-in-out infinite; }
+    @keyframes wb-att-flash { 0%,100% { background: color-mix(in oklab, var(--color-error) 16%, transparent); } 50% { background: color-mix(in oklab, var(--color-error) 36%, transparent); } }
+    .wb-panel-warning  { border-color: color-mix(in oklab, var(--color-warning) 50%, transparent) !important; box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-warning) 25%, transparent), 0 0 26px color-mix(in oklab, var(--color-warning) 8%, transparent); }
+    .wb-panel-critical { border-color: color-mix(in oklab, var(--color-error) 65%, transparent) !important; box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-error) 35%, transparent), 0 0 30px color-mix(in oklab, var(--color-error) 12%, transparent); }

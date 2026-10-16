@@ -1,232 +1,16 @@
 {% extends "base.html" %}
 {% block title %}ION - PCAP Analyzer{% endblock %}
+
+{% block head_css %}
+{# The page's own rules, for the classes the server-rendered panels emit.
+   head_css loads after ion.css and before ion-workspace.css and
+   ion-shell.css; none of the 138 selectors here appears in either of
+   those two, measured before the move. #}
+<link rel="stylesheet" href="/static/css/pcap-page.css?v={{ ion_version }}">
+{% endblock %}
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
-<style nonce="{{ csp_nonce }}">
-.pcap-page { max-width: 1400px; margin: 0 auto; }
-
-/* Upload zone */
-.pcap-upload-zone {
-    border: 2px dashed var(--ion-border);
-    border-radius: 12px;
-    padding: 48px 24px;
-    text-align: center;
-    cursor: pointer;
-    transition: border-color .2s, background .2s;
-    background: var(--bg-secondary);
-    margin-bottom: 24px;
-}
-.pcap-upload-zone:hover, .pcap-upload-zone.drag-over {
-    border-color: var(--accent);
-    background: rgba(0, 229, 255, .04);
-}
-.pcap-upload-zone .upload-icon { font-size: 2.5rem; color: var(--text-secondary); margin-bottom: 12px; }
-.pcap-upload-zone.drag-over .upload-icon { color: var(--accent); }
-.pcap-upload-zone h3 { margin: 0 0 6px; font-size: 1rem; }
-.pcap-upload-zone p { margin: 0; font-size: .82rem; color: var(--text-secondary); }
-
-/* Progress */
-.pcap-progress { display: none; margin-bottom: 24px; }
-.pcap-progress .progress-bar-outer {
-    height: 6px; border-radius: 3px; background: var(--bg-secondary); overflow: hidden;
-}
-.pcap-progress .progress-bar-inner {
-    height: 100%; width: 0; background: var(--accent); border-radius: 3px;
-    transition: width .3s; animation: pulse-bar 1.5s ease-in-out infinite;
-}
-@keyframes pulse-bar { 0%,100%{opacity:1} 50%{opacity:.6} }
-.pcap-progress .progress-text { font-size: .8rem; color: var(--text-secondary); margin-top: 6px; }
-
-/* Verdict banner */
-.verdict-banner {
-    padding: 20px 24px; border-radius: 10px; margin-bottom: 24px;
-    display: flex; align-items: center; gap: 16px;
-}
-.verdict-banner.benign { background: rgba(63,185,80,.1); border: 1px solid rgba(63,185,80,.3); }
-.verdict-banner.elevated { background: rgba(210,153,34,.12); border: 1px solid rgba(210,153,34,.35); }
-.verdict-banner.investigate { background: rgba(248,81,73,.1); border: 1px solid rgba(248,81,73,.3); }
-.verdict-icon { font-size: 2rem; }
-.verdict-banner.benign .verdict-icon { color: var(--success); }
-.verdict-banner.elevated .verdict-icon { color: var(--warning, #d29922); }
-.verdict-banner.investigate .verdict-icon { color: var(--danger); }
-.verdict-info h2 { margin: 0 0 4px; font-size: 1.15rem; }
-.verdict-info .verdict-confidence { font-size: .82rem; color: var(--text-secondary); }
-.verdict-reasons { margin-top: 8px; padding-left: 18px; }
-.verdict-reasons li { font-size: .82rem; color: var(--text-primary); margin-bottom: 3px; }
-
-/* Summary cards */
-.pcap-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 24px; }
-.summary-card {
-    background: var(--bg-secondary); border: 1px solid var(--ion-border);
-    border-radius: var(--ion-radius-lg); padding: 16px;
-}
-.summary-card .card-label { font-size: .72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
-.summary-card .card-value { font-size: 1.3rem; font-weight: 700; }
-.summary-card .card-sub { font-size: .75rem; color: var(--text-secondary); margin-top: 2px; }
-
-/* Tabs */
-.pcap-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--ion-border); margin-bottom: 20px; overflow-x: auto; }
-.pcap-tab {
-    padding: 10px 18px; background: transparent; border: none; color: var(--text-secondary);
-    cursor: pointer; font-size: .82rem; font-weight: 600; border-bottom: 2px solid transparent;
-    white-space: nowrap; transition: color .15s, border-color .15s;
-}
-.pcap-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-.pcap-attach-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
-    padding: .6rem .75rem; margin-bottom: .75rem; border-radius: .5rem;
-    background: var(--bg-elevated, rgba(255,255,255,.03)); }
-.pcap-attach-hint { flex: 1 1 18rem; font-size: .78rem; color: var(--text-secondary); }
-.pcap-pick { display: inline-flex; align-items: center; margin-right: .4rem; }
-.pcap-history-row { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem;
-    /* --ion-border is ION's border COLOUR. daisyUI 5 claims the bare
-       unprefixed name for its border-WIDTH token, so using that one here
-       would resolve to `1px solid 1px` -- an invalid shorthand the browser
-       discards entirely, making the border vanish rather than change
-       colour. test_ui_rewrite_theme_parity.py guards the distinction, and
-       its regex matches the bare name in comments too, so this one avoids
-       spelling it. */
-    padding: .55rem .7rem; border-bottom: 1px solid var(--ion-border, rgba(255,255,255,.08));
-    font-size: .82rem; }
-.pcap-history-row:last-child { border-bottom: 0; }
-.pcap-history-row .mono { font-family: ui-monospace, monospace; opacity: .65; }
-.pcap-tab:hover { color: var(--text-primary); }
-
-/* Tab panels */
-.pcap-panel { display: none; }
-.pcap-panel.active { display: block; }
-
-/* Table styles */
-.pcap-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
-.pcap-table th { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--ion-border); color: var(--text-secondary); font-weight: 600; font-size: .75rem; text-transform: uppercase; letter-spacing: .5px; }
-.pcap-table td { padding: 8px 12px; border-bottom: 1px solid rgba(48,54,61,.4); }
-.pcap-table tbody tr:hover { background: rgba(0,229,255,.03); }
-
-/* Findings */
-.finding-card {
-    padding: 12px 16px; border-radius: var(--ion-radius-lg); margin-bottom: 8px;
-    border-left: 4px solid; background: var(--bg-secondary);
-}
-.finding-card.critical { border-left-color: var(--danger); background: rgba(218,54,51,.06); }
-.finding-card.high { border-left-color: var(--danger); }
-.finding-card.medium { border-left-color: var(--warning); }
-.finding-card.low { border-left-color: var(--info); }
-.finding-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.finding-sev {
-    font-size: .68rem; font-weight: 700; text-transform: uppercase; padding: 2px 6px;
-    border-radius: 3px; letter-spacing: .5px;
-}
-.finding-sev.critical { background: rgba(218,54,51,.2); color: var(--danger); }
-.finding-sev.high { background: rgba(248,81,73,.15); color: var(--danger); }
-.finding-sev.medium { background: rgba(210,153,34,.15); color: var(--warning); }
-.finding-sev.low { background: rgba(139,148,158,.15); color: var(--info); }
-.finding-cat { font-size: .75rem; color: var(--text-secondary); }
-.finding-title { font-size: .85rem; font-weight: 600; margin-bottom: 4px; }
-.finding-detail { font-size: .78rem; color: var(--text-secondary); line-height: 1.4; }
-
-/* Findings triage widget */
-.findings-widget-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
-.findings-widget-head h3 { margin: 0; font-size: 1rem; }
-.findings-hint { font-size: .72rem; color: var(--text-secondary); }
-.findings-triage { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 10px; margin-bottom: 16px; }
-.triage-chip {
-    display: flex; flex-direction: column; gap: 3px; padding: 10px 14px;
-    border-radius: var(--ion-radius-lg); background: var(--bg-secondary);
-    border: 1px solid rgba(48,54,61,.6); border-top: 3px solid var(--chip-color, var(--info));
-    cursor: pointer; transition: opacity .15s ease, box-shadow .15s ease, border-color .15s ease;
-    user-select: none; text-align: left;
-}
-.triage-chip:hover { border-color: var(--chip-color, var(--info)); }
-.triage-chip:focus-visible { outline: 2px solid var(--chip-color, var(--info)); outline-offset: 2px; }
-.triage-chip.zero { opacity: .35; cursor: default; }
-.triage-chip.muted { opacity: .3; }
-.triage-chip.selected { box-shadow: 0 0 0 1px var(--chip-color) inset; border-color: var(--chip-color); }
-.triage-count { font-size: 1.55rem; font-weight: 700; line-height: 1; color: var(--chip-color, var(--info)); font-variant-numeric: tabular-nums; }
-.triage-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .5px; color: var(--text-secondary); }
-.triage-chip.total { --chip-color: var(--accent, #00e5ff); }
-.triage-chip.critical { --chip-color: var(--sev-critical, #da3633); }
-.triage-chip.high { --chip-color: var(--sev-high, #f85149); }
-.triage-chip.medium { --chip-color: var(--sev-medium, #d29922); }
-.triage-chip.low { --chip-color: var(--sev-low, #8b949e); }
-.mitre-rollup { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
-.mitre-chip { font-size: .7rem; padding: 3px 9px; border-radius: 12px; background: rgba(0,229,255,.07); border: 1px solid rgba(0,229,255,.22); color: var(--text-primary); font-family: var(--font-mono, monospace); white-space: nowrap; }
-.mitre-chip .tname { color: var(--text-secondary); }
-.finding-card.hidden { display: none; }
-.finding-mitre { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-.finding-tid { font-size: .66rem; padding: 1px 6px; border-radius: 10px; background: rgba(139,148,158,.12); color: var(--text-secondary); font-family: var(--font-mono, monospace); }
-.findings-empty-filter { padding: 24px; text-align: center; color: var(--text-secondary); font-size: .82rem; }
-
-/* Overflow containment — long IPv6 addresses, filenames, paths, and DGA domains
-   must wrap inside their box instead of pushing the panel sideways. */
-.pcap-panel { min-width: 0; }
-.finding-title, .finding-detail { overflow-wrap: anywhere; }
-.pcap-table td { word-break: break-word; }
-.pcap-table th { white-space: nowrap; }
-#panel-network > div, #panel-data > div { min-width: 0; overflow-x: auto; }
-.conv-pair { flex-shrink: 1; min-width: 0; }
-
-/* Data-transfer direction bars (sent vs received per host) */
-.dt-legend { display: flex; gap: 16px; font-size: .72rem; color: var(--text-secondary); margin: 4px 0 12px; }
-.dt-legend span::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
-.dt-legend .dt-l-sent::before { background: var(--warning); }
-.dt-legend .dt-l-recv::before { background: var(--info); }
-.dt-row { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
-.dt-ip { width: 150px; flex-shrink: 0; font-size: .78rem; font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dt-track { flex: 1; min-width: 0; height: 16px; display: flex; background: var(--bg-secondary); border-radius: 3px; overflow: hidden; }
-.dt-sent { background: var(--warning); height: 100%; }
-.dt-recv { background: var(--info); height: 100%; }
-.dt-vals { width: 128px; flex-shrink: 0; text-align: right; font-size: .72rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
-.dt-vals .dt-exfil { color: var(--danger); font-weight: 600; }
-/* Inline volume bar inside the port/IP count tables */
-.pcap-table .bar-cell { position: relative; }
-.pcap-table .bar-cell .mini-bar { position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 60%; background: rgba(88,166,255,.18); border-radius: 2px; z-index: 0; }
-.pcap-table .bar-cell .mini-val { position: relative; z-index: 1; }
-
-/* Follow-stream + email panels */
-.stream-item { margin-bottom: 6px; background: var(--bg-secondary); border-radius: 6px; padding: 8px 12px; }
-.stream-item summary { cursor: pointer; font-size: .82rem; list-style: none; }
-.stream-item summary::-webkit-details-marker { display: none; }
-.stream-item summary::before { content: '▸ '; color: var(--text-secondary); }
-.stream-item[open] summary::before { content: '▾ '; }
-.stream-size { color: var(--text-secondary); font-size: .75rem; margin-left: 8px; }
-.stream-preview { margin: 8px 0 0; max-height: 340px; overflow: auto; background: var(--bg-tertiary, #0b0f14); padding: 10px; border-radius: 4px; font-size: .72rem; font-family: var(--font-mono, monospace); white-space: pre-wrap; word-break: break-all; color: var(--text-primary); }
-.attach-bad { color: var(--danger); font-weight: 600; }
-
-/* Proto bar chart */
-.proto-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
-.proto-label { width: 60px; font-size: .8rem; text-align: right; color: var(--text-secondary); }
-.proto-bar-bg { flex: 1; height: 20px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden; }
-.proto-bar-fill { height: 100%; border-radius: 4px; transition: width .3s; }
-.proto-bar-fill.tcp { background: var(--info); }
-.proto-bar-fill.udp { background: var(--success); }
-.proto-bar-fill.icmp { background: var(--warning); }
-.proto-bar-fill.other { background: var(--text-secondary); }
-.proto-count { width: 60px; font-size: .78rem; color: var(--text-secondary); }
-
-/* Results area */
-.pcap-results { display: none; }
-.pcap-results.visible { display: block; }
-
-/* Conversation flow bar */
-.conv-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.conv-pair { width: 280px; font-size: .78rem; font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.conv-bar-bg { flex: 1; height: 14px; background: var(--bg-secondary); border-radius: 3px; overflow: hidden; }
-.conv-bar-fill { height: 100%; background: var(--info); border-radius: 3px; }
-.conv-bytes { font-size: .75rem; color: var(--text-secondary); width: 80px; text-align: right; }
-
-/* ISAKMP status badges */
-.ike-status {
-    display: inline-block; padding: 2px 8px; border-radius: 3px;
-    font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
-}
-.ike-status.established { background: rgba(63,185,80,.15); color: var(--success); }
-.ike-status.failed { background: rgba(248,81,73,.15); color: var(--danger); }
-.ike-status.no-response { background: rgba(248,81,73,.15); color: var(--danger); }
-.ike-status.incomplete { background: rgba(210,153,34,.15); color: var(--warning); }
-
-/* Reset button */
-.pcap-reset { margin-bottom: 16px; }
-</style>
 
 <div class="max-w-[1400px] mx-auto">
     <section class="ion-page-header mb-8 rise d-1 flex-wrap">
@@ -378,14 +162,24 @@
         if (fileInput.files[0]) uploadFile(fileInput.files[0]);
     });
 
-    // Tabs
+    function activatePanel(name) {
+        document.querySelectorAll('.pcap-tab').forEach(tab => tab.classList.toggle('active', tab.dataset.panel === name));
+        document.querySelectorAll('.pcap-panel').forEach(panel => panel.classList.toggle('active', panel.id === 'panel-' + name));
+    }
+
     document.getElementById('pcap-tabs').addEventListener('click', e => {
-        const btn = e.target.closest('.pcap-tab');
-        if (!btn) return;
-        document.querySelectorAll('.pcap-tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.pcap-panel').forEach(p => p.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById('panel-' + btn.dataset.panel).classList.add('active');
+        const tab = e.target.closest('.pcap-tab');
+        if (!tab) return;
+        activatePanel(tab.dataset.panel);
+        if (tab.dataset.panel === 'history') loadPcapHistory();
+    });
+    document.getElementById('panel-findings').addEventListener('click', e => {
+        const chip = e.target.closest('.triage-chip');
+        if (chip) {
+            _findingsFilter = chip.dataset.sev === 'total' || chip.dataset.sev === _findingsFilter ? null : chip.dataset.sev;
+            applyFindingsFilter(e.currentTarget);
+        }
+        if (e.target.closest('[data-pcap-attach]')) attachSelectedFindings();
     });
 
     window.resetAnalysis = function() {
@@ -449,662 +243,153 @@
         }
     }
 
+    // GET /ui/pcap/{job}/summary renders the verdict banner, the
+    // summary cards, the findings badge and the overview; the banner,
+    // the cards and the badge are swapped out of band because they sit
+    // above the tab strip. GET /ui/pcap/{job}/network renders the four
+    // top-talker tables.
+    //
+    // This function used to open with
+    //
+    //     const label = d.verdict.label;
+    //
+    // with no guard, as the first statement before any of the
+    // twenty-eight render calls below. A stored result with no verdict
+    // key threw there and nothing rendered at all, on an analysis that
+    // had run and whose result was in the database.
+    //
+    // The four network tables and the conversation bars all shared the
+    // NaN defect: `Math.max(...top.map(i => i.count), 1)` is NaN the
+    // moment one count is not a number, so every bar became
+    // `width:NaN%`. The conversation bars were worse, scaling to
+    // `d.conversations[0].bytes` and so trusting the list to be sorted.
+    //
+    // The findings badge carried its palette in a JavaScript string,
+    // `fb.style.cssText = ...`, one of eighteen such sites on this page.
+    // That applies, since the CSP allows programmatic CSSOM, but it puts
+    // a colour, a padding and a radius where no stylesheet can reach
+    // them. It is a class now.
     function renderResults(d) {
-        // Verdict
-        const banner = document.getElementById('verdict-banner');
-        const label = d.verdict.label;
-        const state = label === 'Needs Investigation' ? 'investigate'
-                    : label === 'Elevated' ? 'elevated'
-                    : 'benign';
-        banner.className = 'verdict-banner ' + state;
-        document.getElementById('verdict-icon').innerHTML =
-            state === 'investigate' ? '<i class="icon-alert-triangle"></i>'
-          : state === 'elevated' ? '<i class="icon-alert-circle"></i>'
-          : '<i class="icon-shield-check"></i>';
-        document.getElementById('verdict-label').textContent = d.verdict.label;
-        document.getElementById('verdict-confidence').textContent =
-            `Confidence: ${d.verdict.confidence}%` +
-            (d.verdict.score != null ? ` · Score: ${d.verdict.score}` : '') +
-            (d.verdict.finding_count ? ` · ${d.verdict.finding_count} finding(s)` : '');
-        const reasonsUl = document.getElementById('verdict-reasons');
-        reasonsUl.innerHTML = (d.verdict.reasons || []).map(r => `<li>${esc(r)}</li>`).join('');
-
-        // Summary cards
-        document.getElementById('pcap-summary').innerHTML = [
-            card('File', esc(d.file_name), fmtBytes(d.file_size)),
-            card('Packets', fmtNum(d.packet_count), ''),
-            card('Duration', fmtDuration(d.capture_duration), d.time_start ? new Date(d.time_start).toLocaleString() : ''),
-            card('Protocols', Object.keys(d.protocols || {}).join(', '), ''),
-            card('Unique Src IPs', fmtNum((d.top_src_ips || []).length), ''),
-            card('DNS Queries', fmtNum((d.dns_queries || []).length) + ' unique', ''),
-        ].join('');
-
-        // Findings badge
-        const fb = document.getElementById('findings-count-badge');
-        if ((d.findings || []).length > 0) {
-            fb.style.display = 'inline';
-            fb.textContent = d.findings.length;
-            fb.style.cssText = 'display:inline;background:var(--sev-critical);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
-        } else {
-            fb.style.display = 'none';
+        activatePanel('overview');
+        _findingsFilter = null;
+        if (_currentJobId) {
+            htmx.ajax('GET', '/ui/pcap/' + _currentJobId + '/summary', {
+                source: document.getElementById('panel-overview'),
+                target: '#panel-overview', swap: 'innerHTML',
+            });
+            htmx.ajax('GET', '/ui/pcap/' + _currentJobId + '/network', {
+                source: document.getElementById('panel-network'),
+                target: '#panel-network', swap: 'innerHTML',
+            });
+            // Fourteen table panels in one request. Each is swapped into
+            // its own container out of band, and its tab button comes
+            // with it, so a panel and its tab cannot disagree about
+            // whether there is anything to show.
+            //
+            // They were fourteen copies of the same function, and they
+            // shared `d.whatever || []`, which hid the tab whenever the
+            // list was empty. That also hid it when the read had failed,
+            // and a hidden tab is the strongest claim this page can
+            // make: no credentials, no malware JA3 match, no ARP
+            // anomalies, no extracted files.
+            htmx.ajax('GET', '/ui/pcap/' + _currentJobId + '/tables', {
+                source: document.getElementById('panel-dns'),
+                target: '#panel-dns', swap: 'none',
+            });
+            // The seven panels with logic of their own: data transfer,
+            // ISAKMP, certificates, host profiles, TCP streams, email and
+            // JA4.
+            //
+            // The exfiltration flag is the reason this one mattered. It
+            // was
+            //
+            //   i.received > 0 && i.sent / i.received > 3 && i.sent > 100000
+            //
+            // and the `received > 0` guard, there so the division is
+            // safe, meant a host that sent a great deal and received
+            // nothing could never trip it. All outbound and no inbound is
+            // the shape the heuristic exists to catch, and the ratio
+            // column was already printing an infinity sign for it, so the
+            // row had the answer and the flag could not say so.
+            //
+            // renderIsakmp also threw on a session with no status:
+            // `s.toLowerCase()` on undefined, inside the map that built
+            // every row, so one such session cost the whole panel.
+            htmx.ajax('GET', '/ui/pcap/' + _currentJobId + '/detail', {
+                source: document.getElementById('panel-data'),
+                target: '#panel-data', swap: 'none',
+            });
+            // The findings cards, the triage chips and the threat intel
+            // table. `(d.findings || []).map(...)` then
+            // `if (!items.length)` rendered a shield tick and "No
+            // suspicious findings detected" for a findings list that
+            // could not be read, which on this tool is the worst
+            // available way to be wrong.
+            htmx.ajax('GET', '/ui/pcap/' + _currentJobId + '/findings', {
+                source: document.getElementById('panel-findings'),
+                target: '#panel-findings', swap: 'innerHTML',
+            }).then(() => {
+                applyFindingsFilter(document.getElementById('panel-findings'));
+                loadPcapCaseOptions();
+            });
+            // The graph's chrome and counts, and the canvas container
+            // renderNetworkGraph draws into.
+            htmx.ajax('GET', '/ui/pcap/' + _currentJobId + '/graph', {
+                source: document.getElementById('panel-graph'),
+                target: '#panel-graph', swap: 'innerHTML',
+            }).then(() => renderNetworkGraph(d));
         }
 
-        renderOverview(d);
-        renderNetwork(d);
-        renderDns(d);
-        renderHttp(d);
-        renderTls(d);
-        renderData(d);
-        renderIsakmp(d);
-        renderExtractedFiles(d);
-        renderJA3(d);
-        renderCredentials(d);
-        renderJA3S(d);
-        renderHASSH(d);
-        renderJA4(d);
-        renderCerts(d);
-        renderHosts(d);
-        renderBeacons(d);
-        renderSMB(d);
-        renderKerberos(d);
-        renderHTTPFiles(d);
-        renderARP(d);
-        renderBase64(d);
-        renderStreams(d);
-        renderEmail(d);
-        renderNetworkGraph(d);
-        renderFindings(d);
-        renderThreatIntel(d);
     }
 
-    function card(label, value, sub) {
-        return `<div class="summary-card"><div class="card-label">${label}</div><div class="card-value">${value}</div>${sub ? `<div class="card-sub">${sub}</div>` : ''}</div>`;
-    }
 
-    function renderOverview(d) {
-        const protos = d.protocols || {};
-        const total = Object.values(protos).reduce((a, b) => a + b, 0) || 1;
-        const colors = { TCP: 'tcp', UDP: 'udp', ICMP: 'icmp' };
-        let bars = '';
-        for (const [proto, count] of Object.entries(protos)) {
-            const pct = (count / total * 100).toFixed(1);
-            const cls = colors[proto] || 'other';
-            bars += `<div class="proto-bar-row">
-                <div class="proto-label">${esc(proto)}</div>
-                <div class="proto-bar-bg"><div class="proto-bar-fill ${cls}" data-ion-style="width:${pct}%"></div></div>
-                <div class="proto-count">${fmtNum(count)} (${pct}%)</div>
-            </div>`;
-        }
 
-        let convBars = '';
-        const convMax = (d.conversations || []).length > 0 ? d.conversations[0].bytes : 1;
-        for (const c of (d.conversations || []).slice(0, 10)) {
-            const pct = (c.bytes / convMax * 100).toFixed(1);
-            convBars += `<div class="conv-bar">
-                <div class="conv-pair" title="${esc(c.pair)}">${esc(c.pair)}</div>
-                <div class="conv-bar-bg"><div class="conv-bar-fill" data-ion-style="width:${pct}%"></div></div>
-                <div class="conv-bytes">${fmtBytes(c.bytes)}</div>
-            </div>`;
-        }
 
-        document.getElementById('panel-overview').innerHTML =
-            `<h3 class="mt-0 mr-0 mb-3 ml-0 text-[.95rem]">Protocol Distribution</h3>${bars}` +
-            `<h3 class="mt-5 mr-0 mb-3 ml-0 text-[.95rem]">Top Conversations</h3>${convBars || '<p class="text-[var(--text-secondary)] text-[.85rem]">No conversations recorded.</p>'}`;
-    }
 
-    function renderNetwork(d) {
-        let html = '<div class="grid grid-cols-2 gap-5">';
-        html += '<div><h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">Top Source IPs</h3>' + ipTable(d.top_src_ips) + '</div>';
-        html += '<div><h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">Top Destination IPs</h3>' + ipTable(d.top_dst_ips) + '</div>';
-        html += '</div>';
-        html += '<div class="grid grid-cols-2 gap-5 mt-5">';
-        html += '<div><h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">Top Source Ports</h3>' + portTable(d.top_src_ports) + '</div>';
-        html += '<div><h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">Top Destination Ports</h3>' + portTable(d.top_dst_ports) + '</div>';
-        html += '</div>';
-        document.getElementById('panel-network').innerHTML = html;
-    }
-
-    function ipTable(items) {
-        if (!items || !items.length) return '<p class="text-[var(--text-secondary)] text-[.85rem]">No data</p>';
-        const top = items.slice(0, 15);
-        const max = Math.max(...top.map(i => i.count), 1);
-        let rows = top.map(i => {
-            const pct = (i.count / max * 100).toFixed(1);
-            return `<tr><td class="font-mono">${esc(i.ip)}</td><td class="text-right bar-cell"><span class="mini-bar" data-ion-style="width:${pct}%"></span><span class="mini-val">${fmtNum(i.count)}</span></td></tr>`;
-        }).join('');
-        return `<table class="pcap-table"><thead><tr><th>IP Address</th><th class="text-right">Packets</th></tr></thead><tbody>${rows}</tbody></table>`;
-    }
-
-    function portTable(items) {
-        if (!items || !items.length) return '<p class="text-[var(--text-secondary)] text-[.85rem]">No data</p>';
-        const top = items.slice(0, 15);
-        const max = Math.max(...top.map(i => i.count), 1);
-        let rows = top.map(i => {
-            const pct = (i.count / max * 100).toFixed(1);
-            return `<tr><td>${i.port}</td><td class="text-right bar-cell"><span class="mini-bar" data-ion-style="width:${pct}%"></span><span class="mini-val">${fmtNum(i.count)}</span></td></tr>`;
-        }).join('');
-        return `<table class="pcap-table"><thead><tr><th>Port</th><th class="text-right">Packets</th></tr></thead><tbody>${rows}</tbody></table>`;
-    }
-
-    function renderDns(d) {
-        const items = d.dns_queries || [];
-        if (!items.length) {
-            document.getElementById('panel-dns').innerHTML = '<p class="text-[var(--text-secondary)] text-[.85rem] p-5">No DNS queries captured.</p>';
-            return;
-        }
-        let rows = items.slice(0, 40).map(i =>
-            `<tr><td class="font-mono break-all">${esc(i.query)}</td><td class="text-right">${fmtNum(i.count)}</td></tr>`
-        ).join('');
-        document.getElementById('panel-dns').innerHTML =
-            `<h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">DNS Queries (${items.length} unique)</h3>` +
-            `<table class="pcap-table"><thead><tr><th>Query</th><th class="text-right">Count</th></tr></thead><tbody>${rows}</tbody></table>`;
-    }
-
-    function renderHttp(d) {
-        const items = d.http_requests || [];
-        if (!items.length) {
-            document.getElementById('panel-http').innerHTML = '<p class="text-[var(--text-secondary)] text-[.85rem] p-5">No HTTP requests captured.</p>';
-            return;
-        }
-        let rows = items.slice(0, 40).map(i =>
-            `<tr><td class="font-mono break-all">${esc(i.request)}</td><td class="text-right">${fmtNum(i.count)}</td></tr>`
-        ).join('');
-        document.getElementById('panel-http').innerHTML =
-            `<h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">HTTP Requests (${items.length} unique)</h3>` +
-            `<table class="pcap-table"><thead><tr><th>Request</th><th class="text-right">Count</th></tr></thead><tbody>${rows}</tbody></table>`;
-    }
-
-    function renderTls(d) {
-        const items = d.tls_handshakes || [];
-        if (!items.length) {
-            document.getElementById('panel-tls').innerHTML = '<p class="text-[var(--text-secondary)] text-[.85rem] p-5">No TLS handshakes captured.</p>';
-            return;
-        }
-        let rows = items.slice(0, 40).map(i =>
-            `<tr><td class="font-mono">${esc(i.sni)}</td><td class="text-right">${fmtNum(i.count)}</td></tr>`
-        ).join('');
-        document.getElementById('panel-tls').innerHTML =
-            `<h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">TLS Server Name Indications (${items.length} unique)</h3>` +
-            `<table class="pcap-table"><thead><tr><th>SNI</th><th class="text-right">Handshakes</th></tr></thead><tbody>${rows}</tbody></table>`;
-    }
-
-    function renderData(d) {
-        const dt = d.data_transfer || {};
-        const byIp = dt.by_ip || [];
-        if (!byIp.length) {
-            document.getElementById('panel-data').innerHTML = '<p class="text-[var(--text-secondary)] text-[.85rem] p-5">No data transfer information.</p>';
-            return;
-        }
-        const top = byIp.slice(0, 20);
-        const maxTotal = Math.max(...top.map(i => i.sent + i.received), 1);
-        // Direction bars: length = share of the busiest host's volume; the split
-        // between amber (sent) and blue (received) makes outbound-heavy hosts —
-        // the exfiltration shape — jump out.
-        const bars = top.map(i => {
-            const total = i.sent + i.received;
-            const sentPct = (i.sent / maxTotal * 100).toFixed(1);
-            const recvPct = (i.received / maxTotal * 100).toFixed(1);
-            const exfil = i.received > 0 && i.sent / i.received > 3 && i.sent > 100000;
-            const ratio = i.received > 0 ? (i.sent / i.received).toFixed(1) + ':1' : '∞';
-            return `<div class="dt-row">
-                <div class="dt-ip" title="${esc(i.ip)}">${esc(i.ip)}</div>
-                <div class="dt-track"><div class="dt-sent" data-ion-style="width:${sentPct}%"></div><div class="dt-recv" data-ion-style="width:${recvPct}%"></div></div>
-                <div class="dt-vals">${fmtBytes(total)} · <span class="${exfil ? 'dt-exfil' : ''}">${ratio}</span></div>
-            </div>`;
-        }).join('');
-        const rows = top.map(i => {
-            const total = i.sent + i.received;
-            const ratio = i.received > 0 ? (i.sent / i.received).toFixed(1) : '∞';
-            return `<tr>
-                <td class="font-mono">${esc(i.ip)}</td>
-                <td class="text-right">${fmtBytes(i.sent)}</td>
-                <td class="text-right">${fmtBytes(i.received)}</td>
-                <td class="text-right">${fmtBytes(total)}</td>
-                <td class="text-right">${ratio}:1</td>
-            </tr>`;
-        }).join('');
-        document.getElementById('panel-data').innerHTML =
-            `<h3 class="mt-0 mr-0 mb-1 ml-0 text-[.95rem]">Data Transfer</h3>` +
-            `<p class="text-[var(--text-secondary)] text-[.82rem] mt-0 mr-0 mb-3 ml-0">Total: ${fmtBytes(dt.total_bytes || 0)}</p>` +
-            `<div class="dt-legend"><span class="dt-l-sent">Sent (outbound)</span><span class="dt-l-recv">Received (inbound)</span></div>` +
-            bars +
-            `<table class="pcap-table ion-u-mt-16"><thead><tr><th>IP</th><th class="text-right">Sent</th><th class="text-right">Received</th><th class="text-right">Total</th><th class="text-right">Send:Recv</th></tr></thead><tbody>${rows}</tbody></table>`;
-    }
-
-    function renderIsakmp(d) {
-        const items = d.isakmp_sessions || [];
-        const tab = document.getElementById('tab-isakmp');
-        if (!items.length) {
-            tab.style.display = 'none';
-            document.getElementById('panel-isakmp').innerHTML = '';
-            return;
-        }
-        tab.style.display = '';
-        const statusClass = s => s.toLowerCase().replace(/\s+/g, '-');
-        let rows = items.map(s => {
-            const errStr = (s.errors || []).length ? `<br><span class="text-[var(--sev-critical)] text-xs">${s.errors.map(esc).join(', ')}</span>` : '';
-            return `<tr>
-                <td><span class="ike-status ${statusClass(s.status)}">${esc(s.status)}</span>${errStr}</td>
-                <td class="font-mono text-xs" title="Init: ${esc(s.init_spi)}">${esc(s.initiator || '-')}</td>
-                <td class="font-mono text-xs">${esc(s.responder || '-')}</td>
-                <td>${esc(s.ike_version)}</td>
-                <td class="text-[.78rem]">${(s.exchanges || []).map(esc).join(', ')}</td>
-                <td class="text-center">${s.initiator_packets}i / ${s.responder_packets}r</td>
-                <td class="text-center">${s.retransmits}</td>
-                <td class="text-right">${s.duration}s</td>
-            </tr>`;
-        }).join('');
-        const established = items.filter(s => s.status === 'Established').length;
-        const failed = items.filter(s => s.status === 'Failed').length;
-        const noResp = items.filter(s => s.status === 'No Response').length;
-        const incomplete = items.filter(s => s.status === 'Incomplete').length;
-        let summary = `<div class="flex gap-4 mb-3 flex-wrap">`;
-        summary += `<span><strong>${items.length}</strong> session(s)</span>`;
-        if (established) summary += `<span><span class="ike-status established">Established</span> ${established}</span>`;
-        if (failed) summary += `<span><span class="ike-status failed">Failed</span> ${failed}</span>`;
-        if (noResp) summary += `<span><span class="ike-status no-response">No Response</span> ${noResp}</span>`;
-        if (incomplete) summary += `<span><span class="ike-status incomplete">Incomplete</span> ${incomplete}</span>`;
-        summary += '</div>';
-        document.getElementById('panel-isakmp').innerHTML =
-            `<h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">ISAKMP / IKE Sessions</h3>` +
-            summary +
-            `<table class="pcap-table"><thead><tr>
-                <th>Status</th><th>Initiator</th><th>Responder</th><th>IKE Ver</th>
-                <th>Exchanges</th><th class="text-center">Packets</th>
-                <th class="text-center">Retrans</th><th class="text-right">Duration</th>
-            </tr></thead><tbody>${rows}</tbody></table>`;
-    }
 
     // ── Extracted Files ──
-    function renderExtractedFiles(d) {
-        const files = d.extracted_files || [];
-        const tab = document.getElementById('tab-files');
-        const badge = document.getElementById('files-count-badge');
-        if (!files.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        badge.style.display = 'inline';
-        badge.textContent = files.length;
-        badge.style.cssText = 'display:inline;background:var(--sev-high);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
-
-        const panel = document.getElementById('panel-files');
-        panel.innerHTML = `<h3>Extracted Files (${files.length})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">Files carved from reassembled TCP streams by magic byte signature.</p>
-        <table class="pcap-table"><thead><tr><th>File</th><th>Type</th><th>Size</th><th>MD5</th><th>SHA-256</th><th>Source</th><th>Destination</th></tr></thead><tbody>
-        ${files.map(f => `<tr>
-            <td><strong>${esc(f.filename)}</strong></td>
-            <td>${esc(f.mime_type)}</td>
-            <td>${fmtBytes(f.size)}</td>
-            <td><code class="text-[.7rem] break-all">${esc(f.md5)}</code></td>
-            <td><code class="text-[.65rem] break-all">${esc(f.sha256)}</code></td>
-            <td>${esc(f.src_ip)}</td>
-            <td>${esc(f.dst_ip)}</td>
-        </tr>`).join('')}
-        </tbody></table>`;
-    }
 
     // ── JA3 Fingerprints ──
-    function renderJA3(d) {
-        const fps = d.ja3_fingerprints || [];
-        const tab = document.getElementById('tab-ja3');
-        const badge = document.getElementById('ja3-count-badge');
-        if (!fps.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        const badCount = fps.filter(f => f.known_malware).length;
-        badge.style.display = 'inline';
-        badge.textContent = fps.length;
-        badge.style.cssText = `display:inline;background:${badCount ? 'var(--sev-critical)' : 'var(--primary)'};color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;`;
-
-        const panel = document.getElementById('panel-ja3');
-        panel.innerHTML = `<h3>JA3 TLS Fingerprints (${fps.length})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">TLS ClientHello fingerprints computed from the PCAP. Known-malware matches are highlighted.</p>
-        <table class="pcap-table"><thead><tr><th>JA3 Hash</th><th>SNI</th><th>Source</th><th>Destination</th><th>Malware Match</th></tr></thead><tbody>
-        ${fps.map(f => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
-            <td><code class="text-[.72rem]">${esc(f.ja3_hash)}</code></td>
-            <td>${esc(f.sni || '-')}</td>
-            <td>${esc(f.src_ip)}</td>
-            <td>${esc(f.dst_ip)}:${f.dst_port}</td>
-            <td>${f.known_malware ? `<span class="text-[var(--sev-critical)] font-bold">${esc(f.known_malware)}</span>` : '<span class="text-[var(--text-secondary)]">No match</span>'}</td>
-        </tr>`).join('')}
-        </tbody></table>`;
-    }
 
     // ── Credentials ──
-    function renderCredentials(d) {
-        const creds = d.credential_captures || [];
-        const tab = document.getElementById('tab-creds');
-        const badge = document.getElementById('creds-count-badge');
-        if (!creds.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        badge.style.display = 'inline';
-        badge.textContent = creds.length;
-        badge.style.cssText = 'display:inline;background:var(--sev-critical);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
-
-        const panel = document.getElementById('panel-creds');
-        panel.innerHTML = `<h3>Captured Credentials (${creds.length})</h3>
-        <p class="text-[var(--sev-critical)] text-[.82rem] mb-3 font-semibold">Credentials and authentication hashes found in cleartext or weak protocols.</p>
-        <table class="pcap-table"><thead><tr><th>Protocol</th><th>Username</th><th>Credential / Hash</th><th>Source</th><th>Destination</th><th>Detail</th></tr></thead><tbody>
-        ${creds.map(c => `<tr class="bg-[rgba(248,81,73,.05)]">
-            <td><strong>${esc(c.protocol)}</strong></td>
-            <td><code>${esc(c.username)}</code></td>
-            <td><code class="text-[.7rem] break-all max-w-[200px] inline-block overflow-hidden text-ellipsis">${esc(c.credential)}</code></td>
-            <td>${esc(c.src_ip)}</td>
-            <td>${esc(c.dst_ip)}</td>
-            <td class="text-[.78rem] text-[var(--text-secondary)]">${esc(c.detail)}</td>
-        </tr>`).join('')}
-        </tbody></table>`;
-    }
 
     // ── JA3S (Server TLS Fingerprints) ──
-    function renderJA3S(d) {
-        const fps = d.ja3s_fingerprints || [];
-        const tab = document.getElementById('tab-ja3s');
-        const badge = document.getElementById('ja3s-count-badge');
-        if (!fps.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        const badCount = fps.filter(f => f.known_malware).length;
-        badge.style.display = 'inline';
-        badge.textContent = fps.length;
-        badge.style.cssText = `display:inline;background:${badCount ? 'var(--sev-critical)' : 'var(--primary)'};color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;`;
-        document.getElementById('panel-ja3s').innerHTML = `<h3>JA3S Server Fingerprints (${fps.length})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">TLS ServerHello fingerprints. Pairs with JA3 for C2 server identification.</p>
-        <table class="pcap-table"><thead><tr><th>JA3S Hash</th><th>Server</th><th>Client</th><th>Port</th><th>Malware Match</th></tr></thead><tbody>
-        ${fps.map(f => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
-            <td><code class="text-[.72rem]">${esc(f.ja3s_hash)}</code></td>
-            <td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td><td>${f.src_port}</td>
-            <td>${f.known_malware ? `<span class="text-[var(--sev-critical)] font-bold">${esc(f.known_malware)}</span>` : '<span class="text-[var(--text-secondary)]">No match</span>'}</td>
-        </tr>`).join('')}</tbody></table>`;
-    }
 
     // ── HASSH (SSH Fingerprints) ──
-    function renderHASSH(d) {
-        const fps = d.hassh_fingerprints || [];
-        const tab = document.getElementById('tab-hassh');
-        const badge = document.getElementById('hassh-count-badge');
-        if (!fps.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        badge.style.display = 'inline';
-        badge.textContent = fps.length;
-        badge.style.cssText = 'display:inline;background:var(--primary);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
-        document.getElementById('panel-hassh').innerHTML = `<h3>HASSH SSH Fingerprints (${fps.length})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">SSH KEX_INIT fingerprints for client and server identification.</p>
-        <table class="pcap-table"><thead><tr><th>HASSH Hash</th><th>Direction</th><th>Source</th><th>Destination</th><th>SSH Version</th><th>Match</th></tr></thead><tbody>
-        ${fps.map(f => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
-            <td><code class="text-[.72rem]">${esc(f.hassh_hash)}</code></td>
-            <td>${esc(f.direction)}</td><td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td>
-            <td class="text-[.78rem]">${esc(f.ssh_version || '-')}</td>
-            <td>${f.known_malware ? `<span class="text-[var(--sev-critical)] font-bold">${esc(f.known_malware)}</span>` : '-'}</td>
-        </tr>`).join('')}</tbody></table>`;
-    }
 
     // ── JA4 / JA4S Fingerprints (FoxIO JA4+) ──
-    function renderJA4(d) {
-        const cli = d.ja4_fingerprints || [];
-        const srv = d.ja4s_fingerprints || [];
-        const tab = document.getElementById('tab-ja4');
-        const badge = document.getElementById('ja4-count-badge');
-        const total = cli.length + srv.length;
-        if (!total) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        const badCount = cli.filter(f => f.known_malware).length;
-        badge.style.display = 'inline';
-        badge.textContent = total;
-        badge.style.cssText = `display:inline;background:${badCount ? 'var(--sev-critical)' : 'var(--primary)'};color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;`;
-
-        let html = `<h3>JA4 / JA4S TLS Fingerprints (${total})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">FoxIO JA4+ fingerprints. JA4 (client) and JA4S (server) are robust to TLS field reordering, unlike JA3. Known-malware matches are highlighted.</p>`;
-        if (cli.length) {
-            html += `<h4 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">JA4 Client (${cli.length})</h4>
-            <table class="pcap-table"><thead><tr><th>JA4</th><th>SNI</th><th>Source</th><th>Destination</th><th>Malware Match</th></tr></thead><tbody>
-            ${cli.map(f => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
-                <td><code class="text-[.72rem]">${esc(f.ja4)}</code></td>
-                <td>${esc(f.sni || '-')}</td>
-                <td>${esc(f.src_ip)}</td>
-                <td>${esc(f.dst_ip)}${f.dst_port ? ':' + f.dst_port : ''}</td>
-                <td>${f.known_malware ? `<span class="text-[var(--sev-critical)] font-bold">${esc(f.known_malware)}</span>` : '<span class="text-[var(--text-secondary)]">No match</span>'}</td>
-            </tr>`).join('')}
-            </tbody></table>`;
-        }
-        if (srv.length) {
-            html += `<h4 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">JA4S Server (${srv.length})</h4>
-            <table class="pcap-table"><thead><tr><th>JA4S</th><th>Server</th><th>Client</th><th>Port</th></tr></thead><tbody>
-            ${srv.map(f => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
-                <td><code class="text-[.72rem]">${esc(f.ja4s)}</code></td>
-                <td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td><td>${f.src_port || '-'}</td>
-            </tr>`).join('')}
-            </tbody></table>`;
-        }
-        document.getElementById('panel-ja4').innerHTML = html;
-    }
 
     // ── TLS Certificates ──
-    function renderCerts(d) {
-        const certs = d.tls_certificates || [];
-        const tab = document.getElementById('tab-certs');
-        const badge = document.getElementById('certs-count-badge');
-        if (!certs.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        const flagged = certs.filter(c => c.self_signed).length;
-        badge.style.display = 'inline';
-        badge.textContent = certs.length;
-        badge.style.cssText = `display:inline;background:${flagged ? 'var(--sev-medium)' : 'var(--primary)'};color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;`;
-        document.getElementById('panel-certs').innerHTML = `<h3>TLS Certificates (${certs.length})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">Leaf X.509 certificates carved from TLS server handshakes. Self-signed and known-malicious (e.g. Cobalt Strike) certs are flagged.</p>
-        <table class="pcap-table"><thead><tr><th>Server</th><th>Subject</th><th>Issuer</th><th>Self-signed</th><th>Validity</th><th>Serial</th></tr></thead><tbody>
-        ${certs.map(c => `<tr>
-            <td>${esc(c.server_ip || '-')}</td>
-            <td class="font-mono">${esc(c.subject || '-')}</td>
-            <td class="font-mono">${esc(c.issuer || '-')}</td>
-            <td>${c.self_signed ? '<span class="text-[var(--sev-critical)] font-bold">yes</span>' : '<span class="text-[var(--text-secondary)]">no</span>'}</td>
-            <td>${c.validity_days != null ? Math.round(c.validity_days / 365) + 'y' : '-'}</td>
-            <td><code class="text-[.72rem]">${esc(c.serial || '-')}</code></td>
-        </tr>`).join('')}
-        </tbody></table>`;
-    }
 
     // ── Host Profiles (OS fingerprint + role rollup) ──
-    function renderHosts(d) {
-        const hosts = d.host_profiles || [];
-        const tab = document.getElementById('tab-hosts');
-        const badge = document.getElementById('hosts-count-badge');
-        if (!hosts.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        badge.style.display = 'inline';
-        badge.textContent = hosts.length;
-        badge.style.cssText = 'display:inline;background:var(--info);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
-        document.getElementById('panel-hosts').innerHTML = `<h3>Host Profiles (${hosts.length})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">Per-host rollup: passive OS fingerprint (p0f-style, from TCP SYN), client/server role, fingerprints, SNIs, beacons, and finding count.</p>
-        <table class="pcap-table"><thead><tr><th>Host</th><th>OS</th><th>Role</th><th>Sent</th><th>Received</th><th>SNIs</th><th>Beacons</th><th>Findings</th></tr></thead><tbody>
-        ${hosts.map(h => `<tr>
-            <td><strong>${esc(h.ip)}</strong></td>
-            <td>${esc(h.os || '-')}${h.os_evidence ? ` <span class="text-[.78rem]">(${esc(h.os_evidence)})</span>` : ''}</td>
-            <td>${(h.role || []).map(r => esc(r)).join(', ')}</td>
-            <td class="text-right">${fmtBytes(h.sent || 0)}</td>
-            <td class="text-right">${fmtBytes(h.received || 0)}</td>
-            <td class="text-[.78rem]">${(h.snis || []).slice(0, 4).map(s => esc(s)).join(', ') || '-'}</td>
-            <td class="text-right">${h.beacons || 0}</td>
-            <td class="text-right">${h.findings || 0}</td>
-        </tr>`).join('')}
-        </tbody></table>`;
-    }
 
     // ── Beaconing (RITA-style scoring) ──
-    function renderBeacons(d) {
-        const beacons = (d.beacons || []).filter(b => (b.score || 0) >= 0.85);
-        const tab = document.getElementById('tab-beacons');
-        const badge = document.getElementById('beacons-count-badge');
-        if (!beacons.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        const strong = beacons.filter(b => b.score >= 0.9).length;
-        badge.style.display = 'inline';
-        badge.textContent = beacons.length;
-        badge.style.cssText = `display:inline;background:${strong ? 'var(--sev-high)' : 'var(--sev-medium)'};color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;`;
-        document.getElementById('panel-beacons').innerHTML = `<h3>Beaconing Candidates (${beacons.length})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">RITA-style scoring of connection regularity (interval + payload-size consistency). A near-1.0 score is metronome-regular traffic — a hallmark of automated C2.</p>
-        <table class="pcap-table"><thead><tr><th>Source</th><th>Destination</th><th>Port</th><th>Score</th><th>Connections</th><th>Interval</th></tr></thead><tbody>
-        ${beacons.map(b => `<tr class="bg-[rgba(248,81,73,.05)]">
-            <td>${esc(b.src)}</td><td>${esc(b.dst)}</td><td>${b.port}</td>
-            <td><strong>${b.score}</strong></td>
-            <td class="text-right">${b.connections}</td>
-            <td class="text-right">~${b.interval_s}s</td>
-        </tr>`).join('')}
-        </tbody></table>`;
-    }
 
     // ── SMB Transfers ──
-    function renderSMB(d) {
-        const items = d.smb_transfers || [];
-        const tab = document.getElementById('tab-smb');
-        const badge = document.getElementById('smb-count-badge');
-        if (!items.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        badge.style.display = 'inline';
-        badge.textContent = items.length;
-        badge.style.cssText = 'display:inline;background:var(--warning);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
-        document.getElementById('panel-smb').innerHTML = `<h3>SMB File Operations (${items.length})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">SMB/CIFS file operations detected on port 445/139. May indicate lateral movement.</p>
-        <table class="pcap-table"><thead><tr><th>Command</th><th>Source</th><th>Destination</th><th>Detail</th></tr></thead><tbody>
-        ${items.map(s => `<tr><td><strong>${esc(s.command)}</strong></td><td>${esc(s.src_ip)}</td><td>${esc(s.dst_ip)}</td><td class="text-[.78rem] text-[var(--text-secondary)]">${esc(s.detail)}</td></tr>`).join('')}
-        </tbody></table>`;
-    }
 
     // ── Kerberos Tickets ──
-    function renderKerberos(d) {
-        const items = d.kerberos_tickets || [];
-        const tab = document.getElementById('tab-kerberos');
-        const badge = document.getElementById('kerberos-count-badge');
-        if (!items.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        badge.style.display = 'inline';
-        badge.textContent = items.length;
-        badge.style.cssText = 'display:inline;background:var(--info);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
-        document.getElementById('panel-kerberos').innerHTML = `<h3>Kerberos Traffic (${items.length})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">Kerberos authentication messages on port 88. AS-REP/TGS-REP may contain extractable tickets.</p>
-        <table class="pcap-table"><thead><tr><th>Type</th><th>Source</th><th>Destination</th><th>Detail</th></tr></thead><tbody>
-        ${items.map(k => `<tr><td><strong>${esc(k.msg_type)}</strong></td><td>${esc(k.src_ip)}</td><td>${esc(k.dst_ip)}</td><td class="text-[.78rem]">${esc(k.detail)}</td></tr>`).join('')}
-        </tbody></table>`;
-    }
 
     // ── HTTP Files ──
-    function renderHTTPFiles(d) {
-        const items = d.http_files || [];
-        const tab = document.getElementById('tab-httpfiles');
-        const badge = document.getElementById('httpfiles-count-badge');
-        if (!items.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        badge.style.display = 'inline';
-        badge.textContent = items.length;
-        badge.style.cssText = 'display:inline;background:var(--sev-high);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
-        document.getElementById('panel-httpfiles').innerHTML = `<h3>HTTP File Transfers (${items.length})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">Files reconstructed from HTTP response bodies via Content-Type headers.</p>
-        <table class="pcap-table"><thead><tr><th>Filename</th><th>Content-Type</th><th>Size</th><th>MD5</th><th>Source</th><th>Destination</th></tr></thead><tbody>
-        ${items.map(f => `<tr>
-            <td><strong>${esc(f.filename)}</strong></td><td>${esc(f.content_type)}</td><td>${fmtBytes(f.size)}</td>
-            <td><code class="text-[.7rem]">${esc(f.md5)}</code></td><td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td>
-        </tr>`).join('')}</tbody></table>`;
-    }
 
     // ── ARP Anomalies ──
-    function renderARP(d) {
-        const items = d.arp_anomalies || [];
-        const tab = document.getElementById('tab-arp');
-        const badge = document.getElementById('arp-count-badge');
-        if (!items.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        badge.style.display = 'inline';
-        badge.textContent = items.length;
-        badge.style.cssText = 'display:inline;background:var(--sev-critical);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
-        document.getElementById('panel-arp').innerHTML = `<h3>ARP Anomalies (${items.length})</h3>
-        <p class="text-[var(--sev-critical)] text-[.82rem] mb-3 font-semibold">MAC addresses claiming multiple IPs — possible ARP spoofing / MITM.</p>
-        <table class="pcap-table"><thead><tr><th>MAC</th><th>IPs Claimed</th><th>Severity</th><th>Detail</th></tr></thead><tbody>
-        ${items.map(a => `<tr class="bg-[rgba(248,81,73,.05)]">
-            <td><code>${esc(a.mac)}</code></td><td>${(a.ips||[]).map(ip => esc(ip)).join(', ')}</td>
-            <td><span class="font-bold" data-ion-style="color:var(--sev-${a.severity})">${esc(a.severity)}</span></td>
-            <td class="text-[.78rem]">${esc(a.detail)}</td>
-        </tr>`).join('')}</tbody></table>`;
-    }
 
     // ── Base64 Payloads ──
-    function renderBase64(d) {
-        const items = d.base64_payloads || [];
-        const tab = document.getElementById('tab-b64');
-        const badge = document.getElementById('b64-count-badge');
-        if (!items.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        badge.style.display = 'inline';
-        badge.textContent = items.length;
-        badge.style.cssText = 'display:inline;background:var(--sev-high);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
-        document.getElementById('panel-b64').innerHTML = `<h3>Base64 Encoded Payloads (${items.length})</h3>
-        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">Base64-encoded scripts or binary payloads found in HTTP streams. May indicate obfuscated C2 or malware delivery.</p>
-        <table class="pcap-table"><thead><tr><th>Type</th><th>Encoded Size</th><th>Decoded Size</th><th>Source</th><th>Destination</th><th>Preview</th></tr></thead><tbody>
-        ${items.map(b => `<tr class="bg-[rgba(248,81,73,.05)]">
-            <td><strong>${esc(b.type)}</strong></td><td>${fmtBytes(b.encoded_length)}</td><td>${fmtBytes(b.decoded_length)}</td>
-            <td>${esc(b.src_ip)}</td><td>${esc(b.dst_ip)}:${b.port}</td>
-            <td><code class="text-[.68rem] break-all max-w-[300px] inline-block overflow-hidden text-ellipsis">${esc(b.preview)}</code></td>
-        </tr>`).join('')}</tbody></table>`;
-    }
 
     // ── Network Graph (vis-network) ──
-    function renderStreams(d) {
-        const items = d.tcp_streams || [];
-        const tab = document.getElementById('tab-streams');
-        const badge = document.getElementById('streams-count-badge');
-        if (!items.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        badge.style.cssText = 'display:inline;background:var(--info);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
-        badge.textContent = items.length;
-        const rows = items.map(s => `
-            <details class="stream-item">
-                <summary><code>${esc(s.src)}:${s.sport} → ${esc(s.dst)}:${s.dport}</code>
-                    <span class="stream-size">${fmtBytes(s.size)}${s.truncated ? ' · truncated' : ''}</span></summary>
-                <pre class="stream-preview">${esc(s.preview)}</pre>
-            </details>`).join('');
-        document.getElementById('panel-streams').innerHTML =
-            `<h3>TCP Streams (${items.length})</h3>` +
-            `<p class="findings-hint">Top conversations by size — expand to follow the reassembled payload.</p>` + rows;
-    }
 
-    function renderEmail(d) {
-        const items = d.email_messages || [];
-        const tab = document.getElementById('tab-email');
-        const badge = document.getElementById('email-count-badge');
-        if (!items.length) { tab.style.display = 'none'; return; }
-        tab.style.display = '';
-        badge.style.cssText = 'display:inline;background:var(--info);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
-        badge.textContent = items.length;
-        const DANGER = /\.(exe|scr|com|pif|js|jse|vbs|vbe|wsf|hta|jar|lnk|bat|cmd|ps1|docm|xlsm|pptm|iso|img|cpl|msi|dll)$/i;
-        const rows = items.map(m => `<tr>
-            <td>${esc(m.protocol || '')}</td>
-            <td>${esc(m.mail_from || '')}</td>
-            <td>${(m.rcpt_to || []).map(esc).join(', ')}</td>
-            <td>${esc(m.subject || '')}</td>
-            <td>${(m.attachments || []).map(a => DANGER.test(a) ? `<span class="attach-bad">${esc(a)}</span>` : esc(a)).join(', ')}</td>
-        </tr>`).join('');
-        document.getElementById('panel-email').innerHTML =
-            `<h3>Email Messages (${items.length})</h3>` +
-            `<table class="pcap-table"><thead><tr><th>Proto</th><th>From</th><th>To</th><th>Subject</th><th>Attachments</th></tr></thead><tbody>${rows}</tbody></table>`;
-    }
 
+    // The panel chrome and the host counts come from
+    // GET /ui/pcap/{job}/graph, which also renders the empty canvas
+    // container. Only the vis-network call stays here: it draws into a
+    // canvas, so there is no markup for a stylesheet to reach and nothing
+    // to gain from moving it.
+    //
+    // The counts were `stats.total_nodes||0` and four more like it, so a
+    // graph whose stats were not recorded reported zero hosts and zero
+    // connections next to a drawing of them.
     function renderNetworkGraph(d) {
         const graph = d.network_graph || {};
-        const panel = document.getElementById('panel-graph');
-        if (!graph.nodes || !graph.nodes.length) {
-            panel.innerHTML = '<p class="text-[var(--text-secondary)] p-5 text-center">No graph data available.</p>';
-            return;
-        }
-        const stats = graph.stats || {};
-        panel.innerHTML = `
-            <div class="flex justify-between items-center mb-2.5 flex-wrap gap-2">
-                <h3 class="m-0">Network Graph</h3>
-                <div class="text-xs text-[var(--text-secondary)]">
-                    ${stats.total_nodes||0} hosts &middot;
-                    ${stats.total_edges||0} connections &middot;
-                    <span class="text-[var(--primary)]">${stats.internal_nodes||0} internal</span> &middot;
-                    <span class="text-[var(--mitre-covered,#3fb950)]">${stats.external_nodes||0} external</span>
-                    ${stats.suspicious_nodes ? ` &middot; <span class="text-[var(--sev-critical)]">${stats.suspicious_nodes} suspicious</span>` : ''}
-                </div>
-            </div>
-            <div class="h-[500px] bg-[var(--bg-tertiary)] border border-[var(--ion-border)] rounded-[var(--ion-radius-lg)]" id="pcap-graph-canvas"></div>
-        `;
+        if (!graph.nodes || !graph.nodes.length) return;
         // Load vis-network and render
         const script = document.createElement('script');
         script.src = '/static/js/vis-network.min.js';
@@ -1162,23 +447,16 @@
     let _currentJobId = null;
     let _pcapCases = null;
 
-    async function loadPcapCaseOptions() {
+    // GET /ui/pcap/case-options renders the <option> list.
+    // `_pcapCases = r.ok ? ... : []`, with the same `[]` in its catch, so
+    // a failed read rendered "No open cases" and told an analyst with
+    // findings to attach that there was nothing to attach them to.
+    function loadPcapCaseOptions() {
         const select = document.getElementById('pcap-attach-case');
         if (!select) return;
-        if (_pcapCases === null) {
-            try {
-                const r = await fetch('/api/elasticsearch/alerts/cases?status=OPEN&limit=500&sort=case_number&order=desc');
-                _pcapCases = r.ok ? ((await r.json()).cases || []) : [];
-            } catch (e) {
-                _pcapCases = [];
-            }
-        }
-        select.innerHTML = _pcapCases.length
-            ? '<option value="">Select a case...</option>' + _pcapCases.map(c =>
-                  '<option value="' + esc(String(c.id)) + '">'
-                  + esc((c.case_number ? c.case_number + ' - ' : '') + (c.title || ('Case ' + c.id)))
-                  + '</option>').join('')
-            : '<option value="">No open cases</option>';
+        return htmx.ajax('GET', '/ui/pcap/case-options', {
+            source: select, target: select, swap: 'innerHTML',
+        });
     }
 
     async function attachSelectedFindings() {
@@ -1221,45 +499,33 @@
         }
     }
 
-    async function loadPcapHistory() {
+    // GET /ui/pcap/history renders the list. `fmtBytes(j.file_size
+    // || 0)` reported a row with no recorded size as 0 B, and
+    // `(j.finding_count || 0) + ' findings'` said a capture whose finding
+    // count was never recorded had none, which on a history list reads as
+    // a clean capture.
+    //
+    // The reopen buttons are delegated rather than wired per render, so
+    // the fragment does not have to be followed by a JS pass.
+    function loadPcapHistory() {
         const panel = document.getElementById('panel-history');
         if (!panel) return;
-        try {
-            const r = await fetch('/api/pcap/jobs?limit=50');
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            const rows = (await r.json()).jobs || [];
-            if (!rows.length) {
-                panel.innerHTML = '<div class="text-center p-10"><p class="text-[var(--text-secondary)] text-[.9rem]">No captures analysed yet.</p></div>';
-                return;
-            }
-            panel.innerHTML = rows.map(j => {
-                const tone = j.status === 'completed' ? 'badge-success'
-                           : j.status === 'failed' ? 'badge-error'
-                           : j.status === 'cancelled' ? 'badge-ghost' : 'badge-warning';
-                const verdictLabel = (j.verdict && typeof j.verdict === 'object')
-                    ? (j.verdict.label || '') : (j.verdict || '');
-                return '<div class="pcap-history-row">'
-                    + '<span class="badge ' + tone + '">' + esc(j.status) + '</span>'
-                    + '<span>' + esc(j.filename) + '</span>'
-                    + '<span class="mono">' + esc((j.content_sha256 || '').slice(0, 12)) + '</span>'
-                    + '<span class="mono">' + fmtBytes(j.file_size || 0) + '</span>'
-                    + (verdictLabel ? '<span>' + esc(String(verdictLabel)) + '</span>' : '')
-                    + '<span>' + (j.finding_count || 0) + ' finding' + (j.finding_count === 1 ? '' : 's') + '</span>'
-                    + (j.reused_from_id ? '<span class="mono">reused from #' + j.reused_from_id + '</span>' : '')
-                    + '<span class="mono">parser ' + esc(j.parser_version) + '</span>'
-                    + '<span class="mono">' + esc(j.requested_by || 'unknown') + '</span>'
-                    + (j.status === 'completed'
-                        ? '<button type="button" class="btn btn-xs pcap-reopen" data-job-id="' + j.id + '">Reopen</button>'
-                        : '')
-                    + '</div>';
-            }).join('');
-            panel.querySelectorAll('.pcap-reopen').forEach(btn => {
-                btn.addEventListener('click', () => reopenPcapJob(parseInt(btn.dataset.jobId, 10)));
-            });
-        } catch (e) {
-            panel.innerHTML = '<div class="p-6 text-[var(--text-secondary)]">Could not load the analysis history.</div>';
-        }
+        return htmx.ajax('GET', '/ui/pcap/history', {
+            source: panel, target: panel, swap: 'innerHTML',
+        });
     }
+
+    loadPcapHistory().then(() => {
+        if (document.querySelector('#panel-history .pcap-reopen') && !_currentJobId) {
+            resultsDiv.classList.add('visible');
+            activatePanel('history');
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.pcap-reopen');
+        if (btn) reopenPcapJob(parseInt(btn.dataset.jobId, 10));
+    });
 
     async function reopenPcapJob(jobId) {
         try {
@@ -1276,144 +542,7 @@
         }
     }
 
-    function renderFindings(d) {
-        const panel = document.getElementById('panel-findings');
-        // _idx is the finding's index in the stored result. The cards are
-        // sorted by severity below, so display order is not stored order --
-        // attaching by display position would pin the wrong finding.
-        const items = (d.findings || []).map((f, i) => Object.assign({ _idx: i }, f));
-        _findingsFilter = null;
-        if (!items.length) {
-            panel.innerHTML =
-                '<div class="text-center p-10"><div class="text-[2rem] mb-2"><i class="icon-shield-check"></i></div><p class="text-[var(--text-secondary)] text-[.9rem]">No suspicious findings detected</p></div>';
-            return;
-        }
-        const sevOrder = { critical: 0, high: 1, medium: 2, low: 3 };
-        items.sort((a, b) => (sevOrder[a.severity] ?? 9) - (sevOrder[b.severity] ?? 9));
-        const counts = { critical: 0, high: 0, medium: 0, low: 0 };
-        items.forEach(f => { if (counts[f.severity] != null) counts[f.severity]++; });
 
-        const chip = (sev, label) => {
-            const c = sev === 'total' ? items.length : counts[sev];
-            const zero = sev !== 'total' && c === 0;
-            return `<button type="button" class="triage-chip ${sev}${zero ? ' zero' : ''}" data-sev="${sev}" ${zero ? 'disabled' : ''}>
-                <span class="triage-count">${c}</span><span class="triage-label">${label}</span></button>`;
-        };
-
-        const techniques = d.mitre_techniques || [];
-        const rollup = techniques.length
-            ? `<div class="mitre-rollup">` + techniques.map(t =>
-                `<span class="mitre-chip">${esc(t.id)}${t.name ? ` <span class="tname">${esc(t.name)}</span>` : ''}</span>`).join('') + `</div>`
-            : '';
-
-        const cards = items.map(f => {
-            const tids = f.mitre || [];
-            const mitreRow = tids.length
-                ? `<div class="finding-mitre">${tids.map(m => `<span class="finding-tid">${esc(m)}</span>`).join('')}</div>`
-                : '';
-            return `<div class="finding-card ${esc(f.severity)}" data-sev="${esc(f.severity)}">
-                <div class="finding-header">
-                    <label class="pcap-pick" title="Select to attach to a case">
-                        <input type="checkbox" class="pcap-finding-pick" data-finding-index="${f._idx}">
-                    </label>
-                    <span class="finding-sev ${esc(f.severity)}">${esc(f.severity)}</span>
-                    <span class="finding-cat">${esc(f.category)}</span>
-                </div>
-                <div class="finding-title">${esc(f.title)}</div>
-                <div class="finding-detail">${esc(f.detail)}</div>
-                ${mitreRow}
-            </div>`;
-        }).join('');
-
-        panel.innerHTML = `
-            <div class="findings-widget-head">
-                <h3>${items.length} Finding${items.length !== 1 ? 's' : ''}</h3>
-                <span class="findings-hint">Select a severity to filter</span>
-            </div>
-            <div class="findings-triage">
-                ${chip('total', 'All')}${chip('critical', 'Critical')}${chip('high', 'High')}${chip('medium', 'Medium')}${chip('low', 'Low')}
-            </div>
-            ${rollup}
-            <div class="pcap-attach-bar">
-                <span class="pcap-attach-hint">Tick findings to attach them to a case as evidence. Each pin records whether it is an observation, a signature match, an indicator match or an inference.</span>
-                <select id="pcap-attach-case" class="select select-sm"><option value="">Loading cases...</option></select>
-                <button type="button" class="btn btn-sm btn-primary" id="pcap-attach-btn">Attach selected</button>
-            </div>
-            <div id="findings-list">${cards}</div>
-            <div class="findings-empty-filter ion-u-hidden">No findings at this severity.</div>`;
-
-        loadPcapCaseOptions();
-        const attachBtn = panel.querySelector('#pcap-attach-btn');
-        if (attachBtn) attachBtn.addEventListener('click', attachSelectedFindings);
-
-        panel.querySelectorAll('.triage-chip').forEach(ch => {
-            if (ch.classList.contains('zero')) return;
-            ch.addEventListener('click', () => {
-                const s = ch.dataset.sev;
-                _findingsFilter = (s === 'total') ? null : (_findingsFilter === s ? null : s);
-                applyFindingsFilter(panel);
-            });
-        });
-        applyFindingsFilter(panel);
-    }
-
-    function renderThreatIntel(d) {
-        const ti = d.threat_intel;
-        const panel = document.getElementById('panel-threatintel');
-        const badge = document.getElementById('ti-count-badge');
-
-        if (!ti || ti.error) {
-            panel.innerHTML = '<p class="text-[var(--text-secondary)] text-[.85rem] p-5">' +
-                (ti && ti.error ? 'Enrichment error: ' + esc(ti.error) : 'No threat intelligence data — OpenCTI may not be configured.') + '</p>';
-            return;
-        }
-
-        const obs = ti.observables || [];
-        if (!obs.length) {
-            panel.innerHTML = '<p class="text-[var(--text-secondary)] text-[.85rem] p-5">No external IPs or domains found to enrich.</p>';
-            return;
-        }
-
-        // Badge for malicious hits
-        if (ti.malicious_count > 0) {
-            badge.style.display = 'inline';
-            badge.textContent = ti.malicious_count;
-            badge.style.cssText = 'display:inline;background:var(--sev-critical);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
-        }
-
-        const threatColors = { unknown: 'var(--sev-low)', benign: 'var(--mitre-covered)', low: 'var(--info)', medium: 'var(--sev-medium)', high: 'var(--sev-high)', critical: 'var(--sev-critical)' };
-
-        let html = `<div class="mb-3 flex gap-4 flex-wrap text-[.85rem] text-[var(--text-secondary)]">
-            <span>IPs checked: <strong>${ti.ips_checked}</strong></span>
-            <span>Domains checked: <strong>${ti.domains_checked}</strong></span>
-            <span>Total observables: <strong>${ti.total}</strong></span>
-            <span data-ion-style="color:${ti.malicious_count ? 'var(--sev-critical)' : 'var(--mitre-covered)'}">Malicious hits: <strong>${ti.malicious_count}</strong></span>
-        </div>`;
-
-        html += '<table class="pcap-table"><thead><tr><th>Type</th><th>Value</th><th>Threat Level</th><th>Score</th><th>Labels</th><th>Threat Actors</th></tr></thead><tbody>';
-
-        for (const o of obs) {
-            const e = o.enrichment;
-            const level = o.threat_level || 'unknown';
-            const color = threatColors[level] || '#8b949e';
-            const score = e ? (e.score != null ? e.score : '—') : '—';
-            const labels = e && e.labels && e.labels.length ? e.labels.map(l => '<span class="_ion-s-7554583028" data-ion-style="background:' + color + '20;color:' + color + '">' + esc(typeof l === 'string' ? l : l.value || l.name || '') + '</span>').join('') : '—';
-            const actors = e && e.threat_actors && e.threat_actors.length ? e.threat_actors.map(a => esc(typeof a === 'string' ? a : a.name || '')).join(', ') : '—';
-            const rowBg = e && e.is_malicious ? 'background:rgba(248,81,73,0.06);' : '';
-
-            html += `<tr data-ion-style="${rowBg}">
-                <td><span class="text-xs uppercase text-[var(--text-secondary)]">${esc(o.type)}</span></td>
-                <td class="font-mono break-all"><a class="_ion-s-b17605f04d" href="/observables?q=${encodeURIComponent(o.value)}">${esc(o.value)}</a></td>
-                <td><span class="font-semibold text-[.8rem]" data-ion-style="color:${color}">${esc(level)}</span></td>
-                <td class="text-center">${score}</td>
-                <td>${labels}</td>
-                <td>${actors}</td>
-            </tr>`;
-        }
-
-        html += '</tbody></table>';
-        panel.innerHTML = html;
-    }
 
     function showToast(message, type) {
         const container = document.getElementById('toast-container');

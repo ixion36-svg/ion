@@ -1,0 +1,36 @@
+{% macro tree(nodes, depth) %}
+{%- for f in nodes %}
+<div class="{% if depth > 0 %}folder-children{% endif %}">
+  <div class="folder-item{% if f.selected %} active{% endif %}" data-id="{{ f.id }}"
+       data-click-action="selectFolder" data-args='{{ [f.id]|tojson }}'>
+    <span class="folder-icon">
+      {%- if f.children %}<i class="icon-folder-open"></i>{% else %}<i class="icon-folder"></i>{% endif %}
+    </span>
+    <span class="folder-name">{{ f.name if f.name is not none else 'Unnamed folder' }}</span>
+    {#- A count we could not take is not a count of none. -#}
+    {%- if f.documents is not none %}
+    <span class="folder-manage-counts">({{ f.documents }})</span>
+    {%- endif %}
+  </div>
+  {%- if f.children %}{{ tree(f.children, depth + 1) }}{% endif %}
+</div>
+{%- endfor %}
+{% endmacro %}
+{# The sidebar folder tree, from ui/documents.py's folders_view.
+
+   Four states, not three. GET /api/collections needs template:read and
+   this page is gated on document:read, so an account can be entitled to
+   the documents and not to the folders they sit in. The page asked anyway,
+   logged the refusal to the console and carried on, so that account got an
+   empty sidebar and no reason for it.
+#}
+{% if state == 'withheld' %}
+<p class="doc-filter-notice">Folders need permission to read the folder
+  hierarchy, which this account does not have.</p>
+{% elif state == 'failed' %}
+<p class="doc-filter-notice">Folders unavailable: the hierarchy did not answer.</p>
+{% elif state == 'empty' %}
+<p class="empty-state">No folders yet</p>
+{% else %}
+{{ tree(nodes, 0) }}
+{% endif %}

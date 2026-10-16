@@ -8,32 +8,20 @@
   <link rel="stylesheet" href="/static/css/ion.css?v={{ ion_version }}">
   <link rel="stylesheet" href="/static/css/ion-migrated-styles.css?v={{ ion_version }}">
   <script nonce="{{ csp_nonce }}" src="/static/js/theme-init.js?v={{ ion_version }}"></script>
-  <style nonce="{{ csp_nonce }}">
-    /* Standalone wall display has no 56px nav; .ion-tw-page subtracts that. */
-    .ion-tw-page { min-height: 100vh; height: 100%; }
-    /* Hide scrollbars on the wall display */
-    html, body { scrollbar-width: none; }
-    ::-webkit-scrollbar { display: none; }
-    .wb-pulse-down { animation: wb-pulse 2s infinite; }
-    @keyframes wb-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
-    /* v0.39.6: attention banner + panel-emphasis states (unattended wall).
-       JS replaces #wb-attention.className and toggles wb-panel-* on the
-       cases card, so these cannot move onto daisyUI utility classes. */
-    #wb-attention { transition: background-color .4s ease, border-color .4s ease; }
-    .wb-att-dot { width: 12px; height: 12px; border-radius: 9999px; flex: none; }
-    .wb-att-ok       { background: color-mix(in oklab, var(--color-success) 10%, transparent); border-color: color-mix(in oklab, var(--color-success) 30%, transparent); }
-    .wb-att-warning  { background: color-mix(in oklab, var(--color-warning) 13%, transparent); border-color: color-mix(in oklab, var(--color-warning) 45%, transparent); }
-    .wb-att-critical { background: color-mix(in oklab, var(--color-error) 18%, transparent);  border-color: color-mix(in oklab, var(--color-error) 65%, transparent); animation: wb-att-flash 1.3s ease-in-out infinite; }
-    @keyframes wb-att-flash { 0%,100% { background: color-mix(in oklab, var(--color-error) 16%, transparent); } 50% { background: color-mix(in oklab, var(--color-error) 36%, transparent); } }
-    .wb-panel-warning  { border-color: color-mix(in oklab, var(--color-warning) 50%, transparent) !important; box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-warning) 25%, transparent), 0 0 26px color-mix(in oklab, var(--color-warning) 8%, transparent); }
-    .wb-panel-critical { border-color: color-mix(in oklab, var(--color-error) 65%, transparent) !important; box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-error) 35%, transparent), 0 0 30px color-mix(in oklab, var(--color-error) 12%, transparent); }
-  </style>
+  <link rel="stylesheet" href="/static/css/wallboard-page.css?v={{ ion_version }}">
+  <!-- htmx must not inject its indicator stylesheet: that element has no
+       nonce and the wall's CSP drops it. The rule lives in ion-legacy.css. -->
+  <meta name="htmx-config" content='{"includeIndicatorStyles":false}'>
+  <script nonce="{{ csp_nonce }}" src="/static/js/htmx.min.js?v={{ ion_version }}"></script>
+  <script nonce="{{ csp_nonce }}" src="/static/js/local-time.js?v={{ ion_version }}"></script>
+  <script nonce="{{ csp_nonce }}" src="/static/js/htmx-errors.js?v={{ ion_version }}"></script>
+  <script nonce="{{ csp_nonce }}" src="/static/js/htmx-busy.js?v={{ ion_version }}"></script>
+  <script nonce="{{ csp_nonce }}" src="/static/js/ion-dynamic-styles.js?v={{ ion_version }}"></script>
 </head>
 <body class="ion-tw ion-tw-page font-sans text-base-content overflow-hidden">
 
   <div class="h-screen flex flex-col px-5 py-4 gap-4">
 
-    <!-- ═══════════════════ HEADER STRIP ═══════════════════ -->
     <header class="flex flex-wrap items-center gap-6">
       <div class="flex items-center gap-3 basis-full md:basis-auto md:flex-1">
         <div class="h-10 w-10 rounded-[8px] bg-gradient-to-br from-primary to-secondary grid place-items-center">
@@ -46,16 +34,15 @@
       </div>
 
       <div class="flex items-center gap-5">
-        <!-- Topology summary (replaces service-health dots — same data,
-             read more clearly off the topology panel) -->
+        <!-- Replaced out of band by the fragment. Stays in the header so the
+             clock beside it is not inside the swap. -->
         <div id="wb-topology-summary" class="flex items-center gap-3">
           <span class="label-tiny text-base-content/50">Estate</span>
-          <span id="wb-top-up"   class="badge badge-success badge-soft badge-sm tabular-nums font-semibold">— up</span>
+          <span id="wb-top-up" class="badge badge-success badge-soft badge-sm tabular-nums font-semibold">— up</span>
           <span id="wb-top-down" class="badge badge-error badge-soft badge-sm tabular-nums font-semibold">— down</span>
-          <span id="wb-top-off"  class="badge badge-ghost badge-sm tabular-nums">— off</span>
+          <span id="wb-top-off" class="badge badge-ghost badge-sm tabular-nums">— off</span>
         </div>
 
-        <!-- Clock -->
         <div class="stat p-0 bg-transparent border-l border-base-300 pl-5">
           <div id="wb-clock-time" class="stat-value font-mono text-[24px] tabular-nums leading-none">--:--:--</div>
           <div class="stat-desc mt-1">Snapshot <span id="wb-cache-age">—</span></div>
@@ -63,731 +50,52 @@
       </div>
     </header>
 
-    <!-- ═══════════ ATTENTION BANNER — shouts when the estate needs attention ═══════════ -->
-    <div id="wb-attention" class="wb-att-ok rounded-[12px] border px-6 py-3 flex items-center gap-4">
-      <span id="wb-att-dot" class="wb-att-dot bg-success"></span>
-      <span id="wb-att-headline" class="font-sans font-semibold text-[18px] tracking-tight text-base-content leading-none">Monitoring…</span>
-      <span id="wb-att-sub" class="label-tiny text-base-content/50 ml-auto tabular-nums">—</span>
+    {# The board is /ui/wallboard. hx-trigger stays on this element, not in
+       the fragment: a failed render swaps the contents and must not be able
+       to remove the poll that tries again. The clock above is the same
+       kind of thing. It is this machine's UTC clock, ticked locally,
+       because a server-formatted clock would be the server's zone and the
+       ts macro is for stored timestamps, which this is not. #}
+    <div id="wb-content"
+         class="flex-1 flex flex-col gap-4 min-h-0"
+         hx-get="/ui/wallboard"
+         hx-trigger="load, every 300s"
+         hx-swap="innerHTML">
+      <div class="flex-1 grid place-items-center text-base-content/50">
+        <span class="loading loading-spinner loading-sm text-primary"></span>
+        Loading the snapshot…
+      </div>
     </div>
-
-    <!-- ═══════════════════ 6-PANEL GRID ═══════════════════ -->
-    <main class="flex-1 grid grid-cols-3 grid-rows-2 gap-4 min-h-0">
-
-      <!-- ┌─── PANEL 1: ALERTS ───┐ -->
-      <section class="card bg-base-200 shadow border border-base-300 flex flex-col min-h-0 overflow-hidden">
-        <div class="card-body p-6 flex flex-col min-h-0 h-full">
-          <div class="flex items-baseline justify-between">
-            <span class="label-tiny text-base-content/50">Alerts</span>
-            <span id="wb-alerts-stamp" class="label-tiny text-base-content/40">last 24h</span>
-          </div>
-
-          <div class="stat px-0 py-2">
-            <div class="stat-figure text-primary">
-              <svg id="wb-alerts-spark" viewBox="0 0 160 50" preserveAspectRatio="none"
-                   class="w-[160px] h-[50px] text-primary shrink-0" aria-hidden="true">
-                <defs>
-                  <linearGradient id="wb-spark-cyan" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stop-color="currentColor" stop-opacity="0.4"/>
-                    <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
-                  </linearGradient>
-                </defs>
-                <path id="wb-alerts-spark-fill" fill="url(#wb-spark-cyan)" d=""/>
-                <path id="wb-alerts-spark-line" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d=""/>
-              </svg>
-            </div>
-            <div id="wb-alerts-24h" class="stat-value font-sans tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-primary">—</div>
-            <div id="wb-alerts-status" class="stat-desc">— open · — ack · — closed</div>
-          </div>
-
-          <!-- Verdict distribution bars -->
-          <div id="wb-alerts-bars" class="flex flex-col gap-2 mt-auto pt-3 border-t border-base-300">
-            <!-- bars populated from snapshot -->
-          </div>
-        </div>
-      </section>
-
-      <!-- ┌─── PANEL 2: CASES ───┐ -->
-      <section id="wb-panel-cases" class="card bg-base-200 shadow border border-base-300 flex flex-col min-h-0 overflow-hidden">
-        <div class="card-body p-6 flex flex-col min-h-0 h-full">
-          <div class="flex items-baseline justify-between">
-            <span class="label-tiny text-base-content/50">Cases</span>
-            <span id="wb-cases-stamp" class="label-tiny text-base-content/40">open right now</span>
-          </div>
-
-          <div class="stat px-0 py-2">
-            <div class="stat-figure text-warning">
-              <svg id="wb-cases-spark" viewBox="0 0 160 50" preserveAspectRatio="none"
-                   class="w-[160px] h-[50px] text-warning shrink-0" aria-hidden="true">
-                <defs>
-                  <linearGradient id="wb-spark-amber" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stop-color="currentColor" stop-opacity="0.4"/>
-                    <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
-                  </linearGradient>
-                </defs>
-                <path id="wb-cases-spark-fill" fill="url(#wb-spark-amber)" d=""/>
-                <path id="wb-cases-spark-line" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d=""/>
-              </svg>
-            </div>
-            <div id="wb-cases-open" class="stat-value font-sans tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-warning">—</div>
-            <div id="wb-cases-closures" class="stat-desc">— closures in last 24h</div>
-          </div>
-
-          <!-- Severity bars -->
-          <div id="wb-cases-bars" class="flex flex-col gap-2 mt-auto pt-3 border-t border-base-300">
-            <!-- bars -->
-          </div>
-        </div>
-      </section>
-
-      <!-- ┌─── PANEL 3: BOB (AI ANALYST) ───┐ -->
-      <section class="card bg-base-200 shadow border border-base-300 flex flex-col min-h-0 overflow-hidden">
-        <div class="card-body p-6 flex flex-col min-h-0 h-full">
-          <div class="flex items-baseline justify-between">
-            <span class="label-tiny text-base-content/50 flex items-center gap-1.5">
-              <svg class="w-3.5 h-3.5"><use href="#i-sparkles"/></svg>
-              Bob — AI Analyst
-            </span>
-            <span id="wb-bob-stamp" class="label-tiny text-base-content/40">last 7d</span>
-          </div>
-
-          <div class="stat px-0 py-2">
-            <div class="stat-figure text-secondary">
-              <svg id="wb-bob-spark" viewBox="0 0 160 50" preserveAspectRatio="none"
-                   class="w-[160px] h-[50px] text-secondary shrink-0" aria-hidden="true">
-                <defs>
-                  <linearGradient id="wb-spark-iris" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stop-color="currentColor" stop-opacity="0.4"/>
-                    <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
-                  </linearGradient>
-                </defs>
-                <path id="wb-bob-spark-fill" fill="url(#wb-spark-iris)" d=""/>
-                <path id="wb-bob-spark-line" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d=""/>
-              </svg>
-            </div>
-            <div id="wb-bob-investigations-24h" class="stat-value font-sans tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-secondary">—</div>
-            <div id="wb-bob-total" class="stat-desc">— investigations · — feedback rows</div>
-          </div>
-
-          <div class="mt-auto pt-3 border-t border-base-300">
-            <div class="flex items-baseline justify-between mb-2">
-              <span class="label-tiny text-base-content/50">Analyst-Bob agreement</span>
-              <span id="wb-bob-agreement-num" class="text-[12px] text-base-content/70 tabular-nums">— / —</span>
-            </div>
-            <div class="h-1.5 w-full rounded-full bg-base-300 overflow-hidden">
-              <div id="wb-bob-agreement-fill" class="h-full rounded-full bg-gradient-to-r from-secondary to-primary transition-[width] duration-700 w-[0%]"></div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ┌─── PANEL 4: RULES (real rule posture) ───┐ -->
-      <section class="card bg-base-200 shadow border border-base-300 flex flex-col min-h-0 overflow-hidden">
-        <div class="card-body p-6 flex flex-col min-h-0 h-full">
-          <div class="flex items-baseline justify-between">
-            <span class="label-tiny text-base-content/50">Rules</span>
-            <span id="wb-rules-stamp" class="label-tiny text-base-content/40">posture</span>
-          </div>
-
-          <div class="stat px-0 py-2">
-            <div class="stat-figure text-right">
-              <div class="stat-title">enabled rules</div>
-              <div id="wb-rules-of-total" class="stat-desc mt-1 tabular-nums">of — total</div>
-            </div>
-            <div id="wb-rules-enabled" class="stat-value font-sans tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-success">—</div>
-            <div id="wb-rules-coverage" class="stat-desc">
-              MITRE coverage <span class="text-primary tabular-nums font-semibold">—</span>
-            </div>
-          </div>
-
-          <!-- Severity distribution bars (critical / high / medium / low) -->
-          <div id="wb-rules-bars" class="flex flex-col gap-2 mt-auto pt-3 border-t border-base-300">
-            <!-- bars populated from snapshot -->
-          </div>
-        </div>
-      </section>
-
-      <!-- ┌─── PANEL 5: PLATFORM TOPOLOGY ───┐ -->
-      <section class="card bg-base-200 shadow border border-base-300 flex flex-col min-h-0 relative overflow-hidden">
-        <div class="card-body p-5 flex flex-col min-h-0 h-full">
-          <div class="flex items-baseline justify-between">
-            <span class="label-tiny text-base-content/50">Platform Topology</span>
-            <span class="badge badge-success badge-soft badge-sm">live</span>
-          </div>
-
-          <!-- The SVG fills the panel; coordinates are computed in JS so
-               the layout is identical regardless of font/scale. The viewBox
-               is large enough that node labels never overflow. -->
-          <div class="flex-1 grid place-items-center min-h-0">
-            <svg id="wb-topology" viewBox="0 0 460 280" preserveAspectRatio="xMidYMid meet"
-                 class="w-full h-full" aria-hidden="true">
-              <defs>
-                <radialGradient id="wb-hub-glow" cx="50%" cy="50%" r="50%">
-                  <stop offset="0%" stop-color="var(--color-primary)" stop-opacity="0.55"/>
-                  <stop offset="100%" stop-color="var(--color-primary)" stop-opacity="0"/>
-                </radialGradient>
-              </defs>
-              <g id="wb-topology-edges"><!-- edges drawn by JS --></g>
-              <g id="wb-topology-nodes"><!-- nodes drawn by JS --></g>
-            </svg>
-          </div>
-
-          <div class="flex items-center gap-3 mt-1 pt-3 border-t border-base-300">
-            <span class="badge badge-success badge-soft badge-sm gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-success"></span>up</span>
-            <span class="badge badge-error badge-soft badge-sm gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-error wb-pulse-down"></span>down</span>
-            <span class="badge badge-ghost badge-sm gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-base-content/40"></span>not configured</span>
-          </div>
-        </div>
-      </section>
-
-      <!-- ┌─── PANEL 6: THREAT LANDSCAPE (AI summary) ───┐ -->
-      <section class="card bg-base-200 shadow border border-base-300 flex flex-col min-h-0 overflow-hidden">
-        <div class="card-body p-5 flex flex-col min-h-0 h-full">
-          <div class="flex items-baseline justify-between">
-            <span class="label-tiny text-base-content/50 flex items-center gap-1.5">
-              <svg class="w-3.5 h-3.5"><use href="#i-sparkles"/></svg>
-              Threat Landscape
-            </span>
-            <span id="wb-tl-mode" class="badge badge-ghost badge-sm">—</span>
-          </div>
-
-          <div id="wb-tl-summary" class="flex-1 overflow-hidden text-sm leading-relaxed text-base-content">
-            <span class="text-base-content/40 italic">Awaiting first refresh…</span>
-          </div>
-
-          <div id="wb-tl-stats" class="stats stats-horizontal w-full bg-transparent shadow-none mt-auto pt-3 border-t border-base-300">
-            <div class="stat px-0 py-2">
-              <div id="wb-tl-alerts-24h" class="stat-value text-xl text-primary tabular-nums">—</div>
-              <div class="stat-desc">alerts 24h</div>
-            </div>
-            <div class="stat px-0 py-2">
-              <div id="wb-tl-tp-rate" class="stat-value text-xl text-error tabular-nums">—</div>
-              <div class="stat-desc">TP rate 7d</div>
-            </div>
-            <div class="stat px-0 py-2">
-              <div id="wb-tl-backlog" class="stat-value text-xl text-warning tabular-nums">—</div>
-              <div class="stat-desc">open backlog</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-    </main>
-
-    <!-- ticker strip removed from the wallboard. Critical
-         alerts are already on the alerts panel; the dedicated ticker
-         feature still renders inside the main app shell. -->
-
-    <!-- People. A board that shows alert counts and nothing about who is
-         dealing with them answers half the question, and the first thing
-         anybody asks when something lands out of hours is who to call.
-
-         A strip rather than a seventh panel: the grid above is six fixed
-         cells on a wall display, and shrinking all of them to add this
-         would cost more than it buys. -->
-    <section id="wb-org" class="shrink-0 mt-4 rounded-[12px] border
-             border-base-300 bg-base-200 px-5 py-3 flex items-center gap-5
-             text-[13px]">
-      <span class="label-tiny text-base-content/50 shrink-0">People</span>
-      <span id="wb-org-duty" class="font-semibold text-base-content
-            tabular-nums">&mdash;</span>
-      <span class="text-base-content/20">&middot;</span>
-      <span id="wb-org-posts" class="text-base-content/70 tabular-nums"
-            >&mdash;</span>
-      <span id="wb-org-leads" class="badge badge-error badge-sm hidden
-            tabular-nums"></span>
-      <span id="wb-org-pillars" class="badge badge-sm hidden tabular-nums"
-            ></span>
-      <span id="wb-org-note" class="label-tiny text-base-content/40 ml-auto
-            text-right"></span>
-    </section>
 
   </div>
 
-  <!-- Embed Lucide icon sprite (subset used here) -->
   <svg class="absolute" width="0" height="0" aria-hidden="true">
     <symbol id="i-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/></symbol>
-    <symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></symbol>
   </svg>
 
-<script nonce="{{ csp_nonce }}" src="/static/js/ion-dynamic-styles.js?v={{ ion_version }}"></script>
+  <!-- Cloned by static/js/htmx-errors.js. This page does not extend
+       base.html, so it carries the template itself. The handler builds
+       nothing: it clones this node and sets textContent. -->
+  <template id="htmx-error-template">
+    <div role="alert" class="alert alert-error m-4">
+      <span data-error-message></span>
+    </div>
+  </template>
+
 <script nonce="{{ csp_nonce }}">
-const REFRESH_MS = 5 * 60 * 1000;  // matches the server-side TTL
-
-const $ = (id) => document.getElementById(id);
-const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
-  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const fmtN = (n) => {
-  if (n == null || isNaN(n)) return '—';
-  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
-  return String(n);
-};
-const fmtAge = (s) => {
-  if (s == null || s < 0) return 'just now';
-  if (s < 60) return s + 's ago';
-  if (s < 3600) return Math.round(s / 60) + 'm ago';
-  return Math.round(s / 3600) + 'h ago';
-};
-
-// ── Clock (UTC, 1Hz) ─────────────────────────────────────────
-function tickClock() {
-  const d = new Date();
-  const t = `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}:${String(d.getUTCSeconds()).padStart(2, '0')}`;
-  $('wb-clock-time').textContent = t;
-}
-setInterval(tickClock, 1000); tickClock();
-
-// ── SVG sparkline drawer ─────────────────────────────────────
-//
-// Mirrors dashboard_v2.html's renderSparkline pattern: build line + fill
-// paths from a histogram of {count} buckets. If ≤ 1 bucket, hide.
-function drawSparkline(svgId, fillId, lineId, buckets) {
-  const svg  = $(svgId);
-  const fill = $(fillId);
-  const line = $(lineId);
-  if (!svg || !fill || !line) return;
-
-  if (!Array.isArray(buckets) || buckets.length < 2) {
-    svg.style.display = 'none';
-    return;
+// UTC clock for the wall. textContent only: the board itself is the fragment.
+(function () {
+  function tick() {
+    var d = new Date();
+    var t = String(d.getUTCHours()).padStart(2, '0') + ':' +
+            String(d.getUTCMinutes()).padStart(2, '0') + ':' +
+            String(d.getUTCSeconds()).padStart(2, '0');
+    var node = document.getElementById('wb-clock-time');
+    if (node) node.textContent = t;
   }
-  svg.style.display = '';
-
-  const W = 160, H = 50, PAD = 2;
-  const n = buckets.length;
-  const max = Math.max(1, ...buckets.map(b => b.count || 0));
-  const stepX = (W - PAD * 2) / (n - 1);
-  const pts = buckets.map((b, i) => {
-    const x = PAD + i * stepX;
-    const y = H - PAD - ((b.count || 0) / max) * (H - PAD * 2 - 4);
-    return [x, y];
-  });
-  const linePath = pts.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
-  const fillPath = `${linePath} L${(W - PAD).toFixed(1)},${H} L${PAD.toFixed(1)},${H} Z`;
-  line.setAttribute('d', linePath);
-  fill.setAttribute('d', fillPath);
-}
-
-// ── Donut renderer (single-value circular gauge) ─────────────
-function drawDonut(arcId, labelId, value, max) {
-  const arc = $(arcId);
-  const label = $(labelId);
-  if (!arc) return;
-  const pct = Math.max(0, Math.min(100, max > 0 ? (value / max) * 100 : 0));
-  const r = 24;
-  const circ = 2 * Math.PI * r;  // ≈ 150.8
-  const filled = (pct / 100) * circ;
-  arc.setAttribute('stroke-dasharray', `${filled.toFixed(1)} ${circ.toFixed(1)}`);
-  if (label) label.textContent = `${Math.round(pct)}%`;
-}
-
-// ── Topology — hub-and-spoke SVG ─────────────────────────────
-//
-// The hub (ION) sits at the centre; every integration is a spoke. Layout
-// is a fixed angular distribution so nodes stay put across refreshes —
-// the eye reads movement as instability on a wall display, so we want
-// the only thing that changes between snapshots to be the colour.
-function renderTopology(t) {
-  const edges = $('wb-topology-edges');
-  const nodes = $('wb-topology-nodes');
-  if (!edges || !nodes) return;
-  edges.innerHTML = ''; nodes.innerHTML = '';
-
-  const cx = 230, cy = 140;     // hub centre (matches viewBox 460x280)
-  const rx = 175, ry = 105;     // spoke ellipse radii
-
-  // Header summary counters
-  const counts = (t && t.counts) || {};
-  $('wb-top-up').textContent   = `${counts.up   ?? 0} up`;
-  $('wb-top-down').textContent = `${counts.down ?? 0} down`;
-  $('wb-top-off').textContent  = `${counts.off  ?? 0} off`;
-
-  // Hub glow + circle
-  nodes.insertAdjacentHTML('beforeend', `
-    <circle cx="${cx}" cy="${cy}" r="56" fill="url(#wb-hub-glow)"/>
-    <circle cx="${cx}" cy="${cy}" r="28" fill="#0a0e17" stroke="rgb(109,228,255)" stroke-width="1.5"/>
-    <text x="${cx}" y="${cy - 2}"  text-anchor="middle"
-          fill="white" font-family="Geist, ui-sans-serif, system-ui, sans-serif"
-          font-size="13" font-weight="700">ION</text>
-    <text x="${cx}" y="${cy + 11}" text-anchor="middle"
-          fill="rgba(255,255,255,0.5)" font-family="Geist, ui-sans-serif, system-ui, sans-serif"
-          font-size="8" letter-spacing="0.12em">HUB</text>
-  `);
-
-  const list = (t && t.nodes) || [];
-  if (!list.length) return;
-
-  const STROKE = { up: 'rgb(134,240,160)', down: 'rgb(255,108,108)', off: 'rgba(255,255,255,0.18)' };
-  const FILL   = { up: 'rgb(134,240,160)', down: 'rgb(255,108,108)', off: 'rgb(100,116,139)' };
-
-  list.forEach((n, i) => {
-    const angle = (-Math.PI / 2) + (i * 2 * Math.PI / list.length);
-    const x = cx + rx * Math.cos(angle);
-    const y = cy + ry * Math.sin(angle);
-    const stroke = STROKE[n.status] || STROKE.off;
-    const fill   = FILL[n.status]   || FILL.off;
-    const dash   = n.status === 'down' ? '4 3' : '';
-    const labelDx = x > cx ? 14 : (x < cx ? -14 : 0);
-    const anchor  = x > cx + 5 ? 'start' : (x < cx - 5 ? 'end' : 'middle');
-
-    edges.insertAdjacentHTML('beforeend', `
-      <line x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"
-            stroke="${stroke}" stroke-width="${n.status === 'up' ? 1.4 : 1}"
-            stroke-opacity="${n.status === 'up' ? 0.55 : 0.35}"
-            ${dash ? `stroke-dasharray="${dash}"` : ''}/>
-    `);
-
-    const pulseClass = n.status === 'down' ? 'wb-pulse-down' : '';
-    const safeLabel = escHtml(n.label);
-    const safeDetails = escHtml(n.details || n.status);
-    nodes.insertAdjacentHTML('beforeend', `
-      <g class="${pulseClass}" data-key="${escHtml(n.key)}">
-        <title>${safeLabel} — ${safeDetails}</title>
-        <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="9"
-                fill="#0a0e17" stroke="${stroke}" stroke-width="1.5"/>
-        <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.5" fill="${fill}"/>
-        <text x="${(x + labelDx).toFixed(1)}" y="${(y + 4).toFixed(1)}"
-              text-anchor="${anchor}" fill="rgba(226,232,240,0.85)"
-              font-family="Geist, ui-sans-serif, system-ui, sans-serif"
-              font-size="11" font-weight="500">${safeLabel}</text>
-      </g>
-    `);
-  });
-}
-
-// ── Renderers ────────────────────────────────────────────────
-function renderAlerts(a) {
-  if (a.error) { $('wb-alerts-24h').textContent = '—'; return; }
-  $('wb-alerts-24h').textContent = fmtN(a.last_24h_total || 0);
-  const open = (a.by_status && (a.by_status.OPEN || a.by_status.open)) || 0;
-  const ack  = (a.by_status && (a.by_status.ACKNOWLEDGED || a.by_status.acknowledged)) || 0;
-  const closed = (a.by_status && (a.by_status.CLOSED || a.by_status.closed)) || 0;
-  $('wb-alerts-status').innerHTML =
-    `<span class="text-ion-coral font-semibold">${fmtN(open)}</span> open · ` +
-    `<span class="text-ion-amber font-semibold">${fmtN(ack)}</span> ack · ` +
-    `<span class="text-slate-300">${fmtN(closed)}</span> closed &nbsp;·&nbsp; ` +
-    deltaHtml(a.last_24h_total, a.prev_24h_total, true);
-
-  drawSparkline('wb-alerts-spark', 'wb-alerts-spark-fill', 'wb-alerts-spark-line', a.histogram_24h || []);
-
-  // Verdict distribution bars
-  const dist = a.verdict_distribution_7d || {};
-  const order = [
-    { key: 'true_positive', label: 'true positive', cls: 'bg-ion-coral' },
-    { key: 'false_positive', label: 'false positive', cls: 'bg-ion-lime' },
-    { key: 'benign_true_positive', label: 'benign TP', cls: 'bg-ion-amber' },
-    { key: 'inconclusive', label: 'inconclusive', cls: 'bg-slate-500' },
-  ];
-  const max = Math.max(1, ...Object.values(dist));
-  const bars = $('wb-alerts-bars');
-  bars.innerHTML = '';
-  if (Object.keys(dist).length === 0) {
-    bars.innerHTML = '<div class="text-[12px] text-slate-600 italic py-2">No verdicts captured in the last 7d.</div>';
-    return;
-  }
-  order.forEach(({ key, label, cls }) => {
-    const v = dist[key] || 0;
-    const pct = Math.round((v / max) * 100);
-    const row = document.createElement('div');
-    row.className = 'grid grid-cols-[110px_1fr_44px] gap-2.5 items-center text-[12px]';
-    row.innerHTML = `
-      <div class="text-slate-400 capitalize">${escHtml(label)}</div>
-      <div class="h-1.5 rounded-full bg-white/5 overflow-hidden">
-        <div class="${cls} h-full rounded-full transition-[width] duration-700" data-ion-style="width:${pct}%"></div>
-      </div>
-      <div class="text-right text-slate-200 tabular-nums font-semibold">${fmtN(v)}</div>`;
-    bars.appendChild(row);
-  });
-}
-
-function renderCases(c) {
-  if (c.error) { $('wb-cases-open').textContent = '—'; return; }
-  const open = (c.by_status && (c.by_status.OPEN || c.by_status.open)) || 0;
-  const ack  = (c.by_status && (c.by_status.ACKNOWLEDGED || c.by_status.acknowledged)) || 0;
-  $('wb-cases-open').textContent = fmtN(open + ack);
-  $('wb-cases-closures').innerHTML =
-    `<span class="text-ion-lime font-semibold">${fmtN(c.closures_24h_total || 0)}</span> closures in last 24h &nbsp;·&nbsp; ` +
-    deltaHtml(c.closures_24h_total, c.closures_prev_24h_total, false);
-
-  drawSparkline('wb-cases-spark', 'wb-cases-spark-fill', 'wb-cases-spark-line', c.closures_history_7d || []);
-
-  // Severity bars
-  const sev = c.open_by_severity || {};
-  const order = [
-    { key: 'critical', cls: 'bg-ion-coral' },
-    { key: 'high',     cls: 'bg-ion-amber' },
-    { key: 'medium',   cls: 'bg-ion-cyan' },
-    { key: 'low',      cls: 'bg-slate-500' },
-  ];
-  const max = Math.max(1, ...Object.values(sev));
-  const bars = $('wb-cases-bars');
-  bars.innerHTML = '';
-  if (Object.keys(sev).length === 0) {
-    bars.innerHTML = '<div class="text-[12px] text-slate-600 italic py-2">No open cases right now.</div>';
-    return;
-  }
-  order.forEach(({ key, cls }) => {
-    const v = sev[key] || 0;
-    const pct = Math.round((v / max) * 100);
-    const row = document.createElement('div');
-    row.className = 'grid grid-cols-[110px_1fr_44px] gap-2.5 items-center text-[12px]';
-    row.innerHTML = `
-      <div class="text-slate-400 capitalize">${escHtml(key)}</div>
-      <div class="h-1.5 rounded-full bg-white/5 overflow-hidden">
-        <div class="${cls} h-full rounded-full transition-[width] duration-700" data-ion-style="width:${pct}%"></div>
-      </div>
-      <div class="text-right text-slate-200 tabular-nums font-semibold">${fmtN(v)}</div>`;
-    bars.appendChild(row);
-  });
-}
-
-function renderBob(b) {
-  if (b.error) { $('wb-bob-investigations-24h').textContent = '—'; return; }
-  $('wb-bob-investigations-24h').textContent = fmtN(b.investigations_24h || 0);
-  $('wb-bob-total').innerHTML =
-    `<span class="text-slate-300 tabular-nums">${fmtN(b.investigations_total || 0)}</span> investigations · ` +
-    `<span class="text-slate-300 tabular-nums">${fmtN(b.feedback_7d_total || 0)}</span> feedback rows &nbsp;·&nbsp; ` +
-    deltaHtml(b.investigations_24h, b.investigations_prev_24h, false);
-
-  drawSparkline('wb-bob-spark', 'wb-bob-spark-fill', 'wb-bob-spark-line', b.history_7d || []);
-
-  const pct = b.agreement_pct != null ? b.agreement_pct : 0;
-  $('wb-bob-agreement-fill').style.width = pct + '%';
-  $('wb-bob-agreement-num').textContent = b.agreement_pct != null
-    ? `${b.agreement_count || 0} / ${b.agreement_total || 0} (${pct}%)`
-    : '— / —';
-}
-
-function renderRules(r) {
-  if (r.error || r.tide_unavailable) {
-    $('wb-rules-enabled').textContent = '—';
-    $('wb-rules-of-total').textContent = r.tide_unavailable ? 'TIDE not configured' : 'unavailable';
-    $('wb-rules-coverage').innerHTML = '';
-    $('wb-rules-bars').innerHTML = '<div class="text-[12px] text-slate-600 italic py-2">No rule posture available.</div>';
-    return;
-  }
-  $('wb-rules-enabled').textContent = fmtN(r.enabled_rules || 0);
-  $('wb-rules-of-total').textContent = `of ${fmtN(r.total_rules || 0)} total`;
-
-  const coveredPct = r.total_techniques
-    ? Math.round((r.covered_techniques / r.total_techniques) * 100)
-    : 0;
-  const avgQ = (r.quality && r.quality.avg_quality != null) ? r.quality.avg_quality : '—';
-  $('wb-rules-coverage').innerHTML =
-    `MITRE coverage <span class="text-ion-cyan tabular-nums font-semibold">${r.covered_techniques || 0} / ${r.total_techniques || 0} (${coveredPct}%)</span> · ` +
-    `avg quality <span class="text-ion-lime tabular-nums font-semibold">${avgQ}</span>`;
-
-  // Severity bars — total per severity, and the enabled fraction renders
-  // as a brighter overlay so disabled rules read as a darker stub.
-  const SEV_ORDER = [
-    { key: 'critical', cls: 'bg-ion-coral'  },
-    { key: 'high',     cls: 'bg-ion-amber'  },
-    { key: 'medium',   cls: 'bg-ion-cyan'   },
-    { key: 'low',      cls: 'bg-slate-500'  },
-  ];
-  const sev = r.severity || {};
-  const max = Math.max(1, ...SEV_ORDER.map(s => (sev[s.key] && sev[s.key].total) || 0));
-  const bars = $('wb-rules-bars');
-  bars.innerHTML = '';
-  if (Object.keys(sev).length === 0) {
-    bars.innerHTML = '<div class="text-[12px] text-slate-600 italic py-2">No severity data captured.</div>';
-    return;
-  }
-  SEV_ORDER.forEach(({ key, cls }) => {
-    const v = sev[key] || { total: 0, enabled: 0, disabled: 0 };
-    const totalPct   = Math.round((v.total / max) * 100);
-    const enabledPct = v.total ? Math.round((v.enabled / v.total) * 100) : 0;
-    const row = document.createElement('div');
-    row.className = 'grid grid-cols-[110px_1fr_44px] gap-2.5 items-center text-[12px]';
-    row.innerHTML = `
-      <div class="text-slate-400 capitalize">${escHtml(key)}</div>
-      <div class="h-1.5 rounded-full bg-white/5 overflow-hidden relative">
-        <div class="${cls} h-full rounded-full opacity-30" data-ion-style="width:${totalPct}%"></div>
-        <div class="${cls} h-full rounded-full absolute inset-y-0 left-0" data-ion-style="width:${Math.round(totalPct * enabledPct / 100)}%"></div>
-      </div>
-      <div class="text-right text-slate-200 tabular-nums font-semibold">${fmtN(v.total)}</div>`;
-    bars.appendChild(row);
-  });
-}
-
-function renderThreatLandscape(t) {
-  const stats = (t && t.stats) || {};
-  // Stats trio
-  $('wb-tl-alerts-24h').textContent = fmtN(stats.alerts_24h_total || 0);
-
-  const verdict = stats.verdict_7d || {};
-  const tp = (verdict.true_positive || 0) + (verdict.malicious || 0);
-  const tot = Object.values(verdict).reduce((a, b) => a + b, 0);
-  const tpPct = tot ? Math.round((tp / tot) * 100) : 0;
-  $('wb-tl-tp-rate').textContent = tot ? (tpPct + '%') : '—';
-
-  const backlog = stats.open_backlog_sev || {};
-  const backlogTotal = Object.values(backlog).reduce((a, b) => a + b, 0);
-  $('wb-tl-backlog').textContent = fmtN(backlogTotal);
-
-  // Mode pill
-  const mode = (t && t.summary_kind) || 'stats';
-  const modeEl = $('wb-tl-mode');
-  if (mode === 'ai') {
-    modeEl.innerHTML = '<span class="text-ion-iris">AI summary</span>';
-  } else {
-    modeEl.innerHTML = '<span class="text-slate-500">stats only</span>';
-  }
-
-  // Body — render LLM text if present, otherwise compose a stats fallback.
-  const body = $('wb-tl-summary');
-  if (t && typeof t.summary === 'string' && t.summary.trim().length) {
-    // Split into paragraph + bullets if the LLM emitted "- " bullets.
-    const lines = t.summary.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-    const bullets = lines.filter(l => /^[-•]\s+/.test(l)).map(l => l.replace(/^[-•]\s+/, ''));
-    const paragraph = lines.filter(l => !/^[-•]\s+/.test(l)).join(' ');
-    body.innerHTML = `
-      <p class="mb-2 text-slate-200">${escHtml(paragraph)}</p>
-      ${bullets.length ? `<ul class="space-y-1 text-[12.5px] text-slate-400">${
-        bullets.map(b => `<li class="flex gap-2"><span class="text-ion-iris shrink-0">•</span><span>${escHtml(b)}</span></li>`).join('')
-      }</ul>` : ''}
-    `;
-  } else {
-    // Fallback — render a simple stats sentence.
-    const sev = stats.severity_24h || {};
-    const sevParts = Object.entries(sev).map(([k, v]) => `${v} ${k}`).join(', ') || 'no alerts';
-    const closures = (stats.top_closures_7d || []).map(c => `${c.reason} (${c.count})`).slice(0, 3).join(', ');
-    body.innerHTML = `
-      <p class="mb-2 text-slate-300">
-        Last 24h: <span class="text-white font-semibold">${stats.alerts_24h_total || 0}</span> alerts (${escHtml(sevParts)}).
-      </p>
-      ${closures ? `<p class="text-[12.5px] text-slate-500">Top closure reasons (7d): ${escHtml(closures)}.</p>` : ''}
-      <p class="text-[11px] text-slate-600 mt-2 italic">AI summary unavailable — Ollama offline or not configured.</p>
-    `;
-  }
-}
-
-// renderTicker removed with the footer strip. Snapshot still
-// carries `ticker` for the rest of the app's ticker UI; we just don't
-// render it on the wallboard.
-
-// ── Attention banner + trend deltas ────────────────
-// Compact ▲/▼ delta vs the prior 24h. goodDown=true means a falling number
-// is the good direction (e.g. fewer alerts) → coloured lime when it drops.
-function deltaHtml(curr, prev, goodDown) {
-  const d = (curr || 0) - (prev || 0);
-  if (d === 0) return '<span class="text-slate-500 tabular-nums">±0 vs prev 24h</span>';
-  const up = d > 0;
-  const good = goodDown ? !up : up;
-  const cls = good ? 'text-ion-lime' : 'text-ion-coral';
-  return `<span class="${cls} font-semibold tabular-nums">${up ? '▲' : '▼'} ${Math.abs(d)}</span>` +
-         `<span class="text-slate-600"> vs prev 24h</span>`;
-}
-
-function renderOrg(o) {
-  // Every branch here says what it means rather than showing a number
-  // that reads as fine by default. An empty duty line looks like a panel
-  // that has not loaded, "0 gaps" with nothing established looks fully
-  // staffed, and an unmeasured pillar looks covered. All three are
-  // wrong in the direction that stops somebody acting.
-  const duty = o.duty || {};
-  const dutyEl = $('wb-org-duty');
-  if (duty.assigned && duty.user) {
-    dutyEl.textContent = duty.user.name + ' on duty';
-    // A rota entry nobody picked up is a plan, not cover, and the
-    // difference matters on the Monday somebody is off sick.
-    dutyEl.className = duty.acknowledged
-      ? 'font-semibold text-base-content tabular-nums'
-      : 'font-semibold text-warning tabular-nums';
-    if (!duty.acknowledged) { dutyEl.textContent += ' (not acknowledged)'; }
-  } else {
-    dutyEl.textContent = 'Nobody on duty this week';
-    dutyEl.className = 'font-semibold text-warning tabular-nums';
-  }
-
-  $('wb-org-posts').textContent = o.headline || '\u2014';
-
-  const leads = $('wb-org-leads');
-  if (o.leads_gapped) {
-    // Counted apart from the post gaps: a function with nobody answering
-    // for it is a different kind of short from being an analyst down.
-    leads.textContent = o.leads_gapped + ' with no lead';
-    leads.classList.remove('hidden');
-  } else {
-    leads.classList.add('hidden');
-  }
-
-  const pillars = $('wb-org-pillars');
-  if (!o.pillars_measured) {
-    pillars.textContent = 'capability unmeasured';
-    pillars.className = 'badge badge-sm badge-ghost tabular-nums';
-    pillars.classList.remove('hidden');
-  } else if (o.pillars_uncovered) {
-    pillars.textContent = o.pillars_uncovered + ' of ' + o.pillars_total +
-      ' pillars uncovered';
-    pillars.className = 'badge badge-sm badge-error tabular-nums';
-    pillars.classList.remove('hidden');
-  } else if (o.pillars_self_rated) {
-    pillars.textContent = o.pillars_self_rated + ' self-rated only';
-    pillars.className = 'badge badge-sm badge-warning tabular-nums';
-    pillars.classList.remove('hidden');
-  } else {
-    pillars.classList.add('hidden');
-  }
-
-  const note = $('wb-org-note');
-  if (o.duty_unfilled_weeks) {
-    note.textContent = o.duty_unfilled_weeks + ' week(s) ahead with nobody' +
-      (o.duty_next_unfilled ? ', from ' + o.duty_next_unfilled : '');
-  } else if ((o.worst || []).length) {
-    note.textContent = 'shortest: ' + o.worst.slice(0, 2).map(function (r) {
-      return r.role + ' \u2212' + r.gap;
-    }).join(', ');
-  } else {
-    note.textContent = '';
-  }
-}
-
-function renderAttention(a) {
-  a = a || {};
-  const el = $('wb-attention'); if (!el) return;
-  const lvl = a.level || 'ok';
-  el.className = 'rounded-[12px] border px-6 py-3 flex items-center gap-4 wb-att-' + lvl;
-  const dot = $('wb-att-dot');
-  if (dot) dot.className = 'wb-att-dot ' +
-    (lvl === 'critical' ? 'bg-ion-coral wb-pulse-down' : lvl === 'warning' ? 'bg-ion-amber' : 'bg-ion-lime');
-  $('wb-att-headline').textContent = a.headline || (lvl === 'ok' ? 'All clear' : '');
-  const sub = $('wb-att-sub');
-  if (sub) sub.textContent = lvl === 'ok'
-    ? 'monitoring · all systems'
-    : `${a.open_critical || 0} critical · ${a.open_high || 0} high · ${a.open_alert_backlog || 0} alerts open`;
-  // Mirror severity state onto the Cases panel so the eye is drawn there.
-  const cp = document.getElementById('wb-panel-cases');
-  if (cp) {
-    cp.classList.remove('wb-panel-warning', 'wb-panel-critical');
-    if ((a.open_critical || 0) > 0) cp.classList.add('wb-panel-critical');
-    else if ((a.open_high || 0) > 0) cp.classList.add('wb-panel-warning');
-  }
-}
-
-// ── Refresh loop ─────────────────────────────────────────────
-async function refresh() {
-  try {
-    const r = await fetch('/api/wallboard/snapshot', { credentials: 'include' });
-    if (!r.ok) {
-      console.warn('snapshot fetch failed', r.status);
-      return;
-    }
-    const s = await r.json();
-    renderAttention(s.attention || {});
-    renderTopology(s.topology || {});  // also updates the header summary
-    renderAlerts(s.alerts || {});
-    renderCases(s.cases || {});
-    renderBob(s.bob || {});
-    renderRules(s.rules || {});
-    renderThreatLandscape(s.threat_landscape || {});
-    renderOrg(s.org || {});
-    $('wb-cache-age').textContent = 'refreshed ' + fmtAge(s.cache_age_seconds || 0);
-  } catch (e) {
-    console.error('refresh error', e);
-  }
-}
-refresh();
-setInterval(refresh, REFRESH_MS);
+  tick();
+  setInterval(tick, 1000);
+})();
 </script>
 </body>
 </html>

@@ -214,6 +214,10 @@ def _summary(row) -> dict:
             case_row.updated_at.isoformat() if case_row.updated_at else None
         ),
         "closed_at": case_row.closed_at.isoformat() if case_row.closed_at else None,
+        # A 50-character enum value, not a narrative field. The alerts page
+        # badges a closed case with it (TP, FP, BTP ...) and had keyed that
+        # badge on a field this row never carried, so it never rendered.
+        "closure_reason": case_row.closure_reason,
         "assigned_to_id": case_row.assigned_to_id,
         "assigned_to": assignee_name,
         "alert_count": int(alert_count or 0),

@@ -248,8 +248,18 @@ def test_the_guide_renders_into_the_aside(cases_js):
     )
 
 
-def test_the_aside_exists_in_the_workspace(cases_js):
-    assert 'aside class="cpanel-guide" id="cpanel-alert-guide"' in cases_js
+def test_the_aside_exists_in_the_workspace():
+    """The workspace is _fragments/cases_panel.html now, so the aside is
+    markup the server renders rather than a string the page assembled. The
+    page still looks it up by id to put the guide in it, asserted here too
+    so the element and its one consumer cannot drift apart."""
+    root = Path(__file__).resolve().parents[1] / "src" / "ion" / "web"
+    fragment = (root / "templates" / "_fragments" / "cases_panel.html"
+                ).read_text(encoding="utf-8")
+    assert '<aside class="cpanel-guide" id="cpanel-alert-guide">' in fragment
+
+    page = (root / "templates" / "cases.html").read_text(encoding="utf-8")
+    assert "getElementById('cpanel-alert-guide')" in page
 
 
 def test_the_guide_shares_the_coalesced_raw_request(cases_js):

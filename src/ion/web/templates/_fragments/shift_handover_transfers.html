@@ -1,0 +1,9 @@
+{% from "_fragments/_time.html" import ts %}
+<h2 class="text-xl font-semibold mb-3">Transfers</h2>
+{% if metrics is none %}<div class="alert alert-error mb-3">Transfer metrics could not be read. Outstanding work is unknown.</div>
+{% else %}<div class="stats w-full mb-3">
+{% for key, label in [('unaccepted_count','Offered and not taken'),('overdue_action_count','Overdue actions'),('unowned_action_count','Unowned actions')] %}<div class="stat"><div class="stat-title">{{ label }}</div><div class="stat-value">{{ metrics.get(key) if metrics.get(key) is not none else 'Unknown' }}</div></div>{% endfor %}
+</div>{% endif %}
+{% if rows is none %}<div class="alert alert-error">Transfers could not be read. This does not mean there are no handovers.</div>
+{% elif not rows %}<p>No handover has been raised yet. The live report below is not a frozen transfer record.</p>
+{% else %}{% for h in rows %}<button class="card bg-base-200 p-4 w-full text-left mb-2" data-sh-open="{{ h.id }}"><span>#{{ h.id }} · {{ h.status }} · {{ h.outgoing_lead or 'Unknown' }} → {{ h.incoming_lead or 'Nobody yet' }}</span><span>{{ ts(h.get('shift_end')) }} · {{ h.open_action_count if h.get('open_action_count') is not none else 'Unknown' }} open · {{ h.overdue_action_count if h.get('overdue_action_count') is not none else 'Unknown' }} overdue</span></button>{% endfor %}{% endif %}

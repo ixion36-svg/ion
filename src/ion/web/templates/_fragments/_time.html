@@ -1,0 +1,45 @@
+{# The one way a server-rendered fragment emits a timestamp.
+
+   Import it, do not hand-roll a `<time>` tag:
+
+     {% from "_fragments/_time.html" import ts %}
+     <td>{{ ts(log.timestamp) }}</td>
+     <td>{{ ts(run.started_at, 'time') }}</td>
+     <td>{{ ts(row.due, fallback='Not scheduled') }}</td>
+
+   Why not just format it on the server: the fragments replace JavaScript
+   that called `toLocaleString()`, which is the viewer's clock. A server
+   knows only its own, so rendering the string server-side would show an
+   analyst in another timezone the wrong time on every row.
+
+   Why not localise everything either: a timestamp has to carry a zone
+   before it can be moved to another one. A timezone-aware value does, and
+   static/js/local-time.js rewrites its text to the viewer's clock. A naive
+   value does not, and ION stores audit and event timestamps in a naive
+   column defaulting to the database's `func.now()`, which is UTC on
+   SQLite and the session timezone on Postgres, with nothing in the row to
+   say which. Those are marked `data-ts-local="no"` and left as stored,
+   with a title saying whose clock they are on.
+
+   Localising them anyway is worse than leaving them, because JavaScript
+   parses a zoneless ISO date-time as local time: the browser would read
+   the digits as the viewer's own clock, convert out of a zone the value
+   was never in, and show a time wrong by the viewer's offset while looking
+   authoritative. ion.web.templating._ts_parts makes that call, so the
+   decision has one definition and its own tests.
+
+   A missing timestamp renders `fallback`, never an empty cell and never
+   the epoch. "No timestamp recorded" and "midnight on 1 January 1970" are
+   not the same claim. #}
+
+{% macro ts(value, format='datetime', fallback='-') -%}
+{%- set parts = ts_parts(value) -%}
+{%- if parts is none -%}
+<span class="opacity-60">{{ fallback }}</span>
+{%- else -%}
+<time datetime="{{ parts.iso }}" data-ts-format="{{ format }}"
+      data-ts-local="{{ 'yes' if parts.localise else 'no' }}"
+      {% if parts.note %}title="{{ parts.note }}"{% endif %}
+      class="whitespace-nowrap">{{ parts.shown }}</time>
+{%- endif -%}
+{%- endmacro %}

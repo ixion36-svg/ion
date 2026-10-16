@@ -1,0 +1,89 @@
+{% macro fig(value, why) %}
+{%- if value is not none %}{{ value }}
+{%- else %}<span class="an-absent" title="{{ why }}"></span>{% endif %}
+{% endmacro %}
+{# The case attack-path lanes, stats and legend, from ui/cases.py.
+
+   `data.nodes || []` then `if (nodes.length === 0)` rendered "No attack
+   path derived yet" for a 200 whose body was the wrong shape. The HTTP
+   failures were handled; that one was not, and it says the case has no
+   established chain of activity.
+
+   The edge overlay is still the page's own. drawAttackPathEdges places
+   each curve from getBoundingClientRect and the graph's scroll offsets,
+   so it needs a laid-out DOM, and it builds SVG with createElementNS
+   rather than markup. The edges ride on .apg-graph so it does not have to
+   fetch them again.
+#}
+{%- if state == 'failed' %}
+<div class="cpanel-empty-hint">The attack path could not be read, so
+  whether this case has a derived path is unknown.</div>
+{%- elif state == 'unreadable' %}
+<div class="cpanel-empty-hint">The attack path is not in a shape this
+  page can draw, so whether this case has a derived path is unknown.</div>
+{%- elif state == 'empty' %}
+<div class="cpanel-empty-hint">
+  <i class="icon-share-2"></i> No attack path derived yet</div>
+{%- else %}
+<div class="apg-stats">
+  <span class="apg-stat"><b>{{ fig(stats.nodes, 'Not recorded') }}</b> nodes</span>
+  <span class="apg-stat"><b>{{ fig(stats.edges, 'Not recorded') }}</b> edges</span>
+  {#- `stats.alerts != null ? stats.alerts : 0` said no alerts fed this
+      path when the count was simply not recorded. -#}
+  <span class="apg-stat"><b>
+    {{- fig(stats.alerts, 'No alert count was recorded for this path') -}}
+  </b> alerts</span>
+  {%- if stats.tactics is none %}
+  <span class="apg-stat apg-stat-tactics"><span class="an-absent"
+      title="The tactics reached are not in a readable shape"></span></span>
+  {%- elif stats.tactics %}
+  <span class="apg-stat apg-stat-tactics"
+        title="MITRE tactics reached, kill-chain order">
+    {%- for t in stats.tactics %}
+    {%- if not loop.first %} <span class="apg-arrow-sep">&rarr;</span> {% endif %}
+    {{- t -}}
+    {%- endfor %}
+  </span>
+  {%- endif %}
+  {%- if stats.reaches_impact %}
+  <span class="apg-impact-badge"
+        title="This path reaches an impact-class MITRE tactic">
+    <i class="icon-alert-triangle"></i> reaches impact</span>
+  {%- endif %}
+</div>
+<div class="apg-legend">
+  {%- for e in legend %}
+  <span class="apg-legend-item">
+    <span class="apg-legend-swatch apg-sw-{{ e.key }}"></span>{{ e.label }}</span>
+  {%- endfor %}
+</div>
+{%- if not edges_readable %}
+<div class="apg-legend"><span class="an-absent"
+    title="The edge list is not in a readable shape, so no edges are
+           drawn"></span> edges not readable</div>
+{%- endif %}
+<div class="apg-graph" data-apg-edges='{{ edges|tojson }}'>
+  <div class="apg-lanes">
+    {%- for lane in lanes %}
+    <div class="apg-lane">
+      <div class="apg-lane-head" title="MITRE tactic">{{ lane.tactic_label }}</div>
+      <div class="apg-lane-body">
+        {%- if not lane.nodes %}
+        <div class="apg-lane-empty">&mdash;</div>
+        {%- endif %}
+        {%- for n in lane.nodes %}
+        {#- The threat class comes from a fixed set, so a level the
+            stylesheet does not know keeps its text and takes none. -#}
+        <div class="apg-node{% if n.threat_class %} tl-{{ n.threat_class }}{% endif %}"
+             data-apg-node="{{ n.node_id }}" title="{{ n.title }}">
+          <span class="apg-node-dot"></span>
+          <span class="apg-node-type t-{{ n.kind }}">{{ n.glyph }}</span>
+          <span class="apg-node-val">{{ n.label }}</span>
+        </div>
+        {%- endfor %}
+      </div>
+    </div>
+    {%- endfor %}
+  </div>
+</div>
+{%- endif %}

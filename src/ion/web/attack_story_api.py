@@ -20,7 +20,15 @@ async def get_attack_stories(
     """Build attack stories from correlated alerts."""
     from ion.services.attack_story_service import build_attack_stories
     es = ElasticsearchService()
-    if not es:
+    # `es.is_configured`, not `not es`. ElasticsearchService defines neither
+    # __bool__ nor __len__, so an instance is always truthy and this guard
+    # never fired once: an unconfigured deployment fell through to
+    # get_alerts, raised, and answered {"enabled": false, "error":
+    # "ElasticsearchError"} from the handler below, where the intent here
+    # was to name the actual cause. Measured on a deployment where
+    # bool(ElasticsearchService()) is True and .is_configured is False.
+    # is_configured is a property, so it is read rather than called.
+    if not es.is_configured:
         return {"enabled": False, "error": "Elasticsearch not configured"}
     try:
         alerts = await es.get_alerts(hours=hours, limit=500)

@@ -65,13 +65,20 @@ async def create_bug_report(
     return br.to_dict()
 
 
-@router.get("/api/bug-reports")
-def list_bug_reports(
-    status: Optional[str] = None,
-    mine: bool = False,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db_session),
-):
+def bug_reports_payload(
+    status: Optional[str],
+    mine: bool,
+    current_user: User,
+    session: Session,
+) -> dict:
+    """The bug reports this user may see, filtered the way the page asks.
+
+    Extracted from list_bug_reports so the /ui fragment that renders this
+    table can call it too. The object-level scoping below is the reason it
+    is one function rather than two: a second copy of "only system:settings
+    sees everyone's reports" is a privacy gate that drifts, and the copy
+    that drifts is the one that keeps showing other people's submissions.
+    """
     # object-level scoping. Anyone can file a bug, but only a
     # privileged user (system:settings — the CAB/admin surface) may see
     # everyone's; a normal analyst is scoped to their own submissions.
@@ -84,6 +91,16 @@ def list_bug_reports(
     stmt = stmt.order_by(BugReport.created_at.desc()).limit(500)
     rows = session.execute(stmt).scalars().all()
     return {"bug_reports": [r.to_dict() for r in rows], "count": len(rows)}
+
+
+@router.get("/api/bug-reports")
+def list_bug_reports(
+    status: Optional[str] = None,
+    mine: bool = False,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    return bug_reports_payload(status, mine, current_user, session)
 
 
 @router.get("/api/bug-reports/{report_id}")

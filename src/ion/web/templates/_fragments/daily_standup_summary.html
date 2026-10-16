@@ -1,0 +1,23 @@
+{#
+  The threat-landscape briefing.
+
+  Rendered as text in a pre-wrap block, which is exactly what the page did
+  (`esc(summary)` inside a `whitespace-pre-wrap` div) and is why no markdown
+  step is needed here: there never was one on this panel.
+
+  Three outcomes. A model that could not be reached is worth retrying; a
+  model that answered with nothing is not, and the old catch printed the
+  thrown message in both cases while the success branch happily wrote an
+  empty div for the second.
+
+  The text is read back by collectState, which POSTs it as `ai_summary`,
+  and cached in localStorage for the slide deck and the .pptx download.
+  Both read textContent from this element, so the summary has one copy.
+#}
+{% if failed %}
+<p role="alert" class="ds-read-failed">The AI summary could not be generated. The request to the AI service did not complete, so there is no briefing. Generate it again to retry.</p>
+{% elif not summary %}
+<p class="ds-empty">The AI service answered but returned no summary. There is nothing to show; this is not a failed request.</p>
+{% else %}
+<div id="threat-summary-text" class="whitespace-pre-wrap">{{ summary }}</div>
+{% endif %}

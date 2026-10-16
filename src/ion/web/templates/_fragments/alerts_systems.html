@@ -1,0 +1,145 @@
+{# Alerts: the analytics drawer's systems tab.
+
+   Replaces the writes in loadAdSystems and renderAdSystems. The grid is the
+   fragment's own target and the four figures above it are swapped out of
+   band, so a failed read replaces them rather than leaving the previous
+   window's numbers under a message about this one.
+
+   The page fetched with `Authorization: Bearer ${localStorage.getItem('token')}`,
+   and nothing in this codebase ever sets that key. The header was always
+   the literal string "Bearer null" and worked only because
+   get_session_token checks the ion_session cookie before it looks at the
+   header. This fragment sends no header: it is already the viewer's
+   request.
+
+   `data.systems || []` rendered "No systems found. Connect Elasticsearch to
+   see system data." for a payload that carried no system list, so a refusal
+   told the reader to go and configure something.
+
+   TIDE coverage is the sharpest of the `|| 0` defaults. A system measured at
+   nought percent coverage and a system whose coverage was not reported were
+   the same number in the same red band, and they are opposite findings:
+   one is an urgent gap, the other is an unknown. #}
+
+{%- macro figure(value, suffix='') -%}
+  {%- if value is none -%}
+    <span title="not reported by this read">&hellip;</span>
+  {%- else -%}
+    {{ value }}{{ suffix }}
+  {%- endif -%}
+{%- endmacro -%}
+
+{% if failed %}
+  <div class="ad-sys-loading text-[var(--danger)]" role="alert">
+    The system overview could not be read. This is not a deployment with no
+    systems in it: whether any exist, and how they are covered, is not known.
+    {% if reason %}({{ reason }}){% endif %}
+  </div>
+{% elif rows is none %}
+  <div class="ad-sys-loading text-[var(--danger)]" role="alert">
+    The system overview answered without a list of systems, so this panel
+    cannot say which systems exist.
+  </div>
+{% elif not rows %}
+  {# A real absence, and the only case where the page's advice made sense. #}
+  <div class="ad-sys-loading">
+    No systems found. Connect Elasticsearch to see system data.
+  </div>
+{% else %}
+  {% if degraded %}
+    {# The systems below are the CyAB mappings out of ION's own database, so
+       the list is real. The alert side of the payload is not, and every
+       count on these cards renders as not reported rather than as nought. #}
+    <div class="ad-sys-loading text-[var(--warning)]" role="status">
+      These systems are the ones ION has mapped. How many alerts each raised
+      could not be read{% if reason %}: {{ reason }}{% endif %}.
+    </div>
+  {% endif %}
+  {% for sys in rows %}
+    <div class="ad-sys-card{{ ' mapped' if sys.mapped else '' }}">
+      <div class="ad-sys-head">
+        <span class="ad-sys-avatar">{{ sys.initials }}</span>
+        <span class="ad-sys-name">{{ sys.name }}</span>
+        {% if sys.mapped %}<span class="ad-sys-badge">mapped</span>{% endif %}
+        <span class="ad-sys-count">{{ figure(sys.alert_count) }} alerts</span>
+      </div>
+
+      <div class="ad-sys-sevs">
+        {% if sys.pills %}
+          {% for p in sys.pills %}
+            <span class="ad-sys-sev-pill {{ p.cls }}">{{ p.count }} {{ p.label }}</span>
+          {% endfor %}
+        {% else %}
+          {# The page said "No alerts" here whenever every pill was zero,
+             which is right, and it also said it when the severity block was
+             missing entirely. Those are told apart now. #}
+          {% if sys.alert_count is none %}
+            <span class="text-xs text-[var(--text-muted)]">Severities not reported</span>
+          {% else %}
+            <span class="text-xs text-[var(--text-muted)]">No alerts</span>
+          {% endif %}
+        {% endif %}
+      </div>
+
+      {% if sys.spark %}
+        {% if sys.spark.flat %}
+          {# Every bucket was zero. `Math.max(1, ...)` drew a flat line along
+             the bottom for this, which reads as a real series that happens
+             to be low. #}
+          <div class="ad-sys-sparkline text-xs text-[var(--text-muted)]">No alerts in this window.</div>
+        {% else %}
+          <div class="ad-sys-sparkline">
+            <svg width="100%" height="{{ sys.spark.h }}" viewBox="0 0 {{ sys.spark.w }} {{ sys.spark.h }}" preserveAspectRatio="none">
+              <polyline points="{{ sys.spark.points }}" fill="none" stroke="var(--primary)" stroke-width="1.5" opacity="0.6"/>
+            </svg>
+          </div>
+        {% endif %}
+      {% endif %}
+
+      {% if sys.tide %}
+        <div class="ad-sys-tide">
+          <div class="ad-sys-tide-label">
+            <span>TIDE Detection Coverage</span>
+            {% if sys.tide.coverage_pct is none %}
+              {# No figure, so no band. The page banded this as nought and
+                 painted it red, asserting an urgent gap on a system nobody
+                 had measured. #}
+              <span class="font-mono font-semibold text-[var(--text-muted)]">not measured</span>
+            {% else %}
+              {# The band is "good", "fair" or "poor" and the colour for each
+                 is this stylesheet's business. It used to arrive from the
+                 Python as var(--success), which put ION's theme vocabulary
+                 inside the view model every reader of this route is built
+                 on. The width below stays an attribute because a percentage
+                 is genuinely per-system. #}
+              <span class="font-mono font-semibold tide-{{ sys.tide.band }}">{{ sys.tide.coverage_pct }}%</span>
+            {% endif %}
+          </div>
+          {% if sys.tide.coverage_pct is not none %}
+            <div class="ad-sys-tide-bar-track"><div class="ad-sys-tide-bar-fill tide-{{ sys.tide.band }}-bg" data-ion-style="width:{{ sys.tide.coverage_pct }}%"></div></div>
+          {% endif %}
+          <div class="ad-sys-tide-stats">
+            <span>{{ figure(sys.tide.applied_rules) }}/{{ figure(sys.tide.total_rules) }} rules</span>
+            <span>{{ figure(sys.tide.enabled_rules) }} enabled</span>
+            <span>{{ figure(sys.tide.disabled_rules) }} disabled</span>
+          </div>
+        </div>
+      {% elif sys.mapped %}
+        <div class="ad-sys-tide">
+          <div class="ad-sys-tide-label">
+            <span>TIDE Detection Coverage</span>
+            <span class="font-mono text-[var(--text-muted)]">no TIDE data</span>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  {% endfor %}
+{% endif %}
+
+{# The four figures above the grid, out of band. The page set these with
+   textContent and `|| 0`, so a figure the payload did not carry became a
+   measured zero in a card the size of a headline. #}
+<span id="ad-sys-total" hx-swap-oob="innerHTML">{{ figure(total_alerts) }}</span>
+<span id="ad-sys-count" hx-swap-oob="innerHTML">{{ figure(total_systems) }}</span>
+<span id="ad-sys-mapped" hx-swap-oob="innerHTML">{{ figure(mapped_systems) }}</span>
+<span id="ad-sys-coverage" hx-swap-oob="innerHTML">{{ figure(avg_coverage, '%') }}</span>

@@ -122,22 +122,39 @@ def test_versions_load_without_a_click(documents):
 
 
 def test_rail_lists_the_documents_currently_in_view(documents):
+    """The rail still builds client-side, from the list the analyst is
+    looking at. What changed is how a row is made: it clones the
+    doc-rail-item template rather than assembling an HTML string, so the
+    click action is an attribute in the markup instead of text inside this
+    function. That is the point of the conversion, so the attribute is
+    asserted where it now lives.
+    """
     js = _strip_comments(_inline_js(documents))
     fn = js[js.index("function renderDocRail"):]
     fn = fn[:fn.index("\nfunction ")]
     assert "filterDocuments()" in fn, "the rail ignores the folder and filters"
-    assert "data-click-action=\"viewDocument\"" in fn
+    assert "cloneDocTemplate('doc-rail-item')" in fn
+    assert 'id="doc-rail-item"' in documents
+    assert 'data-click-action="viewDocument"' in documents
 
 
 def test_rail_is_capped_and_says_what_it_dropped(documents):
     """~600 rail rows is a slow panel. Silent truncation reads as 'that is
-    everything'."""
+    everything'.
+
+    The wording was "N more …" and is now "N more. Narrow the folder or
+    filters to see them." This pinned the old phrasing down to its
+    ellipsis, so it asserts the two things that have to be true instead:
+    the dropped count is named, and the analyst is told how to see the
+    rest.
+    """
     js = _strip_comments(_inline_js(documents))
     fn = js[js.index("function renderDocRail"):]
     fn = fn[:fn.index("\nfunction ")]
     assert "RAIL_MAX" in fn
     assert "hiddenCount" in fn
-    assert "more —" in fn
+    assert "' more." in fn, "the dropped count must be named in the text"
+    assert "Narrow the folder or filters" in fn
 
 
 def test_open_document_survives_the_cap(documents):

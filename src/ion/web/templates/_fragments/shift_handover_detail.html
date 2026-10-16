@@ -1,0 +1,27 @@
+{% from "_fragments/_time.html" import ts %}
+{% macro number(value) %}{{ value if value is not none else 'Unknown' }}{% endmacro %}
+{% if h is none %}<div class="alert alert-error">Handover could not be read. What the outgoing shift recorded is unknown; this is not an empty handover.</div>
+{% else %}<div class="card bg-base-200 p-4 space-y-4">
+<p>#{{ h.id }} · {{ h.status }} · {{ h.outgoing_lead or 'Unknown' }} → {{ h.incoming_lead or 'Nobody yet' }} · {{ ts(h.get('shift_start')) }} — {{ ts(h.get('shift_end')) }} · {{ number(h.get('shift_hours')) }}h · Snapshot {{ ts(h.get('snapshot_taken_at')) }}</p>
+{% if h.summary %}<p>{{ h.summary }}</p>{% endif %}{% if h.rejection_reason %}<div class="alert alert-error">Sent back: {{ h.rejection_reason }}</div>{% endif %}
+{% if h.status == 'accepted' %}
+{% if h.get('accepted_by_designated_lead') is true %}<p>Accepted by the named incoming lead: {{ h.accepted_by }}.</p>
+{% elif h.get('accepted_by_designated_lead') is false %}<div class="alert alert-warning">Accepted by {{ h.accepted_by }}, who was not the named incoming lead ({{ h.incoming_lead }}).</div>
+{% else %}<p>Whether the acceptor was the named incoming lead is unknown.</p>{% endif %}{% endif %}
+<h3>Changes since the last accepted handover</h3>
+{% set changes = h.get('changes_since_previous') %}{% if changes is none %}<p>Baseline comparison unknown.</p>{% elif changes.get('baseline') is none %}<p>No previously accepted handover to compare against.</p>{% else %}
+{% for m in changes.get('metrics') or [] %}<p>{{ m.label }}: {{ number(m.get('current')) }} · {% if m.get('delta') is none or m.get('direction') == 'unknown' %}no baseline{% else %}{{ m.direction }} {{ m.delta }}{% endif %}</p>{% endfor %}<p>Against #{{ changes.baseline }}, snapshot {{ ts(changes.get('baseline_taken_at')) }}.</p>{% endif %}
+<h3>Actions crossing the boundary</h3><p>{{ number(h.get('open_action_count')) }} open · {{ number(h.get('overdue_action_count')) }} overdue · {{ number(h.get('unowned_action_count')) }} unowned</p>
+{% if h.get('actions') is none %}<p>Transferred actions unknown.</p>{% elif not h.actions %}<p>Nothing recorded as crossing the shift boundary.</p>{% else %}
+{% for a in h.actions %}<div class="border-b border-base-300 py-2"><span class="badge">{{ a.status }}</span> {{ a.description }} · {{ a.owner or 'Unowned' }} · due {{ ts(a.get('due_at'), fallback='No deadline') }} · carried ×{{ number(a.get('carry_count')) }}
+{% if a.get('overdue') is true %}<span class="badge badge-error">Overdue</span>{% elif a.get('overdue') is false %}<span>Not overdue</span>{% else %}<span>Deadline status unknown</span>{% endif %}
+{% if a.get('case_id') is not none %}<a class="link" href="/cases/{{ a.case_id|int }}">case {{ a.case_id }}</a>{% endif %}
+{% if a.can_resolve %}<button class="btn btn-xs" data-click-action="shCompleteAction" data-args='[{{ h.id }},{{ a.id }}]'>Done</button><button class="btn btn-xs btn-ghost" data-click-action="shCancelAction" data-args='[{{ h.id }},{{ a.id }}]'>Drop</button>{% endif %}</div>{% endfor %}{% endif %}
+{% if capabilities.get('set_incoming') or capabilities.get('add_action') %}{% if users is none %}<div class="alert alert-error">Assignment choices could not be read. Refresh this handover to retry.</div>{% endif %}{% endif %}
+{% if capabilities.get('set_incoming') and users is not none %}<div><select id="sh-incoming-{{ h.id }}" class="select select-sm">{% for u in users if u.id != h.outgoing_lead_id %}<option value="{{ u.id }}"{% if u.id == h.incoming_lead_id %} selected{% endif %}>{{ u.display_name or u.username }}</option>{% endfor %}</select><button class="btn btn-sm" data-click-action="shSetIncoming" data-args='[{{ h.id }}]'>Set incoming lead</button></div>{% endif %}
+{% if capabilities.get('add_action') and users is not none %}<div class="flex flex-wrap gap-2"><input id="sh-act-desc-{{ h.id }}" class="input input-sm" placeholder="What needs doing"><select id="sh-act-owner-{{ h.id }}" class="select select-sm"><option value="">No owner yet</option>{% for u in users %}<option value="{{ u.id }}">{{ u.display_name or u.username }}</option>{% endfor %}</select><input id="sh-act-due-{{ h.id }}" type="datetime-local" class="input input-sm"><button class="btn btn-sm" data-click-action="shAddAction" data-args='[{{ h.id }}]'>Add</button></div>{% endif %}
+{% for s in (h.get('snapshot') or {}).get('sources') or [] %}<p>{{ s.name }} — {{ s.detail }} ({{ s.freshness }}, {{ ts(s.get('as_of')) }})</p>{% endfor %}
+<div>{% if capabilities.get('submit') %}<button class="btn btn-sm btn-primary" data-click-action="shSubmit" data-args='[{{ h.id }}]'>Submit to incoming shift</button>{% endif %}
+{% if capabilities.get('accept') %}<button class="btn btn-sm btn-success" data-click-action="shAccept" data-args='[{{ h.id }}]'>Accept handover</button>{% endif %}
+{% if capabilities.get('reject') %}<button class="btn btn-sm btn-error" data-click-action="shReject" data-args='[{{ h.id }}]'>Send back</button>{% endif %}</div>
+</div>{% endif %}

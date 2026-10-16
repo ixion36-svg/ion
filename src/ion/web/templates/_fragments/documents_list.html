@@ -1,0 +1,80 @@
+{# The document library, from ui/documents.py's documents_view.
+
+   Three outcomes. `rows is none` means the read failed or answered
+   something that is not a list, so we cannot say the library is empty.
+
+   Delete appears only where the endpoint would allow it. DELETE
+   /api/documents/{id} gates on document:read, which everyone holds,
+   because the real rule is ownership and the handler checks it against the
+   row: your own, or anyone's with document:delete. The page offered the
+   button on every row regardless, so a reader who owned nothing collected
+   a 403 per click.
+
+   Every data-args goes through tojson. The Delete control used
+   JSON.stringify inside a single-quoted attribute, which escapes " and not
+   ', so a document called `Bob's SOP` closed the attribute early and the
+   button silently did nothing.
+#}
+{#- A folder was asked for and could not be honoured. Said out loud,
+    because the page logged the refusal to the console and showed a list
+    that looked filtered and was not. The rows below are everything else
+    the filter matched, with the folder dimension left out. -#}
+{% if folder_filter == 'withheld' %}
+<p class="doc-filter-notice">The folder filter needs permission to read the
+  folder hierarchy, which this account does not have, so these results are
+  not restricted to a folder.</p>
+{% elif folder_filter == 'failed' %}
+<p class="doc-filter-notice">The folder filter could not be applied: the
+  folder hierarchy did not answer, so these results are not restricted to a
+  folder.</p>
+{% endif %}
+{% if rows is none %}
+<p class="empty-state">Documents unavailable</p>
+{% elif not rows %}
+<p class="empty-state">No documents found. Render a template to create one!</p>
+{% else %}
+{%- for d in rows %}
+<div class="list-item doc-row{% if d.archived %} archived doc-row-archived{% endif %}">
+  <div class="list-item-content">
+    <span class="list-item-title">
+      {{- d.name if d.name is not none else 'Untitled document' -}}
+      {%- if d.doc_type %}<span class="doc-type-badge doc-type-{{ d.doc_type }}">{{ d.doc_type }}</span>{% endif %}
+      {%- if d.folder %}<span class="collection-badge">{{ d.folder }}</span>{% endif %}
+      {%- for tag in d.tags %}<span class="tag-badge">{{ tag }}</span>{% endfor %}
+    </span>
+    <div class="list-item-meta">
+      {#- No "undefined" badge for a format the payload did not carry. -#}
+      {%- if d.output_format %}<span class="badge">{{ d.output_format }}</span>{% endif %}
+      {#- Not v1. `(d.current_version || 1)` claimed a revision. -#}
+      {%- if d.version is not none %}
+      <span class="badge badge-version">v{{ d.version }}</span>
+      {%- else %}
+      <span class="badge doc-unmeasured" title="This document arrived without a version number">version unknown</span>
+      {%- endif %}
+      {%- if d.archived %}<span class="badge badge-archived">Archived</span>{% endif %}
+      {%- if d.template_id is not none %}
+      <span>From template #{{ d.template_id }}{% if d.template_version is not none %} v{{ d.template_version }}{% endif %}</span>
+      {%- endif %}
+      {%- if d.when %}<span>{{ d.when }}</span>{% endif %}
+    </div>
+  </div>
+  <div class="list-item-actions">
+    <button class="btn btn-sm" data-click-action="viewDocument"
+            data-args='{{ [d.id]|tojson }}'>View</button>
+    <button class="btn btn-sm move-btn" data-click-action="showMoveModal"
+            data-args='{{ [d.id, d.collection_id]|tojson }}'>Move</button>
+    {%- if d.archived %}
+    <button class="btn btn-sm btn-success" data-click-action="restoreDocument"
+            data-args='{{ [d.id]|tojson }}'>Restore</button>
+    {%- else %}
+    <button class="btn btn-sm btn-warning" data-click-action="archiveDocument"
+            data-args='{{ [d.id]|tojson }}'>Archive</button>
+    {%- endif %}
+    {%- if d.may_delete %}
+    <button class="btn btn-sm btn-danger" data-click-action="deleteDocument"
+            data-args='{{ [d.id, d.name]|tojson }}'>Delete</button>
+    {%- endif %}
+  </div>
+</div>
+{%- endfor %}
+{% endif %}

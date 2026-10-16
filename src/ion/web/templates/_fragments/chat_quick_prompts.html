@@ -1,0 +1,10 @@
+{# The suggested prompts for one context, from ui/chat.py's QUICK_PROMPTS.
+
+   data-prompt is new. The page read the button's own textContent back as
+   the prompt to send, so any change to the label silently changed what
+   was asked, and a label the browser whitespace-collapsed was sent
+   collapsed.
+#}
+{%- for p in prompts %}
+<button class="ai-qp" data-prompt="{{ p }}">{{ p }}</button>
+{%- endfor %}

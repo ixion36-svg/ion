@@ -24,27 +24,31 @@
     </div>
   </section>
 
-  <!-- KPIs -->
+  {# Each tile is replaced out of band by the region whose read produces it,
+     so a figure and the table it summarises always come from one read. The
+     placeholder says "not loaded yet" rather than 0 or "loading", because a
+     region whose request never completes leaves this text on screen and
+     "loading" would then be a claim that is no longer true. #}
   <div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow mb-8 rise d-2">
-    <div class="stat">
+    <div class="stat" id="kpi-requests">
       <div class="stat-title text-error">Open requests</div>
-      <div id="kpi-requests" class="stat-value text-error">—</div>
-      <div id="kpi-requests-sub" class="stat-desc"></div>
+      <div class="stat-value text-error">—</div>
+      <div class="stat-desc">not loaded yet</div>
     </div>
-    <div class="stat">
+    <div class="stat" id="kpi-hours">
       <div class="stat-title text-warning">Addressable hours</div>
-      <div id="kpi-hours" class="stat-value text-warning">—</div>
-      <div id="kpi-hours-sub" class="stat-desc"></div>
+      <div class="stat-value text-warning">—</div>
+      <div class="stat-desc">not loaded yet</div>
     </div>
-    <div class="stat">
+    <div class="stat" id="kpi-proposals">
       <div class="stat-title text-primary">Proposals in flight</div>
-      <div id="kpi-proposals" class="stat-value text-primary">—</div>
-      <div id="kpi-proposals-sub" class="stat-desc"></div>
+      <div class="stat-value text-primary">—</div>
+      <div class="stat-desc">not loaded yet</div>
     </div>
-    <div class="stat">
+    <div class="stat" id="kpi-quirks">
       <div class="stat-title text-warning">Quirks due review</div>
-      <div id="kpi-quirks" class="stat-value text-warning">—</div>
-      <div id="kpi-quirks-sub" class="stat-desc"></div>
+      <div class="stat-value text-warning">—</div>
+      <div class="stat-desc">not loaded yet</div>
     </div>
   </div>
 
@@ -55,40 +59,37 @@
         <h2 class="card-title">Content pack</h2>
         <span class="text-xs opacity-60">portable quirks + proposals · imports land pending/draft (verify before effect)</span>
       </div>
-      <div class="flex items-center gap-3 flex-wrap mt-2">
-        <a href="/api/de/content-pack/export" class="btn btn-sm btn-primary">Export pack</a>
-        <input type="file" id="cp-file" accept="application/json,.json" class="file-input file-input-sm file-input-bordered max-w-xs">
-        <button type="button" id="cp-import" class="btn btn-sm">Import pack</button>
-        <span id="cp-result" class="text-xs opacity-70"></span>
-      </div>
+      {# The only region that reads nothing. It is a fragment so the Import
+         control can be withheld from a viewer whose POST would be refused. #}
+      <div id="dw-content-pack" class="mt-2"
+           hx-get="/ui/de-workbench/content-pack"
+           hx-trigger="load"
+           hx-swap="innerHTML"><span class="loading loading-spinner loading-sm text-primary"></span></div>
     </div>
   </div>
 
   <!-- Tuning Requests queue -->
   <div class="card bg-base-200 shadow mb-6 rise d-3">
     <div class="card-body">
-      <div class="flex items-center justify-between gap-2">
+      <div class="flex items-center justify-between gap-2 flex-wrap">
         <h2 class="card-title">Tuning requests</h2>
-        <span class="text-xs opacity-60">analyst-raised · GitLab-mirrored</span>
+        <div class="flex items-center gap-3">
+          <span class="text-xs opacity-60">analyst-raised · GitLab-mirrored</span>
+          {# Every Refresh is out here, not in the swapped region, so a render
+             that says the read failed cannot remove the control that retries
+             it. One per region rather than one for the page, because each
+             region fails on its own and the one that failed is the one worth
+             retrying. #}
+          <button class="btn btn-xs btn-ghost"
+                  hx-get="/ui/de-workbench/requests"
+                  hx-target="#dw-requests"
+                  hx-swap="innerHTML">Refresh</button>
+        </div>
       </div>
-      <div id="req-empty" class="alert hidden justify-center">No open tuning requests — the queue is clear.</div>
-      <div class="overflow-x-auto">
-        <table class="table table-sm" id="req-table">
-          <thead>
-            <tr>
-              <th>Rule</th>
-              <th>Reason</th>
-              <th>Details</th>
-              <th>Age</th>
-              <th>FP/7d</th>
-              <th>Ticket</th>
-              <th>Status</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="req-body"></tbody>
-        </table>
-      </div>
+      <div id="dw-requests"
+           hx-get="/ui/de-workbench/requests"
+           hx-trigger="load"
+           hx-swap="innerHTML"><div class="flex justify-center items-center gap-2 py-10 opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading the tuning-request queue...</div></div>
     </div>
   </div>
 
@@ -96,36 +97,41 @@
     <!-- Noise campaigns -->
     <div class="lg:col-span-2 card bg-base-200 shadow rise d-4">
       <div class="card-body">
-        <div class="flex items-center justify-between gap-2">
+        <div class="flex items-center justify-between gap-2 flex-wrap">
           <h2 class="card-title">Noise campaigns</h2>
-          <a href="/de-metrics" class="link link-primary text-sm">all campaigns →</a>
+          <div class="flex items-center gap-3">
+            <a href="/de-metrics" class="link link-primary text-sm">all campaigns →</a>
+            <button class="btn btn-xs btn-ghost"
+                    hx-get="/ui/de-workbench/campaigns"
+                    hx-target="#dw-campaigns"
+                    hx-swap="innerHTML">Refresh</button>
+          </div>
         </div>
-        <div id="camp-empty" class="alert hidden justify-center">No active noise campaigns.</div>
-        <div class="overflow-x-auto">
-          <table class="table table-sm">
-            <thead>
-              <tr>
-                <th>Rule</th>
-                <th class="text-right">FP alerts</th>
-                <th class="text-right">Hours</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="camp-body"></tbody>
-          </table>
-        </div>
+        <div id="dw-campaigns"
+             hx-get="/ui/de-workbench/campaigns"
+             hx-trigger="load"
+             hx-swap="innerHTML"><div class="flex justify-center items-center gap-2 py-10 opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Measuring noise campaigns...</div></div>
       </div>
     </div>
 
     <!-- Quirks due -->
     <div class="card bg-base-200 shadow rise d-4">
       <div class="card-body">
-        <div class="flex items-center justify-between gap-2">
+        <div class="flex items-center justify-between gap-2 flex-wrap">
           <h2 class="card-title">Quirks due for review</h2>
-          <a href="/de-quirks" class="link link-primary text-sm">register →</a>
+          <div class="flex items-center gap-3">
+            <a href="/de-quirks" class="link link-primary text-sm">register →</a>
+            <button class="btn btn-xs btn-ghost"
+                    hx-get="/ui/de-workbench/quirks"
+                    hx-target="#dw-quirks"
+                    hx-swap="innerHTML">Refresh</button>
+          </div>
         </div>
-        <div id="quirk-body"></div>
-        <div class="alert alert-info mt-3">Advisory only — quirks never hide or close alerts.</div>
+        <div id="dw-quirks"
+             hx-get="/ui/de-workbench/quirks"
+             hx-trigger="load"
+             hx-swap="innerHTML"><div class="flex justify-center items-center gap-2 py-10 opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading quirks...</div></div>
+        <div class="alert alert-info mt-3">Advisory only. Quirks never hide or close alerts.</div>
       </div>
     </div>
   </div>
@@ -133,24 +139,20 @@
   <!-- Proposals board -->
   <div class="card bg-base-200 shadow mb-6 rise d-5">
     <div class="card-body">
-      <div class="flex items-center justify-between gap-2">
+      <div class="flex items-center justify-between gap-2 flex-wrap">
         <h2 class="card-title">Proposals</h2>
-        <a href="/de-proposals" class="link link-primary text-sm">full board →</a>
-      </div>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <div class="text-xs font-semibold uppercase tracking-wide opacity-60 mb-2">Draft <span id="prop-draft-n"></span></div>
-          <div id="prop-draft" class="space-y-2"></div>
-        </div>
-        <div>
-          <div class="text-xs font-semibold uppercase tracking-wide opacity-60 mb-2">Applied · measuring <span id="prop-applied-n"></span></div>
-          <div id="prop-applied" class="space-y-2"></div>
-        </div>
-        <div>
-          <div class="text-xs font-semibold uppercase tracking-wide opacity-60 mb-2">Rejected <span id="prop-rejected-n"></span></div>
-          <div id="prop-rejected" class="space-y-2"></div>
+        <div class="flex items-center gap-3">
+          <a href="/de-proposals" class="link link-primary text-sm">full board →</a>
+          <button class="btn btn-xs btn-ghost"
+                  hx-get="/ui/de-workbench/proposals"
+                  hx-target="#dw-proposals"
+                  hx-swap="innerHTML">Refresh</button>
         </div>
       </div>
+      <div id="dw-proposals"
+           hx-get="/ui/de-workbench/proposals"
+           hx-trigger="load"
+           hx-swap="innerHTML"><div class="flex justify-center items-center gap-2 py-10 opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading the proposal board...</div></div>
     </div>
   </div>
 
@@ -160,266 +162,106 @@
 
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
-{% raw %}
-(function () {
-  'use strict';
+// The hand-rolled escaper, the age formatter, the status-pill table, the
+// reason-label table and the four render-and-write functions are gone with the
+// markup they served. The five regions are /ui/de-workbench/* and Jinja
+// autoescapes them. Each region's first paint is hx-trigger="load" on its own
+// container, not a call from here.
+//
+// What is left is the four mutations. Each re-requests the regions its write
+// changed instead of rebuilding rows, so a panel has one definition and it is
+// the fragment.
+function dwToast(m, k) { if (typeof showToast === 'function') showToast(m, k); }
 
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[<>&"']/g, function (c) {
-      return ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' })[c];
+function dwLoad(region) {
+  return htmx.ajax('GET', '/ui/de-workbench/' + region,
+                   { target: '#dw-' + region, swap: 'innerHTML' });
+}
+
+function dwPost(url, body) {
+  return fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: body === undefined ? null : JSON.stringify(body)
+  }).then(function (r) {
+    if (r.ok) return r.json().catch(function () { return {}; });
+    return r.json().catch(function () { return {}; }).then(function (d) {
+      throw new Error(d.detail || ('HTTP ' + r.status));
     });
-  }
-  function ageOf(iso) {
-    if (!iso) return '—';
-    var d = (Date.now() - new Date(iso).getTime()) / 864e5;
-    return d >= 1 ? Math.floor(d) + 'd' : Math.max(1, Math.round(d * 24)) + 'h';
-  }
+  });
+}
 
-  var REASON_LABELS = {
-    false_positive: 'False positive', noisy: 'Too noisy', threshold: 'Threshold wrong',
-    duplicate: 'Duplicate', other: 'Other',
-  };
-  var STATUS_CLS = {
-    open: 'bg-ion-coral/10 text-ion-coral',
-    triaged: 'bg-ion-amber/10 text-ion-amber',
-    linked: 'bg-ion-cyan/10 text-ion-cyan',
-    closed: 'bg-white/5 text-slate-500',
-  };
-
-  function chip(status) {
-    return '<span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-[0.08em] '
-      + (STATUS_CLS[status] || 'bg-white/5 text-slate-400') + '">' + esc(status) + '</span>';
-  }
-
-  // ── tuning requests ──────────────────────────────────────────────────────
-  function renderRequests(reqs) {
-    var openish = reqs.filter(function (r) { return r.status !== 'closed'; });
-    var body = document.getElementById('req-body');
-    var empty = document.getElementById('req-empty');
-    document.getElementById('kpi-requests').textContent = openish.length;
-    var oldest = openish.length
-      ? Math.max.apply(null, openish.map(function (r) { return Date.now() - new Date(r.created_at).getTime(); }))
-      : 0;
-    document.getElementById('kpi-requests-sub').textContent =
-      openish.length ? 'oldest ' + (oldest >= 864e5 ? Math.floor(oldest / 864e5) + 'd' : Math.round(oldest / 36e5) + 'h') : 'queue clear';
-    if (!openish.length) {
-      empty.classList.remove('hidden');
-      body.innerHTML = '';
-      return;
-    }
-    empty.classList.add('hidden');
-    body.innerHTML = openish.map(function (r) {
-      var ev = r.evidence_json || {};
-      var ticket = r.gitlab_issue_url
-        ? '<a class="text-ion-cyan hover:brightness-125" href="' + esc(r.gitlab_issue_url) + '" target="_blank" rel="noopener">#' + esc(r.gitlab_issue_iid) + ' ↗</a>'
-        : '<span class="text-slate-600">—</span>';
-      var actions = '';
-      if (r.status === 'open') {
-        actions += '<button class="req-act h-7 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-semibold mr-1" data-act="triage" data-id="' + r.id + '">Triage</button>';
-      }
-      if (r.status !== 'closed') {
-        actions += '<button class="req-act h-7 px-2.5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[11px] font-semibold mr-1" data-act="draft" data-id="' + r.id + '" data-rule="' + esc(r.rule_name) + '">Draft proposal</button>';
-        actions += '<button class="req-act h-7 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-semibold" data-act="close" data-id="' + r.id + '">Close</button>';
-      }
-      return '<tr class="border-b border-white/5 align-top">'
-        + '<td class="py-2.5 pr-4 font-mono text-[11.5px] text-slate-200">' + esc(r.rule_name) + '</td>'
-        + '<td class="py-2.5 pr-4">' + esc(REASON_LABELS[r.reason] || r.reason) + '</td>'
-        + '<td class="py-2.5 pr-4 text-slate-400 max-w-[320px]">' + esc((r.details || '').slice(0, 160)) + '</td>'
-        + '<td class="py-2.5 pr-4">' + ageOf(r.created_at) + '</td>'
-        + '<td class="py-2.5 pr-4">' + (ev.fp_alerts_7d != null ? ev.fp_alerts_7d : '—') + '</td>'
-        + '<td class="py-2.5 pr-4">' + ticket + '</td>'
-        + '<td class="py-2.5 pr-4">' + chip(r.status) + '</td>'
-        + '<td class="py-2.5 whitespace-nowrap">' + actions + '</td></tr>';
-    }).join('');
-  }
-
-  function loadRequests() {
-    return fetch('/api/de/tuning-requests').then(function (r) { return r.ok ? r.json() : { requests: [] }; })
-      .then(function (d) { renderRequests(d.requests || []); })
-      .catch(function () {});
-  }
-
-  // Deterministic draft → saved DRAFT proposal (same flow as DE Metrics),
-  // optionally linked back to the originating tuning request.
-  function draftProposal(rule, requestId) {
-    return fetch('/api/de/proposals/draft', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rule_name: rule, days: 90 }),
-    }).then(function (dr) {
-      if (!dr.ok) return dr.json().then(function (d) { throw new Error(d.detail || 'no active campaign for this rule'); });
-      return dr.json();
-    }).then(function (draft) {
-      return fetch('/api/de/proposals', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(draft),
-      }).then(function (cr) {
-        if (!cr.ok) return cr.json().then(function (d) { throw new Error(d.detail || ('HTTP ' + cr.status)); });
-        return cr.json();
-      });
-    }).then(function (p) {
+// Deterministic draft, then a saved DRAFT proposal (the same flow as DE
+// Metrics), optionally linked back to the originating tuning request. The
+// 90-day window is the one this page has always drafted against. The
+// campaigns panel above reports a 30-day one, and the two are left as they
+// were because narrowing the draft window would change what the proposal is
+// drafted from.
+function dwDraft(rule, requestId) {
+  return dwPost('/api/de/proposals/draft', { rule_name: rule, days: 90 })
+    .then(function (draft) { return dwPost('/api/de/proposals', draft); })
+    .then(function (p) {
       var pid = p.id || (p.proposal && p.proposal.id);
       var after = requestId
-        ? fetch('/api/de/tuning-requests/' + requestId + '/link-proposal', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ proposal_id: pid }),
-          })
+        ? dwPost('/api/de/tuning-requests/' + requestId + '/link-proposal', { proposal_id: pid })
         : Promise.resolve();
       return Promise.resolve(after).then(function () {
-        if (window.showToast) showToast('Draft proposal #' + pid + ' created for ' + rule + ' — refine & decide it on Detection Proposals.', 'success');
-        return Promise.all([loadRequests(), loadProposals()]);
+        dwToast('Draft proposal #' + pid + ' created for ' + rule
+                + '. Refine and decide it on Detection Proposals.', 'success');
+        return Promise.all([dwLoad('requests'), dwLoad('proposals')]);
       });
-    }).catch(function (e) {
-      if (window.showToast) showToast('Draft failed: ' + e.message, 'error');
-    });
-  }
+    })
+    .catch(function (e) { dwToast('Draft failed: ' + e.message, 'error'); });
+}
 
-  function reqAction(act, id, rule) {
-    if (act === 'draft') {
-      draftProposal(rule, id);
-      return;
-    }
-    var url = '/api/de/tuning-requests/' + id + '/' + (act === 'triage' ? 'triage' : 'close');
-    var body = act === 'close'
-      ? JSON.stringify({ resolution: prompt('Resolution (lands on the GitLab ticket):') || 'closed from workbench' })
-      : null;
-    fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body })
-      .then(function (r) {
-        if (!r.ok) return r.json().then(function (d) { throw new Error(d.detail || ('HTTP ' + r.status)); });
-        return loadRequests();
-      })
-      .catch(function (e) { if (window.showToast) showToast('Action failed: ' + e.message, 'error'); });
-  }
+function dwDraftForRule(rule) { return dwDraft(rule, null); }
+function dwDraftForRequest(id, rule) { return dwDraft(rule, id); }
 
-  // ── campaigns + KPIs ─────────────────────────────────────────────────────
-  function loadMetrics() {
-    return fetch('/api/de/metrics?days=30').then(function (r) { return r.ok ? r.json() : null; })
+function dwTriage(id) {
+  return dwPost('/api/de/tuning-requests/' + id + '/triage')
+    .then(function () { return dwLoad('requests'); })
+    .catch(function (e) { dwToast('Triage failed: ' + e.message, 'error'); });
+}
+
+function dwClose(id) {
+  var resolution = window.prompt('Resolution (lands on the GitLab ticket):')
+    || 'closed from workbench';
+  return dwPost('/api/de/tuning-requests/' + id + '/close', { resolution: resolution })
+    .then(function () { return dwLoad('requests'); })
+    .catch(function (e) { dwToast('Close failed: ' + e.message, 'error'); });
+}
+
+// The import reads a file the user picked and posts it as a JSON body, which
+// is not a request htmx can declare, so it stays here. What it no longer does
+// is describe what it created: it re-requests the two regions the import
+// writes to and lets them render the result.
+function dwImportPack() {
+  var out = document.getElementById('cp-result');
+  var input = document.getElementById('cp-file');
+  var f = input && (input.files || [])[0];
+  if (!f) { if (out) out.textContent = 'Choose a .json pack first.'; return; }
+  if (out) out.textContent = 'Importing...';
+  var reader = new FileReader();
+  reader.onload = function () {
+    var pack;
+    try { pack = JSON.parse(reader.result); }
+    catch (e) { if (out) out.textContent = 'Not valid JSON.'; return; }
+    dwPost('/api/de/content-pack/import', pack)
       .then(function (d) {
-        if (!d) return;
-        var summary = d.summary || {};
-        var campaigns = (d.campaigns || []).slice(0, 6);
-        document.getElementById('kpi-hours').textContent =
-          (summary.addressable_hours != null ? summary.addressable_hours : '—') + 'h';
-        document.getElementById('kpi-hours-sub').textContent =
-          'across ' + (summary.campaign_count != null ? summary.campaign_count : '?') + ' campaigns · 30d';
-        var body = document.getElementById('camp-body');
-        var empty = document.getElementById('camp-empty');
-        if (!campaigns.length) { empty.classList.remove('hidden'); body.innerHTML = ''; return; }
-        empty.classList.add('hidden');
-        body.innerHTML = campaigns.map(function (c) {
-          return '<tr class="border-b border-white/5">'
-            + '<td class="py-2.5 pr-4 font-mono text-[11.5px] text-slate-200">' + esc(c.rule_name) + '</td>'
-            + '<td class="py-2.5 pr-4 text-right">' + c.fp_alerts + '</td>'
-            + '<td class="py-2.5 pr-4 text-right text-ion-amber">' + c.cost_hours + 'h</td>'
-            + '<td class="py-2.5 text-right"><button class="camp-draft text-[11px] text-ion-cyan hover:brightness-125" data-rule="' + esc(c.rule_name) + '">Draft proposal</button></td></tr>';
-        }).join('');
+        // `!= null` on every count. The old line concatenated them raw, so a
+        // response omitting one rendered the word "undefined" after a plus.
+        var parts = [];
+        if (d.quirks_created != null) parts.push('quirks +' + d.quirks_created);
+        if (d.proposals_created != null) parts.push('proposals +' + d.proposals_created);
+        if (d.errors && d.errors.length) parts.push(d.errors.length + ' error(s)');
+        if (out) out.textContent = parts.length
+          ? 'Imported: ' + parts.join(', ')
+          : 'Imported. The response reported no counts.';
+        return Promise.all([dwLoad('proposals'), dwLoad('quirks')]);
       })
-      .catch(function () {});
-  }
-
-  // ── proposals board ──────────────────────────────────────────────────────
-  function propCard(p) {
-    var extra = p.status === 'applied' && p.outcome_json && p.outcome_json.fp_reduction_pct != null
-      ? 'measured −' + p.outcome_json.fp_reduction_pct + '% FP'
-      : (p.expected_fp_reduction != null ? 'exp. −' + p.expected_fp_reduction + '% FP' : '');
-    return '<div class="rounded-[10px] bg-white/3 border border-white/5 px-3 py-2.5">'
-      + '<div class="text-[10px] font-semibold uppercase tracking-[0.1em] text-ion-cyan">' + esc(p.change_type) + '</div>'
-      + '<div class="font-mono text-[11.5px] text-slate-200 mt-1">' + esc(p.rule_name || p.title) + '</div>'
-      + (extra ? '<div class="text-[11px] text-slate-500 mt-0.5">' + esc(extra) + '</div>' : '')
-      + '</div>';
-  }
-
-  function loadProposals() {
-    return fetch('/api/de/proposals').then(function (r) { return r.ok ? r.json() : { proposals: [] }; })
-      .then(function (d) {
-        var props = d.proposals || [];
-        var draft = props.filter(function (p) { return p.status === 'draft'; });
-        var applied = props.filter(function (p) { return p.status === 'applied'; });
-        var rejected = props.filter(function (p) { return p.status === 'rejected'; });
-        document.getElementById('kpi-proposals').textContent = draft.length + applied.length;
-        document.getElementById('kpi-proposals-sub').textContent =
-          draft.length + ' draft · ' + applied.length + ' applied/measuring';
-        [['prop-draft', draft], ['prop-applied', applied.slice(0, 4)], ['prop-rejected', rejected.slice(0, 3)]]
-          .forEach(function (pair) {
-            document.getElementById(pair[0]).innerHTML =
-              pair[1].map(propCard).join('') || '<div class="text-[12px] text-slate-600">none</div>';
-          });
-        document.getElementById('prop-draft-n').textContent = '(' + draft.length + ')';
-        document.getElementById('prop-applied-n').textContent = '(' + applied.length + ')';
-        document.getElementById('prop-rejected-n').textContent = '(' + rejected.length + ')';
-      })
-      .catch(function () {});
-  }
-
-  // ── quirks due ───────────────────────────────────────────────────────────
-  function loadQuirks() {
-    return fetch('/api/de/quirks?status=active').then(function (r) { return r.ok ? r.json() : { quirks: [] }; })
-      .then(function (d) {
-        var quirks = d.quirks || [];
-        var now = Date.now();
-        var soon = quirks.filter(function (q) {
-          if (!q.review_date) return false;
-          return new Date(q.review_date).getTime() - now < 7 * 864e5;
-        }).sort(function (a, b) { return new Date(a.review_date) - new Date(b.review_date); });
-        document.getElementById('kpi-quirks').textContent = soon.length;
-        document.getElementById('kpi-quirks-sub').textContent = 'of ' + quirks.length + ' active · 7d window';
-        document.getElementById('quirk-body').innerHTML = soon.slice(0, 6).map(function (q) {
-          var overdue = new Date(q.review_date).getTime() < now;
-          return '<div class="flex items-center justify-between py-2 border-b border-white/5">'
-            + '<span class="font-mono text-[11.5px] text-slate-200">' + esc(q.title) + '</span>'
-            + '<span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-[0.08em] bg-ion-amber/10 text-ion-amber">'
-            + (overdue ? 'overdue' : 'review ' + ageOf(q.review_date).replace('d', 'd out')) + '</span></div>';
-        }).join('') || '<div class="text-[12px] text-slate-600 py-2">Nothing due within 7 days.</div>';
-      })
-      .catch(function () {});
-  }
-
-  document.addEventListener('DOMContentLoaded', function () {
-    document.getElementById('req-table').addEventListener('click', function (e) {
-      var btn = e.target.closest('.req-act');
-      if (!btn) return;
-      reqAction(btn.getAttribute('data-act'), btn.getAttribute('data-id'), btn.getAttribute('data-rule') || '');
-    });
-    document.getElementById('camp-body').addEventListener('click', function (e) {
-      var btn = e.target.closest('.camp-draft');
-      if (btn) draftProposal(btn.getAttribute('data-rule'), null);
-    });
-    var cpImport = document.getElementById('cp-import');
-    if (cpImport) {
-      cpImport.addEventListener('click', function () {
-        var out = document.getElementById('cp-result');
-        var f = (document.getElementById('cp-file').files || [])[0];
-        if (!f) { out.textContent = 'Choose a .json pack first.'; return; }
-        out.textContent = 'Importing…';
-        var reader = new FileReader();
-        reader.onload = function () {
-          var pack;
-          try { pack = JSON.parse(reader.result); }
-          catch (e) { out.textContent = 'Not valid JSON.'; return; }
-          fetch('/api/de/content-pack/import', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(pack)
-          }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
-            .then(function (res) {
-              var d = res.d || {};
-              if (!res.ok) { out.textContent = 'Import failed: ' + (d.detail || 'error'); return; }
-              out.textContent = 'Imported: quirks +' + d.quirks_created + ' (skip ' + d.quirks_skipped
-                + '), proposals +' + d.proposals_created + ' (skip ' + d.proposals_skipped + ')'
-                + (d.errors && d.errors.length ? ' · ' + d.errors.length + ' error(s)' : '');
-              loadProposals();
-              loadQuirks();
-            })
-            .catch(function (e) { out.textContent = 'Import failed: ' + e.message; });
-        };
-        reader.readAsText(f);
-      });
-    }
-    loadRequests();
-    loadMetrics();
-    loadProposals();
-    loadQuirks();
-  });
-})();
-{% endraw %}
+      .catch(function (e) { if (out) out.textContent = 'Import failed: ' + e.message; });
+  };
+  reader.readAsText(f);
+}
 </script>
 {% endblock %}

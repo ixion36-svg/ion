@@ -52,10 +52,15 @@
        /documents. Moved out of cases.html so the second page to use it does
        not render unstyled — the v0.77.0 lesson. #}
     <link rel="stylesheet" href="/static/css/ion-workspace.css?v={{ ion_version }}">
+    <link rel="stylesheet" href="/static/css/ion-shell.css?v={{ ion_version }}">
     <!-- tell HTMX not to inject its indicator <style> block at runtime.
          Inline-injected styles can't carry our per-request CSP nonce, so they'd
          be blocked by `style-src 'self' 'nonce-XXX'`. ION does not use the
-         .htmx-indicator class anywhere, so disabling it has no UI impact. -->
+         .htmx-indicator class is instead defined in frontend/ion-legacy.css,
+         so hx-indicator works and the rule sits where a stylesheet sweep can
+         see it. It used to say nothing referenced the class, which was true
+         and meant hx-indicator did nothing at all: htmx still added
+         .htmx-request and no rule anywhere reacted to it. -->
     <meta name="htmx-config" content='{"includeIndicatorStyles":false}'>
     <script nonce="{{ csp_nonce }}" src="/static/js/theme-init.js?v={{ ion_version }}"></script>
     <script nonce="{{ csp_nonce }}" src="/static/js/htmx.min.js"></script>
@@ -71,6 +76,26 @@
          `data-click-action="foo"` and the helper dispatches. See
          static/js/event-delegation.js for the supported attributes. -->
     <script nonce="{{ csp_nonce }}" src="/static/js/event-delegation.js?v={{ ion_version }}"></script>
+    <!-- Puts server-rendered timestamps back on the viewer's clock. The
+         fragments that replace innerHTML tables cannot call toLocaleString
+         the way the JavaScript they replace did, so they emit the instant
+         in `<time datetime>` with a UTC-labelled fallback and this rewrites
+         the text, after load and after every htmx swap. It assigns
+         textContent, so a page using it still has no markup built in JS.
+         See templates/_fragments/_time.html for the macro that emits it. -->
+    <script nonce="{{ csp_nonce }}" src="/static/js/local-time.js?v={{ ion_version }}"></script>
+    <!-- htmx does not swap a non-2xx response, which is correct, but leaves
+         every fragment placeholder spinning on a 403, a 500 or an expired
+         session. The JavaScript the fragments replace said "Failed to load",
+         so without this the conversion is a regression in exactly the case
+         the user needs to be told about. -->
+    <script nonce="{{ csp_nonce }}" src="/static/js/htmx-errors.js?v={{ ion_version }}"></script>
+    <!-- htmx leaves the old content in place until the response arrives, so
+         a filter change or a Refresh click on a slow query reads as a click
+         that did nothing and the user clicks again. The JavaScript these
+         fragments replace wrote a spinner before every fetch. This marks the
+         element being replaced for the duration instead. -->
+    <script nonce="{{ csp_nonce }}" src="/static/js/htmx-busy.js?v={{ ion_version }}"></script>
     <!-- Restores styling the v0.31.21 inline-style migration broke: it hashed
          `style="width:${pct}%"` into a STATIC class containing the literal
          ${pct}, which browsers drop as invalid CSS. See the file header. -->
@@ -113,7 +138,13 @@
     };
     </script>
 </head>
-<body>
+{# page_id scopes a page's own CSS. Those rules live in
+   frontend/ion-pages.css, shared by every page, so without a scope the
+   last definition of a selector wins everywhere: a flat merge changed
+   .se-header padding on /templates/new and put guide.html's @media
+   print block on all 57 pages. tools/scope_page_css.py applies it.
+   Set it in any template whose CSS has moved to that sheet. #}
+<body data-page="{% block page_id %}{% endblock %}">
     <!-- ═══════════════════ TAILWIND TOP NAV ═══════════════════ -->
     {% set p = request.url.path %}
     <header class="ion-tw relative z-40 border-b border-white/10 bg-ink-950/80 backdrop-blur-md font-sans">
@@ -130,195 +161,22 @@
           </a>
 
           <nav id="tw-nav" class="hidden md:flex items-center gap-0.5 text-[13px]">
-            <a href="/" class="tw-nav-link {% if p == '/' %}is-active{% endif %}">Dashboard</a>
-
-            <!-- Investigate — core daily analyst triage workflow -->
-            <div class="tw-drop" data-drop>
-              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/alerts') or p.startswith('/cases') or p.startswith('/observables') or p.startswith('/entity-timeline') or p.startswith('/discover') or p.startswith('/chat') %}is-active{% endif %}">Investigate
+            {%- for entry in nav_items %}
+            {%- if entry.is_group %}
+            <div class="tw-drop" data-drop{% if entry.dom_id %} id="{{ entry.dom_id }}"{% endif %}>
+              <button class="tw-nav-link tw-drop-btn {% if entry.is_active(p) %}is-active{% endif %}">{{ entry.label }}
                 <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
               </button>
               <div class="tw-drop-menu">
-                <a href="/alerts" class="tw-drop-item {% if p.startswith('/alerts') and '/audit' not in p %}is-active{% endif %}">Alerts</a>
-                <a href="/cases" class="tw-drop-item {% if p.startswith('/cases') %}is-active{% endif %}">Cases</a>
-                <a href="/verdict-review" class="tw-drop-item {% if p.startswith('/verdict-review') %}is-active{% endif %}">Verdict Review</a>
-                <a href="/observables" class="tw-drop-item {% if p.startswith('/observables') %}is-active{% endif %}">Observables</a>
-                <a href="/entity-timeline" class="tw-drop-item {% if p.startswith('/entity-timeline') %}is-active{% endif %}">Entity Timeline</a>
-                <a href="/discover" class="tw-drop-item {% if p.startswith('/discover') %}is-active{% endif %}">Discover</a>
-                <a href="/chat" class="tw-drop-item {% if p.startswith('/chat') %}is-active{% endif %}">AI Chat</a>
+                {%- for item in entry.items if nav_visible(item) %}
+                <a href="{{ item.href }}"{% if item.dom_id %} id="{{ item.dom_id }}"{% endif %}{% if item.new_tab %} target="_blank" rel="noopener"{% endif %} class="tw-drop-item {% if item.is_active(p) %}is-active{% endif %}{% if item.css %} {{ item.css }}{% endif %}">{{ item.label }}</a>
+                {%- endfor %}
               </div>
             </div>
-
-            <!-- Respond — response, forensics, automation -->
-            <div class="tw-drop" data-drop>
-              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/playbooks') or p.startswith('/forensics') or p.startswith('/pcap') or p.startswith('/investigation-') or p == '/case-grouper' %}is-active{% endif %}">Respond
-                <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
-              </button>
-              <div class="tw-drop-menu">
-                <a href="/playbooks" class="tw-drop-item {% if p.startswith('/playbooks') %}is-active{% endif %}">Playbooks</a>
-                <a href="/response-approvals" class="tw-drop-item {% if p.startswith('/response-approvals') %}is-active{% endif %}">Response Approvals</a>
-                <a href="/investigation-queue" class="tw-drop-item {% if p.startswith('/investigation-queue') %}is-active{% endif %}">Investigation Queue</a>
-                <a href="/investigation-memory" class="tw-drop-item {% if p.startswith('/investigation-memory') %}is-active{% endif %}">Investigation Memory</a>
-                <a href="/forensics" id="nav-forensics-link" class="tw-drop-item {% if p.startswith('/forensics') %}is-active{% endif %}">Forensics</a>
-                <a href="/pcap" class="tw-drop-item {% if p.startswith('/pcap') %}is-active{% endif %}">PCAP Analyzer</a>
-                <a href="/case-grouper" class="tw-drop-item {% if p == '/case-grouper' %}is-active{% endif %}">Case Grouper</a>
-              </div>
-            </div>
-
-            <!-- Threat Intel — intelligence & hunting -->
-            <div class="tw-drop" data-drop>
-              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/threat-intel') or p.startswith('/threat-landscape') or p.startswith('/attack-stories') or p.startswith('/canaries') or p.startswith('/knowledge-graph') or p == '/arkime-traffic' %}is-active{% endif %}">Threat Intel
-                <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
-              </button>
-              <div class="tw-drop-menu">
-                <!-- dropdown shrunk 6 → 3. /threat-landscape +
-                     /attack-stories folded into /threat-intel as new
-                     tabs (now 7 tabs total); /threat-hunting deleted
-                     as a half-built CRUD shell (workflow now lives in
-                     /discover for queries + /cases for findings). -->
-                <a href="/threat-intel" class="tw-drop-item {% if p == '/threat-intel' or p.startswith('/threat-intel') or p.startswith('/threat-landscape') or p.startswith('/attack-stories') %}is-active{% endif %}">Threat Intel</a>
-                <a href="/knowledge-graph" class="tw-drop-item {% if p.startswith('/knowledge-graph') %}is-active{% endif %}">Knowledge Graph</a>
-                <a href="/canaries" class="tw-drop-item {% if p.startswith('/canaries') %}is-active{% endif %}">Canaries</a>
-                <a href="/arkime-traffic" class="tw-drop-item {% if p == '/arkime-traffic' %}is-active{% endif %}">Traffic Analytics</a>
-              </div>
-            </div>
-
-            <!-- Engineering nav condensed 9 → 5 items.
-                 * Topology + Network Map + Data Flow  →  one entry "Infrastructure" (default route: /network-map)
-                   The pages share an in-page sibling tab strip so users can
-                   swap between them once inside.
-                   v0.74.0 (route audit phase 7e): "Topology" was ION's own
-                   service graph, not estate topology, and duplicated
-                   /integrations — it now lives there as a tab. The sibling
-                   strip keeps a Topology entry pointing at
-                   /integrations?tab=topology so engineers keep the shortcut.
-                 * Log Source Health + System Analytics  →  one entry "Platform Health" (default route: /log-sources)
-                   Same sibling-tab pattern.
-                 * Architecture  →  renamed "Workflow Orchestrator" (the
-                   route still serves architecture.html, which actually
-                   IS a workflow orchestrator; the old name was just
-                   misleading).
-                 * Security stays admin-gated (security:read perm). -->
-            <div class="tw-drop" data-drop id="nav-group-engineering">
-              <button class="tw-nav-link tw-drop-btn {% if p == '/de' or p.startswith('/detection-engineering') or p.startswith('/de-proposals') or p.startswith('/de-quirks') or p.startswith('/de-bob') or p.startswith('/log-sources') or p.startswith('/data-flow') or p.startswith('/network-map') or p.startswith('/network-topology') or p.startswith('/architecture') %}is-active{% endif %}">Engineering
-                <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
-              </button>
-              <div class="tw-drop-menu">
-                {% if de_module_available() %}
-                <a href="/de" class="tw-drop-item {% if p == '/de' %}is-active{% endif %}">DE Workbench</a>
-                {% endif %}
-                <a href="/detection-engineering" class="tw-drop-item {% if p.startswith('/detection-engineering') %}is-active{% endif %}">Detection Engineering</a>
-                {% if de_module_available() %}
-                <a href="/de-proposals" class="tw-drop-item {% if p.startswith('/de-proposals') %}is-active{% endif %}">Detection Proposals</a>
-                <a href="/de-quirks" class="tw-drop-item {% if p.startswith('/de-quirks') %}is-active{% endif %}">System Quirks</a>
-                <a href="/de-bob" class="tw-drop-item {% if p.startswith('/de-bob') %}is-active{% endif %}">Bob Improvement</a>
-                {% endif %}
-                <a href="/network-map" class="tw-drop-item {% if p.startswith('/network-map') or p.startswith('/network-topology') or p.startswith('/data-flow') %}is-active{% endif %}">Infrastructure</a>
-                <a href="/log-sources" class="tw-drop-item {% if p.startswith('/log-sources') %}is-active{% endif %}">Platform Health</a>
-                <a href="/architecture" id="nav-architecture-link" class="tw-drop-item {% if p.startswith('/architecture') %}is-active{% endif %} _ion-s-c8be1ccba6">Workflow Orchestrator</a>
-                {# "Security" (ION's own posture assessment) moved to
-                   the GRC group — it is an assurance surface, not an
-                   engineering tool. Same security:read gate, same id. #}
-              </div>
-            </div>
-
-            <!-- Reporting — SOC performance metrics.
-                 v0.79.0: Compliance + Maturity moved out to the new GRC group;
-                 what's left here is all operational measurement. -->
-            <div class="tw-drop" data-drop>
-              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/soc-health') or p.startswith('/executive-report') or p.startswith('/detection-health') or p.startswith('/de-metrics') or p.startswith('/analytics') %}is-active{% endif %}">Reporting
-                <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
-              </button>
-              <div class="tw-drop-menu">
-                <a href="/soc-health" class="tw-drop-item {% if p.startswith('/soc-health') %}is-active{% endif %}">SOC Health</a>
-                {# Wallboard is a standalone TV/NOC screen (no base.html chrome) and had no
-                   link anywhere in the app — reachable only by typing the URL. #}
-                <a href="/wallboard" target="_blank" rel="noopener" class="tw-drop-item {% if p.startswith('/wallboard') %}is-active{% endif %}">Wallboard (TV mode)</a>
-                <a href="/executive-report" class="tw-drop-item {% if p.startswith('/executive-report') %}is-active{% endif %}">Executive Report</a>
-                <a href="/detection-health" class="tw-drop-item {% if p.startswith('/detection-health') %}is-active{% endif %}">Detection Health</a>
-                {% if de_module_available() %}
-                <a href="/de-metrics" class="tw-drop-item {% if p.startswith('/de-metrics') %}is-active{% endif %}">DE Metrics</a>
-                {% endif %}
-                <a href="/analytics" class="tw-drop-item {% if p.startswith('/analytics') %}is-active{% endif %}">Analytics Engine</a>
-              </div>
-            </div>
-
-            <!-- GRC — governance, risk & compliance.
-                 These five surfaces were scattered across Reporting,
-                 Engineering and Administration, so the question "what do I
-                 show an auditor?" had no single answer. Each carries a
-                 DIFFERENT permission and keeps it — this group is a place to
-                 find them, not a widening. app.js hides the items a user
-                 can't reach, and the whole group when none of them are. -->
-            <div class="tw-drop" data-drop id="nav-group-grc">
-              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/compliance') or p.startswith('/maturity') or p.startswith('/security') or p.startswith('/change-requests') or p.startswith('/bug-reports') or p.startswith('/audit-logs') %}is-active{% endif %}">GRC
-                <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
-              </button>
-              <div class="tw-drop-menu">
-                <a href="/compliance" id="nav-grc-compliance" class="tw-drop-item {% if p.startswith('/compliance') %}is-active{% endif %}">Compliance</a>
-                <a href="/maturity" id="nav-grc-maturity" class="tw-drop-item {% if p.startswith('/maturity') %}is-active{% endif %}">Maturity</a>
-                <a href="/security" id="nav-security-link" class="tw-drop-item {% if p.startswith('/security') %}is-active{% endif %}">Security Posture</a>
-                <a href="/change-requests" id="nav-grc-servicedesk" class="tw-drop-item {% if p.startswith('/change-requests') or p.startswith('/bug-reports') %}is-active{% endif %}">Service Desk</a>
-                <a href="/audit-logs" id="nav-grc-audit" class="tw-drop-item {% if p.startswith('/audit-logs') %}is-active{% endif %}">Audit Logs</a>
-              </div>
-            </div>
-
-            <!-- Operations condensed 9 → 5 items via shared
-                 sibling-tab strips (same pattern as v0.28.0 Engineering).
-                 Briefing/Handover/Standup → Shift Operations group
-                 (default route /briefing). Alert Prompts + Bob Eval →
-                 Bob Admin group (default /alert-prompts). Translator +
-                 SOC Tools → Tools group (default /tools).
-                 v0.75.0: /translator retired into /tools as a tab. -->
-            <div class="tw-drop" data-drop>
-              <button class="tw-nav-link tw-drop-btn {% if p == '/analyst' or p == '/briefing' or p.startswith('/shift-handover') or p == '/daily-standup' or p.startswith('/alert-prompts') or p == '/scheduler' or p.startswith('/tools') or p == '/bob-eval' %}is-active{% endif %}">Operations
-                <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
-              </button>
-              <div class="tw-drop-menu">
-                <a href="/analyst" class="tw-drop-item {% if p == '/analyst' %}is-active{% endif %}">SOC Workspace</a>
-                <a href="/briefing" class="tw-drop-item {% if p == '/briefing' or p.startswith('/shift-handover') or p == '/daily-standup' %}is-active{% endif %}">Shift Operations</a>
-                <a href="/alert-prompts" class="tw-drop-item {% if p.startswith('/alert-prompts') or p == '/bob-eval' %}is-active{% endif %}">Bob Admin</a>
-                <a href="/tools" class="tw-drop-item {% if p.startswith('/tools') %}is-active{% endif %}">Tools</a>
-                <a href="/scheduler" class="tw-drop-item {% if p == '/scheduler' %}is-active{% endif %}">Job Scheduler</a>
-              </div>
-            </div>
-
-            <!-- Knowledge condensed 9 → 3 items.
-                 Guide/Sim/Range/Skills/Courses → Training group
-                 (default route /guide). Notes/Templates/Documents →
-                 Reference group (default /notes).
-                 v0.79.0: "Reference" renamed "Knowledge Base" — it is the same
-                 library the SOC workspace's KB search reads from, and two names
-                 for one thing sent analysts looking in the wrong place. -->
-            <div class="tw-drop" data-drop>
-              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/training') or p.startswith('/daily-work') or p.startswith('/guide') or p.startswith('/notes') or p.startswith('/templates') or p.startswith('/documents') or p.startswith('/soc-roles') or p.startswith('/workforce') %}is-active{% endif %}">Knowledge
-                <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
-              </button>
-              <div class="tw-drop-menu">
-                <a href="/guide" class="tw-drop-item {% if p.startswith('/guide') %}is-active{% endif %}">Training</a>
-                <a href="/soc-roles" class="tw-drop-item {% if p.startswith('/soc-roles') %}is-active{% endif %}">SOC Roles</a>
-                <a href="/training" class="tw-drop-item {% if p.startswith('/training') %}is-active{% endif %}">Skills &amp; Schedule</a>
-                {% if workforce_available() %}<a href="/workforce" class="tw-drop-item {% if p.startswith('/workforce') %}is-active{% endif %}">Workforce</a>{% endif %}
-                <a href="/daily-work" class="tw-drop-item {% if p.startswith('/daily-work') %}is-active{% endif %}">My Day</a>
-                <a href="/templates" class="tw-drop-item {% if p.startswith('/notes') or p.startswith('/templates') or p.startswith('/documents') %}is-active{% endif %}">Knowledge Base</a>
-              </div>
-            </div>
-
-            <!-- Administration — admin/engineering only (revealed by app.js). -->
-            <div class="tw-drop" data-drop id="nav-admin-dropdown">
-              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/settings') or p.startswith('/users') or p.startswith('/integrations') or p.startswith('/gitlab') or p.startswith('/service-accounts') or p.startswith('/stories') %}is-active{% endif %}">Administration
-                <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
-              </button>
-              <div class="tw-drop-menu">
-                <a href="/settings" class="tw-drop-item {% if p.startswith('/settings') %}is-active{% endif %}">Settings</a>
-                <a href="/users" class="tw-drop-item {% if p.startswith('/users') %}is-active{% endif %}">Users</a>
-                <a href="/integrations" class="tw-drop-item {% if p.startswith('/integrations') %}is-active{% endif %}">Integrations</a>
-                {# Service Desk + Audit Logs moved to GRC (change
-                   governance and the audit evidence trail). Gates unchanged. #}
-                <a href="/gitlab" class="tw-drop-item {% if p.startswith('/gitlab') %}is-active{% endif %}">GitLab</a>
-                <a href="/service-accounts" class="tw-drop-item {% if p.startswith('/service-accounts') %}is-active{% endif %}">Service Accounts</a>
-                <a href="/stories" class="tw-drop-item {% if p.startswith('/stories') %}is-active{% endif %}">Stories (automation)</a>
-              </div>
-            </div>
+            {%- else %}
+            <a href="{{ entry.href }}" class="tw-nav-link {% if entry.is_active(p) %}is-active{% endif %}">{{ entry.label }}</a>
+            {%- endif %}
+            {%- endfor %}
           </nav>
         </div>
 
@@ -367,12 +225,9 @@
       <!-- Mobile nav panel (md-) — mirrors desktop items via JS clone — simpler: hidden for now -->
       <div id="tw-mobile-panel" class="md:hidden hidden border-t border-white/10 bg-ink-950/95 backdrop-blur-md">
         <div class="px-4 py-3 flex flex-col gap-1 text-[13px]">
-          <a href="/" class="block px-3 py-2 rounded-md text-slate-300 hover:bg-white/5">Dashboard</a>
-          <a href="/alerts" class="block px-3 py-2 rounded-md text-slate-300 hover:bg-white/5">Alerts</a>
-          <a href="/cases" class="block px-3 py-2 rounded-md text-slate-300 hover:bg-white/5">Cases</a>
-          <a href="/detection-engineering" class="block px-3 py-2 rounded-md text-slate-300 hover:bg-white/5">Detection</a>
-          <a href="/observables" class="block px-3 py-2 rounded-md text-slate-300 hover:bg-white/5">Observables</a>
-          <a href="/playbooks" class="block px-3 py-2 rounded-md text-slate-300 hover:bg-white/5">Playbooks</a>
+          {%- for item in nav_mobile_items() %}
+          <a href="{{ item.href }}" class="block px-3 py-2 rounded-md text-slate-300 hover:bg-white/5">{{ item.panel_label }}</a>
+          {%- endfor %}
         </div>
       </div>
     </header>
@@ -384,58 +239,6 @@
 
     <!-- Icon library — all SVG <symbol> defs shared across every page -->
     {% include "_icons.html" %}
-
-    <style nonce="{{ csp_nonce }}">
-    /* ── Tailwind nav: atoms that need arbitrary rules ── */
-    .tw-nav-link { display: flex; align-items: center; padding: 6px 12px; border-radius: 6px; color: rgb(148 163 184); transition: background .18s, color .18s; white-space: nowrap; }
-    .tw-nav-link:hover { color: #fff; background: rgba(255,255,255,0.05); }
-    .tw-nav-link.is-active { color: #fff; background: rgba(255,255,255,0.06); }
-    .tw-drop { position: relative; }
-    .tw-drop-btn { background: transparent; border: none; cursor: pointer; font: inherit; }
-    .tw-drop-menu {
-      display: none; position: absolute; top: calc(100% + 8px); left: 0; min-width: 220px;
-      background: rgba(10, 12, 18, 0.96); backdrop-filter: blur(10px);
-      border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
-      box-shadow: 0 16px 40px rgba(0,0,0,0.5); padding: 6px; z-index: 50;
-    }
-    .tw-drop.is-open > .tw-drop-menu { display: block; }
-    .tw-drop-item { display: block; padding: 8px 12px; border-radius: 6px; color: rgb(148 163 184); font-size: 13px; transition: background .18s, color .18s; }
-    .tw-drop-item:hover { color: #fff; background: rgba(255,255,255,0.05); }
-    .tw-drop-item.is-active { color: #6de4ff; background: rgba(109, 228, 255, 0.08); }
-    /* legacy text decoration reset for header anchors */
-    .ion-tw a { text-decoration: none; }
-
-    /* v0.39.1 — focus-mode selector in the user dropdown. Replaces inline
-       style="" attributes in app.js updateUserMenu() (CSP style-src-attr 'none'). */
-    .dropdown-focus { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-color, #30363d); }
-    .dropdown-focus-label { font-size: .75rem; color: var(--text-muted); display: block; margin-bottom: 4px; }
-    .dropdown-focus-select { width: 100%; padding: 4px 8px; font-size: .8rem; }
-
-    /* Light mode overrides for Tailwind pages */
-    [data-theme="light"] .ion-tw-page {
-      --tw-bg-opacity: 1;
-      color: #1e293b;
-    }
-    [data-theme="light"] .ion-tw-page .bg-ink-900\/50,
-    [data-theme="light"] .ion-tw-page .bg-ink-900\/40,
-    [data-theme="light"] .ion-tw-page .bg-ink-900\/60,
-    [data-theme="light"] .ion-tw-page .bg-ink-950\/60 {
-      background: rgba(241, 245, 249, 0.8) !important;
-    }
-    [data-theme="light"] .ion-tw-page .border-white\/5,
-    [data-theme="light"] .ion-tw-page .border-white\/10 {
-      border-color: rgba(0, 0, 0, 0.08) !important;
-    }
-    [data-theme="light"] .ion-tw-page .text-slate-200 { color: #1e293b !important; }
-    [data-theme="light"] .ion-tw-page .text-slate-300 { color: #334155 !important; }
-    [data-theme="light"] .ion-tw-page .text-slate-400 { color: #64748b !important; }
-    [data-theme="light"] .ion-tw-page .text-slate-500 { color: #94a3b8 !important; }
-    [data-theme="light"] .ion-tw-page .text-white { color: #0f172a !important; }
-    [data-theme="light"] .ion-tw-page .bg-white\/5 { background: rgba(0, 0, 0, 0.03) !important; }
-    [data-theme="light"] .ion-tw-page .hover\:bg-white\/5:hover { background: rgba(0, 0, 0, 0.06) !important; }
-    [data-theme="light"] .ion-tw-page .bg-grid { opacity: 0.15 !important; }
-    [data-theme="light"] .ion-tw-page .grain { background-image: none !important; }
-    </style>
 
     <script nonce="{{ csp_nonce }}">
     // Self-contained dropdown toggle for the Tailwind nav.
@@ -510,86 +313,6 @@
         </div>
     </div>
 
-    <!-- Notepad styles — refreshed to align with the Tailwind design language (v0.9.72 Path A) -->
-    <style nonce="{{ csp_nonce }}">
-    /* ── Overlay ─────────────────────────────────── */
-    .np-overlay{position:fixed;inset:0;background:rgba(7,8,12,.7);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:1049;opacity:0;pointer-events:none;transition:opacity .25s}
-    .np-overlay.open{opacity:1;pointer-events:auto}
-
-    /* ── Panel ───────────────────────────────────── */
-    .np-panel{position:fixed;top:0;right:0;width:420px;max-width:95vw;height:100vh;background:rgba(10,12,18,.95);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-left:1px solid rgba(255,255,255,.1);z-index:1050;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s cubic-bezier(.2,.7,.2,1);font-family:'Geist',ui-sans-serif,system-ui,sans-serif;color:#cbd5e1}
-    .np-panel.open{transform:translateX(0)}
-
-    /* ── Tabs ────────────────────────────────────── */
-    .np-tabs{display:flex;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0}
-    .np-tab{flex:1;padding:14px 10px;background:transparent;border:none;color:#64748b;cursor:pointer;font-family:inherit;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;transition:color .15s ease,border-color .15s ease;border-bottom:2px solid transparent;margin-bottom:-1px}
-    .np-tab.active{color:#6de4ff;border-bottom-color:#6de4ff}
-    .np-tab:hover{color:#cbd5e1}
-
-    /* ── Content panels ─────────────────────────── */
-    .np-content{display:none;flex:1;flex-direction:column;overflow:hidden}
-    .np-content.active{display:flex}
-
-    /* ── List header / search ────────────────────── */
-    .np-list-header,.np-clip-header{display:flex;gap:8px;padding:14px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.05)}
-    .np-search{flex:1;height:2.125rem;padding:0 12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:.5rem;color:#fff;font-family:inherit;font-size:.8125rem;transition:border-color .15s ease,background .15s ease}
-    .np-search::placeholder{color:#475569}
-    .np-search:focus{outline:none;border-color:rgba(109,228,255,.5);background:rgba(255,255,255,.06);box-shadow:0 0 0 2px rgba(109,228,255,.1)}
-
-    /* ── Buttons ─────────────────────────────────── */
-    .np-btn-primary{display:inline-flex;align-items:center;gap:4px;height:2.125rem;padding:0 14px;background:#6de4ff;color:#07080c;border:none;border-radius:.5rem;cursor:pointer;font-family:inherit;font-size:.75rem;font-weight:600;white-space:nowrap;transition:filter .15s ease;box-shadow:0 0 0 1px rgba(109,228,255,.25),0 0 16px -6px rgba(109,228,255,.8)}
-    .np-btn-primary:hover{filter:brightness(1.08)}
-    .np-btn-sm{display:inline-flex;align-items:center;gap:4px;padding:6px 10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:.375rem;color:#94a3b8;cursor:pointer;font-family:inherit;font-size:.75rem;transition:background .15s ease,color .15s ease}
-    .np-btn-sm:hover{color:#fff;background:rgba(255,255,255,.08)}
-    .np-btn-danger{color:#ff6c6c!important;border-color:rgba(255,108,108,.3)!important}
-    .np-btn-danger:hover{background:rgba(255,108,108,.1)!important;border-color:rgba(255,108,108,.5)!important}
-    .np-btn-xs{display:inline-flex;align-items:center;gap:2px;padding:3px 8px;background:transparent;border:1px solid rgba(255,255,255,.1);border-radius:.375rem;color:#94a3b8;cursor:pointer;font-family:inherit;font-size:.6875rem;transition:color .15s ease,background .15s ease}
-    .np-btn-xs:hover{color:#fff;background:rgba(255,255,255,.04)}
-
-    /* ── Note list ───────────────────────────────── */
-    .np-note-list{flex:1;overflow-y:auto;padding:8px}
-    .np-note-item{padding:12px;border-radius:.5rem;cursor:pointer;margin-bottom:2px;transition:background .15s ease;border:1px solid transparent}
-    .np-note-item:hover{background:rgba(255,255,255,.03)}
-    .np-note-item.active{background:rgba(109,228,255,.06);border-color:rgba(109,228,255,.2)}
-    .np-note-item-header{display:flex;align-items:center;gap:6px}
-    .np-note-title{font-size:.8125rem;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .np-pin-icon{font-size:.7rem;color:#f8b33a}
-    .np-note-time{font-size:.6875rem;color:#64748b;font-family:'JetBrains Mono',ui-monospace,monospace}
-    .np-empty{padding:3rem 1rem;text-align:center;color:#64748b;font-size:.8125rem}
-
-    /* ── Editor ──────────────────────────────────── */
-    .np-editor {flex-direction:column;flex:1;overflow:hidden}
-    /* `display` is conditional: this element is also written with Tailwind's `hidden`, and an unconditional display here beats it. */
-    .np-editor:not(.hidden) { display: flex; }
-    .np-editor-toolbar{display:flex;align-items:center;gap:6px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.05);flex-shrink:0}
-    .np-save-status{flex:1;text-align:right;font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#64748b}
-    .np-title-input{width:100%;padding:14px;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.05);color:#fff;font-family:'Geist',ui-sans-serif,system-ui,sans-serif;font-size:1.125rem;font-weight:600;letter-spacing:-.01em;flex-shrink:0}
-    .np-title-input:focus{outline:none;border-bottom-color:rgba(109,228,255,.5)}
-    .np-title-input::placeholder{color:#475569}
-
-    /* Quill overrides */
-    .np-quill-wrap{flex:1;overflow:hidden;display:flex;flex-direction:column}
-    .np-quill-wrap .ql-toolbar.ql-snow{border:none;border-bottom:1px solid rgba(255,255,255,.05);background:rgba(255,255,255,.02);flex-shrink:0;padding:8px 14px}
-    .np-quill-wrap .ql-container.ql-snow{border:none;flex:1;overflow-y:auto;font-family:'Geist',ui-sans-serif,system-ui,sans-serif}
-    .np-quill-wrap .ql-editor{color:#cbd5e1;font-size:.875rem;line-height:1.6;min-height:120px;padding:14px}
-    .np-quill-wrap .ql-editor.ql-blank::before{color:#475569;font-style:normal}
-    .np-quill-wrap .ql-snow .ql-stroke{stroke:#64748b}
-    .np-quill-wrap .ql-snow .ql-fill{fill:#64748b}
-    .np-quill-wrap .ql-snow .ql-picker-label{color:#64748b}
-    .np-quill-wrap .ql-snow .ql-picker-options{background:rgba(10,12,18,.98);border-color:rgba(255,255,255,.1);border-radius:.5rem;box-shadow:0 16px 40px rgba(0,0,0,.5)}
-    .np-quill-wrap .ql-snow .ql-picker-item{color:#cbd5e1}
-    .np-quill-wrap .ql-snow button:hover .ql-stroke,
-    .np-quill-wrap .ql-snow .ql-picker-label:hover{color:#6de4ff}
-    .np-quill-wrap .ql-snow button:hover .ql-stroke{stroke:#6de4ff}
-
-    /* ── Clipboard ───────────────────────────────── */
-    .np-clip-list{flex:1;overflow-y:auto;padding:8px}
-    .np-clip-item{display:flex;align-items:flex-start;gap:10px;padding:12px;border-radius:.5rem;margin-bottom:4px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.05)}
-    .np-clip-text{flex:1;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:.75rem;color:#cbd5e1;white-space:pre-wrap;word-break:break-all;line-height:1.5}
-    .np-clip-actions{display:flex;gap:4px;flex-shrink:0}
-
-    </style>
-
     <main class="container">
         {% block content %}{% endblock %}
     </main>
@@ -656,6 +379,16 @@
     <script nonce="{{ csp_nonce }}" src="/static/js/ai-chat.js?v={{ ion_version }}"></script>
     <script nonce="{{ csp_nonce }}" src="/static/js/quill.js"></script>
     <script nonce="{{ csp_nonce }}" src="/static/js/notepad.js?v={{ ion_version }}"></script>
+    <!-- Cloned by static/js/htmx-errors.js when a fragment request fails.
+         It lives here, as markup, rather than as a string in JavaScript, so
+         the stylesheet reaches it like any other alert and so no page is
+         building markup in script. -->
+    <template id="htmx-error-template">
+      <div role="alert" class="alert alert-error m-4">
+        <span data-error-message></span>
+      </div>
+    </template>
+
     {% block scripts %}{% endblock %}
 
 <!-- Keyboard shortcuts overlay -->
@@ -706,7 +439,7 @@
     if (gPressed) {
       gPressed = false;
       clearTimeout(gTimer);
-      var routes = {a:'/alerts',c:'/cases',d:'/',o:'/observables',t:'/threat-landscape',s:'/analyst',h:'/shift-handover',e:'/detection-engineering',n:'/network-map',i:'/chat'};
+      var routes = {{ '{' }}{% for key, href in nav_shortcuts().items() %}{% if not loop.first %},{% endif %}{{ key }}:'{{ href }}'{% endfor %}};
       if (routes[e.key]) { window.location.href = routes[e.key]; }
     }
   });

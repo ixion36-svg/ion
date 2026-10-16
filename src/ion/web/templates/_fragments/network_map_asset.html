@@ -1,0 +1,165 @@
+{# One asset's detail drawer on /network-map.
+
+   Replaces the page's largest single write: a 68-line template literal
+   holding the metadata grid, the source-system chips, four enrichment
+   controls, the IP history and the MAC list. The hostname sits in the
+   drawer's header, outside the swapped region, so it goes out of band.
+
+   Three things that literal got wrong and this does not:
+
+     `${a.environment==='unknown'?'selected':''}` across four options left
+     nothing selected when the column was NULL, which renders as the first
+     option, "Unknown". Saving then wrote the string "unknown" over a value
+     nobody had set. There is a distinct "Not set" option now, and it is
+     the one a NULL selects.
+
+     `title="${esc(a.last_index)}"` put the four-letter string "null" in
+     the tooltip of a cell showing a dash.
+
+     `${a.event_count?.toLocaleString()}` rendered "undefined" rather than
+     saying the figure was not read.
+
+   Save still posts to PATCH /api/network-map/assets/{id}. A write is not a
+   view and has no fragment: the button carries its id as JSON through the
+   delegated dispatcher, because `data-args` built by interpolation is what
+   makes a control look live and do nothing. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+<h2 id="drawer-hostname" class="font-sans font-semibold text-xl" hx-swap-oob="true">
+  {%- if hostname %}{{ hostname }}
+  {%- elif found %}Unnamed asset
+  {%- else %}Asset unavailable{% endif -%}
+</h2>
+
+{% if not found %}
+<div role="alert" class="alert alert-error">
+  This asset could not be read. It may have been removed since the table was
+  loaded, or the read failed; either way nothing below it is this asset's
+  detail. Close the drawer and reload the table.
+</div>
+{% else %}
+<div class="space-y-5">
+  <div class="grid grid-cols-2 gap-3 text-[12px]">
+    <div>
+      <span class="text-slate-500">OS</span>
+      <div class="text-slate-200 mt-0.5">
+        {%- if os %}{{ os }}{% else %}<span class="text-slate-600">unidentified</span>{% endif -%}
+      </div>
+    </div>
+    <div>
+      <span class="text-slate-500">Architecture</span>
+      <div class="text-slate-200 mt-0.5">
+        {%- if architecture %}{{ architecture }}{% else %}<span class="text-slate-600">unidentified</span>{% endif -%}
+      </div>
+    </div>
+    <div>
+      <span class="text-slate-500">First Seen</span>
+      <div class="text-slate-200 mt-0.5">{{ ts(first_seen, fallback='no record') }}</div>
+    </div>
+    <div>
+      <span class="text-slate-500">Last Seen</span>
+      <div class="text-slate-200 mt-0.5">
+        {%- if age %}{{ age }} ago{% else %}<span class="text-slate-600">no timestamp</span>{% endif -%}
+      </div>
+    </div>
+    <div>
+      <span class="text-slate-500">Events</span>
+      <div class="text-slate-200 mt-0.5">
+        {%- if event_count is not none %}{{ "{:,}".format(event_count) }}
+        {%- else %}<span class="text-slate-600">not read</span>{% endif -%}
+      </div>
+    </div>
+    <div>
+      <span class="text-slate-500">Last Index</span>
+      <div class="text-slate-200 mt-0.5 font-mono text-[11px] truncate"
+           {% if last_index %}title="{{ last_index }}"{% endif %}>
+        {%- if last_index %}{{ last_index }}
+        {%- else %}<span class="text-slate-600">&#8212;</span>{% endif -%}
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="label-tiny text-slate-500 mb-2">Source Systems</div>
+    <div>
+      {%- if systems %}
+      {%- for system in systems %}
+      <span class="inline-block px-2 py-0.5 rounded bg-ion-cyan/10 text-[10px] text-ion-cyan mr-1 mb-1">{{ system }}</span>
+      {%- endfor %}
+      {%- else %}
+      <span class="text-slate-500 text-[12px]">No system reports this asset</span>
+      {%- endif %}
+    </div>
+  </div>
+
+  <div class="border-t border-white/5 pt-4 space-y-3">
+    <div class="label-tiny text-slate-500 mb-2">Enrichment</div>
+    <div class="flex gap-3">
+      <div class="flex-1">
+        <label class="text-[11px] text-slate-500" for="edit-env">Environment</label>
+        <select id="edit-env" class="select select-sm w-full">
+          {%- for value, label in environments %}
+          <option value="{{ value }}"{% if value == environment %} selected{% endif %}>{{ label }}</option>
+          {%- endfor %}
+        </select>
+      </div>
+      <div class="flex-1">
+        <label class="text-[11px] text-slate-500" for="edit-crit">Criticality</label>
+        <select id="edit-crit" class="select select-sm w-full">
+          {%- for value, label in criticalities %}
+          <option value="{{ value }}"{% if value == criticality %} selected{% endif %}>{{ label }}</option>
+          {%- endfor %}
+        </select>
+      </div>
+    </div>
+    <div>
+      <label class="text-[11px] text-slate-500" for="edit-owner">Owner</label>
+      <input type="text" id="edit-owner" value="{{ owner }}" placeholder="Team or person"
+             class="input input-sm w-full">
+    </div>
+    <div>
+      <label class="text-[11px] text-slate-500" for="edit-notes">Notes</label>
+      <textarea id="edit-notes" rows="3" placeholder="Free-text notes"
+                class="textarea w-full text-[12px]">{{ notes }}</textarea>
+    </div>
+    <button type="button" class="btn btn-primary btn-sm"
+            data-click-action="saveEnrichment"
+            data-args='{{ [asset_id] | tojson }}'>Save</button>
+  </div>
+
+  <div class="border-t border-white/5 pt-4">
+    <div class="label-tiny text-slate-500 mb-2">IP History ({{ ips | length }})</div>
+    <div>
+      {%- if ips %}
+      {%- for row in ips %}
+      <div class="flex items-center justify-between py-1.5 border-b border-white/[0.03]">
+        <span class="font-mono text-[12px] text-slate-200">{{ row.ip }}</span>
+        <span class="text-[10px] text-slate-500">
+          {%- if row.age %}{{ row.age }} ago{% else %}no timestamp{% endif %}
+          &middot;
+          {%- if row.event_count is not none %} {{ "{:,}".format(row.event_count) }} events
+          {%- else %} events not read{% endif %}
+        </span>
+      </div>
+      {%- endfor %}
+      {%- else %}
+      <div class="text-slate-500 text-[12px]">No IPs recorded</div>
+      {%- endif %}
+    </div>
+  </div>
+
+  <div class="border-t border-white/5 pt-4">
+    <div class="label-tiny text-slate-500 mb-2">MAC Addresses</div>
+    <div>
+      {%- if macs %}
+      {%- for mac in macs %}
+      <span class="inline-block px-2 py-0.5 rounded bg-white/5 text-[11px] font-mono text-slate-400 mr-1 mb-1">{{ mac }}</span>
+      {%- endfor %}
+      {%- else %}
+      <span class="text-slate-500 text-[12px]">None</span>
+      {%- endif %}
+    </div>
+  </div>
+</div>
+{% endif %}

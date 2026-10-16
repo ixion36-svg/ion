@@ -1,0 +1,106 @@
+{# The subnet topology of /network-map.
+
+   Replaces four innerHTML writes: a loading placeholder, two empty-state
+   lines and the whole list.
+
+   It also retires the page's fallback. The JavaScript fetched
+   /api/network-map/subnets, and on anything other than an ok response fell
+   through to fetching /assets and grouping by /24 in the browser. So a 403
+   or a 500 on the subnets read rendered a topology built from a different
+   query, with its own idea of the worst criticality in a subnet, and
+   nothing on the page said which of the two the reader was looking at.
+   There is one read now, and when it fails the panel says so.
+
+   Expanding a subnet is the reader's choice and stays in the browser: the
+   chevron and the body are both here, the body starts hidden, and the
+   delegated action toggles a class. Nothing is fetched to open one. #}
+
+{% set CRIT_BADGE = {
+    'critical': 'badge-error', 'high': 'badge-warning',
+    'medium': 'badge-info', 'low': 'badge-ghost', 'unknown': 'badge-ghost'} %}
+{% set ENV_BADGE = {
+    'prod': 'badge-error', 'staging': 'badge-warning',
+    'dev': 'badge-success', 'unknown': 'badge-ghost'} %}
+{% set CRIT_DOT = {
+    'critical': 'bg-error', 'high': 'bg-warning', 'medium': 'bg-primary',
+    'low': 'bg-slate-400', 'unknown': 'bg-slate-600'} %}
+
+{% if failed %}
+<div role="alert" class="alert alert-error">
+  The subnet topology could not be read. This is not an estate with no
+  subnets in it: the aggregation failed, so which hosts sit where is
+  unknown rather than empty.
+</div>
+
+{% elif not subnets %}
+<div class="alert alert-info justify-center">
+  No subnets to display. Run a sync, and if assets exist with no IP address
+  they will group under their own entry.
+</div>
+
+{% else %}
+{% for subnet in subnets %}
+<div class="rounded-xl border border-white/5 bg-ink-900/40 overflow-hidden"
+     id="topo-subnet-{{ subnet.index }}">
+  <div class="px-4 py-3 flex flex-wrap items-center gap-4 cursor-pointer transition"
+       data-click-action="toggleSubnet" data-args='{{ [subnet.index] | tojson }}'>
+    <svg id="topo-chevron-{{ subnet.index }}"
+         class="w-4 h-4 text-slate-500 transform transition"
+         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="m9 18 6-6-6-6"/>
+    </svg>
+    <span class="font-mono text-[13px] font-semibold">
+      {%- if subnet.subnet %}{{ subnet.subnet }}
+      {%- else %}<span class="text-slate-600">unnamed subnet</span>{% endif -%}
+    </span>
+    <span class="text-[11px] text-slate-400">
+      {%- if subnet.host_count is not none %}{{ subnet.host_count }} host{{ '' if subnet.host_count == 1 else 's' }}
+      {%- else %}host count unread{% endif -%}
+    </span>
+    <span class="badge badge-sm {{ CRIT_BADGE.get(subnet.worst_criticality, 'badge-ghost') }} uppercase">{{ subnet.worst_criticality }}</span>
+    <div class="flex flex-wrap items-center gap-1.5">
+      {%- for environment in subnet.environments %}
+      <span class="badge badge-sm {{ ENV_BADGE.get(environment, 'badge-ghost') }} uppercase">{{ environment }}</span>
+      {%- endfor %}
+    </div>
+    <span class="ml-auto text-[11px] text-slate-500 tabular-nums">
+      {%- if subnet.total_events is not none %}{{ "{:,}".format(subnet.total_events) }} events
+      {%- else %}events unread{% endif -%}
+    </span>
+  </div>
+  <div id="topo-body-{{ subnet.index }}" class="px-4 pb-4 hidden">
+    {% if subnet.hosts %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
+      {%- for host in subnet.hosts %}
+      <div class="rounded-lg border border-white/5 bg-white/[0.02] p-3 cursor-pointer transition"
+           data-click-action="openDetail" data-args='{{ [host.id] | tojson }}'>
+        <div class="flex items-center gap-2 mb-1.5">
+          <span class="w-2 h-2 rounded-full {{ CRIT_DOT.get(host.criticality, 'bg-slate-600') }} flex-shrink-0"></span>
+          <span class="font-mono text-[12px] text-ion-cyan truncate">
+            {%- if host.hostname %}{{ host.hostname }}
+            {%- else %}unnamed{% endif -%}
+          </span>
+        </div>
+        <div class="text-[11px] text-slate-400 space-y-0.5 pl-4">
+          <div class="font-mono">
+            {%- if host.ip %}{{ host.ip }}{% else %}no IP seen{% endif -%}
+          </div>
+          <div>{% if host.os %}{{ host.os }}{% else %}unidentified{% endif %}</div>
+          <div class="text-slate-500">
+            {%- if host.age %}{{ host.age }} ago{% else %}no timestamp{% endif -%}
+          </div>
+        </div>
+      </div>
+      {%- endfor %}
+    </div>
+    {% else %}
+    <div class="pt-2 text-[12px] text-slate-500">
+      {# A subnet in the aggregation with no host rows under it. Different
+         from a host count of zero, which the header says above. #}
+      This subnet's host list came back empty.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+{% endif %}

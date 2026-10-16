@@ -1,0 +1,195 @@
+{# DE Metrics: the six summary tiles, the noise-campaign table, and each
+   campaign's evidence drill-down.
+
+   Replaces four innerHTML sites in de_metrics.html (the loading
+   placeholder, the load-failure alert, the whole body, and the drill-down
+   panel) plus the hand-rolled `deEsc()`, `deSlug()`, `deStat()`,
+   `deTrendText()`, `deSevBadge()` and `deWindow()` they needed. The markup
+   is deliberately what that JavaScript produced, so the page looks
+   unchanged and the move is checkable rather than a redesign in disguise.
+
+   Every number is guarded with `is not none`. This panel is what a
+   detection engineer reads to decide which rule to tune, and a figure
+   measured at zero and a figure nobody measured point at opposite
+   decisions. A truthiness test collapses them into the same cell, which is
+   what `s.addressable_hours || 0` did.
+
+   The window select and Refresh live in the page shell, outside
+   #de-content, so no render of this fragment, success or failure, can
+   remove the control that would retry it.
+
+   The drill-down rows are rendered here rather than fetched per click,
+   which is what the JavaScript did too: it read them out of the payload it
+   had already loaded. One request still answers the whole panel, and the
+   Evidence button only shows and hides a row. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% if failed %}
+  <div role="alert" class="alert alert-error">
+    <span>
+      DE metrics could not be read for the last {{ period_days }} days. No
+      figures are shown below rather than zeros: the read failed, so how
+      much analyst time this estate's false positives are costing is
+      unknown, which is not the same as an estate with no noise to
+      reclaim. Use Refresh to try again.
+    </span>
+  </div>
+{% else %}
+
+<div class="de-stats gap-3 mb-6">
+  {% for tile in tiles %}
+    <div class="stat bg-base-200 shadow rounded-lg">
+      <div class="stat-title">{{ tile.label }}</div>
+      <div class="stat-value text-2xl {{ tile.colour }}">
+        {%- if tile.kind == 'trend' -%}
+          {# Four states, not three. Rising, falling and flat each have an
+             arrow; a direction this page does not know how to draw, or no
+             trend block at all, says so in words. `s.noise_trend || {}`
+             made the last case a truthy empty object, so the tile rendered
+             "▬ " with nothing after it and looked like a flat trend. #}
+          {%- if tile.known -%}
+            <span class="{{ tile.arrow_colour }}">{{ tile.arrow }} {{ tile.direction }}{% if tile.delta is not none %} {{ tile.delta }}{% endif %}</span>
+          {%- else -%}
+            <span class="text-base-content/60">not measured</span>
+          {%- endif -%}
+        {%- else -%}
+          {# `is not none`. Zero addressable hours is the finding that there
+             is no noise worth reclaiming, and 0% Bob agreement is the
+             finding that Bob was wrong on every alert an analyst scored.
+             Neither is an absence of data. #}
+          {%- if tile.value is not none -%}
+            {{ tile.value }}{{ tile.suffix }}
+          {%- else -%}
+            <span class="text-base-content/60">unknown</span>
+          {%- endif -%}
+        {%- endif -%}
+      </div>
+      {% if tile.sub is not none %}<div class="stat-desc">{{ tile.sub }}</div>{% endif %}
+    </div>
+  {% endfor %}
+</div>
+
+<div class="card bg-base-200 shadow">
+  <div class="card-body">
+    <h2 class="card-title text-base">Noise campaigns &mdash; costliest first &middot; {{ period_days }}d</h2>
+    {% if not campaigns %}
+      <div role="alert" class="alert alert-info"><span>No false-positive closures in this window (or none reaching the minimum cluster size). Campaigns appear as cases are closed as false-positive / benign.</span></div>
+    {% else %}
+      <div class="overflow-x-auto">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Rule</th><th>FP alerts</th><th>Cases</th><th>Cost (hrs)</th>
+              <th>Window</th><th>Severity</th><th>MITRE</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in campaigns %}
+              <tr>
+                <td class="font-mono text-sm">{{ c.rule_name }}</td>
+                <td class="font-mono text-sm">
+                  {%- if c.fp_alerts is not none %}{{ c.fp_alerts }}
+                  {%- else %}<span class="opacity-50">&mdash;</span>{% endif -%}
+                  {# Only shown when there is a benign share to break out,
+                     otherwise it restates the number above it. #}
+                  {%- if c.split is not none %}<div class="text-xs opacity-50">{{ c.split }}</div>{% endif -%}
+                </td>
+                <td class="font-mono text-sm">
+                  {%- if c.case_count is not none %}{{ c.case_count }}
+                  {%- else %}<span class="opacity-50">&mdash;</span>{% endif -%}
+                </td>
+                <td>
+                  {%- if c.cost_hours is not none -%}
+                    <span class="font-bold text-warning">{{ c.cost_hours }}</span>
+                  {%- else -%}
+                    <span class="opacity-50">&mdash;</span>
+                  {%- endif -%}
+                </td>
+                {# Never formatted on the server: the JavaScript sliced the
+                   ISO string, which is the server's clock, and an analyst
+                   in another timezone would read the wrong day on every
+                   row. The macro emits the instant and
+                   static/js/local-time.js decides. One missing end of the
+                   window is a "?", as deWindow() had it; both missing is a
+                   dash, because a campaign with neither end has no window
+                   rather than two unknown ones. #}
+                <td class="opacity-50">
+                  {%- if c.first_seen is none and c.last_seen is none -%}
+                    &mdash;
+                  {%- else -%}
+                    {{ ts(c.first_seen, 'date', fallback='?') }} &rarr; {{ ts(c.last_seen, 'date', fallback='?') }}
+                  {%- endif -%}
+                </td>
+                <td>
+                  <div class="flex flex-wrap gap-1">
+                    {%- if c.severity -%}
+                      {% for s in c.severity %}<span class="badge badge-sm {{ s.badge }}">{{ s.label }}{% if s.count is not none %} {{ s.count }}{% endif %}</span> {% endfor %}
+                    {%- else -%}
+                      <span class="opacity-50">&mdash;</span>
+                    {%- endif -%}
+                  </div>
+                </td>
+                <td>
+                  <div class="flex flex-wrap gap-1">
+                    {%- if c.mitre -%}
+                      {% for m in c.mitre %}<span class="badge badge-sm badge-info font-mono">{{ m }}</span> {% endfor %}
+                    {%- else -%}
+                      <span class="opacity-50">&mdash;</span>
+                    {%- endif -%}
+                  </div>
+                </td>
+                <td>
+                  <button class="btn btn-ghost btn-sm" data-click-action="deDrill"
+                          data-drill="de-drill-{{ c.index }}">Evidence</button>
+                  {# The column is here for every reader so the table's
+                     shape does not depend on who is looking; the button
+                     inside it only for a reader whose POST would be
+                     accepted. The JavaScript offered it to everyone and
+                     the draft answered 403. #}
+                  {%- if can_propose %}
+                    <button class="btn btn-ghost btn-sm" data-click-action="deDraft"
+                            data-rule="{{ c.rule_name }}">Draft proposal</button>
+                  {% endif -%}
+                </td>
+              </tr>
+              {# The evidence panel, rendered with its row and hidden until
+                 Evidence is clicked. It was built on click from the cached
+                 payload, so nothing is re-read that was not read before. #}
+              <tr id="de-drill-{{ c.index }}" hidden>
+                <td colspan="8">
+                  <div class="de-drill text-sm bg-base-300 rounded p-2 mt-1">
+                    <strong>Top triggering signatures</strong>:
+                    {% if c.signatures -%}
+                      {% for s in c.signatures %}<span class="badge badge-sm badge-ghost font-mono">{{ s.value }}{% if s.count is not none %} &times;{{ s.count }}{% endif %}</span> {% endfor %}
+                    {%- else -%}
+                      <span class="opacity-50">none captured</span>
+                    {%- endif %}
+                    <br><strong>Top hosts</strong>:
+                    {% if c.hosts -%}
+                      {% for h in c.hosts %}<span class="badge badge-sm badge-ghost font-mono">{{ h.value }}{% if h.count is not none %} &times;{{ h.count }}{% endif %}</span> {% endfor %}
+                    {%- else -%}
+                      <span class="opacity-50">none captured</span>
+                    {%- endif %}
+                    {%- if c.sample_alert_ids %}
+                      <br><strong>Sample alert ids</strong>: <span class="font-mono text-xs opacity-50">{{ c.sample_alert_ids | join(', ') }}</span>
+                    {% endif -%}
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+    <div role="alert" class="alert alert-info text-sm">
+      <span><strong>Reading this:</strong> hours are <em>addressable</em> &mdash; the analyst time these FPs are still costing
+      {%- if minutes_per_alert is not none %} at {{ minutes_per_alert }} min/alert.
+      {%- else %} at a per-alert rate this read could not confirm.
+      {%- endif %} Nothing is auto-tuned or suppressed; drafting a fix and applying it is Phase 1.
+      Bob agreement is measured over closed alerts where Bob scored a verdict.</span>
+    </div>
+  </div>
+</div>
+
+{% endif %}

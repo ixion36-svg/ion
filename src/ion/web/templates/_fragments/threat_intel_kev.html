@@ -1,0 +1,151 @@
+{# Threat Intel: the CISA KEV catalog table, and its status bar.
+
+   Replaces five innerHTML sites across kevRenderStatus, kevSearch, kevRow,
+   kevRansomware and kevDetail.
+
+   Most of this region is carried over unchanged, because it was the
+   best-written part of this page. Three judgements in it are deliberate and
+   are kept word for word:
+
+     * The empty state names which catalog version found nothing. A bare
+       "no results" invites the reader to conclude the CVE is safe, when
+       what they have learned is only that one snapshot does not list it.
+     * "ransomware: unknown" is worded as CISA not having established use,
+       not as having ruled it out.
+     * References are selectable text rather than links, because ION ships
+       to air-gapped sites where an external anchor is a dead end that looks
+       broken.
+
+   The one defect: kevSearch's catch rendered into the ti-empty class, which
+   is the no-results styling, so a failed lookup read as an empty catalog.
+   That is the worst possible confusion for this panel in particular, since
+   its whole purpose is to answer "is this being exploited right now".
+
+   The status bar swaps out of band. One read answers both regions, because
+   GET /api/kev returns the status block alongside the results, which is why
+   the page passed `data.status` to kevRenderStatus rather than reading
+   /kev/status separately. #}
+
+{# ---- the status bar, out of band ---- #}
+<div id="kev-status-bar" class="mb-4" hx-swap-oob="innerHTML">
+  {%- if failed -%}
+    <div class="rounded-lg border border-ion-coral/30 bg-ion-coral/[0.06] px-4 py-3 text-xs text-ion-coral" role="alert">
+      The KEV catalog could not be read, so nothing below should be taken as
+      the catalog's answer about any CVE.
+    </div>
+  {%- elif not status or not status.get('loaded') -%}
+    <div class="rounded-lg border border-ion-amber/30 bg-ion-amber/[0.06] px-4 py-3 text-xs text-ion-amber">
+      No KEV catalog loaded. An operator can import one from Settings.
+    </div>
+  {%- else -%}
+    {# Bands, not a hard cutoff: CISA publishes irregularly, so 30 days is a
+       prompt to check rather than a failure. `age is none` keeps its own
+       state, because an age nobody measured is not a fresh catalog. #}
+    {%- set age = status.get('age_days') -%}
+    {%- if age is none -%}{% set tone = 'slate-400' %}
+    {%- elif age <= 30 -%}{% set tone = 'ion-lime' %}
+    {%- elif age <= 90 -%}{% set tone = 'ion-amber' %}
+    {%- else -%}{% set tone = 'ion-coral' %}
+    {%- endif -%}
+    <div class="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
+      <span class="text-slate-400">Catalog <b class="text-white">{{ status.get('catalog_version') or '&mdash;'|safe }}</b>
+        {%- if status.get('ahead_of_bundle') %} <span class="text-slate-500">(operator import, newer than this build)</span>{% endif -%}
+      </span>
+      {# `is not none`. A catalog of zero entries is a finding; a count
+         nobody recorded is not, and the page printed `${st.count}` straight
+         in, so an absent count read "undefined known-exploited CVEs". #}
+      <span class="text-slate-400">
+        {%- if status.get('count') is not none -%}
+          <b class="text-white">{{ status.get('count') }}</b> known-exploited CVEs
+        {%- else -%}
+          <b class="text-white">unknown</b> number of known-exploited CVEs
+        {%- endif -%}
+      </span>
+      <span class="text-{{ tone }}">{{ (age ~ ' days old') if age is not none else 'age unknown' }}</span>
+      <span class="text-slate-500">snapshot, ION does not fetch this at runtime</span>
+    </div>
+  {%- endif -%}
+</div>
+
+{# ---- the results ---- #}
+{% if failed %}
+  <div class="ti-empty text-[var(--danger)]" role="alert">
+    The KEV lookup did not complete. This is a fault rather than an empty
+    catalog, so it is not an answer about whether any CVE is known to be
+    exploited. Searching again may succeed.
+  </div>
+{% elif results is none %}
+  <div class="ti-empty text-[var(--danger)]" role="alert">
+    The KEV lookup answered with something this table cannot read, so it
+    cannot say what the catalog holds.
+  </div>
+{% elif not results %}
+  {# Which catalog found nothing, not a bare "no results". A reader who
+     searched a CVE and saw nothing has learned only that this snapshot does
+     not list it. #}
+  <div class="ti-empty">
+    No entries in catalog {{ (status or {}).get('catalog_version') or 'unknown' }}
+    {%- if q %} for {{ q }}{% endif -%}
+    {%- if ransomware_only %}, with the ransomware-linked filter applied{% endif -%}.
+  </div>
+{% else %}
+<table class="ti-table">
+  <thead>
+    <tr><th>CVE</th><th>Vendor / product</th><th>Vulnerability</th><th>Added</th><th>Remediate by</th></tr>
+  </thead>
+  <tbody>
+    {% for e in results %}
+      {% set i = loop.index0 %}
+      <tr class="ti-kev-row" data-click-action="kevToggle" data-args='[{{ i }}]'
+          title="Click for the description, required action and CWEs">
+        <td class="ti-name-cell"><span class="ti-kev-caret" id="kev-caret-{{ i }}">&#9656;</span> {{ e.get('cve_id') or '' }}</td>
+        <td>{{ e.get('vendor_project') or '' }} {{ e.get('product') or '' }}</td>
+        <td>
+          {{ e.get('vulnerability_name') or '' }}
+          {%- if e.get('known_ransomware') -%}
+            <span class="ti-badge ti-badge-ransomware" title="CISA records use by known ransomware campaigns">ransomware: known</span>
+          {%- else -%}
+            {# "unknown" means CISA has not established use. Not the same as
+               having ruled it out, and the title says so. #}
+            {%- set raw = e.get('known_ransomware_raw') or 'Unknown' -%}
+            <span class="ti-badge ti-badge-unknown" title="CISA has not established ransomware use. This is not the same as ruling it out.">ransomware: {{ raw|lower }}</span>
+          {%- endif -%}
+        </td>
+        <td>{{ e.get('date_added') or '' }}</td>
+        <td>{{ e.get('due_date') or '' }}</td>
+      </tr>
+      <tr class="ti-kev-detail" id="kev-detail-{{ i }}">
+        <td colspan="5">
+          <div class="ti-kev-body">
+            {% if e.get('short_description') %}
+              <div class="ti-kev-f"><div class="ti-kev-k">Description</div>
+                <div>{{ e.get('short_description') }}</div></div>
+            {% endif %}
+            {% if e.get('required_action') %}
+              {# The actionable field: what CISA mandates, with the due date
+                 already in the row above it. #}
+              <div class="ti-kev-f ti-kev-action"><div class="ti-kev-k">Required action</div>
+                <div>{{ e.get('required_action') }}</div></div>
+            {% endif %}
+            {% set cwes = e.get('cwes') if e.get('cwes') is iterable and e.get('cwes') is not string else [] %}
+            {% if cwes %}
+              <div class="ti-kev-f"><div class="ti-kev-k">Weaknesses</div><div>
+                {% for c in cwes %}<span class="ti-badge ti-badge-cwe">{{ c }}</span> {% endfor %}
+              </div></div>
+            {% endif %}
+            {% if e.get('notes') %}
+              {# Selectable text, not links. ION ships to air-gapped sites
+                 where an external anchor is a dead end that looks broken;
+                 the reference is still worth having to hand. #}
+              <div class="ti-kev-f"><div class="ti-kev-k">References</div>
+                <div class="ti-kev-notes">{{ e.get('notes') }}</div></div>
+            {% endif %}
+            <div class="ti-kev-prov">Catalog {{ e.get('catalog_version') or 'unknown' }}
+              &#183; {{ 'operator import' if e.get('source') == 'imported' else 'shipped in the image' }}</div>
+          </div>
+        </td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}

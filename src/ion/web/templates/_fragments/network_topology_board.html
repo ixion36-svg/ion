@@ -1,0 +1,64 @@
+{% if state == 'unconfigured' %}
+Arkime is not configured, so this graph was not read.
+{% elif state == 'failed' or state == 'unreadable' %}
+The topology could not be read.
+{% elif state == 'empty' %}
+No conversations captured in this window.
+{% else %}
+<span>{% if hosts is not none %}<strong>{{ hosts }}</strong> hosts{% else %}unknown hosts{% endif %}</span>
+<span>{% if conversations is not none %}<strong>{{ conversations }}</strong> conversations{% else %}unknown conversations{% endif %}</span>
+<span class="nt-method">{% if method == 'connections' %}whole-window (connections API){% elif method %}top-volume sample{% else %}unknown{% endif %}</span>
+<span class="nt-legend">
+  <span class="nt-legend-item"><span class="nt-legend-dot nt-cat-subnet"></span>subnet</span>
+  <span class="nt-legend-item"><span class="nt-legend-dot nt-cat-internal"></span>internal host</span>
+  <span class="nt-legend-item"><span class="nt-legend-dot nt-cat-external"></span>external host</span>
+  <span class="nt-legend-item"><span class="nt-legend-dot nt-cat-asset"></span>known asset</span>
+  <span class="nt-legend-item"><span class="nt-legend-dot nt-cat-threat"></span>threat-linked</span>
+</span>
+{% endif %}
+<div id="nt-metrics" class="nt-kv" hx-swap-oob="innerHTML">
+{% if state == 'unconfigured' %}
+Arkime is not configured, so this graph was not read.
+{% elif state == 'failed' or state == 'unreadable' %}
+The topology could not be read.
+{% else %}
+<span>Active conversations: {% if conversations is not none %}<strong>{{ conversations }}</strong>{% else %}unknown{% endif %}</span>
+<span>Hosts observed: {% if hosts is not none %}<strong>{{ hosts }}</strong>{% else %}unknown{% endif %}</span>
+<span>Edge weights: <strong>{% if method == 'connections' %}whole-window (connections API){% elif method %}top-volume sample{% else %}unknown{% endif %}</strong></span>
+{% endif %}
+</div>
+<div id="nt-ports" hx-swap-oob="innerHTML">
+{% if state == 'unconfigured' %}
+Arkime is not configured, so this graph was not read.
+{% elif state == 'failed' or state == 'unreadable' %}
+The topology could not be read.
+{% elif ports_state == 'unreadable' %}
+The port distribution could not be read.
+{% elif ports_state == 'empty' %}
+No port data in this window.
+{% else %}
+{% for port in ports %}
+<div class="nt-port-row">
+  <span class="nt-port-name">{% if port.number is not none %}{{ port.number }}{% else %}unknown{% endif %}</span>
+  {% if port.width is not none %}<span class="nt-port-bar" data-ion-style="width:{{ port.width }}px"></span>{% endif %}
+  <span class="nt-port-val">{% if port.label is not none %}{{ port.label }}{% else %}unknown{% endif %}</span>
+</div>
+{% endfor %}
+{% endif %}
+</div>
+<div id="nt-unavailable" hx-swap-oob="innerHTML">
+{% if state == 'unconfigured' %}
+Arkime is not configured, so this graph was not read.
+{% elif state == 'failed' or state == 'unreadable' %}
+The topology could not be read.
+{% elif unavailable_state == 'unreadable' %}
+The unavailable list could not be read.
+{% elif unavailable_state == 'data' %}
+{% for row in unavailable %}
+<div class="nt-unavail-row">
+  <span class="nt-unavail-name">{{ row.metric }}<span class="nt-tag">unavailable</span></span>
+  <span class="nt-unavail-req">{{ row.requires }}</span>
+</div>
+{% endfor %}
+{% endif %}
+</div>

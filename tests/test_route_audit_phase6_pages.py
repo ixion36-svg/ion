@@ -38,7 +38,10 @@ def paths():
 
 @pytest.fixture(scope="module")
 def base_html():
-    return (TEMPLATES / "base.html").read_text(encoding="utf-8")
+    """Rendered, not the template source: the nav is built from nav.py."""
+    from tests.nav_render import render
+
+    return render()
 
 
 # ── renames + redirects ──────────────────────────────────────────────────
@@ -138,32 +141,67 @@ def test_retired_templates_are_gone():
 
 
 def test_index_breakdown_ported_into_analytics():
-    """The only section unique to /engineering-analytics moved rather than died."""
+    """The only section unique to /engineering-analytics moved rather than
+    died. It moved once more since, from renderIndexTable() in the page
+    into ui/analytics.py, so the port is asserted there."""
+    module = Path("src/ion/web/ui/analytics.py").read_text(encoding="utf-8")
+    assert "indices" in module
+    assert "IndexRow" in module
     html = (TEMPLATES / "analytics.html").read_text(encoding="utf-8")
-    assert "index-table-container" in html
-    assert "function renderIndexTable(" in html
-    assert "renderIndexTable(data.indices" in html
+    assert "function renderIndexTable(" not in html
 
 
 def test_analytics_bar_widths_are_not_the_dead_migrated_class():
-    """The v0.31.21 inline-style migration hashed `width:${pct}%` into a STATIC
-    class, leaving a literal ${pct} in the CSS — an invalid rule browsers drop,
-    so every bar on this page rendered at zero width."""
+    """The v0.31.21 inline-style migration hashed `width:${pct}%` into a
+    STATIC class, leaving a literal ${pct} in the CSS — an invalid rule
+    browsers drop, so every bar on this page rendered at zero width.
+
+    The repair was a data-pct attribute plus an applyBarWidths() pass.
+    Both are gone: the bars are server-rendered with data-ion-style, which
+    ion-dynamic-styles.js applies on a MutationObserver, so a width lands
+    after an htmx swap without the fragment asking for it. No live
+    data-pct attribute is left in the tree, which is why applyBarWidths
+    had neither an element to find nor a caller, and it is deleted.
+
+    The `is not none` guard is the part to keep an eye on. An unmeasured
+    entity renders no bar at all rather than a zero-width one, because a
+    bar of zero length and a bar that was never measured look identical
+    and mean different things.
+    """
     html = (TEMPLATES / "analytics.html").read_text(encoding="utf-8")
-    # no element should still carry the dead class
     assert 'class="risk-bar ${cls} _ion-s-95aea49e0e"' not in html
     assert "_ion-s-95aea49e0e\"></div>" not in html
-    assert "function applyBarWidths(" in html
-    assert html.count("data-pct=") >= 4
+    assert "function applyBarWidths(" not in html
+    assert 'data-pct="' not in html
+
+    fragment = (TEMPLATES / "_fragments" / "analytics_entity_risk.html"
+                ).read_text(encoding="utf-8")
+    assert 'data-ion-style="width: {{ e.width }}%"' in fragment
+    assert "{%- if e.width is not none %}" in fragment
 
 
 def test_ai_scorecard_kpis_folded_into_alert_prompts():
+    """The four KPI tiles and the count behind them.
+
+    They were written by renderScorecardKpis in the page's script until the
+    UI conversion moved the render to the server. The tiles are in
+    _fragments/alert_prompt_templates.html now and the arithmetic is in
+    ui/alert_prompt_templates.py, so this follows them rather than
+    asserting a function the page no longer has.
+    """
     html = (TEMPLATES / "alert_prompt_templates.html").read_text(encoding="utf-8")
-    for tile in ("sc-kpi-templates", "sc-kpi-samples", "sc-kpi-agreement", "sc-kpi-tuning"):
-        assert tile in html
-    assert "function renderScorecardKpis" in html
+    fragment = (TEMPLATES / "_fragments" / "alert_prompt_templates.html"
+                ).read_text(encoding="utf-8")
+    module = Path("src/ion/web/ui/alert_prompt_templates.py").read_text(
+        encoding="utf-8")
+
+    for tile in ("sc-kpi-templates", "sc-kpi-samples", "sc-kpi-agreement",
+                 "sc-kpi-tuning"):
+        assert tile in fragment, tile
+    # the page still reaches them, or the fragment is never asked for
+    assert 'hx-get="/ui/alert-prompts"' in html
     # the old page approximated `evaluated`; the KPI must use the real count
-    assert "c.evaluated" in html
+    assert 'c.get("evaluated")' in module
 
 
 def test_scorecards_api_exposes_exact_evaluated_count():
@@ -209,11 +247,22 @@ def test_analyst_efficiency_merged_into_executive_report(paths):
     assert not (TEMPLATES / "analyst_efficiency.html").exists()
     assert "/api/analyst-efficiency/metrics" in paths   # API backs the Team tab
     html = (TEMPLATES / "executive_report.html").read_text(encoding="utf-8")
-    assert "er-tab-team" in html and "function erLoadTeam" in html
-    assert "Per-Analyst Breakdown" in html
+    team = (TEMPLATES / "_fragments" / "executive_report_team.html"
+            ).read_text(encoding="utf-8")
+
+    # erLoadTeam fetched and wrote the tab; the UI conversion replaced it
+    # with a fragment the shell pulls, so the wiring is what to assert.
+    assert 'id="er-team"' in html
+    assert 'hx-get="/ui/executive-report/team"' in html
+    assert "Per-Analyst Breakdown" in team
+
     # the activity bars must not use the dead migrated height rule
-    assert 'class="ae-activity-bar _ion-s-9ce2eb0cde"' not in html
-    assert "b.style.height" in html
+    for text in (html, team):
+        assert 'class="ae-activity-bar _ion-s-9ce2eb0cde"' not in text
+    # the height is still per-row. b.style.height was the JS that set it;
+    # under the CSP the page runs with, an inline style= cannot, so it is a
+    # data-ion-style attribute applied by ion-dynamic-styles.js.
+    assert 'data-ion-style="height:' in team
 
 
 @pytest.mark.parametrize("tpl", ["detection_health.html", "de_metrics.html"])

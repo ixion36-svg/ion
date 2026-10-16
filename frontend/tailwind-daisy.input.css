@@ -46,8 +46,8 @@
  * of a 1.5MB stylesheet: roughly 90% of the file was utilities for classes no
  * page has ever carried.
  *
- * These four globs are every place a class name can reach a page that loads
- * this sheet. src/ion/web/*.py is here because four API modules build HTML
+ * These globs are every place a class name can reach a page that loads this
+ * sheet. src/ion/web/*.py is here because four API modules build HTML
  * fragments server-side (case_lifecycle_api, course_api, cyab_api,
  * daily_standup_api). Deliberately NOT listed: src/ion/services -- the
  * executive-report and PDF exporters emit standalone documents with their own
@@ -56,10 +56,25 @@
  *
  * Adding a new template directory, or emitting markup from a new module, means
  * adding it here or its utilities will silently not be generated.
+ *
+ * src/ion/web/ui/*.py is the case that warning was written for, which then
+ * happened anyway. A `*` does not cross a directory separator, so the glob
+ * above reaches 94 files and none of the 39 page modules under ui/, which
+ * hold the colour, badge and band lookup tables the fragment conversion
+ * moved out of JavaScript. A utility named only in one of those tables would
+ * stop being emitted at the next build: the same "no stylesheet sweep can
+ * reach this" failure the conversion exists to remove, relocated from a
+ * JavaScript string into a Python one.
+ *
+ * Nothing is broken today, measured rather than assumed. All 37 class-like
+ * tokens in those modules also appear in a template, so every one survives
+ * the scan by luck rather than by design, and this glob is what makes it
+ * design.
  */
 @source "../src/ion/web/templates";
 @source "../src/ion/web/static/js";
 @source "../src/ion/web/*.py";
+@source "../src/ion/web/ui/*.py";
 
 /* The remains of style.css. MUST precede the utilities import -- both are
    unlayered, so whichever comes last wins, and Tailwind utilities have to
@@ -79,6 +94,12 @@
 
 /* ION's semantic mapping. Must come after daisyui.css. */
 @import "./ion-daisy-theme.css";
+
+/* Page sheets, last so they keep the precedence their inline
+   <style> blocks had. See the header of ion-pages.css. */
+@import "./ion-pages.css";
+@import "./ion-training.css";
+@import "./ion-detection-engineering.css";
 
 /*
  * Tokens for Tailwind utility generation (bg-ink-900, text-ion-cyan, ...).
@@ -226,9 +247,9 @@
    * The dark-mode values are unchanged and stay in the @theme block: they are
    * tuned to glow against ink and are correct there.
    */
-  --color-ion-cyan:  #0b7c99;
+  --color-ion-cyan:  #155e75;  /* was #0b7c99: measured 4.46:1 on a tinted card, 0.04 under the floor. #0e7490 is 5.36:1 and matches --primary. */
   --color-ion-iris:  #5a49d6;
-  --color-ion-amber: #a56c00;
+  --color-ion-amber: #854d0e;  /* #a56c00 measured 3.64:1 on a card */
   --color-ion-lime:  #1c7a3a;
   --color-ion-coral: #c02828;
 }

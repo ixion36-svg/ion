@@ -1,0 +1,45 @@
+{# The catalogue of step types the executor knows how to run.
+
+   Replaces one innerHTML site in stories.html and the esc() it ran over
+   four fields, one of which is a JSON schema hint full of braces and
+   quotes.
+
+   The failure state exists because the JavaScript had none: its
+   `catch (e) { /* non-fatal */ }` left the container empty, so a catalogue
+   read that failed looked exactly like an executor that supports no steps.
+   Someone reading this panel to find out what a story can do would
+   conclude the answer is nothing. #}
+
+{% if failed %}
+  {# The Retry button is inside the failure branch. Nothing else re-requests
+     this panel: its only trigger is `load` on the idle pane, so without a
+     control here the way back would be leaving the pane and coming back, or
+     a page reload. #}
+  <div role="alert" class="alert alert-warning text-sm flex items-start gap-3">
+    <span>
+      The step-type catalogue could not be read. This is not a list of every
+      step the executor supports: it is no list at all, so a step type
+      missing from this panel may still exist.
+    </span>
+    <button class="btn btn-ghost btn-xs shrink-0"
+            hx-get="/ui/stories/step-types"
+            hx-target="#step-types-cat"
+            hx-swap="innerHTML">Retry</button>
+  </div>
+{% elif not step_types %}
+  <div class="text-sm opacity-50">
+    The executor reports no step types. Nothing failed reading this, so a
+    story has nothing to call until one is registered.
+  </div>
+{% else %}
+  {% for t in step_types %}
+    <div class="card bg-base-300">
+      <div class="card-body p-3 gap-1">
+        <div class="font-mono text-xs text-primary">{{ t.type }}</div>
+        <div class="font-semibold text-sm">{{ t.label }}</div>
+        <div class="text-xs opacity-60 mt-1">{{ t.description }}</div>
+        <pre class="mt-1.5 text-xs bg-base-100 px-2 py-1 rounded overflow-x-auto">{{ t.config_schema_hint }}</pre>
+      </div>
+    </div>
+  {% endfor %}
+{% endif %}

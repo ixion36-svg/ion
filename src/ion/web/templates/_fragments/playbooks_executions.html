@@ -1,0 +1,38 @@
+{% from "_fragments/_time.html" import ts %}
+{% if state == 'withheld' %}
+<tr><td colspan="7">Playbook executions are withheld.</td></tr>
+{% elif state == 'empty' %}
+<tr><td colspan="7">No executions found</td></tr>
+{% elif state != 'data' %}
+<tr><td colspan="7">The executions could not be read.</td></tr>
+{% else %}
+{% for row in executions %}
+<tr data-exec-id="{{ row.id }}" data-args='{{ [row.id]|tojson }}'{% if row.status_class %} class=""{% endif %}>
+    <td><strong>{{ row.name }}</strong></td>
+    <td>
+        {% if row.alert_short %}<span class="alert-id-display" title="{{ row.alert_title }}">{{ row.alert_short }}</span>{% else %}-{% endif %}
+        {% if row.case_number %}<br><a class="case-link" href="/alerts">{{ row.case_number }}</a>{% endif %}
+    </td>
+    <td class="min-w-[120px]">
+        {% if row.progress is not none %}
+        <div class="progress-bar-container">
+            <div class="progress-bar-fill{% if row.status_class %} status-{{ row.status_class }}{% endif %}" data-ion-style="width:{{ row.progress.pct }}%"></div>
+        </div>
+        <div class="progress-text">{{ row.progress.completed }}/{{ row.progress.total }} steps ({{ row.progress.pct }}%)</div>
+        {% else %}
+        unknown
+        {% endif %}
+    </td>
+    <td>
+        <span class="exec-status{% if row.status_class %} {{ row.status_class }}{% endif %}">{{ row.status_label }}</span>
+        {% if row.outcome_label %}<br><span class="exec-outcome{% if row.outcome_class %} {{ row.outcome_class }}{% endif %}">{{ row.outcome_label }}</span>{% endif %}
+        {% if row.report %}<br><a class="text-[0.7rem]" href="/documents">View Report</a>{% endif %}
+    </td>
+    <td>{{ row.analyst or '-' }}</td>
+    <td class="text-[0.8rem]">{{ ts(row.started_at) }}</td>
+    <td>
+        <button type="button" class="btn btn-sm" data-click-action="toggleExecDetail" data-args='{{ [row.id]|tojson }}'>Work</button>
+    </td>
+</tr>
+{% endfor %}
+{% endif %}

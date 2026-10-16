@@ -1,0 +1,4 @@
+{% if state == 'failed' %}<div class="loading">System information unavailable.</div>{% else %}
+{% for item in technologies %}<div class="info-card"><div class="info-card-label">{{ item.label }}</div><div class="info-card-value">{{ item.value }}</div></div>{% endfor %}
+<div class="info-card col-span-full"><div class="info-card-label">Key Dependencies</div><div class="packages-list">{% if packages is none %}Dependency versions unknown.{% else %}{% for item in packages %}<span class="package-badge">{{ item.name }}=={{ item.version }}</span>{% else %}No package versions reported.{% endfor %}{% endif %}</div></div>{% endif %}
+<div id="system-info" hx-swap-oob="innerHTML">{% if state == 'failed' %}<div class="loading">System information unavailable.</div>{% else %}{% for item in details %}<div class="info-card"><div class="info-card-label">{{ item.label }}</div><div class="info-card-value mono">{{ item.value }}</div></div>{% endfor %}{% endif %}</div>
