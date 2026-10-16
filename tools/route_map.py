@@ -171,36 +171,45 @@ def permission_of(route) -> str:
     return " + ".join(parts)
 
 
-def _repo_relative(path: str) -> str:
-    """A source path relative to the repo.
+def _repo_relative(path: str) -> tuple[str, bool]:
+    """A source path relative to the repo, and whether it is inside it.
 
-    ``Path.resolve()`` follows a junction. A worktree whose ``.venv`` is a
-    junction to another checkout then fails ``relative_to`` and the map
-    drops the handler site, which is how the slowapi limiter lines went
-    blank. The ``.venv`` suffix is the same path the map already records.
+    ``Path.resolve()`` follows a junction, so a worktree whose ``.venv`` is a
+    junction to another checkout fails ``relative_to``; the raw path is tried
+    before the resolved one for that reason.
     """
     raw = pathlib.Path(path)
     for candidate in (raw, raw.resolve()):
         try:
-            return str(candidate.relative_to(ROOT)).replace("\\", "/")
+            return str(candidate.relative_to(ROOT)).replace("\\", "/"), True
         except ValueError:
             continue
     resolved = str(raw.resolve())
-    marker = f"{os.sep}.venv{os.sep}"
+    # An out-of-repo handler (slowapi wraps the API login) must record the same
+    # string on every machine, or the committed map disagrees with the one CI
+    # regenerates. site-packages is the anchor every layout shares; keying on
+    # .venv missed system and CI installs, and handler_site blanked the cell.
+    marker = f"{os.sep}site-packages{os.sep}"
     idx = resolved.lower().find(marker.lower())
     if idx != -1:
-        return resolved[idx + 1:].replace("\\", "/")
+        return resolved[idx + len(marker):].replace("\\", "/"), False
     raise ValueError(path)
 
 
 def handler_site(endpoint) -> tuple[str, int]:
-    """Where the handler is written, relative to the repo."""
+    """Where the handler is written, relative to the repo.
+
+    An out-of-repo handler reports line 0. The line would sit in a third-party
+    file whose version this repo does not pin, so citing it would make the
+    committed map go stale on their release rather than on a change here.
+    """
     try:
         import inspect
 
         f = inspect.getsourcefile(endpoint) or ""
         _, line = inspect.getsourcelines(endpoint)
-        return (_repo_relative(f), line)
+        rel, in_repo = _repo_relative(f)
+        return (rel, line if in_repo else 0)
     except Exception:
         return ("", 0)
 
@@ -376,8 +385,12 @@ def render_markdown(rows, unmatched) -> str:
         add("| --- | --- | --- | --- | --- | --- |")
         for r in group:
             methods = "/".join(r["methods"])
-            site = f"[{r['file'].split('/')[-1]}:{r['line']}]({r['file']}#L{r['line']})" \
-                if r["file"] else ""
+            site = ""
+            if r["file"] and r["line"]:
+                site = (f"[{r['file'].split('/')[-1]}:{r['line']}]"
+                        f"({r['file']}#L{r['line']})")
+            elif r["file"]:
+                site = f"`{r['file']}`"
             tpl = "<br>".join(f"`{t}`" for t in r["templates"]) or ""
             callers = ", ".join(f"`{c.split('/')[-1]}`"
                                 for c in sorted(r["callers"])[:4]) or ""

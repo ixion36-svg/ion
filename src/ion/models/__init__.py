@@ -64,6 +64,7 @@ from ion.models.detection_proposal import (  # noqa: F401
     DetectionProposalStatus,
 )
 from ion.models.document import Document, DocumentVersion
+from ion.models.duty_roster import DutyAssignment  # noqa: F401
 from ion.models.emulation import EmulationPlan, EmulationPlanStatus, EmulationStep, StepResult
 
 # ForensicCase Workbench — parallel ledger + pins for forensic cases.
@@ -98,6 +99,10 @@ from ion.models.integration import (
     Webhook,
     WebhookLog,  # Backward compatibility alias for IntegrationEvent
     WebhookStatus,
+)
+from ion.models.integration_sync import (  # noqa: F401
+    SyncAttempt,
+    SyncStatus,
 )
 from ion.models.investigation import Investigation  # noqa: F401
 
@@ -135,9 +140,14 @@ from ion.models.observable import (
     WatchlistAlert,
     WatchlistAlertType,
 )
+from ion.models.observable_allowlist import ObservableAllowlist  # noqa: F401
 from ion.models.oncall import (
     CommTemplate,
     ServiceAccount,
+)
+from ion.models.pcap_job import (  # noqa: F401
+    PcapJob,
+    PcapJobStatus,
 )
 from ion.models.playbook import (
     ExecutionStatus,
@@ -172,6 +182,12 @@ from ion.models.service_desk import (  # noqa: F401
     ChangeRiskLevel,
     DocAnalysisJob,
 )
+from ion.models.shift_handover import (  # noqa: F401
+    HandoverActionStatus,
+    HandoverStatus,
+    ShiftHandover,
+    ShiftHandoverAction,
+)
 from ion.models.skills import (
     AssessmentReviewCycle,
     AssessmentSnapshot,
@@ -194,21 +210,6 @@ from ion.models.sla import (
     # with the services that were their only callers.
 )
 
-from ion.models.pcap_job import (  # noqa: F401
-    PcapJob,
-    PcapJobStatus,
-)
-from ion.models.integration_sync import (  # noqa: F401
-    SyncAttempt,
-    SyncStatus,
-)
-from ion.models.shift_handover import (  # noqa: F401
-    HandoverActionStatus,
-    HandoverStatus,
-    ShiftHandover,
-    ShiftHandoverAction,
-)
-
 # JSON-DAG playbook automation (Tines-inspired).
 from ion.models.story import Story, StoryRun  # noqa: F401
 from ion.models.system_quirk import SystemQuirk, SystemQuirkStatus  # noqa: F401
@@ -226,8 +227,6 @@ from ion.models.ticker import (  # noqa: F401
     TickerSourceType,
 )
 from ion.models.tide_snapshot import TideSnapshot
-from ion.models.duty_roster import DutyAssignment  # noqa: F401
-from ion.models.observable_allowlist import ObservableAllowlist  # noqa: F401
 from ion.models.traffic_exclusion import TrafficExclusion  # noqa: F401
 from ion.models.tuning_proposal import TuningProposal, TuningProposalStatus  # noqa: F401
 from ion.models.tuning_request import TuningRequest  # noqa: F401

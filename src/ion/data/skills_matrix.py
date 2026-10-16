@@ -41,7 +41,11 @@ SKILLS_MATRIX: Dict[str, Dict[str, dict]] = {
     "SIEM & Logging": {
         "siem-operations": {
             "name": "SIEM Operations",
-            "targets": {"l1-analyst": 2, "l2-analyst": 3, "l3-analyst": 4, "soc-lead": 4, "detection-engineer": 5, "threat-hunter": 4, "security-engineer": 3, "cloud-security": 2, "security-architect": 3, "grc": 1},
+            "targets": {
+                "l1-analyst": 2, "l2-analyst": 3, "l3-analyst": 4, "soc-lead": 4,
+                "detection-engineer": 5, "threat-hunter": 4, "security-engineer": 3,
+                "cloud-security": 2, "security-architect": 3, "grc": 1,
+            },
         },
         "log-analysis": {
             "name": "Log Analysis",

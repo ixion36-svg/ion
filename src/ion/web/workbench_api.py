@@ -28,7 +28,6 @@ from ion.services import (
     case_pin_service,
     query_evidence_service,
 )
-from ion.services.query_evidence_service import QueryEvidenceError
 from ion.services.annotation_service import (
     AnnotationError,
     AnnotationForbiddenError,
@@ -38,6 +37,7 @@ from ion.services.case_pin_service import (
     DuplicatePinError,
     PinError,
 )
+from ion.services.query_evidence_service import QueryEvidenceError
 from ion.web.api import get_db_session
 
 logger = logging.getLogger(__name__)
