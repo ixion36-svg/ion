@@ -11,12 +11,18 @@
 
 ## v0.99.13 — 2026-10-16
 
-Three session-lifecycle fixes in the auth layer, and the two main-line
-commits that had not yet reached a release. **v0.99.12 shipped from a branch
-that was never merged into `main`**, so `main` carried on at 0.99.11 while the
-tag sat four days ahead of it. This release merges that line back and
-supersedes it: everything in v0.99.12 is here, plus what follows. An instance
+Three session-lifecycle fixes in the auth layer, and the two commits that had
+not yet reached a release. **The local `main` checkout was 250 commits behind
+`origin/main`** — last fetched five days earlier, with v0.99.12 sitting on the
+remote the whole time — and two commits were then made on that stale base,
+diverging the local line from the published one. This release merges the two
+back together: everything in v0.99.12 is here, plus what follows. An instance
 on v0.99.12 loses nothing by taking it.
+
+That divergence is the trap the release skill's own image check documents:
+`git fetch origin main` followed by `git checkout main` does not move local
+`main`. It cost v0.99.8 two wrong images; here it cost a branch built on a
+five-day-old base. Worth re-reading before the next release.
 
 ### Security
 
