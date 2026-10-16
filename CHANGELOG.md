@@ -1,13 +1,109 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.12 -->
-<!-- ion-doc:version=0.99.12 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.13 -->
+<!-- ion-doc:version=0.99.13 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-10-14 -->
+<!-- ion-doc:date=2026-10-16 -->
 
 # Changelog
+
+## v0.99.13 — 2026-10-16
+
+Three session-lifecycle fixes in the auth layer, and the two main-line
+commits that had not yet reached a release. **v0.99.12 shipped from a branch
+that was never merged into `main`**, so `main` carried on at 0.99.11 while the
+tag sat four days ahead of it. This release merges that line back and
+supersedes it: everything in v0.99.12 is here, plus what follows. An instance
+on v0.99.12 loses nothing by taking it.
+
+### Security
+
+Three linked gaps in the auth layer, found while triaging an external scan
+of the repository. They are read together because ION authenticates its
+analysts through Keycloak: the
+only local-password account is `admin`, OIDC users are created with
+`password_hash=""`, and `must_change_password` is therefore an
+admin-account control that does nothing at all on the estate ION is built
+for. Deleting the session rows is the only thing ION can do to an attacker
+who already holds a cookie.
+
+- **A password change now revokes the user's other sessions, and a session
+  can no longer renew itself for ever.** One change, because the second is
+  what makes the first durable. `AuthService.change_password` hashed,
+  wrote, audited and returned without touching `user_sessions`, so "I think
+  I was compromised, so I changed my password" — the one remediation a user
+  can perform unaided — left the attacker's session valid; the admin reset
+  path was the same. Meanwhile `validate_session` pushed `expires_at`
+  forward by a fresh 24h on any request made with under half the lifetime
+  remaining, so a session in continuous use never expired at all and the
+  stolen cookie was good indefinitely. Both password paths now call
+  `AuthService.revoke_sessions`, audited as `sessions_revoked` with a count
+  and a reason; the user-initiated change spares the caller's own token
+  (`SessionRepository.delete_all_for_user_except`) so changing your password
+  does not log you out of the tab you are in, while an admin reset spares
+  nothing. Renewal is now clamped to `created_at + session_absolute_lifetime_hours`,
+  a new config.json-managed field defaulting to **168 (7 days)**, overridable
+  with `ION_SESSION_ABSOLUTE_LIFETIME_HOURS` and disabled with `0`. **Analysts
+  will be asked to authenticate again at least weekly**; through Keycloak that
+  is a redirect. Service-account tokens keep their existing exemption and
+  still expire exactly at their minted `--ttl-days` bound, in either
+  direction. A session already past its ceiling has `expires_at` pulled back
+  to it, so sessions over-extended by the old behaviour die within half a
+  window of the upgrade rather than running on. Deactivating a user now
+  deletes their session rows too: `validate_session` already refused an
+  inactive user, but the rows survived, so reactivating an account handed a
+  stolen cookie its access back. `tests/test_session_revocation_and_ceiling.py`
+  covers all of it, at the service and at the route.
+
+- **The admin password reset is refused for an account ION holds no password
+  for.** `POST /api/users/{user_id}/reset-password` accepted any user id and
+  `must_change` defaults `True`, so resetting an OIDC user — `password_hash=""`
+  — set a flag that `password_change_blocks` checks on every request
+  regardless of how the user authenticated. Their next Keycloak login was
+  refused everywhere outside the change-password allowlist, and the only exit
+  was an ION-local password change on an estate that deliberately has no local
+  passwords. The reset now raises before hashing for any account with no local
+  hash — OIDC users and service accounts, which carry the no-login sentinel —
+  and the endpoint returns 400 naming deactivation as the lever the admin
+  actually wants. The alternative, setting the flag only for local accounts,
+  was rejected: issuing a local password to an IdP-backed account creates a
+  second way in that Keycloak's MFA and password policy never see.
+
+- **`POST /api/admin/sessions/{user_id}/revoke` now revokes a session.** Found
+  while checking the claim that deactivation was an admin's only lever on an
+  OIDC account. It was — because this route did not work. It deleted nothing:
+  it wrote an integration-log line saying the session had been "marked for
+  revocation" and returned a message telling the admin the user would have to
+  authenticate again. That success path was unreachable anyway, because
+  `IntegrationLogService` takes no constructor argument and has no `log_event`,
+  so every call raised `TypeError` and came back 500. ION's one explicit
+  session-revocation control had therefore never worked, on the estate where
+  revoking a session is the only thing that stops a stolen cookie. It now calls
+  `revoke_sessions` and returns the count. The integration-log line is removed
+  rather than repaired: a session revocation is an auth event and belongs in
+  `audit_logs`, which is where `revoke_sessions` records it.
+
+### Fixed
+
+* **The GitLab and OpenCTI connection tests are awaited.** Both handlers
+  called an async test and returned without awaiting it, so Settings reported
+  the outcome of a coroutine object rather than of a connection — a test that
+  could not fail.
+
+### Added
+
+* **One command brings the local estate up in order.** The compose stack,
+  Elasticsearch and the seed data came up by hand in a sequence that had to be
+  remembered and was usually got wrong once.
+
+### Notes
+
+The absolute session ceiling is the one operator-visible behaviour change:
+`session_absolute_lifetime_hours` defaults to 168, so an analyst
+re-authenticates at least weekly. Through Keycloak that is a redirect. Set it
+to `0` in Settings to keep the previous unbounded behaviour. No schema change.
 
 ## v0.99.12 — 2026-10-14
 
@@ -166,72 +262,6 @@ The flaky `test_large_doc` failure that had been attributed to timing
 twice was this bug, not timing. It is covered now by
 `tests/test_large_doc_worker_startup.py`, and the completion test waits
 on a terminal status rather than on a worker thread.
-
-**Post-tag session-lifecycle fixes.** Not in the v0.99.11 image; recorded
-here against the tag they follow. Three linked gaps in the auth layer,
-found while triaging an external scan of the repository. They are read
-together because ION authenticates its analysts through Keycloak: the
-only local-password account is `admin`, OIDC users are created with
-`password_hash=""`, and `must_change_password` is therefore an
-admin-account control that does nothing at all on the estate ION is built
-for. Deleting the session rows is the only thing ION can do to an attacker
-who already holds a cookie.
-
-- **A password change now revokes the user's other sessions, and a session
-  can no longer renew itself for ever.** One change, because the second is
-  what makes the first durable. `AuthService.change_password` hashed,
-  wrote, audited and returned without touching `user_sessions`, so "I think
-  I was compromised, so I changed my password" — the one remediation a user
-  can perform unaided — left the attacker's session valid; the admin reset
-  path was the same. Meanwhile `validate_session` pushed `expires_at`
-  forward by a fresh 24h on any request made with under half the lifetime
-  remaining, so a session in continuous use never expired at all and the
-  stolen cookie was good indefinitely. Both password paths now call
-  `AuthService.revoke_sessions`, audited as `sessions_revoked` with a count
-  and a reason; the user-initiated change spares the caller's own token
-  (`SessionRepository.delete_all_for_user_except`) so changing your password
-  does not log you out of the tab you are in, while an admin reset spares
-  nothing. Renewal is now clamped to `created_at + session_absolute_lifetime_hours`,
-  a new config.json-managed field defaulting to **168 (7 days)**, overridable
-  with `ION_SESSION_ABSOLUTE_LIFETIME_HOURS` and disabled with `0`. **Analysts
-  will be asked to authenticate again at least weekly**; through Keycloak that
-  is a redirect. Service-account tokens keep their existing exemption and
-  still expire exactly at their minted `--ttl-days` bound, in either
-  direction. A session already past its ceiling has `expires_at` pulled back
-  to it, so sessions over-extended by the old behaviour die within half a
-  window of the upgrade rather than running on. Deactivating a user now
-  deletes their session rows too: `validate_session` already refused an
-  inactive user, but the rows survived, so reactivating an account handed a
-  stolen cookie its access back. `tests/test_session_revocation_and_ceiling.py`
-  covers all of it, at the service and at the route.
-
-- **The admin password reset is refused for an account ION holds no password
-  for.** `POST /api/users/{user_id}/reset-password` accepted any user id and
-  `must_change` defaults `True`, so resetting an OIDC user — `password_hash=""`
-  — set a flag that `password_change_blocks` checks on every request
-  regardless of how the user authenticated. Their next Keycloak login was
-  refused everywhere outside the change-password allowlist, and the only exit
-  was an ION-local password change on an estate that deliberately has no local
-  passwords. The reset now raises before hashing for any account with no local
-  hash — OIDC users and service accounts, which carry the no-login sentinel —
-  and the endpoint returns 400 naming deactivation as the lever the admin
-  actually wants. The alternative, setting the flag only for local accounts,
-  was rejected: issuing a local password to an IdP-backed account creates a
-  second way in that Keycloak's MFA and password policy never see.
-
-- **`POST /api/admin/sessions/{user_id}/revoke` now revokes a session.** Found
-  while checking the claim that deactivation was an admin's only lever on an
-  OIDC account. It was — because this route did not work. It deleted nothing:
-  it wrote an integration-log line saying the session had been "marked for
-  revocation" and returned a message telling the admin the user would have to
-  authenticate again. That success path was unreachable anyway, because
-  `IntegrationLogService` takes no constructor argument and has no `log_event`,
-  so every call raised `TypeError` and came back 500. ION's one explicit
-  session-revocation control had therefore never worked, on the estate where
-  revoking a session is the only thing that stops a stolen cookie. It now calls
-  `revoke_sessions` and returns the count. The integration-log line is removed
-  rather than repaired: a session revocation is an auth event and belongs in
-  `audit_logs`, which is where `revoke_sessions` records it.
 
 ## v0.99.10 — 2026-10-09
 
