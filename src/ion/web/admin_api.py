@@ -1180,7 +1180,7 @@ async def test_integration_connection(
         if not service.is_configured:
             return {"success": False, "error": "GitLab is not configured"}
         try:
-            result = service.test_connection()
+            result = await service.test_connection()
             return {"success": True, "details": result}
         except Exception as e:
             return {"success": False, "error": safe_error(e)}
@@ -1191,7 +1191,7 @@ async def test_integration_connection(
         if not service.is_configured:
             return {"success": False, "error": "OpenCTI is not configured"}
         try:
-            result = service.test_connection()
+            result = await service.test_connection()
             return {"success": True, "details": result}
         except Exception as e:
             return {"success": False, "error": safe_error(e)}
