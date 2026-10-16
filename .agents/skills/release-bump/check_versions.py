@@ -5,7 +5,7 @@ Reads the canonical version from pyproject.toml, then verifies every file
 in CANONICAL_FILES carries a matching version string. Reports drift.
 
 Why: ION's __version__ string rotted across 13 releases in 2025 because
-the 8 places it appears were never centralised. This script is the
+the places it appears were never centralised. This script is the
 guardrail. Run before every release-tag commit and on demand.
 """
 from __future__ import annotations

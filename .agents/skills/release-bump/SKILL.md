@@ -1,6 +1,6 @@
 ---
 name: release-bump
-description: Walk the ION release-version bump ritual — 8 canonical files in lockstep with pyproject.toml, sanity-grep for stragglers, CHANGELOG/SECURITY_ASSESSMENT delta. Use BEFORE tagging a release.
+description: Walk the ION release-version bump ritual — 10 canonical files in lockstep with pyproject.toml, sanity-grep for stragglers, CHANGELOG/SECURITY_ASSESSMENT delta. Use BEFORE tagging a release.
 disable-model-invocation: true
 ---
 
@@ -20,7 +20,7 @@ ION's version string lives in 10 files. Past releases rotted them (`src/ion/__in
    grep -E '^version = ' pyproject.toml
    ```
 
-2. **Run the drift checker** — reports any of the 8 canonical files that disagree with `pyproject.toml`:
+2. **Run the drift checker** — reports any canonical file that disagrees with `pyproject.toml`:
    ```
    python .agents/skills/release-bump/check_versions.py
    ```
