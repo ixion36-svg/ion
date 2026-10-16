@@ -16,12 +16,11 @@ from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 
+from ion.core.async_http import dispose_client as _shared_dispose_client
 from ion.core.circuit_breaker import es_breaker
 from ion.core.concurrency import map_bounded
 from ion.core.config import get_config, get_elasticsearch_config, get_ssl_verify
 from ion.core.safe_errors import safe_error
-
-from ion.core.async_http import dispose_client as _shared_dispose_client
 
 logger = logging.getLogger(__name__)
 

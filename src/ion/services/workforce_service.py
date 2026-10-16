@@ -26,8 +26,8 @@ from sqlalchemy.orm import Session
 from ion.models.user import AuditLog, User
 from ion.models.workforce import (
     KIND_CERT,
-    KIND_SIGNOFF,
     KIND_COURSE,
+    KIND_SIGNOFF,
     PHASE_GATE,
     PHASE_READINESS,
     STAGE_CLOSED,

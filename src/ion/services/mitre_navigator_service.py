@@ -170,7 +170,7 @@ def generate_navigator_layer(
         },
         "domain": "enterprise-attack",
         "description": (
-            f"Auto-generated from ION/TIDE. "
+            "Auto-generated from ION/TIDE. "
             + (
                 f"{covered_techniques}/{total_techniques} techniques have an "
                 f"enabled rule."
