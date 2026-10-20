@@ -12,7 +12,31 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 JS = ROOT / "src" / "ion" / "web" / "static" / "js" / "alerts-queue.js"
-CSS = ROOT / "src" / "ion" / "web" / "static" / "css" / "alerts-queue.css"
+#: alerts-queue.css was retired into the one build, nested under
+#: body[data-page="alerts"]. Read only that block: ion-pages.css carries
+#: every page, and scanning the whole file would quietly widen each check
+#: here from this page to all of them.
+PAGES_CSS = ROOT / "frontend" / "ion-pages.css"
+
+
+class _Scoped:
+    """Just enough of a Path to keep `CSS.read_text()` meaning one page."""
+
+    def read_text(self, **kw) -> str:
+        whole = PAGES_CSS.read_text(encoding="utf-8")
+        opener = 'body[data-page="alerts"] {'
+        start = whole.index(opener) + len(opener)
+        depth, i = 1, start
+        while depth:
+            if whole[i] == "{":
+                depth += 1
+            elif whole[i] == "}":
+                depth -= 1
+            i += 1
+        return whole[start:i - 1]
+
+
+CSS = _Scoped()
 ALERTS = ROOT / "src" / "ion" / "web" / "templates" / "alerts.html"
 BASE = ROOT / "src" / "ion" / "web" / "templates" / "base.html"
 
@@ -122,9 +146,13 @@ def test_severity_low_is_not_given_an_accent_colour():
 
 
 def test_queue_css_is_page_scoped_not_global():
-    """base.html loads nine stylesheets on every page whether used or not."""
-    assert "{% block head_css %}" in BASE.read_text(encoding="utf-8")
-    assert "alerts-queue.css" in ALERTS.read_text(encoding="utf-8")
+    """The rules used to be kept off every other page by being a link only
+    this template carried. They are in the shared build now, so the scope
+    does that job: body[data-page="alerts"] is what keeps them here."""
+    page = ALERTS.read_text(encoding="utf-8")
+    assert "alerts-queue.css" not in page, "the retired sheet is linked again"
+    assert "{% block page_id %}alerts{% endblock %}" in page
+    assert 'body[data-page="alerts"]' in PAGES_CSS.read_text(encoding="utf-8")
     assert "alerts-queue.css" not in BASE.read_text(encoding="utf-8")
 
 

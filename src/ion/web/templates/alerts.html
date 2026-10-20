@@ -2,9 +2,12 @@
 
 {% block title %}Alerts · ION{% endblock %}
 
+{% block page_id %}alerts{% endblock %}
+
 {% block head_css %}
-<link rel="stylesheet" href="/static/css/alerts-queue.css?v={{ ion_version }}">
-{# the page's own rules, lifted out of this template's inline style block. Must stay after alerts-queue.css: the block loaded after that sheet and keeps winning. #}
+{# the page's own rules, lifted out of this template's inline style block.
+   The queue sheet it had to stay after is in ion.css now, which base.html
+   links above head_css, so this still loads second and still wins. #}
 <link rel="stylesheet" href="/static/css/alerts-page.css?v={{ ion_version }}">
 {% endblock %}
 

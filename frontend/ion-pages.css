@@ -4941,3 +4941,1531 @@ body[data-page="forensics"] {
       color: var(--text-secondary);
   }
 }
+
+/* -- /alerts --------------------------------------------------
+ * Was alerts-queue.css, moved verbatim inside its scope. The build flattens
+ * the nesting, so each selector keeps the specificity it used to get
+ * from loading after ion.css.
+ *
+ */
+body[data-page="alerts"] {
+  /* No overflow:hidden on the wrapper. An ancestor with non-visible overflow becomes
+     the scroll container for position:sticky, so the column header silently stops
+     sticking and scrolls away under the page chrome. Corners are rounded on the
+     cells instead. border-collapse must stay separate — collapse drops sticky th
+     borders in Chrome. */
+  .aq-wrap {
+      border: 1px solid var(--ion-border, #212b38);
+      border-radius: 8px;
+      background: var(--ion-surface, #0f141b);
+      /* The queue is wider than its column on anything below a wide desktop, and
+         without a scroll context here the table painted straight through this
+         element's own border and rounded corners — the right-hand end of every
+         alert row ran off past the card and off the viewport. The nearest
+         scroller was .card-body one level up, which scrolls the card rather
+         than the table, so the border was overrun either way. Scroll the table
+         inside its own frame instead. */
+      overflow-x: auto;
+  }
+
+  table.aq {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 12.5px;
+  }
+
+  table.aq thead tr:first-child th:first-child { border-top-left-radius: 7px; }
+  table.aq thead tr:first-child th:last-child  { border-top-right-radius: 7px; }
+  table.aq tbody tr:last-child td:first-child  { border-bottom-left-radius: 7px; }
+  table.aq tbody tr:last-child td:last-child   { border-bottom-right-radius: 7px; }
+
+  table.aq th {
+      text-align: left;
+      font-size: 10px;
+      letter-spacing: .07em;
+  /* --color-ink-* is a SURFACE ramp, and the light-mode block inverts it
+     (--color-ink-500 is #2a2f3a in dark and #cbd5e1 in light) so that
+     `bg-ink-900` panels become white. Used as a TEXT colour it therefore
+     goes light exactly when the page does: measured 1.34:1 on the kbd chips
+     in /alerts, the worst remaining failure on that page. In dark mode the
+     token resolves empty here and the literal fallback carried it, which is
+     why this only broke one way round. --ion-text-muted is a text token and
+     flips the right direction in both modes. */
+      text-transform: uppercase;
+      color: var(--ion-text-muted, #94a3b8);
+      font-weight: 600;
+      padding: 7px 8px;
+      background: var(--ion-surface-2, #11141c);
+      box-shadow: inset 0 -1px 0 var(--ion-border, #222c39);
+      position: sticky;
+      top: var(--aq-stick, 0px);
+      z-index: 20;
+      user-select: none;
+  }
+  table.aq th[data-aq-sort] { cursor: pointer; }
+  table.aq th[data-aq-sort]:hover { color: var(--ion-text, #e6e9ef); }
+  table.aq th .aq-ar { color: var(--color-ion-cyan, #6de4ff); font-size: 9px; margin-left: 3px; }
+
+  table.aq td {
+      padding: 6px 8px;
+      box-shadow: inset 0 -1px 0 rgba(255, 255, 255, .05);
+      vertical-align: middle;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+  }
+  /* group headers draw their own padding inside .aq-ghead and must stay flush in
+     both densities */
+  table.aq.aq-roomy tbody tr:not(.aq-grp) td { padding: 10px 8px; }
+
+  table.aq tbody tr.aq-row { cursor: pointer; }
+  table.aq tbody tr.aq-row td:first-child { border-left: 3px solid transparent; }
+
+  /* Severity is carried by the whole row, not only the pill. These must precede the
+     hover / picked / cursor rules, which share their specificity and have to win. */
+  tr.sv-critical td { background: color-mix(in srgb, var(--sev-critical) 7%, transparent); }
+  tr.sv-high     td { background: color-mix(in srgb, var(--sev-high)     6%, transparent); }
+  tr.sv-medium   td { background: color-mix(in srgb, var(--sev-medium)   5%, transparent); }
+  tr.sv-low      td { background: color-mix(in srgb, var(--sev-low)      5%, transparent); }
+
+  /* same selector depth as the transparent base rule above, or that one wins on
+     specificity and the edge stays invisible */
+  table.aq tbody tr.sv-critical td:first-child { border-left-color: var(--sev-critical); }
+  table.aq tbody tr.sv-high     td:first-child { border-left-color: var(--sev-high); }
+  table.aq tbody tr.sv-medium   td:first-child { border-left-color: var(--sev-medium); }
+  table.aq tbody tr.sv-low      td:first-child { border-left-color: var(--sev-low); }
+
+  table.aq tbody tr.aq-row:hover td { background: rgba(255, 255, 255, .04); }
+  table.aq tbody tr.aq-picked td { background: color-mix(in srgb, var(--color-ion-cyan) 10%, transparent); }
+
+  /* The cursor reads as a focus ring across the row, so it never competes with the
+     severity edge for the same 3px. */
+  table.aq tbody tr.aq-cur td {
+      background: color-mix(in srgb, var(--color-ion-cyan) 15%, transparent);
+      box-shadow: inset 0 1px 0 var(--color-ion-cyan), inset 0 -1px 0 var(--color-ion-cyan);
+  }
+  table.aq tbody tr.aq-cur td:last-child {
+      box-shadow: inset 0 1px 0 var(--color-ion-cyan), inset 0 -1px 0 var(--color-ion-cyan),
+                  inset -1px 0 0 var(--color-ion-cyan);
+  }
+
+  /* ── columns ─────────────────────────────────────────────────────────────── */
+  .aq-chk { width: 26px; }
+  .aq-sev { width: 74px; }
+  .aq-ts { width: 152px; }
+  .aq-host { width: 118px; }
+  .aq-user { width: 96px; }
+  .aq-src { width: 92px; }
+  .aq-age { width: 54px; }
+  .aq-status { width: 96px; }
+  .aq-case { width: 92px; }
+  .aq-rule { width: 150px; }
+  .aq-tactic { width: 130px; }
+  .aq-ip { width: 116px; }
+  .aq-node { width: 116px; }
+  .aq-act { width: 104px; text-align: right; }
+
+  .aq-mut { color: var(--ion-text-muted, #94a3b8); }
+  .aq-mono { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; }
+  .aq-hot { color: var(--color-ion-amber, #f8b33a); font-weight: 600; }
+  .aq-ts, .aq-age { font-variant-numeric: tabular-nums; }
+  .aq-ts { color: var(--ion-text-muted, #94a3b8); font-family: ui-monospace, Consolas, monospace; }
+  .aq-ts .aq-d { color: #63728a; }
+
+  /* the title is what the analyst reads first, so it gets full contrast; the
+     identifying columns sit one step down */
+  .aq-title .aq-t { color: var(--ion-text, #e6e9ef); font-weight: 500; }
+  .aq-host, .aq-user { color: var(--ion-text-muted, #cbd5e1); }
+
+  .aq-sev-pill {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 9px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .04em;
+  }
+  .aq-sev-pill.sev-critical { background: color-mix(in srgb, var(--sev-critical) 20%, #0d1117); color: var(--sev-critical); }
+  .aq-sev-pill.sev-high     { background: color-mix(in srgb, var(--sev-high)     20%, #0d1117); color: var(--sev-high); }
+  .aq-sev-pill.sev-medium   { background: color-mix(in srgb, var(--sev-medium)   20%, #0d1117); color: var(--sev-medium); }
+  .aq-sev-pill.sev-low      { background: color-mix(in srgb, var(--sev-low)      18%, #0d1117); color: var(--sev-low); }
+
+  .aq-st {
+      font-size: 10.5px;
+      padding: 1px 7px;
+      border-radius: 9px;
+      border: 1px solid var(--ion-border-strong, #2b3746);
+      color: var(--ion-text-muted, #94a3b8);
+  }
+  .aq-st-open { border-color: #3a4d66; color: #a8c0da; }
+  .aq-st-acknowledged, .aq-st-in_progress { border-color: #3f5340; color: var(--color-ion-lime, #86f0a0); }
+  .aq-st-closed { border-color: #3a3f47; color: #7b8794; }
+
+  .aq-tag {
+      display: inline-block;
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      border-radius: 8px;
+      padding: 0 6px;
+      margin-left: 6px;
+      vertical-align: 1px;
+  }
+  /* iris marks model-derived or automation-owned values, so they never read as
+     something ION asserts */
+  .aq-tag.aq-auto, .aq-tag.aq-autocase {
+      color: var(--color-ion-iris, #9a8cff);
+      border: 1px solid color-mix(in srgb, var(--color-ion-iris) 40%, transparent);
+      background: color-mix(in srgb, var(--color-ion-iris) 12%, transparent);
+  }
+  .aq-tag.aq-mitre {
+      color: var(--color-ion-iris, #9a8cff);
+      border: 1px solid color-mix(in srgb, var(--color-ion-iris) 30%, transparent);
+      background: color-mix(in srgb, var(--color-ion-iris) 8%, transparent);
+      font-weight: 600;
+  }
+  .aq-tag.aq-lab {
+      color: var(--color-ion-amber, #f8b33a);
+      border: 1px solid color-mix(in srgb, var(--color-ion-amber) 40%, transparent);
+      background: color-mix(in srgb, var(--color-ion-amber) 10%, transparent);
+  }
+  .aq-tag.aq-caseref {
+      color: var(--color-ion-cyan, #6de4ff);
+      border: 1px solid color-mix(in srgb, var(--color-ion-cyan) 35%, transparent);
+      background: color-mix(in srgb, var(--color-ion-cyan) 10%, transparent);
+      margin-left: 0;
+      font-weight: 600;
+  }
+
+  /* ── group headers ───────────────────────────────────────────────────────── */
+  tr.aq-grp td {
+      background: var(--ion-surface-2, #131a24);
+      box-shadow: inset 0 -1px 0 var(--ion-border, #222c39);
+      padding: 0;
+  }
+  tr.aq-grp:hover td { background: rgba(255, 255, 255, .05); }
+  .aq-ghead {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 10px;
+      font-size: 11.5px;
+      border-left: 3px solid transparent;
+      cursor: pointer;
+  }
+  .aq-ghead.sev-critical { border-left-color: var(--sev-critical); background: linear-gradient(90deg, color-mix(in srgb, var(--sev-critical) 8%, transparent), transparent 55%); }
+  .aq-ghead.sev-high     { border-left-color: var(--sev-high);     background: linear-gradient(90deg, color-mix(in srgb, var(--sev-high)     7%, transparent), transparent 55%); }
+  .aq-ghead.sev-medium   { border-left-color: var(--sev-medium);   background: linear-gradient(90deg, color-mix(in srgb, var(--sev-medium)   6%, transparent), transparent 55%); }
+  .aq-ghead.sev-low      { border-left-color: var(--sev-low);      background: linear-gradient(90deg, color-mix(in srgb, var(--sev-low)      6%, transparent), transparent 55%); }
+  .aq-ghead .aq-gc { color: var(--ion-text-muted, #94a3b8); font-size: 10px; width: 9px; display: inline-block; transition: transform .15s; }
+  .aq-ghead.aq-closed .aq-gc { transform: rotate(-90deg); }
+  .aq-ghead .aq-gn { color: var(--ion-text, #e6e9ef); font-weight: 600; text-transform: capitalize; }
+  .aq-ghead .aq-gct { color: var(--ion-text-muted, #94a3b8); font-variant-numeric: tabular-nums; }
+  .aq-ghead .aq-gsel {
+      margin-left: auto;
+      background: color-mix(in srgb, var(--color-ion-cyan) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--color-ion-cyan) 35%, transparent);
+      color: var(--ion-text-muted, #cbd5e1);
+      border-radius: 5px;
+      padding: 1px 8px;
+      font-size: 10.5px;
+      cursor: pointer;
+      font-family: inherit;
+  }
+  .aq-ghead .aq-gsel:hover { background: color-mix(in srgb, var(--color-ion-cyan) 22%, transparent); }
+
+  /* severity mix bar, used on non-severity group headers */
+  .aq-mix { display: flex; height: 5px; width: 64px; border-radius: 3px; overflow: hidden; background: rgba(255,255,255,.06); flex: none; }
+  .aq-mix i { display: block; height: 100%; }
+  .aq-mix i.sev-critical { background: var(--sev-critical); }
+  .aq-mix i.sev-high     { background: var(--sev-high); }
+  .aq-mix i.sev-medium   { background: var(--sev-medium); }
+  .aq-mix i.sev-low      { background: var(--sev-low); }
+
+  /* ── row actions ─────────────────────────────────────────────────────────── */
+  /* dimmed until hover or cursor, so the column is not a wall of icons */
+  .aq-acts { display: inline-flex; gap: 3px; opacity: .28; transition: opacity .12s; }
+  tr.aq-row:hover .aq-acts, tr.aq-cur .aq-acts { opacity: 1; }
+  .aq-ra {
+      width: 22px;
+      height: 20px;
+      border-radius: 5px;
+      border: 1px solid var(--ion-border-strong, #2a3644);
+      background: var(--ion-surface-2, #161d27);
+      color: var(--ion-text-muted, #94a3b8);
+      cursor: pointer;
+      font-size: 11px;
+      line-height: 1;
+      padding: 0;
+      font-family: inherit;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+  }
+  .aq-ra:hover { border-color: var(--color-ion-cyan, #6de4ff); color: var(--ion-text, #e6e9ef); }
+  .aq-ra[disabled] { opacity: .35; cursor: default; }
+  .aq-ra[disabled]:hover { border-color: var(--ion-border-strong, #2a3644); color: var(--ion-text-muted, #94a3b8); }
+  .aq-ra-ack:hover { color: var(--color-ion-lime, #86f0a0); border-color: color-mix(in srgb, var(--color-ion-lime) 45%, transparent); }
+  .aq-ra-pcap { color: var(--color-ion-iris, #9a8cff); }
+  .aq-ra-pcap:hover { color: var(--color-ion-iris, #9a8cff); border-color: color-mix(in srgb, var(--color-ion-iris) 55%, transparent); }
+
+  .aq-empty { padding: 34px; text-align: center; color: var(--ion-text-muted, #94a3b8); font-size: 12.5px; }
+
+  /* Browsers without color-mix get flat token colours rather than nothing. */
+  @supports not (color: color-mix(in srgb, red 50%, transparent)) {
+      tr.sv-critical td, tr.sv-high td, tr.sv-medium td, tr.sv-low td { background: transparent; }
+      table.aq tbody tr.aq-cur td { background: rgba(109, 228, 255, .14); }
+      table.aq tbody tr.aq-picked td { background: rgba(109, 228, 255, .09); }
+  }
+
+  /* ── toolbar + keyboard legend ───────────────────────────────────────────── */
+  .aq-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+  }
+  .aq-tool { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ion-text-muted, #94a3b8); }
+  .aq-tool select,
+  .aq-tool-btn {
+      background: var(--ion-surface, #0f151d);
+      border: 1px solid var(--ion-border-strong, #26313f);
+      border-radius: 6px;
+      color: var(--ion-text-muted, #a8bacf);
+      padding: 4px 9px;
+      font-size: 11.5px;
+      font-family: inherit;
+      cursor: pointer;
+  }
+  .aq-tool select:focus, .aq-tool-btn:focus { outline: none; border-color: var(--color-ion-cyan); }
+  .aq-tool-btn:hover { border-color: var(--color-ion-cyan); color: var(--ion-text, #e6e9ef); }
+
+  .aq-seg { display: flex; border: 1px solid var(--ion-border-strong, #26313f); border-radius: 6px; overflow: hidden; }
+  .aq-seg button {
+      background: var(--ion-surface, #0f151d);
+      border: none;
+      color: var(--ion-text-muted, #7f92a8);
+      padding: 4px 10px;
+      font-size: 11px;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 600;
+  }
+  .aq-seg button.is-on {
+      background: color-mix(in srgb, var(--color-ion-cyan) 18%, transparent);
+      color: var(--ion-text, #e6e9ef);
+  }
+
+  .aq-colwrap { position: relative; }
+  /* absolute, not fixed: this popover belongs to its button */
+  .aq-colmenu {
+      position: absolute;
+      top: 30px;
+      left: 0;
+      z-index: 60;
+      display: none;
+      min-width: 172px;
+      background: var(--ion-surface-2, #111721);
+      border: 1px solid var(--ion-border-strong, #2a3644);
+      border-radius: 8px;
+      padding: 5px;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, .55);
+  }
+  .aq-colmenu.is-open { display: block; }
+  .aq-colrow {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 5px 9px;
+      border-radius: 5px;
+      font-size: 12px;
+      color: var(--ion-text-muted, #bccbdb);
+      cursor: pointer;
+  }
+  .aq-colrow:hover { background: color-mix(in srgb, var(--color-ion-cyan) 12%, transparent); }
+  .aq-colrow input { margin: 0; }
+
+  .aq-count { margin-left: auto; font-size: 11.5px; color: var(--ion-text-muted, #94a3b8); font-variant-numeric: tabular-nums; }
+
+  .aq-keys {
+      display: flex;
+      gap: 13px;
+      flex-wrap: wrap;
+      padding: 8px 12px;
+      background: var(--ion-surface, #0f151d);
+      border: 1px solid var(--ion-border, #1f2937);
+      border-radius: 7px;
+      margin-top: 10px;
+      font-size: 11.5px;
+      color: var(--ion-text-muted, #8ea3bb);
+  }
+  .aq-keys kbd {
+      background: var(--ion-surface-2, #1b2430);
+      border: 1px solid var(--ion-border-strong, #33415a);
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      padding: 0 5px;
+      font-size: 10px;
+      font-family: ui-monospace, Consolas, monospace;
+      color: var(--ion-text-muted, #b9cbe0);
+      line-height: 16px;
+      display: inline-block;
+  }
+
+  /* ── saved views ─────────────────────────────────────────────────────────── */
+  .aq-views { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; margin-bottom: 9px; }
+  .aq-view {
+      background: var(--ion-surface, #141b24);
+      border: 1px solid var(--ion-border-strong, #26313f);
+      color: var(--ion-text-muted, #93a5bb);
+      padding: 5px 12px;
+      border-radius: 14px;
+      font-size: 11.5px;
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+  }
+  .aq-view:hover { border-color: var(--color-ion-cyan); color: var(--ion-text, #cfe0f2); }
+  .aq-view.is-on {
+      background: color-mix(in srgb, var(--color-ion-cyan) 16%, transparent);
+      border-color: var(--color-ion-cyan);
+      color: var(--ion-text, #dbeafe);
+  }
+  .aq-view .n { opacity: .65; margin-left: 5px; font-variant-numeric: tabular-nums; }
+  .aq-view-saved { border-style: dashed; }
+  .aq-view-add { border-style: dashed; color: #6d7f96; }
+
+  /* ── filter chips ────────────────────────────────────────────────────────── */
+  .aq-chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 9px; }
+  .aq-chips:empty { display: none; }
+  .aq-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      background: color-mix(in srgb, var(--color-ion-cyan) 10%, transparent);
+      border: 1px solid color-mix(in srgb, var(--color-ion-cyan) 35%, transparent);
+      border-radius: 13px;
+      padding: 3px 5px 3px 11px;
+      font-size: 11.5px;
+      color: var(--ion-text-muted, #a8c0da);
+  }
+  .aq-chip b { color: var(--ion-text, #dbeafe); font-weight: 600; }
+  .aq-chip .x {
+      background: color-mix(in srgb, var(--color-ion-cyan) 20%, transparent);
+      border: none;
+      color: var(--ion-text-muted, #8ea3bb);
+      cursor: pointer;
+      font-family: inherit;
+      border-radius: 50%;
+      width: 16px;
+      height: 16px;
+      line-height: 1;
+      font-size: 10px;
+      padding: 0;
+  }
+  .aq-chip .x:hover { background: var(--color-ion-cyan); color: #04080d; }
+  .aq-chip-all {
+      background: none;
+      border: none;
+      color: var(--color-ion-cyan);
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 11.5px;
+  }
+
+  /* The chips row supersedes #active-filter-banner, which only ever described the
+     entity filter — so a severity + host narrowing showed one of the two. The
+     element stays because seven call sites still write to it; retiring those is a
+     separate change. Hidden here so the page does not show the same state twice. */
+  #active-filter-banner { display: none !important; }
+
+  /* ── KEV + quirk advisories ──────────────────────────────────────────────── */
+  /* Both are context the server has attached for releases with nothing rendering
+     them. Neither suppresses, hides or reorders an alert — they explain a row. */
+  .aq-tag.aq-kev {
+      color: var(--sev-critical);
+      border: 1px solid color-mix(in srgb, var(--sev-critical) 45%, transparent);
+      background: color-mix(in srgb, var(--sev-critical) 14%, transparent);
+  }
+  /* ransomware-linked entries earn a filled badge — this is the one KEV fact that
+     changes what an analyst does first */
+  .aq-tag.aq-kev.is-ransomware {
+      color: #0d1117;
+      background: var(--sev-critical);
+      border-color: var(--sev-critical);
+  }
+  /* --sev-info violet: advisory context, deliberately not a severity colour, so a
+     quirk can never be misread as a statement about how bad the alert is */
+  .aq-tag.aq-quirk {
+      color: var(--sev-info);
+      border: 1px solid color-mix(in srgb, var(--sev-info) 40%, transparent);
+      background: color-mix(in srgb, var(--sev-info) 12%, transparent);
+  }
+}
+
+/* -- /daily-standup -------------------------------------------
+ * Was ds-standup.css, moved verbatim inside its scope. The build flattens
+ * the nesting, so each selector keeps the specificity it used to get
+ * from loading after ion.css.
+ *
+ * A keyframe name is global, so the animation is hoisted out of the
+ * wrapper rather than nested where it would mean nothing.
+ *
+ */
+@keyframes ds-rag-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
+@keyframes ds-spin { to { transform: rotate(360deg); } }
+
+body[data-page="daily_standup"] {
+  /* ── Table chrome ─────────────────────────────────────────────────────── */
+
+  .dth {
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--text-muted);
+    font-weight: 600;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--ion-border);
+  }
+
+  .ds-row { border-bottom: 1px solid var(--ion-border); }
+  .ds-row:hover { background: rgba(255, 255, 255, .02); }
+
+  /* ── Page furniture ───────────────────────────────────────────────────── */
+
+  .ds-section-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+
+  .ds-panel {
+    border-radius: var(--ion-radius-lg, 12px);
+    border: 1px solid var(--ion-border);
+    background: var(--bg-secondary);
+    padding: 20px;
+  }
+
+  .ds-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+  }
+
+  .ds-figure { color: var(--text-primary); font-weight: 600; }
+
+  .ds-stat-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--text-muted);
+  }
+
+  .ds-stat-value {
+    font-size: 24px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+  }
+
+  /* A figure the sweep did not produce. Deliberately quiet rather than
+   * alarming: it is the absence of a measurement, not a bad measurement. */
+  .ds-unmeasured {
+    color: var(--text-muted);
+    font-style: italic;
+    font-weight: 400;
+    cursor: help;
+  }
+
+  .ds-count-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--danger);
+    background: rgba(255, 108, 108, .1);
+    border: 1px solid rgba(255, 108, 108, .2);
+  }
+
+  /* ── Outcome blocks: failed, error, unconfigured, empty ───────────────── */
+
+  .ds-read-failed {
+    border-radius: 8px;
+    border: 1px solid rgba(255, 108, 108, .3);
+    background: rgba(255, 108, 108, .08);
+    color: var(--danger);
+    font-size: 12px;
+    padding: 12px;
+    margin: 8px 0;
+  }
+
+  .ds-logsrc-error {
+    border-radius: 8px;
+    border: 1px solid rgba(239, 68, 68, .3);
+    background: rgba(239, 68, 68, .1);
+    color: var(--danger);
+    font-size: 12px;
+    padding: 12px;
+  }
+
+  .ds-logsrc-unconfigured {
+    border-radius: 8px;
+    border: 1px solid rgba(245, 158, 11, .3);
+    background: rgba(245, 158, 11, .1);
+    color: var(--warning);
+    font-size: 12px;
+    padding: 12px;
+  }
+
+  .ds-empty {
+    color: var(--text-muted);
+    font-size: 11px;
+    text-align: center;
+    padding: 12px 0;
+  }
+
+  .ds-diag {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 8px;
+    text-align: center;
+  }
+
+  .ds-diag code { color: var(--text-secondary); }
+
+  /* ── Cluster state pill ───────────────────────────────────────────────── */
+
+  .ds-state-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 10px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+    border: 1px solid transparent;
+  }
+
+  .ds-state-good     { background: rgba(163, 230, 53, .1);  color: var(--success); border-color: rgba(163, 230, 53, .2); }
+  .ds-state-warning  { background: rgba(245, 158, 11, .1);  color: var(--warning); border-color: rgba(245, 158, 11, .2); }
+  .ds-state-critical { background: rgba(255, 108, 108, .1); color: var(--danger);  border-color: rgba(255, 108, 108, .2); }
+  .ds-state-unknown  { background: rgba(148, 163, 184, .1); color: var(--text-muted); border-color: var(--ion-border); }
+
+  /* ── Severity ─────────────────────────────────────────────────────────── */
+
+  .ds-sev-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+
+  .ds-sev-critical { background: rgba(255, 108, 108, .12); color: var(--danger);       border: 1px solid rgba(255, 108, 108, .25); }
+  .ds-sev-high     { background: rgba(245, 158, 11, .12);  color: var(--warning);      border: 1px solid rgba(245, 158, 11, .25); }
+  .ds-sev-medium   { background: rgba(139, 92, 246, .12);  color: var(--neon-purple);  border: 1px solid rgba(139, 92, 246, .25); }
+  .ds-sev-low      { background: rgba(148, 163, 184, .1);  color: var(--text-secondary); border: 1px solid rgba(148, 163, 184, .2); }
+  .ds-sev-info     { background: rgba(96, 165, 250, .12);  color: var(--info);         border: 1px solid rgba(96, 165, 250, .25); }
+
+  /* Not a quieter low. An unclassified alert is marked as unclassified. */
+  .ds-sev-unknown {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px dashed var(--ion-border);
+  }
+
+  /* The KPI cards colour the figure rather than wrapping it in a pill. */
+  .ds-sev-text-critical { color: var(--danger); }
+  .ds-sev-text-high     { color: var(--warning); }
+  .ds-sev-text-medium   { color: var(--text-secondary); }
+  .ds-sev-text-low      { color: var(--text-muted); }
+
+  .ds-status-text-open         { color: var(--danger); }
+  .ds-status-text-acknowledged { color: var(--warning); }
+  .ds-status-text-closed       { color: var(--success); }
+
+  /* ── KPI cards ────────────────────────────────────────────────────────── */
+
+  .ds-kpi-figure {
+    font-size: 36px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -.02em;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+  }
+
+  .ds-kpi-row {
+    display: grid;
+    gap: 8px;
+    text-align: center;
+    padding-top: 8px;
+    margin-top: 8px;
+    border-top: 1px solid var(--ion-border);
+  }
+
+  .ds-kpi-cell {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+  }
+
+  .ds-kpi-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--text-muted);
+    margin-top: 6px;
+  }
+
+  /* ── Hours open, as a state rather than a colour name ─────────────────── */
+
+  .ds-hours-critical { color: var(--danger);  font-weight: 700; }
+  .ds-hours-warning  { color: var(--warning); font-weight: 700; }
+  .ds-hours-elevated { color: var(--warning); font-weight: 600; }
+
+  .ds-rule-count { color: var(--warning); }
+
+  /* ── RAG traffic lights ───────────────────────────────────────────────── */
+
+  .ds-rag-light {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 1px solid var(--ion-border);
+  }
+
+  .ds-rag-good     { background: var(--success); box-shadow: 0 0 8px rgba(34, 197, 94, .6); }
+  .ds-rag-warning  { background: var(--warning); box-shadow: 0 0 8px rgba(245, 158, 11, .6); animation: ds-rag-pulse 1.5s ease-in-out infinite; }
+  .ds-rag-critical { background: var(--danger);  box-shadow: 0 0 10px rgba(239, 68, 68, .7); animation: ds-rag-pulse .8s ease-in-out infinite; }
+  .ds-rag-unknown  { background: var(--text-muted); }
+
+  /* ── Host widget cards ────────────────────────────────────────────────── */
+
+  .ds-host-widget {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--ion-border);
+    background: rgba(255, 255, 255, .02);
+    transition: border-color .2s;
+  }
+
+  .ds-host-widget.ds-hw-good     { border-color: rgba(34, 197, 94, .15); }
+  .ds-host-widget.ds-hw-warning  { border-color: rgba(245, 158, 11, .25); background: rgba(245, 158, 11, .04); }
+  .ds-host-widget.ds-hw-critical { border-color: rgba(239, 68, 68, .3);  background: rgba(239, 68, 68, .06); }
+  .ds-host-widget.ds-hw-unknown  { border-style: dashed; }
+
+  .ds-hw-light { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  .ds-hw-name {
+    font-family: var(--font-mono, 'JetBrains Mono', ui-monospace, monospace);
+    font-size: 10px;
+    color: var(--text-primary);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .ds-hw-meta {
+    font-size: 9px;
+    color: var(--text-muted);
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  /* Was class="text-[#ef4444]" inside a JavaScript template string, which is
+   * why no restyle of this page ever reached it. */
+  .ds-hw-gap { color: var(--danger); }
+
+  /* ── Arkime country cards ─────────────────────────────────────────────── */
+
+  .ds-country-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 16px 8px;
+    border-radius: 10px;
+    border: 1px solid var(--ion-border);
+    background: rgba(255, 255, 255, .02);
+    transition: border-color .2s, background .2s;
+  }
+
+  .ds-country-card.highlighted {
+    border-color: rgba(255, 108, 108, .4);
+    background: rgba(255, 108, 108, .08);
+  }
+
+  .ds-country-count.active { color: var(--danger); font-weight: 700; }
+
+  .ds-node-detail { width: 100%; }
+  .ds-node-line { font-size: 9px; color: var(--text-secondary); margin-top: 4px; text-align: left; }
+  .ds-node-name { color: var(--primary); }
+  .ds-node-session { padding-left: 8px; color: var(--text-muted); }
+
+  /* ── Arkime capture-node cards ────────────────────────────────────────── */
+
+  .ds-node-card {
+    border-radius: 8px;
+    border: 1px solid var(--ion-border);
+    background: rgba(255, 255, 255, .02);
+    padding: 16px;
+  }
+
+  .ds-node-card.ds-node-dropping { border-color: rgba(255, 108, 108, .3); }
+
+  .ds-node-rate { color: var(--primary); }
+  .ds-node-drop { color: var(--danger); font-weight: 600; }
+
+  /* ── Report slide-over ────────────────────────────────────────────────── */
+
+  .ds-report-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background .15s;
+  }
+
+  .ds-report-item:hover { background: rgba(255, 255, 255, .05); }
+
+  .ds-rpt-sec-hdr {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: 4px;
+    padding-top: 12px;
+  }
+
+  .ds-rpt-tag {
+    display: inline-flex;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    background: rgba(109, 228, 255, .1);
+    color: var(--primary);
+  }
+
+  .ds-rpt-ttp {
+    display: inline-flex;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 10px;
+    background: rgba(245, 158, 11, .12);
+    color: var(--warning);
+    border: 1px solid rgba(245, 158, 11, .25);
+  }
+
+  /* ── Rows and bars that would otherwise need new Tailwind utilities ──
+   *
+   * These three are page rules rather than markup utilities on purpose.
+   * `bg-base-300/30`, `bg-base-100/90` and `hover:bg-base-300/40` are not in
+   * the compiled ion.css, and that file is resolved centrally, so adding a
+   * utility to this page's markup would mean either a rebuild of a shared
+   * artefact or a row that silently loses its hover. One class each, here.
+   */
+
+  .ds-check-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background .15s;
+  }
+
+  .ds-check-row:hover { background: rgba(255, 255, 255, .04); }
+
+  .ds-duty-line {
+    border-radius: 8px;
+    border: 1px solid var(--ion-border);
+    background: rgba(255, 255, 255, .03);
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .ds-action-bar {
+    border-top: 1px solid var(--ion-border);
+    background: var(--bg-primary);
+    backdrop-filter: blur(12px);
+  }
+
+  /* ── Duty line ────────────────────────────────────────────────────────── */
+
+  .ds-duty-who { color: var(--text-primary); }
+  .ds-duty-ack { color: var(--success); }
+  .ds-duty-gap { color: var(--warning); }
+
+  /* ── Sign-off status, which only the browser knows ────────────────────── */
+
+  .ds-saved { color: var(--success); }
+  .ds-save-failed { color: var(--danger); }
+  .ds-save-pending { color: var(--text-muted); }
+
+  /* ── Busy indicators ──────────────────────────────────────────────────── */
+
+  .ds-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--ion-border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: ds-spin .7s linear infinite;
+  }
+
+  /* htmx adds .htmx-request to the element that issued a request, and to
+   * whatever hx-indicator names. The spinner inside the button is markup in
+   * the page, revealed rather than written: `btn.innerHTML = spinner` is what
+   * made the Run Checks label unstylable and unrecoverable on an error. */
+  .ds-busy { display: none; }
+  .htmx-request .ds-busy,
+  .htmx-request.ds-busy { display: inline-flex; }
+  .htmx-request .ds-idle { display: none; }
+  /* The slide-over's spinner fills the panel rather than sitting in a label. */
+  #ds-report-busy.htmx-request { display: flex; }
+}
+
+/* -- /playbooks -----------------------------------------------
+ * Was playbooks-page.css, moved verbatim inside its scope. The build flattens
+ * the nesting, so each selector keeps the specificity it used to get
+ * from loading after ion.css.
+ *
+ */
+body[data-page="playbooks"] {
+  .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+  }
+
+  .header-actions {
+      display: flex;
+      gap: 0.5rem;
+  }
+
+  .section {
+      background: var(--bg-secondary);
+      border-radius: var(--ion-radius-lg);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+  }
+
+  .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+  }
+
+  .section-header h2 {
+      margin: 0;
+  }
+
+  .filter-controls {
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+  }
+
+  .table-container {
+      overflow-x: auto;
+  }
+
+  .data-table {
+      width: 100%;
+      border-collapse: collapse;
+  }
+
+  .data-table th,
+  .data-table td {
+      padding: 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--ion-border);
+  }
+
+  .data-table th {
+      background: var(--bg-tertiary);
+      font-weight: 600;
+  }
+
+  .data-table tr:hover {
+      background: var(--bg-hover);
+  }
+
+  .loading {
+      text-align: center;
+      color: var(--text-secondary);
+      padding: 2rem;
+  }
+
+  /* Status badges */
+  .status-badge {
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 500;
+  }
+
+  .status-active {
+      background: rgba(40, 167, 69, 0.12);
+      color: var(--success);
+  }
+
+  .status-inactive {
+      background: rgba(158, 158, 158, 0.12);
+      color: var(--text-muted);
+  }
+
+  /* Trigger tags */
+  .trigger-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+  }
+
+  .trigger-tag {
+      background: var(--bg-tertiary);
+      padding: 0.2rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+  }
+
+  /* Modal styles */
+  .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+  }
+
+  .modal-dialog {
+      background: var(--bg-primary);
+      border-radius: var(--ion-radius-lg);
+      width: 100%;
+      max-width: 600px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 2px 8px rgba(0,0,0,.15);
+  }
+
+  .modal-dialog.modal-large {
+      max-width: 800px;
+  }
+
+  .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--ion-border);
+  }
+
+  .modal-header h3 {
+      margin: 0;
+  }
+
+  .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: var(--text-secondary);
+  }
+
+  .modal-close:hover {
+      color: var(--text-primary);
+  }
+
+  .modal-body {
+      padding: 1.5rem;
+  }
+
+  .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      padding: 1rem 1.5rem;
+      border-top: 1px solid var(--ion-border);
+  }
+
+  /* Form styles */
+  .form-section {
+      margin-bottom: 1.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--ion-border);
+  }
+
+  .form-section:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+  }
+
+  .form-section h4 {
+      margin: 0 0 1rem 0;
+      color: var(--accent-color);
+  }
+
+  .form-row {
+      display: flex;
+      gap: 1rem;
+  }
+
+  .form-group {
+      margin-bottom: 1rem;
+  }
+
+  .form-group label {
+      display: block;
+      margin-bottom: 0.25rem;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+  }
+
+  .form-control {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid var(--ion-border);
+      border-radius: 4px;
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+  }
+
+  .form-help {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      margin-bottom: 1rem;
+  }
+
+  .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+  }
+
+  .checkbox-group {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+  }
+
+  /* Step builder */
+  .step-item {
+      background: var(--bg-secondary);
+      border: 1px solid var(--ion-border);
+      border-radius: 4px;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+      position: relative;
+  }
+
+  .step-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+  }
+
+  .step-number {
+      font-weight: bold;
+      color: var(--accent-color);
+  }
+
+  .step-actions {
+      display: flex;
+      gap: 0.25rem;
+  }
+
+  .step-actions .btn {
+      padding: 0.25rem 0.5rem;
+      font-size: 0.75rem;
+  }
+
+  .step-row {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 0.5rem;
+  }
+
+  .step-row .form-group {
+      margin-bottom: 0;
+  }
+
+  /* View modal */
+  .view-section {
+      margin-bottom: 1.5rem;
+  }
+
+  .view-section h4 {
+      margin: 0 0 0.5rem 0;
+      color: var(--accent-color);
+  }
+
+  .view-steps-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+  }
+
+  .view-step {
+      display: flex;
+      gap: 0.75rem;
+      padding: 0.75rem;
+      background: var(--bg-secondary);
+      border-radius: 4px;
+  }
+
+  .view-step-number {
+      font-weight: bold;
+      color: var(--accent-color);
+      min-width: 30px;
+  }
+
+  .view-step-content {
+      flex: 1;
+  }
+
+  .view-step-title {
+      font-weight: 500;
+  }
+
+  .view-step-meta {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-top: 0.25rem;
+  }
+
+  /* Tab Navigation */
+  .tab-nav {
+      display: flex;
+      gap: 0;
+      margin-bottom: 1.5rem;
+      border-bottom: 2px solid var(--ion-border);
+  }
+
+  .tab-btn {
+      padding: 0.75rem 1.25rem;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: border-color 0.2s;
+  }
+
+  .tab-btn:hover {
+      color: var(--text-primary);
+      background: var(--primary-dim);
+  }
+
+  .tab-btn.active {
+      color: var(--accent-color);
+      border-bottom-color: var(--accent-color);
+  }
+
+  .tab-badge {
+      background: var(--accent-color);
+      color: var(--accent-contrast);
+      padding: 0.125rem 0.5rem;
+      border-radius: 10px;
+      font-size: 0.75rem;
+      margin-left: 0.25rem;
+  }
+
+  /* Progress bar */
+  .progress-bar-container {
+      width: 100%;
+      background: var(--bg-tertiary);
+      border-radius: 4px;
+      height: 8px;
+      overflow: hidden;
+  }
+
+  .progress-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.3s;
+  }
+
+  .progress-bar-fill.status-in_progress { background: var(--warning); }
+  .progress-bar-fill.status-completed { background: var(--success); }
+  .progress-bar-fill.status-failed { background: var(--danger); }
+  .progress-bar-fill.status-pending { background: var(--text-muted); }
+
+  .progress-text {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-top: 0.25rem;
+  }
+
+  /* Execution status badges */
+  .exec-status {
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 500;
+  }
+
+  .exec-status.in_progress { background: rgba(255, 193, 7, 0.12); color: var(--warning); }
+  .exec-status.completed { background: rgba(40, 167, 69, 0.12); color: var(--success); }
+  .exec-status.failed { background: rgba(220, 53, 69, 0.12); color: var(--danger); }
+  .exec-status.pending { background: rgba(158, 158, 158, 0.12); color: var(--text-muted); }
+
+  /* Outcome badges */
+  .exec-outcome {
+      padding: 0.2rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+  }
+  .exec-outcome.true_positive { background: rgba(220, 53, 69, 0.12); color: var(--danger); }
+  .exec-outcome.false_positive { background: rgba(40, 167, 69, 0.12); color: var(--success); }
+  .exec-outcome.benign_true_positive { background: rgba(23, 162, 184, 0.12); color: var(--info); }
+  .exec-outcome.risk_accepted { background: rgba(255, 193, 7, 0.12); color: var(--warning); }
+  .exec-outcome.inconclusive { background: rgba(158, 158, 158, 0.12); color: var(--text-muted); }
+  .exec-outcome.escalated { background: rgba(253, 126, 20, 0.12); color: var(--neon-orange); }
+
+  /* Step action data form */
+  .step-action-form {
+      padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+      margin-bottom: 0.5rem;
+      font-size: 0.8rem;
+  }
+  .step-action-form .form-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.375rem;
+      align-items: center;
+  }
+  .step-action-form label {
+      min-width: 110px;
+      font-weight: 500;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+  }
+  .step-action-form input,
+  .step-action-form textarea,
+  .step-action-form select {
+      flex: 1;
+      background: var(--bg-secondary);
+      border: 1px solid var(--ion-border);
+      border-radius: 3px;
+      color: var(--text-primary);
+      padding: 0.25rem 0.5rem;
+      font-size: 0.8rem;
+  }
+  .step-action-form textarea {
+      min-height: 40px;
+      resize: vertical;
+  }
+
+  /* Outcome picker modal overlay */
+  .outcome-modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+  }
+  .outcome-modal {
+      background: var(--bg-secondary);
+      border: 1px solid var(--accent-color);
+      border-radius: var(--ion-radius-lg);
+      padding: 1.5rem;
+      width: 480px;
+      max-width: 90vw;
+  }
+  .outcome-modal h3 {
+      margin: 0 0 1rem 0;
+  }
+  .outcome-modal .form-group {
+      margin-bottom: 1rem;
+  }
+  .outcome-modal .form-group label {
+      display: block;
+      margin-bottom: 0.25rem;
+      font-weight: 500;
+      font-size: 0.85rem;
+  }
+  .outcome-modal select,
+  .outcome-modal textarea {
+      width: 100%;
+      background: var(--bg-primary);
+      border: 1px solid var(--ion-border);
+      border-radius: 4px;
+      color: var(--text-primary);
+      padding: 0.5rem;
+      font-size: 0.875rem;
+  }
+  .outcome-modal textarea {
+      min-height: 80px;
+      resize: vertical;
+  }
+  .outcome-modal .btn-row {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: flex-end;
+      margin-top: 1rem;
+  }
+
+  /* Execution detail panel */
+  .exec-detail-panel {
+      background: var(--bg-secondary);
+      border: 1px solid var(--accent-color);
+      border-radius: var(--ion-radius-lg);
+      margin-top: 1rem;
+  }
+
+  .exec-detail-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--ion-border);
+  }
+
+  .exec-detail-header h3 {
+      margin: 0;
+  }
+
+  .exec-detail-body {
+      padding: 1.5rem;
+  }
+
+  .exec-step-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.625rem 0.75rem;
+      background: var(--bg-primary);
+      border-radius: 4px;
+      margin-bottom: 0.5rem;
+      font-size: 0.875rem;
+  }
+
+  .exec-step-item.done {
+      opacity: 0.7;
+  }
+
+  .exec-step-item.done .exec-step-title {
+      text-decoration: line-through;
+      color: var(--text-secondary);
+  }
+
+  .exec-step-checkbox {
+      cursor: pointer;
+      width: 16px;
+      height: 16px;
+  }
+
+  .exec-step-title {
+      flex: 1;
+  }
+
+  .exec-step-required {
+      font-size: 0.625rem;
+      color: var(--danger);
+      text-transform: uppercase;
+      font-weight: 600;
+  }
+
+  .exec-step-meta {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+  }
+
+  .exec-actions-bar {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--ion-border);
+  }
+
+  .case-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.8rem;
+      color: var(--accent-color);
+      text-decoration: none;
+  }
+
+  .case-link:hover {
+      text-decoration: underline;
+  }
+
+  .alert-id-display {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+  }
+
+  /* The open execution row. The script adds this class after the list swaps. */
+  #executions-table tr.row-expanded { background: var(--primary-dim); }
+
+  /* daisyUI .tab-content is display:none until an adjacent .tab-active.
+     These panes are not siblings of the tab buttons, so that rule never
+     lifts and the library stays blank. An id shows the pane switchTab left
+     without .hidden, and still loses to the .hidden rule below. */
+  #tab-library:not(.hidden),
+  #tab-executions:not(.hidden) { display: block; }
+
+  /* Tailwind .hidden and .flex are one class each. An id keeps hidden winning
+     while the class is present, including after ion-workspace.css. */
+  #playbook-modal.hidden,
+  #view-playbook-modal.hidden,
+  #tab-library.hidden,
+  #tab-executions.hidden,
+  #exec-detail-panel.hidden,
+  #btn-new-playbook.hidden { display: none; }
+}

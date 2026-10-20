@@ -158,7 +158,39 @@ RETIRED = {
             ".modal-body",
         ),
     ),
+    "alerts": (
+        "alerts",
+        "alerts-queue.css",
+        (
+            "table.aq tbody tr.aq-cur td",         # keyboard cursor row
+            "table.aq tbody tr.aq-picked td",      # multi-select state
+            "tr.sv-critical td",                   # severity row tint
+        ),
+    ),
+    "daily_standup": (
+        "daily_standup",
+        "ds-standup.css",
+        (
+            ".ds-sev-critical",                    # severity, server-rendered
+            ".ds-sev-high",
+        ),
+    ),
+    "playbooks": (
+        "playbooks",
+        "playbooks-page.css",
+        (
+            ".exec-status.completed",              # run state from the fragment
+            ".exec-status.failed",
+            ".exec-step-item.done",
+        ),
+    ),
 }
+
+
+#: Pages that retired one sheet but still link another. The moved rules are
+#: pinned like any other; only the "links nothing of its own" claim is held
+#: back until the page's last sheet goes.
+PARTIAL = {"alerts"}
 
 
 def _page(stem: str) -> str:
@@ -201,6 +233,9 @@ def test_the_old_sheet_is_gone(page_id):
 def test_the_page_links_no_stylesheet_of_its_own(page_id):
     stem, sheet, _ = RETIRED[page_id]
     page = _page(stem)
+    if page_id in PARTIAL:
+        assert sheet not in page, f"{sheet} is retired but still linked"
+        return
     assert sheet not in page
     assert "{% block head_css %}" not in page, (
         "an empty head_css block says the page has a sheet when it does not"

@@ -1,11 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Daily Standup · ION{% endblock %}
 
-{% block head_css %}
-{# The page's own rules, lifted out of this template's inline style block.
-   See the header of ds-standup.css for the cascade check. #}
-<link rel="stylesheet" href="/static/css/ds-standup.css?v={{ ion_version }}">
-{% endblock %}
+{% block page_id %}daily_standup{% endblock %}
 
 {% block content %}
 {#

@@ -625,7 +625,10 @@ def test_the_shell_builds_no_markup_and_carries_no_stylesheet():
     assert "<style" not in source
     assert "function esc(" not in source
     assert "function sevPill(" not in source
-    assert "ds-standup.css" in source
+    # The sheet is retired into the one build; the page_id block is what
+    # reaches its rules now.
+    assert "ds-standup.css" not in source
+    assert "{% block page_id %}daily_standup{% endblock %}" in source
 
 
 def test_the_controls_that_retry_sit_outside_what_they_swap():

@@ -132,7 +132,9 @@ def test_a_quirk_is_presented_as_advisory_not_as_severity():
 
 
 def test_quirk_styling_does_not_use_a_severity_colour():
-    for css in (ROOT / "src/ion/web/static/css/alerts-queue.css",
+    # alerts-queue.css was retired into frontend/ion-pages.css; the rule
+    # bodies the regex below looks for are unchanged by the move.
+    for css in (ROOT / "frontend/ion-pages.css",
                 ROOT / "src/ion/web/static/css/alert-detail.css"):
         text = css.read_text(encoding="utf-8")
         for block in re.findall(r"\.(?:aq-tag\.aq-quirk|iad-adv-quirk)\s*\{[^}]*\}", text):
