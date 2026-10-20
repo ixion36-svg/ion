@@ -66,6 +66,26 @@
 [data-actor="system"]  { --v: #64748b; }
 [data-actor="unknown"] { --v: #64748b; }
 
+/* Document type. Free-form on the model (`[A-Za-z0-9_-]+`), not an enum, so
+   this cannot be exhaustive -- and does not need to be: a type with no row
+   sets no --v and .v-chip falls back to muted. The old arrangement had a
+   base rule doing that job by hand, after a type with no rule of its own
+   was measured at 1.00:1.
+ *
+ * Three sheets declared this domain and had drifted: SOI was green on
+ * /templates and cyan on /documents, WI and RUNBOOK were indigo and purple
+ * on two pages and iris on the third, and /template-view set no text colour
+ * on three of them. The pairs that shared a colour before still share one. */
+[data-doctype="SOP"]              { --v: var(--color-ion-cyan); }
+[data-doctype="DETECTION_RULE"]   { --v: var(--color-ion-cyan); }
+[data-doctype="SOI"]              { --v: var(--color-ion-lime); }
+[data-doctype="KB"]               { --v: var(--color-ion-lime); }
+[data-doctype="WI"]               { --v: var(--color-ion-iris); }
+[data-doctype="RUNBOOK"]          { --v: var(--color-ion-iris); }
+[data-doctype="IRP"]              { --v: var(--sev-critical); }
+[data-doctype="THREAT_ADVISORY"]  { --v: var(--sev-medium); }
+[data-doctype="AAR"]              { --v: var(--sev-high); }
+
 /* Categorical series for charts and workload bars, cycled by index. The
    count here is the count a view model may emit. */
 [data-series="0"] { --v: var(--color-ion-cyan); }

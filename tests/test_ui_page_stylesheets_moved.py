@@ -94,8 +94,6 @@ PAGES: dict[str, tuple[str, tuple[str, ...]]] = {
         (
             "#folders-modal.modal",                  # modal bridge: JS sets display:flex
             ".folder-item.active",
-            ".doc-type-badge",                       # neutral chip for an unlisted type
-            ".doc-type-SOP",
             "#templates-list > .card",
             "#templates-list .tag",
         ),
@@ -105,7 +103,6 @@ PAGES: dict[str, tuple[str, tuple[str, ...]]] = {
         (
             ".tabs-border > .tab.content-tab-btn.active",   # .active, not .tab-active
             "#version-modal.modal",
-            ".doc-type-badge",
             ".sv-card",
             ".checkpoint-badge",                     # beats the compiled neon gradient
             ".diff-view .diff-add",

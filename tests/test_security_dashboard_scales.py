@@ -103,6 +103,29 @@ def test_every_threat_level_the_banner_can_set_has_a_row():
     assert not missing, f"threat levels with no colour: {missing}"
 
 
+@pytest.mark.parametrize("doc_type", [
+    "SOP", "SOI", "WI", "KB", "RUNBOOK", "IRP", "AAR",
+    "THREAT_ADVISORY", "DETECTION_RULE",
+])
+def test_every_known_document_type_has_a_row_in_the_scale(doc_type):
+    """These nine were declared in three separate page sheets, drifted apart:
+    SOI was green on /templates and cyan on /documents, WI and RUNBOOK were
+    indigo and purple on two pages and iris on the third. One table now.
+
+    document_type is a free-form String rather than an enum, so this list is
+    the known set and not an exhaustive one -- a type with no row sets no --v
+    and .v-chip falls back to muted, which is the behaviour the old base rule
+    had to be hand-fixed to provide."""
+    assert f'[data-doctype="{doc_type}"]' in _without_comments(_text(SCALES))
+
+
+def test_no_page_sheet_declares_the_document_type_domain_any_more():
+    css_dir = ROOT / "src/ion/web/static/css"
+    offenders = [p.name for p in css_dir.glob("*.css")
+                 if "ion.css" != p.name and ".doc-type-" in p.read_text(encoding="utf-8")]
+    assert not offenders, f"the domain is declared again in: {offenders}"
+
+
 def test_the_status_value_reaches_the_markup_with_its_underscore():
     """The old _badge() rewrote `false_positive` to `false-positive` to match a
     selector. The data attribute carries the enum value, so that rewrite is

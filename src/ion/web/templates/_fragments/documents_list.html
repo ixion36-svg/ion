@@ -38,7 +38,7 @@
   <div class="list-item-content">
     <span class="list-item-title">
       {{- d.name if d.name is not none else 'Untitled document' -}}
-      {%- if d.doc_type %}<span class="doc-type-badge doc-type-{{ d.doc_type }}">{{ d.doc_type }}</span>{% endif %}
+      {%- if d.doc_type %}<span class="v-chip ml-2" data-doctype="{{ d.doc_type }}">{{ d.doc_type }}</span>{% endif %}
       {%- if d.folder %}<span class="collection-badge">{{ d.folder }}</span>{% endif %}
       {%- for tag in d.tags %}<span class="tag-badge">{{ tag }}</span>{% endfor %}
     </span>

@@ -230,24 +230,6 @@
 .tag-chip .tag-remove:hover {
     opacity: 1;
 }
-.doc-type-badge {
-    padding: 2px 8px;
-    border-radius: var(--radius-selector);
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: var(--color-white);
-    margin-left: 0.5rem;
-}
-.doc-type-SOP { background: var(--color-info); color: var(--color-info-content); }
-.doc-type-SOI { background: var(--color-primary); color: var(--color-primary-content); }
-.doc-type-WI { background: var(--color-ion-iris); color: var(--color-white); }
-.doc-type-KB { background: var(--color-success); color: var(--color-success-content); }
-.doc-type-RUNBOOK { background: var(--color-ion-iris); color: var(--color-white); }
-.doc-type-IRP { background: var(--color-error); color: var(--color-error-content); }
-.doc-type-AAR { background: var(--neon-orange); color: var(--color-white); }
-.doc-type-THREAT_ADVISORY { background: var(--color-warning); color: var(--color-warning-content); }
-.doc-type-DETECTION_RULE { background: var(--color-info); color: var(--color-info-content); }
-
 /* daisyUI's global .loading is a spinner utility (fixed square size, an SVG
    mask cutout) that collides with this page's plain-text loading / empty /
    error messages -- loadDocuments/loadVersions/renderFoldersManageTree/etc.

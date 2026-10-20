@@ -44,29 +44,6 @@
     translate: 0;
 }
 
-/* The fragment sets doc-type-badge plus doc-type-<TYPE> from the document's
-   own type. WI / RUNBOOK / AAR have no daisyUI colour slot. A type with no
-   rule of its own stays on the neutral chip, which is legible. */
-.doc-type-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.125rem 0.5rem;
-    border-radius: var(--radius-selector, 0.25rem);
-    font-size: 0.7rem;
-    font-weight: 600;
-    background: var(--bg-elevated);
-    color: var(--text-primary);
-}
-.doc-type-SOP { background: var(--color-info); color: var(--color-info-content); }
-.doc-type-SOI { background: var(--color-success); color: var(--color-success-content); }
-.doc-type-WI { background: #4f46e5; }
-.doc-type-KB { background: var(--color-success); color: var(--color-success-content); }
-.doc-type-RUNBOOK { background: #9333ea; }
-.doc-type-IRP { background: var(--color-error); color: var(--color-error-content); }
-.doc-type-AAR { background: var(--neon-orange); }
-.doc-type-THREAT_ADVISORY { background: var(--color-warning); color: var(--color-warning-content); }
-.doc-type-DETECTION_RULE { background: var(--color-info); color: var(--color-info-content); }
-
 .sv-card {
     display: flex;
     align-items: flex-start;

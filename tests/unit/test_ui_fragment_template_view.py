@@ -656,13 +656,18 @@ def test_format_and_document_type_render_the_value_not_the_enum_repr():
     assert 'id="template-format">markdown</span>' in html
     assert "_Fmt" not in html
     assert "MARKDOWN" not in html
-    assert "doc-type-SOP" in html
+    assert 'data-doctype="SOP"' in html
     assert "_Doc" not in html
     assert "PROCEDURE" not in html
 
     hostile = show(template(document_type='"><script>'))
-    assert 'class="doc-type-badge"' in hostile
-    assert 'class="doc-type-badge ' not in hostile
+    # The type is a free-form String, so it used to be screened before being
+    # concatenated into a class. It is an attribute value now: the screen
+    # still blanks it, the chip keeps its own class, and the label is
+    # escaped. An empty data-doctype matches no row and reads as muted.
+    assert 'class="v-chip"' in hostile
+    assert 'data-doctype=""' in hostile
+    assert "doc-type-" not in hostile
     assert "<script>" not in hostile
     assert "&lt;script&gt;" in hostile
 
@@ -1612,7 +1617,7 @@ def test_the_route_renders_a_real_template_from_the_service(session):
     assert "widget" in text
     assert "sv-var-badge" in text
     assert 'id="section-count-badge">2</span>' in text
-    assert "doc-type-SOP" in text
+    assert 'data-doctype="SOP"' in text
     assert "<time " in text
     assert ">Current<" in text
     assert "Initial version" in text

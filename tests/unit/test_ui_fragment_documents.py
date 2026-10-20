@@ -170,7 +170,7 @@ def test_a_row_renders_its_name_folder_and_type(answers):
     body = flat(html)
     assert "Incident SOP" in body
     assert "Runbooks" in body, "collection_name comes with the payload"
-    assert "doc-type-SOP" in html
+    assert 'data-doctype="SOP"' in html, "the type chip reads the scale"
     assert "v4" in body
     assert "pdf" in body
 
@@ -329,7 +329,7 @@ def test_the_fragment_has_no_inline_style_or_javascript_url(answers):
 def test_the_fragment_ships_no_colour_of_its_own(answers):
     answers(docs=[_Doc()])
     html = _get(_reader()).text
-    assert "doc-type-SOP" in html
+    assert 'data-doctype="SOP"' in html
     assert not re.search(r"#[0-9a-fA-F]{3,8}\b", html)
     assert "rgba(" not in html
     assert "var(--" not in html

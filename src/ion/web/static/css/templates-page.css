@@ -69,7 +69,8 @@
 .folder-path span { cursor: pointer; }
 .folder-path span:hover { color: var(--color-primary); }
 
-/* JS fragment markup: collection-badge / doc-type-${type} — class names are concatenated. */
+/* JS fragment markup: collection-badge. The doc-type chip moved to
+   [data-doctype] in frontend/ion-value-scales.css. */
 .collection-badge {
     background: var(--color-primary);
     color: var(--color-primary-content);
@@ -78,33 +79,6 @@
     font-size: 0.75rem;
     margin-left: 0.5rem;
 }
-.doc-type-badge {
-    padding: 2px 8px;
-    border-radius: var(--radius-selector, 0.25rem);
-    font-size: 0.7rem;
-    font-weight: 600;
-    /* A neutral chip by default, because the type-specific class is
-       assembled at runtime from the document's own type
-       (`'doc-type-' + t.document_type`). A type with no rule of its own,
-       SAL and SLA among them today, used to get this `color` with no
-       background at all: measured 1.00:1, white text on the page, 38
-       instances on /templates. The typed rules below each set their own
-       colour, so this one only has to be legible when none of them
-       matches. */
-    background: var(--bg-elevated);
-    color: var(--text-primary);
-    margin-left: 0.5rem;
-}
-.doc-type-SOP { background: var(--color-info); color: var(--color-info-content); }
-.doc-type-SOI { background: var(--color-success); color: var(--color-success-content); }
-.doc-type-WI { background: #4f46e5; color: #fff; }
-.doc-type-KB { background: var(--color-success); color: var(--color-success-content); }
-.doc-type-RUNBOOK { background: #9333ea; color: #fff; }
-.doc-type-IRP { background: var(--color-error); color: var(--color-error-content); }
-.doc-type-AAR { background: var(--neon-orange); color: var(--color-warning-content); }
-.doc-type-THREAT_ADVISORY { background: var(--color-warning); color: var(--color-warning-content); }
-.doc-type-DETECTION_RULE { background: var(--color-info); color: var(--color-info-content); }
-
 /* JS renderFolderManageItems() / renderFolderItems() emit these class names. */
 .folder-manage-item {
     display: flex;
