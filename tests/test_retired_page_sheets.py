@@ -373,3 +373,74 @@ def test_every_scope_with_rules_is_declared_by_some_template():
         "page_id block is missing, or it disagrees with the scope the rules "
         "were written against."
     )
+
+
+#: Selectors a page scope shares with a global sheet that base.html links
+#: AFTER ion.css. Each is safe only because the body[data-page] prefix adds
+#: 0,1,1 and so outranks the unprefixed rule that now loads later. Before
+#: the flattening these pages won on source order instead, from head_css.
+KNOWN_LATE_SHEET_CLASHES = {
+    "alert-detail.css": {"cases": {".caf-key", ".caf-val"}},
+}
+
+#: Linked by base.html after ion.css, so their rules now come second.
+LOADS_AFTER_ION = ("ion-migrated-styles.css", "alert-detail.css",
+                   "ion-workspace.css", "ion-shell.css")
+
+
+def _selectors(text: str) -> set[str]:
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    out, depth, head = set(), 0, ""
+    for ch in text:
+        if ch == "{":
+            if depth == 0:
+                for s in head.split(","):
+                    s = " ".join(s.split())
+                    if s and not s.startswith("@") and not s.endswith("%"):
+                        out.add(s)
+                head = ""
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+        elif depth == 0:
+            head += ch
+    return out
+
+
+def test_no_new_clash_with_a_sheet_that_now_loads_after_the_build():
+    """A page sheet used to load from head_css, after ion-migrated-styles
+    and alert-detail. Its rules are inside ion.css now, which base.html
+    links BEFORE both, so a shared selector has swapped from winning on
+    order to depending on the scope prefix for its specificity.
+
+    That holds today for the one clash there is, checked in a browser. The
+    point of this test is the next one: a new shared selector should be a
+    decision, not a silent restyle.
+    """
+    src = PAGES_CSS.read_text(encoding="utf-8")
+    scopes = sorted(set(re.findall(r'body\[data-page="([a-z_]+)"\]', src)))
+
+    found: dict[str, dict[str, set[str]]] = {}
+    for name in LOADS_AFTER_ION:
+        theirs = _selectors((CSS / name).read_text(encoding="utf-8", errors="replace"))
+        for scope in scopes:
+            m = re.search(r'body\[data-page="' + scope + r'"\]\s*(?:,[^{]*)?\{', src)
+            if not m:
+                continue
+            i, depth = m.end(), 1
+            while depth:
+                if src[i] == "{":
+                    depth += 1
+                elif src[i] == "}":
+                    depth -= 1
+                i += 1
+            shared = _selectors(src[m.end():i - 1]) & theirs
+            if shared:
+                found.setdefault(name, {})[scope] = shared
+
+    assert found == KNOWN_LATE_SHEET_CLASHES, (
+        "the set of selectors a page shares with a later-loading global sheet "
+        f"changed.\n  expected: {KNOWN_LATE_SHEET_CLASHES}\n  found:    {found}\n"
+        "Each one only still wins because of its body[data-page] prefix. "
+        "Check the new one in a browser before adding it here."
+    )
