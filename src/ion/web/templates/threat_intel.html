@@ -1,8 +1,7 @@
 {% extends "base.html" %}
 {% block title %}ION - Threat Intel{% endblock %}
-{% block head_css %}
-<link rel="stylesheet" href="/static/css/threat-intel.css?v={{ ion_version }}">
-{% endblock %}
+
+{% block page_id %}threat_intel{% endblock %}
 {% block content %}
 {# data-can-manage-watches carries the viewer's observable:enrich to the
    script, which still builds the actor and campaign result tables. It is a

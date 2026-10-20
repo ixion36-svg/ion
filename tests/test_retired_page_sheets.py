@@ -184,6 +184,24 @@ RETIRED = {
             ".exec-step-item.done",
         ),
     ),
+    "threat_intel": (
+        "threat_intel",
+        "threat-intel.css",
+        (
+            ".ti-empty",                           # the no-results sentence
+            ".ti-table",
+            ".ti-btn-watch",                       # watchlist state
+            ".ti-spinner",
+        ),
+    ),
+    "threat_intel_actor": (
+        "threat_intel_actor",
+        "threat-intel.css",
+        (
+            ".ti-detail-row",                      # the actor results table
+            ".ti-name-cell",
+        ),
+    ),
 }
 
 
@@ -191,6 +209,11 @@ RETIRED = {
 #: pinned like any other; only the "links nothing of its own" claim is held
 #: back until the page's last sheet goes.
 PARTIAL = {"alerts"}
+
+#: threat_intel_actor never linked a sheet. It is registered because
+#: the scope now reaches it: /ui/threat-intel/actors renders ti-* markup
+#: into that page, and nothing painted it before.
+NEVER_LINKED = {"threat_intel_actor"}
 
 
 def _page(stem: str) -> str:
@@ -211,7 +234,15 @@ def _scope_block(css: str, page_id: str) -> str:
     opener = f'body[data-page="{page_id}"] {{'
     start = css.find(opener)
     if start == -1:
-        return ""
+        # A sheet shared by two pages opens with a grouped selector:
+        #   body[data-page="a"],
+        #   body[data-page="b"] {
+        # The build compiles that to :is(a, b) <selector>, which reaches
+        # both; find the brace that closes the group's selector list.
+        m = re.search(r'body\[data-page="' + re.escape(page_id) + r'"\]\s*(?:,[^{]*)?\{', css)
+        if not m:
+            return ""
+        start, opener = m.start(), m.group(0)
     i = start + len(opener)
     depth = 1
     while i < len(css) and depth:

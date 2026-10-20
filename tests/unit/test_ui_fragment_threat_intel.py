@@ -52,7 +52,28 @@ from ion.web.ui.threat_intel import (
 
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = ROOT / "src/ion/web/templates/threat_intel.html"
-PAGE_CSS = ROOT / "src/ion/web/static/css/threat-intel.css"
+#: threat-intel.css was retired into the one build. Read only this page's
+#: scope block: ion-pages.css carries every page, so reading it whole would
+#: widen each check here from this page to all of them.
+_PAGES_CSS = ROOT / "frontend/ion-pages.css"
+
+
+class _Scoped:
+    def read_text(self, **kw) -> str:
+        whole = _PAGES_CSS.read_text(encoding="utf-8")
+        m = re.search(r'body\[data-page="threat_intel"\]\s*(?:,[^{]*)?\{', whole)
+        assert m, "the threat_intel scope block is gone"
+        start, depth, i = m.end(), 1, m.end()
+        while depth:
+            if whole[i] == "{":
+                depth += 1
+            elif whole[i] == "}":
+                depth -= 1
+            i += 1
+        return whole[start:i - 1]
+
+
+PAGE_CSS = _Scoped()
 SERVER = ROOT / "src/ion/web/server.py"
 
 WATCHLIST = "_fragments/threat_intel_watchlist.html"
