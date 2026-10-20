@@ -85,11 +85,14 @@
 .v-svg    { fill: var(--v, var(--ion-text-muted)); }
 .v-border { border-color: var(--v, var(--ion-border)); }
 
+/* Comfortable by default; compact inside .ion-dense. The density is taken
+   from the region rather than from a modifier class, so a chip is the right
+   size wherever it lands and there is nothing to remember. */
 .v-chip {
   display: inline-block;
-  padding: 1px 7px;
+  padding: 3px 9px;
   border-radius: 6px;
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 1.5;
   white-space: nowrap;
@@ -97,6 +100,18 @@
   /* --v-soft where a tested tint exists; otherwise mix one at the same
      weight the ramp uses, so the two read alike. */
   background: var(--v-soft, color-mix(in oklab, var(--v, #64748b) 18%, transparent));
+}
+
+.ion-dense .v-chip {
+  padding: 1px 7px;
+  font-size: 10.5px;
+}
+
+/* Severity is a rank, and ION has always set it in caps. A status is a
+   phrase and is title-cased by the view model, so it is left alone. */
+.v-chip[data-sev] {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 /* A 3px rail reads severity without colouring the whole row, which is what

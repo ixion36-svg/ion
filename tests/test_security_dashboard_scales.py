@@ -117,6 +117,34 @@ def test_the_view_model_no_longer_builds_badge_classes():
         assert gone not in source, f"{gone} survived the move to the scales"
 
 
+# ------------------------------------------------------------ the chip's tiers
+
+def test_the_chip_takes_its_density_from_the_region():
+    """Comfortable by default, compact inside .ion-dense. A modifier class
+    would have to be remembered at every call site; the region already knows."""
+    css = _without_comments(_text(SCALES))
+    assert re.search(r"\.v-chip\s*\{[^}]*font-size:\s*12px", css), (
+        "the default chip is not the comfortable size"
+    )
+    assert re.search(r"\.ion-dense\s+\.v-chip\s*\{[^}]*font-size:\s*10\.5px", css), (
+        "a chip inside a dense region does not compact, so a 500-row queue "
+        "pays comfortable padding on every row"
+    )
+
+
+def test_severity_still_reads_as_a_rank_in_caps():
+    """.severity-badge set text-transform:uppercase, so the page has always
+    shown CRITICAL. The markup emits the lowercase enum value, so losing this
+    rule quietly lowercases every severity on the page."""
+    css = _without_comments(_text(SCALES))
+    assert re.search(r"\.v-chip\[data-sev\]\s*\{[^}]*text-transform:\s*uppercase", css)
+    assert "text-transform" not in re.search(
+        r"\.v-chip\s*\{([^}]*)\}", css).group(1), (
+        "a status is a phrase and is title-cased by the view model; "
+        "uppercasing every chip would shout it too"
+    )
+
+
 # ------------------------------------------------- the rules that stayed, moved
 
 @pytest.mark.parametrize("selector", [
