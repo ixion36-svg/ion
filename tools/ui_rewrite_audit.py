@@ -62,6 +62,18 @@ def load_map() -> dict:
     return json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {}
 
 
+#: Lightning CSS drops the quotes from [data-page="x"] when the value is
+#: a valid identifier, so the built ion.css spells page scopes unquoted.
+#: The claims are written in source form; compare both sides unquoted or
+#: every page-scoped claim reads as a style loss.
+_QUOTED_ATTR = re.compile(r"""=\s*(?:"([^"]*)"|'([^']*)')\s*\]""")
+
+
+def _unquote_attrs(text: str) -> str:
+    return _QUOTED_ATTR.sub(
+        lambda m: "=" + (m.group(1) or m.group(2) or "") + "]", text)
+
+
 def _replaced_by_a_rule(entry: dict | None) -> bool:
     """Did this class's styling move to a page stylesheet rather than to a
     utility?
@@ -89,7 +101,11 @@ def _replaced_by_a_rule(entry: dict | None) -> bool:
         p.read_text(encoding="utf-8", errors="replace")
         for p in sorted(STYLESHEETS.glob("*.css"))
     )
-    return all(isinstance(s, str) and s and s in css for s in selectors)
+    css = _unquote_attrs(css)
+    return all(
+        isinstance(s, str) and s and _unquote_attrs(s) in css
+        for s in selectors
+    )
 
 
 def _never_valid_css(entry: dict | None) -> bool:

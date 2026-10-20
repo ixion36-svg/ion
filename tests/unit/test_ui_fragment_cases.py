@@ -120,7 +120,14 @@ def _both(session):
     return _get(session, PERMISSION, METRICS_PERMISSION)
 
 
-NOW = datetime.now(timezone.utc).replace(tzinfo=None)
+def _now() -> datetime:
+    """Read at call time, never at import.
+
+    pytest imports every module at collection, so a module-level constant
+    is hours stale once a long run reaches this file, and an age then lands
+    in the wrong bucket -- a failure that appears only in a full suite.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def _case(session, number, status=AlertCaseStatus.OPEN, severity="medium",
@@ -135,10 +142,10 @@ def _case(session, number, status=AlertCaseStatus.OPEN, severity="medium",
         created_by_id=1,
         assigned_to_id=assigned,
         closure_reason=reason,
-        closed_at=None if closed_ago is None else NOW - closed_ago,
+        closed_at=None if closed_ago is None else _now() - closed_ago,
     )
     if created_at == "set":
-        row.created_at = NOW - age
+        row.created_at = _now() - age
     else:
         row.created_at = created_at
     session.add(row)
@@ -542,7 +549,7 @@ def test_a_case_with_no_creation_time_is_age_unknown_not_oldest(session, monkeyp
          "status": "open", "assigned_to_id": None, "created_at": None},
         {"id": 2, "case_number": "N-2", "title": "fresh", "severity": "low",
          "status": "open", "assigned_to_id": None,
-         "created_at": NOW - timedelta(hours=1)},
+         "created_at": _now() - timedelta(hours=1)},
     ]
     monkeypatch.setattr(mod, "active_cases", lambda _session: rows)
     html = _both(session).text

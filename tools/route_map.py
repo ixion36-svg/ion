@@ -174,10 +174,11 @@ def permission_of(route) -> str:
 def _repo_relative(path: str) -> str:
     """A source path relative to the repo.
 
-    ``Path.resolve()`` follows a junction. A worktree whose ``.venv`` is a
-    junction to another checkout then fails ``relative_to`` and the map
-    drops the handler site, which is how the slowapi limiter lines went
-    blank. The ``.venv`` suffix is the same path the map already records.
+    A dependency's handler site is not under the repo, so ``relative_to``
+    fails and the cell goes blank -- which is how the slowapi limiter rows
+    lost their file. The ``site-packages`` tail spells them identically
+    under a venv, a junctioned venv and a global interpreter, so the map
+    does not depend on how the environment was built.
     """
     raw = pathlib.Path(path)
     for candidate in (raw, raw.resolve()):
@@ -186,10 +187,11 @@ def _repo_relative(path: str) -> str:
         except ValueError:
             continue
     resolved = str(raw.resolve())
-    marker = f"{os.sep}.venv{os.sep}"
-    idx = resolved.lower().find(marker.lower())
-    if idx != -1:
-        return resolved[idx + 1:].replace("\\", "/")
+    for marker in (f"{os.sep}site-packages{os.sep}",
+                   f"{os.sep}.venv{os.sep}"):
+        idx = resolved.lower().find(marker.lower())
+        if idx != -1:
+            return resolved[idx + 1:].replace("\\", "/")
     raise ValueError(path)
 
 
