@@ -458,7 +458,10 @@ def test_the_shell_builds_no_markup_and_carries_no_stylesheet():
     assert "insertAdjacentHTML" not in source
     assert "<style" not in source
     assert "function escHtml(" not in source
-    assert "arkime-traffic.css" in source
+    # The sheet is retired: its rules are in the one build, scoped by
+    # page_id, and that block is what reaches them now.
+    assert "arkime-traffic.css" not in source
+    assert "{% block page_id %}arkime_traffic{% endblock %}" in source
 
 
 def test_the_range_tabs_sit_outside_every_panel_they_reload():

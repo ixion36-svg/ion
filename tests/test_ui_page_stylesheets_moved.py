@@ -77,23 +77,12 @@ def _strip_comments(src: str) -> str:
 
 # page template stem -> (sheet file name, load-bearing selectors)
 PAGES: dict[str, tuple[str, tuple[str, ...]]] = {
-    "gitlab": (
-        "gitlab-page.css",
-        (
-            '#create-issue-modal[style*="flex"]',   # modal bridge: JS sets display:flex
-            ".connection-status.connected",          # banner state from the fragment
-            "#issues-list .loading",                 # the word, not daisyUI's spinner
-            ".issue-card",
-            ".issue-state.opened",
-            ".issue-label",
-            "#issue-labels",                         # native multi-select, not .select
-        ),
-    ),
     # security_dashboard is deliberately absent. It no longer links a sheet:
     # its badges moved to ion-value-scales.css and the rest to ion-pages.css,
     # both compiled into ion.css. The guarantees this registry gave it are
     # re-asserted in tests/test_security_dashboard_scales.py.
-    # templates, template_view, scheduler and alert_arkime are deliberately absent, like
+    # gitlab, templates, template_view, scheduler and alert_arkime are
+    # deliberately absent, like
     # security_dashboard: their rules moved into frontend/ion-pages.css and
     # they link no sheet. tests/test_retired_page_sheets.py holds what this
     # registry held for them.

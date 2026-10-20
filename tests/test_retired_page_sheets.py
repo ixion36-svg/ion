@@ -101,6 +101,35 @@ RETIRED = {
             ".doc-filter-notice",                  # a filter that could not be honoured
         ),
     ),
+    "gitlab": (
+        "gitlab",
+        "gitlab-page.css",
+        (
+            '#create-issue-modal[style*="flex"]',  # modal bridge: JS sets display:flex
+            ".connection-status.connected",        # banner state from the fragment
+            "#issues-list .loading",               # the word, not daisyUI's spinner
+            ".issue-state.opened",
+            "#issue-labels",                       # native multi-select, not .select
+        ),
+    ),
+    "network_topology": (
+        "network_topology",
+        "network-topology-page.css",
+        (
+            "#nt-unconfigured.hidden",             # state the fragment sets
+            "#nt-range-tabs .nt-seg-btn.active",   # .active, not daisyUI .tab-active
+            "#nt-canvas",
+        ),
+    ),
+    "arkime_traffic": (
+        "arkime_traffic",
+        "arkime-traffic.css",
+        (
+            ".atf-busy",
+            "#atf-talkers .ip-cell",
+            ".atf-hunt-done",                      # run state, server-rendered
+        ),
+    ),
 }
 
 
