@@ -239,7 +239,10 @@ strict = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+# "tests" so a shared helper under tests/ -- page_css.py -- is importable
+# from tests/unit/ too. Without it each module needs its own sys.path
+# shim, which has to sit between the imports and so fights the linter.
+pythonpath = ["src", "tests"]
 
 # ---------------------------------------------------------------------------
 # Coverage (v0.100.0)

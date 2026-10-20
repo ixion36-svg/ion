@@ -25,6 +25,7 @@ from pathlib import Path
 import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
+from page_css import page_css
 
 from ion.web.ui.analytics import PERMISSION, STALE_DANGER_DAYS, router
 
@@ -311,16 +312,16 @@ def test_the_page_no_longer_builds_the_stale_panel():
 # ---------------------------------------------------------------------------
 
 
-def test_the_page_links_its_stylesheet_from_head_css():
-    head = re.search(r"\{%\s*block head_css\s*%\}(.*?)\{%\s*endblock\s*%\}",
-                     PAGE.read_text(encoding="utf-8"), re.S)
-    assert head, "linked from head_css"
-    assert "analytics-page.css" in head.group(1)
+def test_the_page_declares_the_scope_that_reaches_its_rules():
+    """The sheet is retired into the one build; the page_id block is
+    what addresses its rules to this page."""
+    page = PAGE.read_text(encoding="utf-8")
+    assert "analytics-page.css" not in page
+    assert "{% block page_id %}analytics{% endblock %}" in page
 
 
 def test_the_absent_marker_has_a_rule_and_nothing_outranks_it():
-    sheet = (ROOT / "src/ion/web/static/css/analytics-page.css").read_text(
-        encoding="utf-8")
+    sheet = page_css("analytics")
     assert ".an-absent" in sheet
     page = PAGE.read_text(encoding="utf-8")
     blocks = "\n".join(re.findall(r"<style[^>]*>(.*?)</style>", page, re.S))
@@ -341,8 +342,7 @@ def test_the_severity_unknown_rule_is_declared_exactly_once():
     sheet is the duplicate the original was really guarding against, and
     the later one would quietly win.
     """
-    sheet = (ROOT / "src/ion/web/static/css/analytics-page.css").read_text(
-        encoding="utf-8")
+    sheet = page_css("analytics")
     rules = re.sub(r"/\*.*?\*/", "", sheet, flags=re.S)
     assert ".severity-unknown" in rules, (
         "the rule the fragment relies on")

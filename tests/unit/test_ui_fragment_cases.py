@@ -31,6 +31,7 @@ from pathlib import Path
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from page_css import page_css
 
 from ion.models.alert_triage import AlertCase, AlertCaseStatus
 from ion.web.ui.cases import (
@@ -697,8 +698,7 @@ def test_the_classes_the_fragment_emits_have_rules_in_the_page_stylesheet():
     tools/dead_css.py, which asks the opposite question: whether a rule
     has any class still using it.
     """
-    sheet = (ROOT / "src/ion/web/static/css/cases-page.css").read_text(
-        encoding="utf-8")
+    sheet = page_css("cases")
     page = PAGE.read_text(encoding="utf-8")
     assert "<style nonce" not in page
     for cls in (".age-bar-seg", ".cases-stat-sub", ".cases-card-failed",

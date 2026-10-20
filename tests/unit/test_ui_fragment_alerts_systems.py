@@ -30,6 +30,7 @@ from typing import Any
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from page_css import page_css
 
 import ion.web.analytics_api as analytics_api
 from ion.web.ui.alerts import (
@@ -517,7 +518,7 @@ def test_the_timer_button_writes_no_icon_markup():
     assert "btn.innerHTML" not in page
     assert 'class="timer-icon-pause"' in page
 
-    css = (ROOT / "src/ion/web/static/css/alerts-page.css").read_text(encoding="utf-8")
+    css = page_css("alerts")
     assert ".timer-btn.playing .timer-icon-pause" in css, (
         "the bars have to be hidden when the ::before triangle shows, or the "
         "paused button draws two icons again")

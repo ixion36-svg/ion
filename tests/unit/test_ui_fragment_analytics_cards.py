@@ -45,6 +45,7 @@ from pathlib import Path
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from page_css import page_css
 
 from ion.web.ui.analytics import PERMISSION, router
 
@@ -319,8 +320,7 @@ def test_every_kind_the_module_can_emit_has_a_colour_in_the_sheet():
     """A kind with no rule is an icon with no background."""
     from ion.web.ui.analytics import NAMESPACE_FALLBACKS, NAMESPACE_KINDS
 
-    sheet = (ROOT / "src/ion/web/static/css/analytics-page.css").read_text(
-        encoding="utf-8")
+    sheet = page_css("analytics")
     for _needles, kind in NAMESPACE_KINDS:
         assert ".sys-card." + kind + " " in sheet, kind
     for index in range(NAMESPACE_FALLBACKS):

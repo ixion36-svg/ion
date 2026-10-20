@@ -26,11 +26,12 @@ from __future__ import annotations
 import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from page_css import page_css
 
 import ion.web.elasticsearch_api as es_api
 from ion.web.ui import alerts as mod
@@ -47,7 +48,9 @@ from ion.web.ui.alerts import (
 
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = ROOT / "src/ion/web/templates/alerts.html"
-PAGE_CSS = ROOT / "src/ion/web/static/css/alerts-page.css"
+#: Retired into the one build; this is the
+#: body[data-page="alerts"] block and only that block.
+PAGE_CSS_TEXT = page_css("alerts")
 FRAGMENTS = ROOT / "src/ion/web/templates/_fragments"
 URL = "/ui/alerts/analytics"
 
@@ -261,7 +264,7 @@ def test_the_donut_colours_are_the_ones_that_were_on_screen():
     "critical" is the stylesheet's answer, and a model carrying it makes
     every reader of this route inherit ION's palette. The values are
     unchanged, which is what this asserts."""
-    css = PAGE_CSS.read_text(encoding="utf-8")
+    css = PAGE_CSS_TEXT
     for key, hexval in (("critical", "#f44336"), ("high", "#ff9800"),
                         ("medium", "#ffc107"), ("low", "#4caf50"),
                         ("info", "#2196f3"), ("open", "#1976d2"),

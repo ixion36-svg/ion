@@ -49,9 +49,33 @@ def module_css() -> str:
 
 @pytest.fixture(scope="module")
 def alerts_page_css() -> str:
-    """Where /alerts' own rules live since the UI redesign moved them out of
-    the template's <style> block."""
-    return (STATIC / "css" / "alerts-page.css").read_text(encoding="utf-8")
+    """Where /alerts' own rules live.
+
+    Out of the template's <style> block at the redesign, into
+    alerts-page.css, and from there into the one build -- nested under
+    body[data-page="alerts"] in frontend/ion-pages.css. Only that block is
+    returned: the file carries every page, and handing back the whole thing
+    would quietly widen every assertion made against this fixture.
+    """
+    whole = Path("frontend/ion-pages.css").read_text(encoding="utf-8")
+    opener = 'body[data-page="alerts"] {'
+    # /alerts has two blocks: alerts-queue.css and alerts-page.css were
+    # separate sheets and were retired separately. Reading only the first
+    # silently halves what this fixture covers.
+    blocks, at = [], 0
+    while (found := whole.find(opener, at)) != -1:
+        start = found + len(opener)
+        depth, i = 1, start
+        while depth:
+            if whole[i] == "{":
+                depth += 1
+            elif whole[i] == "}":
+                depth -= 1
+            i += 1
+        blocks.append(whole[start:i - 1])
+        at = i
+    assert blocks, "the alerts scope block is gone"
+    return "\n".join(blocks)
 
 
 @pytest.fixture(scope="module")

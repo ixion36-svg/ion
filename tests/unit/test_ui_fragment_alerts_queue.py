@@ -44,6 +44,7 @@ from typing import Any, Optional
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from page_css import page_css
 
 from ion.models.alert_triage import AlertCase, AlertCaseStatus, AlertTriage, AlertTriageStatus
 from ion.web.templating import make_templates
@@ -66,7 +67,9 @@ from ion.web.ui.alerts import (
 
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = ROOT / "src/ion/web/templates/alerts.html"
-PAGE_CSS = ROOT / "src/ion/web/static/css/alerts-page.css"
+#: Retired into the one build; this is the
+#: body[data-page="alerts"] block and only that block.
+PAGE_CSS_TEXT = page_css("alerts")
 FRAGMENTS = ROOT / "src/ion/web/templates/_fragments"
 QUEUE = mod.QUEUE_FRAGMENT
 
@@ -1226,7 +1229,7 @@ def test_the_page_additions_carry_nothing_the_csp_would_block():
 
 
 def test_the_classes_the_fragment_and_shell_emit_have_rules_in_the_stylesheet():
-    css = PAGE_CSS.read_text(encoding="utf-8")
+    css = PAGE_CSS_TEXT
     for rule in (".aq-notice {", ".aq-notice:empty {", ".aq-failed {", ".aq-reason {",
                  ".triage-dot.triage-unknown {", ".side-panel .empty-state.aq-side-failed {",
                  ".aq-notice-degraded, .aq-notice-triage, .aq-notice-module {"):

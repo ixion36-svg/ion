@@ -54,13 +54,15 @@ from pathlib import Path
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from page_css import page_css
 
 from ion.web.ui.analytics import PERMISSION, router
 
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = ROOT / "src/ion/web/templates/analytics.html"
-SHEET = ROOT / "src/ion/web/static/css/analytics-page.css"
-
+#: Retired into the one build; this is the
+#: body[data-page="analytics"] block and only that block.
+SHEET_TEXT = page_css("analytics")
 DASH = "/ui/analytics/dashboard"
 CONFIG = "/ui/analytics/config"
 
@@ -183,9 +185,9 @@ def test_a_zoneless_run_time_is_read_as_utc_for_the_staleness_badge(
     """The defect this panel exists to fix. 09:00 UTC against a 10:00 UTC
     clock is one hour old, so inside the two-hour window, whatever zone
     the viewer keeps."""
-    import ion.web.ui.analytics as module
-
     from datetime import datetime, timezone
+
+    import ion.web.ui.analytics as module
 
     monkeypatch.setattr(
         module, "_now",
@@ -198,9 +200,9 @@ def test_a_zoneless_run_time_is_read_as_utc_for_the_staleness_badge(
 
 
 def test_a_run_older_than_the_window_is_stale(dashboard, monkeypatch):
-    import ion.web.ui.analytics as module
-
     from datetime import datetime, timezone
+
+    import ion.web.ui.analytics as module
 
     monkeypatch.setattr(
         module, "_now",
@@ -536,7 +538,7 @@ def test_the_two_status_colours_moved_into_the_stylesheet():
     body = _page_js()
     assert "text-[#ef4444]" not in body
     assert "text-[#22c55e]" not in body
-    sheet = SHEET.read_text(encoding="utf-8")
+    sheet = SHEET_TEXT
     assert ".config-status-error" in sheet
     assert ".config-status-ok" in sheet
 
@@ -544,4 +546,6 @@ def test_the_two_status_colours_moved_into_the_stylesheet():
 def test_the_page_still_links_its_stylesheet():
     """A sheet nobody links is the mistake that left the forensics
     preview bare."""
-    assert "analytics-page.css" in PAGE.read_text(encoding="utf-8")
+    page = PAGE.read_text(encoding="utf-8")
+    assert "analytics-page.css" not in page
+    assert "{% block page_id %}analytics{% endblock %}" in page

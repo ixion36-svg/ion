@@ -1,13 +1,15 @@
-from pathlib import Path
 import re
+from pathlib import Path
+
 import pytest
 
 ROOT=Path(__file__).resolve().parents[2]
 
 
-#: forensics has been retired into the one build and reaches its rules by
-#: page_id; observables still links a sheet of its own.
-RETIRED = {'forensics'}
+#: Both sheets are retired into the one build; each page reaches its rules
+#: through page_id. The set stays because the branch below is what the
+#: assertion turns on, and a page added here later may not be retired yet.
+RETIRED = {'forensics', 'observables'}
 
 
 @pytest.mark.parametrize('page',['observables','forensics'])

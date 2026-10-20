@@ -444,3 +444,54 @@ def test_no_new_clash_with_a_sheet_that_now_loads_after_the_build():
         "Each one only still wins because of its body[data-page] prefix. "
         "Check the new one in a browser before adding it here."
     )
+
+
+def test_a_hoisted_keyframe_never_shadows_a_different_one():
+    """@keyframes cannot be nested, so every page's animations were hoisted
+    out of its scope and are global. A later block with the same name
+    replaces an earlier one outright, whatever the specificity and whatever
+    page it came from.
+
+    Two names are declared twice -- slideIn by observables and alerts, spin
+    by integrations and settings -- and both pairs are identical, so which
+    one wins does not matter. The moment they differ, one page's animation
+    silently becomes the other's.
+
+    This also covers the global sheets base.html links, where the same
+    collision already happened once: chat-page.css declared typingBounce at
+    opacity 0.4 and ai-chat.css declares it at 0.5, so hoisting chat's copy
+    changed the widget on every page. It is chatTypingBounce now.
+    """
+    def blocks(text: str) -> dict[str, list[str]]:
+        found: dict[str, list[str]] = {}
+        for m in re.finditer(r"@keyframes\s+([A-Za-z0-9_-]+)\s*\{", text):
+            i, depth = m.end(), 1
+            while depth:
+                if text[i] == "{":
+                    depth += 1
+                elif text[i] == "}":
+                    depth -= 1
+                i += 1
+            found.setdefault(m.group(1), []).append(
+                " ".join(text[m.end():i - 1].split()))
+        return found
+
+    ours = blocks(PAGES_CSS.read_text(encoding="utf-8"))
+    diverged = {n: v for n, v in ours.items() if len(set(v)) > 1}
+    assert not diverged, (
+        f"the same keyframe name is declared differently by two pages: "
+        f"{sorted(diverged)}. One page's animation is silently the other's."
+    )
+
+    for name in ("ai-chat.css", "alert-detail.css", "ion-workspace.css",
+                 "ion-shell.css", "ion-migrated-styles.css"):
+        theirs = blocks((CSS / name).read_text(encoding="utf-8", errors="replace"))
+        clash = sorted(
+            n for n in set(ours) & set(theirs)
+            if set(ours[n]) != set(theirs[n])
+        )
+        assert not clash, (
+            f"{name} declares {clash} differently, and base.html links it on "
+            "every page. A hoisted copy replaces it everywhere -- rename the "
+            "page's keyframes instead."
+        )
