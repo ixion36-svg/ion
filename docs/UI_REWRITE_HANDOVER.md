@@ -24,15 +24,26 @@ several were caused by fixing the previous one.
 the email and PDF exporters, which emit standalone documents with their own
 inline styling and never load the app stylesheet.
 
-`base.html` links five stylesheets, down from eight:
+`base.html` links eight stylesheets, and **a page links none of its own**.
+The 23 page-specific sheets were retired into the one build: their rules are
+nested under `body[data-page="<id>"]` in `frontend/ion-pages.css` and compile
+into `ion.css`. See `docs/design/TITANIUM_CONTRACT.md` for what did not fit
+that pattern, and `tests/test_retired_page_sheets.py` for the per-page
+guarantees.
 
 | file | role |
 |---|---|
-| `ion.css` | the single build: Tailwind + daisyUI + ION's theme + what survived `style.css` |
+| `ion.css` | the single build: Tailwind + daisyUI + ION's theme + every page's rules |
 | `lucide.css` | icon font |
 | `quill.snow.css` | editor, third-party |
 | `ion-migrated-styles.css` | 25 rules, residue of the v0.31.21 inline-style migration |
-| `alert-detail.css`, `ion-workspace.css`, `ai-chat.css` | page-scoped sheets, still legacy |
+| `alert-detail.css`, `ion-workspace.css`, `ai-chat.css`, `ion-shell.css` | global, still legacy |
+
+A page reaches its rules through `{% block page_id %}`, or, on the two
+standalone pages that do not extend `base.html`, a `data-page` attribute on
+`<body>`. Without it the body carries `data-page=""`, every rule written for
+that page matches nothing, and the page still renders — so the scope is
+asserted per page rather than assumed.
 
 Retired: `ion-ui.css`, a second `tailwind.css` build, `design-system.css`, and
 the `style.css` `<link>`.

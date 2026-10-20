@@ -75,15 +75,18 @@ def test_every_exclusion_carries_a_reason():
         assert reason and len(reason) > 20, (name, reason)
 
 
-def test_the_redesigns_page_sheets_are_actually_covered():
-    """The specific claim that was false. These are the sheets the
-    `styled` column produced, and the column's stated purpose was to
-    bring them under this scanner."""
-    # pcap, documents and discover have since been retired into the one
-    # build, which tools/dead_css.py deliberately does not scan; they are
-    # pinned by tests/test_retired_page_sheets.py instead.
-    for sheet in ("cases-page.css", "chat-page.css",
-                  "analytics-page.css", "ion-shell.css", "login-page.css"):
+def test_the_sheets_this_scanner_still_has_to_reach_are_covered():
+    """The specific claim that was false: sheets the `styled` column
+    produced were not actually under this scanner.
+
+    Every page sheet has since been retired into the one build, and
+    tools/dead_css.py deliberately does not scan the compiled output, so
+    what is left to cover is the global sheets base.html links on every
+    page. Those are the ones a dead rule can still hide in.
+    """
+    for sheet in ("ion-shell.css", "ion-workspace.css",
+                  "ion-migrated-styles.css", "alert-detail.css",
+                  "ai-chat.css"):
         assert sheet in SHEETS, sheet
 
 

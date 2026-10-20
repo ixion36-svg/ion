@@ -202,6 +202,21 @@ RETIRED = {
             ".ti-name-cell",
         ),
     ),
+    "observables": ("observables", "observables-page.css",
+                    (".co-occur-badge", ".context-badge")),
+    "analytics": ("analytics", "analytics-page.css",
+                  (".an-absent", ".an-breakdown-title")),
+    "integrations": ("integrations", "integrations-page.css",
+                     (".cluster-status", ".copy-field")),
+    "settings": ("settings", "settings-page.css",
+                 (".backup-item", ".backup-meta")),
+    "chat": ("chat", "chat-page.css",
+             (".ai-brand-icon", ".ai-grounding")),
+    "cases": ("cases", "cases-page.css",
+              (".age-bar-seg", ".analytics-card")),
+    "login": ("login", "login-page.css", ()),
+    "wallboard": ("wallboard", "wallboard-page.css",
+                  (".wb-att-critical", ".wb-panel-critical")),
 }
 
 
@@ -214,6 +229,10 @@ PARTIAL = {"alerts"}
 #: the scope now reaches it: /ui/threat-intel/actors renders ti-* markup
 #: into that page, and nothing painted it before.
 NEVER_LINKED = {"threat_intel_actor"}
+
+#: Standalone pages. They do not extend base.html, so they have no
+#: page_id block; the scope is a data-page attribute on <body>.
+STANDALONE = {"login", "wallboard"}
 
 
 def _page(stem: str) -> str:
@@ -278,6 +297,11 @@ def test_the_template_declares_the_scope_its_rules_are_written_against(page_id):
     """The scope and the selector live in different files. If they disagree
     the rules match nothing and the page renders unstyled without an error."""
     stem = RETIRED[page_id][0]
+    if page_id in STANDALONE:
+        assert f'data-page="{page_id}"' in _page(stem), (
+            f"{stem}.html is standalone; its <body> must carry the scope"
+        )
+        return
     assert f"{{% block page_id %}}{page_id}{{% endblock %}}" in _page(stem), (
         f"{stem}.html does not declare page_id {page_id!r}, so every "
         f'body[data-page="{page_id}"] rule in ion-pages.css is dead'
@@ -320,3 +344,32 @@ def test_a_retired_sheet_never_reappears_in_the_other_registry():
         assert sheet not in {s for s, _ in STILL_LINKED.values()}, (
             f"{sheet} is retired but still listed as linked"
         )
+
+
+def test_every_scope_with_rules_is_declared_by_some_template():
+    """The whole-file invariant, not just the retired pages.
+
+    A rule in ion-pages.css is addressed to body[data-page="x"]. If no
+    template ever sets that x, the rule matches nothing and the page still
+    renders -- unstyled in that one respect, with no error anywhere. This
+    is the cheapest guard against that, and it covers pages that were never
+    retired as well as the ones that were.
+    """
+    pages_css = PAGES_CSS.read_text(encoding="utf-8")
+    scopes = sorted(set(re.findall(r'body\[data-page="([a-z_]+)"\]', pages_css)))
+    assert scopes, "no scoped rules found at all -- has the file moved?"
+
+    declared = set()
+    for p in TPL.glob("*.html"):
+        t = p.read_text(encoding="utf-8", errors="replace")
+        for m in re.finditer(r"\{%\s*block page_id\s*%\}([a-z_]+)\{%\s*endblock\s*%\}", t):
+            declared.add(m.group(1))
+        for m in re.finditer(r'<body[^>]*data-page="([a-z_]+)"', t):
+            declared.add(m.group(1))
+
+    orphans = sorted(set(scopes) - declared)
+    assert not orphans, (
+        f"rules are scoped to pages nothing declares: {orphans}. Either the "
+        "page_id block is missing, or it disagrees with the scope the rules "
+        "were written against."
+    )

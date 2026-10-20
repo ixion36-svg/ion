@@ -8,7 +8,6 @@
   <link rel="stylesheet" href="/static/css/ion.css?v={{ ion_version }}">
   <link rel="stylesheet" href="/static/css/ion-migrated-styles.css?v={{ ion_version }}">
   <script nonce="{{ csp_nonce }}" src="/static/js/theme-init.js?v={{ ion_version }}"></script>
-  <link rel="stylesheet" href="/static/css/wallboard-page.css?v={{ ion_version }}">
   <!-- htmx must not inject its indicator stylesheet: that element has no
        nonce and the wall's CSP drops it. The rule lives in ion-legacy.css. -->
   <meta name="htmx-config" content='{"includeIndicatorStyles":false}'>
@@ -18,7 +17,7 @@
   <script nonce="{{ csp_nonce }}" src="/static/js/htmx-busy.js?v={{ ion_version }}"></script>
   <script nonce="{{ csp_nonce }}" src="/static/js/ion-dynamic-styles.js?v={{ ion_version }}"></script>
 </head>
-<body class="ion-tw ion-tw-page font-sans text-base-content overflow-hidden">
+<body data-page="wallboard" class="ion-tw ion-tw-page font-sans text-base-content overflow-hidden">
 
   <div class="h-screen flex flex-col px-5 py-4 gap-4">
 

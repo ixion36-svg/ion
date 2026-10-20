@@ -2,12 +2,7 @@
 
 {% block title %}Cases · ION{% endblock %}
 
-{% block head_css %}
-{# The page's own rules. Its inline <style> block moves here when this
-   page converts for the styled column; the colours the view model used
-   to carry are here already. #}
-<link rel="stylesheet" href="/static/css/cases-page.css?v={{ ion_version }}">
-{% endblock %}
+{% block page_id %}cases{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden" data-alert-detail-v2="{{ '1' if alert_detail_v2 else '0' }}" data-alert-field-pins="{{ '1' if alert_field_pins else '0' }}" data-bob-templates="{{ '1' if bob_custom_templates else '0' }}">
@@ -1069,7 +1064,7 @@ function renderCaseMarkdown(root) {
 // What moved to the server, beyond the markup: a payload that is not the
 // expected shape now reads as "Similarity unavailable" rather than "No
 // similar closed cases yet", a row with no similarity says so instead of
-// printing 0%, the closure colours are in cases-page.css where a theme can
+// printing 0%, the closure colours are in frontend/ion-pages.css where a theme can
 // reach them, data-args goes through tojson, and the case number is no
 // longer a javascript: href that this CSP blocks.
 function loadSimilarCases(caseId) {

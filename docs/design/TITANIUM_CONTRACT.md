@@ -334,9 +334,48 @@ The residual 142px is a page-header flex cluster that will not wrap, which is
 a markup problem and identical on both; CSS should not paper over it. It is
 the case a shared header macro fixes once.
 
+## The page sheets are gone
+
+Every page-specific stylesheet has been retired into the one build. A page
+links nothing of its own; its rules live in `frontend/ion-pages.css` under
+`body[data-page="<id>"]` and compile into `ion.css`.
+
+| | before | after |
+|---|--:|--:|
+| page-specific sheets | 23 | **0** |
+| their CSS, separately linked | 14,507 lines | **0** |
+| `frontend/ion-pages.css` | 2,586 lines | 17,097 |
+| `ion.css` gzipped over the wire | 105 KB | 156 KB |
+
+Most moved verbatim inside a nested wrapper, which the build flattens. Four
+cases did not fit that:
+
+- **`@keyframes`** is hoisted out of every wrapper. A keyframe name is
+  global and `@keyframes` is not a style rule, so nesting it means nothing.
+- **`login` and `wallboard`** are standalone: no `base.html`, so no
+  `page_id` block, and their `<body>` carries `data-page` directly. Their
+  `.ion-tw-page` override is a **compound** selector, not a descendant one —
+  `.ion-tw-page` is on the body itself, so a wrapper would match nothing. It
+  beats the later `.ion-tw-page` on specificity, 0,2,1 against 0,1,0,
+  verified in a browser rather than reasoned about.
+- **`wallboard`'s scrollbar rules** were bare `html, body` and
+  `::-webkit-scrollbar` — global, and from a shared file they would reach
+  every page. `html` is matched through `:has()`; a probe confirmed the page
+  gets `scrollbar-width: none` and `login` still gets `auto`.
+- **`threat-intel`** is scoped to two pages. Only `threat_intel.html` linked
+  it, but `/ui/threat-intel/actors` renders `ti-*` markup into
+  `threat_intel_actor.html`, which links no stylesheet at all — so that
+  table had been rendering unstyled. The build compiles the pair to
+  `:is(…)`, one specificity, both pages.
+
+What a page still gets from `base.html` is the eight global sheets, by
+design: `lucide`, `ai-chat`, `quill.snow`, `ion.css`, `ion-migrated-styles`,
+`alert-detail`, `ion-workspace`, `ion-shell`.
+
 Still open, in order: retire the ~45 per-page value tables onto
-`ion-value-scales.css`; reintroduce the Jinja macro library (`_components.html`
-was deleted during the rewrite, recorded in the cleanup table of
-`docs/UI_REDESIGN.md`, which is why all 75 pages hand-write their box markup
-and nothing can enforce C1–C4); then the per-region spacing ladder and the
-radius-token retirement. The wave order for those is not yet written.
+`ion-value-scales.css` (only `/security-dashboard` and the document-type
+domain are migrated so far); reintroduce the Jinja macro library
+(`_components.html` was deleted during the rewrite, recorded in the cleanup
+table of `docs/UI_REDESIGN.md`, which is why all 75 pages hand-write their
+box markup and nothing can enforce C1–C4); then the per-region spacing
+ladder and the radius-token retirement.

@@ -982,7 +982,7 @@ NAMESPACE_LETTERS: tuple[tuple[tuple[str, ...], str], ...] = (
 )
 
 #: The namespace kind, from getSysColor's ladder. The kind names a class;
-#: analytics-page.css gives that class its --ns-color, so the colour is
+#: frontend/ion-pages.css gives that class its --ns-color, so the colour is
 #: somewhere the theme can reach and no hex is composed at render time.
 #:
 #: It is a second table because the two ladders in the page did not agree:

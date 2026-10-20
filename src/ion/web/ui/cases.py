@@ -187,7 +187,7 @@ STATUS_SEGMENTS: tuple[tuple[str, str], ...] = (
 
 #: The closure reasons the summary donut paints. A reason not in here is
 #: drawn in the fallback, which is what the page did. The colours are in
-#: static/css/cases-page.css, keyed by these names: which colour means
+#: frontend/ion-pages.css, keyed by these names: which colour means
 #: "true positive" is the stylesheet's answer, and a model carrying it
 #: makes every reader of /ui/cases/summary inherit ION's palette.
 CLOSURE_KEYS: tuple[str, ...] = (
@@ -720,7 +720,7 @@ SIMILAR_SHOWN = 5
 SIMILAR_TITLE_CHARS = 120
 
 #: The closure reasons the verdict badge has a colour for, in
-#: static/css/cases-page.css. A reason outside this set is painted as
+#: frontend/ion-pages.css. A reason outside this set is painted as
 #: `other`, where the page fell back to the not_applicable grey. Which
 #: colour means "true positive" is the stylesheet's answer: the view model
 #: carried rgba() and var() literals, so the palette shipped in the page.
@@ -891,7 +891,7 @@ TIMELINE_KINDS: dict[str, str] = {
 TIMELINE_KIND_FALLBACK = "unknown"
 
 #: The verdicts the narrative badge has a colour for, from `verdictColors`.
-#: The colours are in static/css/cases-page.css, keyed by these names.
+#: The colours are in frontend/ion-pages.css, keyed by these names.
 TIMELINE_VERDICTS: tuple[str, ...] = (
     "true_positive",
     "false_positive",
@@ -1127,7 +1127,7 @@ SIGHTINGS_SHOWN = 6
 SIGHTING_TITLE_CHARS = 100
 
 #: The TLP markings the pill has a colour for, from `tlpColors`. The
-#: colours are in static/css/cases-page.css, keyed by these names.
+#: colours are in frontend/ion-pages.css, keyed by these names.
 TLP_KEYS: tuple[str, ...] = ("red", "amber", "green", "clear", "white")
 
 #: What the column means by an unset TLP, per Observable.tlp's own default.
