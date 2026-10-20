@@ -2646,3 +2646,29 @@ body[data-page="security_dashboard"] .matched-content code {
   white-space: nowrap;
   vertical-align: middle;
 }
+
+/* ── /maturity ────────────────────────────────────────────────────────
+ * Was maturity-page.css. The assessment title input carries daisyUI's
+ * .input.input-bordered as well, and this rule beats it on specificity --
+ * 0,2,1 against 0,2,0 -- so it no longer depends on loading after ion.css
+ * the way it did from head_css.
+ */
+body[data-page="maturity"] .mat-title {
+  flex: 1;
+  background: var(--bg-secondary);
+  border: 1px solid var(--ion-border);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: .85rem;
+}
+
+/* ── /data-flow ───────────────────────────────────────────────────────
+ * Was data-flow-page.css. The Event ID cell carries .val too, and the
+ * .val rule above sets font-weight 600 at the same specificity, so this
+ * wins only by coming later in this file. Keep it below that rule.
+ */
+body[data-page="data_flow"] .df-winlog-row .df-event-id {
+  font-weight: 900;
+}

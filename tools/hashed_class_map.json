@@ -1911,7 +1911,7 @@
   "_ion-s-56b5cc5749": {
     "css": "flex:1;background:var(--bg-secondary);border:1px solid var(--ion-border);color:var(--text-primary);padding:8px 12px;border-radius:var(--radius);font:inherit;font-size:.85rem;",
     "kind": "manual",
-    "note": "The assessment title input, #mat-title. The control survived the conversion on daisyUI's .input, which is a different chrome. The eight declarations are body[data-page=\"maturity\"] .mat-title in static/css/maturity-page.css. The notes inputs on the same form were never this rule.",
+    "note": "The assessment title input, #mat-title. The control survived the conversion on daisyUI's .input, which is a different chrome. The eight declarations are body[data-page=\"maturity\"] .mat-title in frontend/ion-pages.css, compiled into ion.css. The notes inputs on the same form were never this rule.",
     "partial_do_not_apply": "flex-1 bg-[var(--bg-secondary)] border border-[var(--ion-border)] text-[var(--text-primary)] py-2 px-3 rounded-[var(--radius)] text-[.85rem]",
     "replaced_by": [
       "body[data-page=\"maturity\"] .mat-title"
@@ -3187,7 +3187,7 @@
   "_ion-s-92fb99917f": {
     "css": "font-weight:900;",
     "kind": "manual",
-    "note": "Event ID in the data-flow source mock-up. The hashed class lost to body[data-page=data_flow] .df-winlog-row .val {font-weight:600} on specificity, so 900 never painted. The winning rule is body[data-page=\"data_flow\"] .df-winlog-row .df-event-id in static/css/data-flow-page.css, which loads from head_css after ion.css. The other .val cells stay at 600.",
+    "note": "Event ID in the data-flow source mock-up. The hashed class lost to body[data-page=data_flow] .df-winlog-row .val {font-weight:600} on specificity, so 900 never painted. The winning rule is body[data-page=\"data_flow\"] .df-winlog-row .df-event-id in frontend/ion-pages.css, below the .val rule it ties with, which is what makes it win. The other .val cells stay at 600.",
     "replaced_by": [
       "body[data-page=\"data_flow\"] .df-winlog-row .df-event-id"
     ],
