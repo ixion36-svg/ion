@@ -79,9 +79,11 @@ def test_the_redesigns_page_sheets_are_actually_covered():
     """The specific claim that was false. These are the sheets the
     `styled` column produced, and the column's stated purpose was to
     bring them under this scanner."""
-    for sheet in ("cases-page.css", "chat-page.css", "pcap-page.css",
-                  "analytics-page.css", "documents-page.css",
-                  "discover-page.css", "ion-shell.css", "login-page.css"):
+    # pcap, documents and discover have since been retired into the one
+    # build, which tools/dead_css.py deliberately does not scan; they are
+    # pinned by tests/test_retired_page_sheets.py instead.
+    for sheet in ("cases-page.css", "chat-page.css",
+                  "analytics-page.css", "ion-shell.css", "login-page.css"):
         assert sheet in SHEETS, sheet
 
 

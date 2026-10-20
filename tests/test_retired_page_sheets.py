@@ -130,6 +130,34 @@ RETIRED = {
             ".atf-hunt-done",                      # run state, server-rendered
         ),
     ),
+    "pcap": (
+        "pcap",
+        "pcap-page.css",
+        (
+            ".pcap-tab.active",                    # .active, not daisyUI .tab-active
+            ".pcap-panel.active",
+            ".triage-chip.selected",
+            ".finding-card.hidden",                # a filter state, not a utility
+        ),
+    ),
+    "discover": (
+        "discover",
+        "discover-page.css",
+        (
+            ".modal-dialog",                       # the page's own overlay, not daisyUI
+            ".modal-close",
+            ".health-green",                       # connection state from the server
+        ),
+    ),
+    "forensics": (
+        "forensics",
+        "forensics-page.css",
+        (
+            ".fr-tab.active",                      # .active, not daisyUI .tab-active
+            ".ioc-chip.selected",
+            ".modal-body",
+        ),
+    ),
 }
 
 

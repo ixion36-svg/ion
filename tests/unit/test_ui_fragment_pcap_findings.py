@@ -308,7 +308,7 @@ def test_the_chip_and_link_styling_survives_under_its_own_name(job):
     After this conversion no template referenced either and no other page
     used them: only a constant in ui/pcap.py did, which is a reference
     the rewrite audit cannot see and a reader cannot place. So both have
-    real names in pcap-page.css carrying the same declarations, and
+    real names in ion-pages.css carrying the same declarations, and
     tools/hashed_class_map.json claims them, which the audit checks.
 
     What this test is for is unchanged: the styling must not be dropped.
@@ -323,7 +323,7 @@ def test_the_chip_and_link_styling_survives_under_its_own_name(job):
     assert "pcap-ti-chip" in html
     assert "pcap-ti-link" in html
 
-    sheet = (ROOT / "src/ion/web/static/css/pcap-page.css").read_text(
+    sheet = (ROOT / "frontend/ion-pages.css").read_text(
         encoding="utf-8")
     # The declarations, not just the selectors: a renamed class with an
     # empty body is the same loss under a nicer name.
