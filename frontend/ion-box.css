@@ -25,9 +25,20 @@
 }
 
 /* `anywhere`, not `break-word`: only `anywhere` lowers the intrinsic
-   minimum width, which is what stops the box growing in the first place. */
-.ion-tw :is(code, pre, dd, td, [class*="font-mono"]) {
+   minimum width, which is what stops the box growing in the first place.
+ *
+ * `td` is deliberately absent. `anywhere` with no width floor breaks every
+ * word in a column narrower than its content, so a squeezed table renders a
+ * rule name one character per line. A cell that needs it opts in with
+ * .cell-wrap, which carries the floor. */
+.ion-tw :is(code, pre, dd, [class*="font-mono"]) {
   overflow-wrap: anywhere;
+}
+
+/* The opt-in, for any table, dense or not. */
+.ion-tw td.cell-wrap {
+  overflow-wrap: anywhere;
+  min-width: 220px;
 }
 
 /* `white-space: pre` beats overflow-wrap outright, so a <pre> holding an
