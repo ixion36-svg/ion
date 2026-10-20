@@ -2584,3 +2584,65 @@ body[data-page="versions"] #versions-list > .empty-state{
     text-align: center;
     opacity: 0.6;
 }
+
+/* ── /security-dashboard ──────────────────────────────────────────────
+ * What is left of security-dashboard-page.css after its badges moved to
+ * ion-value-scales.css. These rules are geometry and one cascade bridge,
+ * none of which generalises, so they are page-scoped rather than shared.
+ *
+ * The sheet used to be linked from head_css and so loaded after ion.css.
+ * From here it loads inside it, after the daisyUI import, and the
+ * body[data-page] prefix takes the modal bridge to 0,3,1 against daisyUI's
+ * 0,1,0 -- it still wins, by specificity now rather than by order.
+ */
+
+/* openModal() toggles .active, not daisyUI's .modal-open. Bridge the two. */
+body[data-page="security_dashboard"] .modal.active {
+  display: grid;
+  place-items: center;
+  visibility: visible;
+  pointer-events: auto;
+  opacity: 1;
+  background-color: oklch(0% 0 0 / 0.4);
+}
+body[data-page="security_dashboard"] .modal.active > .modal-box {
+  opacity: 1;
+  scale: 1;
+  translate: 0;
+}
+
+/* The events table is swapped in by htmx; the column widths are its own. */
+body[data-page="security_dashboard"] #events-table th,
+body[data-page="security_dashboard"] #events-table td {
+  white-space: nowrap;
+}
+body[data-page="security_dashboard"] #events-table th:nth-child(5),
+body[data-page="security_dashboard"] #events-table td:nth-child(5) {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+body[data-page="security_dashboard"] #events-table th:nth-child(6),
+body[data-page="security_dashboard"] #events-table td:nth-child(6) {
+  min-width: 150px;
+  max-width: 300px;
+}
+
+/* The matched payload: evidence, clipped, with the full value in title. */
+body[data-page="security_dashboard"] .matched-content {
+  min-width: 150px;
+  max-width: 300px;
+}
+body[data-page="security_dashboard"] .matched-content code {
+  background: var(--sev-critical-dim);
+  color: var(--sev-critical);
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}

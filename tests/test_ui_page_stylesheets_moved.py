@@ -111,18 +111,10 @@ PAGES: dict[str, tuple[str, tuple[str, ...]]] = {
             ".diff-view .diff-add",
         ),
     ),
-    "security_dashboard": (
-        "security-dashboard-page.css",
-        (
-            ".modal.active",                         # modal bridge: JS toggles .active
-            ".threat-level.critical",
-            ".severity-badge",
-            ".severity-critical",
-            ".status-new",
-            "#events-table th",
-            ".matched-content code",
-        ),
-    ),
+    # security_dashboard is deliberately absent. It no longer links a sheet:
+    # its badges moved to ion-value-scales.css and the rest to ion-pages.css,
+    # both compiled into ion.css. The guarantees this registry gave it are
+    # re-asserted in tests/test_security_dashboard_scales.py.
     "scheduler": (
         "scheduler-page.css",
         (

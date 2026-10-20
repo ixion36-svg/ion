@@ -16,19 +16,31 @@
  * Adding a scale means adding rows here, not a sheet.
  */
 
-/* Severity */
-[data-sev="critical"] { --v: var(--color-ion-coral); }
-[data-sev="high"]     { --v: var(--color-ion-amber); }
-[data-sev="medium"]   { --v: var(--color-ion-cyan); }
-[data-sev="low"]      { --v: #64748b; }
-[data-sev="info"]     { --v: var(--color-ion-iris); }
+/* Severity resolves through the existing --sev-* ramp rather than the accent
+   tokens. That ramp is defined for both modes and tests/test_severity_contrast.py
+   holds it to a WCAG ratio on its own tint and as a solid stripe, so a chip
+   built from --color-ion-* would be a second severity palette with none of
+   that guarantee. --v-soft is the tested tint; scales below that have no ramp
+   fall back to a mix in .v-chip. */
+[data-sev="critical"] { --v: var(--sev-critical); --v-soft: var(--sev-critical-dim); }
+[data-sev="high"]     { --v: var(--sev-high);     --v-soft: var(--sev-high-dim); }
+[data-sev="medium"]   { --v: var(--sev-medium);   --v-soft: var(--sev-medium-dim); }
+[data-sev="low"]      { --v: var(--sev-low);      --v-soft: var(--sev-low-dim); }
+[data-sev="info"]     { --v: var(--sev-info);     --v-soft: var(--sev-info-dim); }
+/* The threat banner's fifth level. It is an absence of elevated severity,
+   which is what info means here. */
+[data-sev="normal"]   { --v: var(--sev-info);     --v-soft: var(--sev-info-dim); }
 
 /* Alert and case status */
-[data-status="open"]         { --v: var(--color-ion-cyan); }
-[data-status="acknowledged"] { --v: var(--color-ion-amber); }
-[data-status="investigating"]{ --v: var(--color-ion-amber); }
-[data-status="resolved"]     { --v: var(--color-ion-lime); }
-[data-status="closed"]       { --v: #64748b; }
+[data-status="open"]          { --v: var(--color-ion-cyan); }
+[data-status="new"]           { --v: var(--color-ion-cyan); }
+[data-status="acknowledged"]  { --v: var(--color-ion-amber); }
+[data-status="investigating"] { --v: var(--color-ion-amber); }
+[data-status="confirmed"]     { --v: var(--sev-critical); }
+[data-status="false_positive"]{ --v: var(--sev-low); }
+[data-status="mitigated"]     { --v: var(--color-ion-lime); }
+[data-status="resolved"]      { --v: var(--color-ion-lime); }
+[data-status="closed"]        { --v: #64748b; }
 
 /* Closure reason and verdict. `other` is the fallback for a reason the map
    does not know; it must not resolve to a verdict that means something. */
@@ -82,7 +94,9 @@
   line-height: 1.5;
   white-space: nowrap;
   color: var(--v, var(--ion-text-muted));
-  background: color-mix(in oklab, var(--v, #64748b) 14%, transparent);
+  /* --v-soft where a tested tint exists; otherwise mix one at the same
+     weight the ramp uses, so the two read alike. */
+  background: var(--v-soft, color-mix(in oklab, var(--v, #64748b) 18%, transparent));
 }
 
 /* A 3px rail reads severity without colouring the whole row, which is what

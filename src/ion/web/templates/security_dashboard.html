@@ -2,9 +2,10 @@
 
 {% block title %}Security Dashboard - ION{% endblock %}
 
-{% block head_css %}
-<link rel="stylesheet" href="/static/css/security-dashboard-page.css?v={{ ion_version }}">
-{% endblock %}
+{# Scopes this page's rules in frontend/ion-pages.css. The badges moved to
+   ion-value-scales.css and the rest moved there, so there is no page
+   stylesheet to link any more. #}
+{% block page_id %}security_dashboard{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
