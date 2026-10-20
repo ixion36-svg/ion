@@ -70,6 +70,37 @@ RETIRED = {
             ".arkime-commit .mode-new:checked ~ .commit-fields .commit-existing",
         ),
     ),
+    "templates": (
+        "templates",
+        "templates-page.css",
+        (
+            "#folders-modal.modal",                # modal bridge: JS sets display:flex
+            ".folder-item.active",
+            "#templates-list > .card",
+            "#templates-list .tag",
+        ),
+    ),
+    "template_view": (
+        "template_view",
+        "template-view-page.css",
+        (
+            ".tabs-border > .tab.content-tab-btn.active",  # .active, not .tab-active
+            "#version-modal.modal",
+            ".sv-card",
+            ".checkpoint-badge",
+            ".diff-view .diff-add",
+        ),
+    ),
+    "documents": (
+        "documents",
+        "documents-page.css",
+        (
+            ".doc-row",
+            ".doc-row-archived",
+            ".doc-unmeasured",                     # a figure the payload lacked
+            ".doc-filter-notice",                  # a filter that could not be honoured
+        ),
+    ),
 }
 
 
@@ -79,6 +110,28 @@ def _page(stem: str) -> str:
 
 def _pages_css() -> str:
     return re.sub(r"/\*.*?\*/", "", PAGES_CSS.read_text(encoding="utf-8"), flags=re.S)
+
+
+def _scope_block(css: str, page_id: str) -> str:
+    """The body of a `body[data-page="x"] { ... }` wrapper, or "".
+
+    A sheet moved verbatim is nested inside one of these and the build
+    flattens it; a sheet moved rule by rule is prefixed instead. Both forms
+    are in this file, so the selector check has to know about both.
+    """
+    opener = f'body[data-page="{page_id}"] {{'
+    start = css.find(opener)
+    if start == -1:
+        return ""
+    i = start + len(opener)
+    depth = 1
+    while i < len(css) and depth:
+        if css[i] == "{":
+            depth += 1
+        elif css[i] == "}":
+            depth -= 1
+        i += 1
+    return css[start + len(opener):i - 1]
 
 
 @pytest.mark.parametrize("page_id", sorted(RETIRED))
@@ -112,11 +165,14 @@ def test_the_template_declares_the_scope_its_rules_are_written_against(page_id):
     (pid, sel) for pid, (_, _, sels) in sorted(RETIRED.items()) for sel in sels
 ])
 def test_each_load_bearing_rule_survived_the_move(page_id, selector):
-    scoped = f'body[data-page="{page_id}"] {selector}'
-    assert scoped in _pages_css(), (
-        f"{selector} is not scoped to {page_id} in ion-pages.css. It was "
-        "pinned because only the server emits it, so no state-class or "
-        "dead-CSS check would notice it going missing."
+    css = _pages_css()
+    prefixed = f'body[data-page="{page_id}"] {selector}' in css
+    nested = selector in _scope_block(css, page_id)
+    assert prefixed or nested, (
+        f"{selector} is not scoped to {page_id} in ion-pages.css, in either "
+        "the prefixed or the nested form. It was pinned because only the "
+        "server emits it, so no state-class or dead-CSS check would notice "
+        "it going missing."
     )
 
 

@@ -2,13 +2,7 @@
 
 {% block title %}Documents - ION{% endblock %}
 
-{% block head_css %}
-{# The page's own rules, for the classes the server-rendered list emits.
-   head_css loads at base.html line 50, so this beats ion.css and
-   ion-migrated-styles.css and loses to ion-workspace.css. None of the
-   selectors here appears in that sheet, so nothing changes winner. #}
-<link rel="stylesheet" href="/static/css/documents-page.css?v={{ ion_version }}">
-{% endblock %}
+{% block page_id %}documents{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
@@ -158,7 +152,7 @@
             {# The label is its own element so the busy state can change the
                words without rebuilding the button from a string, which is
                what rebuilding the whole button and restoring it did.
-               The spinner is .is-busy in documents-page.css. #}
+               The spinner is .is-busy, in frontend/ion-pages.css. #}
             <button id="export-pdf-btn" class="btn btn-sm btn-primary"><i class="icon-file-text"></i> <span data-btn-label>PDF</span></button>
             <button id="download-btn" class="btn btn-sm">Download</button>
             <button id="delete-doc-btn" class="btn btn-sm btn-danger">Delete</button>

@@ -89,30 +89,11 @@ PAGES: dict[str, tuple[str, tuple[str, ...]]] = {
             "#issue-labels",                         # native multi-select, not .select
         ),
     ),
-    "templates": (
-        "templates-page.css",
-        (
-            "#folders-modal.modal",                  # modal bridge: JS sets display:flex
-            ".folder-item.active",
-            "#templates-list > .card",
-            "#templates-list .tag",
-        ),
-    ),
-    "template_view": (
-        "template-view-page.css",
-        (
-            ".tabs-border > .tab.content-tab-btn.active",   # .active, not .tab-active
-            "#version-modal.modal",
-            ".sv-card",
-            ".checkpoint-badge",                     # beats the compiled neon gradient
-            ".diff-view .diff-add",
-        ),
-    ),
     # security_dashboard is deliberately absent. It no longer links a sheet:
     # its badges moved to ion-value-scales.css and the rest to ion-pages.css,
     # both compiled into ion.css. The guarantees this registry gave it are
     # re-asserted in tests/test_security_dashboard_scales.py.
-    # scheduler and alert_arkime are deliberately absent, like
+    # templates, template_view, scheduler and alert_arkime are deliberately absent, like
     # security_dashboard: their rules moved into frontend/ion-pages.css and
     # they link no sheet. tests/test_retired_page_sheets.py holds what this
     # registry held for them.

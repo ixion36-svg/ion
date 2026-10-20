@@ -2755,3 +2755,603 @@ body[data-page="alert_arkime"] .arkime-commit .mode-new:checked ~ .commit-fields
 body[data-page="alert_arkime"] .arkime-commit .mode-existing:checked ~ .commit-fields .commit-new {
   display: none;
 }
+
+/* -- /templates ---------------------------------------------------
+ * Was templates-page.css, moved verbatim inside its scope. The build flattens
+ * the nesting, so every selector here compiles to
+ * body[data-page="templates"] <selector> and keeps the specificity it
+ * needs to beat daisyUI -- which it used to get from loading after
+ * ion.css rather than from inside it.
+ */
+body[data-page="templates"] {
+  /* JS showFoldersModal()/showMoveModal() set style.display = 'flex', not daisyUI
+     .modal-open. The hashed display:none class on each overlay keeps them hidden
+     until then. Bridge so daisyUI .modal still presents when display is flex. */
+  #folders-modal.modal,
+  #move-modal.modal {
+      visibility: visible;
+      pointer-events: auto;
+      opacity: 1;
+      align-items: center;
+      justify-content: center;
+      background-color: oklch(0% 0 0 / 0.4);
+  }
+  #folders-modal .modal-box,
+  #move-modal .modal-box {
+      opacity: 1;
+      scale: 1;
+      translate: 0;
+  }
+
+  /* JS querySelectorAll('.folder-item') toggles .active; fragment markup emits these. */
+  .folder-tree { font-size: 0.9rem; }
+  .folder-item {
+      display: flex;
+      align-items: center;
+      padding: 0.5rem 0.75rem;
+      border-radius: var(--radius-selector, 0.25rem);
+      cursor: pointer;
+      margin-bottom: 2px;
+  }
+  .folder-item:hover { background: var(--color-base-300); }
+  .folder-item.active {
+      background: var(--color-primary);
+      color: var(--color-primary-content);
+  }
+  .folder-icon { margin-right: 0.5rem; }
+  .folder-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+  }
+  .folder-children {
+      margin-left: 1.25rem;
+      border-left: 1px solid var(--color-base-300);
+      padding-left: 0.5rem;
+  }
+
+  /* JS writes breadcrumb <span>s into #current-folder-path. */
+  .folder-path span { cursor: pointer; }
+  .folder-path span:hover { color: var(--color-primary); }
+
+  /* JS fragment markup: collection-badge. The doc-type chip moved to
+     [data-doctype] in frontend/ion-value-scales.css. */
+  .collection-badge {
+      background: var(--color-primary);
+      color: var(--color-primary-content);
+      padding: 2px 8px;
+      border-radius: var(--radius-selector, 0.25rem);
+      font-size: 0.75rem;
+      margin-left: 0.5rem;
+  }
+  /* JS renderFolderManageItems() / renderFolderItems() emit these class names. */
+  .folder-manage-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem;
+      border: 1px solid var(--color-base-300);
+      border-radius: var(--radius-selector, 0.25rem);
+      margin-bottom: 0.5rem;
+  }
+  .folder-manage-item:hover { background: var(--color-base-300); }
+  .folder-manage-info {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+  }
+  .folder-manage-path {
+      color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+      font-size: 0.8rem;
+  }
+  .folder-manage-counts {
+      font-size: 0.75rem;
+      color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  }
+  .folder-manage-children { margin-left: 1.5rem; }
+
+  /* JS renderTemplates() emits .card / .card-header / .card-body / .card-footer /
+     .move-btn / .tag — class names are fixed in script, so restyle them here. */
+  #templates-list > .card {
+      background: var(--color-base-200);
+      border: 1px solid var(--color-base-300);
+      border-radius: var(--radius-box);
+      padding: 1rem 1.25rem;
+      box-shadow: none;
+  }
+  .card-header {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+  }
+  #templates-list .card-title { color: var(--color-base-content); }
+  #templates-list .card-title:hover { color: var(--color-primary); }
+  #templates-list .card-body { padding: 0; gap: 0; }
+  #templates-list .card-description {
+      font-size: 0.875rem;
+      opacity: 0.8;
+  }
+  #templates-list .card-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      font-size: 0.75rem;
+      opacity: 0.6;
+      margin-top: 0.5rem;
+  }
+  #templates-list .card-tags { margin-top: 0.75rem; }
+  #templates-list .tag {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      font-size: 0.7rem;
+      border-radius: var(--radius-selector, 0.25rem);
+      background: color-mix(in oklab, var(--color-primary) 15%, transparent);
+      color: var(--color-primary);
+      margin-right: 0.25rem;
+  }
+  #templates-list .card-footer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      border-top: 1px solid var(--color-base-300);
+      padding-top: 0.75rem;
+      margin-top: 0.75rem;
+  }
+  .move-btn {
+      font-size: 0.75rem;
+      padding: 2px 6px;
+  }
+}
+
+/* -- /template-view ---------------------------------------------------
+ * Was template-view-page.css, moved verbatim inside its scope. The build flattens
+ * the nesting, so every selector here compiles to
+ * body[data-page="template_view"] <selector> and keeps the specificity it
+ * needs to beat daisyUI -- which it used to get from loading after
+ * ion.css rather than from inside it.
+ */
+body[data-page="template_view"] {
+  /* JS toggles .active on .content-tab-btn / .version-tab-btn, not daisyUI .tab-active. */
+  .tabs-border > .tab.content-tab-btn.active,
+  .tabs-border > .tab.version-tab-btn.active {
+      color: var(--color-base-content);
+  }
+  .tabs-border > .tab.content-tab-btn.active::before,
+  .tabs-border > .tab.version-tab-btn.active::before {
+      --tab-border-color: currentColor;
+      border-top: 3px solid;
+  }
+
+  /* The version modal is inserted with class "modal show". Legacy .modal is
+     display:none unlayered, and .modal.show is what reveals it. */
+  #version-modal.modal {
+      visibility: visible;
+      pointer-events: auto;
+      opacity: 1;
+      align-items: center;
+      justify-content: center;
+      background-color: oklch(0% 0 0 / 0.4);
+  }
+  #version-modal .modal-box {
+      opacity: 1;
+      scale: 1;
+      translate: 0;
+  }
+
+  .sv-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+      margin-bottom: 0.5rem;
+      padding: 0.6rem 0.75rem;
+      background: var(--color-base-100);
+      border: 1px solid var(--color-base-300);
+      border-radius: var(--radius-box, 0.5rem);
+  }
+  .sv-card-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: var(--radius-selector, 0.25rem);
+      background: var(--color-primary);
+      color: var(--color-primary-content);
+      font-weight: 700;
+      font-size: 0.55rem;
+      flex-shrink: 0;
+      margin-top: 2px;
+  }
+  .sv-card-body { flex: 1; min-width: 0; }
+  .sv-card-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.25rem;
+  }
+  .sv-card-type { font-weight: 600; font-size: 0.8rem; }
+  .sv-card-title {
+      color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+      font-size: 0.8rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+  }
+  .sv-card-details {
+      font-size: 0.75rem;
+      color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  }
+  .sv-card-details code {
+      font-size: 0.7rem;
+      background: var(--color-base-300);
+      padding: 0.1rem 0.3rem;
+      border-radius: var(--radius-selector, 0.25rem);
+  }
+  .sv-var-badge {
+      font-size: 0.65rem;
+      background: var(--color-primary);
+      color: var(--color-primary-content);
+      padding: 0.1rem 0.4rem;
+      border-radius: var(--radius-selector, 0.25rem);
+      font-family: var(--font-mono, ui-monospace, monospace);
+  }
+
+  .versions-table tr:hover { background: color-mix(in oklab, var(--color-primary) 8%, transparent); }
+  .current-version { background: var(--color-base-300); }
+  .badge-current {
+      background: var(--color-success);
+      color: var(--color-success-content);
+  }
+  /* The fragment reuses versions_meta.html's checkpoint_badge macro, which
+     emits `checkpoint-badge`. The compiled stylesheet defines that class
+     globally as a legacy neon gradient with a baked margin-left, and defines
+     the warning chip only under body[data-page="versions"], which this page is
+     not. Redefining it here is what keeps it matching badge-current beside it
+     in the same cell; `background` as a shorthand also clears the gradient's
+     background-image, and the margin goes because the flex gap in the modal
+     bar and the whitespace in the table cell already space it. */
+  .checkpoint-badge {
+      background: var(--color-warning);
+      color: var(--color-warning-content);
+      margin-left: 0;
+  }
+
+  .diff-view .diff-add {
+      background: color-mix(in oklab, var(--color-success) 15%, transparent);
+      color: var(--color-success);
+  }
+  .diff-view .diff-del {
+      background: color-mix(in oklab, var(--color-error) 15%, transparent);
+      color: var(--color-error);
+  }
+
+  #template-variables > .error,
+  #versions-list > .error {
+      margin: 1rem;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-box, 0.5rem);
+      background: color-mix(in oklab, var(--color-error) 12%, transparent);
+      color: var(--color-error);
+  }
+  #template-variables > .muted,
+  #versions-list > .empty-state,
+  #versions-list > .loading {
+      margin: 1rem;
+      padding: 0.75rem 1rem;
+      text-align: center;
+      opacity: 0.6;
+  }
+  #template-variables code {
+      font-family: var(--font-mono, ui-monospace, monospace);
+      font-size: 0.75rem;
+      background: var(--color-base-300);
+      padding: 0.1rem 0.3rem;
+      border-radius: var(--radius-selector, 0.25rem);
+  }
+}
+
+/* -- /documents ------------------------------------------------
+ * Was documents-page.css, moved verbatim inside its scope. Its own
+ * note recorded that it beat ion.css and ion-migrated-styles.css and
+ * lost to ion-workspace.css, and that none of its selectors appear in
+ * that sheet. ion-workspace.css is still a separate link loading after
+ * ion.css, so that ordering is unchanged.
+ *
+ * The spinner keyframes stay outside the scope: a keyframe name is
+ * global and @keyframes is not a style rule, so nesting it would not
+ * mean anything.
+ */
+@keyframes doc-busy-spin { to { transform: rotate(360deg); } }
+
+body[data-page="documents"] {
+  /* The row. `list-item` already carries the layout; this is the hook the
+     fragment's tests pin so a future restyle has somewhere to land. */
+  .doc-row { position: relative; }
+
+  /* An archived document. The page set a bare `archived` class whose rule
+     lives with the rest of the page styling; this names the same state in
+     the page's own namespace so the two can diverge without a surprise. */
+  .doc-row-archived { opacity: 0.72; }
+
+  /* A figure the payload did not carry. Deliberately not the same as a zero
+     or a one: the page printed "v1" for a missing version, which is a
+     confident claim about which revision is on screen. */
+  .doc-unmeasured {
+      font-style: italic;
+      color: var(--text-muted);
+      border: 1px dashed color-mix(in srgb, var(--text-muted) 40%, transparent);
+      background: transparent;
+  }
+
+  /* A filter dimension that could not be honoured. The page logged the
+     refusal to the console, so the list looked filtered and was not. */
+  .doc-filter-notice {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      padding: 0.5rem 0.75rem;
+      margin-bottom: 0.5rem;
+      border-left: 3px solid var(--warning, #f59e0b);
+      background: color-mix(in srgb, var(--warning, #f59e0b) 8%, transparent);
+      border-radius: 0.25rem;
+  }
+
+  /* A control waiting on a request. The page replaced the whole button's
+     markup with '<i class="icon-loader"></i> Generating...' and put the
+     original back afterwards, so the button was rebuilt from a string twice
+     per export and the spinner lived in JavaScript. Only the label changes
+     now, and the spinner is here. */
+  .is-busy { position: relative; pointer-events: none; }
+
+  .is-busy::after {
+      content: "";
+      display: inline-block;
+      width: 0.75em;
+      height: 0.75em;
+      margin-left: 0.4em;
+      vertical-align: -0.1em;
+      border: 2px solid currentColor;
+      border-right-color: transparent;
+      border-radius: 50%;
+      animation: doc-busy-spin 0.7s linear infinite;
+  }
+
+  /* A viewer who has asked for no motion gets the disabled state without
+     the spin, which is what the animation was there to signal. */
+  @media (prefers-reduced-motion: reduce) {
+      .is-busy::after { animation: none; opacity: 0.6; }
+  }
+
+  /* The empty tag state. It was `class="muted text-[0.8rem]"` in a JS
+     string, an arbitrary Tailwind value the page owned. */
+  .doc-tags-none { font-size: 0.8rem; }
+
+  /* ---------------------------------------------------------------
+   * The page's own rules, moved verbatim out of its inline <style>.
+   *
+   * The block was in {% block scripts %} at the end of <body>, so it
+   * beat every stylesheet. Linked from head_css it beats ion.css,
+   * ion-migrated-styles.css and alert-detail.css, and loses to
+   * ion-workspace.css and base.html's two in-body blocks. Measured
+   * before the move: of the block's 77 distinct selectors, none
+   * appears in any of those three, so nothing changes winner.
+   * --------------------------------------------------------------- */
+
+  /* .folder-item / .active are emitted both by the static markup above and by
+     selectFolder()'s JS re-render (renderFolderItems in the script block below),
+     so the class names stay exactly as JS expects them -- only the colors move
+     to daisyUI tokens. --primary-color and --bg-hover were never defined
+     anywhere in the loaded stylesheets, so the active/hover states were
+     silently no-ops before this pass; --color-primary/--color-base-300 are
+     real daisyUI theme tokens. */
+  .folder-item {
+      display: flex;
+      align-items: center;
+      padding: 0.5rem;
+      border-radius: var(--radius-field);
+      cursor: pointer;
+      margin-bottom: 2px;
+  }
+  .folder-item:hover {
+      background: var(--color-base-300);
+  }
+  .folder-item.active {
+      background: var(--color-primary);
+      color: var(--color-primary-content);
+  }
+  .folder-icon {
+      margin-right: 0.5rem;
+  }
+  .folder-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+  }
+  .folder-children {
+      margin-left: 1.25rem;
+      border-left: 1px solid var(--color-base-300);
+      padding-left: 0.5rem;
+  }
+  .folder-path span {
+      cursor: pointer;
+  }
+  .folder-path span:hover {
+      color: var(--color-primary);
+  }
+  .collection-badge {
+      background: var(--color-primary);
+      color: var(--color-primary-content);
+      padding: 2px 8px;
+      border-radius: var(--radius-selector);
+      font-size: 0.75rem;
+      margin-left: 0.5rem;
+  }
+  .folder-manage-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem;
+      border: 1px solid var(--color-base-300);
+      border-radius: var(--radius-field);
+      margin-bottom: 0.5rem;
+  }
+  .folder-manage-item:hover {
+      background: var(--color-base-300);
+  }
+  .folder-manage-info {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+  }
+  .folder-manage-counts {
+      font-size: 0.75rem;
+      color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  }
+  .folder-manage-children {
+      margin-left: 1.5rem;
+  }
+  .move-btn {
+      font-size: 0.75rem;
+      padding: 2px 6px;
+  }
+  .tag-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: var(--radius-selector);
+      font-size: 0.7rem;
+      font-weight: 500;
+      background: var(--color-base-300);
+      color: var(--color-base-content);
+      border: 1px solid var(--color-base-300);
+      margin-left: 4px;
+  }
+  /* .tags-section / .tags-display / .tag-add-inline / #modal-doc-tags live
+     inside the ion-ws-* document panel shared with /cases (see the Jinja
+     comment above #document-modal) and are left exactly as they were -- no
+     daisyUI substitution, no token changes, to keep parity with that shared
+     design. .tag-chip is that panel's own tag pill, JS-generated
+     (renderDocumentTags) -- kept for the same reason, with only the dead
+     --primary-color reference replaced by the real token so the chip actually
+     renders in the theme's primary color instead of doing nothing. */
+  .tags-section {
+      margin-top: 0.75rem;
+      padding: 0.75rem;
+      background: var(--bg-secondary);
+      border-radius: 4px;
+  }
+  .tags-section h4 {
+      margin: 0 0 0.5rem 0;
+      font-size: 0.875rem;
+      color: var(--text-muted);
+  }
+  .tags-display {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+      align-items: center;
+  }
+  .tag-add-inline {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+  }
+  .tag-add-inline input {
+      width: 120px;
+      padding: 2px 6px;
+      font-size: 0.75rem;
+      border: 1px solid var(--ion-border);
+      border-radius: 3px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+  }
+  .tag-add-inline button {
+      padding: 2px 8px;
+      font-size: 0.75rem;
+  }
+  .tag-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 3px;
+      font-size: 0.75rem;
+      background: var(--color-primary);
+      color: white;
+  }
+  .tag-chip .tag-remove {
+      cursor: pointer;
+      opacity: 0.7;
+      font-size: 0.85rem;
+      line-height: 1;
+  }
+  .tag-chip .tag-remove:hover {
+      opacity: 1;
+  }
+  /* daisyUI's global .loading is a spinner utility (fixed square size, an SVG
+     mask cutout) that collides with this page's plain-text loading / empty /
+     error messages -- loadDocuments/loadVersions/renderFoldersManageTree/etc.
+     all build literal `<p class="loading">`, `.empty-state`, `.error` strings
+     in the script block below, which is out of scope to touch. A tag-qualified
+     selector out-specifies the bare .loading/.empty-state/.error rules so the
+     text renders instead of being masked into a tiny spinner glyph. */
+  p.loading,
+  p.empty-state,
+  p.error {
+      display: block;
+      width: auto;
+      aspect-ratio: auto;
+      background: none;
+      -webkit-mask-image: none;
+              mask-image: none;
+      text-align: center;
+      padding: 2rem 0;
+      color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  }
+  p.error {
+      color: var(--color-error);
+  }
+
+  /* JS sets style.display = 'flex'/'none' directly on these five plain modals
+     (showFoldersModal/closeFoldersModal, showMoveModal/closeMoveModal,
+     showAmendmentModal/closeAmendmentModal, previewVersion/closeVersionModal,
+     showUploadModal/closeUploadModal) rather than toggling a class -- JS is
+     unchanged, see "what NOT to change" in the rewrite spec. daisyUI's .modal
+     is hidden via visibility/opacity/pointer-events, which a bare inline
+     `display` does not override on its own, so bridge the two here. */
+  .modal[style*="flex"] {
+      z-index: 2000;
+      visibility: visible;
+      opacity: 1;
+      pointer-events: auto;
+      background-color: oklch(0% 0 0 / 0.4);
+  }
+  .modal[style*="flex"] > .modal-box {
+      opacity: 1;
+      scale: 1;
+      translate: 0;
+  }
+
+  /* Document Quill editor -- third-party widget CSS that can't be expressed as
+     daisyUI components; re-pointed at daisyUI tokens so it follows the theme.
+     Lives inside the ion-ws-* document panel shared with /cases, so only the
+     colors move here -- the layout rule and DOM structure are untouched. */
+  .doc-quill-wrap { display: flex; flex-direction: column; min-height: 400px; }
+  .doc-quill-wrap .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid var(--color-base-300); background: var(--color-base-200); }
+  .doc-quill-wrap .ql-container.ql-snow { border: none; flex: 1; overflow-y: auto; max-height: 60vh; }
+  .doc-quill-wrap .ql-editor { color: var(--color-base-content); font-size: 0.875rem; line-height: 1.7; min-height: 300px; }
+  .doc-quill-wrap .ql-editor.ql-blank::before { color: color-mix(in oklab, var(--color-base-content) 60%, transparent); font-style: normal; }
+  .doc-quill-wrap .ql-snow .ql-stroke { stroke: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
+  .doc-quill-wrap .ql-snow .ql-fill { fill: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
+  .doc-quill-wrap .ql-snow .ql-picker-label { color: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
+  .doc-quill-wrap .ql-snow .ql-picker-options { background: var(--color-base-100); border-color: var(--color-base-300); }
+  .doc-quill-wrap .ql-snow .ql-picker-item { color: var(--color-base-content); }
+  .doc-quill-wrap .ql-snow button:hover .ql-stroke { stroke: var(--color-primary); }
+  .doc-quill-wrap .ql-snow .ql-picker-label:hover { color: var(--color-primary); }
+  .doc-quill-wrap .ql-editor h1, .doc-quill-wrap .ql-editor h2, .doc-quill-wrap .ql-editor h3 { color: var(--color-base-content); }
+  .doc-quill-wrap .ql-editor pre.ql-syntax { background: var(--color-base-200); border: 1px solid var(--color-base-300); border-radius: var(--radius-field); padding: 0.75rem; }
+  .doc-quill-wrap .ql-editor blockquote { border-left: 3px solid var(--color-primary); padding-left: 1rem; color: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
+  .doc-quill-wrap .ql-editor a { color: var(--color-primary); }
+  .doc-quill-wrap .ql-editor code { background: var(--color-base-200); padding: 2px 5px; border-radius: 3px; font-size: 0.8125rem; }
+}
