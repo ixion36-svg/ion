@@ -1,0 +1,100 @@
+/* The box contract: containment, one hairline, one radius ladder.
+ *
+ * Expressed against ION's own class names, so a page opts in by existing
+ * and no template changes. Page layout, container ladder and display type
+ * are left alone -- this is the box, not the page.
+ *
+ * Deliberately sets no table cell padding. Most ION tables are volume
+ * surfaces showing up to the 500-row cap, and Titanium's comfortable
+ * 15px/16px cell would roughly double their row height. Density stays with
+ * the page that owns it.
+ */
+
+/* Containment.
+ *
+ * A grid or flex child defaults to min-width:auto and will not shrink below
+ * its longest unbroken token, so one sha256 widens the track and the text
+ * renders outside the box. These are the containers ION actually uses.
+ */
+.ion-tw [class*="grid-cols-"] > *,
+.ion-tw .card-body > *,
+.ion-tw .stats > *,
+.ion-tw .stat > *,
+.ion-tw .flex-1 {
+  min-width: 0;
+}
+
+/* `anywhere`, not `break-word`: only `anywhere` lowers the intrinsic
+   minimum width, which is what stops the box growing in the first place. */
+.ion-tw :is(code, pre, dd, td, [class*="font-mono"]) {
+  overflow-wrap: anywhere;
+}
+
+/* `white-space: pre` beats overflow-wrap outright, so a <pre> holding an
+   encoded command still clipped at the card edge with the rule above.
+   pre-wrap keeps the significant whitespace and wraps. */
+.ion-tw pre {
+  white-space: pre-wrap;
+}
+
+/* Narrative inside a card, not every paragraph: a toolbar caption capped at
+   75ch would wrap for no reason. */
+.ion-tw .card-body > p {
+  max-width: 75ch;
+  line-height: 1.7;
+}
+
+/* Reading surfaces are quiet. One hairline separates them; buttons and the
+   selected row keep their elevation. */
+.ion-tw .card,
+.ion-tw .stats {
+  box-shadow: none;
+  border: 1px solid var(--ion-border);
+  border-radius: 12px;
+}
+.ion-tw .stat + .stat {
+  border-inline-start: 1px solid var(--ion-border);
+}
+
+/* Radius ladder, keyed to element size. Controls are smaller than cards. */
+.ion-tw :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  border-radius: 9px;
+}
+.ion-tw .badge {
+  border-radius: 6px;
+}
+
+/* Line-height on the small roles inside a card. Table cells are excluded:
+   growing their leading costs rows on a 500-row queue. */
+.ion-tw .card-body :is(dd, dt, label) {
+  line-height: 1.6;
+}
+.ion-tw :is(h1, h2, h3, h4) {
+  text-wrap: balance;
+}
+
+.ion-tw :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  min-height: 40px;
+}
+
+@media (max-width: 780px) {
+  /* below 16px iOS Safari zooms the viewport on focus */
+  .ion-tw :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+    min-height: 44px;
+    font-size: 16px;
+  }
+}
+
+/* ION ships .rise, .pulse-red and .pulse-cyan and had no reduced-motion
+   block, so a page announced itself by moving however the viewer asked. */
+@media (prefers-reduced-motion: reduce) {
+  .ion-tw *,
+  .ion-tw *::before,
+  .ion-tw *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .ion-tw .rise {
+    opacity: 1;
+  }
+}

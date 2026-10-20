@@ -1,0 +1,97 @@
+/* The semantic value scales, declared once.
+ *
+ * ION's CSP sets style-src-attr:none, so a server-computed colour cannot be
+ * an inline style and has to reach the page as a class. That is correct and
+ * stays. What was wrong is that each page froze its own table: severity is
+ * declared by .severity-*, .donut-*, .case-seg-*, .case-dot-*, .rail-sev-*,
+ * .ds-sev-text-* and .alert-attn-chip-* across six sheets, drawing on four
+ * unrelated token families, so no two pages agree and a palette change
+ * cannot propagate.
+ *
+ * Here the server emits the fact it already knows as a data attribute, this
+ * table maps the fact to --v, and a consumer class spends it. Data
+ * attributes are untouched by CSP. Because --v resolves through ION's own
+ * --color-ion-*, the light-mode flip is inherited rather than repeated.
+ *
+ * Adding a scale means adding rows here, not a sheet.
+ */
+
+/* Severity */
+[data-sev="critical"] { --v: var(--color-ion-coral); }
+[data-sev="high"]     { --v: var(--color-ion-amber); }
+[data-sev="medium"]   { --v: var(--color-ion-cyan); }
+[data-sev="low"]      { --v: #64748b; }
+[data-sev="info"]     { --v: var(--color-ion-iris); }
+
+/* Alert and case status */
+[data-status="open"]         { --v: var(--color-ion-cyan); }
+[data-status="acknowledged"] { --v: var(--color-ion-amber); }
+[data-status="investigating"]{ --v: var(--color-ion-amber); }
+[data-status="resolved"]     { --v: var(--color-ion-lime); }
+[data-status="closed"]       { --v: #64748b; }
+
+/* Closure reason and verdict. `other` is the fallback for a reason the map
+   does not know; it must not resolve to a verdict that means something. */
+[data-verdict="true_positive"]        { --v: var(--color-ion-coral); }
+[data-verdict="benign_true_positive"] { --v: var(--color-ion-amber); }
+[data-verdict="false_positive"]       { --v: #64748b; }
+[data-verdict="duplicate"]            { --v: var(--color-ion-iris); }
+[data-verdict="inconclusive"]         { --v: var(--color-ion-amber); }
+[data-verdict="insufficient_data"]    { --v: #64748b; }
+[data-verdict="not_applicable"]       { --v: #64748b; }
+[data-verdict="unspecified"]          { --v: #64748b; }
+[data-verdict="other"]                { --v: #64748b; }
+
+/* RAG health, however a page spells it */
+[data-rag="good"]    { --v: var(--color-ion-lime); }
+[data-rag="fair"]    { --v: var(--color-ion-amber); }
+[data-rag="poor"]    { --v: var(--color-ion-coral); }
+[data-rag="unknown"] { --v: #64748b; }
+
+/* Who produced a record */
+[data-actor="analyst"] { --v: var(--color-ion-cyan); }
+[data-actor="bob"]     { --v: var(--color-ion-iris); }
+[data-actor="system"]  { --v: #64748b; }
+[data-actor="unknown"] { --v: #64748b; }
+
+/* Categorical series for charts and workload bars, cycled by index. The
+   count here is the count a view model may emit. */
+[data-series="0"] { --v: var(--color-ion-cyan); }
+[data-series="1"] { --v: var(--color-ion-iris); }
+[data-series="2"] { --v: var(--color-ion-lime); }
+[data-series="3"] { --v: var(--color-ion-amber); }
+[data-series="4"] { --v: var(--color-ion-coral); }
+[data-series="5"] { --v: #7dd3fc; }
+[data-series="6"] { --v: #c4b5fd; }
+[data-series="7"] { --v: #94a3b8; }
+
+/* Consumers. A scale is spent as text, a tinted chip, a fill or a stroke;
+   nothing else needs to know which scale produced it. */
+.v-text   { color: var(--v, var(--ion-text-muted)); }
+.v-fill   { background: var(--v, var(--ion-text-muted)); }
+.v-stroke { stroke: var(--v, var(--ion-text-muted)); }
+.v-svg    { fill: var(--v, var(--ion-text-muted)); }
+.v-border { border-color: var(--v, var(--ion-border)); }
+
+.v-chip {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  color: var(--v, var(--ion-text-muted));
+  background: color-mix(in oklab, var(--v, #64748b) 14%, transparent);
+}
+
+/* A 3px rail reads severity without colouring the whole row, which is what
+   keeps a 400-row queue legible. */
+.v-rail {
+  display: inline-block;
+  width: 3px;
+  height: 15px;
+  border-radius: 2px;
+  vertical-align: middle;
+  background: var(--v, var(--ion-border));
+}
