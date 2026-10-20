@@ -115,23 +115,10 @@ PAGES: dict[str, tuple[str, tuple[str, ...]]] = {
     # its badges moved to ion-value-scales.css and the rest to ion-pages.css,
     # both compiled into ion.css. The guarantees this registry gave it are
     # re-asserted in tests/test_security_dashboard_scales.py.
-    "scheduler": (
-        "scheduler-page.css",
-        (
-            "#sch-modal-bg.show",                    # modal bridge: JS toggles .show
-            ".sch-card",
-            ".sch-card.ok",
-            ".sch-grid",                             # auto-fit grid, no daisyUI token
-        ),
-    ),
-    "alert_arkime": (
-        "alert-arkime-page.css",
-        (
-            ".arkime-commit .mode-new",              # the radio that drives the switch
-            ".arkime-commit .mode-bar label",
-            '.arkime-commit .mode-new:checked ~ .commit-fields .commit-existing',
-        ),
-    ),
+    # scheduler and alert_arkime are deliberately absent, like
+    # security_dashboard: their rules moved into frontend/ion-pages.css and
+    # they link no sheet. tests/test_retired_page_sheets.py holds what this
+    # registry held for them.
     "wallboard": (
         "wallboard-page.css",
         (

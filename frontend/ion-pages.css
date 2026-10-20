@@ -2672,3 +2672,86 @@ body[data-page="maturity"] .mat-title {
 body[data-page="data_flow"] .df-winlog-row .df-event-id {
   font-weight: 900;
 }
+
+/* ── /scheduler ───────────────────────────────────────────────────────
+ * Was scheduler-page.css. What these override is daisyUI, in ion.css, and
+ * the body[data-page] prefix keeps them ahead of it by specificity now
+ * that they load from inside the same file rather than after it.
+ */
+
+/* JS toggles .show, not daisyUI's .modal-open. Bridge the two. */
+body[data-page="scheduler"] #sch-modal-bg.show,
+body[data-page="scheduler"] #sch-exec-bg.show {
+  pointer-events: auto;
+  visibility: visible;
+  opacity: 1;
+  background-color: oklch(0% 0 0 / 0.4);
+}
+body[data-page="scheduler"] #sch-modal-bg.show > .modal-box,
+body[data-page="scheduler"] #sch-exec-bg.show > .modal-box {
+  opacity: 1;
+  scale: 1;
+  translate: 0;
+  max-width: 720px;
+  max-height: 90vh;
+}
+
+/* Job-card / exec-row left stripe. The state comes from card_cls in
+   ui/scheduler.py and the colours are daisyUI slots ION already themes. */
+body[data-page="scheduler"] .sch-card,
+body[data-page="scheduler"] .sch-exec-row {
+  border-left-width: 4px;
+  border-left-style: solid;
+  border-left-color: var(--color-base-300);
+}
+body[data-page="scheduler"] .sch-card.ok,
+body[data-page="scheduler"] .sch-exec-row.ok { border-left-color: var(--color-success); }
+body[data-page="scheduler"] .sch-card.err,
+body[data-page="scheduler"] .sch-exec-row.err { border-left-color: var(--color-error); }
+body[data-page="scheduler"] .sch-card.run,
+body[data-page="scheduler"] .sch-exec-row.run { border-left-color: var(--color-warning); }
+body[data-page="scheduler"] .sch-card.off {
+  border-left-color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  opacity: 0.7;
+}
+
+body[data-page="scheduler"] .sch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  body[data-page="scheduler"] .sch-grid { grid-template-columns: 1fr; }
+  body[data-page="scheduler"] #sch-modal-bg.show > .modal-box,
+  body[data-page="scheduler"] #sch-exec-bg.show > .modal-box { max-height: 95vh; }
+}
+
+/* ── /alert-arkime ────────────────────────────────────────────────────
+ * Was alert-arkime-page.css. The new/existing switch is a pair of radios
+ * so it submits with the form and needs no script: :checked picks the
+ * label and which fieldset shows.
+ */
+body[data-page="alert_arkime"] .arkime-commit .mode-new,
+body[data-page="alert_arkime"] .arkime-commit .mode-existing {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+/* was rgb(148 163 184), which is --ion-text-muted in dark mode exactly and
+   stayed that pale on a light page. The token flips; the literal did not. */
+body[data-page="alert_arkime"] .arkime-commit .mode-bar label {
+  color: var(--ion-text-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+body[data-page="alert_arkime"] .arkime-commit .mode-new:checked ~ .mode-bar label[for="arkime-mode-new"],
+body[data-page="alert_arkime"] .arkime-commit .mode-existing:checked ~ .mode-bar label[for="arkime-mode-existing"] {
+  background: var(--color-ion-cyan);
+  color: var(--color-ink-950, #0b1220);
+}
+body[data-page="alert_arkime"] .arkime-commit .mode-new:checked ~ .commit-fields .commit-existing,
+body[data-page="alert_arkime"] .arkime-commit .mode-existing:checked ~ .commit-fields .commit-new {
+  display: none;
+}
