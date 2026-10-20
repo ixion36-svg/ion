@@ -1599,6 +1599,17 @@ def _run_migrations(engine: Engine) -> None:
     except Exception as exc:  # never block startup on a backfill
         logger.warning("Detection-proposal enum repair skipped: %s", exc)
 
+    # Same failure, the other tables `ion upgrade` populated with raw SQL:
+    # notes, observable_links and integration_events.
+    try:
+        with engine.begin() as conn:
+            repaired = repair_enum_name_storage(conn)
+        if repaired:
+            logger.info("Repaired %d row(s) storing an enum value where the "
+                        "name belongs", repaired)
+    except Exception as exc:  # never block startup on a backfill
+        logger.warning("Enum name-storage repair skipped: %s", exc)
+
     # The companion threat-modelling product was renamed AEGIS -> METIS. Its
     # ION identity is two rows, not a string in the source, so the rename has
     # to reach the database or `seed-metis` silently creates a second account
@@ -1697,6 +1708,73 @@ def repair_detection_proposal_enums(conn) -> int:
                 {"n": member.name, "v": member.value},
             )
     return len(repaired_ids)
+
+
+#: Every SQLEnum(native_enum=False) column that `ion upgrade` populated with
+#: raw SQL. Those migrations wrote the member VALUE where the column stores the
+#: NAME, and no CHECK constraint stops it, so the row inserts cleanly and then
+#: raises LookupError on hydration -- failing the whole query, not just the row.
+#: Columns are listed per table so one row is counted once however many of its
+#: columns needed repair.
+def _enum_name_storage_targets() -> tuple[tuple[str, tuple[tuple[str, type], ...]], ...]:
+    from ion.models.alert_triage import NoteEntityType
+    from ion.models.integration import (
+        IntegrationEventType,
+        IntegrationStatus,
+        IntegrationType,
+        LogLevel,
+        WebhookStatus,
+    )
+    from ion.models.observable import ObservableLinkType
+
+    return (
+        ("notes", (("entity_type", NoteEntityType),)),
+        ("observable_links", (("link_type", ObservableLinkType),)),
+        ("integration_events", (
+            ("event_type", IntegrationEventType),
+            ("integration_type", IntegrationType),
+            ("level", LogLevel),
+            ("status", WebhookStatus),
+            ("health_status", IntegrationStatus),
+        )),
+    )
+
+
+def repair_enum_name_storage(conn) -> int:
+    """Rewrite enum columns holding a VALUE to its NAME, across the tables
+    `ion upgrade` populated with raw SQL.
+
+    The companion to repair_detection_proposal_enums, which does the same for
+    detection_proposals. Returns the number of rows changed.
+
+    Idempotent: a row already holding a name does not match. A value matching
+    no member is left alone rather than guessed at. A table or column this
+    deployment does not have is skipped.
+    """
+    repaired = 0
+    for table, columns in _enum_name_storage_targets():
+        touched: set[int] = set()
+        for column, enum_cls in columns:
+            for member in enum_cls:
+                if member.value == member.name:
+                    continue
+                try:
+                    rows = conn.execute(
+                        text(f"SELECT id FROM {table} WHERE {column} = :v"),  # noqa: S608
+                        {"v": member.value},
+                    ).fetchall()
+                except Exception:  # table or column absent in this deployment
+                    break
+                if not rows:
+                    continue
+                touched.update(row[0] for row in rows)
+                conn.execute(
+                    text(f"UPDATE {table} SET {column} = :n "  # noqa: S608
+                         f"WHERE {column} = :v"),
+                    {"n": member.name, "v": member.value},
+                )
+        repaired += len(touched)
+    return repaired
 
 
 def _migrate_status_values(engine: Engine) -> None:
