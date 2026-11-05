@@ -595,38 +595,13 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         ]
     },
     {
-        "id": "crtp",
-        "name": "CRTL",
-        "abbr": "CRTL",
-        "provider": "SANS/GIAC",
-        "domain": "threat",
-        "level": "expert",
-        "cost": 6800,
-        "currency": "GBP",
-        "desc": "Threat Intelligence Lead. Expert-level threat intel leadership \u2014 managing teams, developing collection strategies, driving intelligence-led operations.",
-        "duration": "Open book, 3h",
-        "questions": "75",
-        "passing": "66%",
-        "renewal": "4 years / 36 CPEs",
-        "prereqs": [
-            "gti_mgmt"
-        ],
-        "topics": [
-            "Intel Team Leadership",
-            "Collection Strategy",
-            "Purple Teaming",
-            "Campaign Tracking",
-            "Executive Reporting"
-        ]
-    },
-    {
         "id": "ccsk",
         "name": "CSA CCSK",
         "abbr": "CCSK",
         "provider": "Cloud Security Alliance",
         "domain": "cloud",
         "level": "foundation",
-        "cost": 315,
+        "cost": 331,
         "currency": "GBP",
         "desc": "Certificate of Cloud Security Knowledge. Foundational cloud security covering shared responsibility, data security, and cloud governance.",
         "duration": "90 min",
@@ -1227,7 +1202,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "ISC2",
         "domain": "arch",
         "level": "advanced",
-        "cost": 475,
+        "cost": 485,
         "currency": "GBP",
         "desc": "Certified Secure Software Architect (ISSAP concentration). Advanced architecture design \u2014 access control, security assessment, network security architecture.",
         "duration": "3 hours",
@@ -1243,31 +1218,6 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
             "Telecom Security",
             "Security Assessment",
             "Tech-Related BCP/DRP"
-        ]
-    },
-    {
-        "id": "awssap_arch",
-        "name": "AWS Sec Architect",
-        "abbr": "AWS SecArch",
-        "provider": "AWS",
-        "domain": "arch",
-        "level": "advanced",
-        "cost": 240,
-        "currency": "GBP",
-        "desc": "AWS Solutions Architect Professional with security specialization. Multi-account, multi-region secure architecture at enterprise scale.",
-        "duration": "180 min",
-        "questions": "75",
-        "passing": "750/1000",
-        "renewal": "3 years",
-        "prereqs": [
-            "awssaa"
-        ],
-        "topics": [
-            "Multi-Account Strategy",
-            "Network Design",
-            "Data Protection",
-            "Identity Federation",
-            "Disaster Recovery"
         ]
     },
     {
@@ -1510,59 +1460,6 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
             "Uptime Monitoring",
             "SLOs",
             "Alerting"
-        ]
-    },
-    {
-        "id": "ecsiem",
-        "name": "Elastic SIEM Specialist",
-        "abbr": "ESIEM",
-        "provider": "Elastic",
-        "domain": "secops",
-        "level": "intermediate",
-        "cost": 320,
-        "currency": "GBP",
-        "desc": "Specialist certification for Elastic Security SIEM capabilities \u2014 detection rules, timeline investigation, case management, and threat hunting using EQL/ES|QL.",
-        "duration": "120 min",
-        "questions": "35 hands-on",
-        "passing": "Pass/Fail",
-        "renewal": "2 years",
-        "prereqs": [
-            "ecsa"
-        ],
-        "topics": [
-            "Detection Rules",
-            "EQL",
-            "ES|QL",
-            "Timeline",
-            "Cases",
-            "Threat Hunting",
-            "Indicators"
-        ]
-    },
-    {
-        "id": "eced",
-        "name": "Elastic Endpoint Security",
-        "abbr": "ECED",
-        "provider": "Elastic",
-        "domain": "secops",
-        "level": "advanced",
-        "cost": 320,
-        "currency": "GBP",
-        "desc": "Covers Elastic Defend endpoint protection \u2014 malware prevention, ransomware protection, memory threat protection, and endpoint response actions.",
-        "duration": "120 min",
-        "questions": "35 hands-on",
-        "passing": "Pass/Fail",
-        "renewal": "2 years",
-        "prereqs": [
-            "ecsa"
-        ],
-        "topics": [
-            "Elastic Defend",
-            "Malware Prevention",
-            "Ransomware Protection",
-            "Memory Threats",
-            "Response Actions",
-            "Policy Management"
         ]
     },
     {
@@ -2519,6 +2416,35 @@ PRICE_PROVENANCE["itilf"] = {
     ),
 }
 
+PRICE_PROVENANCE["ccsk"] = {
+    "source": "https://exams.cloudsecurityalliance.org/en/faq",
+    "checked_on": "2026-11-05",
+    "vendor_price": 445,
+    "vendor_currency": "USD",
+    "note": (
+        "CCSK v5 exam token, which carries two attempts. CSA's older "
+        "pages still show USD 395 and its World Bank programme page "
+        "USD 455; the exams platform FAQ is the one that governs."
+    ),
+    **_RATE_2026_11_05,
+}
+
+PRICE_PROVENANCE["cisaarch"] = {
+    "source": "https://www.isc2.org/register-for-exam/isc2-exam-pricing",
+    "checked_on": "2026-11-05",
+    "vendor_price": 485.19,
+    "vendor_currency": "GBP",
+    "note": (
+        "ISSAP is USD 599, the same price point as CCSP and CSSLP, and "
+        "ISC2's UK column prices both of those at GBP 485.19 -- read "
+        "directly, not converted. Taking the sterling figure rather "
+        "than converting the dollar one is the closer answer: ISC2's "
+        "UK rate works out around 0.81 to the dollar, well off the "
+        "0.743 market rate, so converting would understate it by about "
+        "GBP 40."
+    ),
+}
+
 PRICE_PROVENANCE["oscp"] = {
     "source": "https://www.offsec.com/products/pen-200/",
     "checked_on": "2026-11-05",
@@ -2546,36 +2472,6 @@ PRICE_PROVENANCE["oscp"] = {
 #: visible inconsistency with an invisible wrong answer. A test asserts
 #: these name real entries, so the list cannot rot once they are fixed.
 KNOWN_ISSUES: Dict[str, str] = {
-    "crtp": (
-        "Four fields, four different certifications. The id is CRTP "
-        "(Certified Red Team Professional, Altered Security), the name "
-        "and abbr are CRTL (Certified Red Team Lead, Zero Point "
-        "Security), the provider is SANS/GIAC, and the description is "
-        "for a threat intelligence leadership course. CRTO is already "
-        "here under Zero Point Security and GIAC's threat-intel "
-        "management certification is already here as gti_mgmt. Its GBP "
-        "6,800 is the old SANS flat rate, wrong for any of the three "
-        "readings. Needs somebody to say which was meant."
-    ),
-    "awssap_arch": (
-        "Named 'AWS Sec Architect'. AWS has no Security Architect "
-        "certification: its security credential is the Security - "
-        "Specialty already here as awsscs, and its architect ones are "
-        "the Solutions Architect Associate and Professional, also "
-        "already here. The id duplicates awssap's prefix, so it looks "
-        "copied from it. Probably a duplicate to delete, but deleting "
-        "a catalogue entry is somebody's call, not this file's."
-    ),
-    "ecsiem": (
-        "'Elastic SIEM Specialist'. Elastic's programme lists three "
-        "credentials -- Certified Analyst, Certified Engineer and "
-        "Certified Observability Engineer -- all three already here "
-        "under their own ids. No SIEM Specialist is among them."
-    ),
-    "eced": (
-        "'Elastic Endpoint Security'. Same as ecsiem: not among the "
-        "three credentials Elastic's programme lists."
-    ),
     "gcsec": (
         "The id says sec; the name and description are both Google "
         "Professional Cloud ARCHITECT. The security one is gcpse, "
@@ -2662,6 +2558,7 @@ UNPUBLISHED_PRICES: Tuple[str, ...] = (
     "ejpt",                                         # INE
     "crto",                                         # Zero Point Security
     "crt", "cfce", "cde",                           # CREST, IACIS, Cybrary
+    "sabsa",                                        # SABSA Institute
 )
 
 
