@@ -109,7 +109,7 @@
             <span class="badge badge-xs badge-ghost shrink-0">{{ o.kind }}</span>
             <span class="text-xs grow">{{ o.name }}</span>
             {% if o.cost %}
-              <span class="text-xs text-base-content/60 shrink-0">£{{ '{:,.0f}'.format(o.cost) }}</span>
+              <span class="text-xs text-base-content/60 shrink-0">{{ money(o.cost) }}</span>
             {% endif %}
           </li>
         {% endfor %}
@@ -121,7 +121,7 @@
     {% endif %}
 
     <p class="text-xs text-base-content/50 mt-3">
-      Spent £{{ '{:,.0f}'.format(journey.spend) }}, committed £{{ '{:,.0f}'.format(journey.committed) }}.
+      Spent {{ money(journey.spend) }}, committed {{ money(journey.committed) }}.
     </p>
 
   </div>

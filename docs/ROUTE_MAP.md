@@ -288,8 +288,8 @@ Server-rendered fragments. `render_view` routes also answer the view model as JS
 | POST | `/ui/tools/ioc` | `alert:read` | [tools.py:402](src/ion/web/ui/tools.py#L402) |  | `tools.html` |
 | POST | `/ui/tools/ioc-bulk` | `alert:read` | [tools.py:475](src/ion/web/ui/tools.py#L475) |  | `tools.html` |
 | GET | `/ui/tools/translator-languages` | `alert:read` | [tools.py:542](src/ion/web/ui/tools.py#L542) |  | `tools.html` |
-| GET | `/ui/training/forecast` | `security:read` | [_training_plans.py:83](src/ion/web/ui/_training_plans.py#L83) | `_fragments/training_plans_forecast.html` | `training.html` |
-| GET | `/ui/training/plans/{plan_id}/items` | `alert:read` | [_training_plans.py:63](src/ion/web/ui/_training_plans.py#L63) | `_fragments/training_plans_items.html` | `training.html` |
+| GET | `/ui/training/forecast` | `security:read` | [_training_plans.py:87](src/ion/web/ui/_training_plans.py#L87) | `_fragments/training_plans_forecast.html` | `training.html` |
+| GET | `/ui/training/plans/{plan_id}/items` | `alert:read` | [_training_plans.py:67](src/ion/web/ui/_training_plans.py#L67) | `_fragments/training_plans_items.html` | `training.html` |
 | GET | `/ui/users` | `user:read` | [users.py:263](src/ion/web/ui/users.py#L263) | `_fragments/users.html` | `users.html` |
 | GET | `/ui/users/role-options` | `user:read` | [users.py:324](src/ion/web/ui/users.py#L324) | `_fragments/users_role_options.html` | `users.html` |
 | GET | `/ui/verdict-review` | `verdict:review` | [verdict_review.py:176](src/ion/web/ui/verdict_review.py#L176) | `_fragments/verdict_review.html` | `verdict_review.html` |
@@ -992,13 +992,13 @@ JSON endpoints.
 | GET | `/api/skills/team-overview` | `security:read` | [skills_api.py:364](src/ion/web/skills_api.py#L364) |  | `training.html` |
 | GET | `/api/skills/team-overview/departure-impact` | `security:read` | [skills_api.py:427](src/ion/web/skills_api.py#L427) |  | `training.html` |
 | GET | `/api/skills/training-plans` | `alert:read` | [skills_api.py:1102](src/ion/web/skills_api.py#L1102) |  | `training.html` |
-| POST | `/api/skills/training-plans` | `alert:read` | [skills_api.py:1203](src/ion/web/skills_api.py#L1203) |  | `training.html` |
+| POST | `/api/skills/training-plans` | `alert:read` | [skills_api.py:1229](src/ion/web/skills_api.py#L1229) |  | `training.html` |
 | GET | `/api/skills/training-plans/forecast` | `security:read` | [skills_api.py:1126](src/ion/web/skills_api.py#L1126) |  | `training.html` |
-| DELETE | `/api/skills/training-plans/{plan_id}` | `alert:read` | [skills_api.py:1265](src/ion/web/skills_api.py#L1265) |  |  |
-| PUT | `/api/skills/training-plans/{plan_id}` | `alert:read` | [skills_api.py:1230](src/ion/web/skills_api.py#L1230) |  |  |
-| POST | `/api/skills/training-plans/{plan_id}/items` | `alert:read` | [skills_api.py:1285](src/ion/web/skills_api.py#L1285) |  |  |
-| DELETE | `/api/skills/training-plans/{plan_id}/items/{item_id}` | `alert:read` | [skills_api.py:1392](src/ion/web/skills_api.py#L1392) |  |  |
-| PUT | `/api/skills/training-plans/{plan_id}/items/{item_id}` | `alert:read` | [skills_api.py:1343](src/ion/web/skills_api.py#L1343) |  |  |
+| DELETE | `/api/skills/training-plans/{plan_id}` | `alert:read` | [skills_api.py:1291](src/ion/web/skills_api.py#L1291) |  |  |
+| PUT | `/api/skills/training-plans/{plan_id}` | `alert:read` | [skills_api.py:1256](src/ion/web/skills_api.py#L1256) |  |  |
+| POST | `/api/skills/training-plans/{plan_id}/items` | `alert:read` | [skills_api.py:1311](src/ion/web/skills_api.py#L1311) |  |  |
+| DELETE | `/api/skills/training-plans/{plan_id}/items/{item_id}` | `alert:read` | [skills_api.py:1418](src/ion/web/skills_api.py#L1418) |  |  |
+| PUT | `/api/skills/training-plans/{plan_id}/items/{item_id}` | `alert:read` | [skills_api.py:1369](src/ion/web/skills_api.py#L1369) |  |  |
 | GET | `/api/soc-health/scorecard` | `alert:read` | [soc_health_api.py:16](src/ion/web/soc_health_api.py#L16) |  |  |
 | GET | `/api/stats` | — | [api.py:2528](src/ion/web/api.py#L2528) |  |  |
 | GET | `/api/stories` | `playbook:read` | [story_api.py:190](src/ion/web/story_api.py#L190) |  | `stories.html` |

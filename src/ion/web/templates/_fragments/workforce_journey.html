@@ -157,8 +157,8 @@
     {% endif %}
 
     <p class="text-sm text-base-content/50 mt-3">
-      Training spend so far £{{ '{:,}'.format(active.spend) }}, with
-      £{{ '{:,}'.format(active.committed) }} committed.
+      Training spend so far {{ money(active.spend) }}, with
+      {{ money(active.committed) }} committed.
     </p>
   </div>
 </div>

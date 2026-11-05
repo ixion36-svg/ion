@@ -34,6 +34,10 @@ class TrainingForecastView(TypedDict):
     total_certs: int | None
     completion: int | None
     company_liability: float | None
+    #: Non-empty only when the plans span more than one currency, in
+    #: which case the totals added amounts that cannot be added and the
+    #: fragment says so instead of printing one.
+    mixed_currencies: list[str]
 
 
 def _liability(values: dict[str, Any] | None) -> float | None:
@@ -113,5 +117,6 @@ def training_forecast(request: Request,
         'forecasts': forecasts, 'totals': totals, 'by_employment_type': employment,
         'plan_count': data.get('plan_count'), 'total_certs': total_certs,
         'completion': completion, 'company_liability': _liability(totals),
+        'mixed_currencies': data.get('mixed_currencies') or [],
     }
     return render_view(request, '_fragments/training_plans_forecast.html', view)

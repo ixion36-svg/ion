@@ -115,7 +115,7 @@
                   <span class="badge badge-xs badge-ghost shrink-0">{{ r.kind }}</span>
                   <span class="grow text-sm">{{ r.name }}</span>
                   <span class="text-xs text-base-content/50 shrink-0">
-                    {% if r.validity_months %}renew every {{ r.validity_months }} months{% else %}no expiry{% endif %}{% if r.cost %}, £{{ '{:,.0f}'.format(r.cost) }}{% endif %}
+                    {% if r.validity_months %}renew every {{ r.validity_months }} months{% else %}no expiry{% endif %}{% if r.cost %}, {{ money(r.cost) }}{% endif %}
                   </span>
                   <form hx-post="/ui/workforce/profile-requirements/{{ r.id }}/remove"
                         hx-target="#wf-tab" hx-swap="innerHTML" class="shrink-0">

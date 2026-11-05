@@ -508,6 +508,26 @@ def _run_migrations(engine: Engine) -> None:
         if "tenant_id" not in existing:
             _add_column_tolerant(engine, "users", "tenant_id", "INTEGER")
 
+    # training_plan_items: what the price is in, and where it came from.
+    #
+    # There was no currency anywhere in the money path. It worked because
+    # every price in the product was GBP and the templates hardcoded a "£",
+    # so the first amount entered in another currency would have been added
+    # to the pounds and labelled as pounds, with nothing on screen to show
+    # it. All three are nullable and nothing is backfilled: a NULL currency
+    # means the estate's configured one, which is what every existing row
+    # already is, and writing a literal "GBP" into them would assert
+    # something nobody recorded.
+    if insp.has_table("training_plan_items"):
+        existing = {col["name"] for col in insp.get_columns("training_plan_items")}
+        for col_name, col_def in (
+            ("currency", "VARCHAR(3)"),
+            ("price_source", "VARCHAR(300)"),
+            ("price_checked_on", "DATE"),
+        ):
+            if col_name not in existing:
+                _add_column_tolerant(engine, "training_plan_items", col_name, col_def)
+
     # (route audit phase 8): DetectionProposal absorbs the retired
     # TuningProposal pipeline. Bob wrote tuning proposals unattended off a
     # false-positive verdict, but DetectionProposal had nowhere to put the
