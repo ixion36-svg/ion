@@ -623,7 +623,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "id": "ccsk",
         "name": "CSA CCSK",
         "abbr": "CCSK",
-        "provider": "ISC2",
+        "provider": "Cloud Security Alliance",
         "domain": "cloud",
         "level": "foundation",
         "cost": 315,
@@ -1131,7 +1131,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "id": "itilf",
         "name": "ITIL 4 Foundation",
         "abbr": "ITIL4",
-        "provider": "APMG",
+        "provider": "PeopleCert",
         "domain": "grc",
         "level": "foundation",
         "cost": 541,
@@ -1178,7 +1178,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "id": "togaf",
         "name": "TOGAF 9",
         "abbr": "TOGAF",
-        "provider": "APMG",
+        "provider": "The Open Group",
         "domain": "arch",
         "level": "intermediate",
         "cost": 550,
@@ -1201,7 +1201,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "id": "sabsa",
         "name": "SABSA Foundation",
         "abbr": "SABSA",
-        "provider": "APMG",
+        "provider": "The SABSA Institute",
         "domain": "arch",
         "level": "intermediate",
         "cost": 595,
@@ -1222,8 +1222,8 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
     },
     {
         "id": "cisaarch",
-        "name": "CSSA",
-        "abbr": "CSSA",
+        "name": "ISSAP",
+        "abbr": "ISSAP",
         "provider": "ISC2",
         "domain": "arch",
         "level": "advanced",
@@ -1840,8 +1840,8 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
     },
     {
         "id": "ccht",
-        "name": "CrowdStrike CCHT",
-        "abbr": "CCHT",
+        "name": "CrowdStrike CCFH",
+        "abbr": "CCFH",
         "provider": "CrowdStrike",
         "domain": "threat",
         "level": "intermediate",
@@ -2546,106 +2546,71 @@ PRICE_PROVENANCE["oscp"] = {
 #: visible inconsistency with an invisible wrong answer. A test asserts
 #: these name real entries, so the list cannot rot once they are fixed.
 KNOWN_ISSUES: Dict[str, str] = {
-    "itilf": (
-        "Attributed to APMG. ITIL is PeopleCert's, which bought the "
-        "scheme with AXELOS; APMG was an examination institute for "
-        "earlier versions, which is probably where this came from. "
-        "Priced anyway from PeopleCert's own sterling listing, since "
-        "the fee does not depend on who the catalogue credits."
-    ),
-    "togaf": (
-        "Attributed to APMG. TOGAF is The Open Group's. The entry also "
-        "says TOGAF 9, which the TOGAF Standard 10th Edition "
-        "superseded, so the name and the price may both describe a "
-        "certification no longer sold."
-    ),
-    "sabsa": (
-        "Attributed to APMG. SABSA is the SABSA Institute's, delivered "
-        "through its own accredited training partners."
-    ),
-    "iso27001": (
-        "Attributed to APMG. ISO 27001 Lead Auditor is not one "
-        "organisation's: PECB, BSI and several others each run their "
-        "own, at prices that differ by more than the figure recorded. "
-        "Pricing it means first deciding whose."
-    ),
-    "ccht": (
-        "Abbreviated CCHT. CrowdStrike's hunting credential is CCFH, "
-        "Certified Falcon Hunter; the entry's description ('Certified "
-        "Threat Hunter') describes it correctly but the code does not "
-        "match. Priced anyway, because CrowdStrike charges the same "
-        "USD 250 for every certification voucher, so the figure holds "
-        "whichever of the two the entry means."
-    ),
-    "gcsec": (
-        "The id says sec, the name and description say Google "
-        "Professional Cloud ARCHITECT. The security one is gcpse, "
-        "already here separately. Priced anyway: Google charges the "
-        "same professional-level registration fee either way."
-    ),
-    "osce3": (
-        "Not a product anybody can buy. OSCE3 is awarded for holding "
-        "OSED, OSEP and OSWE together, so its cost is whichever route "
-        "somebody takes to all three -- three course-and-cert bundles "
-        "at USD 1,749 each, or a Learn One year at USD 2,199 that "
-        "covers them if they finish in time. A single figure here means "
-        "picking one of those routes on the reader's behalf, so the "
-        "original GBP 4,350 is left as an estimate rather than restated."
-    ),
-    "cks": (
-        "The Linux Foundation lists no standalone CKS price in what was "
-        "read: only a CKA+CKS bundle at USD 825 against CKA's USD 445. "
-        "Subtracting gives about USD 380, but that is arithmetic on two "
-        "list prices rather than a price anybody publishes, so it is "
-        "not recorded as checked."
-    ),
-    "ecsiem": (
-        "'Elastic SIEM Specialist'. Elastic's certification programme "
-        "lists three credentials -- Certified Analyst, Certified "
-        "Engineer and Certified Observability Engineer -- all three of "
-        "which are already in this catalogue under their own ids. No "
-        "SIEM Specialist appears among them, so there is nothing to "
-        "price it against."
-    ),
-    "eced": (
-        "'Elastic Endpoint Security'. Same as ecsiem: not among the "
-        "three credentials Elastic's certification programme lists."
-    ),
-    "awssap_arch": (
-        "Named 'AWS Sec Architect'. AWS has no Security Architect "
-        "certification: its security credential is the Security - "
-        "Specialty already here as awsscs, and its architect ones are "
-        "the Solutions Architect Associate and Professional, also "
-        "already here. The id duplicates awssap's prefix, which "
-        "suggests it was copied from it. Left unpriced rather than "
-        "guessed at."
-    ),
-    "ccsk": (
-        "Filed under ISC2. CCSK is the Cloud Security Alliance's "
-        "Certificate of Cloud Security Knowledge, which the entry's own "
-        "name ('CSA CCSK') and description both say. ISC2 does not issue "
-        "it, so its price was not checked against the ISC2 table with "
-        "the others."
-    ),
-    "cisaarch": (
-        "The id is cisaarch, the name and abbr are CSSA, and the "
-        "description is for ISSAP -- ISC2's architecture concentration, "
-        "which is the only one of the three that exists. CSSA is not an "
-        "ISC2 certification. Left unpriced: the ISC2 pricing table "
-        "covers CISSP, CCSP, SSCP, CSSLP and CC, and guessing which of "
-        "the three readings to price would be inventing the entry."
-    ),
     "crtp": (
         "Four fields, four different certifications. The id is CRTP "
         "(Certified Red Team Professional, Altered Security), the name "
         "and abbr are CRTL (Certified Red Team Lead, Zero Point "
         "Security), the provider is SANS/GIAC, and the description is "
         "for a threat intelligence leadership course. CRTO is already "
-        "in the catalogue separately and correctly under Zero Point "
-        "Security, and GIAC's threat-intel management certification is "
-        "already here as gti_mgmt. Its GBP 6,800 is the SANS flat rate, "
-        "which is wrong for any of the three readings, so it is left out "
-        "of the SANS price check above."
+        "here under Zero Point Security and GIAC's threat-intel "
+        "management certification is already here as gti_mgmt. Its GBP "
+        "6,800 is the old SANS flat rate, wrong for any of the three "
+        "readings. Needs somebody to say which was meant."
+    ),
+    "awssap_arch": (
+        "Named 'AWS Sec Architect'. AWS has no Security Architect "
+        "certification: its security credential is the Security - "
+        "Specialty already here as awsscs, and its architect ones are "
+        "the Solutions Architect Associate and Professional, also "
+        "already here. The id duplicates awssap's prefix, so it looks "
+        "copied from it. Probably a duplicate to delete, but deleting "
+        "a catalogue entry is somebody's call, not this file's."
+    ),
+    "ecsiem": (
+        "'Elastic SIEM Specialist'. Elastic's programme lists three "
+        "credentials -- Certified Analyst, Certified Engineer and "
+        "Certified Observability Engineer -- all three already here "
+        "under their own ids. No SIEM Specialist is among them."
+    ),
+    "eced": (
+        "'Elastic Endpoint Security'. Same as ecsiem: not among the "
+        "three credentials Elastic's programme lists."
+    ),
+    "gcsec": (
+        "The id says sec; the name and description are both Google "
+        "Professional Cloud ARCHITECT. The security one is gcpse, "
+        "already here separately. The id cannot simply be renamed "
+        "because gcpse lists it as a prereq, so fixing it means "
+        "deciding whether the pathway is right as well. Priced anyway: "
+        "Google charges the same professional-level fee either way."
+    ),
+    "iso27001": (
+        "Attributed to APMG. ISO 27001 Lead Auditor is not one "
+        "organisation's: PECB, BSI and several others each run their "
+        "own, at prices differing by more than the figure recorded. "
+        "Pricing it means first deciding whose."
+    ),
+    "togaf": (
+        "The entry says TOGAF 9, which the TOGAF Standard 10th Edition "
+        "superseded, so both the name and the price may describe a "
+        "certification no longer sold. The provider was corrected to "
+        "The Open Group; the version was left, because moving it to 10 "
+        "would change what the entry is rather than correct it."
+    ),
+    "osce3": (
+        "Not a product anybody can buy. OSCE3 is awarded for holding "
+        "OSED, OSEP and OSWE together, so its cost is whichever route "
+        "somebody takes to all three -- three course-and-cert bundles "
+        "at USD 1,749 each, or a Learn One year at USD 2,199 that "
+        "covers them if they finish in time. A single figure means "
+        "picking a route on the reader's behalf."
+    ),
+    "cks": (
+        "The Linux Foundation publishes no standalone CKS price in "
+        "what was read: only a CKA+CKS bundle at USD 825 against CKA's "
+        "USD 445. Subtracting gives about USD 380, but that is "
+        "arithmetic on two list prices rather than a price anybody "
+        "publishes."
     ),
 }
 
