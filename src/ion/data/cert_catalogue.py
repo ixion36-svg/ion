@@ -128,7 +128,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "CompTIA",
         "domain": "secops",
         "level": "intermediate",
-        "cost": 310,
+        "cost": 316,
         "currency": "GBP",
         "desc": "Validates behavioral analytics skills to detect and respond to cybersecurity threats through continuous security monitoring.",
         "duration": "165 min",
@@ -292,7 +292,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "ISC2",
         "domain": "secops",
         "level": "intermediate",
-        "cost": 200,
+        "cost": 202,
         "currency": "GBP",
         "desc": "Systems Security Certified Practitioner. Validates hands-on security operations skills \u2014 access controls, IR, cryptography, network security.",
         "duration": "4 hours",
@@ -649,7 +649,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "AWS",
         "domain": "cloud",
         "level": "foundation",
-        "cost": 120,
+        "cost": 111,
         "currency": "GBP",
         "desc": "AWS Solutions Architect Associate. Designing distributed systems on AWS \u2014 VPC, IAM, S3, EC2, Lambda. Foundation for cloud security understanding.",
         "duration": "130 min",
@@ -673,7 +673,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "AWS",
         "domain": "cloud",
         "level": "intermediate",
-        "cost": 240,
+        "cost": 223,
         "currency": "GBP",
         "desc": "AWS Certified Security Specialty. Deep dive into AWS security services \u2014 GuardDuty, Security Hub, KMS, WAF, and incident response in cloud environments.",
         "duration": "170 min",
@@ -698,7 +698,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "Microsoft",
         "domain": "cloud",
         "level": "intermediate",
-        "cost": 130,
+        "cost": 123,
         "currency": "GBP",
         "desc": "Microsoft Azure Security Technologies. Managing identity and access, platform protection, security operations, and data security in Azure.",
         "duration": "150 min",
@@ -743,7 +743,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "ISC2",
         "domain": "cloud",
         "level": "advanced",
-        "cost": 475,
+        "cost": 485,
         "currency": "GBP",
         "desc": "Certified Cloud Security Professional. Advanced cloud security across all major platforms \u2014 architecture, data security, operations, compliance, and legal.",
         "duration": "4 hours",
@@ -769,7 +769,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "AWS",
         "domain": "cloud",
         "level": "advanced",
-        "cost": 240,
+        "cost": 223,
         "currency": "GBP",
         "desc": "AWS Solutions Architect Professional. Expert-level multi-account architecture, cost optimization, and complex migration strategies.",
         "duration": "180 min",
@@ -1012,7 +1012,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "ISC2",
         "domain": "grc",
         "level": "advanced",
-        "cost": 749,
+        "cost": 607,
         "currency": "GBP",
         "desc": "The most recognized information security management certification globally. Covers 8 domains spanning the full breadth of security practice. Requires 5 years experience.",
         "duration": "6 hours (CAT)",
@@ -1348,7 +1348,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "ISC2",
         "domain": "devsec",
         "level": "advanced",
-        "cost": 475,
+        "cost": 485,
         "currency": "GBP",
         "desc": "Certified Secure Software Lifecycle Professional. Secure SDLC from requirements through deployment \u2014 threat modeling, secure coding, and testing.",
         "duration": "4 hours",
@@ -1668,7 +1668,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "Microsoft",
         "domain": "secops",
         "level": "intermediate",
-        "cost": 130,
+        "cost": 123,
         "currency": "GBP",
         "desc": "Microsoft Security Operations Analyst. Covers Microsoft Sentinel (SIEM), Defender XDR, threat hunting with KQL, and incident management in the Microsoft security stack.",
         "duration": "150 min",
@@ -1692,7 +1692,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "Microsoft",
         "domain": "arch",
         "level": "advanced",
-        "cost": 130,
+        "cost": 123,
         "currency": "GBP",
         "desc": "Microsoft Cybersecurity Architect Expert. Designing zero trust architecture, governance strategies, security operations architecture, and data/application security strategy across Microsoft platforms.",
         "duration": "150 min",
@@ -1718,7 +1718,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "Microsoft",
         "domain": "cloud",
         "level": "intermediate",
-        "cost": 130,
+        "cost": 123,
         "currency": "GBP",
         "desc": "Identity and Access Administrator. Managing Azure AD/Entra ID \u2014 conditional access, MFA, identity governance, PIM, and external identities in hybrid environments.",
         "duration": "150 min",
@@ -2238,6 +2238,84 @@ PRICE_PROVENANCE: Dict[str, Dict[str, Any]] = {
     cert_id: dict(_SANS_GIAC_CHECK) for cert_id in _SANS_GIAC_IDS
 }
 
+#: ISC2 publishes a UK price in sterling, so these need no rate at all
+#: and no rounding beyond the pence. That is the best case: a vendor
+#: figure in the estate's own currency cannot go stale through FX, only
+#: through the vendor changing it.
+_ISC2 = {
+    "source": "https://www.isc2.org/register-for-exam/isc2-exam-pricing",
+    "checked_on": "2026-11-05",
+    "vendor_currency": "GBP",
+}
+
+PRICE_PROVENANCE["sscp"] = {**_ISC2, "vendor_price": 201.69}
+PRICE_PROVENANCE["ccsp"] = {**_ISC2, "vendor_price": 485.19}
+PRICE_PROVENANCE["csslp"] = {**_ISC2, "vendor_price": 485.19}
+PRICE_PROVENANCE["cissp"] = {
+    **_ISC2,
+    "vendor_price": 606.69,
+    "note": (
+        "Was 749, which is ISC2's US dollar price recorded as sterling. "
+        "The UK standard registration is GBP 606.69, so the catalogue "
+        "was over by about GBP 142 -- not a stale rate but a currency "
+        "label applied to the wrong number, which is the failure the "
+        "currency column exists to make visible."
+    ),
+}
+
+PRICE_PROVENANCE["cysa"] = {
+    "source": "https://www.comptia.org/en-us/blog/how-much-does-the-comptia-cysa-certification-cost/",
+    "checked_on": "2026-11-05",
+    "vendor_price": 425,
+    "vendor_currency": "USD",
+    "rate": 0.74299,
+    "rate_source": "European Central Bank reference rate via api.frankfurter.dev",
+    "rate_date": "2026-11-05",
+    "note": (
+        "CySA+ V4 (CS0-004) US retail voucher. CompTIA's own exam-price "
+        "page lists no figures, so this is from their costing article on "
+        "the same domain. The other five CompTIA entries could not be "
+        "confirmed from either."
+    ),
+}
+
+_RATE_2026_11_05 = {
+    "rate": 0.74299,
+    "rate_source": "European Central Bank reference rate via api.frankfurter.dev",
+    "rate_date": "2026-11-05",
+}
+
+#: AWS publishes one USD price per exam level worldwide.
+_AWS = {
+    "source": "https://aws.amazon.com/certification/",
+    "checked_on": "2026-11-05",
+    "vendor_currency": "USD",
+    **_RATE_2026_11_05,
+}
+PRICE_PROVENANCE["awssaa"] = {**_AWS, "vendor_price": 150, "note": "Associate level."}
+PRICE_PROVENANCE["awsscs"] = {**_AWS, "vendor_price": 300, "note": "Specialty level."}
+PRICE_PROVENANCE["awssap"] = {**_AWS, "vendor_price": 300, "note": "Professional level."}
+
+#: Microsoft lists USD 165 for Associate and Expert exams, but prices
+#: each region separately, so the UK figure is not necessarily this
+#: converted. Recorded as the published rate converted at the same ECB
+#: rate as everything else, with that caveat attached rather than
+#: implied -- it is the best available figure, not the UK list price.
+_MSFT = {
+    "source": "https://learn.microsoft.com/en-us/credentials/certifications/",
+    "checked_on": "2026-11-05",
+    "vendor_price": 165,
+    "vendor_currency": "USD",
+    "note": (
+        "Microsoft's published Associate/Expert rate. Microsoft prices "
+        "per region, so the UK list price may differ from this "
+        "conversion; the exam page shows the local figure at checkout."
+    ),
+    **_RATE_2026_11_05,
+}
+for _exam in ("az500", "sc200", "sc300", "sc100"):
+    PRICE_PROVENANCE[_exam] = dict(_MSFT)
+
 PRICE_PROVENANCE["oscp"] = {
     "source": "https://www.offsec.com/products/pen-200/",
     "checked_on": "2026-11-05",
@@ -2265,6 +2343,30 @@ PRICE_PROVENANCE["oscp"] = {
 #: visible inconsistency with an invisible wrong answer. A test asserts
 #: these name real entries, so the list cannot rot once they are fixed.
 KNOWN_ISSUES: Dict[str, str] = {
+    "awssap_arch": (
+        "Named 'AWS Sec Architect'. AWS has no Security Architect "
+        "certification: its security credential is the Security - "
+        "Specialty already here as awsscs, and its architect ones are "
+        "the Solutions Architect Associate and Professional, also "
+        "already here. The id duplicates awssap's prefix, which "
+        "suggests it was copied from it. Left unpriced rather than "
+        "guessed at."
+    ),
+    "ccsk": (
+        "Filed under ISC2. CCSK is the Cloud Security Alliance's "
+        "Certificate of Cloud Security Knowledge, which the entry's own "
+        "name ('CSA CCSK') and description both say. ISC2 does not issue "
+        "it, so its price was not checked against the ISC2 table with "
+        "the others."
+    ),
+    "cisaarch": (
+        "The id is cisaarch, the name and abbr are CSSA, and the "
+        "description is for ISSAP -- ISC2's architecture concentration, "
+        "which is the only one of the three that exists. CSSA is not an "
+        "ISC2 certification. Left unpriced: the ISC2 pricing table "
+        "covers CISSP, CCSP, SSCP, CSSLP and CC, and guessing which of "
+        "the three readings to price would be inventing the entry."
+    ),
     "crtp": (
         "Four fields, four different certifications. The id is CRTP "
         "(Certified Red Team Professional, Altered Security), the name "

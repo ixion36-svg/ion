@@ -215,10 +215,16 @@ class TestThePriceCheckIsHonest:
             assert cert is not None, cert_id
             rate = entry.get("rate")
             if rate is None:
-                # Not converted: the entry must then be in the vendor's
-                # own currency at the vendor's own number.
+                # Not converted: the entry must be in the vendor's own
+                # currency at the vendor's own number, to the pound.
+                # Catalogue costs are whole pounds and vendors quote
+                # pence -- ISC2's UK CISSP is GBP 606.69 -- so the
+                # rounding is part of the record, not slack in it.
                 assert cert["currency"] == entry["vendor_currency"], cert_id
-                assert cert["cost"] == entry["vendor_price"], cert_id
+                assert cert["cost"] == round(entry["vendor_price"]), (
+                    f"{cert_id}: catalogue {cert['cost']} against a "
+                    f"vendor price of {entry['vendor_price']}"
+                )
                 continue
             assert cert["cost"] == round(entry["vendor_price"] * rate), (
                 f"{cert_id}: {entry['vendor_price']} * {rate} = "
