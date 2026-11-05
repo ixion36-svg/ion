@@ -197,7 +197,7 @@ Write-Ok "$($namedBefore.Count) named volumes recorded"
 # ------------------------------------------------------------------- prune
 
 if (-not $SkipPrune) {
-    $anon = @(docker volume ls -q -f dangling=true) | Where-Object { $_ -match $AnonPattern }
+    $anon = @(@(docker volume ls -q -f dangling=true) | Where-Object { $_ -match $AnonPattern })
 
     # The filter above is the safety boundary, so assert it rather than trust it.
     $leaked = $anon | Where-Object { $_ -notmatch $AnonPattern }
