@@ -430,6 +430,17 @@
     </div>
     <div id="sa-form"></div>
     <div id="sa-forecast"></div>
+
+    {# Served by ion.web.ui.skills_certifications rather than built here:
+       this page renders through the generated training-node-N templates,
+       and a new block would mean hand-editing a generated file. Refreshed
+       on certs-refresh, which the save handler fires once the career goal
+       has actually been written -- the suggestions are keyed off the
+       stored goal, not the unsaved value in the select. #}
+    <div id="sa-suggested-certs"
+         hx-get="/ui/skills/suggested-certifications"
+         hx-trigger="load, certs-refresh from:body"
+         hx-swap="innerHTML"></div>
     <div class="flex justify-end gap-3 mt-6 items-center">
         <button class="btn btn-ghost btn-sm mr-auto hover:border-error hover:text-error hover:bg-error/10" id="sa-delete-btn" data-click-action="deleteAssessment" title="Delete your entire self-assessment"><i class="icon-trash-2"></i> Reset Assessment</button>
         <span class="sa-save-status" id="sa-save-status">Saved successfully</span>
@@ -3378,6 +3389,9 @@ async function saveAssessment() {
         }
 
         savedRatings = {...userRatings};
+        // The career goal is now stored, so the suggested certificates can
+        // be rebuilt against it.
+        document.body.dispatchEvent(new CustomEvent('certs-refresh'));
         status.textContent = 'Saved successfully';
         status.classList.add('show');
         setTimeout(() => status.classList.remove('show'), 3000);

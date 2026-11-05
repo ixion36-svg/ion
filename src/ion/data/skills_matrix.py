@@ -519,3 +519,26 @@ def skills_role_for(catalogue_id: str) -> Optional[str]:
 def unmapped_catalogue_roles() -> List[str]:
     """Catalogue roles the matrix cannot speak about."""
     return sorted(k for k, v in CATALOGUE_TO_SKILLS_ROLE.items() if v is None)
+
+
+def catalogue_roles_for(skills_role_id: str) -> Tuple[str, ...]:
+    """The catalogue roles that map to one matrix role.
+
+    The inverse of CATALOGUE_TO_SKILLS_ROLE, and many to one on purpose:
+    five catalogue posts map to l3-analyst, so anything asked of a matrix
+    role has to gather from all of them rather than pick the first. A
+    question like "what certificates suit this role" answered from one
+    post would quietly drop the others' lists.
+
+    An empty tuple means no catalogue post maps to that matrix role,
+    which a caller has to tell apart from a post that lists no
+    certificates -- the first is a gap in the bridge, the second is an
+    answer.
+    """
+    if not skills_role_id:
+        return ()
+    return tuple(sorted(
+        catalogue_id
+        for catalogue_id, matrix_id in CATALOGUE_TO_SKILLS_ROLE.items()
+        if matrix_id == skills_role_id
+    ))

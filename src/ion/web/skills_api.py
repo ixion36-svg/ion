@@ -206,6 +206,29 @@ def get_career_goal(
     return {"current_role": goal.current_role, "target_role": goal.target_role}
 
 
+@router.get("/suggested-certifications")
+def suggested_certifications(
+    current_user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Certificates for the caller's current role and the one they want.
+
+    Scoped to the caller, like the rest of this file's own-data routes:
+    it reads their career goal and their recorded certificates and
+    resolves nobody else's.
+
+    The payload carries its own caveat. The catalogue these come from is
+    explicit that they are what adverts and vendor pathways usually list
+    for a role rather than what somebody needs to do the job, and any of
+    them can be met by assessed proficiency instead.
+    """
+    from ion.services.role_skills_service import (
+        suggested_certifications as build,
+    )
+
+    return build(session, current_user.id)
+
+
 @router.post("/career-goal")
 def save_career_goal(
     payload: CareerGoalSave,
