@@ -2499,8 +2499,17 @@ body[data-page="training"] .rm-q-rate{display:flex;gap:.25rem}
 body[data-page="training"] .rm-q-rate button{width:36px;height:32px;border:1px solid var(--ion-border);border-radius:var(--radius);background:var(--bg-secondary);color:var(--text-secondary);cursor:pointer;font-weight:700;font-size:.82rem;transition:all .12s}
 body[data-page="training"] .rm-q-rate button:hover{border-color:var(--primary);color:var(--primary)}
 body[data-page="training"] .rm-q-rate button.selected{background:var(--primary);color:#fff;border-color:var(--primary)}
-body[data-page="training"] .rm-rating-legend{display:flex;gap:.5rem;font-size:.7rem;color:var(--text-secondary);margin-bottom:.75rem;flex-wrap:wrap}
-body[data-page="training"] .rm-rating-legend span{padding:2px 6px;border-radius:4px;background:var(--bg-tertiary);border:1px solid var(--ion-border)}
+/* The rating legend carries what each level takes to demonstrate, so it
+   is a stacked list rather than a row of pills -- a sentence per level
+   does not fit in a chip. The old `.rm-rating-legend span` pill rule is
+   gone with it: the label and the demonstration text are both spans now,
+   and it would have boxed each of them. */
+body[data-page="training"] .rm-rating-caption{font-size:.72rem;color:var(--text-secondary);margin:.35rem 0 .55rem;line-height:1.45}
+body[data-page="training"] .rm-rating-legend{display:flex;flex-direction:column;gap:.3rem;font-size:.72rem;color:var(--text-secondary);margin-bottom:.9rem}
+body[data-page="training"] .rm-rating-row{display:flex;gap:.5rem;align-items:baseline;flex-wrap:wrap;line-height:1.45}
+body[data-page="training"] .rm-rating-value{flex:none;min-width:1.2rem;text-align:center;padding:1px 5px;border-radius:4px;background:var(--bg-tertiary);border:1px solid var(--ion-border);color:var(--text-primary)}
+body[data-page="training"] .rm-rating-label{flex:none;min-width:11rem;color:var(--text-primary)}
+body[data-page="training"] .rm-rating-demo{flex:1 1 18rem;color:var(--text-secondary)}
 body[data-page="training"] .rm-submit{display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem}
 
 body[data-page="training"] .rm-result-overall{background:var(--bg-secondary);border:1px solid var(--ion-border);border-radius:var(--ion-radius-lg);padding:1.25rem;margin-bottom:1rem;display:flex;align-items:center;gap:1.5rem}

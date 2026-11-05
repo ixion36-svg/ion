@@ -681,8 +681,12 @@ function rmRenderQuestionnaire() {
     fragment.querySelector('.rm-sub').textContent = role.description ?? '';
     for (const rating of (rmDefinitions.rating_scale || [])) {
         const item = rmTemplate('training-rm-rating');
-        item.querySelector('strong').textContent = rating.value;
-        item.querySelector('span span').textContent = rating.label;
+        item.querySelector('.rm-rating-value').textContent = rating.value;
+        item.querySelector('.rm-rating-label').textContent = rating.label;
+        // What the level takes to demonstrate. Absent on an older payload,
+        // so the legend degrades to the labels it used to show rather than
+        // rendering "undefined" against every level.
+        item.querySelector('.rm-rating-demo').textContent = rating.demonstrates ?? '';
         fragment.querySelector('.rm-rating-legend').append(item);
     }
     for (const area of role.areas) {

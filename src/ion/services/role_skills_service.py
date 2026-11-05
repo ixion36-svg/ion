@@ -834,6 +834,72 @@ ROLE_DEFINITIONS: List[Dict[str, Any]] = [
 # Public questionnaire API
 # =========================================================================
 
+#: The self-assessment scale, and what each value takes to demonstrate.
+#:
+#: The labels on their own were the whole scale, and a label is not a
+#: criterion: "Can do it supervised" and "Confident & independent" are the
+#: same claim at different volumes, so where somebody lands depends on how
+#: boldly they read themselves rather than on what they have done. Two
+#: people with identical experience rate themselves differently, which is
+#: the failure mode that makes a skills matrix an opinion survey.
+#:
+#: Each level therefore names something a reader could point at. That is
+#: also what makes the number checkable later: a lead recording an
+#: equivalence, or asking why cover is thin, has something to ask for.
+#:
+#: 1 is deliberately given an encouraging line. The honest 1s are what
+#: make a gap visible, and a scale that feels like a judgement collects
+#: 3s instead.
+#:
+#: Scored 1-5, matching SkillAssessment.rating and the buttons the
+#: questionnaire renders. No 0: "never heard of it" is already the floor,
+#: and a 0 would only mean "did not answer", which an absent row says.
+RATING_SCALE: List[Dict[str, Any]] = [
+    {
+        "value": 1,
+        "label": "Never heard of it",
+        "demonstrates": (
+            "You would not recognise the term in a handover. Nothing to "
+            "show, and that is a useful answer: honest 1s are what make "
+            "the gaps real."
+        ),
+    },
+    {
+        "value": 2,
+        "label": "Aware of it",
+        "demonstrates": (
+            "You can say what it is and when it matters, but you have not "
+            "done it. You would need somebody alongside you the first time."
+        ),
+    },
+    {
+        "value": 3,
+        "label": "Can do it supervised",
+        "demonstrates": (
+            "You have done it and somebody checked the result. Point to a "
+            "case, ticket or exercise where you did, and who reviewed it."
+        ),
+    },
+    {
+        "value": 4,
+        "label": "Confident and independent",
+        "demonstrates": (
+            "You do it unsupervised and your work is not routinely "
+            "corrected. Point to recent work you owned end to end."
+        ),
+    },
+    {
+        "value": 5,
+        "label": "Could teach it",
+        "demonstrates": (
+            "Others come to you when it goes wrong. Point to somebody you "
+            "taught, a runbook you wrote, or a call you made when the "
+            "documented method did not fit."
+        ),
+    },
+]
+
+
 def get_role_definitions() -> Dict[str, Any]:
     """Return all role definitions for the picker + questionnaire UI.
 
@@ -850,13 +916,7 @@ def get_role_definitions() -> Dict[str, Any]:
         })
     return {
         "roles": out_roles,
-        "rating_scale": [
-            {"value": 1, "label": "Never heard of it"},
-            {"value": 2, "label": "Aware of it"},
-            {"value": 3, "label": "Can do it supervised"},
-            {"value": 4, "label": "Confident & independent"},
-            {"value": 5, "label": "Could teach it"},
-        ],
+        "rating_scale": RATING_SCALE,
     }
 
 
