@@ -152,7 +152,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "CompTIA",
         "domain": "secops",
         "level": "advanced",
-        "cost": 380,
+        "cost": 378,
         "currency": "GBP",
         "desc": "Advanced-level practitioner certification for security architects and senior security engineers. Performance-based, no multiple choice.",
         "duration": "165 min",
@@ -223,7 +223,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "Splunk",
         "domain": "secops",
         "level": "foundation",
-        "cost": 100,
+        "cost": 97,
         "currency": "GBP",
         "desc": "Validates foundational Splunk searching, reporting, and dashboard skills. Essential for SOC analysts using Splunk SIEM.",
         "duration": "60 min",
@@ -246,7 +246,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "Elastic",
         "domain": "secops",
         "level": "intermediate",
-        "cost": 320,
+        "cost": 297,
         "currency": "GBP",
         "desc": "Validates skills in using Elastic Security for threat hunting, detection rules, and alert triage in Elasticsearch environments.",
         "duration": "120 min",
@@ -316,7 +316,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "EC-Council",
         "domain": "ir",
         "level": "foundation",
-        "cost": 595,
+        "cost": 334,
         "currency": "GBP",
         "desc": "EC-Council Certified Incident Handler. Covers the full IR lifecycle \u2014 preparation, identification, containment, eradication, and recovery.",
         "duration": "3 hours",
@@ -458,7 +458,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "EC-Council",
         "domain": "ir",
         "level": "intermediate",
-        "cost": 950,
+        "cost": 483,
         "currency": "GBP",
         "desc": "Computer Hacking Forensic Investigator. Digital forensics investigation skills including evidence collection, data recovery, and analysis.",
         "duration": "4 hours",
@@ -553,7 +553,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "EC-Council",
         "domain": "threat",
         "level": "intermediate",
-        "cost": 595,
+        "cost": 334,
         "currency": "GBP",
         "desc": "Certified Threat Intelligence Analyst. Covers threat data collection, processing, analysis, and dissemination in structured and unstructured formats.",
         "duration": "3 hours",
@@ -865,7 +865,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "EC-Council",
         "domain": "pentest",
         "level": "intermediate",
-        "cost": 950,
+        "cost": 891,
         "currency": "GBP",
         "desc": "Certified Ethical Hacker. Covers hacking techniques and tools across multiple domains. Widely recognized but knowledge-based rather than practical.",
         "duration": "4 hours",
@@ -1040,7 +1040,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "ISACA",
         "domain": "grc",
         "level": "advanced",
-        "cost": 455,
+        "cost": 565,
         "currency": "GBP",
         "desc": "Certified Information Security Manager. For security managers focusing on governance, risk management, program development, and incident management.",
         "duration": "4 hours",
@@ -1062,7 +1062,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "ISACA",
         "domain": "grc",
         "level": "intermediate",
-        "cost": 455,
+        "cost": 565,
         "currency": "GBP",
         "desc": "Certified Information Systems Auditor. IT audit, control, and assurance. Widely recognized for governance and compliance roles.",
         "duration": "4 hours",
@@ -1085,7 +1085,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "ISACA",
         "domain": "grc",
         "level": "advanced",
-        "cost": 455,
+        "cost": 565,
         "currency": "GBP",
         "desc": "Certified in Risk and Information Systems Control. Enterprise IT risk management \u2014 identification, assessment, response, and monitoring.",
         "duration": "4 hours",
@@ -1109,7 +1109,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "ISACA",
         "domain": "grc",
         "level": "expert",
-        "cost": 455,
+        "cost": 565,
         "currency": "GBP",
         "desc": "Certified in Governance of Enterprise IT. For senior executives responsible for IT governance frameworks, strategic alignment, and value delivery.",
         "duration": "4 hours",
@@ -1324,7 +1324,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "Cisco",
         "domain": "arch",
         "level": "foundation",
-        "cost": 260,
+        "cost": 223,
         "currency": "GBP",
         "desc": "Cisco Certified Network Associate. Foundational networking cert covering routing, switching, IP services, and security fundamentals.",
         "duration": "120 min",
@@ -1396,7 +1396,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "Offensive Security",
         "domain": "devsec",
         "level": "expert",
-        "cost": 1300,
+        "cost": 1299,
         "currency": "GBP",
         "desc": "Offensive Security Web Expert. White-box web app pen testing \u2014 source code review, auth bypass, and custom exploit development against real applications.",
         "duration": "48 hours + report",
@@ -1468,7 +1468,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "Elastic",
         "domain": "secops",
         "level": "advanced",
-        "cost": 320,
+        "cost": 371,
         "currency": "GBP",
         "desc": "Validates advanced skills in deploying, managing, and troubleshooting Elasticsearch clusters. Covers indexing, mappings, aggregations, cluster management, and performance tuning.",
         "duration": "120 min",
@@ -1494,7 +1494,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "Elastic",
         "domain": "devsec",
         "level": "intermediate",
-        "cost": 320,
+        "cost": 371,
         "currency": "GBP",
         "desc": "Demonstrates proficiency in using Elastic Observability for monitoring infrastructure, applications, and services \u2014 logs, metrics, APM, and uptime.",
         "duration": "120 min",
@@ -1743,7 +1743,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "Splunk",
         "domain": "secops",
         "level": "intermediate",
-        "cost": 100,
+        "cost": 97,
         "currency": "GBP",
         "desc": "Validates Splunk administration skills \u2014 installation, configuration, user management, indexing, clustering, and performance monitoring in enterprise deployments.",
         "duration": "60 min",
@@ -1769,7 +1769,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "Splunk",
         "domain": "secops",
         "level": "advanced",
-        "cost": 100,
+        "cost": 97,
         "currency": "GBP",
         "desc": "Splunk Enterprise Security Certified Admin. Configuring and managing Splunk ES for security operations \u2014 notable events, risk-based alerting, investigations, and threat intelligence.",
         "duration": "60 min",
@@ -1795,7 +1795,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "Splunk",
         "domain": "secops",
         "level": "advanced",
-        "cost": 100,
+        "cost": 97,
         "currency": "GBP",
         "desc": "Splunk SOAR Certified Automation Developer. Building playbooks and automations in Splunk SOAR for security orchestration, automated response, and case management.",
         "duration": "75 min",
@@ -1918,7 +1918,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "CNCF",
         "domain": "devsec",
         "level": "intermediate",
-        "cost": 315,
+        "cost": 331,
         "currency": "GBP",
         "desc": "Certified Kubernetes Administrator. Hands-on exam covering cluster architecture, workload scheduling, networking, storage, security, and troubleshooting in Kubernetes.",
         "duration": "2 hours",
@@ -1968,7 +1968,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "HashiCorp",
         "domain": "devsec",
         "level": "foundation",
-        "cost": 55,
+        "cost": 52,
         "currency": "GBP",
         "desc": "Validates understanding of Infrastructure as Code concepts using Terraform \u2014 HCL, state management, modules, and cloud provisioning workflows.",
         "duration": "60 min",
@@ -1992,7 +1992,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "HashiCorp",
         "domain": "devsec",
         "level": "intermediate",
-        "cost": 55,
+        "cost": 52,
         "currency": "GBP",
         "desc": "HashiCorp Vault secrets management \u2014 dynamic secrets, encryption as a service, identity-based access, and PKI certificate management.",
         "duration": "60 min",
@@ -2144,7 +2144,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "Cisco",
         "domain": "arch",
         "level": "advanced",
-        "cost": 320,
+        "cost": 297,
         "currency": "GBP",
         "desc": "Cisco Certified Network Professional Security. Advanced network security \u2014 firewalls, VPNs, IPS, identity services, and content security across Cisco platforms.",
         "duration": "120 min core + concentration",
@@ -2316,6 +2316,131 @@ _MSFT = {
 for _exam in ("az500", "sc200", "sc300", "sc100"):
     PRICE_PROVENANCE[_exam] = dict(_MSFT)
 
+#: ISACA prices all four of its flagship certifications identically and
+#: charges members less. The non-member figure is recorded because it is
+#: the one that assumes nothing about the candidate; a SOC that holds
+#: ISACA membership pays USD 575 and recovers the difference quickly.
+_ISACA = {
+    "source": "https://www.isaca.org/-/media/files/isacadp/project/isaca/certification/exam-candidate-guides/2026/exam-candidate-guide.pdf",
+    "checked_on": "2026-11-05",
+    "vendor_price": 760,
+    "vendor_currency": "USD",
+    "note": (
+        "Non-member registration. Members pay USD 575. Neither includes "
+        "the USD 50 application fee charged after a pass, or the annual "
+        "maintenance fee."
+    ),
+    **_RATE_2026_11_05,
+}
+for _isaca in ("cism", "cisa", "crisc", "cgeit"):
+    PRICE_PROVENANCE[_isaca] = dict(_ISACA)
+
+_ECC = {
+    "source": "https://store.eccouncil.org/",
+    "checked_on": "2026-11-05",
+    "vendor_currency": "USD",
+    **_RATE_2026_11_05,
+}
+PRICE_PROVENANCE["ceh"] = {**_ECC, "vendor_price": 1199, "note": "Pearson VUE voucher. A bundle with the CEH Practical voucher is USD 1,250."}
+PRICE_PROVENANCE["chfi"] = {**_ECC, "vendor_price": 650}
+PRICE_PROVENANCE["ctia"] = {**_ECC, "vendor_price": 450, "note": "CTIA v2 voucher."}
+PRICE_PROVENANCE["ecih"] = {**_ECC, "vendor_price": 450}
+
+#: Splunk prices every certification exam the same, per attempt.
+_SPLUNK = {
+    "source": "https://www.splunk.com/en_us/training/certification-track/",
+    "checked_on": "2026-11-05",
+    "vendor_price": 130,
+    "vendor_currency": "USD",
+    **_RATE_2026_11_05,
+}
+PRICE_PROVENANCE["splunkcore"] = dict(_SPLUNK)
+PRICE_PROVENANCE["splunkadmin"] = dict(_SPLUNK)
+PRICE_PROVENANCE["splunkes"] = {
+    **_SPLUNK,
+    "note": (
+        "Splunk's uniform per-attempt rate. The Core User, Power User, "
+        "Enterprise Admin, Cloud Admin and Enterprise Architect pages "
+        "were each seen at this figure; this exam's own page was not, so "
+        "it rests on the uniformity rather than on its own listing."
+    ),
+}
+PRICE_PROVENANCE["splunksoar"] = dict(PRICE_PROVENANCE["splunkes"])
+
+_ELASTIC = {
+    "source": "https://www.elastic.co/training/certification/faq",
+    "checked_on": "2026-11-05",
+    "vendor_currency": "USD",
+    **_RATE_2026_11_05,
+}
+PRICE_PROVENANCE["ecsa"] = {**_ELASTIC, "vendor_price": 400, "note": "Elastic Certified Analyst, per attempt."}
+PRICE_PROVENANCE["ece"] = {**_ELASTIC, "vendor_price": 500, "note": "Elastic Certified Engineer, per attempt."}
+PRICE_PROVENANCE["ecoe"] = {**_ELASTIC, "vendor_price": 500, "note": "Elastic Certified Observability Engineer, per attempt."}
+
+PRICE_PROVENANCE["casp"] = {
+    "source": "https://www.comptia.org/en-us/blog/how-much-does-the-securityx-certification-cost/",
+    "checked_on": "2026-11-05",
+    "vendor_price": 509,
+    "vendor_currency": "USD",
+    "note": (
+        "SecurityX V5, the current name for CASP+. The GBP 380 this "
+        "replaces converts to within two pounds of it, so that figure "
+        "was right and had only never been sourced."
+    ),
+    **_RATE_2026_11_05,
+}
+
+_CISCO = {
+    "source": "https://www.cisco.com/site/us/en/learn/training-certifications/exams/index.html",
+    "checked_on": "2026-11-05",
+    "vendor_currency": "USD",
+    **_RATE_2026_11_05,
+}
+PRICE_PROVENANCE["ccna"] = {**_CISCO, "vendor_price": 300, "note": "Associate-level exam rate."}
+PRICE_PROVENANCE["ccnpsec"] = {
+    **_CISCO,
+    "vendor_price": 400,
+    "note": (
+        "Cisco's CCNP core exam rate. The Security core specifically "
+        "(350-701 SCOR) was not read on its own page, so this rests on "
+        "the published core rate; concentration exams are USD 300."
+    ),
+}
+
+PRICE_PROVENANCE["cka"] = {
+    "source": "https://www.cncf.io/training/certification/cka/",
+    "checked_on": "2026-11-05",
+    "vendor_price": 445,
+    "vendor_currency": "USD",
+    "note": "Includes one free retake. A CKA+CKS bundle is USD 825.",
+    **_RATE_2026_11_05,
+}
+
+_HASHICORP = {
+    "source": "https://developer.hashicorp.com/certifications/",
+    "checked_on": "2026-11-05",
+    "vendor_price": 70.50,
+    "vendor_currency": "USD",
+    "note": "Plus local taxes. No free retake.",
+    **_RATE_2026_11_05,
+}
+PRICE_PROVENANCE["tf"] = dict(_HASHICORP)
+PRICE_PROVENANCE["vault"] = dict(_HASHICORP)
+
+PRICE_PROVENANCE["oswe"] = {
+    "source": "https://www.offsec.com/pricing/",
+    "checked_on": "2026-11-05",
+    "vendor_price": 1749,
+    "vendor_currency": "USD",
+    "note": (
+        "OffSec prices by access plan, not per certificate: this is the "
+        "course-and-certification bundle, the same product as OSCP, with "
+        "one exam attempt. Learn One is USD 2,199 a year and includes "
+        "two attempts per certification."
+    ),
+    **_RATE_2026_11_05,
+}
+
 PRICE_PROVENANCE["oscp"] = {
     "source": "https://www.offsec.com/products/pen-200/",
     "checked_on": "2026-11-05",
@@ -2343,6 +2468,34 @@ PRICE_PROVENANCE["oscp"] = {
 #: visible inconsistency with an invisible wrong answer. A test asserts
 #: these name real entries, so the list cannot rot once they are fixed.
 KNOWN_ISSUES: Dict[str, str] = {
+    "osce3": (
+        "Not a product anybody can buy. OSCE3 is awarded for holding "
+        "OSED, OSEP and OSWE together, so its cost is whichever route "
+        "somebody takes to all three -- three course-and-cert bundles "
+        "at USD 1,749 each, or a Learn One year at USD 2,199 that "
+        "covers them if they finish in time. A single figure here means "
+        "picking one of those routes on the reader's behalf, so the "
+        "original GBP 4,350 is left as an estimate rather than restated."
+    ),
+    "cks": (
+        "The Linux Foundation lists no standalone CKS price in what was "
+        "read: only a CKA+CKS bundle at USD 825 against CKA's USD 445. "
+        "Subtracting gives about USD 380, but that is arithmetic on two "
+        "list prices rather than a price anybody publishes, so it is "
+        "not recorded as checked."
+    ),
+    "ecsiem": (
+        "'Elastic SIEM Specialist'. Elastic's certification programme "
+        "lists three credentials -- Certified Analyst, Certified "
+        "Engineer and Certified Observability Engineer -- all three of "
+        "which are already in this catalogue under their own ids. No "
+        "SIEM Specialist appears among them, so there is nothing to "
+        "price it against."
+    ),
+    "eced": (
+        "'Elastic Endpoint Security'. Same as ecsiem: not among the "
+        "three credentials Elastic's certification programme lists."
+    ),
     "awssap_arch": (
         "Named 'AWS Sec Architect'. AWS has no Security Architect "
         "certification: its security credential is the Security - "
