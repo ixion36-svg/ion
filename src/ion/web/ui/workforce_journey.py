@@ -34,11 +34,15 @@ from ion.models.user import User
 from ion.models.workforce import JourneyRequirement
 from ion.services import workforce_service as wf
 from ion.storage.database import get_db_session
+from ion.web.workforce_api import require_workforce_module
 from ion.web.ui._shared import render_view
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+# The module gate belongs on the router, not on each route: with the
+# workforce feature off the page 404s, and a fragment that still
+# answered would be reachable directly even though nothing links to it.
+router = APIRouter(dependencies=[Depends(require_workforce_module)])
 
 FRAGMENT = "_fragments/workforce_journey.html"
 
@@ -155,7 +159,7 @@ def _view(
     }
 
 
-@router.get("/workforce/journey")
+@router.get("/workforce/me")
 def journey_fragment(
     request: Request,
     journey: Optional[int] = None,

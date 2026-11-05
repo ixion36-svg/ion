@@ -27,13 +27,16 @@ from ion.auth.dependencies import require_permission
 from ion.models.workforce import UserJourney
 from ion.services import workforce_service as wf
 from ion.storage.database import get_db_session
+from ion.web.workforce_api import require_workforce_module
 from ion.web.ui._shared import render_view
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+# The module gate belongs on the router, not on each route: with the
+# workforce feature off the page 404s, and a fragment that still
+# answered would be reachable directly even though nothing links to it.
+router = APIRouter(dependencies=[Depends(require_workforce_module)])
 
-FRAGMENT = "_fragments/workforce_orbat.html"
 PERSON_FRAGMENT = "_fragments/workforce_orbat_person.html"
 
 #: A post's state, in the words the page uses, with the tone it carries.
@@ -63,37 +66,6 @@ ITEM_TONE: dict[str, tuple[str, str]] = {
     "expired": ("Lapsed", "bg-error"),
     "pending": ("Not started", "bg-base-content/30"),
 }
-
-
-@router.get(
-    "/workforce/orbat",
-    dependencies=[Depends(require_permission("workforce:read"))],
-)
-def orbat_fragment(
-    request: Request,
-    session: Session = Depends(get_db_session),
-):
-    """The tree of units and posts, with the detail panel empty."""
-    view: dict[str, Any] = {
-        "failed": False, "units": [], "posts_total": 0, "gaps": 0,
-        "filling": 0, "leads_gapped": 0, "post_state": POST_STATE,
-        "stage_label": STAGE_LABEL,
-    }
-    try:
-        tree = wf.org_tree(session)
-    except Exception:
-        logger.exception("ORBAT fragment could not be rendered")
-        view["failed"] = True
-        return render_view(request, FRAGMENT, view)
-
-    view.update({
-        "units": tree.get("units") or [],
-        "posts_total": tree.get("posts_total") or 0,
-        "gaps": tree.get("gaps") or 0,
-        "filling": tree.get("filling") or 0,
-        "leads_gapped": tree.get("leads_gapped") or 0,
-    })
-    return render_view(request, FRAGMENT, view)
 
 
 @router.get(

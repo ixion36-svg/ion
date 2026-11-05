@@ -1883,7 +1883,7 @@ async def verdict_review_page(request: Request, user: User = Depends(require_pag
 
 @app.get("/workforce", response_class=HTMLResponse)
 async def workforce_page(request: Request, user: User = Depends(require_page_auth), _gate: None = Depends(require_workforce_module)):
-    """A person's own journey: the gate, then role readiness.
+    """The whole of workforce: Me, Team and Setup, on one page.
 
     Signed in is the only requirement, deliberately. This needed
     ``workforce:read``, which on a real estate only admin and
@@ -1895,45 +1895,54 @@ async def workforce_page(request: Request, user: User = Depends(require_page_aut
     mandatory training is verified, and the training was listed behind a
     permission, so a joiner could not start.
 
-    Nothing leaks by opening it. The page renders from
-    ``/api/workforce/journeys/me``, which resolves the caller's own
-    journeys and nobody else's. The other three workforce pages keep their
-    permissions, because the profile builder, the verification queue and
-    the roster are other people's business.
+    That is why the PAGE is open and the TABS are gated instead. Someone
+    with no permissions sees Me and nothing else; the queue, the order of
+    battle and the role profiles appear for the people whose business they
+    are. Each fragment re-checks its own permission, so the tab list is a
+    courtesy to the reader and never the thing enforcing anything.
+
+    Me, Team and Setup were /workforce, /workforce/people,
+    /workforce/orbat and /workforce/profiles. nav.py carried one entry for
+    the four, so three were reachable only by spotting a ghost button in
+    another page's header -- including the verification queue, which is a
+    lead's daily work and sat two unmarked hops from the navigation.
     """
+    tabs = [{"id": "me", "label": "Me"}]
+    if user.has_permission("workforce:read"):
+        tabs.append({"id": "team", "label": "Team"})
+    if user.has_permission("workforce:manage"):
+        tabs.append({"id": "setup", "label": "Setup"})
+
+    subtitles = {
+        "me": "What you need to complete, and how far your lead has got with verifying it.",
+        "team": "What is waiting on you, who holds which post, and how far along they are.",
+        "setup": "Role profiles, how many posts each role has, and who is leaving.",
+    }
+
+    wanted = request.query_params.get("tab") or "me"
+    # An unknown tab, or one this person may not open, falls back to Me
+    # rather than 403ing: the tab is a view of a page they are entitled to.
+    if wanted not in {t["id"] for t in tabs}:
+        wanted = "me"
+
     return templates.TemplateResponse(
-        request=request, name="workforce_journey.html",
-        context={"current_user": user},
+        request=request, name="workforce.html",
+        context={"current_user": user, "tabs": tabs, "tab": wanted,
+                 "tab_subtitle": subtitles[wanted]},
     )
 
 
-@app.get("/workforce/profiles", response_class=HTMLResponse)
-async def workforce_profiles_page(request: Request, user: User = Depends(require_page_permission("workforce:manage")), _gate: None = Depends(require_workforce_module)):
-    """Role profile builder — the schema a SOC edits for itself."""
-    return templates.TemplateResponse(
-        request=request, name="workforce_profiles.html",
-        context={"current_user": user},
-    )
+# /workforce/profiles is gone too: the schema a SOC edits for itself is the
+# Setup tab of /workforce, beside the establishment, because what a role
+# requires and how many of that role you need are halves of one decision.
+# All four workforce pages are now one.
 
 
-@app.get("/workforce/people", response_class=HTMLResponse)
-async def workforce_people_page(request: Request, user: User = Depends(require_page_permission("workforce:verify")), _gate: None = Depends(require_workforce_module)):
-    """The lead's roster and verification queue."""
-    return templates.TemplateResponse(
-        request=request, name="workforce_people.html",
-        context={"current_user": user,
-                 "can_manage": user.has_permission("workforce:manage")},
-    )
-
-
-@app.get("/workforce/orbat", response_class=HTMLResponse)
-async def workforce_orbat_page(request: Request, user: User = Depends(require_page_permission("workforce:read")), _gate: None = Depends(require_workforce_module)):
-    """Who holds which role, primary and cover, and where cover is thin."""
-    return templates.TemplateResponse(
-        request=request, name="workforce_orbat.html",
-        context={"current_user": user,
-                 "can_manage": user.has_permission("workforce:manage")},
-    )
+# /workforce/people and /workforce/orbat are gone: the roster, the
+# verification queue and the order of battle are the Team tab of
+# /workforce. Removed rather than redirected, by request -- they were
+# never in nav.py and were only ever reached from another page's header,
+# so there is no menu entry left pointing at them.
 
 
 @app.get("/de-metrics", response_class=HTMLResponse)

@@ -38,7 +38,7 @@
       </summary>
       <form class="flex items-end gap-2 flex-wrap mt-2"
             hx-post="/ui/workforce/requirements/{{ r.id }}/submit"
-            hx-target="#wf-journey" hx-swap="innerHTML">
+            hx-target="#wf-tab" hx-swap="innerHTML">
         <input type="hidden" name="journey" value="{{ active.id }}">
         <div>
           <label class="label text-xs py-0" for="done-{{ r.id }}">Date completed</label>
@@ -63,7 +63,7 @@
   {% if r.withdrawable %}
     <form class="flex items-center gap-3 mb-3 ml-5"
           hx-post="/ui/workforce/requirements/{{ r.id }}/withdraw"
-          hx-target="#wf-journey" hx-swap="innerHTML">
+          hx-target="#wf-tab" hx-swap="innerHTML">
       <input type="hidden" name="journey" value="{{ active.id }}">
       <span class="text-xs text-base-content/60">Your lead has been asked to verify this.</span>
       <button type="submit" class="btn btn-xs btn-ghost">Withdraw</button>

@@ -69,7 +69,7 @@ _TEMPLATES = (
     Path(__file__).resolve().parent.parent
     / "src" / "ion" / "web" / "templates"
 )
-_JOURNEY = _TEMPLATES / "workforce_journey.html"
+_JOURNEY = _TEMPLATES / "workforce.html"
 _FRAGMENTS = _TEMPLATES / "_fragments"
 
 

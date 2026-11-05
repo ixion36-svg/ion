@@ -1,0 +1,71 @@
+{# The Team tab: what is waiting on you, then the team itself.
+
+   Four counts, then the queue, then one of two views of the same team --
+   the chart by post, the list by person. They were two pages; they answer
+   the same question from different ends, and a reader switching between
+   them should not be navigating.
+
+   The counts come from all of the sources whichever view is showing, so
+   "3 waiting" is visible without first clicking the right thing. #}
+
+{% if failed %}
+  <div role="alert" class="alert alert-error">
+    <span>The team could not be read. This is not an empty team: the query
+      failed, so anything waiting on you is unknown rather than nothing.</span>
+  </div>
+
+{% else %}
+
+{% if error %}
+  <div role="alert" class="alert alert-warning mb-4"><span>{{ error }}</span></div>
+{% endif %}
+
+{# The queue, and the count of it, only for somebody who can act on it.
+   Not decoration: the view does not read the queue at all without
+   workforce:verify, because its API is declared on that permission. #}
+<div class="stats stats-vertical sm:stats-horizontal w-full bg-base-200 border border-base-300 mb-5">
+  {% if can_verify %}
+    <div class="stat">
+      <div class="stat-title">Waiting on you</div>
+      <div class="stat-value {{ 'text-warning' if awaiting else 'text-success' }}">{{ awaiting }}</div>
+      <div class="stat-desc">{{ 'items to verify' if awaiting != 1 else 'item to verify' }}</div>
+    </div>
+  {% endif %}
+  <div class="stat">
+    <div class="stat-title">Without access</div>
+    <div class="stat-value {{ 'text-error' if blocked }}">{{ blocked }}</div>
+    <div class="stat-desc">gate not cleared</div>
+  </div>
+  <div class="stat">
+    <div class="stat-title">Past target</div>
+    <div class="stat-value {{ 'text-warning' if overdue }}">{{ overdue }}</div>
+    <div class="stat-desc">journeys over their day count</div>
+  </div>
+  <div class="stat">
+    <div class="stat-title">Gapped posts</div>
+    <div class="stat-value {{ 'text-error' if gaps }}">{{ gaps }}</div>
+    <div class="stat-desc">{{ leads_gapped }} of them lead posts</div>
+  </div>
+</div>
+
+{% if can_verify %}{% include "_fragments/_workforce_queue.html" %}{% endif %}
+
+<div class="flex items-center gap-2 mb-4">
+  <div class="ion-toggle">
+    <a role="button" class="btn btn-sm {{ 'btn-primary' if view == 'chart' else 'btn-ghost' }}"
+       hx-get="/ui/workforce/team?view=chart" hx-target="#wf-tab" hx-swap="innerHTML">Chart</a>
+    <a role="button" class="btn btn-sm {{ 'btn-primary' if view == 'list' else 'btn-ghost' }}"
+       hx-get="/ui/workforce/team?view=list" hx-target="#wf-tab" hx-swap="innerHTML">List</a>
+  </div>
+  <span class="text-xs text-base-content/50">
+    {% if view == 'chart' %}Posts and who holds them{% else %}People, including anyone holding no post{% endif %}
+  </span>
+</div>
+
+{% if view == 'chart' %}
+  {% include "_fragments/_workforce_chart.html" %}
+{% else %}
+  {% include "_fragments/_workforce_roster.html" %}
+{% endif %}
+
+{% endif %}

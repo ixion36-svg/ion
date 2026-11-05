@@ -51,8 +51,8 @@
   <div role="tablist" class="tabs tabs-boxed mb-4 justify-start">
     {% for j in journeys %}
       <a role="tab" class="tab {{ 'tab-active' if j.id == active.id }}"
-         hx-get="/ui/workforce/journey?journey={{ j.id }}"
-         hx-target="#wf-journey" hx-swap="innerHTML">
+         hx-get="/ui/workforce/me?journey={{ j.id }}"
+         hx-target="#wf-tab" hx-swap="innerHTML">
         {{ j.role }}{% if j.is_cover %} (cover){% endif %}
       </a>
     {% endfor %}

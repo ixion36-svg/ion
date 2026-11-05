@@ -1,20 +1,15 @@
-{# The order of battle as an org chart: units as boxes, reporting lines
-   drawn between them.
+{# The order of battle as an org chart, with the person detail beside it.
 
-   A unit's box holds its own posts -- the lead first, then the members --
-   and the units themselves form the tree. Putting every post in the tree
-   instead would branch a ten-person SOC into a chart nobody can read on a
-   laptop, and the thing a reader is tracing here is command, which runs
-   between units.
+   A unit's box holds its own posts, lead first, and the units form the
+   tree. Putting every post in the tree would branch a ten-person SOC into
+   something unreadable on a laptop, and what a reader traces here is
+   command, which runs between units.
 
-   The connectors come from .ion-orbat in frontend/ion-daisy-theme.css.
-   They are pseudo-elements on the list, so the markup stays a plain
-   nested <ul>: the structure a screen reader walks is the structure the
-   lines draw.
+   Connectors come from .ion-orbat in frontend/ion-daisy-theme.css. They
+   are pseudo-elements, so the markup stays a plain nested <ul>: the
+   structure a screen reader walks is the structure the lines draw.
 
-   Each occupied post is a button, so it is reachable by keyboard and
-   announced as an action. A gapped post opens nothing and so is not a
-   button -- a control that does nothing is worse than plain text. #}
+   Expects `units`, `post_state` and `stage_label`. #}
 
 {% macro post_row(p, lead=False) %}
   {% set state = post_state.get(p.state, ('Unknown', 'badge-ghost', 'border-base-300')) %}
@@ -61,7 +56,6 @@
           {{ all_posts | length }} {{ 'post' if all_posts | length == 1 else 'posts' }}{% if gapped %}, {{ gapped }} gapped{% endif %}
         </span>
       </div>
-
       {% if not all_posts %}
         <p class="text-xs text-base-content/50">No posts in this unit.</p>
       {% else %}
@@ -71,46 +65,11 @@
         </div>
       {% endif %}
     </div>
-
     {% if u.children %}
-      <ul>
-        {% for child in u.children %}{{ unit_node(child) }}{% endfor %}
-      </ul>
+      <ul>{% for child in u.children %}{{ unit_node(child) }}{% endfor %}</ul>
     {% endif %}
   </li>
 {% endmacro %}
-
-{% if failed %}
-  <div role="alert" class="alert alert-error">
-    <span>The order of battle could not be read. This is not an empty
-      establishment: the query failed, so any gap is unknown rather than
-      absent.</span>
-  </div>
-
-{% else %}
-
-<div class="stats stats-vertical sm:stats-horizontal w-full bg-base-200 border border-base-300 mb-5">
-  <div class="stat">
-    <div class="stat-title">Posts</div>
-    <div class="stat-value">{{ posts_total }}</div>
-    <div class="stat-desc">on the establishment</div>
-  </div>
-  <div class="stat">
-    <div class="stat-title">Gapped</div>
-    <div class="stat-value {{ 'text-error' if gaps }}">{{ gaps }}</div>
-    <div class="stat-desc">nobody in post</div>
-  </div>
-  <div class="stat">
-    <div class="stat-title">Being filled</div>
-    <div class="stat-value {{ 'text-warning' if filling }}">{{ filling }}</div>
-    <div class="stat-desc">held, not yet operational</div>
-  </div>
-  <div class="stat">
-    <div class="stat-title">Lead posts gapped</div>
-    <div class="stat-value {{ 'text-error' if leads_gapped }}">{{ leads_gapped }}</div>
-    <div class="stat-desc">nobody answers for these</div>
-  </div>
-</div>
 
 <div class="grid gap-5 xl:grid-cols-[1fr_360px] items-start">
 
@@ -122,15 +81,13 @@
       </div>
 
       {% if not units %}
-        <p class="text-sm text-base-content/60 mt-2">No units yet. Add one to
-          start laying out the establishment.</p>
+        <p class="text-sm text-base-content/60 mt-2">No units yet. Add one on
+          Setup to start laying out the establishment.</p>
       {% else %}
         {# Scrolls rather than wraps: a wrapped org chart draws reporting
            lines to the wrong boxes, which is worse than a scrollbar. #}
         <div class="ion-orbat overflow-x-auto pb-2 mt-3">
-          <ul>
-            {% for u in units %}{{ unit_node(u) }}{% endfor %}
-          </ul>
+          <ul>{% for u in units %}{{ unit_node(u) }}{% endfor %}</ul>
         </div>
       {% endif %}
     </div>
@@ -148,5 +105,3 @@
   </div>
 
 </div>
-
-{% endif %}
