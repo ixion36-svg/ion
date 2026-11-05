@@ -289,3 +289,21 @@ class TestThePriceCheckIsHonest:
                 f"{cert_id}: {components} does not sum to "
                 f"{entry['vendor_price']}"
             )
+
+
+class TestTheUnreachableVendors:
+    """A record of what was tried, so it is not tried again blindly."""
+
+    def test_they_name_real_certs(self):
+        known = {c["id"] for c in cc.CERTIFICATIONS}
+        for cert_id in cc.UNPUBLISHED_PRICES:
+            assert cert_id in known, cert_id
+
+    def test_none_of_them_is_also_recorded_as_checked(self):
+        """An entry cannot both have a sourced price and be listed as
+        having no reachable source."""
+        both = set(cc.UNPUBLISHED_PRICES) & set(cc.PRICE_PROVENANCE)
+        assert not both, both
+
+    def test_they_are_all_still_unverified(self):
+        assert set(cc.UNPUBLISHED_PRICES) <= set(cc.unverified_prices())

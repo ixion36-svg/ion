@@ -842,7 +842,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "TCM Security",
         "domain": "pentest",
         "level": "intermediate",
-        "cost": 315,
+        "cost": 371,
         "currency": "GBP",
         "desc": "Practical Network Penetration Tester. Full external and internal pen test in a realistic lab. Includes OSINT, AD attacks, and report writing.",
         "duration": "5 days (lab)",
@@ -1134,7 +1134,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "APMG",
         "domain": "grc",
         "level": "foundation",
-        "cost": 315,
+        "cost": 541,
         "currency": "GBP",
         "desc": "IT Service Management foundation. Covers ITIL 4 practices including incident management, change control, and service desk operations.",
         "duration": "60 min",
@@ -2491,6 +2491,34 @@ PRICE_PROVENANCE["cztp"] = {
     "note": "NSE 7 fee under the 2 November 2026 increase, up from USD 400.",
 }
 
+PRICE_PROVENANCE["pnpt"] = {
+    "source": "https://certifications.tcm-sec.com/pnpt/",
+    "checked_on": "2026-11-05",
+    "vendor_price": 499,
+    "vendor_currency": "USD",
+    "note": (
+        "TCM sells the certification with its training: one voucher "
+        "with a free retake, 45+ hours of video and 12 months access. "
+        "There is no voucher-only price, so this is the whole package."
+    ),
+    **_RATE_2026_11_05,
+}
+
+PRICE_PROVENANCE["itilf"] = {
+    "source": "https://www.peoplecert.org/browse-certifications/it-governance-and-service-management/ITIL-1/itil-4-foundation-2565",
+    "checked_on": "2026-11-05",
+    "vendor_price": 541,
+    "vendor_currency": "GBP",
+    "note": (
+        "PeopleCert's cheapest route, in sterling including VAT: the "
+        "exam bundle, which carries the voucher plus the official eBook "
+        "and resource kit. No voucher-only price is published, so this "
+        "is above a bare exam fee. eLearning bundles are GBP 1,235 and "
+        "GBP 1,483. ITIL is PeopleCert's, not APMG's -- see "
+        "KNOWN_ISSUES."
+    ),
+}
+
 PRICE_PROVENANCE["oscp"] = {
     "source": "https://www.offsec.com/products/pen-200/",
     "checked_on": "2026-11-05",
@@ -2518,6 +2546,29 @@ PRICE_PROVENANCE["oscp"] = {
 #: visible inconsistency with an invisible wrong answer. A test asserts
 #: these name real entries, so the list cannot rot once they are fixed.
 KNOWN_ISSUES: Dict[str, str] = {
+    "itilf": (
+        "Attributed to APMG. ITIL is PeopleCert's, which bought the "
+        "scheme with AXELOS; APMG was an examination institute for "
+        "earlier versions, which is probably where this came from. "
+        "Priced anyway from PeopleCert's own sterling listing, since "
+        "the fee does not depend on who the catalogue credits."
+    ),
+    "togaf": (
+        "Attributed to APMG. TOGAF is The Open Group's. The entry also "
+        "says TOGAF 9, which the TOGAF Standard 10th Edition "
+        "superseded, so the name and the price may both describe a "
+        "certification no longer sold."
+    ),
+    "sabsa": (
+        "Attributed to APMG. SABSA is the SABSA Institute's, delivered "
+        "through its own accredited training partners."
+    ),
+    "iso27001": (
+        "Attributed to APMG. ISO 27001 Lead Auditor is not one "
+        "organisation's: PECB, BSI and several others each run their "
+        "own, at prices that differ by more than the figure recorded. "
+        "Pricing it means first deciding whose."
+    ),
     "ccht": (
         "Abbreviated CCHT. CrowdStrike's hunting credential is CCFH, "
         "Certified Falcon Hunter; the entry's description ('Certified "
@@ -2620,6 +2671,33 @@ def by_domain(domain_id: str) -> List[Dict[str, Any]]:
 def providers() -> Tuple[str, ...]:
     """Every issuing body named in the catalogue, sorted."""
     return tuple(sorted({c["provider"] for c in CERTIFICATIONS}))
+
+
+#: Vendors that do not publish a price anywhere a reader can reach.
+#:
+#: Recorded so the next person does not spend the same effort finding
+#: the same nothing. Each was tried directly, not just searched for.
+#:
+#:   CompTIA     five attempts. Its own exam-price page lists no
+#:               figures, its store product URLs redirect to the
+#:               certifications index, and its costing articles cover
+#:               only CySA+ and SecurityX -- both of which ARE recorded.
+#:   Palo Alto   its certification page names no exam and no price;
+#:               everything goes through Pearson VUE checkout.
+#:   INE/eJPT    price sits behind "Buy My Voucher"; the page describes
+#:               the bundles without costing them.
+#:   Zero Point  training.zeropointsecurity.co.uk returns 403.
+#:
+#: CREST, IACIS and Cybrary were not reached either. Cybrary's entry is
+#: recorded at zero, which is at least a deliberate claim rather than a
+#: guess, and the others would need a human with an account.
+UNPUBLISHED_PRICES: Tuple[str, ...] = (
+    "secplus", "netplus", "linuxplus", "penplus",   # CompTIA
+    "pcnsa", "pcnse",                               # Palo Alto
+    "ejpt",                                         # INE
+    "crto",                                         # Zero Point Security
+    "crt", "cfce", "cde",                           # CREST, IACIS, Cybrary
+)
 
 
 def unverified_prices() -> List[str]:
