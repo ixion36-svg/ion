@@ -42,8 +42,8 @@ from ion.models.user import User
 from ion.models.workforce import LeaverRecord
 from ion.services import workforce_service as wf
 from ion.storage.database import get_db_session
-from ion.web.workforce_api import require_workforce_module
 from ion.web.ui._shared import render_view
+from ion.web.workforce_api import require_workforce_module
 
 logger = logging.getLogger(__name__)
 
@@ -187,7 +187,8 @@ def create_profile(
     created: dict[str, Any] = {}
 
     def run():
-        from ion.web.workforce_api import ProfileIn, create_profile as api_create
+        from ion.web.workforce_api import ProfileIn
+        from ion.web.workforce_api import create_profile as api_create
 
         if not name.strip():
             raise wf.WorkforceError("Give the role a name.")
@@ -229,7 +230,8 @@ def set_grants(
     nothing else about their journey will change to trigger it.
     """
     def run():
-        from ion.web.workforce_api import GrantsIn, set_grants as api_set
+        from ion.web.workforce_api import GrantsIn
+        from ion.web.workforce_api import set_grants as api_set
 
         api_set(
             profile_id=profile_id,
@@ -259,7 +261,8 @@ def add_requirement(
 ):
     """Add one requirement to the open draft."""
     def run():
-        from ion.web.workforce_api import RequirementIn, add_requirement as api_add
+        from ion.web.workforce_api import RequirementIn
+        from ion.web.workforce_api import add_requirement as api_add
 
         if not name.strip():
             raise wf.WorkforceError("Give the requirement a name.")
@@ -323,6 +326,44 @@ def publish(
     return _write(request, session, user, run, profile,
                   "Published. Existing journeys keep the version they "
                   "started on; this applies to new assignments.")
+
+
+@router.post(
+    "/workforce/establishment/{profile_id}",
+    dependencies=[Depends(require_permission("workforce:manage"))],
+)
+def set_establishment(
+    request: Request,
+    profile_id: int,
+    count: str = Form(""),
+    session: Session = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """Set how many posts a role has.
+
+    `count` is taken as a string and parsed here so a typo comes back as
+    a sentence on the page. Declared as an int, FastAPI would reject the
+    request with a 422 before this route ran, and htmx would swap
+    nothing in -- the form would simply appear not to work.
+
+    The rules about what may be removed live in the service, not here:
+    an occupied post is never deleted to satisfy a number going down,
+    and nor is a lead post, because a vacant one is the ORBAT saying
+    nobody answers for that unit.
+    """
+    def run():
+        from ion.models.workforce import RoleProfile
+
+        try:
+            wanted = int(count.strip())
+        except (TypeError, ValueError):
+            raise wf.WorkforceError(f"{count!r} is not a number of posts.")
+        profile = session.get(RoleProfile, profile_id)
+        if profile is None:
+            raise wf.WorkforceError("That role profile no longer exists.")
+        wf.set_establishment(session, profile=profile, count=wanted, actor=user)
+
+    return _write(request, session, user, run)
 
 
 # --- offboarding ------------------------------------------------------------

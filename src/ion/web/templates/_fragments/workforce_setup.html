@@ -37,7 +37,9 @@
       <p class="text-sm text-base-content/60 mt-2">No roles established yet.</p>
     {% else %}
       <p class="text-sm text-base-content/70">How many posts each role has,
-        how many are held, and how short that leaves you.</p>
+        how many are held, and how short that leaves you. Change a number to
+        add or remove posts; filled posts and lead posts are never removed to
+        make a number fit.</p>
       <div class="overflow-x-auto mt-2">
         <table class="table table-sm">
           <thead>
@@ -53,7 +55,25 @@
             {% for r in roles %}
               <tr>
                 <td class="text-sm font-medium">{{ r.role }}</td>
-                <td class="text-right text-sm">{{ r.established }}</td>
+                <td class="text-right text-sm">
+                  {% if can_manage and r.profile_id %}
+                    {# Posts are added and removed to match the number
+                       typed here. An occupied post is never removed to
+                       satisfy it -- the service refuses and says how far
+                       down the role can actually go. #}
+                    <form class="flex items-center gap-1 justify-end"
+                          hx-post="/ui/workforce/establishment/{{ r.profile_id }}"
+                          hx-target="#wf-tab" hx-swap="innerHTML">
+                      <label class="sr-only" for="est-{{ r.profile_id }}">Posts for {{ r.role }}</label>
+                      <input id="est-{{ r.profile_id }}" name="count" type="number"
+                             min="0" max="200" value="{{ r.established }}"
+                             class="input input-xs input-bordered w-16 text-right">
+                      <button type="submit" class="btn btn-xs btn-ghost">Set</button>
+                    </form>
+                  {% else %}
+                    {{ r.established }}
+                  {% endif %}
+                </td>
                 <td class="text-right text-sm text-success">{{ r.filled }}</td>
                 <td class="text-right text-sm {{ 'text-warning' if r.filling }}">{{ r.filling }}</td>
                 <td class="text-right text-sm {{ 'text-error font-medium' if r.gap }}">{{ r.gap }}</td>
