@@ -62,18 +62,26 @@ def _route(path: str) -> str:
 def _fragment(module: str, path: str) -> str:
     """The decorator block for one /ui fragment route.
 
-    Read from the source rather than off the live app, like _route above,
-    so a gate that is present but wired wrong still reads as present here
-    and the complementary runtime check in test_workforce_who_verifies.py
-    is what catches that.
+    Scanned to the following `def` rather than pattern-matched on the
+    decorator's shape. The first version matched a decorator whose only
+    argument was the path, and adding `response_class=HTMLResponse` to
+    every route broke it -- not by failing the assertion it makes, but
+    by finding no route at all, which is the worse way for a test to
+    break because the message points at the wrong thing.
+
+    Read from the source, like _route above, so a gate that is present
+    but wired wrong still reads as present here; the complementary
+    runtime check in test_workforce_who_verifies.py is what catches
+    that.
     """
     source = (_UI / f"{module}.py").read_text(encoding="utf-8")
-    match = re.search(
-        r'@router\.(?:get|post)\(\s*"' + re.escape(path) + r'"\s*\)'
-        r'|@router\.(?:get|post)\(\s*\n\s*"' + re.escape(path) + r'",.*?\n\)',
-        source, re.DOTALL)
-    assert match, f"no route found for {path} in ui/{module}.py"
-    return match.group(0)
+    for match in re.finditer(r"@router\.(?:get|post)\(", source):
+        tail = source[match.start():]
+        body_at = tail.index("\ndef ")
+        decorator = tail[:body_at]
+        if f'"{path}"' in decorator:
+            return decorator
+    raise AssertionError(f"no route found for {path} in ui/{module}.py")
 
 
 class TestTheJoinersOwnPage:

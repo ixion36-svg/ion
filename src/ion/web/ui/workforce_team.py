@@ -22,15 +22,16 @@ import logging
 from typing import Any, Callable
 
 from fastapi import APIRouter, Depends, Form, Request
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import get_current_user, require_permission
 from ion.models.user import User
 from ion.services import workforce_service as wf
 from ion.storage.database import get_db_session
-from ion.web.workforce_api import require_workforce_module
 from ion.web.ui._shared import age_label, render_view
 from ion.web.ui.workforce_orbat import POST_STATE, STAGE_LABEL
+from ion.web.workforce_api import require_workforce_module
 
 logger = logging.getLogger(__name__)
 
@@ -220,6 +221,7 @@ def _view(
 @router.get(
     "/workforce/team",
     dependencies=[Depends(require_permission("workforce:read"))],
+    response_class=HTMLResponse,
 )
 def team_fragment(
     request: Request,
@@ -268,6 +270,7 @@ def _requirement(session: Session, requirement_id: int):
 @router.post(
     "/workforce/requirements/{requirement_id}/verify",
     dependencies=[Depends(require_permission("workforce:verify"))],
+    response_class=HTMLResponse,
 )
 def verify(
     request: Request,
@@ -299,6 +302,7 @@ def verify(
 @router.post(
     "/workforce/requirements/{requirement_id}/send-back",
     dependencies=[Depends(require_permission("workforce:verify"))],
+    response_class=HTMLResponse,
 )
 def send_back(
     request: Request,

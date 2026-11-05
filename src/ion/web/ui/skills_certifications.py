@@ -19,6 +19,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import get_db_session, require_permission
@@ -32,7 +33,7 @@ router = APIRouter()
 FRAGMENT = "_fragments/skills_suggested_certifications.html"
 
 
-@router.get("/skills/suggested-certifications")
+@router.get("/skills/suggested-certifications", response_class=HTMLResponse)
 def suggested_certifications_fragment(
     request: Request,
     session: Session = Depends(get_db_session),

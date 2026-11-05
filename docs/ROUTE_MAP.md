@@ -241,7 +241,7 @@ Server-rendered fragments. `render_view` routes also answer the view model as JS
 | GET | `/ui/shift-handover/report` | `alert:read` | [shift_handover.py:34](src/ion/web/ui/shift_handover.py#L34) | `_fragments/shift_handover_report.html` | `shift_handover.html` |
 | GET | `/ui/shift-handover/transfers` | `alert:read` | [shift_handover.py:47](src/ion/web/ui/shift_handover.py#L47) | `_fragments/shift_handover_transfers.html` | `shift_handover.html` |
 | GET | `/ui/shift-handover/transfers/{handover_id}` | `alert:read` | [shift_handover.py:78](src/ion/web/ui/shift_handover.py#L78) | `_fragments/observables_detail.html`<br>`_fragments/shift_handover_detail.html` |  |
-| GET | `/ui/skills/suggested-certifications` | `alert:read` | [skills_certifications.py:35](src/ion/web/ui/skills_certifications.py#L35) | `_fragments/skills_suggested_certifications.html` | `training.html` |
+| GET | `/ui/skills/suggested-certifications` | `alert:read` | [skills_certifications.py:36](src/ion/web/ui/skills_certifications.py#L36) | `_fragments/skills_suggested_certifications.html` | `training.html` |
 | GET | `/ui/soc-health/scorecard` | `alert:read` | [soc_health.py:218](src/ion/web/ui/soc_health.py#L218) | `_fragments/soc_health_scorecard.html` | `soc_health.html` |
 | GET | `/ui/stories/editor` | `playbook:read` | [stories.py:368](src/ion/web/ui/stories.py#L368) | `_fragments/stories_editor.html` | `stories.html` |
 | GET | `/ui/stories/list` | `playbook:read` | [stories.py:292](src/ion/web/ui/stories.py#L292) | `_fragments/stories_list.html` | `stories.html` |
@@ -294,23 +294,23 @@ Server-rendered fragments. `render_view` routes also answer the view model as JS
 | GET | `/ui/users/role-options` | `user:read` | [users.py:324](src/ion/web/ui/users.py#L324) | `_fragments/users_role_options.html` | `users.html` |
 | GET | `/ui/verdict-review` | `verdict:review` | [verdict_review.py:176](src/ion/web/ui/verdict_review.py#L176) | `_fragments/verdict_review.html` | `verdict_review.html` |
 | GET | `/ui/wallboard` | `alert:read` | [wallboard.py:796](src/ion/web/ui/wallboard.py#L796) | `_fragments/wallboard.html` | `wallboard.html` |
-| POST | `/ui/workforce/establishment/{profile_id}` | `workforce:manage` | [workforce_setup.py:331](src/ion/web/ui/workforce_setup.py#L331) |  | `workforce_setup.html`, `workforce.html` |
-| POST | `/ui/workforce/leavers` | `workforce:manage` | [workforce_setup.py:372](src/ion/web/ui/workforce_setup.py#L372) |  | `workforce_setup.html`, `workforce.html` |
-| POST | `/ui/workforce/leavers/{record_id}/checklist` | `workforce:manage` | [workforce_setup.py:423](src/ion/web/ui/workforce_setup.py#L423) |  | `workforce.html` |
-| POST | `/ui/workforce/leavers/{record_id}/revoke` | `workforce:manage` | [workforce_setup.py:403](src/ion/web/ui/workforce_setup.py#L403) |  | `workforce.html` |
-| GET | `/ui/workforce/me` | — | [workforce_journey.py:162](src/ion/web/ui/workforce_journey.py#L162) | `_fragments/workforce_journey.html` | `workforce_journey.html`, `workforce.html` |
-| GET | `/ui/workforce/orbat/person/{journey_id}` | `workforce:read` | [workforce_orbat.py:71](src/ion/web/ui/workforce_orbat.py#L71) | `_fragments/workforce_orbat_person.html` | `_workforce_chart.html`, `workforce.html` |
-| POST | `/ui/workforce/profile-requirements/{requirement_id}/remove` | `workforce:manage` | [workforce_setup.py:282](src/ion/web/ui/workforce_setup.py#L282) |  | `_workforce_profiles.html`, `workforce.html` |
-| POST | `/ui/workforce/profiles` | `workforce:manage` | [workforce_setup.py:175](src/ion/web/ui/workforce_setup.py#L175) | `_fragments/workforce_setup.html` | `_workforce_profiles.html`, `workforce.html` |
-| POST | `/ui/workforce/profiles/{profile_id}/grants` | `workforce:manage` | [workforce_setup.py:215](src/ion/web/ui/workforce_setup.py#L215) |  | `workforce.html` |
-| POST | `/ui/workforce/requirements/{requirement_id}/send-back` | `workforce:verify` | [workforce_team.py:299](src/ion/web/ui/workforce_team.py#L299) |  | `_workforce_queue.html`, `_workforce_requirement.html`, `_workforce_roster.html`, `workforce.html` |
-| POST | `/ui/workforce/requirements/{requirement_id}/submit` | — | [workforce_journey.py:210](src/ion/web/ui/workforce_journey.py#L210) |  | `_workforce_queue.html`, `_workforce_requirement.html`, `_workforce_roster.html`, `workforce.html` |
-| POST | `/ui/workforce/requirements/{requirement_id}/verify` | `workforce:verify` | [workforce_team.py:268](src/ion/web/ui/workforce_team.py#L268) |  | `_workforce_queue.html`, `_workforce_requirement.html`, `_workforce_roster.html`, `workforce.html` |
-| POST | `/ui/workforce/requirements/{requirement_id}/withdraw` | — | [workforce_journey.py:241](src/ion/web/ui/workforce_journey.py#L241) |  | `_workforce_queue.html`, `_workforce_requirement.html`, `_workforce_roster.html`, `workforce.html` |
-| GET | `/ui/workforce/setup` | `workforce:manage` | [workforce_setup.py:127](src/ion/web/ui/workforce_setup.py#L127) | `_fragments/workforce_setup.html` | `_workforce_profiles.html`, `workforce.html` |
-| GET | `/ui/workforce/team` | `workforce:read` | [workforce_team.py:220](src/ion/web/ui/workforce_team.py#L220) | `_fragments/workforce_team.html` | `_workforce_roster.html`, `workforce_team.html`, `workforce.html` |
-| POST | `/ui/workforce/versions/{version_id}/publish` | `workforce:manage` | [workforce_setup.py:309](src/ion/web/ui/workforce_setup.py#L309) |  | `_workforce_profiles.html`, `workforce.html` |
-| POST | `/ui/workforce/versions/{version_id}/requirements` | `workforce:manage` | [workforce_setup.py:246](src/ion/web/ui/workforce_setup.py#L246) |  | `_workforce_profiles.html`, `workforce.html` |
+| POST | `/ui/workforce/establishment/{profile_id}` | `workforce:manage` | [workforce_setup.py:338](src/ion/web/ui/workforce_setup.py#L338) |  | `workforce_setup.html`, `workforce.html` |
+| POST | `/ui/workforce/leavers` | `workforce:manage` | [workforce_setup.py:380](src/ion/web/ui/workforce_setup.py#L380) |  | `workforce_setup.html`, `workforce.html` |
+| POST | `/ui/workforce/leavers/{record_id}/checklist` | `workforce:manage` | [workforce_setup.py:433](src/ion/web/ui/workforce_setup.py#L433) |  | `workforce.html` |
+| POST | `/ui/workforce/leavers/{record_id}/revoke` | `workforce:manage` | [workforce_setup.py:412](src/ion/web/ui/workforce_setup.py#L412) |  | `workforce.html` |
+| GET | `/ui/workforce/me` | — | [workforce_journey.py:163](src/ion/web/ui/workforce_journey.py#L163) | `_fragments/workforce_journey.html` | `workforce_journey.html`, `workforce.html` |
+| GET | `/ui/workforce/orbat/person/{journey_id}` | `workforce:read` | [workforce_orbat.py:72](src/ion/web/ui/workforce_orbat.py#L72) | `_fragments/workforce_orbat_person.html` | `_workforce_chart.html`, `workforce.html` |
+| POST | `/ui/workforce/profile-requirements/{requirement_id}/remove` | `workforce:manage` | [workforce_setup.py:287](src/ion/web/ui/workforce_setup.py#L287) |  | `_workforce_profiles.html`, `workforce.html` |
+| POST | `/ui/workforce/profiles` | `workforce:manage` | [workforce_setup.py:177](src/ion/web/ui/workforce_setup.py#L177) | `_fragments/workforce_setup.html` | `_workforce_profiles.html`, `workforce.html` |
+| POST | `/ui/workforce/profiles/{profile_id}/grants` | `workforce:manage` | [workforce_setup.py:218](src/ion/web/ui/workforce_setup.py#L218) |  | `workforce.html` |
+| POST | `/ui/workforce/requirements/{requirement_id}/send-back` | `workforce:verify` | [workforce_team.py:302](src/ion/web/ui/workforce_team.py#L302) |  | `_workforce_queue.html`, `_workforce_requirement.html`, `_workforce_roster.html`, `workforce.html` |
+| POST | `/ui/workforce/requirements/{requirement_id}/submit` | — | [workforce_journey.py:211](src/ion/web/ui/workforce_journey.py#L211) |  | `_workforce_queue.html`, `_workforce_requirement.html`, `_workforce_roster.html`, `workforce.html` |
+| POST | `/ui/workforce/requirements/{requirement_id}/verify` | `workforce:verify` | [workforce_team.py:270](src/ion/web/ui/workforce_team.py#L270) |  | `_workforce_queue.html`, `_workforce_requirement.html`, `_workforce_roster.html`, `workforce.html` |
+| POST | `/ui/workforce/requirements/{requirement_id}/withdraw` | — | [workforce_journey.py:242](src/ion/web/ui/workforce_journey.py#L242) |  | `_workforce_queue.html`, `_workforce_requirement.html`, `_workforce_roster.html`, `workforce.html` |
+| GET | `/ui/workforce/setup` | `workforce:manage` | [workforce_setup.py:128](src/ion/web/ui/workforce_setup.py#L128) | `_fragments/workforce_setup.html` | `_workforce_profiles.html`, `workforce.html` |
+| GET | `/ui/workforce/team` | `workforce:read` | [workforce_team.py:221](src/ion/web/ui/workforce_team.py#L221) | `_fragments/workforce_team.html` | `_workforce_roster.html`, `workforce_team.html`, `workforce.html` |
+| POST | `/ui/workforce/versions/{version_id}/publish` | `workforce:manage` | [workforce_setup.py:315](src/ion/web/ui/workforce_setup.py#L315) |  | `_workforce_profiles.html`, `workforce.html` |
+| POST | `/ui/workforce/versions/{version_id}/requirements` | `workforce:manage` | [workforce_setup.py:250](src/ion/web/ui/workforce_setup.py#L250) |  | `_workforce_profiles.html`, `workforce.html` |
 
 ## /api
 

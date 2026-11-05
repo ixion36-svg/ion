@@ -34,6 +34,7 @@ from datetime import date
 from typing import Any, Callable, Optional
 
 from fastapi import APIRouter, Depends, Form, Request
+from fastapi.responses import HTMLResponse
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
@@ -127,6 +128,7 @@ def _view(
 @router.get(
     "/workforce/setup",
     dependencies=[Depends(require_permission("workforce:manage"))],
+    response_class=HTMLResponse,
 )
 def setup_fragment(
     request: Request,
@@ -175,6 +177,7 @@ def _write(
 @router.post(
     "/workforce/profiles",
     dependencies=[Depends(require_permission("workforce:manage"))],
+    response_class=HTMLResponse,
 )
 def create_profile(
     request: Request,
@@ -215,6 +218,7 @@ def create_profile(
 @router.post(
     "/workforce/profiles/{profile_id}/grants",
     dependencies=[Depends(require_permission("workforce:manage"))],
+    response_class=HTMLResponse,
 )
 def set_grants(
     request: Request,
@@ -246,6 +250,7 @@ def set_grants(
 @router.post(
     "/workforce/versions/{version_id}/requirements",
     dependencies=[Depends(require_permission("workforce:manage"))],
+    response_class=HTMLResponse,
 )
 def add_requirement(
     request: Request,
@@ -282,6 +287,7 @@ def add_requirement(
 @router.post(
     "/workforce/profile-requirements/{requirement_id}/remove",
     dependencies=[Depends(require_permission("workforce:manage"))],
+    response_class=HTMLResponse,
 )
 def remove_requirement(
     request: Request,
@@ -309,6 +315,7 @@ def remove_requirement(
 @router.post(
     "/workforce/versions/{version_id}/publish",
     dependencies=[Depends(require_permission("workforce:manage"))],
+    response_class=HTMLResponse,
 )
 def publish(
     request: Request,
@@ -331,6 +338,7 @@ def publish(
 @router.post(
     "/workforce/establishment/{profile_id}",
     dependencies=[Depends(require_permission("workforce:manage"))],
+    response_class=HTMLResponse,
 )
 def set_establishment(
     request: Request,
@@ -372,6 +380,7 @@ def set_establishment(
 @router.post(
     "/workforce/leavers",
     dependencies=[Depends(require_permission("workforce:manage"))],
+    response_class=HTMLResponse,
 )
 def start_offboarding(
     request: Request,
@@ -403,6 +412,7 @@ def start_offboarding(
 @router.post(
     "/workforce/leavers/{record_id}/revoke",
     dependencies=[Depends(require_permission("workforce:manage"))],
+    response_class=HTMLResponse,
 )
 def revoke(
     request: Request,
@@ -423,6 +433,7 @@ def revoke(
 @router.post(
     "/workforce/leavers/{record_id}/checklist",
     dependencies=[Depends(require_permission("workforce:manage"))],
+    response_class=HTMLResponse,
 )
 def tick(
     request: Request,

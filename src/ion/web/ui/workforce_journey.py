@@ -27,6 +27,7 @@ from datetime import date
 from typing import Any, Callable, Optional
 
 from fastapi import APIRouter, Depends, Form, Request
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import get_current_user
@@ -34,8 +35,8 @@ from ion.models.user import User
 from ion.models.workforce import JourneyRequirement
 from ion.services import workforce_service as wf
 from ion.storage.database import get_db_session
-from ion.web.workforce_api import require_workforce_module
 from ion.web.ui._shared import render_view
+from ion.web.workforce_api import require_workforce_module
 
 logger = logging.getLogger(__name__)
 
@@ -159,7 +160,7 @@ def _view(
     }
 
 
-@router.get("/workforce/me")
+@router.get("/workforce/me", response_class=HTMLResponse)
 def journey_fragment(
     request: Request,
     journey: Optional[int] = None,
@@ -207,7 +208,7 @@ def _write(
     return render_view(request, FRAGMENT, _view(session, user, journey_id, error))
 
 
-@router.post("/workforce/requirements/{requirement_id}/submit")
+@router.post("/workforce/requirements/{requirement_id}/submit", response_class=HTMLResponse)
 def submit_requirement(
     request: Request,
     requirement_id: int,
@@ -238,7 +239,7 @@ def submit_requirement(
     )
 
 
-@router.post("/workforce/requirements/{requirement_id}/withdraw")
+@router.post("/workforce/requirements/{requirement_id}/withdraw", response_class=HTMLResponse)
 def withdraw_requirement(
     request: Request,
     requirement_id: int,

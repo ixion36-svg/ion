@@ -21,14 +21,15 @@ import logging
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Request
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_permission
 from ion.models.workforce import UserJourney
 from ion.services import workforce_service as wf
 from ion.storage.database import get_db_session
-from ion.web.workforce_api import require_workforce_module
 from ion.web.ui._shared import render_view
+from ion.web.workforce_api import require_workforce_module
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,7 @@ ITEM_TONE: dict[str, tuple[str, str]] = {
 @router.get(
     "/workforce/orbat/person/{journey_id}",
     dependencies=[Depends(require_permission("workforce:read"))],
+    response_class=HTMLResponse,
 )
 def person_fragment(
     request: Request,
