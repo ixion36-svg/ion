@@ -198,12 +198,49 @@ class TestThePriceCheckIsHonest:
             if "vendor_price" in entry:
                 assert entry.get("vendor_currency"), cert_id
 
-    def test_nothing_silently_converted_the_catalogue(self):
-        """Where vendor and catalogue disagree the catalogue is left
-        alone, because converting needs a rate and a date. If a figure is
-        ever restated it must be because somebody decided to, not because
-        this file quietly did it."""
+    def test_a_checked_price_is_the_vendor_figure_verbatim(self):
+        """Adopted, never converted.
+
+        A checked entry carries the vendor's own number in the vendor's
+        own currency. That is exact for ever and anybody can re-derive
+        it from the source. A converted figure would be precise to the
+        pound and wrong by hundreds -- no GBP/USD rate could be verified
+        for the day these were checked and the candidates spread
+        1.28-1.35 -- and nothing downstream could tell which rate made
+        it.
+        """
         for cert_id, entry in cc.PRICE_PROVENANCE.items():
+            if "vendor_price" not in entry:
+                continue
             cert = cc.get_cert(cert_id)
-            if entry.get("vendor_currency") and cert:
-                assert cert["currency"] == "GBP", cert_id
+            assert cert is not None, cert_id
+            assert cert["cost"] == entry["vendor_price"], (
+                f"{cert_id}: catalogue says {cert['cost']}, vendor says "
+                f"{entry['vendor_price']}. Adopt the vendor figure or "
+                f"drop the provenance; a half-updated entry claims to be "
+                f"checked and is not."
+            )
+            assert cert["currency"] == entry["vendor_currency"], (
+                f"{cert_id}: carrying {cert['currency']} against a "
+                f"{entry['vendor_currency']} vendor figure means somebody "
+                f"converted it without recording a rate."
+            )
+
+    def test_the_catalogue_reports_being_multi_currency(self):
+        """Checked entries are in the vendor's currency and the rest are
+        the template's original GBP, so this genuinely holds both.
+        Anything summing across it has to convert deliberately."""
+        assert set(cc.currencies()) == {"GBP", "USD"}
+
+    def test_components_add_up_to_the_adopted_figure(self):
+        """A price recorded as parts must equal the sum of its parts, or
+        the breakdown is decoration rather than a record of what was
+        bought."""
+        for cert_id, entry in cc.PRICE_PROVENANCE.items():
+            components = entry.get("components")
+            if not components:
+                continue
+            assert sum(components.values()) == entry["vendor_price"], (
+                f"{cert_id}: {components} does not sum to "
+                f"{entry['vendor_price']}"
+            )

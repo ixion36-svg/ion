@@ -12,14 +12,20 @@ tests/test_cert_catalogue_data.py fails if the two drift. Two copies of
 reference data drift silently, because each screen looks right on its
 own.
 
-**Every price here is GBP and undated.** That is not a claim that they
-are current -- it is what was in the template, carried across unchanged
-so that lifting the data did not quietly restate it. Vendors publish in
-their own currency and move their prices: GIAC lists a certification
-attempt at USD 999, and a figure here is only as good as the day
-somebody checked it. PRICE_PROVENANCE records the ones that have been
-checked against a source, and `unverified_prices()` names the rest, so
-"nobody has confirmed this" is visible rather than implied.
+**The catalogue is not all one currency, and that is deliberate.** The
+20 entries whose prices have been checked against their vendors now
+carry the vendor's own published figure in the vendor's own currency;
+the remaining 65 are the template's original undated GBP. Nothing is
+converted. No GBP/USD rate for the day these were checked could be
+verified, and the candidates ranged 1.28 to 1.35 -- about 5%, several
+hundred pounds on a SANS course -- so a converted figure would carry
+invented precision that nothing downstream could trace or re-derive.
+`currencies()` reports what is actually in here, and anything summing
+across it has to convert deliberately, with a rate it records.
+
+PRICE_PROVENANCE says which figures have been checked and against what;
+`unverified_prices()` names the rest, so "nobody has confirmed this" is
+visible rather than implied.
 
 **The costs are not all the same kind of thing.** Some are an exam fee
 (Security+), some are a training course with the exam bundled (the
@@ -167,8 +173,8 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "SANS/GIAC",
         "domain": "secops",
         "level": "advanced",
-        "cost": 6800,
-        "currency": "GBP",
+        "cost": 9779,
+        "currency": "USD",
         "desc": "Intrusion analyst certification. Deep-dive into traffic analysis, protocol dissection, and IDS/IPS management. One of the most respected blue team certs.",
         "duration": "Open book, 4h",
         "questions": "106",
@@ -190,8 +196,8 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "SANS/GIAC",
         "domain": "secops",
         "level": "expert",
-        "cost": 6800,
-        "currency": "GBP",
+        "cost": 9779,
+        "currency": "USD",
         "desc": "SOC management certification covering building and running a security operations center. Strategy, staffing, metrics, and tool optimization.",
         "duration": "Open book, 3h",
         "questions": "75",
@@ -329,8 +335,8 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "SANS/GIAC",
         "domain": "ir",
         "level": "intermediate",
-        "cost": 6800,
-        "currency": "GBP",
+        "cost": 9779,
+        "currency": "USD",
         "desc": "Certified Incident Handler. The gold standard for incident response skills \u2014 detection, response, and handling security incidents.",
         "duration": "Open book, 4h",
         "questions": "106",
@@ -352,8 +358,8 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "SANS/GIAC",
         "domain": "ir",
         "level": "intermediate",
-        "cost": 6800,
-        "currency": "GBP",
+        "cost": 9779,
+        "currency": "USD",
         "desc": "Certified Forensic Examiner. Windows forensics, browser forensics, email analysis, and evidence preservation for DFIR practitioners.",
         "duration": "Open book, 4h",
         "questions": "115",
@@ -375,8 +381,8 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "SANS/GIAC",
         "domain": "ir",
         "level": "advanced",
-        "cost": 6800,
-        "currency": "GBP",
+        "cost": 9779,
+        "currency": "USD",
         "desc": "Network Forensic Analyst. Advanced network forensics including protocol analysis, encrypted traffic, and network-level indicators of compromise.",
         "duration": "Open book, 4h",
         "questions": "115",
@@ -400,8 +406,8 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "SANS/GIAC",
         "domain": "ir",
         "level": "advanced",
-        "cost": 6800,
-        "currency": "GBP",
+        "cost": 9779,
+        "currency": "USD",
         "desc": "Reverse Engineering Malware. Deep malware analysis skills \u2014 static/dynamic analysis, code-level reverse engineering, and behavioral analysis.",
         "duration": "Open book, 4h",
         "questions": "75",
@@ -471,8 +477,8 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "SANS/GIAC",
         "domain": "ir",
         "level": "expert",
-        "cost": 6800,
-        "currency": "GBP",
+        "cost": 9779,
+        "currency": "USD",
         "desc": "Advanced Forensics & Incident Response. Expert-level forensics for lead investigators and DFIR team leads handling complex, multi-vector incidents.",
         "duration": "Open book, 3h",
         "questions": "82",
@@ -496,8 +502,8 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "SANS/GIAC",
         "domain": "threat",
         "level": "foundation",
-        "cost": 6800,
-        "currency": "GBP",
+        "cost": 9779,
+        "currency": "USD",
         "desc": "Open Source Intelligence. OSINT collection, analysis, and operational security for intelligence gathering and investigations.",
         "duration": "Open book, 3h",
         "questions": "75",
@@ -519,8 +525,8 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "SANS/GIAC",
         "domain": "threat",
         "level": "intermediate",
-        "cost": 6800,
-        "currency": "GBP",
+        "cost": 9779,
+        "currency": "USD",
         "desc": "Cyber Threat Intelligence. Strategic and operational threat intelligence \u2014 APT profiling, intelligence cycle, and analytical frameworks.",
         "duration": "Open book, 4h",
         "questions": "75",
@@ -566,8 +572,8 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "SANS/GIAC",
         "domain": "threat",
         "level": "advanced",
-        "cost": 6800,
-        "currency": "GBP",
+        "cost": 9779,
+        "currency": "USD",
         "desc": "Strategic Threat Intelligence. Building and managing CTI programs \u2014 team structure, collection planning, stakeholder communication, and intelligence-driven defense.",
         "duration": "Open book, 3h",
         "questions": "75",
@@ -879,8 +885,8 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "Offensive Security",
         "domain": "pentest",
         "level": "advanced",
-        "cost": 1300,
-        "currency": "GBP",
+        "cost": 1749,
+        "currency": "USD",
         "desc": "Offensive Security Certified Professional. The gold standard practical pen testing cert. 24-hour hands-on exam exploiting multiple machines in a network.",
         "duration": "24 hours + report",
         "questions": "Practical",
@@ -927,8 +933,8 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "SANS/GIAC",
         "domain": "pentest",
         "level": "expert",
-        "cost": 6800,
-        "currency": "GBP",
+        "cost": 9779,
+        "currency": "USD",
         "desc": "Expert Penetration Tester. SANS' most advanced pen test cert \u2014 custom exploit development, advanced network attacks, and cryptographic attacks.",
         "duration": "Open book, 3h",
         "questions": "60",
@@ -1362,8 +1368,8 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "SANS/GIAC",
         "domain": "devsec",
         "level": "intermediate",
-        "cost": 6800,
-        "currency": "GBP",
+        "cost": 9779,
+        "currency": "USD",
         "desc": "Web Application Penetration Tester. Finding and exploiting web app vulnerabilities \u2014 injection, XSS, auth flaws, and business logic bugs.",
         "duration": "Open book, 4h",
         "questions": "82",
@@ -1435,8 +1441,8 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "SANS/GIAC",
         "domain": "devsec",
         "level": "intermediate",
-        "cost": 6800,
-        "currency": "GBP",
+        "cost": 9779,
+        "currency": "USD",
         "desc": "Defending Advanced Threats. Purple team operations \u2014 building detections for advanced adversary techniques, validating controls, and improving defenses.",
         "duration": "Open book, 4h",
         "questions": "75",
@@ -1562,8 +1568,8 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "SANS/GIAC",
         "domain": "secops",
         "level": "foundation",
-        "cost": 6800,
-        "currency": "GBP",
+        "cost": 9779,
+        "currency": "USD",
         "desc": "Security Essentials. Broad foundational cert validating hands-on security skills beyond theory \u2014 networking, defense, cryptography, and incident handling fundamentals.",
         "duration": "Open book, 5h",
         "questions": "106-180",
@@ -1586,8 +1592,8 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "SANS/GIAC",
         "domain": "cloud",
         "level": "intermediate",
-        "cost": 6800,
-        "currency": "GBP",
+        "cost": 9779,
+        "currency": "USD",
         "desc": "Cloud Security Automation. Building and securing cloud infrastructure using IaC, CI/CD pipelines, and cloud-native security tooling across AWS, Azure, and GCP.",
         "duration": "Open book, 3h",
         "questions": "75",
@@ -1610,8 +1616,8 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "SANS/GIAC",
         "domain": "pentest",
         "level": "intermediate",
-        "cost": 6800,
-        "currency": "GBP",
+        "cost": 9779,
+        "currency": "USD",
         "desc": "Penetration Tester. SANS-level pen test cert covering advanced reconnaissance, exploitation, password attacks, and post-exploitation in enterprise environments.",
         "duration": "Open book, 3h",
         "questions": "82",
@@ -1634,8 +1640,8 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "SANS/GIAC",
         "domain": "arch",
         "level": "advanced",
-        "cost": 6800,
-        "currency": "GBP",
+        "cost": 9779,
+        "currency": "USD",
         "desc": "Defensible Security Architecture. Designing and building resilient network architectures \u2014 zero trust, segmentation, cloud architecture, and detection-oriented design.",
         "duration": "Open book, 3h",
         "questions": "75",
@@ -2084,8 +2090,8 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "SANS/GIAC",
         "domain": "arch",
         "level": "advanced",
-        "cost": 6800,
-        "currency": "GBP",
+        "cost": 9779,
+        "currency": "USD",
         "desc": "Global Industrial Cyber Security Professional. Securing ICS/SCADA/OT environments \u2014 Purdue model, industrial protocols, safety systems, and OT incident response.",
         "duration": "Open book, 3h",
         "questions": "82",
@@ -2108,8 +2114,8 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "SANS/GIAC",
         "domain": "ir",
         "level": "expert",
-        "cost": 6800,
-        "currency": "GBP",
+        "cost": 9779,
+        "currency": "USD",
         "desc": "Response and Industrial Defense. Advanced incident response in industrial and OT environments \u2014 forensics on PLCs, RTUs, and industrial network protocols.",
         "duration": "Open book, 3h",
         "questions": "75",
@@ -2171,12 +2177,16 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
 #: Hand-maintained. Nothing regenerates this, and a check recorded here
 #: is a claim that somebody actually opened that page on that date.
 #:
-#: `vendor_price` and `vendor_currency` are what the vendor publishes, in
-#: the vendor's own currency. They are NOT converted into `cost`, and the
-#: catalogue figure is deliberately left alone where the two disagree:
-#: converting needs a rate and a date, and quietly restating 22 budget
-#: figures off a rate nobody recorded is how the numbers stop being
-#: traceable to anything. A disagreement is reported, not resolved.
+#: `vendor_price` and `vendor_currency` are what the vendor publishes.
+#: Where a price has been checked, the catalogue entry now carries that
+#: figure and that currency verbatim -- adopted, never converted.
+#:
+#: Converting would need a rate and a date. None could be verified for
+#: the day these were checked and the candidates spread 1.28-1.35, so a
+#: GBP figure here would be precise to the pound and wrong by hundreds,
+#: with nothing downstream able to re-derive it. Holding the vendor's own
+#: number is exact for ever; turning it into the estate's currency is a
+#: decision for whoever knows the rate they actually pay.
 
 #: Every SANS/GIAC entry in the catalogue carries the same flat £6,800,
 #: which is a placeholder rather than a researched per-course figure.
@@ -2194,14 +2204,21 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
 _SANS_GIAC_CHECK: Dict[str, Any] = {
     "source": "https://www.sans.org/cyber-security-courses/ and https://www.giac.org/pricing",
     "checked_on": "2026-11-05",
-    "vendor_price": 8780,
+    #: Course plus attempt. Recorded as one adopted figure with its parts
+    #: spelled out, because the two are bought separately and an estate
+    #: whose alumni sit the exam alone pays only the second.
+    "vendor_price": 8780 + 999,
     "vendor_currency": "USD",
+    "components": {"sans_course": 8780, "giac_attempt": 999},
     "note": (
-        "Typical six-day SANS course tuition. The GIAC attempt is a "
-        "separate USD 999 and is not included, so the catalogue's flat "
-        "GBP 6,800 appears to be tuition only. Course prices vary by "
-        "course, event and region; this is the common figure, not a "
-        "quote for this specific certification."
+        "USD 8,780 typical six-day SANS course tuition plus the USD 999 "
+        "GIAC attempt, which is what it costs to hold the certification "
+        "rather than to sit the course. Replaces a flat GBP 6,800 that "
+        "every SANS entry carried and that appears to have been tuition "
+        "only. Course prices vary by course, event and region, so this "
+        "is the common figure rather than a quote for this specific "
+        "certification -- and it is the vendor's own number, not a "
+        "conversion."
     ),
 }
 
@@ -2221,9 +2238,9 @@ PRICE_PROVENANCE["oscp"] = {
     "vendor_price": 1749,
     "vendor_currency": "USD",
     "note": (
-        "Course and certification bundle, one exam attempt. The "
-        "standalone OSCP+ exam without the course is USD 1,699. The "
-        "catalogue's GBP 1,300 is below both."
+        "Course and certification bundle, one exam attempt included. "
+        "The standalone OSCP+ exam without the course is USD 1,699. "
+        "Replaces GBP 1,300, which was below both."
     ),
 }
 

@@ -1027,13 +1027,13 @@ async function rmShowHistory() {
             </div>
             <div class="flex items-center gap-[0.35rem]">
                 <label class="text-[0.72rem] text-base-content/70 font-semibold uppercase tracking-[0.05em]">Max Cost:</label>
-                <select id="cr-cost-filter" class="ion-select" data-change-action="crFilterCost" data-args='["$value"]'>
+                <select id="cr-cost-filter" class="ion-select" title="Compares the listed price in each certification's own currency. The catalogue holds both GBP and USD, so these thresholds are not converted." data-change-action="crFilterCost" data-args='["$value"]'>
                     <option value="all">Any</option>
-                    <option value="250">Under £250</option>
-                    <option value="500">Under £500</option>
-                    <option value="1000">Under £1,000</option>
-                    <option value="2000">Under £2,000</option>
-                    <option value="5000">Under £5,000</option>
+                    <option value="250">Under 250</option>
+                    <option value="500">Under 500</option>
+                    <option value="1000">Under 1,000</option>
+                    <option value="2000">Under 2,000</option>
+                    <option value="5000">Under 5,000</option>
                 </select>
             </div>
             <button class="btn btn-sm btn-ghost" data-click-action="crResetFilters">Reset</button>
@@ -2807,6 +2807,38 @@ function getPathwayCumulative(steps) {
     return { allSkills, allCerts, totalCost };
 }
 
+// ─── money ───
+// The catalogue is no longer one currency. 20 entries now carry the
+// vendor's own published figure in the vendor's own currency (USD),
+// because no GBP/USD rate could be verified for the day they were
+// checked and the candidates spread 1.28-1.35. Everything below used to
+// concatenate '~£' onto a bare number, which would now print a dollar
+// figure with a pound sign, and the aggregates would add the two.
+const CERT_SYMBOLS = { GBP: '£', USD: '$', EUR: '€' };
+
+function certMoney(amount, currency) {
+    if (amount == null) return 'Unknown';
+    const code = (currency || 'GBP').toUpperCase();
+    const symbol = CERT_SYMBOLS[code] || (code + ' ');
+    return symbol + Number(amount).toLocaleString();
+}
+
+// Totals, per currency, because adding USD to GBP produces a number that
+// is not money. One currency renders as one figure; more than one renders
+// as both, which is honest and is also a prompt to fix the catalogue.
+function certCostSummary(certs) {
+    const totals = {};
+    for (const entry of certs) {
+        const cert = entry && entry.cert ? entry.cert : entry;
+        if (!cert || cert.price == null) continue;
+        const code = (cert.currency || 'GBP').toUpperCase();
+        totals[code] = (totals[code] || 0) + cert.price;
+    }
+    const codes = Object.keys(totals).sort();
+    if (!codes.length) return 'Unknown';
+    return codes.map(code => certMoney(totals[code], code)).join(' + ');
+}
+
 function trainingElement(tag, classes = '', text = null, action = null, args = []) {
     const element = cloneTemplate('training-el-' + tag);
     element.className = classes;
@@ -2850,7 +2882,7 @@ function trainingCertCard(cert, funding = false) {
     button.textContent = inPlan ? 'In Plan' : '+ Plan';
     button.dataset.cert = btoa(JSON.stringify({name:cert.name, provider:cert.provider, price:cert.price, difficulty:cert.difficulty}));
     card.querySelector('.cert-name').textContent = cert.name;
-    card.querySelector('.cert-price').textContent = '~£' + cert.price.toLocaleString();
+    card.querySelector('.cert-price').textContent = '~' + certMoney(cert.price, cert.currency);
     card.querySelector('.cert-provider').textContent = cert.provider;
     card.querySelector('.cert-difficulty').textContent = cert.difficulty;
     card.querySelector('.cert-difficulty').classList.add(cert.difficulty);
@@ -2901,7 +2933,7 @@ function renderDetailPanel() {
         equiv.after(row);
     }
     const filterLabel = certFilter === 'cs' ? ' (CS)' : certFilter === 'contractor' ? ' (Ctr)' : '';
-    trainingKpis(root, [['Experience',role.experience],['Skills',cumulative.allSkills.length],['Certs' + filterLabel,certs.length],['Cert Cost' + filterLabel,'~£' + cost.toLocaleString()]]);
+    trainingKpis(root, [['Experience',role.experience],['Skills',cumulative.allSkills.length],['Certs' + filterLabel,certs.length],['Cert Cost' + filterLabel, '~' + certCostSummary(certs)]]);
     const pathway = trainingSection(root, 'Career Pathways');
     const modes = trainingElement('div', 'mode-toggle');
     [['to','Paths TO This Role'],['from','Explore FROM Here']].forEach(([mode, label]) => modes.append(trainingElement('button', 'mode-btn' + (viewMode === mode ? ' active' : ''), label, 'switchMode', [mode])));
@@ -2950,7 +2982,7 @@ function renderDetailPanel() {
     const filters = trainingElement('div', 'cert-filter');
     [['all','All'],['cs','Civil Servant'],['contractor','Contractor'],['mod','MOD']].forEach(([value,label]) => filters.append(trainingElement('button', 'cert-filter-btn' + (certFilter === value ? ' active' : ''), label, 'switchCertFilter', [value])));
     certifications.append(filters);
-    const notes = {cs:'Showing certs funded for civil servants (CompTIA + SANS/GIAC).',contractor:'Contractors can pursue any certification. SANS/GIAC are uncommon due to cost (~£7,900 course + exam, self-funded).',mod:'Showing certs available through Defence funding (ELCAS / Unit Training Budget). Includes CompTIA, SANS/GIAC, EC-Council, ISC².',all:'Showing all certifications. Use filters to see availability by employment type.'};
+    const notes = {cs:'Showing certs funded for civil servants (CompTIA + SANS/GIAC).',contractor:'Contractors can pursue any certification. SANS/GIAC are uncommon due to cost (~USD 9,779 course + exam, self-funded).',mod:'Showing certs available through Defence funding (ELCAS / Unit Training Budget). Includes CompTIA, SANS/GIAC, EC-Council, ISC².',all:'Showing all certifications. Use filters to see availability by employment type.'};
     certifications.append(trainingElement('div', 'cert-note', notes[certFilter]));
     if (multi) {
         const seen = new Set();
@@ -2964,7 +2996,7 @@ function renderDetailPanel() {
             certifications.append(group);
         });
         const total = trainingElement('div', 'cert-total-bar');
-        total.append(trainingElement('span', 'ctb-label', (certFilter === 'all' ? '' : certFilter === 'cs' ? 'CS ' : certFilter === 'mod' ? 'MOD ' : 'Contractor ') + 'Pathway Cost (' + certs.length + ' certs)'), trainingElement('span', 'ctb-value', '~£' + cost.toLocaleString()));
+        total.append(trainingElement('span', 'ctb-label', (certFilter === 'all' ? '' : certFilter === 'cs' ? 'CS ' : certFilter === 'mod' ? 'MOD ' : 'Contractor ') + 'Pathway Cost (' + certs.length + ' certs)'), trainingElement('span', 'ctb-value', '~' + certCostSummary(certs)));
         certifications.append(total);
     } else {
         const matches = role.certs.filter(certPassesFilter);
@@ -2972,7 +3004,7 @@ function renderDetailPanel() {
         if (!matches.length) certifications.append(trainingElement('p', 'detail-desc', 'No certifications match this filter for this role.'));
     }
     const create = trainingSection(root, 'Training Plan');
-    create.append(trainingElement('button', 'tp-btn tp-btn-primary w-full p-3', 'Create "' + role.title + '" Training Plan (' + certs.length + ' certs, ~£' + cost.toLocaleString() + ')', 'tpCreateFromPathway'));
+    create.append(trainingElement('button', 'tp-btn tp-btn-primary w-full p-3', 'Create "' + role.title + '" Training Plan (' + certs.length + ' certs, ~' + certCostSummary(certs) + ')', 'tpCreateFromPathway'));
     create.append(trainingElement('p', 'detail-desc', 'Auto-creates a plan named after this role with all ' + (certFilter === 'all' ? '' : certFilter === 'cs' ? 'CS-funded ' : certFilter === 'mod' ? 'MOD-funded ' : 'contractor ') + 'certs'));
     document.getElementById('detail-content').replaceChildren(root);
 }
@@ -3073,7 +3105,7 @@ function modShowDetail(roleId) {
     trainingList(root, 'Key Units / Postings', role.units, 'mod-unit-badge');
     if (role.certs.length) {
         const create = trainingSection(root, 'Training Plan');
-        create.append(trainingElement('button', 'tp-btn tp-btn-primary w-full p-3', 'Create "' + role.title + '" Training Plan (' + role.certs.length + ' certs, ~£' + role.certs.reduce((sum,cert) => sum + cert.price, 0).toLocaleString() + ')', 'tpCreateFromModRole', [roleId]));
+        create.append(trainingElement('button', 'tp-btn tp-btn-primary w-full p-3', 'Create "' + role.title + '" Training Plan (' + role.certs.length + ' certs, ~' + certCostSummary(role.certs) + ')', 'tpCreateFromModRole', [roleId]));
         create.append(trainingElement('p', 'detail-desc', 'Auto-creates a plan with all MOD-funded certifications for this role'));
     }
     document.getElementById('detail-content').replaceChildren(root);
@@ -6109,7 +6141,7 @@ function renderCalPlanSchedule() {
         const schedule = calPlanSchedule.find(entry => entry.item.id === item.id);
         const row = cloneTemplate('tp-cal-schedule-row');
         row.querySelector('.tp-item-name').textContent = item.cert_name ?? 'Unknown';
-        row.querySelector('.tp-item-provider').textContent = (item.provider ?? 'Unknown') + ' - ' + (item.price == null ? 'Unknown' : '~£' + item.price.toLocaleString());
+        row.querySelector('.tp-item-provider').textContent = (item.provider ?? 'Unknown') + ' - ' + (item.price == null ? 'Unknown' : '~' + certMoney(item.price, item.currency));
         const status = row.querySelector('.cal-sched-status');
         status.textContent = {planned: 'Planned', in_progress: 'Studying', completed: 'Passed', skipped: 'Skipped'}[item.status] ?? item.status ?? 'Unknown';
         if (['planned', 'in_progress', 'completed', 'skipped'].includes(item.status)) status.classList.add(item.status);
@@ -6225,8 +6257,8 @@ const CR_CERTS = [
     { id:'secplus', name:'Security+', abbr:'Sec+', provider:'CompTIA', domain:'secops', level:'foundation', cost:295, currency:'GBP', desc:'Foundational cybersecurity certification covering threat analysis, risk management, and network security. The industry standard entry-level cert.', duration:'90 min', questions:'90 MCQ + PBQ', passing:'750/900', renewal:'3 years / 50 CEUs', prereqs:[], topics:['Threats & Vulnerabilities','Architecture & Design','Implementation','Operations & IR','Governance'] },
     { id:'cysa', name:'CySA+', abbr:'CySA+', provider:'CompTIA', domain:'secops', level:'intermediate', cost:310, currency:'GBP', desc:'Validates behavioral analytics skills to detect and respond to cybersecurity threats through continuous security monitoring.', duration:'165 min', questions:'85 MCQ + PBQ', passing:'750/900', renewal:'3 years / 60 CEUs', prereqs:['secplus'], topics:['Threat Management','Vulnerability Management','Incident Response','Security Architecture'] },
     { id:'casp', name:'CASP+', abbr:'CASP+', provider:'CompTIA', domain:'secops', level:'advanced', cost:380, currency:'GBP', desc:'Advanced-level practitioner certification for security architects and senior security engineers. Performance-based, no multiple choice.', duration:'165 min', questions:'90 PBQ', passing:'Pass/Fail', renewal:'3 years / 75 CEUs', prereqs:['cysa'], topics:['Security Architecture','Security Operations','Governance','Risk & Compliance','Enterprise Security'] },
-    { id:'cdsa', name:'GIAC GCIA', abbr:'GCIA', provider:'SANS/GIAC', domain:'secops', level:'advanced', cost:6800, currency:'GBP', desc:'Intrusion analyst certification. Deep-dive into traffic analysis, protocol dissection, and IDS/IPS management. One of the most respected blue team certs.', duration:'Open book, 4h', questions:'106', passing:'70%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['TCP/IP','IDS','Signature Analysis','Traffic Analysis','Incident Handling'] },
-    { id:'gsom', name:'GIAC GSOM', abbr:'GSOM', provider:'SANS/GIAC', domain:'secops', level:'expert', cost:6800, currency:'GBP', desc:'SOC management certification covering building and running a security operations center. Strategy, staffing, metrics, and tool optimization.', duration:'Open book, 3h', questions:'75', passing:'71%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['SOC Strategy','Analyst Development','Detection Engineering','Metrics & Reporting','Tool Optimization'] },
+    { id:'cdsa', name:'GIAC GCIA', abbr:'GCIA', provider:'SANS/GIAC', domain:'secops', level:'advanced', cost:9779, currency:'USD', desc:'Intrusion analyst certification. Deep-dive into traffic analysis, protocol dissection, and IDS/IPS management. One of the most respected blue team certs.', duration:'Open book, 4h', questions:'106', passing:'70%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['TCP/IP','IDS','Signature Analysis','Traffic Analysis','Incident Handling'] },
+    { id:'gsom', name:'GIAC GSOM', abbr:'GSOM', provider:'SANS/GIAC', domain:'secops', level:'expert', cost:9779, currency:'USD', desc:'SOC management certification covering building and running a security operations center. Strategy, staffing, metrics, and tool optimization.', duration:'Open book, 3h', questions:'75', passing:'71%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['SOC Strategy','Analyst Development','Detection Engineering','Metrics & Reporting','Tool Optimization'] },
     { id:'splunkcore', name:'Splunk Core Certified User', abbr:'Splunk Core', provider:'Splunk', domain:'secops', level:'foundation', cost:100, currency:'GBP', desc:'Validates foundational Splunk searching, reporting, and dashboard skills. Essential for SOC analysts using Splunk SIEM.', duration:'60 min', questions:'65', passing:'70%', renewal:'3 years', prereqs:[], topics:['Searching','Fields','Reports','Dashboards','Lookups'] },
     { id:'ecsa', name:'Elastic Certified Analyst', abbr:'ECA', provider:'Elastic', domain:'secops', level:'intermediate', cost:320, currency:'GBP', desc:'Validates skills in using Elastic Security for threat hunting, detection rules, and alert triage in Elasticsearch environments.', duration:'120 min', questions:'40 hands-on', passing:'Pass/Fail', renewal:'2 years', prereqs:[], topics:['KQL','Detection Rules','Alert Triage','Dashboards','Timeline Investigation'] },
     { id:'csa', name:'CrowdStrike CCFA', abbr:'CCFA', provider:'CrowdStrike', domain:'secops', level:'intermediate', cost:160, currency:'GBP', desc:'CrowdStrike Certified Falcon Administrator. Validates skills in managing and operating the Falcon platform for endpoint detection and response.', duration:'90 min', questions:'60', passing:'70%', renewal:'2 years', prereqs:[], topics:['Falcon Console','Host Management','Detection Policies','IOA/IOC','Response Actions'] },
@@ -6234,19 +6266,19 @@ const CR_CERTS = [
 
     // ─── IR & Forensics ───
     { id:'ecih', name:'EC-Council ECIH', abbr:'ECIH', provider:'EC-Council', domain:'ir', level:'foundation', cost:595, currency:'GBP', desc:'EC-Council Certified Incident Handler. Covers the full IR lifecycle — preparation, identification, containment, eradication, and recovery.', duration:'3 hours', questions:'100', passing:'70%', renewal:'3 years / 120 ECE', prereqs:[], topics:['IR Process','Forensic Readiness','Malware Incidents','Email/Web/Insider Threats','Cloud IR'] },
-    { id:'gcih', name:'GIAC GCIH', abbr:'GCIH', provider:'SANS/GIAC', domain:'ir', level:'intermediate', cost:6800, currency:'GBP', desc:'Certified Incident Handler. The gold standard for incident response skills — detection, response, and handling security incidents.', duration:'Open book, 4h', questions:'106', passing:'70%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['Incident Handling','Hacker Techniques','Tools','Attack Detection','Packet Analysis'] },
-    { id:'gcfe', name:'GIAC GCFE', abbr:'GCFE', provider:'SANS/GIAC', domain:'ir', level:'intermediate', cost:6800, currency:'GBP', desc:'Certified Forensic Examiner. Windows forensics, browser forensics, email analysis, and evidence preservation for DFIR practitioners.', duration:'Open book, 4h', questions:'115', passing:'71%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['Windows Forensics','Browser Analysis','Email Forensics','Evidence Handling','Registry Analysis'] },
-    { id:'gnfa', name:'GIAC GNFA', abbr:'GNFA', provider:'SANS/GIAC', domain:'ir', level:'advanced', cost:6800, currency:'GBP', desc:'Network Forensic Analyst. Advanced network forensics including protocol analysis, encrypted traffic, and network-level indicators of compromise.', duration:'Open book, 4h', questions:'115', passing:'70%', renewal:'4 years / 36 CPEs', prereqs:['gcih'], topics:['Network Forensics','Protocol Analysis','Encrypted Traffic','NetFlow','Wireless Forensics'] },
-    { id:'grem', name:'GIAC GREM', abbr:'GREM', provider:'SANS/GIAC', domain:'ir', level:'advanced', cost:6800, currency:'GBP', desc:'Reverse Engineering Malware. Deep malware analysis skills — static/dynamic analysis, code-level reverse engineering, and behavioral analysis.', duration:'Open book, 4h', questions:'75', passing:'70%', renewal:'4 years / 36 CPEs', prereqs:['gcih'], topics:['Static Analysis','Dynamic Analysis','Disassembly','Document Malware','Shellcode Analysis'] },
+    { id:'gcih', name:'GIAC GCIH', abbr:'GCIH', provider:'SANS/GIAC', domain:'ir', level:'intermediate', cost:9779, currency:'USD', desc:'Certified Incident Handler. The gold standard for incident response skills — detection, response, and handling security incidents.', duration:'Open book, 4h', questions:'106', passing:'70%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['Incident Handling','Hacker Techniques','Tools','Attack Detection','Packet Analysis'] },
+    { id:'gcfe', name:'GIAC GCFE', abbr:'GCFE', provider:'SANS/GIAC', domain:'ir', level:'intermediate', cost:9779, currency:'USD', desc:'Certified Forensic Examiner. Windows forensics, browser forensics, email analysis, and evidence preservation for DFIR practitioners.', duration:'Open book, 4h', questions:'115', passing:'71%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['Windows Forensics','Browser Analysis','Email Forensics','Evidence Handling','Registry Analysis'] },
+    { id:'gnfa', name:'GIAC GNFA', abbr:'GNFA', provider:'SANS/GIAC', domain:'ir', level:'advanced', cost:9779, currency:'USD', desc:'Network Forensic Analyst. Advanced network forensics including protocol analysis, encrypted traffic, and network-level indicators of compromise.', duration:'Open book, 4h', questions:'115', passing:'70%', renewal:'4 years / 36 CPEs', prereqs:['gcih'], topics:['Network Forensics','Protocol Analysis','Encrypted Traffic','NetFlow','Wireless Forensics'] },
+    { id:'grem', name:'GIAC GREM', abbr:'GREM', provider:'SANS/GIAC', domain:'ir', level:'advanced', cost:9779, currency:'USD', desc:'Reverse Engineering Malware. Deep malware analysis skills — static/dynamic analysis, code-level reverse engineering, and behavioral analysis.', duration:'Open book, 4h', questions:'75', passing:'70%', renewal:'4 years / 36 CPEs', prereqs:['gcih'], topics:['Static Analysis','Dynamic Analysis','Disassembly','Document Malware','Shellcode Analysis'] },
     { id:'cfce', name:'IACIS CFCE', abbr:'CFCE', provider:'IACIS', domain:'ir', level:'advanced', cost:595, currency:'GBP', desc:'Certified Forensic Computer Examiner. Comprehensive digital forensics certification covering evidence acquisition, analysis, and courtroom presentation.', duration:'Practical + written', questions:'Peer review + exam', passing:'80%', renewal:'3 years / 40 hours training', prereqs:[], topics:['Evidence Acquisition','File System Analysis','Email Forensics','Internet Artifacts','Report Writing'] },
     { id:'chfi', name:'EC-Council CHFI', abbr:'CHFI', provider:'EC-Council', domain:'ir', level:'intermediate', cost:950, currency:'GBP', desc:'Computer Hacking Forensic Investigator. Digital forensics investigation skills including evidence collection, data recovery, and analysis.', duration:'4 hours', questions:'150', passing:'70%', renewal:'3 years / 120 ECE', prereqs:[], topics:['Forensic Science','Hard Disk Forensics','OS Forensics','Network Forensics','Mobile Forensics'] },
-    { id:'gfa', name:'GIAC GX-FA', abbr:'GX-FA', provider:'SANS/GIAC', domain:'ir', level:'expert', cost:6800, currency:'GBP', desc:'Advanced Forensics & Incident Response. Expert-level forensics for lead investigators and DFIR team leads handling complex, multi-vector incidents.', duration:'Open book, 3h', questions:'82', passing:'64%', renewal:'4 years / 36 CPEs', prereqs:['gnfa'], topics:['Advanced Memory Forensics','APT Tracking','Multi-platform IR','DFIR Automation','Expert Witness'] },
+    { id:'gfa', name:'GIAC GX-FA', abbr:'GX-FA', provider:'SANS/GIAC', domain:'ir', level:'expert', cost:9779, currency:'USD', desc:'Advanced Forensics & Incident Response. Expert-level forensics for lead investigators and DFIR team leads handling complex, multi-vector incidents.', duration:'Open book, 3h', questions:'82', passing:'64%', renewal:'4 years / 36 CPEs', prereqs:['gnfa'], topics:['Advanced Memory Forensics','APT Tracking','Multi-platform IR','DFIR Automation','Expert Witness'] },
 
     // ─── Threat Intelligence ───
-    { id:'gosi', name:'GIAC GOSI', abbr:'GOSI', provider:'SANS/GIAC', domain:'threat', level:'foundation', cost:6800, currency:'GBP', desc:'Open Source Intelligence. OSINT collection, analysis, and operational security for intelligence gathering and investigations.', duration:'Open book, 3h', questions:'75', passing:'66%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['OSINT Tools','Social Media Intel','Dark Web','Sock Puppets','Operational Security'] },
-    { id:'gcti', name:'GIAC GCTI', abbr:'GCTI', provider:'SANS/GIAC', domain:'threat', level:'intermediate', cost:6800, currency:'GBP', desc:'Cyber Threat Intelligence. Strategic and operational threat intelligence — APT profiling, intelligence cycle, and analytical frameworks.', duration:'Open book, 4h', questions:'75', passing:'70%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['Intelligence Cycle','APT Analysis','Diamond Model','MITRE ATT&CK','Strategic Intel','Kill Chain'] },
+    { id:'gosi', name:'GIAC GOSI', abbr:'GOSI', provider:'SANS/GIAC', domain:'threat', level:'foundation', cost:9779, currency:'USD', desc:'Open Source Intelligence. OSINT collection, analysis, and operational security for intelligence gathering and investigations.', duration:'Open book, 3h', questions:'75', passing:'66%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['OSINT Tools','Social Media Intel','Dark Web','Sock Puppets','Operational Security'] },
+    { id:'gcti', name:'GIAC GCTI', abbr:'GCTI', provider:'SANS/GIAC', domain:'threat', level:'intermediate', cost:9779, currency:'USD', desc:'Cyber Threat Intelligence. Strategic and operational threat intelligence — APT profiling, intelligence cycle, and analytical frameworks.', duration:'Open book, 4h', questions:'75', passing:'70%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['Intelligence Cycle','APT Analysis','Diamond Model','MITRE ATT&CK','Strategic Intel','Kill Chain'] },
     { id:'ctia', name:'EC-Council CTIA', abbr:'CTIA', provider:'EC-Council', domain:'threat', level:'intermediate', cost:595, currency:'GBP', desc:'Certified Threat Intelligence Analyst. Covers threat data collection, processing, analysis, and dissemination in structured and unstructured formats.', duration:'3 hours', questions:'100', passing:'70%', renewal:'3 years / 120 ECE', prereqs:[], topics:['Data Collection','Analysis Frameworks','APT Groups','Intelligence Sharing','TLP/STIX/TAXII'] },
-    { id:'gti_mgmt', name:'GIAC GSTRT', abbr:'GSTRT', provider:'SANS/GIAC', domain:'threat', level:'advanced', cost:6800, currency:'GBP', desc:'Strategic Threat Intelligence. Building and managing CTI programs — team structure, collection planning, stakeholder communication, and intelligence-driven defense.', duration:'Open book, 3h', questions:'75', passing:'67%', renewal:'4 years / 36 CPEs', prereqs:['gcti'], topics:['Intel Program Design','Collection Management','Stakeholder Briefs','Attribution','Strategic Analysis'] },
+    { id:'gti_mgmt', name:'GIAC GSTRT', abbr:'GSTRT', provider:'SANS/GIAC', domain:'threat', level:'advanced', cost:9779, currency:'USD', desc:'Strategic Threat Intelligence. Building and managing CTI programs — team structure, collection planning, stakeholder communication, and intelligence-driven defense.', duration:'Open book, 3h', questions:'75', passing:'67%', renewal:'4 years / 36 CPEs', prereqs:['gcti'], topics:['Intel Program Design','Collection Management','Stakeholder Briefs','Attribution','Strategic Analysis'] },
     { id:'crtp', name:'CRTL', abbr:'CRTL', provider:'SANS/GIAC', domain:'threat', level:'expert', cost:6800, currency:'GBP', desc:'Threat Intelligence Lead. Expert-level threat intel leadership — managing teams, developing collection strategies, driving intelligence-led operations.', duration:'Open book, 3h', questions:'75', passing:'66%', renewal:'4 years / 36 CPEs', prereqs:['gti_mgmt'], topics:['Intel Team Leadership','Collection Strategy','Purple Teaming','Campaign Tracking','Executive Reporting'] },
 
     // ─── Cloud Security ───
@@ -6263,9 +6295,9 @@ const CR_CERTS = [
     { id:'ejpt', name:'eJPT', abbr:'eJPT', provider:'eLearnSecurity', domain:'pentest', level:'foundation', cost:200, currency:'GBP', desc:'eLearnSecurity Junior Penetration Tester. Practical, hands-on entry-level pen test cert. Lab-based exam testing real exploitation skills.', duration:'48 hours (lab)', questions:'20 practical', passing:'70%', renewal:'3 years', prereqs:[], topics:['Networking','Web App Testing','Host Exploitation','Scripting','Reporting'] },
     { id:'pnpt', name:'PNPT', abbr:'PNPT', provider:'TCM Security', domain:'pentest', level:'intermediate', cost:315, currency:'GBP', desc:'Practical Network Penetration Tester. Full external and internal pen test in a realistic lab. Includes OSINT, AD attacks, and report writing.', duration:'5 days (lab)', questions:'Practical report', passing:'Report graded', renewal:'Lifetime', prereqs:[], topics:['OSINT','External Pentest','Active Directory','Post-Exploitation','Report Writing'] },
     { id:'ceh', name:'CEH', abbr:'CEH', provider:'EC-Council', domain:'pentest', level:'intermediate', cost:950, currency:'GBP', desc:'Certified Ethical Hacker. Covers hacking techniques and tools across multiple domains. Widely recognized but knowledge-based rather than practical.', duration:'4 hours', questions:'125', passing:'60-85%', renewal:'3 years / 120 ECE', prereqs:[], topics:['Footprinting','Scanning','Enumeration','Exploitation','Web Hacking','Social Engineering'] },
-    { id:'oscp', name:'OSCP', abbr:'OSCP', provider:'Offensive Security', domain:'pentest', level:'advanced', cost:1300, currency:'GBP', desc:'Offensive Security Certified Professional. The gold standard practical pen testing cert. 24-hour hands-on exam exploiting multiple machines in a network.', duration:'24 hours + report', questions:'Practical', passing:'70 points', renewal:'None (lifetime)', prereqs:[], topics:['Linux/Windows Exploitation','Privilege Escalation','Web Apps','Active Directory','Tunneling','Report Writing'] },
+    { id:'oscp', name:'OSCP', abbr:'OSCP', provider:'Offensive Security', domain:'pentest', level:'advanced', cost:1749, currency:'USD', desc:'Offensive Security Certified Professional. The gold standard practical pen testing cert. 24-hour hands-on exam exploiting multiple machines in a network.', duration:'24 hours + report', questions:'Practical', passing:'70 points', renewal:'None (lifetime)', prereqs:[], topics:['Linux/Windows Exploitation','Privilege Escalation','Web Apps','Active Directory','Tunneling','Report Writing'] },
     { id:'crto', name:'CRTO', abbr:'CRTO', provider:'Zero Point Security', domain:'pentest', level:'advanced', cost:450, currency:'GBP', desc:'Certified Red Team Operator. Cobalt Strike-focused red team operations — C2, evasion, lateral movement, and domain dominance in simulated enterprise.', duration:'48 hours (lab)', questions:'6/8 flags', passing:'6 flags', renewal:'Lifetime', prereqs:[], topics:['Cobalt Strike','OPSEC','Lateral Movement','Privilege Escalation','Domain Dominance','Evasion'] },
-    { id:'gxpn', name:'GIAC GXPN', abbr:'GXPN', provider:'SANS/GIAC', domain:'pentest', level:'expert', cost:6800, currency:'GBP', desc:'Expert Penetration Tester. SANS\' most advanced pen test cert — custom exploit development, advanced network attacks, and cryptographic attacks.', duration:'Open book, 3h', questions:'60', passing:'67%', renewal:'4 years / 36 CPEs', prereqs:['oscp'], topics:['Exploit Development','Network Attacks','Crypto Attacks','Fuzzing','Shellcode','Bypasses'] },
+    { id:'gxpn', name:'GIAC GXPN', abbr:'GXPN', provider:'SANS/GIAC', domain:'pentest', level:'expert', cost:9779, currency:'USD', desc:'Expert Penetration Tester. SANS\' most advanced pen test cert — custom exploit development, advanced network attacks, and cryptographic attacks.', duration:'Open book, 3h', questions:'60', passing:'67%', renewal:'4 years / 36 CPEs', prereqs:['oscp'], topics:['Exploit Development','Network Attacks','Crypto Attacks','Fuzzing','Shellcode','Bypasses'] },
     { id:'osce3', name:'OSCE3', abbr:'OSCE3', provider:'Offensive Security', domain:'pentest', level:'expert', cost:4350, currency:'GBP', desc:'Offensive Security Certified Expert 3. Requires OSWE + OSEP + OSED — web expert, evasion expert, and exploit developer. The ultimate OffSec achievement.', duration:'3 x 48h exams', questions:'Practical', passing:'All 3 certs', renewal:'None (lifetime)', prereqs:['oscp'], topics:['Web Exploitation','AV Evasion','Exploit Development','Shellcoding','Active Directory','Advanced Attacks'] },
     { id:'crt', name:'CREST CRT', abbr:'CRT', provider:'CREST', domain:'pentest', level:'intermediate', cost:500, currency:'GBP', desc:'CREST Registered Penetration Tester. UK industry-standard pen test qualification. Required for CHECK/CREST-accredited testing.', duration:'MCQ + Practical', questions:'Mixed', passing:'Pass/Fail', renewal:'3 years', prereqs:[], topics:['IP/Networking','Web Technologies','OS Security','Cryptography','Databases'] },
 
@@ -6289,10 +6321,10 @@ const CR_CERTS = [
 
     // ─── DevSecOps & AppSec ───
     { id:'csslp', name:'CSSLP', abbr:'CSSLP', provider:'ISC2', domain:'devsec', level:'advanced', cost:475, currency:'GBP', desc:'Certified Secure Software Lifecycle Professional. Secure SDLC from requirements through deployment — threat modeling, secure coding, and testing.', duration:'4 hours', questions:'175', passing:'700/1000', renewal:'3 years / 90 CPEs', prereqs:[], topics:['Secure Design','Supply Chain','Secure Coding','Deployment','Maintenance','Testing'] },
-    { id:'gweb', name:'GIAC GWEB', abbr:'GWEB', provider:'SANS/GIAC', domain:'devsec', level:'intermediate', cost:6800, currency:'GBP', desc:'Web Application Penetration Tester. Finding and exploiting web app vulnerabilities — injection, XSS, auth flaws, and business logic bugs.', duration:'Open book, 4h', questions:'82', passing:'71%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['OWASP Top 10','Injection','Auth/Session','XSS','CSRF','API Security'] },
+    { id:'gweb', name:'GIAC GWEB', abbr:'GWEB', provider:'SANS/GIAC', domain:'devsec', level:'intermediate', cost:9779, currency:'USD', desc:'Web Application Penetration Tester. Finding and exploiting web app vulnerabilities — injection, XSS, auth flaws, and business logic bugs.', duration:'Open book, 4h', questions:'82', passing:'71%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['OWASP Top 10','Injection','Auth/Session','XSS','CSRF','API Security'] },
     { id:'oswe', name:'OSWE', abbr:'OSWE', provider:'Offensive Security', domain:'devsec', level:'expert', cost:1300, currency:'GBP', desc:'Offensive Security Web Expert. White-box web app pen testing — source code review, auth bypass, and custom exploit development against real applications.', duration:'48 hours + report', questions:'Practical', passing:'Pass/Fail', renewal:'None (lifetime)', prereqs:['oscp'], topics:['Source Code Review','Auth Bypass','Persistent XSS','SQL Injection','Deserialization','Type Juggling'] },
     { id:'cde', name:'CDE', abbr:'CDE', provider:'Cybrary', domain:'devsec', level:'foundation', cost:0, currency:'GBP', desc:'Cybrary Certified Detection Engineer (free). Introduction to detection engineering — writing rules, testing logic, and tuning for SIEM/EDR platforms.', duration:'Self-paced', questions:'Assessment', passing:'Pass/Fail', renewal:'None', prereqs:[], topics:['SIGMA Rules','YARA','Detection Logic','False Positive Tuning','Data Sources'] },
-    { id:'dsoe', name:'GIAC GDAT', abbr:'GDAT', provider:'SANS/GIAC', domain:'devsec', level:'intermediate', cost:6800, currency:'GBP', desc:'Defending Advanced Threats. Purple team operations — building detections for advanced adversary techniques, validating controls, and improving defenses.', duration:'Open book, 4h', questions:'75', passing:'69%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['APT Emulation','Detection Engineering','Endpoint Detection','Network Detection','Purple Teaming'] },
+    { id:'dsoe', name:'GIAC GDAT', abbr:'GDAT', provider:'SANS/GIAC', domain:'devsec', level:'intermediate', cost:9779, currency:'USD', desc:'Defending Advanced Threats. Purple team operations — building detections for advanced adversary techniques, validating controls, and improving defenses.', duration:'Open book, 4h', questions:'75', passing:'69%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['APT Emulation','Detection Engineering','Endpoint Detection','Network Detection','Purple Teaming'] },
 
     // ─── Additional Elastic Certifications ───
     { id:'ece', name:'Elastic Certified Engineer', abbr:'ECE', provider:'Elastic', domain:'secops', level:'advanced', cost:320, currency:'GBP', desc:'Validates advanced skills in deploying, managing, and troubleshooting Elasticsearch clusters. Covers indexing, mappings, aggregations, cluster management, and performance tuning.', duration:'120 min', questions:'40 hands-on', passing:'Pass/Fail', renewal:'2 years', prereqs:['ecsa'], topics:['Cluster Management','Index Design','Mappings & Analyzers','Aggregations','Cross-Cluster','Performance Tuning'] },
@@ -6301,10 +6333,10 @@ const CR_CERTS = [
     { id:'eced', name:'Elastic Endpoint Security', abbr:'ECED', provider:'Elastic', domain:'secops', level:'advanced', cost:320, currency:'GBP', desc:'Covers Elastic Defend endpoint protection — malware prevention, ransomware protection, memory threat protection, and endpoint response actions.', duration:'120 min', questions:'35 hands-on', passing:'Pass/Fail', renewal:'2 years', prereqs:['ecsa'], topics:['Elastic Defend','Malware Prevention','Ransomware Protection','Memory Threats','Response Actions','Policy Management'] },
 
     // ─── Additional Security Operations & Engineering ───
-    { id:'gsec', name:'GIAC GSEC', abbr:'GSEC', provider:'SANS/GIAC', domain:'secops', level:'foundation', cost:6800, currency:'GBP', desc:'Security Essentials. Broad foundational cert validating hands-on security skills beyond theory — networking, defense, cryptography, and incident handling fundamentals.', duration:'Open book, 5h', questions:'106-180', passing:'73%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['Networking','Defense in Depth','Cryptography','Linux/Windows Security','Cloud Fundamentals','Incident Handling'] },
-    { id:'gcld', name:'GIAC GCLD', abbr:'GCLD', provider:'SANS/GIAC', domain:'cloud', level:'intermediate', cost:6800, currency:'GBP', desc:'Cloud Security Automation. Building and securing cloud infrastructure using IaC, CI/CD pipelines, and cloud-native security tooling across AWS, Azure, and GCP.', duration:'Open book, 3h', questions:'75', passing:'68%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['Cloud Architecture','IaC Security','CI/CD Pipelines','Container Security','Cloud Monitoring','Multi-Cloud'] },
-    { id:'gpen', name:'GIAC GPEN', abbr:'GPEN', provider:'SANS/GIAC', domain:'pentest', level:'intermediate', cost:6800, currency:'GBP', desc:'Penetration Tester. SANS-level pen test cert covering advanced reconnaissance, exploitation, password attacks, and post-exploitation in enterprise environments.', duration:'Open book, 3h', questions:'82', passing:'74%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['Reconnaissance','Scanning','Exploitation','Password Attacks','Privilege Escalation','Pivoting'] },
-    { id:'gdsa', name:'GIAC GDSA', abbr:'GDSA', provider:'SANS/GIAC', domain:'arch', level:'advanced', cost:6800, currency:'GBP', desc:'Defensible Security Architecture. Designing and building resilient network architectures — zero trust, segmentation, cloud architecture, and detection-oriented design.', duration:'Open book, 3h', questions:'75', passing:'69%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['Zero Trust','Network Segmentation','Cloud Architecture','Detection Design','Resilient Infrastructure','Logging Architecture'] },
+    { id:'gsec', name:'GIAC GSEC', abbr:'GSEC', provider:'SANS/GIAC', domain:'secops', level:'foundation', cost:9779, currency:'USD', desc:'Security Essentials. Broad foundational cert validating hands-on security skills beyond theory — networking, defense, cryptography, and incident handling fundamentals.', duration:'Open book, 5h', questions:'106-180', passing:'73%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['Networking','Defense in Depth','Cryptography','Linux/Windows Security','Cloud Fundamentals','Incident Handling'] },
+    { id:'gcld', name:'GIAC GCLD', abbr:'GCLD', provider:'SANS/GIAC', domain:'cloud', level:'intermediate', cost:9779, currency:'USD', desc:'Cloud Security Automation. Building and securing cloud infrastructure using IaC, CI/CD pipelines, and cloud-native security tooling across AWS, Azure, and GCP.', duration:'Open book, 3h', questions:'75', passing:'68%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['Cloud Architecture','IaC Security','CI/CD Pipelines','Container Security','Cloud Monitoring','Multi-Cloud'] },
+    { id:'gpen', name:'GIAC GPEN', abbr:'GPEN', provider:'SANS/GIAC', domain:'pentest', level:'intermediate', cost:9779, currency:'USD', desc:'Penetration Tester. SANS-level pen test cert covering advanced reconnaissance, exploitation, password attacks, and post-exploitation in enterprise environments.', duration:'Open book, 3h', questions:'82', passing:'74%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['Reconnaissance','Scanning','Exploitation','Password Attacks','Privilege Escalation','Pivoting'] },
+    { id:'gdsa', name:'GIAC GDSA', abbr:'GDSA', provider:'SANS/GIAC', domain:'arch', level:'advanced', cost:9779, currency:'USD', desc:'Defensible Security Architecture. Designing and building resilient network architectures — zero trust, segmentation, cloud architecture, and detection-oriented design.', duration:'Open book, 3h', questions:'75', passing:'69%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['Zero Trust','Network Segmentation','Cloud Architecture','Detection Design','Resilient Infrastructure','Logging Architecture'] },
 
     // ─── Microsoft Security Certifications ───
     { id:'sc200', name:'SC-200', abbr:'SC-200', provider:'Microsoft', domain:'secops', level:'intermediate', cost:130, currency:'GBP', desc:'Microsoft Security Operations Analyst. Covers Microsoft Sentinel (SIEM), Defender XDR, threat hunting with KQL, and incident management in the Microsoft security stack.', duration:'150 min', questions:'40-60', passing:'700/1000', renewal:'Annual renewal', prereqs:[], topics:['Microsoft Sentinel','Defender XDR','KQL Hunting','Incident Response','Threat Intelligence','Workbooks'] },
@@ -6336,8 +6368,8 @@ const CR_CERTS = [
     { id:'pcnse', name:'Palo Alto PCNSE', abbr:'PCNSE', provider:'Palo Alto', domain:'arch', level:'advanced', cost:140, currency:'GBP', desc:'Palo Alto Certified Network Security Engineer. Expert-level PAN-OS skills — advanced firewall design, Panorama management, GlobalProtect, and WildFire configuration.', duration:'80 min', questions:'75', passing:'Pass/Fail', renewal:'2 years', prereqs:['pcnsa'], topics:['Advanced Policies','Panorama','GlobalProtect','WildFire','HA Configuration','Troubleshooting'] },
 
     // ─── GIAC Industrial / Specialist ───
-    { id:'gicsp', name:'GIAC GICSP', abbr:'GICSP', provider:'SANS/GIAC', domain:'arch', level:'advanced', cost:6800, currency:'GBP', desc:'Global Industrial Cyber Security Professional. Securing ICS/SCADA/OT environments — Purdue model, industrial protocols, safety systems, and OT incident response.', duration:'Open book, 3h', questions:'82', passing:'71%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['ICS Architecture','SCADA Security','Industrial Protocols','Safety Systems','OT Incident Response','Purdue Model'] },
-    { id:'grid', name:'GIAC GRID', abbr:'GRID', provider:'SANS/GIAC', domain:'ir', level:'expert', cost:6800, currency:'GBP', desc:'Response and Industrial Defense. Advanced incident response in industrial and OT environments — forensics on PLCs, RTUs, and industrial network protocols.', duration:'Open book, 3h', questions:'75', passing:'65%', renewal:'4 years / 36 CPEs', prereqs:['gicsp'], topics:['OT Forensics','PLC Analysis','Industrial Protocol Forensics','Safety System IR','OT Network Analysis','ICS Threat Hunting'] },
+    { id:'gicsp', name:'GIAC GICSP', abbr:'GICSP', provider:'SANS/GIAC', domain:'arch', level:'advanced', cost:9779, currency:'USD', desc:'Global Industrial Cyber Security Professional. Securing ICS/SCADA/OT environments — Purdue model, industrial protocols, safety systems, and OT incident response.', duration:'Open book, 3h', questions:'82', passing:'71%', renewal:'4 years / 36 CPEs', prereqs:[], topics:['ICS Architecture','SCADA Security','Industrial Protocols','Safety Systems','OT Incident Response','Purdue Model'] },
+    { id:'grid', name:'GIAC GRID', abbr:'GRID', provider:'SANS/GIAC', domain:'ir', level:'expert', cost:9779, currency:'USD', desc:'Response and Industrial Defense. Advanced incident response in industrial and OT environments — forensics on PLCs, RTUs, and industrial network protocols.', duration:'Open book, 3h', questions:'75', passing:'65%', renewal:'4 years / 36 CPEs', prereqs:['gicsp'], topics:['OT Forensics','PLC Analysis','Industrial Protocol Forensics','Safety System IR','OT Network Analysis','ICS Threat Hunting'] },
 
     // ─── Cisco Security ───
     { id:'ccnpsec', name:'CCNP Security', abbr:'CCNP Sec', provider:'Cisco', domain:'arch', level:'advanced', cost:320, currency:'GBP', desc:'Cisco Certified Network Professional Security. Advanced network security — firewalls, VPNs, IPS, identity services, and content security across Cisco platforms.', duration:'120 min core + concentration', questions:'90-110', passing:'Pass/Fail', renewal:'3 years / 120 CE', prereqs:['ccna'], topics:['Firepower','ISE','VPN','Secure Email','Umbrella','Endpoint Security','Automation'] },
@@ -6384,7 +6416,7 @@ function crInit() {
         chip.dataset.args = JSON.stringify([cert.id]);
         fragment.querySelector('.cr-cert-dot').dataset.ionStyle = 'background:' + (CR_PROVIDER_COLORS[cert.provider] || 'var(--text-muted)');
         fragment.querySelector('[data-field="abbr"]').textContent = cert.abbr;
-        fragment.querySelector('.cr-cert-cost').textContent = cert.cost === 0 ? 'Free' : '£' + cert.cost.toLocaleString();
+        fragment.querySelector('.cr-cert-cost').textContent = cert.cost === 0 ? 'Free' : certMoney(cert.cost, cert.currency);
         cell.append(fragment);
     }
     const providers = [...new Set(CR_CERTS.map(cert => cert.provider))].sort();
@@ -6451,7 +6483,7 @@ function crShowDetail(certId) {
     const levelLabels = {foundation:'Foundation', intermediate:'Intermediate', advanced:'Advanced', expert:'Expert'};
     const levelColors = {foundation:'var(--info)', intermediate:'var(--primary)', advanced:'var(--secondary)', expert:'var(--warning)'};
     const values = [
-        ['Cost', cert.cost === 0 ? 'Free' : (cert.currency === 'GBP' ? '£' : '$') + cert.cost.toLocaleString()],
+        ['Cost', cert.cost === 0 ? 'Free' : certMoney(cert.cost, cert.currency)],
         ['Level', levelLabels[cert.level]], ['Domain', domain ? domain.name : cert.domain],
         ['Duration', cert.duration], ['Questions', cert.questions], ['Passing', cert.passing], ['Renewal', cert.renewal],
     ];
