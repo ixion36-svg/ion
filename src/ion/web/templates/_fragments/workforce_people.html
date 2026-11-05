@@ -1,0 +1,304 @@
+{# The lead's queue, roster and offboarding.
+
+   Three jobs that used to be three cards on one scroll, in the order a
+   lead needs them: what is waiting on them, who everyone is, and who is
+   leaving. The counts sit above the tabs because they are what says
+   whether the lead has to open the page at all, and they are read from all
+   three sources whichever tab is showing.
+
+   The roster's search keeps its node across swaps with hx-preserve, so
+   typing does not lose the caret when the fragment comes back. #}
+
+{% if failed %}
+  <div role="alert" class="alert alert-error">
+    <span>The workforce roster could not be read. This is not an empty team:
+      the query failed, so anything waiting on you is unknown rather than
+      nothing.</span>
+  </div>
+
+{% else %}
+
+{% if error %}
+  <div role="alert" class="alert alert-warning mb-4">
+    <span>{{ error }}</span>
+  </div>
+{% endif %}
+
+<div class="stats stats-vertical sm:stats-horizontal w-full bg-base-200 border border-base-300 mb-5">
+  <div class="stat">
+    <div class="stat-title">Waiting on you</div>
+    <div class="stat-value {{ 'text-warning' if awaiting else 'text-success' }}">{{ awaiting }}</div>
+    <div class="stat-desc">{{ 'items to verify' if awaiting != 1 else 'item to verify' }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-title">Without access</div>
+    <div class="stat-value {{ 'text-error' if blocked }}">{{ blocked }}</div>
+    <div class="stat-desc">gate not cleared</div>
+  </div>
+  <div class="stat">
+    <div class="stat-title">Past target</div>
+    <div class="stat-value {{ 'text-warning' if overdue }}">{{ overdue }}</div>
+    <div class="stat-desc">journeys over their day count</div>
+  </div>
+  <div class="stat">
+    <div class="stat-title">Operational</div>
+    <div class="stat-value text-success">{{ operational }}</div>
+    <div class="stat-desc">journeys complete</div>
+  </div>
+</div>
+
+<div role="tablist" class="tabs tabs-boxed mb-4 justify-start">
+  <a role="tab" class="tab {{ 'tab-active' if tab == 'queue' }}"
+     hx-get="/ui/workforce/people?tab=queue" hx-target="#wf-people" hx-swap="innerHTML">
+    To verify{% if awaiting %} <span class="badge badge-sm badge-warning ml-2">{{ awaiting }}</span>{% endif %}
+  </a>
+  <a role="tab" class="tab {{ 'tab-active' if tab == 'everyone' }}"
+     hx-get="/ui/workforce/people?tab=everyone" hx-target="#wf-people" hx-swap="innerHTML">Everyone</a>
+  <a role="tab" class="tab {{ 'tab-active' if tab == 'offboarding' }}"
+     hx-get="/ui/workforce/people?tab=offboarding" hx-target="#wf-people" hx-swap="innerHTML">Offboarding</a>
+</div>
+
+{% if tab == 'queue' %}
+<div class="card bg-base-200 border border-base-300">
+  <div class="card-body p-5">
+    <h2 class="card-title text-base">Awaiting verification</h2>
+    {% if not items %}
+      <p class="text-sm text-base-content/60">Nothing is waiting. Submissions
+        arrive here the moment someone records an item as complete.</p>
+    {% else %}
+      <p class="text-sm text-base-content/70">Oldest first. Verifying a gate
+        item can grant that person access to ION straight away.</p>
+      <ul class="flex flex-col mt-2">
+        {% for i in items %}
+          <li class="flex items-center gap-3 py-3 flex-wrap border-t border-base-300/60 first:border-t-0">
+            <div class="grow min-w-0">
+              <div class="text-sm font-medium">{{ i.user }}</div>
+              <div class="text-sm">{{ i.name }}</div>
+              <div class="text-xs text-base-content/60">
+                {{ i.role }}{% if i.completed_on %}, completed {{ i.completed_on }}{% endif %}{% if i.evidence_ref %}, reference {{ i.evidence_ref }}{% endif %}
+              </div>
+            </div>
+            {% if i.phase == 'gate' %}
+              <span class="badge badge-sm badge-warning shrink-0">Gate</span>
+            {% else %}
+              <span class="badge badge-sm badge-ghost shrink-0">{{ i.kind }}</span>
+            {% endif %}
+            {% if i.waiting %}
+              <span class="text-xs text-base-content/60 shrink-0">waiting {{ i.waiting }}</span>
+            {% endif %}
+            <form class="shrink-0" hx-post="/ui/workforce/requirements/{{ i.id }}/verify"
+                  hx-target="#wf-people" hx-swap="innerHTML">
+              <button type="submit" class="btn btn-xs btn-primary">Verify</button>
+            </form>
+            <form class="shrink-0" hx-post="/ui/workforce/requirements/{{ i.id }}/send-back"
+                  hx-target="#wf-people" hx-swap="innerHTML">
+              <button type="submit" class="btn btn-xs btn-ghost"
+                      aria-label="Send {{ i.name }} back to {{ i.user }}">Send back</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+</div>
+
+{% elif tab == 'everyone' %}
+<div class="card bg-base-200 border border-base-300">
+  <div class="card-body p-5">
+    <div class="flex items-center gap-3 flex-wrap">
+      <h2 class="card-title text-base">Everyone</h2>
+      <span class="text-sm text-base-content/60">
+        {% if q %}{{ people|length }} of {{ total_people }}{% else %}{{ total_people }} active{% endif %}
+      </span>
+      <div class="grow"></div>
+      <input id="wf-q" hx-preserve="true" type="search" name="q" value="{{ q }}"
+             class="input input-sm input-bordered w-56"
+             placeholder="Search name or role"
+             hx-get="/ui/workforce/people?tab=everyone"
+             hx-target="#wf-people" hx-swap="innerHTML"
+             hx-trigger="input changed delay:300ms, search">
+    </div>
+
+    {% if not people %}
+      <p class="text-sm text-base-content/60 mt-2">
+        {% if q %}Nobody matches "{{ q }}".{% else %}No active people.{% endif %}
+      </p>
+    {% else %}
+      <div class="overflow-x-auto mt-2">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Person</th><th>Onboarding</th><th>Roles held</th><th>Access</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in people %}
+              <tr>
+                <td class="align-top">
+                  <div class="text-sm font-medium">{{ p.name }}</div>
+                  <div class="text-xs text-base-content/50">{{ p.username }}</div>
+                  {% if p.target_role %}
+                    <div class="text-xs text-base-content/60">wants {{ p.target_role }}</div>
+                  {% endif %}
+                </td>
+                <td class="align-top">
+                  {% if not p.journeys %}
+                    <span class="text-xs text-base-content/40">None</span>
+                  {% endif %}
+                  {% for j in p.journeys %}
+                    {% set stage = stage_view.get(j.stage, (j.stage, 'badge-ghost')) %}
+                    <div class="py-0.5">
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <span class="badge badge-xs {{ 'badge-secondary' if j.is_cover else 'badge-primary' }}">{{ 'Cover' if j.is_cover else 'Primary' }}</span>
+                        <span class="text-sm">{{ j.role }}</span>
+                        <span class="badge badge-xs {{ stage[1] }}">{{ stage[0] }}</span>
+                        {% if j.awaiting_verification %}
+                          <span class="badge badge-xs badge-warning">{{ j.awaiting_verification }} to verify</span>
+                        {% endif %}
+                      </div>
+                      {# The counts are the summary; the checklist behind
+                         them is what says WHICH item is outstanding, which
+                         the roster could not answer at all.
+
+                         The day count shows only while the journey is
+                         running. On an operational or suspended one it
+                         measures nothing anybody acts on, and "day 190 of
+                         60" against a finished journey reads as a failure
+                         rather than as a role held for six months. #}
+                      <details class="mt-0.5">
+                        <summary class="text-xs text-base-content/60 cursor-pointer w-fit">
+                          gate {{ j.gate_done }} of {{ j.gate_total }}, readiness {{ j.readiness_done }} of {{ j.readiness_total }}{% if j.stage in ('pre_access', 'role_training') %},
+                          <span class="{{ 'text-warning' if j.days_elapsed > j.target_days }}">day {{ j.days_elapsed }} of {{ j.target_days }}</span>{% endif %}
+                        </summary>
+                        {% if not j.checklist %}
+                          <p class="text-xs text-base-content/50 mt-1 ml-3">This role profile has no items.</p>
+                        {% else %}
+                          <ul class="mt-1 ml-1 flex flex-col gap-1">
+                            {% for it in j.checklist %}
+                              <li class="flex items-center gap-2 flex-wrap">
+                                <span class="w-2 h-2 rounded-full shrink-0 {{ it.dot }}"></span>
+                                <span class="text-xs {{ 'text-base-content/50 line-through' if it.satisfied }}">{{ it.name }}</span>
+                                {% if it.phase == 'gate' %}
+                                  <span class="badge badge-xs badge-ghost shrink-0">gate</span>
+                                {% endif %}
+                                <span class="text-xs text-base-content/50 shrink-0">{{ it.label }}</span>
+                                {% if it.status == 'submitted' %}
+                                  <form hx-post="/ui/workforce/requirements/{{ it.id }}/verify"
+                                        hx-target="#wf-people" hx-swap="innerHTML" class="shrink-0">
+                                    <input type="hidden" name="tab" value="everyone">
+                                    <input type="hidden" name="q" value="{{ q }}">
+                                    <button type="submit" class="btn btn-xs btn-primary">Verify</button>
+                                  </form>
+                                {% endif %}
+                              </li>
+                            {% endfor %}
+                          </ul>
+                        {% endif %}
+                      </details>
+                    </div>
+                  {% endfor %}
+                </td>
+                <td class="align-top">
+                  <div class="flex gap-1 flex-wrap max-w-[220px]">
+                    {% for r in p.ion_roles %}
+                      <span class="badge badge-xs badge-ghost">{{ r }}</span>
+                    {% endfor %}
+                  </div>
+                </td>
+                <td class="align-top">
+                  {% if p.has_access is none %}
+                    <span class="badge badge-sm badge-ghost">n/a</span>
+                  {% elif p.has_access %}
+                    <span class="badge badge-sm badge-success">Granted</span>
+                  {% else %}
+                    <span class="badge badge-sm badge-error">Blocked</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+{% else %}
+<div class="card bg-base-200 border border-base-300">
+  <div class="card-body p-5">
+    <h2 class="card-title text-base">Offboarding</h2>
+    <p class="text-sm text-base-content/70">Access is revoked at 17:00 on the
+      last working day whether or not the checklist is finished. Outstanding
+      items are chased; they are never a reason to leave an account enabled.</p>
+
+    {% if can_manage %}
+      <form class="flex items-end gap-2 flex-wrap mt-2"
+            hx-post="/ui/workforce/leavers" hx-target="#wf-people" hx-swap="innerHTML">
+        <div>
+          <label class="label text-xs py-0" for="lv-user">Person</label>
+          <select id="lv-user" name="user_id" class="select select-sm select-bordered min-w-[180px]">
+            {% for p in all_people %}
+              <option value="{{ p.user_id }}">{{ p.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="label text-xs py-0" for="lv-day">Last working day</label>
+          <input id="lv-day" name="last_working_day" type="date" class="input input-sm input-bordered">
+        </div>
+        <div class="grow max-w-xs">
+          <label class="label text-xs py-0" for="lv-reason">Reason</label>
+          <input id="lv-reason" name="reason" type="text" class="input input-sm input-bordered w-full"
+                 placeholder="resignation, transfer">
+        </div>
+        <button type="submit" class="btn btn-sm btn-warning">Start offboarding</button>
+      </form>
+    {% endif %}
+
+    <div class="flex flex-col gap-3 mt-4">
+      {% if not leavers %}
+        <p class="text-sm text-base-content/60">Nobody is offboarding.</p>
+      {% endif %}
+      {% for l in leavers %}
+        <div class="rounded-lg border p-3 {{ 'border-base-300 bg-base-100 opacity-60' if l.revoked_at else 'border-warning/50' }}">
+          <div class="flex items-center gap-3 flex-wrap">
+            <span class="text-sm font-medium">{{ l.name }}</span>
+            <span class="text-xs text-base-content/60">
+              last day {{ l.last_working_day }}{% if l.reason %}, {{ l.reason }}{% endif %}
+            </span>
+            <div class="grow"></div>
+            {% if l.revoked_at %}
+              <span class="badge badge-sm badge-ghost">Revoked {{ l.revoked_at[:10] }}</span>
+            {% elif can_manage %}
+              <form hx-post="/ui/workforce/leavers/{{ l.id }}/revoke"
+                    hx-target="#wf-people" hx-swap="innerHTML"
+                    hx-confirm="Close every journey for {{ l.name }} and take back their granted roles?">
+                <button type="submit" class="btn btn-xs btn-error">Revoke now</button>
+              </form>
+            {% endif %}
+          </div>
+          <div class="flex flex-col gap-1 mt-2">
+            {% for item in l.checklist %}
+              <form class="flex items-center gap-2"
+                    hx-post="/ui/workforce/leavers/{{ l.id }}/checklist"
+                    hx-target="#wf-people" hx-swap="innerHTML"
+                    hx-trigger="change">
+                <input type="hidden" name="index" value="{{ loop.index0 }}">
+                <input type="checkbox" name="done" class="checkbox checkbox-xs"
+                       id="lv-{{ l.id }}-{{ loop.index0 }}"
+                       {% if item.done %}checked{% endif %}
+                       {% if not can_manage or l.revoked_at %}disabled{% endif %}>
+                <label class="text-sm {{ 'line-through text-base-content/50' if item.done }}"
+                       for="lv-{{ l.id }}-{{ loop.index0 }}">{{ item.name }}</label>
+                <span class="text-xs text-base-content/40">{{ item.owner }}</span>
+              </form>
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endif %}

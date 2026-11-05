@@ -1,0 +1,72 @@
+{# One requirement row, for both of the journey page's lists.
+
+   Included from _fragments/workforce_journey.html inside its loops, so `r`,
+   `dot`, `ink` and `active` come from that context. One definition, because
+   the gate list and the readiness list differ only in what the surrounding
+   card says about them -- the wizard built the same row twice through the
+   same function and this keeps that single definition in markup.
+
+   `is not none` rather than truthiness on the dates: a requirement with no
+   expiry and one whose expiry failed to read are different claims, and only
+   the second is worth showing. #}
+
+<li class="border-t border-base-300/60 first:border-t-0">
+  <div class="flex items-center gap-3 py-3 flex-wrap">
+    <span class="w-2.5 h-2.5 rounded-full shrink-0 {{ dot[r.tone] }}"></span>
+
+    <div class="grow min-w-0">
+      <div class="text-sm font-medium">{{ r.name }}</div>
+      {% if r.notes %}
+        <div class="text-xs text-base-content/60">{{ r.notes }}</div>
+      {% endif %}
+      {% if r.expires_on is not none %}
+        <div class="text-xs text-base-content/50">Expires {{ r.expires_on }}</div>
+      {% endif %}
+      {% if r.withdrawable and r.completed_on is not none %}
+        <div class="text-xs text-base-content/50">You recorded it complete on {{ r.completed_on }}</div>
+      {% endif %}
+    </div>
+
+    <span class="badge badge-sm badge-ghost shrink-0">{{ r.kind }}</span>
+    <span class="text-xs font-medium shrink-0 {{ ink[r.tone] }}">{{ r.label }}</span>
+  </div>
+
+  {% if r.actionable %}
+    <details class="mb-3 ml-5">
+      <summary class="text-xs text-primary cursor-pointer w-fit">
+        {{ 'Renew and resubmit' if r.status == 'expired' else 'Record this as complete' }}
+      </summary>
+      <form class="flex items-end gap-2 flex-wrap mt-2"
+            hx-post="/ui/workforce/requirements/{{ r.id }}/submit"
+            hx-target="#wf-journey" hx-swap="innerHTML">
+        <input type="hidden" name="journey" value="{{ active.id }}">
+        <div>
+          <label class="label text-xs py-0" for="done-{{ r.id }}">Date completed</label>
+          <input id="done-{{ r.id }}" name="completed_on" type="date"
+                 class="input input-xs input-bordered">
+        </div>
+        <div class="grow max-w-xs">
+          <label class="label text-xs py-0" for="ref-{{ r.id }}">Evidence reference</label>
+          <input id="ref-{{ r.id }}" name="evidence_ref" type="text"
+                 value="{{ r.evidence_ref }}"
+                 placeholder="certificate number, ticket, document"
+                 class="input input-xs input-bordered w-full">
+        </div>
+        <button type="submit" class="btn btn-xs btn-primary">Send to my lead</button>
+      </form>
+      <p class="text-xs text-base-content/50 mt-1">
+        Leave the date empty and today is recorded.
+      </p>
+    </details>
+  {% endif %}
+
+  {% if r.withdrawable %}
+    <form class="flex items-center gap-3 mb-3 ml-5"
+          hx-post="/ui/workforce/requirements/{{ r.id }}/withdraw"
+          hx-target="#wf-journey" hx-swap="innerHTML">
+      <input type="hidden" name="journey" value="{{ active.id }}">
+      <span class="text-xs text-base-content/60">Your lead has been asked to verify this.</span>
+      <button type="submit" class="btn btn-xs btn-ghost">Withdraw</button>
+    </form>
+  {% endif %}
+</li>
