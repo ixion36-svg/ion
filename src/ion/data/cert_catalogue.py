@@ -269,7 +269,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "CrowdStrike",
         "domain": "secops",
         "level": "intermediate",
-        "cost": 160,
+        "cost": 186,
         "currency": "GBP",
         "desc": "CrowdStrike Certified Falcon Administrator. Validates skills in managing and operating the Falcon platform for endpoint detection and response.",
         "duration": "90 min",
@@ -720,7 +720,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "Google",
         "domain": "cloud",
         "level": "intermediate",
-        "cost": 160,
+        "cost": 149,
         "currency": "GBP",
         "desc": "Google Professional Cloud Architect. Designing secure, scalable cloud solutions on GCP \u2014 IAM, VPC, encryption, and compliance.",
         "duration": "120 min",
@@ -1277,7 +1277,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "Fortinet",
         "domain": "arch",
         "level": "advanced",
-        "cost": 320,
+        "cost": 312,
         "currency": "GBP",
         "desc": "Fortinet Network Security Expert 7. Advanced firewall architecture, SD-WAN, zero trust, and multi-cloud security design with Fortinet products.",
         "duration": "60 min",
@@ -1819,7 +1819,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "CrowdStrike",
         "domain": "ir",
         "level": "intermediate",
-        "cost": 160,
+        "cost": 186,
         "currency": "GBP",
         "desc": "CrowdStrike Certified Falcon Responder. Incident response and threat hunting using the Falcon platform \u2014 real-time response, host containment, and IOC sweeping.",
         "duration": "90 min",
@@ -1845,7 +1845,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "CrowdStrike",
         "domain": "threat",
         "level": "intermediate",
-        "cost": 160,
+        "cost": 186,
         "currency": "GBP",
         "desc": "CrowdStrike Certified Threat Hunter. Proactive threat hunting using Falcon \u2014 adversary tradecraft, behavioral IOAs, custom detections, and Falcon Overwatch methodology.",
         "duration": "90 min",
@@ -2017,7 +2017,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "Google",
         "domain": "cloud",
         "level": "advanced",
-        "cost": 160,
+        "cost": 149,
         "currency": "GBP",
         "desc": "Professional Cloud Security Engineer. Configuring access, network security, data protection, and compliance monitoring across Google Cloud Platform.",
         "duration": "120 min",
@@ -2043,7 +2043,7 @@ CERTIFICATIONS: List[Dict[str, Any]] = [
         "provider": "Fortinet",
         "domain": "arch",
         "level": "intermediate",
-        "cost": 320,
+        "cost": 156,
         "currency": "GBP",
         "desc": "Fortinet Network Security Expert 4. FortiGate firewall administration \u2014 security policies, NAT, VPN, authentication, logging, and web filtering.",
         "duration": "105 min",
@@ -2441,6 +2441,56 @@ PRICE_PROVENANCE["oswe"] = {
     **_RATE_2026_11_05,
 }
 
+#: CrowdStrike prices every certification voucher the same.
+_CROWDSTRIKE = {
+    "source": "https://www.crowdstrike.com/en-us/crowdstrike-university/faq/",
+    "checked_on": "2026-11-05",
+    "vendor_price": 250,
+    "vendor_currency": "USD",
+    "note": (
+        "Per exam appointment. Included at no extra cost for named "
+        "users on a Flex for Services subscription."
+    ),
+    **_RATE_2026_11_05,
+}
+for _cs in ("csa", "ccfr", "ccht"):
+    PRICE_PROVENANCE[_cs] = dict(_CROWDSTRIKE)
+
+#: Google charges one registration fee across its professional exams.
+_GOOGLE = {
+    "source": "https://cloud.google.com/learn/certification/cloud-security-engineer",
+    "checked_on": "2026-11-05",
+    "vendor_price": 200,
+    "vendor_currency": "USD",
+    "note": (
+        "Professional-level registration fee, plus tax. The page read "
+        "carries an old timestamp, so this is the weakest of the "
+        "sourced figures and worth re-checking before it is relied on."
+    ),
+    **_RATE_2026_11_05,
+}
+PRICE_PROVENANCE["gcsec"] = dict(_GOOGLE)
+PRICE_PROVENANCE["gcpse"] = dict(_GOOGLE)
+
+_FORTINET = {
+    "source": "https://helpdesk.training.fortinet.com/support/solutions/articles/73000671071",
+    "checked_on": "2026-11-05",
+    "vendor_currency": "USD",
+    **_RATE_2026_11_05,
+}
+PRICE_PROVENANCE["nse4"] = {
+    **_FORTINET, "vendor_price": 210,
+    "note": (
+        "Fortinet's NSE 4-6 fee under the increase that took effect on "
+        "2 November 2026, three days before this check. An older "
+        "notice still showing USD 200 was superseded by it."
+    ),
+}
+PRICE_PROVENANCE["cztp"] = {
+    **_FORTINET, "vendor_price": 420,
+    "note": "NSE 7 fee under the 2 November 2026 increase, up from USD 400.",
+}
+
 PRICE_PROVENANCE["oscp"] = {
     "source": "https://www.offsec.com/products/pen-200/",
     "checked_on": "2026-11-05",
@@ -2468,6 +2518,20 @@ PRICE_PROVENANCE["oscp"] = {
 #: visible inconsistency with an invisible wrong answer. A test asserts
 #: these name real entries, so the list cannot rot once they are fixed.
 KNOWN_ISSUES: Dict[str, str] = {
+    "ccht": (
+        "Abbreviated CCHT. CrowdStrike's hunting credential is CCFH, "
+        "Certified Falcon Hunter; the entry's description ('Certified "
+        "Threat Hunter') describes it correctly but the code does not "
+        "match. Priced anyway, because CrowdStrike charges the same "
+        "USD 250 for every certification voucher, so the figure holds "
+        "whichever of the two the entry means."
+    ),
+    "gcsec": (
+        "The id says sec, the name and description say Google "
+        "Professional Cloud ARCHITECT. The security one is gcpse, "
+        "already here separately. Priced anyway: Google charges the "
+        "same professional-level registration fee either way."
+    ),
     "osce3": (
         "Not a product anybody can buy. OSCE3 is awarded for holding "
         "OSED, OSEP and OSWE together, so its cost is whichever route "

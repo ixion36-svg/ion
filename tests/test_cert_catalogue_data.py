@@ -173,12 +173,31 @@ class TestKnownIssues:
         for cert_id, note in cc.KNOWN_ISSUES.items():
             assert len(note.strip()) > 40, cert_id
 
-    def test_a_flagged_entry_is_not_also_price_checked(self):
-        """crtp's price is the SANS flat rate applied to an entry that is
-        probably not a SANS certification. Recording it as checked would
-        assert the figure is right for it."""
-        for cert_id in cc.KNOWN_ISSUES:
-            assert cert_id not in cc.PRICE_PROVENANCE, cert_id
+    def test_a_flagged_entry_is_not_priced_silently(self):
+        """An ambiguous entry may only carry a price if its note says why
+        the price survives the ambiguity.
+
+        Most flagged entries cannot be priced at all: crtp's figure is
+        the SANS flat rate applied to something that is probably not a
+        SANS certification, and recording it as checked would assert it
+        is right. But two of them can. CrowdStrike charges the same
+        USD 250 for every certification voucher and Google one fee for
+        every professional exam, so for ccht and gcsec the figure holds
+        whichever reading of the entry is correct.
+
+        That is a real exception and not a loophole, so it has to be
+        written down: a flagged entry with a price must say "Priced
+        anyway" and give the reason. Silence is the thing being
+        forbidden, not the price.
+        """
+        for cert_id, note in cc.KNOWN_ISSUES.items():
+            if cert_id not in cc.PRICE_PROVENANCE:
+                continue
+            assert "Priced anyway" in note, (
+                f"{cert_id} is flagged as ambiguous and also carries a "
+                f"price, without its note explaining why that price is "
+                f"safe despite the ambiguity"
+            )
 
 
 class TestThePriceCheckIsHonest:
