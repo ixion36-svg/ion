@@ -198,39 +198,59 @@ class TestThePriceCheckIsHonest:
             if "vendor_price" in entry:
                 assert entry.get("vendor_currency"), cert_id
 
-    def test_a_checked_price_is_the_vendor_figure_verbatim(self):
-        """Adopted, never converted.
+    def test_a_converted_price_can_be_recomputed(self):
+        """vendor_price * rate must round to the stored cost.
 
-        A checked entry carries the vendor's own number in the vendor's
-        own currency. That is exact for ever and anybody can re-derive
-        it from the source. A converted figure would be precise to the
-        pound and wrong by hundreds -- no GBP/USD rate could be verified
-        for the day these were checked and the candidates spread
-        1.28-1.35 -- and nothing downstream could tell which rate made
-        it.
+        This is what makes a converted figure honest. The prices it
+        replaced were conversions too, at a rate nobody wrote down,
+        which is exactly why nobody could tell they had gone stale: GBP
+        6,800 implies about 1.29 USD/GBP against SANS tuition alone.
+        With the rate recorded, anybody can redo the arithmetic and see
+        both what was converted and when.
         """
         for cert_id, entry in cc.PRICE_PROVENANCE.items():
             if "vendor_price" not in entry:
                 continue
             cert = cc.get_cert(cert_id)
             assert cert is not None, cert_id
-            assert cert["cost"] == entry["vendor_price"], (
-                f"{cert_id}: catalogue says {cert['cost']}, vendor says "
-                f"{entry['vendor_price']}. Adopt the vendor figure or "
-                f"drop the provenance; a half-updated entry claims to be "
-                f"checked and is not."
-            )
-            assert cert["currency"] == entry["vendor_currency"], (
-                f"{cert_id}: carrying {cert['currency']} against a "
-                f"{entry['vendor_currency']} vendor figure means somebody "
-                f"converted it without recording a rate."
+            rate = entry.get("rate")
+            if rate is None:
+                # Not converted: the entry must then be in the vendor's
+                # own currency at the vendor's own number.
+                assert cert["currency"] == entry["vendor_currency"], cert_id
+                assert cert["cost"] == entry["vendor_price"], cert_id
+                continue
+            assert cert["cost"] == round(entry["vendor_price"] * rate), (
+                f"{cert_id}: {entry['vendor_price']} * {rate} = "
+                f"{entry['vendor_price'] * rate:.2f}, but the catalogue "
+                f"says {cert['cost']}. Either the rate or the price was "
+                f"changed without the other."
             )
 
-    def test_the_catalogue_reports_being_multi_currency(self):
-        """Checked entries are in the vendor's currency and the rest are
-        the template's original GBP, so this genuinely holds both.
-        Anything summing across it has to convert deliberately."""
-        assert set(cc.currencies()) == {"GBP", "USD"}
+    def test_every_conversion_records_its_rate_and_date(self):
+        """A rate with no date is not a rate, it is a number. A price is
+        only true on the day of the rate that made it."""
+        for cert_id, entry in cc.PRICE_PROVENANCE.items():
+            if "rate" not in entry:
+                continue
+            assert entry.get("rate_source"), cert_id
+            assert entry.get("rate_date"), cert_id
+            assert entry["rate"] > 0, cert_id
+
+    def test_a_converted_price_is_in_the_estate_currency(self):
+        """Converting is what puts it in GBP. An entry with a rate still
+        carrying the vendor's currency means the rate was recorded but
+        never applied."""
+        for cert_id, entry in cc.PRICE_PROVENANCE.items():
+            if "rate" in entry:
+                assert cc.get_cert(cert_id)["currency"] == "GBP", cert_id
+
+    def test_the_catalogue_is_one_currency_again(self):
+        """Converted back to GBP, so the totals the training page shows
+        are addable. certCostSummary still groups by currency, which
+        costs nothing while there is one and is correct if that changes.
+        """
+        assert cc.currencies() == ("GBP",)
 
     def test_components_add_up_to_the_adopted_figure(self):
         """A price recorded as parts must equal the sum of its parts, or
