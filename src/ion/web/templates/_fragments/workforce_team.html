@@ -60,6 +60,12 @@
   <span class="text-xs text-base-content/50">
     {% if view == 'chart' %}Posts and who holds them{% else %}People, including anyone holding no post{% endif %}
   </span>
+  {% if can_manage %}
+    {# A full page load rather than an htmx swap, so the tab strip above
+       moves to Setup as well; a swap would leave Team highlighted over
+       Setup's content. #}
+    <a class="link link-hover text-xs ml-auto" href="/workforce?tab=setup#structure">Edit structure</a>
+  {% endif %}
 </div>
 
 {% if view == 'chart' %}
@@ -67,5 +73,7 @@
 {% else %}
   {% include "_fragments/_workforce_roster.html" %}
 {% endif %}
+
+{% include "_fragments/_workforce_coverage.html" %}
 
 {% endif %}

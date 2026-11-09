@@ -1633,7 +1633,7 @@ def set_establishment(session: Session, *, profile: RoleProfile, count: int,
         if not units:
             raise WorkforceError(
                 f"{profile.name} has no posts yet, so there is no unit to "
-                f"add to. Add its first post on the order of battle, where "
+                f"add to. Add its first post under Structure below, where "
                 f"the unit is chosen explicitly."
             )
         # Where most of them already sit, so a role split across two units

@@ -33,7 +33,7 @@ import logging
 from datetime import date
 from typing import Any, Callable, Optional
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
@@ -44,6 +44,7 @@ from ion.models.workforce import LeaverRecord
 from ion.services import workforce_service as wf
 from ion.storage.database import get_db_session
 from ion.web.ui._shared import render_view
+from ion.web.ui.workforce_orbat import POST_STATE, STAGE_LABEL
 from ion.web.workforce_api import require_workforce_module
 
 logger = logging.getLogger(__name__)
@@ -74,6 +75,60 @@ def _draft_for(session: Session, user: User, profile_id: Optional[int]):
         return None
 
 
+#: Journeys in these stages cannot be seated: fill_post refuses them, so
+#: offering them in the list would only produce a refusal.
+UNSEATABLE_STAGES = ("closed", "withdrawn")
+
+
+def _structure(
+    units: list[dict[str, Any]],
+    everyone: list[dict[str, Any]],
+    profiles: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """What the structure editor needs beyond the tree itself.
+
+    `unit_paths` is every unit as "SOC / Detection", for the parent picker:
+    two teams can both be called "Tier 2" under different parents, and a
+    flat list of bare names would not say which one a new unit goes under.
+
+    `seatable` is every live journey not already in a post. A journey can
+    hold one post at a time (fill_post refuses a second), so listing seated
+    ones would offer a choice that always fails. The template narrows it
+    per post to the post's own role profile, which fill_post also enforces.
+    """
+    paths: list[dict[str, Any]] = []
+    seated: set[int] = set()
+
+    def walk(nodes: list[dict[str, Any]], prefix: str) -> None:
+        for u in nodes:
+            path = f"{prefix} / {u['name']}" if prefix else u["name"]
+            paths.append({"id": u["id"], "path": path})
+            for p in (u.get("leads") or []) + (u.get("posts") or []):
+                if p.get("occupant"):
+                    seated.add(p["occupant"]["journey_id"])
+            walk(u.get("children") or [], path)
+
+    walk(units, "")
+
+    seatable = [
+        {
+            "journey_id": j["id"], "name": p["name"], "role": j.get("role") or "?",
+            "is_cover": bool(j.get("is_cover")), "profile_id": j.get("profile_id"),
+        }
+        for p in everyone
+        for j in p.get("journeys") or []
+        if j["id"] not in seated and j.get("stage") not in UNSEATABLE_STAGES
+    ]
+    seatable.sort(key=lambda s: (s["name"].lower(), s["is_cover"]))
+
+    return {
+        "units": units,
+        "unit_paths": paths,
+        "seatable": seatable,
+        "profile_names": {p["id"]: p["name"] for p in profiles},
+    }
+
+
 def _view(
     session: Session,
     user: User,
@@ -90,6 +145,8 @@ def _view(
         "roles": [], "note": "",
         "established": 0, "filled": 0, "filling": 0, "gap": 0,
         "leavers": [], "all_people": [],
+        "units": [], "unit_paths": [], "seatable": [], "profile_names": {},
+        "post_state": POST_STATE, "stage_label": STAGE_LABEL,
         "profiles": [], "profile_id": profile_id, "draft": None,
         "ion_roles": [], "kinds": list(KINDS), "phases": list(PHASES),
         "can_manage": user.has_permission("workforce:manage"),
@@ -102,11 +159,15 @@ def _view(
         profiles = list_profiles(session=session, _user=user)
         roles_available = ion_roles(session=session, _user=user)
         draft = _draft_for(session, user, profile_id)
+        tree = wf.org_tree(session)
     except Exception:
         logger.exception("Workforce setup fragment could not be rendered")
         base["failed"] = True
         return base
 
+    units = tree.get("units") or []
+    everyone = list(roster.get("people") or [])
+    base.update(_structure(units, everyone, profiles.get("profiles") or []))
     base.update({
         "roles": est.get("roles") or [],
         # Present when no posts exist at all. Reporting zero gaps there
@@ -153,13 +214,16 @@ def _write(
     A pydantic ValidationError is caught alongside WorkforceError because
     the form posts strings: a name the model rejects is a thing the reader
     typed, and it belongs on the page next to the field rather than as a
-    500.
+    500. HTTPException is caught because the structure writes call the
+    /api handlers, which refuse a missing unit or profile that way.
     """
     error = ""
     try:
         action()
     except wf.WorkforceError as exc:
         error = str(exc)
+    except HTTPException as exc:
+        error = str(exc.detail)
     except ValidationError as exc:
         first = exc.errors()[0] if exc.errors() else {}
         error = str(first.get("msg") or "That value was not accepted.")
@@ -370,6 +434,157 @@ def set_establishment(
         if profile is None:
             raise wf.WorkforceError("That role profile no longer exists.")
         wf.set_establishment(session, profile=profile, count=wanted, actor=user)
+
+    return _write(request, session, user, run)
+
+
+# --- the structure ----------------------------------------------------------
+#
+# Units and posts: the tree the Team tab's chart draws. These were on the
+# /workforce/orbat page and went missing when it was folded into Team,
+# which left no way to build a structure except the catalogue's one-shot
+# establishment. Each write calls its /api handler, so the rules -- a post
+# needs a real unit, a seat needs a matching profile -- live in one place.
+
+
+def _optional_id(raw: str) -> Optional[int]:
+    """A select's value as an id, with "" meaning none.
+
+    Parsed here rather than declared Optional[int] on the form, because an
+    empty option posts "" and FastAPI would answer that with a 422 that
+    htmx swaps nowhere -- the control would just seem dead.
+    """
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        raise wf.WorkforceError("That choice was not recognised. Reload the page.")
+
+
+@router.post(
+    "/workforce/org/units",
+    dependencies=[Depends(require_permission("workforce:manage"))],
+    response_class=HTMLResponse,
+)
+def create_unit(
+    request: Request,
+    name: str = Form(""),
+    parent_id: str = Form(""),
+    session: Session = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """Add a unit, at the top or under another."""
+    def run():
+        from ion.web.workforce_api import OrgUnitIn
+        from ion.web.workforce_api import create_unit as api_create
+
+        if not name.strip():
+            raise wf.WorkforceError("Give the unit a name.")
+        api_create(
+            payload=OrgUnitIn(name=name.strip(), parent_id=_optional_id(parent_id)),
+            session=session, _user=user,
+        )
+
+    return _write(request, session, user, run, None, "Unit added.")
+
+
+@router.post(
+    "/workforce/org/units/{unit_id}/delete",
+    dependencies=[Depends(require_permission("workforce:manage"))],
+    response_class=HTMLResponse,
+)
+def delete_unit(
+    request: Request,
+    unit_id: int,
+    session: Session = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """Remove a unit and everything under it. The button confirms first."""
+    def run():
+        from ion.web.workforce_api import delete_unit as api_delete
+
+        api_delete(unit_id=unit_id, session=session, _user=user)
+
+    return _write(request, session, user, run, None, "Unit removed.")
+
+
+@router.post(
+    "/workforce/org/posts",
+    dependencies=[Depends(require_permission("workforce:manage"))],
+    response_class=HTMLResponse,
+)
+def create_post(
+    request: Request,
+    unit_id: int = Form(...),
+    title: str = Form(""),
+    profile_id: str = Form(""),
+    session: Session = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """Add a post to a unit, for one role or for any."""
+    def run():
+        from ion.web.workforce_api import OrgPostIn
+        from ion.web.workforce_api import create_post as api_create
+
+        if not title.strip():
+            raise wf.WorkforceError("Give the post a title.")
+        api_create(
+            payload=OrgPostIn(unit_id=unit_id, title=title.strip(),
+                              profile_id=_optional_id(profile_id)),
+            session=session, _user=user,
+        )
+
+    return _write(request, session, user, run, None, "Post added.")
+
+
+@router.post(
+    "/workforce/org/posts/{post_id}/delete",
+    dependencies=[Depends(require_permission("workforce:manage"))],
+    response_class=HTMLResponse,
+)
+def delete_post(
+    request: Request,
+    post_id: int,
+    session: Session = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """Remove one post. Its occupant keeps their journey; only the seat goes."""
+    def run():
+        from ion.web.workforce_api import delete_post as api_delete
+
+        api_delete(post_id=post_id, session=session, _user=user)
+
+    return _write(request, session, user, run, None, "Post removed.")
+
+
+@router.post(
+    "/workforce/org/posts/{post_id}/fill",
+    dependencies=[Depends(require_permission("workforce:manage"))],
+    response_class=HTMLResponse,
+)
+def fill_post(
+    request: Request,
+    post_id: int,
+    journey_id: str = Form(""),
+    session: Session = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """Seat a journey in a post, or empty it when `journey_id` is blank.
+
+    The seat select and the Unseat button both post here. fill_post
+    refuses a closed journey, one from a different role profile, and one
+    already seated elsewhere, and those refusals come back on the page.
+    """
+    def run():
+        from ion.web.workforce_api import FillIn
+        from ion.web.workforce_api import fill as api_fill
+
+        api_fill(
+            post_id=post_id, payload=FillIn(journey_id=_optional_id(journey_id)),
+            session=session, user=user,
+        )
 
     return _write(request, session, user, run)
 

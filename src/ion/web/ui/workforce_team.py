@@ -133,6 +133,85 @@ def _attach_checklists(session: Session, everyone: list[dict[str, Any]]) -> None
         j["checklist"] = rows
 
 
+#: A pillar's coverage state, in the old ORBAT page's words, with its badge.
+#:
+#: `unmeasured` is ghost, not an error: nobody has filled the form in,
+#: which is a different job from being short of people, and colouring it
+#: like a gap would send a lead recruiting when they should be surveying.
+PILLAR_STATE: dict[str, tuple[str, str]] = {
+    "covered": ("covered", "badge-success"),
+    "thin": ("thin", "badge-warning"),
+    "partial": ("partial", "badge-warning"),
+    "self_rated": ("self-rated", "badge-warning"),
+    "uncovered": ("nobody owns it", "badge-error"),
+    "unmeasured": ("unmeasured", "badge-ghost"),
+}
+
+#: How far ahead Expiring soon looks, and how many it lists.
+EXPIRING_DAYS = 90
+EXPIRING_SHOWN = 12
+
+
+def _coverage(session: Session) -> dict[str, Any]:
+    """Cover by role, day-to-day pillar coverage, and what lapses soon.
+
+    These were the old ORBAT page's side panels and are the same three
+    reads as /api/workforce/{orbat,coverage,expiring}, each declared
+    workforce:read -- the gate this router holds -- so calling the services
+    directly widens nothing.
+
+    Kept out of the main read: they are supplementary, and a failure here
+    should say "coverage could not be read" beside a working roster rather
+    than take the whole tab down with it.
+    """
+    from ion.models.user import User as UserModel
+    from ion.models.workforce import RoleProfile
+    from ion.services import coverage_service
+
+    cover = []
+    for profile in session.query(RoleProfile).order_by(RoleProfile.name).all():
+        c = wf.capability_cover(session, profile.name)
+        # A role nobody holds, trains for or has been suspended from is a
+        # line of zeros, and twenty of those bury the three that matter.
+        if c["primary"] or c["cover"] or c["in_training"] or c["blocked"]:
+            cover.append({"role": profile.name, **c})
+
+    pillars = coverage_service.pillar_coverage(session)
+
+    due = wf.expiring(session, within_days=EXPIRING_DAYS)
+    shown = due[:EXPIRING_SHOWN]
+    ids = {i.journey.user_id for i in shown}
+    # One query for every name on the list, not one per row.
+    names = {
+        u.id: (u.display_name or u.username)
+        for u in session.query(UserModel).filter(UserModel.id.in_(ids or [0])).all()
+    }
+    expiring = [
+        {
+            "name": names.get(i.journey.user_id, f"user {i.journey.user_id}"),
+            "journey_id": i.journey.id,
+            "requirement": i.requirement.name,
+            "phase": i.requirement.phase,
+            "expires_on": i.requirement.expires_on.isoformat(),
+            "days_left": i.days_left,
+        }
+        for i in shown
+    ]
+
+    return {
+        "cover": cover,
+        "cover_weight": wf.COVER_WEIGHT,
+        "pillars": pillars.get("pillars") or [],
+        "measured": bool(pillars.get("measured")),
+        "self_rated_pillars": pillars.get("self_rated_pillars") or 0,
+        "unplaced": [u.get("name") for u in pillars.get("unplaced") or []],
+        "weights": pillars.get("weights") or {},
+        "expiring": expiring,
+        "expiring_more": max(0, len(due) - len(shown)),
+        "expiring_days": EXPIRING_DAYS,
+    }
+
+
 def _view(
     session: Session,
     user: User,
@@ -154,6 +233,9 @@ def _view(
         "awaiting": 0, "blocked": 0, "overdue": 0, "gaps": 0,
         "leads_gapped": 0,
         "can_verify": user.has_permission("workforce:verify"),
+        "can_manage": user.has_permission("workforce:manage"),
+        "pillar_state": PILLAR_STATE,
+        "coverage": None, "coverage_failed": False,
     }
 
     # The queue is read only for a verifier, and that is load-bearing.
@@ -215,6 +297,12 @@ def _view(
         "gaps": tree.get("gaps") or 0,
         "leads_gapped": tree.get("leads_gapped") or 0,
     })
+
+    try:
+        base["coverage"] = _coverage(session)
+    except Exception:
+        logger.exception("Workforce coverage panels could not be rendered")
+        base["coverage_failed"] = True
     return base
 
 
