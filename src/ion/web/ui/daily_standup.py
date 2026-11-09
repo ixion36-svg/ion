@@ -90,7 +90,7 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Any, Optional, TypedDict
+from typing import Optional, TypedDict
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, Response
@@ -99,6 +99,8 @@ from ion.auth.dependencies import require_permission
 from ion.models.user import User
 from ion.web.daily_standup_api import (
     _duty_today as duty_today,
+)
+from ion.web.daily_standup_api import (
     arkime_node_stats,
     check_arkime_high_risk,
     daily_checks_payload,

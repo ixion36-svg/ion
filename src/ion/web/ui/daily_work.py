@@ -10,8 +10,8 @@ from ion.auth.dependencies import require_permission
 from ion.models.user import User
 from ion.services import worklog_service
 from ion.storage.database import get_db_session
-from ion.web.worklog_api import _parse_day, get_my_day
 from ion.web.ui._shared import plain, templates
+from ion.web.worklog_api import _parse_day, get_my_day
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

@@ -116,8 +116,8 @@ def audit_logs_fragment(
     the total is an exact multiple of the page size, and then shows an empty
     table to a user who followed it.
     """
-    from ion.web.api import _parse_audit_details
     from ion.storage.auth_repository import AuditLogRepository
+    from ion.web.api import _parse_audit_details
 
     try:
         rows = AuditLogRepository(session).list_all(

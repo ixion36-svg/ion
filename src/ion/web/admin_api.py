@@ -3,11 +3,11 @@
 import logging
 import os
 import platform
+import re
 import sys
+from dataclasses import fields as dataclass_fields
 from datetime import datetime
 from pathlib import Path
-import re
-from dataclasses import fields as dataclass_fields
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request

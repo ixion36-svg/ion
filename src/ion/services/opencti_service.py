@@ -5,19 +5,18 @@ indicators, and threat actors associated with given IOC values.
 """
 
 import asyncio
+import logging
 import re
 import threading
-import logging
 from typing import Any, Dict, List, Optional
 
 import httpx
 
+from ion.core.async_http import current_loop, dispose_client, is_usable_on
 from ion.core.circuit_breaker import opencti_breaker
 from ion.core.config import get_opencti_config, get_ssl_verify
 from ion.core.safe_errors import safe_error
 from ion.services.country_mapper import country_code_to_flag, get_country_code, get_country_name
-
-from ion.core.async_http import current_loop, dispose_client, is_usable_on
 
 logger = logging.getLogger(__name__)
 

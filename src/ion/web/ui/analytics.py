@@ -53,8 +53,7 @@ from ion.auth.dependencies import get_current_user, require_permission
 from ion.models.analytics import AnalyticsJobType
 from ion.models.user import User
 from ion.storage.database import get_db_session
-from ion.web.ui._shared import (age_label, instant_label, parse_instant, plain,
-                                 render_view)
+from ion.web.ui._shared import age_label, instant_label, parse_instant, plain, render_view
 
 logger = logging.getLogger(__name__)
 
@@ -1031,7 +1030,12 @@ def namespace_kind(name: Optional[str]) -> str:
     # same namespace would change colour on every restart.
     import hashlib
 
-    digest = hashlib.sha1(lowered.encode("utf-8")).digest()
+    # usedforsecurity=False, not a nosec: this picks a colour bucket for a
+    # namespace with no security property at all, and saying so in the call
+    # keeps the next reader (and bandit) from having to judge it again.
+    digest = hashlib.sha1(  # noqa: S324
+        lowered.encode("utf-8"), usedforsecurity=False
+    ).digest()
     return "ns-p%d" % (digest[0] % NAMESPACE_FALLBACKS)
 
 

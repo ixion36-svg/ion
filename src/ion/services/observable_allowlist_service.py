@@ -27,7 +27,7 @@ import logging
 import threading
 import time
 from datetime import datetime, timezone
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session

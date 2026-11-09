@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session
 from ion.auth.dependencies import require_permission
 from ion.core.safe_errors import safe_error
 from ion.models.user import User
-from ion.storage.database import get_db_session
 
 # Shared with the Arkime auto-case pipeline (pcap_analysis_service) — the
 # canonical implementations live in services.pcap_enrichment_service.
@@ -20,6 +19,7 @@ from ion.services.pcap_enrichment_service import (
 from ion.services.pcap_enrichment_service import (
     ti_findings as _ti_findings,
 )
+from ion.storage.database import get_db_session
 
 logger = logging.getLogger(__name__)
 
