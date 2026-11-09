@@ -3620,6 +3620,17 @@ async def get_batch_triage(
                 triage = triage_map.get(alert_id)
                 if triage:
                     ion_status = triage.status.value if hasattr(triage.status, "value") else str(triage.status)
+                    # An alert on a closed case stays closed, as the case
+                    # does (closed is terminal in ION; reopen the case to
+                    # reopen it). The page's ES snapshot predates ION's own
+                    # writes, and replaying it reopened alerts a false-
+                    # positive close had just closed.
+                    case_closed = (
+                        triage.case is not None
+                        and getattr(triage.case.status, "value", triage.case.status) == "closed"
+                    )
+                    if case_closed and es_status_lower != "closed":
+                        continue
                     if ion_status.lower() != es_status_lower:
                         triage.status = AlertTriageStatus(es_status_lower)
                         logger.debug("Synced ES status '%s' → ION triage for alert %s", es_status_lower, alert_id)
