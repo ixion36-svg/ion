@@ -1,0 +1,333 @@
+{
+  "document": {
+    "category": "csaf_vex",
+    "csaf_version": "2.0",
+    "title": "ION 0.99.13 \u2014 VEX",
+    "publisher": {
+      "category": "vendor",
+      "name": "ION maintainer (ixion36)",
+      "namespace": "https://ixion36.dev"
+    },
+    "tracking": {
+      "id": "ION-VEX-0.99.13",
+      "initial_release_date": "2026-11-09T08:27:25Z",
+      "current_release_date": "2026-11-09T08:27:25Z",
+      "status": "final",
+      "version": "1",
+      "revision_history": [
+        {
+          "date": "2026-11-09T08:27:25Z",
+          "number": "1",
+          "summary": "Generated from security/vex_statements.yaml"
+        }
+      ]
+    }
+  },
+  "product_tree": {
+    "full_product_names": [
+      {
+        "product_id": "ION",
+        "name": "ION 0.99.13",
+        "product_identification_helper": {
+          "cpe": "cpe:2.3:a:ixion36:ion:0.99.13:*:*:*:*:*:*:*",
+          "purls": [
+            "pkg:docker/fubsxploitapps/ion@0.99.13"
+          ]
+        }
+      }
+    ]
+  },
+  "vulnerabilities": [
+    {
+      "cve": "CVE-2024-23342",
+      "product_status": {
+        "known_not_affected": [
+          "ION"
+        ]
+      },
+      "notes": [
+        {
+          "category": "other",
+          "title": "Impact statement",
+          "text": "The Minerva timing attack is in `ecdsa`, which reached ION only as a transitive dependency of python-jose. ION migrated to PyJWT, which pulls `cryptography` and no `ecdsa`, so the package is absent from the image."
+        }
+      ],
+      "flags": [
+        {
+          "label": "component_not_present",
+          "product_ids": [
+            "ION"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "MAL-2026-4750",
+      "product_status": {
+        "known_not_affected": [
+          "ION"
+        ]
+      },
+      "ids": [
+        {
+          "system_name": "OSV",
+          "text": "MAL-2026-4750"
+        }
+      ],
+      "notes": [
+        {
+          "category": "other",
+          "title": "Impact statement",
+          "text": "The compromised artefact is the fastapi 0.136.3 wheel, whose metadata adds an undocumented dependency on a typo-squat package. ION pins fastapi >=0.136.1,<0.136.3, so the affected release is never resolved. ION also does not use the [standard] extra through which the typo-squat would have installed."
+        }
+      ],
+      "flags": [
+        {
+          "label": "component_not_present",
+          "product_ids": [
+            "ION"
+          ]
+        }
+      ]
+    },
+    {
+      "cve": "CVE-2025-71176",
+      "product_status": {
+        "known_not_affected": [
+          "ION"
+        ]
+      },
+      "notes": [
+        {
+          "category": "other",
+          "title": "Impact statement",
+          "text": "The /tmp race is in pytest, which is a dev extra. The runtime image installs only the resolved runtime venv, so pytest is not present in a shipped ION container."
+        }
+      ],
+      "flags": [
+        {
+          "label": "component_not_present",
+          "product_ids": [
+            "ION"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "PYSEC-2026-35",
+      "product_status": {
+        "fixed": [
+          "ION"
+        ]
+      },
+      "ids": [
+        {
+          "system_name": "OSV",
+          "text": "PYSEC-2026-35"
+        }
+      ],
+      "notes": [
+        {
+          "category": "other",
+          "title": "Impact statement",
+          "text": "DNS constraint bypass in cryptography; ION pins cryptography>=46.0.7."
+        }
+      ]
+    },
+    {
+      "title": "PYSEC-2026-161",
+      "product_status": {
+        "fixed": [
+          "ION"
+        ]
+      },
+      "ids": [
+        {
+          "system_name": "OSV",
+          "text": "PYSEC-2026-161"
+        }
+      ],
+      "notes": [
+        {
+          "category": "other",
+          "title": "Impact statement",
+          "text": "Host-header URL reconstruction in starlette. ION pins starlette>=1.0.1, which requires fastapi>=0.136.1 to drop its upper cap."
+        }
+      ]
+    },
+    {
+      "title": "PYSEC-2026-141",
+      "product_status": {
+        "fixed": [
+          "ION"
+        ]
+      },
+      "ids": [
+        {
+          "system_name": "OSV",
+          "text": "PYSEC-2026-141"
+        }
+      ],
+      "notes": [
+        {
+          "category": "other",
+          "title": "Impact statement",
+          "text": "ION pins urllib3>=2.7.0."
+        }
+      ]
+    },
+    {
+      "title": "PYSEC-2026-87",
+      "product_status": {
+        "fixed": [
+          "ION"
+        ]
+      },
+      "ids": [
+        {
+          "system_name": "OSV",
+          "text": "PYSEC-2026-87"
+        }
+      ],
+      "notes": [
+        {
+          "category": "other",
+          "title": "Impact statement",
+          "text": "lxml, reached as a WeasyPrint dependency. ION pins lxml>=6.1.0."
+        }
+      ]
+    },
+    {
+      "title": "PYSEC-2026-3447",
+      "product_status": {
+        "fixed": [
+          "ION"
+        ]
+      },
+      "ids": [
+        {
+          "system_name": "OSV",
+          "text": "PYSEC-2026-3447"
+        }
+      ],
+      "notes": [
+        {
+          "category": "other",
+          "title": "Impact statement",
+          "text": "ION pins setuptools>=83.0.0."
+        }
+      ]
+    },
+    {
+      "title": "PYSEC-2026-120",
+      "product_status": {
+        "fixed": [
+          "ION"
+        ]
+      },
+      "ids": [
+        {
+          "system_name": "OSV",
+          "text": "PYSEC-2026-120"
+        }
+      ],
+      "notes": [
+        {
+          "category": "other",
+          "title": "Impact statement",
+          "text": "Critical-header bypass in PyJWT. ION pins PyJWT>=2.12.0 and validates RS256 tokens from Keycloak."
+        }
+      ]
+    },
+    {
+      "cve": "CVE-2026-45409",
+      "product_status": {
+        "fixed": [
+          "ION"
+        ]
+      },
+      "notes": [
+        {
+          "category": "other",
+          "title": "Impact statement",
+          "text": "ION pins idna>=3.15."
+        }
+      ]
+    },
+    {
+      "cve": "CVE-2026-40192",
+      "product_status": {
+        "fixed": [
+          "ION"
+        ]
+      },
+      "notes": [
+        {
+          "category": "other",
+          "title": "Impact statement",
+          "text": "Pillow, reached as a WeasyPrint dependency. ION pins Pillow>=12.2.0."
+        }
+      ]
+    },
+    {
+      "cve": "CVE-2026-30922",
+      "product_status": {
+        "fixed": [
+          "ION"
+        ]
+      },
+      "notes": [
+        {
+          "category": "other",
+          "title": "Impact statement",
+          "text": "Recursion-bomb DoS via crafted ASN.1. ION pins pyasn1>=0.6.3."
+        }
+      ]
+    },
+    {
+      "cve": "CVE-2026-4539",
+      "product_status": {
+        "fixed": [
+          "ION"
+        ]
+      },
+      "notes": [
+        {
+          "category": "other",
+          "title": "Impact statement",
+          "text": "ReDoS in the Pygments AdlLexer, local access only. ION pins pygments>=2.20.0."
+        }
+      ]
+    },
+    {
+      "cve": "CVE-2026-25645",
+      "product_status": {
+        "fixed": [
+          "ION"
+        ]
+      },
+      "notes": [
+        {
+          "category": "other",
+          "title": "Impact statement",
+          "text": "ION pins requests>=2.33.0."
+        }
+      ]
+    },
+    {
+      "cve": "CVE-2026-40347",
+      "product_status": {
+        "fixed": [
+          "ION"
+        ]
+      },
+      "notes": [
+        {
+          "category": "other",
+          "title": "Impact statement",
+          "text": "Multipart DoS. ION pins python-multipart>=0.0.27."
+        }
+      ]
+    }
+  ]
+}
