@@ -386,7 +386,16 @@ def test_page_secret_template_is_rendered_outside_script():
         )
     )
     soup = BeautifulSoup(page, "html.parser")
-    assert soup.select_one("template#settings-secret-status-template > span") is not None
+    # Walked, not CSS-selected. A `<template>`'s children belong to a separate
+    # document fragment, and beautifulsoup4 4.15 stopped letting a child
+    # combinator descend into one -- `template#id > span` matches nothing there
+    # while the span is still in `.contents`. The tree is what this test is
+    # about, so it reads the tree and does not depend on the selector engine's
+    # view of it. (beautifulsoup4 is unpinned at >=4.12, so CI picks up the
+    # newest release and this changed under a run with no code change.)
+    secret_template = soup.find("template", id="settings-secret-status-template")
+    assert secret_template is not None
+    assert secret_template.find("span") is not None
     assert soup.select_one('[data-click-action="createBackup"]') is None
     assert soup.select_one('[data-click-action="cleanupDatabase"]') is None
     assert soup.select_one('[data-click-action="openIntegrationWizard"]') is None
