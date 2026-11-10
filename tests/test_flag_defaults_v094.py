@@ -321,10 +321,13 @@ def _code_bool_defaults():
         and n.value is not None
     }
     out = {}
-    for m in re.finditer(r'_config\.(\w+)\s*=\s*_get_env_bool\(\s*"([^"]+)"', src):
+    # The override block builds into a local `cfg` (config._load_config).
+    for m in re.finditer(r'\bcfg\.(\w+)\s*=\s*_get_env_bool\(\s*"([^"]+)"', src):
         field, var = m.group(1), m.group(2)
         if field in field_default:
             out[var] = field_default[field]
+    # A pattern that stopped matching would compare nothing and pass.
+    assert len(out) > 20, f"found only {len(out)} boolean env overrides in config.py"
     return out
 
 
