@@ -749,15 +749,15 @@ JSON endpoints.
 | GET | `/api/integrations/webhooks/{webhook_id}/logs` | `alert:read or integration:read` | [integration_api.py:688](src/ion/web/integration_api.py#L688) |  |  |
 | POST | `/api/integrations/webhooks/{webhook_id}/regenerate-token` | `integration:manage` | [integration_api.py:602](src/ion/web/integration_api.py#L602) |  |  |
 | GET | `/api/integrations/{integration_type}/config-schema` | `alert:read or integration:read` | [integration_api.py:459](src/ion/web/integration_api.py#L459) |  |  |
-| POST | `/api/investigate` | `alert:triage` | [investigation_api.py:187](src/ion/web/investigation_api.py#L187) |  | `investigation_queue.html` |
-| GET | `/api/investigate/jobs` | `alert:read` | [investigation_api.py:280](src/ion/web/investigation_api.py#L280) |  | `investigation_queue.html` |
-| POST | `/api/investigate/jobs/cancel-pending` | `alert:triage` | [investigation_api.py:393](src/ion/web/investigation_api.py#L393) |  | `investigation_queue.html` |
-| GET | `/api/investigate/jobs/{inv_id}` | `alert:read` | [investigation_api.py:288](src/ion/web/investigation_api.py#L288) |  |  |
-| POST | `/api/investigate/jobs/{inv_id}/cancel` | `alert:triage` | [investigation_api.py:423](src/ion/web/investigation_api.py#L423) |  |  |
-| POST | `/api/investigate/loop/pause` | `alert:triage` | [investigation_api.py:355](src/ion/web/investigation_api.py#L355) |  | `investigation_queue.html` |
-| POST | `/api/investigate/loop/resume` | `alert:triage` | [investigation_api.py:381](src/ion/web/investigation_api.py#L381) |  | `investigation_queue.html` |
-| GET | `/api/investigate/loop/status` | `alert:read` | [investigation_api.py:339](src/ion/web/investigation_api.py#L339) |  | `investigation_queue.html` |
-| POST | `/api/investigate/sweep` | `alert:triage` | [investigation_api.py:224](src/ion/web/investigation_api.py#L224) |  | `investigation_queue.html` |
+| POST | `/api/investigate` | `alert:triage` | [investigation_api.py:191](src/ion/web/investigation_api.py#L191) |  | `investigation_queue.html` |
+| GET | `/api/investigate/jobs` | `alert:read` | [investigation_api.py:284](src/ion/web/investigation_api.py#L284) |  | `investigation_queue.html` |
+| POST | `/api/investigate/jobs/cancel-pending` | `alert:triage` | [investigation_api.py:397](src/ion/web/investigation_api.py#L397) |  | `investigation_queue.html` |
+| GET | `/api/investigate/jobs/{inv_id}` | `alert:read` | [investigation_api.py:292](src/ion/web/investigation_api.py#L292) |  |  |
+| POST | `/api/investigate/jobs/{inv_id}/cancel` | `alert:triage` | [investigation_api.py:427](src/ion/web/investigation_api.py#L427) |  |  |
+| POST | `/api/investigate/loop/pause` | `alert:triage` | [investigation_api.py:359](src/ion/web/investigation_api.py#L359) |  | `investigation_queue.html` |
+| POST | `/api/investigate/loop/resume` | `alert:triage` | [investigation_api.py:385](src/ion/web/investigation_api.py#L385) |  | `investigation_queue.html` |
+| GET | `/api/investigate/loop/status` | `alert:read` | [investigation_api.py:343](src/ion/web/investigation_api.py#L343) |  | `investigation_queue.html` |
+| POST | `/api/investigate/sweep` | `alert:triage` | [investigation_api.py:228](src/ion/web/investigation_api.py#L228) |  | `investigation_queue.html` |
 | GET | `/api/investigations` | `alert:read` | [investigation_memory_api.py:246](src/ion/web/investigation_memory_api.py#L246) |  |  |
 | GET | `/api/investigations/{inv_id}` | `alert:read` | [investigation_memory_api.py:277](src/ion/web/investigation_memory_api.py#L277) |  |  |
 | GET | `/api/ioc-staleness` | `alert:read` | [ioc_staleness_api.py:15](src/ion/web/ioc_staleness_api.py#L15) |  |  |
@@ -805,7 +805,7 @@ JSON endpoints.
 | GET | `/api/maturity/questionnaire` | `alert:read` | [maturity_api.py:23](src/ion/web/maturity_api.py#L23) |  | `maturity.html` |
 | POST | `/api/mcp` | — | [mcp_api.py:768](src/ion/web/mcp_api.py#L768) |  |  |
 | GET | `/api/mitre-navigator/layer` | `alert:read` | [mitre_navigator_api.py:15](src/ion/web/mitre_navigator_api.py#L15) |  |  |
-| GET | `/api/nav/permissions` | — | [server.py:1359](src/ion/web/server.py#L1359) |  | `app.js` |
+| GET | `/api/nav/permissions` | — | [server.py:1337](src/ion/web/server.py#L1337) |  | `app.js` |
 | GET | `/api/network-correlation-report/html` | `case:read` | [network_correlation_report_api.py:44](src/ion/web/network_correlation_report_api.py#L44) |  | `arkime_traffic.html` |
 | GET | `/api/network-correlation-report/json` | `case:read` | [network_correlation_report_api.py:31](src/ion/web/network_correlation_report_api.py#L31) |  |  |
 | GET | `/api/network-map/assets` | `alert:read` | [network_map_api.py:33](src/ion/web/network_map_api.py#L33) |  | `network_map.html` |
@@ -1119,96 +1119,96 @@ Pages, static mounts and infrastructure.
 
 | method | path | permission | handler | renders | called from |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/` | — | [server.py:1269](src/ion/web/server.py#L1269) | `dashboard_v2.html` |  |
-| GET | `/about` | — | [server.py:1428](src/ion/web/server.py#L1428) | `briefings.html` |  |
+| GET | `/` | — | [server.py:1247](src/ion/web/server.py#L1247) | `dashboard_v2.html` |  |
+| GET | `/about` | — | [server.py:1406](src/ion/web/server.py#L1406) | `briefings.html` |  |
 | GET | `/ai-scorecard` | — | [alert_prompt_api.py:404](src/ion/web/alert_prompt_api.py#L404) |  |  |
 | GET | `/alert-prompts` | — | [alert_prompt_api.py:393](src/ion/web/alert_prompt_api.py#L393) |  |  |
-| GET | `/alerts` | `alert:read` | [server.py:1527](src/ion/web/server.py#L1527) | `alerts.html` |  |
-| GET | `/alerts/{alert_id}/arkime` | `alert:read` | [server.py:1554](src/ion/web/server.py#L1554) | `alert_arkime.html` |  |
-| GET | `/alerts/{row_id:int}` | `alert:read` | [server.py:1570](src/ion/web/server.py#L1570) |  |  |
-| GET | `/analyst` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/analyst-efficiency` | — | [server.py:1838](src/ion/web/server.py#L1838) |  |  |
-| GET | `/analytics` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/architecture` | `security:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/arkime-traffic` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/attack-stories` | — | [server.py:1972](src/ion/web/server.py#L1972) |  |  |
-| GET | `/audit-logs` | `system:audit_view` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
+| GET | `/alerts` | `alert:read` | [server.py:1505](src/ion/web/server.py#L1505) | `alerts.html` |  |
+| GET | `/alerts/{alert_id}/arkime` | `alert:read` | [server.py:1532](src/ion/web/server.py#L1532) | `alert_arkime.html` |  |
+| GET | `/alerts/{row_id:int}` | `alert:read` | [server.py:1548](src/ion/web/server.py#L1548) |  |  |
+| GET | `/analyst` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/analyst-efficiency` | — | [server.py:1816](src/ion/web/server.py#L1816) |  |  |
+| GET | `/analytics` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/architecture` | `security:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/arkime-traffic` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/attack-stories` | — | [server.py:1950](src/ion/web/server.py#L1950) |  |  |
+| GET | `/audit-logs` | `system:audit_view` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
 | GET | `/bob-eval` | `system:settings` | [bob_eval_api.py:195](src/ion/web/bob_eval_api.py#L195) |  |  |
-| GET | `/briefing` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/briefings` | — | [server.py:1748](src/ion/web/server.py#L1748) |  |  |
+| GET | `/briefing` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/briefings` | — | [server.py:1726](src/ion/web/server.py#L1726) |  |  |
 | GET | `/bug-reports` | — | [bug_report_api.py:138](src/ion/web/bug_report_api.py#L138) |  |  |
-| GET | `/canaries` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
+| GET | `/canaries` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
 | GET | `/case-grouper` | — | [case_grouper_api.py:165](src/ion/web/case_grouper_api.py#L165) |  |  |
-| GET | `/cases` | `case:read` | [server.py:1604](src/ion/web/server.py#L1604) | `cases.html` |  |
-| GET | `/cases/{row_id:int}` | `case:read` | [server.py:1618](src/ion/web/server.py#L1618) | `cases.html` |  |
+| GET | `/cases` | `case:read` | [server.py:1582](src/ion/web/server.py#L1582) | `cases.html` |  |
+| GET | `/cases/{row_id:int}` | `case:read` | [server.py:1596](src/ion/web/server.py#L1596) | `cases.html` |  |
 | GET | `/change-requests` | `system:settings` | [change_request_api.py:160](src/ion/web/change_request_api.py#L160) |  |  |
-| GET | `/chat` | `ai:chat` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/compliance` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/daily-standup` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/daily-standup/slides` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/daily-work` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/data-flow` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/de` | `de:read` | [server.py:1864](src/ion/web/server.py#L1864) | `de_workbench.html` |  |
-| GET | `/de-bob` | `de:read` | [server.py:1960](src/ion/web/server.py#L1960) | `de_bob.html` |  |
-| GET | `/de-metrics` | `de:read` | [server.py:1939](src/ion/web/server.py#L1939) | `de_metrics.html` |  |
-| GET | `/de-proposals` | `de:read` | [server.py:1948](src/ion/web/server.py#L1948) | `de_proposals.html` |  |
-| GET | `/de-quirks` | `de:read` | [server.py:1954](src/ion/web/server.py#L1954) | `de_quirks.html` |  |
-| GET | `/detection-engineering` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/detection-health` | `security:read` | [server.py:1855](src/ion/web/server.py#L1855) | `detection_health.html` |  |
-| GET | `/discover` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
+| GET | `/chat` | `ai:chat` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/compliance` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/daily-standup` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/daily-standup/slides` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/daily-work` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/data-flow` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/de` | `de:read` | [server.py:1842](src/ion/web/server.py#L1842) | `de_workbench.html` |  |
+| GET | `/de-bob` | `de:read` | [server.py:1938](src/ion/web/server.py#L1938) | `de_bob.html` |  |
+| GET | `/de-metrics` | `de:read` | [server.py:1917](src/ion/web/server.py#L1917) | `de_metrics.html` |  |
+| GET | `/de-proposals` | `de:read` | [server.py:1926](src/ion/web/server.py#L1926) | `de_proposals.html` |  |
+| GET | `/de-quirks` | `de:read` | [server.py:1932](src/ion/web/server.py#L1932) | `de_quirks.html` |  |
+| GET | `/detection-engineering` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/detection-health` | `security:read` | [server.py:1833](src/ion/web/server.py#L1833) | `detection_health.html` |  |
+| GET | `/discover` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
 | GET | `/document-analysis` | — | [large_doc_api.py:84](src/ion/web/large_doc_api.py#L84) |  |  |
-| GET | `/documents` | `document:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/engineering-analytics` | — | [server.py:1797](src/ion/web/server.py#L1797) |  |  |
-| GET | `/entity-timeline` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/executive-report` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/forensics` | `forensic:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/gitlab` | — | [server.py:1422](src/ion/web/server.py#L1422) | `gitlab.html` |  |
-| GET | `/guide` | — | [server.py:1966](src/ion/web/server.py#L1966) | `guide.html` |  |
-| GET | `/integrations` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/investigate` | — | [server.py:1755](src/ion/web/server.py#L1755) |  |  |
+| GET | `/documents` | `document:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/engineering-analytics` | — | [server.py:1775](src/ion/web/server.py#L1775) |  |  |
+| GET | `/entity-timeline` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/executive-report` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/forensics` | `forensic:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/gitlab` | — | [server.py:1400](src/ion/web/server.py#L1400) | `gitlab.html` |  |
+| GET | `/guide` | — | [server.py:1944](src/ion/web/server.py#L1944) | `guide.html` |  |
+| GET | `/integrations` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/investigate` | — | [server.py:1733](src/ion/web/server.py#L1733) |  |  |
 | GET | `/investigation-memory` | — | [investigation_memory_api.py:540](src/ion/web/investigation_memory_api.py#L540) |  |  |
-| GET | `/investigation-queue` | — | [investigation_api.py:468](src/ion/web/investigation_api.py#L468) |  |  |
-| GET | `/investigations` | — | [server.py:1776](src/ion/web/server.py#L1776) |  |  |
-| GET | `/knowledge-graph` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/log-sources` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/login` | — | [server.py:1509](src/ion/web/server.py#L1509) | `login.html` |  |
-| GET | `/maturity` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
+| GET | `/investigation-queue` | — | [investigation_api.py:472](src/ion/web/investigation_api.py#L472) |  |  |
+| GET | `/investigations` | — | [server.py:1754](src/ion/web/server.py#L1754) |  |  |
+| GET | `/knowledge-graph` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/log-sources` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/login` | — | [server.py:1487](src/ion/web/server.py#L1487) | `login.html` |  |
+| GET | `/maturity` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
 | GET | `/metrics` | — | [metrics_api.py:141](src/ion/web/metrics_api.py#L141) |  |  |
-| GET | `/network-map` | — | [server.py:2007](src/ion/web/server.py#L2007) | `network_map.html` |  |
-| GET | `/network-topology` | `alert:read` | [server.py:2013](src/ion/web/server.py#L2013) | `network_topology.html` |  |
-| GET | `/notes` | — | [server.py:1782](src/ion/web/server.py#L1782) | `notes.html` |  |
-| GET | `/observables` | `observable:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/pcap` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/playbooks` | `playbook:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/profile` | — | [server.py:1515](src/ion/web/server.py#L1515) | `profile.html` |  |
-| GET | `/response-approvals` | `response:approve` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/scheduler` | — | [server.py:1381](src/ion/web/server.py#L1381) | `scheduler.html` |  |
-| GET | `/security` | `security:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/service-accounts` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/settings` | `system:settings` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/shift-handover` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/soc-health` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
+| GET | `/network-map` | — | [server.py:1985](src/ion/web/server.py#L1985) | `network_map.html` |  |
+| GET | `/network-topology` | `alert:read` | [server.py:1991](src/ion/web/server.py#L1991) | `network_topology.html` |  |
+| GET | `/notes` | — | [server.py:1760](src/ion/web/server.py#L1760) | `notes.html` |  |
+| GET | `/observables` | `observable:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/pcap` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/playbooks` | `playbook:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/profile` | — | [server.py:1493](src/ion/web/server.py#L1493) | `profile.html` |  |
+| GET | `/response-approvals` | `response:approve` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/scheduler` | — | [server.py:1359](src/ion/web/server.py#L1359) | `scheduler.html` |  |
+| GET | `/security` | `security:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/service-accounts` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/settings` | `system:settings` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/shift-handover` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/soc-health` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
 | GET | `/soc-roles` | — | [soc_roles_api.py:195](src/ion/web/soc_roles_api.py#L195) |  |  |
 | GET | `/stories` | — | [story_api.py:364](src/ion/web/story_api.py#L364) |  |  |
-| GET | `/templates` | `template:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/templates/new` | `template:read` | [server.py:1389](src/ion/web/server.py#L1389) | `template_form.html` |  |
-| GET | `/templates/{template_id}` | `template:read` | [server.py:1395](src/ion/web/server.py#L1395) | `template_view.html` |  |
-| GET | `/templates/{template_id}/edit` | `template:read` | [server.py:1401](src/ion/web/server.py#L1401) | `template_form.html` |  |
-| GET | `/templates/{template_id}/render` | `template:read` | [server.py:1407](src/ion/web/server.py#L1407) | `template_render.html` |  |
-| GET | `/templates/{template_id}/versions` | `template:read` | [server.py:1413](src/ion/web/server.py#L1413) | `versions.html` |  |
-| GET | `/threat-intel` | `observable:read` | [server.py:1657](src/ion/web/server.py#L1657) | `threat_intel.html` |  |
-| GET | `/threat-intel/actors/{entity_id}` | `observable:read` | [server.py:1697](src/ion/web/server.py#L1697) | `threat_intel_actor.html` |  |
-| GET | `/threat-landscape` | — | [server.py:1729](src/ion/web/server.py#L1729) |  |  |
-| GET | `/tools` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/topology` | — | [server.py:1983](src/ion/web/server.py#L1983) |  |  |
-| GET | `/training` | `alert:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
+| GET | `/templates` | `template:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/templates/new` | `template:read` | [server.py:1367](src/ion/web/server.py#L1367) | `template_form.html` |  |
+| GET | `/templates/{template_id}` | `template:read` | [server.py:1373](src/ion/web/server.py#L1373) | `template_view.html` |  |
+| GET | `/templates/{template_id}/edit` | `template:read` | [server.py:1379](src/ion/web/server.py#L1379) | `template_form.html` |  |
+| GET | `/templates/{template_id}/render` | `template:read` | [server.py:1385](src/ion/web/server.py#L1385) | `template_render.html` |  |
+| GET | `/templates/{template_id}/versions` | `template:read` | [server.py:1391](src/ion/web/server.py#L1391) | `versions.html` |  |
+| GET | `/threat-intel` | `observable:read` | [server.py:1635](src/ion/web/server.py#L1635) | `threat_intel.html` |  |
+| GET | `/threat-intel/actors/{entity_id}` | `observable:read` | [server.py:1675](src/ion/web/server.py#L1675) | `threat_intel_actor.html` |  |
+| GET | `/threat-landscape` | — | [server.py:1707](src/ion/web/server.py#L1707) |  |  |
+| GET | `/tools` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/topology` | — | [server.py:1961](src/ion/web/server.py#L1961) |  |  |
+| GET | `/training` | `alert:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
 | GET | `/translator` | — | [translator_api.py:54](src/ion/web/translator_api.py#L54) |  |  |
-| GET | `/tuning-proposals` | — | [server.py:1761](src/ion/web/server.py#L1761) |  |  |
-| GET | `/users` | `user:read` | [server.py:1324](src/ion/web/server.py#L1324) |  |  |
-| GET | `/verdict-review` | `verdict:review` | [server.py:1871](src/ion/web/server.py#L1871) | `verdict_review.html` |  |
+| GET | `/tuning-proposals` | — | [server.py:1739](src/ion/web/server.py#L1739) |  |  |
+| GET | `/users` | `user:read` | [server.py:1302](src/ion/web/server.py#L1302) |  |  |
+| GET | `/verdict-review` | `verdict:review` | [server.py:1849](src/ion/web/server.py#L1849) | `verdict_review.html` |  |
 | GET | `/wallboard` | `alert:read` | [wallboard_api.py:44](src/ion/web/wallboard_api.py#L44) |  |  |
-| GET | `/workforce` | — | [server.py:1884](src/ion/web/server.py#L1884) | `workforce_journey.html` |  |
-| GET | `/workforce/orbat` | `workforce:read` | [server.py:1929](src/ion/web/server.py#L1929) | `workforce_orbat.html` |  |
-| GET | `/workforce/people` | `workforce:verify` | [server.py:1919](src/ion/web/server.py#L1919) | `workforce_people.html` |  |
-| GET | `/workforce/profiles` | `workforce:manage` | [server.py:1910](src/ion/web/server.py#L1910) | `workforce_profiles.html` |  |
+| GET | `/workforce` | — | [server.py:1862](src/ion/web/server.py#L1862) | `workforce_journey.html` |  |
+| GET | `/workforce/orbat` | `workforce:read` | [server.py:1907](src/ion/web/server.py#L1907) | `workforce_orbat.html` |  |
+| GET | `/workforce/people` | `workforce:verify` | [server.py:1897](src/ion/web/server.py#L1897) | `workforce_people.html` |  |
+| GET | `/workforce/profiles` | `workforce:manage` | [server.py:1888](src/ion/web/server.py#L1888) | `workforce_profiles.html` |  |
 

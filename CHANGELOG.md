@@ -1,13 +1,136 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.13 -->
-<!-- ion-doc:version=0.99.13 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.15 -->
+<!-- ion-doc:version=0.99.15 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-10-16 -->
+<!-- ion-doc:date=2026-11-10 -->
 
 # Changelog
+
+## v0.99.15 — 2026-11-10
+
+Case creation no longer freezes ION, alerts attached in Kibana reach ION,
+and Bob no longer investigates alerts as they arrive. Found by load-testing
+v0.99.14 against a live Elasticsearch, Kibana and Postgres. No new route,
+permission, dependency or schema change; three settings are removed.
+
+### Performance
+
+- **Investigations run off the request event loop.** Creating a case
+  started its Bob investigation as a task on the event loop that serves the
+  web worker's requests. The investigation makes blocking calls, the first a
+  synchronous request to Ollama's embeddings endpoint while it builds the
+  prompt, and the worker served nothing until it returned. A load test of
+  200 cases of 10 alerts, 10 at a time, took 1,174 s; case creation's median
+  was 38 s and `/api/health` waited a median 11.3 s. On v0.99.15 the same
+  load takes 45 s, the median create 2.0 s and the median health check 6 ms.
+  That stack had no Ollama host, which lengthens every embeddings call; with
+  Ollama present each call is shorter, but the worker still waits on it, and
+  longest when Ollama is busy generating. Every place that started
+  background AI work this way now uses a thread with its own event loop:
+  case creation, the case grouper, the Kibana import hook, manual investigate
+  and sweep, and PCAP analysis.
+
+### Fixed
+
+- **Alerts attached to a case in Kibana never reached ION.** v0.99.14
+  claimed this and did not deliver it: it read the alerts from Kibana's
+  comments `_find`, which returns user comments only, and its tests passed
+  against a fake Kibana that did otherwise. A changed case with alerts now
+  also reads `GET /api/cases/{id}/alerts`, and the alerts arrive within one
+  sync cycle.
+
+### Removed
+
+- **The automatic per-alert investigation sweep.** A background thread sent
+  up to 50 open alerts to Bob every 15 minutes whenever the case grouper was
+  not investigating, so an estate that creates cases by hand had each alert
+  investigated on arrival and again with its case. It is gone, with its
+  settings `investigation_loop_enabled`, `investigation_sweep_interval_s` and
+  `investigation_max_per_sweep` (`ION_INVESTIGATION_LOOP_ENABLED`,
+  `ION_INVESTIGATION_SWEEP_INTERVAL_S`, `ION_INVESTIGATION_MAX_PER_SWEEP`). A
+  `config.json` that still carries them loads, and they drop out on the next
+  save. Investigations at case creation, case grouper investigations and the
+  manual sweep are unchanged.
+
+### Known gaps
+
+- **A status change made in Kibana can be pushed back over by ION.** Status
+  sync keeps whichever side changed last, judged by the case's `updated_at`,
+  which every ION write moves, including ION's own sync bookkeeping. A note,
+  an enrichment or a Bob write to the case before the next sync cycle can
+  undo a reopen made in Kibana. Reproduced on a live stack; not yet fixed.
+- **An alert storm with the case grouper on stalls the sync loop.** The loop
+  exports new cases to Kibana one at a time, about one a second, and nothing
+  else syncs meanwhile: 133 cases took one 132 s cycle.
+
+## v0.99.14 — 2026-11-10
+
+Case work against Kibana is faster, cases created in Kibana import in full,
+and a false-positive close now stays closed. No new route, permission,
+configuration field, dependency or schema change.
+
+### Performance
+
+- **Alerts are attached to a Kibana case in batches.** Case creation posted
+  one Kibana request per alert, in sequence: a 50-alert case took 51 requests
+  (7.75 s against a fake Kibana at 150 ms a request), and a 300-alert case
+  about 45 s. Alerts now go 100 per request, falling back to one at a time
+  only for a batch Kibana rejects, so one bad alert id still cannot sink the
+  rest. The same 50-alert case is 2 requests and 0.37 s.
+- **Kibana calls no longer block the web worker.** The Kibana client is
+  synchronous and was called straight from async request handlers and from
+  the sync loop, which runs inside one web worker. Every request routed to
+  that worker waited on Kibana. Case create, case detail, the case-update
+  push and every call in the sync loop now run in a thread. Against 150
+  linked cases, the worst event-loop stall in a sync cycle fell from 14.2 s
+  to 0.02 s.
+- **A sync cycle costs the same however many cases are linked.** Each 15 s
+  cycle read every linked case from Kibana twice, plus its comments: 452
+  requests for 150 cases. A cycle now makes one paged `_find` sweep of all
+  cases and reads comments only for a case whose version, update time or
+  comment count changed. A quiet cycle is 3 requests.
+
+### Fixed
+
+- **Comment sync read only the first 100 comments of a case.** It now pages
+  to the end.
+- **A failed comment read was recorded as seen**, so those comments were
+  never retried. The case is now read again next cycle.
+- **Cases deleted in Kibana were polled for ever.** A case missing from the
+  sweep is now skipped.
+- **Cases created in Kibana: some were never imported.** Import looked only
+  at the newest 100 open and 100 in-progress cases. It now works from the
+  full sweep.
+- **Cases created in Kibana: an import could be lost for good.** ION renamed
+  the Kibana case to `[CASE-…]` before committing the import, and the import
+  skips cases with that prefix, so a failed commit left a renamed case that no
+  later cycle would pick up. The commit now comes first, and a failed import
+  rolls back cleanly before the next case.
+- **Alerts attached to a case in Kibana never reached ION.** Alerts added in
+  Kibana after the case was linked are now filed under the ION case, with a
+  triage row created where none exists. An alert ION already files under a
+  different case is left there.
+- **A false-positive close was undone by the alerts page.** Close-as-FP, the
+  known-false-positive auto-close on case creation and bulk close closed the
+  case and its triage rows, and since v0.96.3 the Kibana case too, but left
+  the alerts open in Elasticsearch. The alerts page sends each alert's
+  Elasticsearch status, from the list it fetched at load, to the batch triage
+  endpoint, which copied it onto the triage rows, so the next page load
+  reopened every alert the close had closed. All three paths now close the
+  alerts in Elasticsearch, the batch endpoint no longer reopens an alert
+  whose case is closed, and the page keeps the server's status after a batch
+  instead of resending its snapshot. A reopen made in Kibana still reaches an
+  alert that is not on a closed case.
+
+### Known gaps
+
+Title, severity and assignee are still pulled from Kibana only at import.
+A failed status push to Kibana is still reported as a success, leaving the
+sync loop to correct it. The status push in close-as-FP, the known-FP
+auto-close and `/close` still runs on the event loop.
 
 ## v0.99.13 — 2026-10-16
 

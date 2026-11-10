@@ -506,10 +506,10 @@ def push_to_kibana_best_effort(case: AlertCase) -> Optional[str]:
 def enqueue_investigation(alert_id: str) -> None:
     """Fire-and-forget autonomous investigation for ``alert_id``.
 
-    Uses the same pattern as ``web/investigation_api._spawn_investigation``:
-    if a running loop exists (we're inside FastAPI), schedule a task;
-    otherwise spawn a short-lived thread that calls ``asyncio.run``.
-    Never raises.
+    Runs in a short-lived thread with its own event loop, never as a task
+    on the caller's loop: investigation code makes blocking calls (Ollama
+    embeddings over a sync client), which would stall every request a web
+    worker serves. Never raises.
     """
     try:
         from ion.services.investigation_service import get_investigation_service
@@ -526,15 +526,6 @@ def enqueue_investigation(alert_id: str) -> None:
         except Exception as exc:  # pragma: no cover — defensive
             logger.info("Auto-investigation for %s stopped: %s", alert_id, exc)
 
-    try:
-        loop = asyncio.get_running_loop()
-        loop.create_task(_runner())
-        return
-    except RuntimeError:
-        pass
-
-    # No running loop — use a daemon thread so we never block the
-    # grouper tick. Each thread gets its own asyncio loop via run().
     def _bg() -> None:
         try:
             asyncio.run(_runner())
@@ -549,7 +540,7 @@ def enqueue_case_investigation(case_id: int) -> None:
 
     Mirrors ``enqueue_investigation`` but calls ``investigate_case`` so the
     LLM sees all grouped alerts at once — one call per case, not N.
-    Never raises.
+    Off the caller's loop for the same reason. Never raises.
     """
     try:
         from ion.services.investigation_service import get_investigation_service
@@ -565,13 +556,6 @@ def enqueue_case_investigation(case_id: int) -> None:
             )
         except Exception as exc:  # pragma: no cover — defensive
             logger.info("Auto-case-investigation for #%s stopped: %s", case_id, exc)
-
-    try:
-        loop = asyncio.get_running_loop()
-        loop.create_task(_runner())
-        return
-    except RuntimeError:
-        pass
 
     def _bg() -> None:
         try:

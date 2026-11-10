@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import threading
 from datetime import datetime
 from typing import Any, Optional
 
@@ -149,14 +150,23 @@ def _spawn_investigation(alert_id: str, force: bool, triggered_by: str) -> None:
         except Exception as exc:  # pragma: no cover — defensive
             logger.exception("Investigation for %s crashed: %s", alert_id, exc)
 
-    try:
-        asyncio.create_task(_runner())
-    except RuntimeError:
-        # No running loop (unlikely in FastAPI) — run in a throwaway loop.
+    _run_in_thread(_runner, f"ion-inv-{alert_id[:12]}")
+
+
+def _run_in_thread(runner, name: str) -> None:
+    """Run ``runner()`` in a daemon thread with its own event loop.
+
+    Not ``asyncio.create_task``: that runs investigation code on the request
+    loop, and its blocking calls (Ollama embeddings over a sync client) stall
+    every request the worker serves until it finishes.
+    """
+    def _bg() -> None:
         try:
-            asyncio.run(_runner())
-        except Exception:
-            pass
+            asyncio.run(runner())
+        except Exception as exc:  # pragma: no cover — defensive
+            logger.debug("%s failed: %s", name, exc)
+
+    threading.Thread(target=_bg, daemon=True, name=name).start()
 
 
 def _spawn_sweep(force: bool = False) -> None:
@@ -170,13 +180,7 @@ def _spawn_sweep(force: bool = False) -> None:
         except Exception as exc:  # pragma: no cover — defensive
             logger.exception("Manual sweep crashed: %s", exc)
 
-    try:
-        asyncio.create_task(_runner())
-    except RuntimeError:
-        try:
-            asyncio.run(_runner())
-        except Exception:
-            pass
+    _run_in_thread(_runner, "ion-sweep")
 
 
 # ---------------------------------------------------------------------------

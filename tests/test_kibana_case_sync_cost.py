@@ -80,7 +80,7 @@ class FakeKibana:
         if path == "/api/cases/_find":
             page = int(request.url.params.get("page", 1))
             per = int(request.url.params.get("perPage", 20))
-            rows = list(self.cases.values())
+            rows = [{**c, "totalAlerts": len(self.alerts_of(c["id"]))} for c in self.cases.values()]
             return httpx.Response(200, json={
                 "cases": rows[(page - 1) * per: page * per], "total": len(rows),
                 "page": page, "perPage": per,
@@ -91,16 +91,26 @@ class FakeKibana:
                 return httpx.Response(500, json={})
             page = int(request.url.params.get("page", 1))
             per = int(request.url.params.get("perPage", 20))
-            rows = self.comments.get(m.group(1), [])
+            # Kibana's comments _find returns user comments only (checked
+            # against Kibana 9.4.4); alert attachments come from /alerts.
+            rows = [c for c in self.comments.get(m.group(1), []) if c.get("type") != "alert"]
             return httpx.Response(200, json={
                 "comments": rows[(page - 1) * per: page * per], "total": len(rows),
                 "page": page, "perPage": per,
             })
+        m = re.fullmatch(r"/api/cases/([^/]+)/alerts", path)
+        if request.method == "GET" and m:
+            return httpx.Response(200, json=self.alerts_of(m.group(1)))
         m = re.fullmatch(r"/api/cases/([^/]+)", path)
         if request.method == "GET" and m:
             case = self.cases.get(m.group(1))
             return httpx.Response(200, json=case) if case else httpx.Response(404, json={})
         return httpx.Response(200, json={})
+
+    def alerts_of(self, case_id: str) -> list[dict]:
+        return [{"id": aid, "index": c["index"][0]}
+                for c in self.comments.get(case_id, []) if c.get("type") == "alert"
+                for aid in c["alertId"]]
 
     def count(self, method: str, pattern: str) -> int:
         return sum(1 for m, p, _ in self.requests
@@ -420,6 +430,25 @@ class TestAlertsAttachedInKibana:
         assert s.query(AlertTriage).filter_by(es_alert_id="a-1").one().case_id == 2
         assert not s.get(AlertCase, 1).source_alert_ids
         s.close()
+
+    def test_an_alert_attached_after_the_first_cycle_arrives(self, kibana, db):
+        fake = kibana(cases=1)
+        _link_cases(db, 1)
+        svc = kss.KibanaSyncService()
+        asyncio.run(svc.run_sync_cycle())
+        fake.comments["kb-1"] = [_alert_comment("a-9")]
+        fake.cases["kb-1"]["version"] = "v2"
+        asyncio.run(svc.run_sync_cycle())
+
+        s = db()
+        assert s.query(AlertTriage).filter_by(es_alert_id="a-9").one().case_id == 1
+        s.close()
+
+    def test_a_case_without_alerts_costs_no_alert_read(self, kibana, db):
+        fake = kibana(cases=3)
+        _link_cases(db, 3)
+        asyncio.run(kss.KibanaSyncService().run_sync_cycle())
+        assert fake.count("GET", r"/api/cases/[^/]+/alerts") == 0
 
     def test_alerts_already_on_the_case_change_nothing(self, kibana, db):
         fake = kibana(cases=1)
