@@ -1,13 +1,79 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.13 -->
-<!-- ion-doc:version=0.99.13 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.14 -->
+<!-- ion-doc:version=0.99.14 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-10-16 -->
+<!-- ion-doc:date=2026-11-10 -->
 
 # Changelog
+
+## v0.99.14 — 2026-11-10
+
+Case work against Kibana is faster, cases created in Kibana import in full,
+and a false-positive close now stays closed. No new route, permission,
+configuration field, dependency or schema change.
+
+### Performance
+
+- **Alerts are attached to a Kibana case in batches.** Case creation posted
+  one Kibana request per alert, in sequence: a 50-alert case took 51 requests
+  (7.75 s against a fake Kibana at 150 ms a request), and a 300-alert case
+  about 45 s. Alerts now go 100 per request, falling back to one at a time
+  only for a batch Kibana rejects, so one bad alert id still cannot sink the
+  rest. The same 50-alert case is 2 requests and 0.37 s.
+- **Kibana calls no longer block the web worker.** The Kibana client is
+  synchronous and was called straight from async request handlers and from
+  the sync loop, which runs inside one web worker. Every request routed to
+  that worker waited on Kibana. Case create, case detail, the case-update
+  push and every call in the sync loop now run in a thread. Against 150
+  linked cases, the worst event-loop stall in a sync cycle fell from 14.2 s
+  to 0.02 s.
+- **A sync cycle costs the same however many cases are linked.** Each 15 s
+  cycle read every linked case from Kibana twice, plus its comments: 452
+  requests for 150 cases. A cycle now makes one paged `_find` sweep of all
+  cases and reads comments only for a case whose version, update time or
+  comment count changed. A quiet cycle is 3 requests.
+
+### Fixed
+
+- **Comment sync read only the first 100 comments of a case.** It now pages
+  to the end.
+- **A failed comment read was recorded as seen**, so those comments were
+  never retried. The case is now read again next cycle.
+- **Cases deleted in Kibana were polled for ever.** A case missing from the
+  sweep is now skipped.
+- **Cases created in Kibana: some were never imported.** Import looked only
+  at the newest 100 open and 100 in-progress cases. It now works from the
+  full sweep.
+- **Cases created in Kibana: an import could be lost for good.** ION renamed
+  the Kibana case to `[CASE-…]` before committing the import, and the import
+  skips cases with that prefix, so a failed commit left a renamed case that no
+  later cycle would pick up. The commit now comes first, and a failed import
+  rolls back cleanly before the next case.
+- **Alerts attached to a case in Kibana never reached ION.** Alerts added in
+  Kibana after the case was linked are now filed under the ION case, with a
+  triage row created where none exists. An alert ION already files under a
+  different case is left there.
+- **A false-positive close was undone by the alerts page.** Close-as-FP, the
+  known-false-positive auto-close on case creation and bulk close closed the
+  case and its triage rows, and since v0.96.3 the Kibana case too, but left
+  the alerts open in Elasticsearch. The alerts page sends each alert's
+  Elasticsearch status, from the list it fetched at load, to the batch triage
+  endpoint, which copied it onto the triage rows, so the next page load
+  reopened every alert the close had closed. All three paths now close the
+  alerts in Elasticsearch, the batch endpoint no longer reopens an alert
+  whose case is closed, and the page keeps the server's status after a batch
+  instead of resending its snapshot. A reopen made in Kibana still reaches an
+  alert that is not on a closed case.
+
+### Known gaps
+
+Title, severity and assignee are still pulled from Kibana only at import.
+A failed status push to Kibana is still reported as a success, leaving the
+sync loop to correct it. The status push in close-as-FP, the known-FP
+auto-close and `/close` still runs on the event loop.
 
 ## v0.99.13 — 2026-10-16
 
