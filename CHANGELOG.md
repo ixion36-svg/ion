@@ -1,7 +1,7 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.15 -->
-<!-- ion-doc:version=0.99.15 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.16 -->
+<!-- ion-doc:version=0.99.16 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
@@ -9,12 +9,46 @@
 
 # Changelog
 
-## Unreleased
+## v0.99.16 — 2026-11-10
 
-On `main` since v0.99.15, and not in any image yet. The next release bump
-renames this heading to its version.
+CyAB returns, rebuilt around one question per system: what is left to do,
+and who does it. Alongside it: ATT&CK v20.1 detection guidance, SSVC patch
+decisions, VEX documents for the SBOM, glass surfaces in dark mode, a
+shorter case window, and settings saves that reach every web worker.
+Net-new findings: 0C / 0H / 0M / 0L. CyAB's restored API carried writes
+gated on read access; they are closed here, before any release shipped
+them.
 
 ### Added
+
+- **CyAB is back, rebuilt.** The Cyber Assurance Baseline module was
+  archived in v0.99.6. On v0.99.4 several of its pages did not work: intake
+  save, "+ Add source", sign-off, use-case status and every row action. It
+  returns as five places:
+  - the **Board** (`/cyab`) shows the stage pipeline, your queue, what needs
+    attention and recent activity;
+  - **Systems** (`/cyab/systems`) is one filtered set shown as a list or a
+    matrix, with saved views, paging, bulk owner and SAL changes, and CSV
+    export. `/cyab/coverage` now redirects to the matrix;
+  - **a system page** shows its stage, readiness and next action, with a
+    linkable tab for the summary, profile and intake, sources, a use-case
+    grid, and docs and sign-off;
+  - **Onboard** is one form that creates a draft system;
+  - **History** (`/cyab/history`) replaces Audit, with CSV export.
+
+  A system moves through profile, sources, intake, use cases, docs and
+  sign-off. Its stage and readiness are computed from its records rather
+  than stored, so they cannot drift.
+- **CyAB sign-off you can rely on.** A sign-off is the signed-in user's,
+  kept as a record (`cyab_signoffs`). It needs both department and SOC, and
+  it opens only once the earlier steps are complete. Signing starts the
+  review clock. A missing document can be accepted with a reason, an
+  approver and an end date (`cyab_checklist_exceptions`), and it opens
+  again when that date passes.
+- **SAL 1 to 5**, as `docs/CyAB_SAL.md` defines them. The UI offered three
+  levels and the level changed nothing. It now decides which documents are
+  required, the review interval (730 days down to 91), and the longest a gap
+  may stay accepted.
 
 - **ATT&CK v20.1 detection guidance.** ION pinned ATT&CK v15.1. Since v18 the
   catalogue carries detection guidance as Detection Strategies and Analytics
@@ -53,6 +87,11 @@ renames this heading to its version.
 
 ### Changed
 
+- **The public CyAB scoping questionnaire works signed out.** It extended
+  the main layout, whose `app.js` sends any signed-out visitor to `/login`,
+  so it had never been reachable without an account. It has its own layout
+  now. Its PDF download and "Convert to system" buttons were nested forms the
+  browser discarded, and both work again.
 - **A shorter case window.** CASE-0239 (10 alerts, 7 notes) went from 3,899 to
   2,591 px tall at 1440 × 900. Kibana comments, which the sync already
   imports as case notes, are listed once among the notes with a Kibana badge
@@ -60,6 +99,31 @@ renames this heading to its version.
   the next sync, up to 15 s later. A run of alert links folds into one
   timeline line, an attack path with no connections folds to a summary line,
   and an empty section is one line instead of a card.
+
+### Fixed
+
+- **A settings save reaches every web worker.** Each uvicorn worker cached
+  its own configuration, so a save applied to roughly one request in four
+  until a restart. `get_config()` now reloads when `config.json` changes,
+  checking at most every 2 s. A save writes a temporary file and swaps it
+  in, so no worker reads half a file. Services that copy settings when they
+  are built, the Kibana client among them, still hold their starting values.
+- **CyAB use-case statuses save on Postgres.**
+  `cyab_data_sources.use_case_status` holds a status for every use case and
+  was `varchar(64)`, so most saves were refused. It is widened to `text`, a
+  catalogue-only change.
+
+### Security
+
+- **CyAB permissions.** Reads need `alert:read` and edits `case:update`.
+  Signing off, closing a review, accepting or revoking a gap, removing a
+  source and lowering a SAL need `case:close`.
+- **Closed before release.** The restored API had eight write routes under
+  `alert:read`. The system update and both create routes could set `ACTIVE`
+  and the sign-off names directly. No route can now set a
+  sign-off except by recording one, and a test walks every CyAB write route.
+  The archived onboarding wizard is removed, and so is a bulk route that
+  changed data under read access.
 
 ## v0.99.15 — 2026-11-10
 
