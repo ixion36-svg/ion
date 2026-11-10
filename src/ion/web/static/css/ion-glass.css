@@ -1,0 +1,121 @@
+/* Glass surfaces, dark mode only.
+
+   On when <html data-glass="on">, which theme-init.js sets from
+   localStorage "ion-glass" (default on) and the profile page's Appearance
+   card switches. Loaded after every page sheet, so it can restate their
+   surfaces without editing them; the page sheets are due to be flattened
+   into one build, and this keeps that merge clean.
+
+   Panels are translucent over a fixed gradient. Real frost
+   (backdrop-filter) is kept to the layers that float: the header, the
+   case window, dialogs, drawers and menus. Blurring every card and table
+   row on a long page costs scrolling for no visible gain, because a
+   translucent fill over the same gradient reads the same. */
+
+/* The profile page's Glass / Solid switch, matching its Mode buttons. Its
+   own class, because setMode clears .active on every .mode-btn. */
+.glass-btn {
+    color: #94a3b8; background: none; border: none; border-radius: .375rem;
+    padding: .5rem 1rem; font-size: .75rem; font-weight: 600;
+    letter-spacing: .05em; text-transform: uppercase; cursor: pointer;
+    transition: background .15s, color .15s;
+}
+.glass-btn.active { background: var(--primary); color: var(--bg-deep); }
+
+html[data-glass="on"][data-mode="dark"] {
+    --glass-tint: color-mix(in srgb, var(--color-primary, #6de4ff) 100%, transparent);
+
+    /* Page and panel tokens. The page itself is transparent so the
+       gradient shows; panels are a light veil over it. */
+    --color-base-100: rgba(10, 16, 36, 0.55);
+    --color-base-200: rgba(255, 255, 255, 0.055);
+    --color-base-300: rgba(255, 255, 255, 0.11);
+    --bg-primary: rgba(10, 16, 36, 0.55);
+    --bg-secondary: rgba(255, 255, 255, 0.05);
+    --bg-tertiary: rgba(255, 255, 255, 0.08);
+    --bg-card: rgba(255, 255, 255, 0.05);
+    --ion-bg: transparent;
+    --ion-surface: rgba(255, 255, 255, 0.05);
+    --ion-surface-2: rgba(255, 255, 255, 0.07);
+    --ion-border: rgba(255, 255, 255, 0.12);
+    --ion-border-strong: rgba(255, 255, 255, 0.18);
+
+    /* Overlays stay readable: mostly opaque, frosted. */
+    --glass-overlay: rgba(12, 18, 40, 0.82);
+    --glass-edge: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    --glass-frost: blur(18px) saturate(150%);
+
+    background: #070b1d;
+}
+
+html[data-glass="on"][data-mode="dark"] body {
+    background:
+        radial-gradient(42% 50% at 92% 4%, color-mix(in srgb, var(--glass-tint) 22%, transparent), transparent 65%),
+        radial-gradient(38% 46% at 2% 98%, rgba(99, 102, 241, 0.26), transparent 66%),
+        radial-gradient(30% 40% at 50% 60%, rgba(139, 92, 246, 0.10), transparent 70%),
+        linear-gradient(140deg, #070b1d 0%, #0a1433 48%, #06202f 100%);
+    background-attachment: fixed;
+}
+
+/* The header and the main card-like containers. */
+html[data-glass="on"][data-mode="dark"] header.ion-tw {
+    background: rgba(8, 12, 30, 0.55) !important;
+    backdrop-filter: var(--glass-frost);
+    -webkit-backdrop-filter: var(--glass-frost);
+    border-bottom-color: rgba(255, 255, 255, 0.10) !important;
+}
+
+html[data-glass="on"][data-mode="dark"] :is(.card, .ion-card, .cpanel-section, .ion-ws-section, .stat-card, .ion-metric) {
+    box-shadow: var(--glass-edge), 0 8px 28px rgba(0, 0, 0, 0.28);
+}
+
+/* Floating layers: the case window, drawers, dialogs and menus. */
+html[data-glass="on"][data-mode="dark"] :is(.case-panel, .modal-box, .np-panel, .tw-drop-menu, .dropdown-content, .menu.dropdown-content) {
+    background: var(--glass-overlay) !important;
+    backdrop-filter: var(--glass-frost);
+    -webkit-backdrop-filter: var(--glass-frost);
+    box-shadow: var(--glass-edge), 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+html[data-glass="on"][data-mode="dark"] .case-panel.page-mode {
+    background: rgba(255, 255, 255, 0.035) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 18px;
+}
+
+/* Panels drawn with Tailwind's ink scale (bg-ink-900/50 and friends) are
+   near-black at half strength, which reads as solid over the gradient.
+   Matched on a class that starts with bg-ink-, so hover: variants stay. */
+html[data-glass="on"][data-mode="dark"] :is([class^="bg-ink-"], [class*=" bg-ink-"]) {
+    background-color: rgba(255, 255, 255, 0.045) !important;
+}
+
+/* Floating panels and dialog boxes: frosted and mostly opaque. Dialogs are
+   the direct children of ION's overlay containers. */
+html[data-glass="on"][data-mode="dark"] :is(.acp-panel, .context-menu, .jvectormap-tip, .forensic-toast, .notification-toast, #toast-container > *, .ion-ws-panel),
+html[data-glass="on"][data-mode="dark"] :is(.saved-filters-modal, .case-create-overlay, .case-mgmt-overlay, .closure-modal-overlay, .acp-closure-overlay, .cases-modal-overlay, .ai-file-modal, .modal-overlay, .outcome-modal-overlay, .wizard-modal-overlay, .sched-modal-backdrop, .day-roster-backdrop, .tp-modal-overlay, .iad-tune-overlay, .modal:not(.modal-box)) > :not(script):not(style) {
+    background: var(--glass-overlay) !important;
+    backdrop-filter: var(--glass-frost);
+    -webkit-backdrop-filter: var(--glass-frost);
+    box-shadow: var(--glass-edge), 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+/* Sticky headers: rows scroll underneath them, so a see-through fill shows
+   the text behind. Frosted and nearly opaque instead. */
+html[data-glass="on"][data-mode="dark"] :is(table.aq th, .data-table th, .iad-jump, .mitre-heatmap-header, .playbook-library-group-header, .cpanel-playbook-browser-search, .cpanel-pb-group-header, .hm-header, .hm-skill-name, .sg-header, .sg-name, .sg-summary, .sc-cap-name, .km-doc-table th, .cr-domain-header) {
+    background: rgba(13, 19, 42, 0.92) !important;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+
+/* Form fields keep a darker well, so typed text stays legible. */
+html[data-glass="on"][data-mode="dark"] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
+    background-color: rgba(4, 8, 22, 0.45);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    html[data-glass="on"][data-mode="dark"] {
+        --color-base-200: #121a33;
+        --bg-secondary: #121a33;
+        --glass-overlay: #0e1530;
+    }
+}
