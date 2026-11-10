@@ -124,6 +124,8 @@ ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy 
 | Low | 0 |
 | **Total** | **0** |
 
+Unreleased, on `main` after v0.99.15 — **Net-new surfaces: one route, three settings and two shipped documents; no new permission, dependency at runtime or external sink.** The route is `GET /ui/detection-health/attack`, the per-rule ATT&CK drill-down, behind the same read permission as the rest of Detection Health. The settings are the SSVC deployment inputs (`ssvc_exposure`, `ssvc_automatable`, `ssvc_human_impact`), config.json-managed and overridable by `ION_SSVC_*`; they shape a patching recommendation and nothing else. The documents are the VEX statements in the image (`/app/ion.openvex.json`, `/app/ion.csaf.json`): they are public claims about which advisories affect ION, so a wrong `not_affected` would tell a scanner to stop reporting a real exposure. The generator refuses a `not_affected` without a recorded justification, and each of the two such statements is transcribed from a decision already recorded against its pin. `jsonschema` is a development dependency only. The ATT&CK update also corrects a coverage error: controls mapped to revoked technique ids read as detection gaps.
+
 v0.99.15 — **Net-new surfaces: none** (see *Application Version* above). No finding opened or closed. The automatic per-alert LLM sweep is removed, narrowing when alert data reaches the LLM, and investigations no longer run on the request event loop.
 
 v0.99.14 — **Net-new surfaces: none** (see *Application Version* above). No finding opened or closed. Alerts attached in Kibana to a linked case now reach the ION case, a small widening of the existing Kibana-to-ION sync channel.

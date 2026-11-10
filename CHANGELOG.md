@@ -9,6 +9,58 @@
 
 # Changelog
 
+## Unreleased
+
+On `main` since v0.99.15, and not in any image yet. The next release bump
+renames this heading to its version.
+
+### Added
+
+- **ATT&CK v20.1 detection guidance.** ION pinned ATT&CK v15.1. Since v18 the
+  catalogue carries detection guidance as Detection Strategies and Analytics
+  rather than a free-text field, so the old snapshot had none. The bundled
+  data now holds 706 strategies and 1,758 analytics, and Detection Health
+  gains an ATT&CK drill-down per rule (`GET /ui/detection-health/attack`).
+  The bump was not additive: 16 techniques were revoked, the whole `T1562`
+  sub-tree among them. ION resolves revoked ids forward on both sides of
+  every coverage intersection, so the NIST 800-53 `AU-2` / `AU-12` and ISO
+  `A.8.15` controls no longer read as detection gaps because their mapped ids
+  retired. The exported Navigator layer now names the ATT&CK version of its
+  data rather than a fixed "14".
+- **SSVC patch decisions.** CERT/CC's deployer tree turns KEV, in-the-wild
+  and exploit-availability evidence into `defer`, `scheduled`,
+  `out-of-cycle` or `immediate`. The Detection Engineering vulnerability table
+  shows the decision for every row, from one KEV query for the whole list.
+  The tree's other three inputs are properties of the estate ION cannot
+  observe: they are settings (`ssvc_exposure`, `ssvc_automatable`,
+  `ssvc_human_impact`, each overridable by its `ION_SSVC_*` variable), and
+  until they are set every decision says how many inputs it assumed. A value
+  the tree does not know is refused and named rather than used. An unreadable
+  table declines to decide rather than returning `defer`.
+- **VEX documents.** The image's SPDX SBOM lists every installed package, so a
+  scanner reports advisories ION has already pinned past. Fifteen statements
+  (13 `fixed`, 2 `not_affected`), each transcribed from a decision recorded
+  against a pin, now ship beside it as OpenVEX 0.2.0 and CSAF 2.0
+  (`/app/ion.openvex.json`, `/app/ion.csaf.json`). CSAF is validated against
+  OASIS's own schema, vendored so the check runs offline. The release
+  checklist now regenerates both documents, which name the version they
+  describe.
+- **Glass surfaces in dark mode.** Panels are translucent over a fixed
+  gradient tinted by the accent colour; the header, the case window, dialogs,
+  drawers, menus and sticky table headers are frosted. On by default, with a
+  Glass / Solid switch on the profile page. Light mode and Solid are
+  unchanged.
+
+### Changed
+
+- **A shorter case window.** CASE-0239 (10 alerts, 7 notes) went from 3,899 to
+  2,591 px tall at 1440 × 900. Kibana comments, which the sync already
+  imports as case notes, are listed once among the notes with a Kibana badge
+  instead of again in their own section; a new Kibana comment appears after
+  the next sync, up to 15 s later. A run of alert links folds into one
+  timeline line, an attack path with no connections folds to a summary line,
+  and an empty section is one line instead of a card.
+
 ## v0.99.15 — 2026-11-10
 
 Case creation no longer freezes ION, alerts attached in Kibana reach ION,
