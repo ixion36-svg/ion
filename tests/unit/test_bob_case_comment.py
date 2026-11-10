@@ -1,41 +1,9 @@
-"""Bob runs per-case (at case creation), not per-alert.
+"""The case comment Bob posts on case creation.
 
-Two pure seams:
-- ``should_run_per_alert_sweep`` — the standalone per-alert background sweep is
-  OFF when the case grouper is the active investigator; a fallback when it isn't.
-- ``_render_bob_case_note`` — the case comment Bob posts on case creation, worded
-  to distinguish a single-alert case from a multi-alert cluster.
+``_render_bob_case_note`` words a single-alert case differently from a
+multi-alert cluster.
 """
-from ion.services.investigation_service import (
-    _render_bob_case_note,
-    should_run_per_alert_sweep,
-)
-
-
-class _Cfg:
-    def __init__(self, loop=True, grouper=True, grouper_ai=True):
-        self.investigation_loop_enabled = loop
-        self.case_grouper_enabled = grouper
-        self.case_grouper_auto_investigate = grouper_ai
-
-
-# ── sweep gating ──────────────────────────────────────────────────────────────
-
-def test_sweep_off_when_grouper_actively_investigating():
-    assert should_run_per_alert_sweep(_Cfg(loop=True, grouper=True, grouper_ai=True)) is False
-
-
-def test_sweep_on_when_grouper_disabled_and_loop_enabled():
-    assert should_run_per_alert_sweep(_Cfg(loop=True, grouper=False, grouper_ai=True)) is True
-
-
-def test_sweep_on_when_grouper_enabled_but_not_investigating():
-    # Grouper groups but doesn't investigate → per-alert sweep is the investigator.
-    assert should_run_per_alert_sweep(_Cfg(loop=True, grouper=True, grouper_ai=False)) is True
-
-
-def test_sweep_off_when_loop_disabled():
-    assert should_run_per_alert_sweep(_Cfg(loop=False, grouper=False, grouper_ai=False)) is False
+from ion.services.investigation_service import _render_bob_case_note
 
 
 # ── case comment renderer ─────────────────────────────────────────────────────

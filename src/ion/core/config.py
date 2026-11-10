@@ -226,10 +226,7 @@ class Config:
     pii_anon_enabled: bool = False
     pii_fields_file: str = ""  # optional override; empty = use packaged default
 
-    # Investigation loop
-    investigation_loop_enabled: bool = True
-    investigation_sweep_interval_s: int = 900
-    investigation_max_per_sweep: int = 50
+    # Investigations
     # was 120; the v0.17.3 fix-pack bumped the module default
     # in investigation_service to 300 (real prompts on an 8B model take
     # 130-180s warm — longer cold/CPU) but missed this config-dataclass copy.
@@ -466,9 +463,6 @@ class Config:
             pii_anon_enabled=data.get("pii_anon_enabled", False),
             pii_fields_file=data.get("pii_fields_file", ""),
             # Investigation loop
-            investigation_loop_enabled=data.get("investigation_loop_enabled", True),
-            investigation_sweep_interval_s=data.get("investigation_sweep_interval_s", 900),
-            investigation_max_per_sweep=data.get("investigation_max_per_sweep", 50),
             investigation_llm_timeout_s=data.get("investigation_llm_timeout_s", 300),
             # Attack Path + Bob escalation tier
             attack_path_enabled=data.get("attack_path_enabled", True),
@@ -908,13 +902,7 @@ def get_config() -> Config:
         if os.environ.get("ION_PII_FIELDS_FILE"):
             _config.pii_fields_file = os.environ.get("ION_PII_FIELDS_FILE", "")
 
-        # Investigation loop env overrides
-        if os.environ.get("ION_INVESTIGATION_LOOP_ENABLED"):
-            _config.investigation_loop_enabled = _get_env_bool("ION_INVESTIGATION_LOOP_ENABLED", True)
-        if os.environ.get("ION_INVESTIGATION_SWEEP_INTERVAL_S"):
-            _config.investigation_sweep_interval_s = int(os.environ.get("ION_INVESTIGATION_SWEEP_INTERVAL_S", "900"))
-        if os.environ.get("ION_INVESTIGATION_MAX_PER_SWEEP"):
-            _config.investigation_max_per_sweep = int(os.environ.get("ION_INVESTIGATION_MAX_PER_SWEEP", "50"))
+        # Investigation env overrides
         if os.environ.get("ION_INVESTIGATION_LLM_TIMEOUT_S"):
             _config.investigation_llm_timeout_s = int(os.environ.get("ION_INVESTIGATION_LLM_TIMEOUT_S", "300"))
 
@@ -1106,9 +1094,6 @@ ENV_FIELD_MAP: dict[str, str] = {
     "gitlab_url": "ION_GITLAB_URL",
     "gitlab_verify_ssl": "ION_GITLAB_VERIFY_SSL",
     "investigation_llm_timeout_s": "ION_INVESTIGATION_LLM_TIMEOUT_S",
-    "investigation_loop_enabled": "ION_INVESTIGATION_LOOP_ENABLED",
-    "investigation_max_per_sweep": "ION_INVESTIGATION_MAX_PER_SWEEP",
-    "investigation_sweep_interval_s": "ION_INVESTIGATION_SWEEP_INTERVAL_S",
     "ip_blocking_enabled": "ION_IP_BLOCKING_ENABLED",
     "kibana_case_owner": "ION_KIBANA_CASE_OWNER",
     "kibana_cases_enabled": "ION_KIBANA_CASES_ENABLED",
