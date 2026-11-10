@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+{# For pages a visitor without an ION account may open. base.html loads
+   app.js, which sends any signed-out visitor to /login, so a page meant to
+   be public cannot extend it. #}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CyAB · ION{% endblock %}</title>
+    <link rel="icon" type="image/png" href="/static/img/ion-favicon.png">
+    <link rel="stylesheet" href="/static/css/ion.css?v={{ ion_version }}">
+    <link rel="stylesheet" href="/static/css/ion-shell.css?v={{ ion_version }}">
+    <link rel="stylesheet" href="/static/css/ion-glass.css?v={{ ion_version }}">
+    <meta name="htmx-config" content='{"includeIndicatorStyles":false}'>
+    <script nonce="{{ csp_nonce }}" src="/static/js/theme-init.js?v={{ ion_version }}"></script>
+    <script nonce="{{ csp_nonce }}" src="/static/js/htmx.min.js"></script>
+    <script nonce="{{ csp_nonce }}" src="/static/js/csrf.js?v={{ ion_version }}"></script>
+</head>
+<body class="min-h-screen bg-base-100 text-base-content">
+  <header class="flex items-center gap-3 px-4 md:px-10 py-3 border-b border-base-300">
+    <img src="/static/img/ion-favicon.png" alt="" class="w-6 h-6">
+    <span class="font-semibold">ION</span>
+    <span class="text-base-content/50 text-sm">Cyber Assurance Baseline</span>
+    <div class="grow"></div>
+    <a href="/login?redirect=/cyab" class="btn btn-sm btn-ghost">Sign in</a>
+  </header>
+  {% block content %}{% endblock %}
+</body>
+</html>

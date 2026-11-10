@@ -156,9 +156,12 @@ def test_the_csp_exemption_still_recognises_email_and_pdf_templates():
     assert not _is_csp_exempt(BASE / "web/static/js/app.js")
 
 
-def test_no_exempt_templates_remain_in_the_tree():
-    """Recorded so the vacuous exemption above is not mistaken for a bug."""
-    assert not list(Path("src/ion/web/templates").glob("**/*_pdf*.html"))
+def test_the_only_exempt_template_is_the_cyab_scoping_pack():
+    """CyAB came back with its PDF template, which WeasyPrint renders and the
+    HTML fallback serves under its own style-src 'unsafe-inline' policy. Any
+    other exempt template arriving should be a decision, so it fails here."""
+    pdfs = sorted(p.as_posix() for p in Path("src/ion/web/templates").glob("**/*_pdf*.html"))
+    assert pdfs == ["src/ion/web/templates/cyab/_scoping_pack_pdf.html"]
     assert not Path("src/ion/web/templates/emails").exists()
 
 

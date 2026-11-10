@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }} · CyAB · ION{% endblock %}
+{% block content %}
+<div id="cyab-main" class="cyab p-4 md:p-6 max-w-[1500px] mx-auto">
+  <div class="flex flex-wrap items-end gap-4 mb-5">
+    <div class="min-w-0">
+      <div class="text-[0.7rem] uppercase tracking-widest text-base-content/50 mb-1">{% block crumb %}CyAB{% endblock %}</div>
+      <h1 class="text-2xl font-semibold truncate">{% block heading %}{{ page_title }}{% endblock %}</h1>
+    </div>
+    <div class="grow"></div>
+    <nav class="flex flex-wrap items-center gap-1" aria-label="CyAB">
+      {% for href, label, key in [('/cyab', 'Board', 'board'), ('/cyab/systems', 'Systems', 'systems'), ('/cyab/history', 'History', 'history')] %}
+        <a href="{{ href }}" class="btn btn-sm {{ 'btn-soft btn-primary' if section == key else 'btn-ghost' }}"{% if section == key %} aria-current="page"{% endif %}>{{ label }}</a>
+      {% endfor %}
+      <a href="/cyab/scoping" class="btn btn-sm btn-ghost">Scoping</a>
+      {% if can_edit %}<a href="/cyab/onboard" class="btn btn-sm btn-primary">+ Onboard</a>{% endif %}
+    </nav>
+  </div>
+  {% if flash_err %}<div role="alert" class="alert alert-error alert-soft mb-4 text-sm">{{ flash_err }}</div>{% endif %}
+  {% if flash_msg %}<div role="status" class="alert alert-success alert-soft mb-4 text-sm">{{ flash_msg }}</div>{% endif %}
+  {% block body %}{% endblock %}
+</div>
+{% endblock %}
+{% block scripts %}<script nonce="{{ csp_nonce }}" src="/static/js/cyab.js?v={{ ion_version }}"></script>{% endblock %}

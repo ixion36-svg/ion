@@ -1,0 +1,82 @@
+{% from "cyab/_macros.html" import post %}
+<div class="grid grid-cols-1 xl:grid-cols-5 gap-4">
+  <section class="card bg-base-200 border border-base-300 xl:col-span-2" aria-label="Profile">
+    <form class="card-body p-4 gap-3" {{ post('/cyab/systems/' ~ system.id ~ '/profile') }}>
+      <h2 class="font-semibold">Profile</h2>
+      <fieldset class="grid grid-cols-1 sm:grid-cols-2 gap-3" {{ 'disabled' if not can_edit }}>
+        <label class="flex flex-col gap-1 sm:col-span-2"><span class="text-xs text-base-content/60">System name</span>
+          <input name="name" required maxlength="255" value="{{ system.name }}" class="input input-sm w-full"></label>
+        <label class="flex flex-col gap-1"><span class="text-xs text-base-content/60">Department</span>
+          <input name="department" required maxlength="255" value="{{ system.department }}" class="input input-sm w-full"></label>
+        <label class="flex flex-col gap-1"><span class="text-xs text-base-content/60">Business unit</span>
+          <input name="business_unit" maxlength="255" value="{{ system.business_unit or '' }}" class="input input-sm w-full"></label>
+        <label class="flex flex-col gap-1"><span class="text-xs text-base-content/60">Department lead</span>
+          <input name="department_lead" maxlength="255" value="{{ system.department_lead or '' }}" class="input input-sm w-full"></label>
+        <label class="flex flex-col gap-1"><span class="text-xs text-base-content/60">Lead's email</span>
+          <input name="dept_lead_email" type="email" maxlength="255" value="{{ system.dept_lead_email or '' }}" class="input input-sm w-full"></label>
+        <label class="flex flex-col gap-1"><span class="text-xs text-base-content/60">SOC lead</span>
+          <input name="soc_lead" maxlength="255" value="{{ system.soc_lead or '' }}" class="input input-sm w-full"></label>
+        <label class="flex flex-col gap-1"><span class="text-xs text-base-content/60">SOC owner</span>
+          <input name="soc_analyst_owner" maxlength="255" value="{{ system.soc_analyst_owner or '' }}" class="input input-sm w-full"></label>
+        <label class="flex flex-col gap-1"><span class="text-xs text-base-content/60">Data classification</span>
+          <select name="data_classification" class="select select-sm w-full">
+            <option value="">Not set</option>
+            {% for c in classifications %}<option {{ 'selected' if system.data_classification == c }}>{{ c }}</option>{% endfor %}
+          </select></label>
+        <label class="flex flex-col gap-1"><span class="text-xs text-base-content/60">Assurance level</span>
+          <select name="sal_tier" class="select select-sm w-full">
+            {% for l in sal_levels %}<option value="{{ l }}" {{ 'selected' if rd.sal == l }}>{{ l }} {{ sal_names[l] }} ({{ sal_review_days[l] }} d)</option>{% endfor %}
+          </select></label>
+        <label class="flex flex-col gap-1 sm:col-span-2"><span class="text-xs text-base-content/60">Incident runbook link</span>
+          <input name="ir_runbook_url" type="url" maxlength="2048" value="{{ system.ir_runbook_url or '' }}" placeholder="https://" class="input input-sm w-full"></label>
+      </fieldset>
+      {% if can_edit %}<div class="flex justify-end"><button class="btn btn-sm btn-primary">Save profile</button></div>{% endif %}
+    </form>
+  </section>
+
+  <section class="card bg-base-200 border border-base-300 xl:col-span-3" aria-label="Intake">
+    <form class="card-body p-4 gap-3" {{ post('/cyab/systems/' ~ system.id ~ '/intake') }}>
+      <div class="flex items-baseline gap-3">
+        <h2 class="font-semibold">Intake</h2>
+        {% set st = steps[2] %}
+        <span class="text-xs text-base-content/60">{{ st.done }} of {{ st.total }} answered</span>
+      </div>
+      {% if not intake %}
+        <p class="text-sm text-base-content/70">Intake questions come from the sub-profiles of this system's data sources. <a href="/cyab/systems/{{ system.id }}/sources" class="link link-primary">Add a source and choose its sub-profile</a> first.</p>
+      {% else %}
+        <fieldset class="flex flex-col gap-5" {{ 'disabled' if not can_edit }}>
+          {% for sec in intake %}
+            <div>
+              <div class="flex items-baseline gap-2 mb-2">
+                <h3 class="text-sm font-semibold">{{ sec.subprofile.label }}</h3>
+                <span class="text-xs text-base-content/50">{{ sec.subprofile.pillar }} · {{ sec.answered }}/{{ sec.questions|length }}</span>
+              </div>
+              <ol class="flex flex-col">
+                {% for q in sec.questions %}
+                  {% set v = answers.get(q.key) %}
+                  <li class="border-t border-base-300/60 first:border-t-0 py-2 grid grid-cols-1 md:grid-cols-[1fr_15rem] gap-2 items-center">
+                    <span class="text-sm {{ 'text-base-content/60' if v }}">{{ q.text }}</span>
+                    {% if q.answer_type == 'multi' %}
+                      <div class="flex flex-wrap gap-x-3 gap-y-1">
+                        {% for opt in q.options or [] %}
+                          <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" class="checkbox checkbox-xs" name="q:{{ q.key }}" value="{{ opt.value }}" {{ 'checked' if v and opt.value in v }}> {{ opt.label }}</label>
+                        {% endfor %}
+                      </div>
+                    {% else %}
+                      {% set opts = q.options if q.answer_type == 'single' else [{'value': 'yes', 'label': 'Yes'}, {'value': 'partial', 'label': 'Partly'}, {'value': 'no', 'label': 'No'}, {'value': 'dont_know', 'label': "Don't know"}] %}
+                      <select name="q:{{ q.key }}" class="select select-sm w-full {{ 'select-success' if v }}" aria-label="{{ q.text }}">
+                        <option value="">Not answered</option>
+                        {% for opt in opts %}<option value="{{ opt.value }}" {{ 'selected' if v == opt.value }}>{{ opt.label }}</option>{% endfor %}
+                      </select>
+                    {% endif %}
+                  </li>
+                {% endfor %}
+              </ol>
+            </div>
+          {% endfor %}
+        </fieldset>
+        {% if can_edit %}<div class="flex justify-end"><button class="btn btn-sm btn-primary">Save answers</button></div>{% endif %}
+      {% endif %}
+    </form>
+  </section>
+</div>

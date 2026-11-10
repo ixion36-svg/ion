@@ -677,6 +677,21 @@ All migrated routes confirmed to carry `require_permission` or `get_current_user
 
 ---
 
+## Net-New Surfaces: CyAB restored (unreleased, `feat/restore-cyab`)
+
+**CyAB returns, archived in v0.99.6, with its pages rebuilt.** Restored: the `/api/cyab/*` JSON API (`cyab_api.py`) and the pages in `cyab_pages.py` (`/cyab`, `/cyab/systems[.csv]`, `/cyab/systems/{id}/{tab}`, `/cyab/onboard`, `/cyab/history[.csv]`, `/cyab/scoping`, and form POSTs under `/cyab/...`). New tables `cyab_signoffs` and `cyab_checklist_exceptions`. `cyab_data_sources.use_case_status` is widened from `varchar(64)` to `text` on Postgres, a catalogue-only change.
+
+**Threat assessment:**
+- **Public surface, by design.** `/cyab/scoping`, `POST /api/cyab/scoping/score` and `POST /api/cyab/scoping/pdf` need no account. They are the stakeholder questionnaire. They are rate-limited (30/min score, 10/min PDF) and refuse a body over 256 KB or more than 300 fields before any scoring or rendering. The page uses its own layout (`cyab/_public_layout.html`), because `base.html` loads `app.js`, which redirects signed-out visitors. `POST /api/cyab/scoping/convert` needs `alert:read` and only carries the answers, through the same caps, to the onboard form.
+- **Permissions.** Reads need `alert:read`. Edits need `case:update`. Signing off, closing a review, accepting or revoking a documentation gap, removing a source, deleting a system and lowering a system's SAL need `case:close`. The archived API had eight writes under `alert:read`, including `PUT /systems/{id}`, which could set `status=ACTIVE` and the sign-off names and dates directly. Those writes now need `case:update`. The PUT refuses `ACTIVE` and no longer accepts sign-off fields. `mark-reviewed` and `onboarding-pack/sign` go through `cyab_assurance_service` under `case:close`, so a sign-off always names the signed-in user and is kept as a `CyabSignoff` row. The unauthenticated wizard routes and `POST /api/cyab/systems/bulk`, which changed data under `alert:read`, are removed. `tests/integration/test_cyab_workflow.py::test_every_cyab_write_needs_more_than_read` walks every CyAB write route.
+- **Input handling.** Evidence and runbook links must be `http(s)` (`clean_url`), on both the page and API paths. CSV exports prefix formula-leading cells with `'`. The form redirect target (`back`) is confined to same-site `/cyab/` paths. A use-case status is accepted only for a use case in the source's own sub-profile.
+- **CSP unchanged.** No inline handlers or styles. Page behaviour lives in `static/js/cyab.js` and `cyab-scoping.js`, loaded with the nonce. The radial progress value uses `data-ion-style`.
+- **Known gaps, not regressions.** CyAB has no per-system ACL: anyone holding a permission holds it for every system. Page edits other than sign-off, review and accepted gaps write no `audit_logs` row.
+
+**Net new findings:** 0C / 0H / 0M / 2L (the two known gaps above).
+
+---
+
 ## Net-New Surfaces in v0.39.8
 
 **Minimal net-new surface; mostly fixes + an additive column.** No new routes or permissions. One additive schema column (`observables.is_ignored`, idempotent migration, default false) drives the per-observable Ignore action (gated by the existing `observable:update` permission). The linked-alert field viewer reads alert `_source` via the existing permission-gated `/api/elasticsearch/alerts/{id}/raw` endpoint and renders it client-side through `esc()`. Security-relevant *reductions*: the PCAP auto-case path now correctly attaches its alert to the Kibana case on creation, and IOC extraction no longer surfaces ECS field names as spurious domain observables. Net new findings: 0C / 0H / 0M / 0L.

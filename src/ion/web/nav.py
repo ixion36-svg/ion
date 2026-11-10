@@ -133,6 +133,7 @@ NAV: tuple[Item | Group, ...] = (
             Item(href='/de-proposals', label='Detection Proposals', gate='de'),
             Item(href='/de-quirks', label='System Quirks', gate='de'),
             Item(href='/de-bob', label='Bob Improvement', gate='de'),
+            Item(href='/cyab', label='CyAB'),
             Item(href='/network-map', label='Infrastructure', also=('/network-topology', '/data-flow'), shortcut='n'),
             Item(href='/log-sources', label='Platform Health'),
             Item(

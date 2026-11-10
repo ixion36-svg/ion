@@ -1,0 +1,77 @@
+{% from "cyab/_macros.html" import post %}
+{% macro subprofile_options(selected) -%}
+  <option value="">Choose a sub-profile</option>
+  {% for g in groups %}
+    <optgroup label="{{ g.pillar }}">
+      {% for sp in g['items'] %}<option value="{{ sp.id }}" {{ 'selected' if selected == sp.id }}>{{ sp.label }}</option>{% endfor %}
+    </optgroup>
+  {% endfor %}
+{%- endmacro %}
+
+<section class="card bg-base-200 border border-base-300 mb-4" aria-label="Data sources">
+  <div class="card-body p-4 gap-3">
+    <div class="flex items-baseline gap-3">
+      <h2 class="font-semibold">Data sources</h2>
+      <span class="text-xs text-base-content/60">The sub-profile decides which intake questions and use cases apply.</span>
+    </div>
+    {% if system.data_sources %}
+      <div class="overflow-x-auto">
+        <table class="table table-sm">
+          <thead><tr><th>Source</th><th>Type</th><th>Sub-profile</th><th>Namespace</th><th>Use cases set</th>{% if can_approve %}<th></th>{% endif %}</tr></thead>
+          <tbody>
+            {% for ds in system.data_sources %}
+              {% set sp = subprofiles.get(ds.subprofile_id) %}
+              <tr>
+                <td class="font-medium">{{ ds.name }}</td>
+                <td class="text-sm text-base-content/70">{{ ds.data_source_type or '—' }}</td>
+                <td>
+                  {% if can_edit %}
+                    <form {{ post('/cyab/sources/' ~ ds.id ~ '/subprofile') }} hx-trigger="change">
+                      <select name="subprofile_id" class="select select-xs w-56 {{ 'select-warning' if not ds.subprofile_id }}" aria-label="Sub-profile for {{ ds.name }}">{{ subprofile_options(ds.subprofile_id) }}</select>
+                    </form>
+                  {% else %}
+                    {{ sp.label if sp else '—' }}
+                  {% endif %}
+                </td>
+                <td class="font-mono text-xs">{{ ds.data_namespace or '—' }}</td>
+                <td class="text-xs font-mono">
+                  {% set cat = sp.catalogue if sp else {} %}
+                  {% set total = (cat.get('detection_use_cases') or [])|length + (cat.get('audit_use_cases') or [])|length %}
+                  {% if total %}{{ uc_set[ds.id] }}/{{ total }}{% else %}—{% endif %}
+                </td>
+                {% if can_approve %}
+                <td class="text-right">
+                  <form {{ post('/cyab/sources/' ~ ds.id ~ '/delete') }} hx-confirm="Remove {{ ds.name }} from {{ system.name }}? Its use-case statuses go with it.">
+                    <button class="btn btn-xs btn-ghost text-error">Remove</button>
+                  </form>
+                </td>
+                {% endif %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-sm text-base-content/70">No data sources yet. Add the log feeds this system sends to the SOC.</p>
+    {% endif %}
+  </div>
+</section>
+
+{% if can_edit %}
+<section class="card bg-base-200 border border-base-300" aria-label="Add a data source">
+  <form class="card-body p-4 gap-3" {{ post('/cyab/systems/' ~ system.id ~ '/sources') }}>
+    <h2 class="font-semibold">Add a data source</h2>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <label class="flex flex-col gap-1"><span class="text-xs text-base-content/60">Name</span>
+        <input name="name" required maxlength="255" placeholder="Domain controller security log" class="input input-sm w-full"></label>
+      <label class="flex flex-col gap-1"><span class="text-xs text-base-content/60">Type</span>
+        <input name="data_source_type" maxlength="64" placeholder="Windows event log" class="input input-sm w-full"></label>
+      <label class="flex flex-col gap-1"><span class="text-xs text-base-content/60">Sub-profile</span>
+        <select name="subprofile_id" class="select select-sm w-full">{{ subprofile_options('') }}</select></label>
+      <label class="flex flex-col gap-1"><span class="text-xs text-base-content/60">Elastic namespace</span>
+        <input name="data_namespace" maxlength="128" placeholder="payroll" class="input input-sm w-full font-mono"></label>
+    </div>
+    <div class="flex justify-end"><button class="btn btn-sm btn-primary">Add source</button></div>
+  </form>
+</section>
+{% endif %}

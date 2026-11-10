@@ -903,6 +903,19 @@ def _run_migrations(engine: Engine) -> None:
         if "containment_authority" not in existing:
             _add_column_tolerant(engine, "cyab_systems", "containment_authority", "TEXT")
 
+    # cyab_data_sources.use_case_status holds a JSON map of every use case's
+    # status, which VARCHAR(64) cut off after two or three. varchar -> text
+    # is a catalogue-only change on Postgres; SQLite never enforced the limit.
+    if _is_postgres(engine) and insp.has_table("cyab_data_sources"):
+        cols = {c["name"]: c for c in insp.get_columns("cyab_data_sources")}
+        ucs = cols.get("use_case_status")
+        if ucs is not None and getattr(ucs["type"], "length", None):
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "ALTER TABLE cyab_data_sources ALTER COLUMN use_case_status TYPE TEXT"
+                ))
+            logger.info("Migrated: cyab_data_sources.use_case_status -> TEXT")
+
     # Performance indexes on hot tables (alert_cases, alert_triage).
     # create_all() creates indexes for new tables but NOT for tables that
     # already existed before the Index() was added to the model. This
