@@ -942,10 +942,10 @@ def enqueue_pcap_analysis_for_case(
     alerts). Flows are deduped by ``community_id`` — if two alerts in
     the same case carry the same flow hash they get one note.
 
-    Mirrors ``case_grouper_service.enqueue_investigation``: prefer the
-    running event loop when one exists (we're inside FastAPI), fall
-    back to a daemon thread that owns its own asyncio loop. Never
-    raises so case creation isn't blocked or broken by Arkime issues.
+    Mirrors ``case_grouper_service.enqueue_investigation``: a daemon
+    thread that owns its own asyncio loop, never a task on the caller's
+    loop. Never raises so case creation isn't blocked or broken by
+    Arkime issues.
 
     Legacy callers passing ``community_ids`` + ``alert_node_hint`` are
     accepted; the kwargs are mapped into the flow shape internally.
@@ -993,13 +993,6 @@ def enqueue_pcap_analysis_for_case(
         "pcap_analysis: enqueued case=%s flows=%d",
         case_id, len(unique),
     )
-
-    try:
-        loop = asyncio.get_running_loop()
-        loop.create_task(_runner(case_id, unique))
-        return
-    except RuntimeError:
-        pass
 
     def _bg() -> None:
         try:

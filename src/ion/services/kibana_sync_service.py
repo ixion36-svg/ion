@@ -791,23 +791,17 @@ class KibanaSyncService:
                         investigation_service = get_investigation_service()
                         for alert_id in (source_alert_ids or []):
                             try:
-                                try:
-                                    loop = asyncio.get_running_loop()
-                                    loop.create_task(
+                                # A thread with its own loop, not a task on the
+                                # sync loop's: investigations make blocking calls.
+                                import threading
+
+                                def _bg(aid=alert_id):
+                                    asyncio.run(
                                         investigation_service.investigate_alert(
-                                            alert_id=alert_id, force=False, triggered_by="kibana_sync",
+                                            alert_id=aid, force=False, triggered_by="kibana_sync",
                                         )
                                     )
-                                except RuntimeError:
-                                    # No running loop — run in a background thread
-                                    import threading
-                                    def _bg(aid=alert_id):
-                                        asyncio.run(
-                                            investigation_service.investigate_alert(
-                                                alert_id=aid, force=False, triggered_by="kibana_sync",
-                                            )
-                                        )
-                                    threading.Thread(target=_bg, daemon=True).start()
+                                threading.Thread(target=_bg, daemon=True).start()
                             except Exception as inv_exc:
                                 logger.debug("Enqueue investigation failed for %s: %s", alert_id, inv_exc)
                     except Exception as hook_exc:
