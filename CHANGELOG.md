@@ -1,13 +1,70 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.14 -->
-<!-- ion-doc:version=0.99.14 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.15 -->
+<!-- ion-doc:version=0.99.15 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-11-10 -->
 
 # Changelog
+
+## v0.99.15 — 2026-11-10
+
+Case creation no longer freezes ION, alerts attached in Kibana reach ION,
+and Bob no longer investigates alerts as they arrive. Found by load-testing
+v0.99.14 against a live Elasticsearch, Kibana and Postgres. No new route,
+permission, dependency or schema change; three settings are removed.
+
+### Performance
+
+- **Investigations run off the request event loop.** Creating a case
+  started its Bob investigation as a task on the event loop that serves the
+  web worker's requests. The investigation makes blocking calls, the first a
+  synchronous request to Ollama's embeddings endpoint while it builds the
+  prompt, and the worker served nothing until it returned. A load test of
+  200 cases of 10 alerts, 10 at a time, took 1,174 s; case creation's median
+  was 38 s and `/api/health` waited a median 11.3 s. On v0.99.15 the same
+  load takes 45 s, the median create 2.0 s and the median health check 6 ms.
+  That stack had no Ollama host, which lengthens every embeddings call; with
+  Ollama present each call is shorter, but the worker still waits on it, and
+  longest when Ollama is busy generating. Every place that started
+  background AI work this way now uses a thread with its own event loop:
+  case creation, the case grouper, the Kibana import hook, manual investigate
+  and sweep, and PCAP analysis.
+
+### Fixed
+
+- **Alerts attached to a case in Kibana never reached ION.** v0.99.14
+  claimed this and did not deliver it: it read the alerts from Kibana's
+  comments `_find`, which returns user comments only, and its tests passed
+  against a fake Kibana that did otherwise. A changed case with alerts now
+  also reads `GET /api/cases/{id}/alerts`, and the alerts arrive within one
+  sync cycle.
+
+### Removed
+
+- **The automatic per-alert investigation sweep.** A background thread sent
+  up to 50 open alerts to Bob every 15 minutes whenever the case grouper was
+  not investigating, so an estate that creates cases by hand had each alert
+  investigated on arrival and again with its case. It is gone, with its
+  settings `investigation_loop_enabled`, `investigation_sweep_interval_s` and
+  `investigation_max_per_sweep` (`ION_INVESTIGATION_LOOP_ENABLED`,
+  `ION_INVESTIGATION_SWEEP_INTERVAL_S`, `ION_INVESTIGATION_MAX_PER_SWEEP`). A
+  `config.json` that still carries them loads, and they drop out on the next
+  save. Investigations at case creation, case grouper investigations and the
+  manual sweep are unchanged.
+
+### Known gaps
+
+- **A status change made in Kibana can be pushed back over by ION.** Status
+  sync keeps whichever side changed last, judged by the case's `updated_at`,
+  which every ION write moves, including ION's own sync bookkeeping. A note,
+  an enrichment or a Bob write to the case before the next sync cycle can
+  undo a reopen made in Kibana. Reproduced on a live stack; not yet fixed.
+- **An alert storm with the case grouper on stalls the sync loop.** The loop
+  exports new cases to Kibana one at a time, about one a second, and nothing
+  else syncs meanwhile: 133 cases took one 132 s cycle.
 
 ## v0.99.14 — 2026-11-10
 
