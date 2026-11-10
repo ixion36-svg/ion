@@ -431,9 +431,9 @@ JSON endpoints.
 | GET | `/api/arkime/traffic/topology` | `alert:read` | [arkime_traffic_analytics_api.py:309](src/ion/web/arkime_traffic_analytics_api.py#L309) |  | `network_topology.html` |
 | GET | `/api/attack-stories` | `alert:read` | [attack_story_api.py:15](src/ion/web/attack_story_api.py#L15) |  |  |
 | GET | `/api/audit-logs` | `system:audit_view` | [api.py:1304](src/ion/web/api.py#L1304) |  |  |
-| POST | `/api/auth/change-password` | — |  |  | `profile.html` |
+| POST | `/api/auth/change-password` | — | [extension.py:580](.venv/Lib/site-packages/slowapi/extension.py#L580) |  | `profile.html` |
 | POST | `/api/auth/focus-mode` | — | [api.py:395](src/ion/web/api.py#L395) |  | `app.js` |
-| POST | `/api/auth/login` | — |  |  | `login.html` |
+| POST | `/api/auth/login` | — | [extension.py:269](.venv/Lib/site-packages/slowapi/extension.py#L269) |  | `login.html` |
 | POST | `/api/auth/logout` | — | [api.py:326](src/ion/web/api.py#L326) |  | `app.js`, `profile.html` |
 | GET | `/api/auth/me` | — | [api.py:383](src/ion/web/api.py#L383) |  | `app.js`, `alert_prompt_templates.html`, `analyst.html`, `gitlab.html` +1 |
 | GET | `/api/auth/oidc/callback` | — | [api.py:663](src/ion/web/api.py#L663) |  |  |
