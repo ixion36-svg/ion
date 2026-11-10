@@ -243,6 +243,21 @@
 .case-tl-unknown .case-tl-marker { background: #94a3b8; }
 .case-tl-unknown .case-tl-kind   { color: #94a3b8; }
 
+/* A run of alert links, folded to one line until opened. */
+.case-tl-run > summary { list-style: none; cursor: pointer; }
+.case-tl-run > summary::-webkit-details-marker { display: none; }
+.case-tl-run-toggle {
+    margin-left: 0.4rem;
+    font-size: 0.68rem;
+    color: var(--primary);
+}
+.case-tl-run[open] .case-tl-run-toggle { display: none; }
+.case-tl-run-body { margin-top: 0.35rem; }
+.case-tl-run-body .case-tl-event { background: none; padding: 0.15rem 0.5rem; margin-bottom: 0; }
+.case-tl-run-body .case-tl-marker { display: none; }
+.case-tl-run-body .case-tl-event-head,
+.case-tl-run-body .case-tl-detail { display: none; }
+
 /* Cross-case observable sightings --------------------------------------
  *
  * The TLP pill was a `tlpColors` map in the page's JavaScript, and the IOC
@@ -1347,6 +1362,17 @@
     color: var(--accent-color);
 }
 
+.cpanel-note-source {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0 0.35rem;
+    border-radius: 0.25rem;
+    border: 1px solid rgba(249, 168, 212, 0.4);
+    color: #f9a8d4;
+}
+
 /* ── Section Badge ──────────────────────────────────────── */
 .cpanel-section-badge {
     display: inline-block;
@@ -2152,6 +2178,16 @@
     color: var(--sev-high); font-weight: 700; font-size: 11px;
     border-radius: 6px; padding: 3px 9px;
 }
+
+/* A path with no connections, folded to one line. */
+.apg-unlinked > summary {
+    list-style: none; cursor: pointer;
+    font-size: 0.78rem; color: var(--text-secondary);
+}
+.apg-unlinked > summary::-webkit-details-marker { display: none; }
+.apg-unlinked-toggle { margin-left: 0.4rem; font-size: 0.7rem; color: var(--primary); }
+.apg-unlinked[open] .apg-unlinked-toggle { display: none; }
+.apg-unlinked[open] > summary { margin-bottom: 0.6rem; }
 
 /* Legend (edge types) */
 .apg-legend {

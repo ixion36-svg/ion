@@ -713,7 +713,6 @@ async function openCaseDetail(caseId) {
         selectCaseAlert(firstAlertId, 0, c.id);
     }
 
-    if (c.kibana_case_id) loadKibanaComments(c.kibana_case_id);
     loadCaseTimeline(c.id);
     loadResponseActions(c.id, c.observables || []);
     loadAttackPath(c.id);
@@ -1287,20 +1286,6 @@ function loadSimilarObservables(caseId) {
     return htmx.ajax('GET', '/ui/cases/' + encodeURIComponent(caseId) + '/similar-observables', {
         source: container, target: container, swap: 'innerHTML',
     });
-}
-
-// ── Load Kibana Comments ───────────────────────────────────
-async function loadKibanaComments(kibanaId) {
-    const container = document.getElementById('kibana-comments-container');
-    if (!container) return;
-    const token = {};
-    container._ionCommentsRequest = token;
-    const loaded = await ionLoadFragment('/ui/cases/kibana/' + encodeURIComponent(kibanaId) + '/comments', container, 'Loading Kibana comments...', {failure:'Could not load Kibana comments'});
-    if (container._ionCommentsRequest !== token) return;
-    if (!loaded) {
-        const badge = document.getElementById('kibana-comment-count');
-        if (badge) badge.textContent = '-';
-    }
 }
 
 // panel tab state. Persisted across panel re-renders (e.g.

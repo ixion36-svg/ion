@@ -369,6 +369,14 @@
 .cpanel-section.pm-collapsed .pm-fold { transform: rotate(-90deg); }
 .cpanel-section.pm-collapsed > :not(.pm-sec-head) { display: none; }
 .pm-sec-body { padding: 0.8rem 0.9rem; }
+/* A section holding only its empty hint is one line under its title, not a
+   dashed card: five empty sections took about 600 px of CASE-0239. */
+.pm-sec-body:has(> .cpanel-empty-hint:only-child),
+.pm-sec-body:has(> :only-child > .cpanel-empty-hint:only-child) { padding: 0.45rem 0.9rem; }
+.pm-sec-body > .cpanel-empty-hint:only-child,
+.pm-sec-body > :only-child > .cpanel-empty-hint:only-child {
+    padding: 0; background: none; border: 0; text-align: left; font-size: 0.74rem;
+}
 .cpanel-section.pm-dragging { opacity: 0.35; }
 .pm-drop-marker { height: 3px; border-radius: 2px; background: var(--accent-color); margin: -7px 4px; }
 
