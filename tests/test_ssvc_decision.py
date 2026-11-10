@@ -22,10 +22,15 @@ def _vuln(**kw):
 
 
 @pytest.fixture(autouse=True)
-def _clean_env(monkeypatch):
+def _clean_env(monkeypatch, tmp_path):
     for env in ("ION_SSVC_EXPOSURE", "ION_SSVC_AUTOMATABLE",
                 "ION_SSVC_HUMAN_IMPACT"):
         monkeypatch.delenv(env, raising=False)
+    # The inputs are settings now, which get_config() loads once; each test
+    # starts from an empty data dir and a fresh load.
+    import ion.core.config as config_module
+    monkeypatch.setenv("ION_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(config_module, "_config", None)
     ssvc.reset_cache()
     yield
     ssvc.reset_cache()
@@ -167,5 +172,33 @@ def test_an_unreadable_table_declines_rather_than_defers(monkeypatch, tmp_path):
         assert result["decision"] is None
         assert "could not be read" in result["reason"]
         assert ssvc.status()["loaded"] is False
+        # The list's "inputs assumed" note reads these, so they are reported
+        # on this path too rather than going missing when the table does.
+        assert result["unset_settings"] == ["ssvc_exposure", "ssvc_automatable", "ssvc_human_impact"]
+        assert result["assumed_count"] == 3
     finally:
         ssvc.reset_cache()
+
+
+def test_an_input_saved_in_settings_is_used_and_reported_configured(tmp_path):
+    """The inputs live in Settings (config.json); ION_SSVC_* only overrides."""
+    import json
+
+    (tmp_path / ".ion").mkdir(exist_ok=True)
+    (tmp_path / ".ion" / "config.json").write_text(json.dumps(
+        {"ssvc_exposure": "open", "ssvc_automatable": "yes"}), encoding="utf-8")
+    result = ssvc.assess(_vuln())
+    assert result["assumed"]["exposure"] == {
+        "value": "open", "configured": True, "setting": "ssvc_exposure",
+        "env": "ION_SSVC_EXPOSURE", "invalid": None,
+        "legal": result["assumed"]["exposure"]["legal"]}
+    assert result["assumed"]["automatable"]["configured"] is True
+    assert result["assumed_count"] == 1
+    assert result["unset_settings"] == ["ssvc_human_impact"]
+
+
+def test_a_value_the_table_does_not_know_is_named_not_used(monkeypatch):
+    monkeypatch.setenv("ION_SSVC_HUMAN_IMPACT", "catastrophic")
+    a = ssvc.configured_inputs()["human_impact"]
+    assert a["configured"] is False and a["invalid"] == "catastrophic"
+    assert "catastrophic" not in a["legal"] and a["legal"]

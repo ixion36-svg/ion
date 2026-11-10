@@ -226,6 +226,13 @@ class Config:
     pii_anon_enabled: bool = False
     pii_fields_file: str = ""  # optional override; empty = use packaged default
 
+    # SSVC deployment inputs, read by ssvc_service. Properties of the estate
+    # ION cannot observe. Empty means not set: the decision then uses the
+    # service's default for that input and reports it as assumed.
+    ssvc_exposure: str = ""
+    ssvc_automatable: str = ""
+    ssvc_human_impact: str = ""
+
     # Investigations
     # was 120; the v0.17.3 fix-pack bumped the module default
     # in investigation_service to 300 (real prompts on an 8B model take
@@ -462,7 +469,10 @@ class Config:
             # PII anonymising proxy
             pii_anon_enabled=data.get("pii_anon_enabled", False),
             pii_fields_file=data.get("pii_fields_file", ""),
-            # Investigation loop
+            ssvc_exposure=data.get("ssvc_exposure", ""),
+            ssvc_automatable=data.get("ssvc_automatable", ""),
+            ssvc_human_impact=data.get("ssvc_human_impact", ""),
+            # Investigations
             investigation_llm_timeout_s=data.get("investigation_llm_timeout_s", 300),
             # Attack Path + Bob escalation tier
             attack_path_enabled=data.get("attack_path_enabled", True),
@@ -902,6 +912,13 @@ def get_config() -> Config:
         if os.environ.get("ION_PII_FIELDS_FILE"):
             _config.pii_fields_file = os.environ.get("ION_PII_FIELDS_FILE", "")
 
+        # SSVC deployment inputs
+        for _field, _env in (("ssvc_exposure", "ION_SSVC_EXPOSURE"),
+                             ("ssvc_automatable", "ION_SSVC_AUTOMATABLE"),
+                             ("ssvc_human_impact", "ION_SSVC_HUMAN_IMPACT")):
+            if os.environ.get(_env):
+                setattr(_config, _field, os.environ[_env].strip())
+
         # Investigation env overrides
         if os.environ.get("ION_INVESTIGATION_LLM_TIMEOUT_S"):
             _config.investigation_llm_timeout_s = int(os.environ.get("ION_INVESTIGATION_LLM_TIMEOUT_S", "300"))
@@ -1147,6 +1164,9 @@ ENV_FIELD_MAP: dict[str, str] = {
     "smtp_verify_ssl": "ION_SMTP_VERIFY_SSL",
     "ssl_cert": "ION_SSL_CERT",
     "ssl_key": "ION_SSL_KEY",
+    "ssvc_automatable": "ION_SSVC_AUTOMATABLE",
+    "ssvc_exposure": "ION_SSVC_EXPOSURE",
+    "ssvc_human_impact": "ION_SSVC_HUMAN_IMPACT",
     "tide_api_key": "ION_TIDE_API_KEY",
     "tide_client_id": "ION_TIDE_CLIENT_ID",
     "tide_enabled": "ION_TIDE_ENABLED",
