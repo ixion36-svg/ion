@@ -6,7 +6,14 @@ import logging
 import re
 from typing import Any, Iterable, List, Optional
 
+from ion.services.attack_detection_service import attack_version
+
 logger = logging.getLogger(__name__)
+
+#: Navigator takes the ATT&CK major version only ("20", not "20.1"). Used when
+#: the detection snapshot is unreadable, so an exported layer never claims a
+#: version ION cannot evidence.
+_FALLBACK_ATTACK_VERSION = "20"
 
 
 _TECHNIQUE_ID_RE = re.compile(r"\bT\d{4}(?:\.\d{3})?\b", re.IGNORECASE)
@@ -161,10 +168,11 @@ def generate_navigator_layer(
         })
 
     # -- Assemble full layer ---------------------------------------------------
+    snapshot_version = attack_version()
     layer: dict = {
         "name": layer_name,
         "versions": {
-            "attack": "14",
+            "attack": (snapshot_version or _FALLBACK_ATTACK_VERSION).split(".")[0],
             "navigator": "4.9.1",
             "layer": "4.5",
         },

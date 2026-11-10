@@ -40,7 +40,15 @@ def test_alerts_page_reports_alert_read_and_login_reports_nothing(rows):
     # cell is not a permission result.
     api_login = _one(rows, "/api/auth/login", "POST")
     assert api_login["permission"] == ""
-    assert api_login["file"].endswith("slowapi/extension.py")
+    # Either form, because which one appears is a property of the machine
+    # rather than of the route: the tool can only rebuild a repo-relative
+    # `.venv/...` path when the dependency lives inside the checkout. CI
+    # installs with `pip install -e .[dev]` into the runner's own Python, so
+    # the cell is blank there and this asserted a developer's layout.
+    assert (api_login["file"] == ""
+            or api_login["file"].endswith("slowapi/extension.py")), (
+        f"unexpected handler file for the API login: {api_login['file']!r}"
+    )
 
 
 def test_an_api_route_still_reports_require_permission(rows):

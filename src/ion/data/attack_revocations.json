@@ -1,0 +1,602 @@
+{
+  "attack_version": "20.1",
+  "count": 149,
+  "revocations": {
+    "T1002": {
+      "replacement": "T1560",
+      "name": "Archive Collected Data"
+    },
+    "T1004": {
+      "replacement": "T1547.004",
+      "name": "Winlogon Helper DLL"
+    },
+    "T1009": {
+      "replacement": "T1027.001",
+      "name": "Binary Padding"
+    },
+    "T1013": {
+      "replacement": "T1547.010",
+      "name": "Port Monitors"
+    },
+    "T1015": {
+      "replacement": "T1546.008",
+      "name": "Accessibility Features"
+    },
+    "T1017": {
+      "replacement": "T1072",
+      "name": "Software Deployment Tools"
+    },
+    "T1019": {
+      "replacement": "T1542.001",
+      "name": "System Firmware"
+    },
+    "T1022": {
+      "replacement": "T1560",
+      "name": "Archive Collected Data"
+    },
+    "T1023": {
+      "replacement": "T1547.009",
+      "name": "Shortcut Modification"
+    },
+    "T1024": {
+      "replacement": "T1573",
+      "name": "Encrypted Channel"
+    },
+    "T1028": {
+      "replacement": "T1021.006",
+      "name": "Windows Remote Management"
+    },
+    "T1031": {
+      "replacement": "T1543.003",
+      "name": "Windows Service"
+    },
+    "T1032": {
+      "replacement": "T1573",
+      "name": "Encrypted Channel"
+    },
+    "T1035": {
+      "replacement": "T1569.002",
+      "name": "Service Execution"
+    },
+    "T1038": {
+      "replacement": "T1574.001",
+      "name": "DLL"
+    },
+    "T1042": {
+      "replacement": "T1546.001",
+      "name": "Change Default File Association"
+    },
+    "T1044": {
+      "replacement": "T1574.010",
+      "name": "Services File Permissions Weakness"
+    },
+    "T1045": {
+      "replacement": "T1027.002",
+      "name": "Software Packing"
+    },
+    "T1050": {
+      "replacement": "T1543.003",
+      "name": "Windows Service"
+    },
+    "T1053.001": {
+      "replacement": "T1053.002",
+      "name": "At"
+    },
+    "T1054": {
+      "replacement": "T1685",
+      "name": "Disable or Modify Tools"
+    },
+    "T1058": {
+      "replacement": "T1574.011",
+      "name": "Services Registry Permissions Weakness"
+    },
+    "T1060": {
+      "replacement": "T1547.001",
+      "name": "Registry Run Keys / Startup Folder"
+    },
+    "T1063": {
+      "replacement": "T1518.001",
+      "name": "Security Software Discovery"
+    },
+    "T1065": {
+      "replacement": "T1571",
+      "name": "Non-Standard Port"
+    },
+    "T1066": {
+      "replacement": "T1027.005",
+      "name": "Indicator Removal from Tools"
+    },
+    "T1067": {
+      "replacement": "T1542.003",
+      "name": "Bootkit"
+    },
+    "T1070.001": {
+      "replacement": "T1685.005",
+      "name": "Clear Windows Event Logs"
+    },
+    "T1070.002": {
+      "replacement": "T1685.006",
+      "name": "Clear Linux or Mac System Logs"
+    },
+    "T1073": {
+      "replacement": "T1574.002",
+      "name": "DLL Side-Loading"
+    },
+    "T1075": {
+      "replacement": "T1550.002",
+      "name": "Pass the Hash"
+    },
+    "T1076": {
+      "replacement": "T1021.001",
+      "name": "Remote Desktop Protocol"
+    },
+    "T1077": {
+      "replacement": "T1021.002",
+      "name": "SMB/Windows Admin Shares"
+    },
+    "T1079": {
+      "replacement": "T1573",
+      "name": "Encrypted Channel"
+    },
+    "T1081": {
+      "replacement": "T1552.001",
+      "name": "Credentials In Files"
+    },
+    "T1084": {
+      "replacement": "T1546.003",
+      "name": "Windows Management Instrumentation Event Subscription"
+    },
+    "T1085": {
+      "replacement": "T1218.011",
+      "name": "Rundll32"
+    },
+    "T1086": {
+      "replacement": "T1059.001",
+      "name": "PowerShell"
+    },
+    "T1088": {
+      "replacement": "T1548.002",
+      "name": "Bypass User Account Control"
+    },
+    "T1089": {
+      "replacement": "T1685",
+      "name": "Disable or Modify Tools"
+    },
+    "T1093": {
+      "replacement": "T1055.012",
+      "name": "Process Hollowing"
+    },
+    "T1094": {
+      "replacement": "T1095",
+      "name": "Non-Application Layer Protocol"
+    },
+    "T1096": {
+      "replacement": "T1564.004",
+      "name": "NTFS File Attributes"
+    },
+    "T1097": {
+      "replacement": "T1550.003",
+      "name": "Pass the Ticket"
+    },
+    "T1099": {
+      "replacement": "T1070.006",
+      "name": "Timestomp"
+    },
+    "T1100": {
+      "replacement": "T1505.003",
+      "name": "Web Shell"
+    },
+    "T1101": {
+      "replacement": "T1547.005",
+      "name": "Security Support Provider"
+    },
+    "T1103": {
+      "replacement": "T1546.010",
+      "name": "AppInit DLLs"
+    },
+    "T1107": {
+      "replacement": "T1070.004",
+      "name": "File Deletion"
+    },
+    "T1109": {
+      "replacement": "T1542.002",
+      "name": "Component Firmware"
+    },
+    "T1116": {
+      "replacement": "T1553.002",
+      "name": "Code Signing"
+    },
+    "T1117": {
+      "replacement": "T1218.010",
+      "name": "Regsvr32"
+    },
+    "T1118": {
+      "replacement": "T1218.004",
+      "name": "InstallUtil"
+    },
+    "T1121": {
+      "replacement": "T1218.009",
+      "name": "Regsvcs/Regasm"
+    },
+    "T1122": {
+      "replacement": "T1546.015",
+      "name": "Component Object Model Hijacking"
+    },
+    "T1126": {
+      "replacement": "T1070.005",
+      "name": "Network Share Connection Removal"
+    },
+    "T1128": {
+      "replacement": "T1546.007",
+      "name": "Netsh Helper DLL"
+    },
+    "T1130": {
+      "replacement": "T1553.004",
+      "name": "Install Root Certificate"
+    },
+    "T1131": {
+      "replacement": "T1547.002",
+      "name": "Authentication Package"
+    },
+    "T1138": {
+      "replacement": "T1546.011",
+      "name": "Application Shimming"
+    },
+    "T1139": {
+      "replacement": "T1552.003",
+      "name": "Shell History"
+    },
+    "T1141": {
+      "replacement": "T1056.002",
+      "name": "GUI Input Capture"
+    },
+    "T1142": {
+      "replacement": "T1555.001",
+      "name": "Keychain"
+    },
+    "T1143": {
+      "replacement": "T1564.003",
+      "name": "Hidden Window"
+    },
+    "T1144": {
+      "replacement": "T1553.001",
+      "name": "Gatekeeper Bypass"
+    },
+    "T1145": {
+      "replacement": "T1552.004",
+      "name": "Private Keys"
+    },
+    "T1146": {
+      "replacement": "T1070.003",
+      "name": "Clear Command History"
+    },
+    "T1147": {
+      "replacement": "T1564.002",
+      "name": "Hidden Users"
+    },
+    "T1148": {
+      "replacement": "T1690",
+      "name": "Prevent Command History Logging"
+    },
+    "T1150": {
+      "replacement": "T1547.011",
+      "name": "Plist Modification"
+    },
+    "T1151": {
+      "replacement": "T1036.006",
+      "name": "Space after Filename"
+    },
+    "T1152": {
+      "replacement": "T1569.001",
+      "name": "Launchctl"
+    },
+    "T1154": {
+      "replacement": "T1546.005",
+      "name": "Trap"
+    },
+    "T1155": {
+      "replacement": "T1059.002",
+      "name": "AppleScript"
+    },
+    "T1156": {
+      "replacement": "T1546.004",
+      "name": "Unix Shell Configuration Modification"
+    },
+    "T1157": {
+      "replacement": "T1574.004",
+      "name": "Dylib Hijacking"
+    },
+    "T1158": {
+      "replacement": "T1564.001",
+      "name": "Hidden Files and Directories"
+    },
+    "T1159": {
+      "replacement": "T1543.001",
+      "name": "Launch Agent"
+    },
+    "T1160": {
+      "replacement": "T1543.004",
+      "name": "Launch Daemon"
+    },
+    "T1161": {
+      "replacement": "T1546.006",
+      "name": "LC_LOAD_DYLIB Addition"
+    },
+    "T1162": {
+      "replacement": "T1547.011",
+      "name": "Plist Modification"
+    },
+    "T1163": {
+      "replacement": "T1037.004",
+      "name": "RC Scripts"
+    },
+    "T1164": {
+      "replacement": "T1547.007",
+      "name": "Re-opened Applications"
+    },
+    "T1165": {
+      "replacement": "T1037.005",
+      "name": "Startup Items"
+    },
+    "T1166": {
+      "replacement": "T1548.001",
+      "name": "Setuid and Setgid"
+    },
+    "T1167": {
+      "replacement": "T1555.002",
+      "name": "Securityd Memory"
+    },
+    "T1168": {
+      "replacement": "T1053",
+      "name": "Scheduled Task/Job"
+    },
+    "T1169": {
+      "replacement": "T1548.003",
+      "name": "Sudo and Sudo Caching"
+    },
+    "T1170": {
+      "replacement": "T1218.005",
+      "name": "Mshta"
+    },
+    "T1171": {
+      "replacement": "T1557.001",
+      "name": "Name Resolution Poisoning and SMB Relay"
+    },
+    "T1172": {
+      "replacement": "T1090.004",
+      "name": "Domain Fronting"
+    },
+    "T1173": {
+      "replacement": "T1559.002",
+      "name": "Dynamic Data Exchange"
+    },
+    "T1174": {
+      "replacement": "T1556.002",
+      "name": "Password Filter DLL"
+    },
+    "T1177": {
+      "replacement": "T1547.008",
+      "name": "LSASS Driver"
+    },
+    "T1178": {
+      "replacement": "T1134.005",
+      "name": "SID-History Injection"
+    },
+    "T1179": {
+      "replacement": "T1056.004",
+      "name": "Credential API Hooking"
+    },
+    "T1180": {
+      "replacement": "T1546.002",
+      "name": "Screensaver"
+    },
+    "T1181": {
+      "replacement": "T1055.011",
+      "name": "Extra Window Memory Injection"
+    },
+    "T1182": {
+      "replacement": "T1546.009",
+      "name": "AppCert DLLs"
+    },
+    "T1183": {
+      "replacement": "T1546.012",
+      "name": "Image File Execution Options Injection"
+    },
+    "T1184": {
+      "replacement": "T1563.001",
+      "name": "SSH Hijacking"
+    },
+    "T1186": {
+      "replacement": "T1055.013",
+      "name": "Process Doppelg\u00e4nging"
+    },
+    "T1188": {
+      "replacement": "T1090.003",
+      "name": "Multi-hop Proxy"
+    },
+    "T1191": {
+      "replacement": "T1218.003",
+      "name": "CMSTP"
+    },
+    "T1192": {
+      "replacement": "T1566.002",
+      "name": "Spearphishing Link"
+    },
+    "T1193": {
+      "replacement": "T1566.001",
+      "name": "Spearphishing Attachment"
+    },
+    "T1194": {
+      "replacement": "T1566.003",
+      "name": "Spearphishing via Service"
+    },
+    "T1196": {
+      "replacement": "T1218.002",
+      "name": "Control Panel"
+    },
+    "T1198": {
+      "replacement": "T1553.003",
+      "name": "SIP and Trust Provider Hijacking"
+    },
+    "T1206": {
+      "replacement": "T1548.003",
+      "name": "Sudo and Sudo Caching"
+    },
+    "T1208": {
+      "replacement": "T1558.003",
+      "name": "Kerberoasting"
+    },
+    "T1209": {
+      "replacement": "T1547.003",
+      "name": "Time Providers"
+    },
+    "T1214": {
+      "replacement": "T1552.002",
+      "name": "Credentials in Registry"
+    },
+    "T1215": {
+      "replacement": "T1547.006",
+      "name": "Kernel Modules and Extensions"
+    },
+    "T1223": {
+      "replacement": "T1218.001",
+      "name": "Compiled HTML File"
+    },
+    "T1483": {
+      "replacement": "T1568.002",
+      "name": "Domain Generation Algorithms"
+    },
+    "T1487": {
+      "replacement": "T1561.002",
+      "name": "Disk Structure Wipe"
+    },
+    "T1488": {
+      "replacement": "T1561.001",
+      "name": "Disk Content Wipe"
+    },
+    "T1492": {
+      "replacement": "T1565.001",
+      "name": "Stored Data Manipulation"
+    },
+    "T1493": {
+      "replacement": "T1565.002",
+      "name": "Transmitted Data Manipulation"
+    },
+    "T1494": {
+      "replacement": "T1565.003",
+      "name": "Runtime Data Manipulation"
+    },
+    "T1500": {
+      "replacement": "T1027.004",
+      "name": "Compile After Delivery"
+    },
+    "T1501": {
+      "replacement": "T1543.002",
+      "name": "Systemd Service"
+    },
+    "T1502": {
+      "replacement": "T1134.004",
+      "name": "Parent PID Spoofing"
+    },
+    "T1503": {
+      "replacement": "T1555.003",
+      "name": "Credentials from Web Browsers"
+    },
+    "T1504": {
+      "replacement": "T1546.013",
+      "name": "PowerShell Profile"
+    },
+    "T1506": {
+      "replacement": "T1550.004",
+      "name": "Web Session Cookie"
+    },
+    "T1514": {
+      "replacement": "T1548.004",
+      "name": "Elevated Execution with Prompt"
+    },
+    "T1519": {
+      "replacement": "T1546.014",
+      "name": "Emond"
+    },
+    "T1522": {
+      "replacement": "T1552.005",
+      "name": "Cloud Instance Metadata API"
+    },
+    "T1527": {
+      "replacement": "T1550.001",
+      "name": "Application Access Token"
+    },
+    "T1536": {
+      "replacement": "T1578.004",
+      "name": "Revert Cloud Instance"
+    },
+    "T1547.011": {
+      "replacement": "T1647",
+      "name": "Plist File Modification"
+    },
+    "T1562": {
+      "replacement": "T1685",
+      "name": "Disable or Modify Tools"
+    },
+    "T1562.001": {
+      "replacement": "T1685",
+      "name": "Disable or Modify Tools"
+    },
+    "T1562.002": {
+      "replacement": "T1685.001",
+      "name": "Disable or Modify Windows Event Log"
+    },
+    "T1562.003": {
+      "replacement": "T1690",
+      "name": "Prevent Command History Logging"
+    },
+    "T1562.004": {
+      "replacement": "T1686",
+      "name": "Disable or Modify System Firewall"
+    },
+    "T1562.006": {
+      "replacement": "T1685",
+      "name": "Disable or Modify Tools"
+    },
+    "T1562.007": {
+      "replacement": "T1686.001",
+      "name": "Cloud Firewall"
+    },
+    "T1562.008": {
+      "replacement": "T1685.002",
+      "name": "Disable or Modify Cloud Log"
+    },
+    "T1562.009": {
+      "replacement": "T1688",
+      "name": "Safe Mode Boot"
+    },
+    "T1562.010": {
+      "replacement": "T1689",
+      "name": "Downgrade Attack"
+    },
+    "T1562.011": {
+      "replacement": "T1685.003",
+      "name": "Modify or Spoof Tool UI"
+    },
+    "T1562.012": {
+      "replacement": "T1685.004",
+      "name": "Disable or Modify Linux Audit System Log"
+    },
+    "T1562.013": {
+      "replacement": "T1686.002",
+      "name": "Network Device Firewall"
+    },
+    "T1574.002": {
+      "replacement": "T1574.001",
+      "name": "DLL"
+    },
+    "T1656": {
+      "replacement": "T1684.001",
+      "name": "Impersonation"
+    },
+    "T1672": {
+      "replacement": "T1684.002",
+      "name": "Email Spoofing"
+    }
+  }
+}

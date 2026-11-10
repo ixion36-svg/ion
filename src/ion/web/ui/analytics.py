@@ -1030,7 +1030,12 @@ def namespace_kind(name: Optional[str]) -> str:
     # same namespace would change colour on every restart.
     import hashlib
 
-    digest = hashlib.sha1(lowered.encode("utf-8"), usedforsecurity=False).digest()
+    # usedforsecurity=False, not a nosec: this picks a colour bucket for a
+    # namespace with no security property at all, and saying so in the call
+    # keeps the next reader (and bandit) from having to judge it again.
+    digest = hashlib.sha1(  # noqa: S324
+        lowered.encode("utf-8"), usedforsecurity=False
+    ).digest()
     return "ns-p%d" % (digest[0] % NAMESPACE_FALLBACKS)
 
 

@@ -1,7 +1,8 @@
-"""Generate src/ion/data/attack_techniques.json from ATT&CK Enterprise v15.1.
+"""Generate src/ion/data/attack_techniques.json from ATT&CK Enterprise.
 
 Usage (run once from repo root):
     python scripts/generate_attack_techniques_json.py
+    python scripts/generate_attack_techniques_json.py --bundle path/to/bundle.json
 
 Fetches the STIX bundle from MITRE's GitHub, extracts technique metadata,
 and writes the bundled snapshot. Commit the output; ION is air-gapped so
@@ -13,17 +14,26 @@ the KEV snapshot refresh).
 
 from __future__ import annotations
 
+import argparse
 import json
-import sys
 import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+#: Keep in step with ATTACK_VERSION in generate_attack_detections_json.py --
+#: the two snapshots are read side by side, and a technique with no entry in
+#: the detections snapshot is indistinguishable from one MITRE wrote no
+#: detection for.
+ATTACK_VERSION = "20.1"
+
 _STIX_URL = (
     "https://github.com/mitre-attack/attack-stix-data/raw/master/"
-    "enterprise-attack/enterprise-attack-15.1.json"
+    f"enterprise-attack/enterprise-attack-{ATTACK_VERSION}.json"
 )
 _OUT_PATH = Path(__file__).parent.parent / "src" / "ion" / "data" / "attack_techniques.json"
+_REVOCATIONS_PATH = (
+    Path(__file__).parent.parent / "src" / "ion" / "data" / "attack_revocations.json"
+)
 
 
 def _tactic_short_id(phase_name: str) -> str:
@@ -111,12 +121,72 @@ def extract(bundle: Dict[str, Any]) -> List[Dict[str, Any]]:
     return results
 
 
+def extract_revocations(bundle: Dict[str, Any]) -> Dict[str, Any]:
+    """Map every revoked technique id to the id that replaced it.
+
+    A catalogue bump drops revoked ids, and ION keeps only catalogue-valid
+    technique ids in several places. Without this map a rule, template or PCAP
+    finding carrying a pre-bump id stops matching and nothing says so -- the
+    mapping just disappears. T1562 and its whole sub-tree moved this way at
+    v18/v19.
+    """
+    objects = bundle.get("objects", [])
+    by_stix_id = {o.get("id"): o for o in objects}
+
+    revocations: Dict[str, Dict[str, str]] = {}
+    for obj in objects:
+        if obj.get("type") != "relationship":
+            continue
+        if obj.get("relationship_type") != "revoked-by":
+            continue
+        source = by_stix_id.get(obj.get("source_ref"))
+        target = by_stix_id.get(obj.get("target_ref"))
+        if not source or not target:
+            continue
+        if source.get("type") != "attack-pattern":
+            continue
+        old_id = _extract_technique_id(source)
+        new_id = _extract_technique_id(target)
+        if old_id and new_id and old_id != new_id:
+            revocations[old_id] = {
+                "replacement": new_id,
+                "name": target.get("name", ""),
+            }
+
+    return {
+        "attack_version": ATTACK_VERSION,
+        "count": len(revocations),
+        "revocations": dict(sorted(revocations.items())),
+    }
+
+
 def main() -> None:
-    bundle = _load_bundle(_STIX_URL)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--bundle",
+        type=Path,
+        default=None,
+        help="Read a local STIX bundle instead of fetching from GitHub.",
+    )
+    args = parser.parse_args()
+
+    if args.bundle:
+        print(f"Reading {args.bundle} ...", flush=True)
+        bundle = json.loads(args.bundle.read_text(encoding="utf-8"))
+    else:
+        bundle = _load_bundle(_STIX_URL)
     techniques = extract(bundle)
+    if not techniques:
+        raise SystemExit("Refusing to write an empty technique snapshot.")
     _OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     _OUT_PATH.write_text(json.dumps(techniques, indent=2) + "\n", encoding="utf-8")
     print(f"Wrote {len(techniques)} techniques to {_OUT_PATH}")
+
+    revocations = extract_revocations(bundle)
+    _REVOCATIONS_PATH.write_text(
+        json.dumps(revocations, indent=2) + "\n", encoding="utf-8"
+    )
+    print(f"Wrote {revocations['count']} revocations to {_REVOCATIONS_PATH}")
 
 
 if __name__ == "__main__":

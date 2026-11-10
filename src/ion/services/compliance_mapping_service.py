@@ -18,6 +18,8 @@ Public API:
 import logging
 from typing import Optional
 
+from ion.services.attack_revocation_service import resolve, resolve_all
+
 logger = logging.getLogger(__name__)
 
 
@@ -285,10 +287,14 @@ def _covered_techniques(tide_service) -> set[str]:
     if not coverage:
         return set()
     techniques_data = coverage.get("techniques", {})
-    return {
+    # Resolved forward: TIDE rules carry whatever ATT&CK generation they were
+    # written against, and the control maps below are resolved the same way.
+    # Comparing the two unresolved makes a retired id miss and reads as "no
+    # detection" rather than "ids from two ATT&CK versions".
+    return resolve_all(
         tid for tid, info in techniques_data.items()
         if (info or {}).get("enabled_rules", 0) > 0
-    }
+    )
 
 
 #: What this scorecard measures, and — just as important — what it does
@@ -333,8 +339,12 @@ def _score_framework(framework: dict, covered: set[str]) -> dict:
         covered_techs: list[str] = []
         gap_techs: list[str] = []
         for tid in required:
-            parent = tid.split(".")[0]
-            if tid in covered or parent in covered:
+            # Parent is taken from the resolved id: a retired sub-technique can
+            # land under a different parent (T1562.002 -> T1685.001), so
+            # splitting the original would test the wrong one.
+            resolved = resolve(tid)
+            parent = resolved.split(".")[0]
+            if resolved in covered or parent in covered:
                 covered_techs.append(tid)
             else:
                 gap_techs.append(tid)

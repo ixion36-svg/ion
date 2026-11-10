@@ -28,7 +28,7 @@
   },
   {
     "id": "T1001.003",
-    "name": "Protocol Impersonation",
+    "name": "Protocol or Service Impersonation",
     "tactic_ids": [
       "TA0011"
     ],
@@ -468,6 +468,51 @@
     "parent_id": "T1027"
   },
   {
+    "id": "T1027.014",
+    "name": "Polymorphic Code",
+    "tactic_ids": [
+      "TA0005"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1027"
+  },
+  {
+    "id": "T1027.015",
+    "name": "Compression",
+    "tactic_ids": [
+      "TA0005"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1027"
+  },
+  {
+    "id": "T1027.016",
+    "name": "Junk Code Insertion",
+    "tactic_ids": [
+      "TA0005"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1027"
+  },
+  {
+    "id": "T1027.017",
+    "name": "SVG Smuggling",
+    "tactic_ids": [
+      "TA0005"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1027"
+  },
+  {
+    "id": "T1027.018",
+    "name": "Invisible Unicode",
+    "tactic_ids": [
+      "TA0005"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1027"
+  },
+  {
     "id": "T1029",
     "name": "Scheduled Transfer",
     "tactic_ids": [
@@ -523,7 +568,7 @@
   },
   {
     "id": "T1036.003",
-    "name": "Rename System Utilities",
+    "name": "Rename Legitimate Utilities",
     "tactic_ids": [
       "TA0005"
     ],
@@ -541,7 +586,7 @@
   },
   {
     "id": "T1036.005",
-    "name": "Match Legitimate Name or Location",
+    "name": "Match Legitimate Resource Name or Location",
     "tactic_ids": [
       "TA0005"
     ],
@@ -578,6 +623,33 @@
   {
     "id": "T1036.009",
     "name": "Break Process Trees",
+    "tactic_ids": [
+      "TA0005"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1036"
+  },
+  {
+    "id": "T1036.010",
+    "name": "Masquerade Account Name",
+    "tactic_ids": [
+      "TA0005"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1036"
+  },
+  {
+    "id": "T1036.011",
+    "name": "Overwrite Process Arguments",
+    "tactic_ids": [
+      "TA0005"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1036"
+  },
+  {
+    "id": "T1036.012",
+    "name": "Browser Fingerprint",
     "tactic_ids": [
       "TA0005"
     ],
@@ -1108,6 +1180,33 @@
     "parent_id": "T1059"
   },
   {
+    "id": "T1059.011",
+    "name": "Lua",
+    "tactic_ids": [
+      "TA0002"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1059"
+  },
+  {
+    "id": "T1059.012",
+    "name": "Hypervisor CLI",
+    "tactic_ids": [
+      "TA0002"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1059"
+  },
+  {
+    "id": "T1059.013",
+    "name": "Container CLI/API",
+    "tactic_ids": [
+      "TA0002"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1059"
+  },
+  {
     "id": "T1068",
     "name": "Exploitation for Privilege Escalation",
     "tactic_ids": [
@@ -1160,24 +1259,6 @@
     ],
     "is_subtechnique": false,
     "parent_id": null
-  },
-  {
-    "id": "T1070.001",
-    "name": "Clear Windows Event Logs",
-    "tactic_ids": [
-      "TA0005"
-    ],
-    "is_subtechnique": true,
-    "parent_id": "T1070"
-  },
-  {
-    "id": "T1070.002",
-    "name": "Clear Linux or Mac System Logs",
-    "tactic_ids": [
-      "TA0005"
-    ],
-    "is_subtechnique": true,
-    "parent_id": "T1070"
   },
   {
     "id": "T1070.003",
@@ -1243,6 +1324,15 @@
     "parent_id": "T1070"
   },
   {
+    "id": "T1070.010",
+    "name": "Relocate Malware",
+    "tactic_ids": [
+      "TA0005"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1070"
+  },
+  {
     "id": "T1071",
     "name": "Application Layer Protocol",
     "tactic_ids": [
@@ -1281,6 +1371,15 @@
   {
     "id": "T1071.004",
     "name": "DNS",
+    "tactic_ids": [
+      "TA0011"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1071"
+  },
+  {
+    "id": "T1071.005",
+    "name": "Publish/Subscribe Protocols",
     "tactic_ids": [
       "TA0011"
     ],
@@ -1600,6 +1699,16 @@
     "parent_id": "T1098"
   },
   {
+    "id": "T1098.007",
+    "name": "Additional Local or Domain Groups",
+    "tactic_ids": [
+      "TA0003",
+      "TA0004"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1098"
+  },
+  {
     "id": "T1102",
     "name": "Web Service",
     "tactic_ids": [
@@ -1720,7 +1829,8 @@
     "id": "T1112",
     "name": "Modify Registry",
     "tactic_ids": [
-      "TA0005"
+      "TA0003",
+      "TA0112"
     ],
     "is_subtechnique": false,
     "parent_id": null
@@ -1828,6 +1938,7 @@
     "id": "T1127",
     "name": "Trusted Developer Utilities Proxy Execution",
     "tactic_ids": [
+      "TA0002",
       "TA0005"
     ],
     "is_subtechnique": false,
@@ -1837,6 +1948,27 @@
     "id": "T1127.001",
     "name": "MSBuild",
     "tactic_ids": [
+      "TA0002",
+      "TA0005"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1127"
+  },
+  {
+    "id": "T1127.002",
+    "name": "ClickOnce",
+    "tactic_ids": [
+      "TA0002",
+      "TA0005"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1127"
+  },
+  {
+    "id": "T1127.003",
+    "name": "JamPlus",
+    "tactic_ids": [
+      "TA0002",
       "TA0005"
     ],
     "is_subtechnique": true,
@@ -2067,12 +2199,30 @@
   },
   {
     "id": "T1176",
-    "name": "Browser Extensions",
+    "name": "Software Extensions",
     "tactic_ids": [
       "TA0003"
     ],
     "is_subtechnique": false,
     "parent_id": null
+  },
+  {
+    "id": "T1176.001",
+    "name": "Browser Extensions",
+    "tactic_ids": [
+      "TA0003"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1176"
+  },
+  {
+    "id": "T1176.002",
+    "name": "IDE Extensions",
+    "tactic_ids": [
+      "TA0003"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1176"
   },
   {
     "id": "T1185",
@@ -2150,6 +2300,7 @@
     "id": "T1197",
     "name": "BITS Jobs",
     "tactic_ids": [
+      "TA0002",
       "TA0003",
       "TA0005"
     ],
@@ -2238,6 +2389,24 @@
     "parent_id": "T1204"
   },
   {
+    "id": "T1204.004",
+    "name": "Malicious Copy and Paste",
+    "tactic_ids": [
+      "TA0002"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1204"
+  },
+  {
+    "id": "T1204.005",
+    "name": "Malicious Library",
+    "tactic_ids": [
+      "TA0002"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1204"
+  },
+  {
     "id": "T1205",
     "name": "Traffic Signaling",
     "tactic_ids": [
@@ -2274,7 +2443,7 @@
     "id": "T1207",
     "name": "Rogue Domain Controller",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": false,
     "parent_id": null
@@ -2290,7 +2459,7 @@
   },
   {
     "id": "T1211",
-    "name": "Exploitation for Defense Evasion",
+    "name": "Exploitation for Stealth",
     "tactic_ids": [
       "TA0005"
     ],
@@ -2336,6 +2505,33 @@
   {
     "id": "T1213.003",
     "name": "Code Repositories",
+    "tactic_ids": [
+      "TA0009"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1213"
+  },
+  {
+    "id": "T1213.004",
+    "name": "Customer Relationship Management Software",
+    "tactic_ids": [
+      "TA0009"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1213"
+  },
+  {
+    "id": "T1213.005",
+    "name": "Messaging Applications",
+    "tactic_ids": [
+      "TA0009"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1213"
+  },
+  {
+    "id": "T1213.006",
+    "name": "Databases",
     "tactic_ids": [
       "TA0009"
     ],
@@ -2515,12 +2711,39 @@
   },
   {
     "id": "T1219",
-    "name": "Remote Access Software",
+    "name": "Remote Access Tools",
     "tactic_ids": [
       "TA0011"
     ],
     "is_subtechnique": false,
     "parent_id": null
+  },
+  {
+    "id": "T1219.001",
+    "name": "IDE Tunneling",
+    "tactic_ids": [
+      "TA0011"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1219"
+  },
+  {
+    "id": "T1219.002",
+    "name": "Remote Desktop Software",
+    "tactic_ids": [
+      "TA0011"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1219"
+  },
+  {
+    "id": "T1219.003",
+    "name": "Remote Access Hardware",
+    "tactic_ids": [
+      "TA0011"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1219"
   },
   {
     "id": "T1220",
@@ -2544,25 +2767,25 @@
     "id": "T1222",
     "name": "File and Directory Permissions Modification",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": false,
     "parent_id": null
   },
   {
     "id": "T1222.001",
-    "name": "Windows File and Directory Permissions Modification",
+    "name": "Windows Permissions",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1222"
   },
   {
     "id": "T1222.002",
-    "name": "Linux and Mac File and Directory Permissions Modification",
+    "name": "Linux and Mac Permissions",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1222"
@@ -2586,6 +2809,15 @@
     "parent_id": "T1480"
   },
   {
+    "id": "T1480.002",
+    "name": "Mutual Exclusion",
+    "tactic_ids": [
+      "TA0005"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1480"
+  },
+  {
     "id": "T1482",
     "name": "Domain Trust Discovery",
     "tactic_ids": [
@@ -2599,7 +2831,7 @@
     "name": "Domain or Tenant Policy Modification",
     "tactic_ids": [
       "TA0004",
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": false,
     "parent_id": null
@@ -2609,7 +2841,7 @@
     "name": "Group Policy Modification",
     "tactic_ids": [
       "TA0004",
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1484"
@@ -2619,7 +2851,7 @@
     "name": "Trust Modification",
     "tactic_ids": [
       "TA0004",
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1484"
@@ -2632,6 +2864,15 @@
     ],
     "is_subtechnique": false,
     "parent_id": null
+  },
+  {
+    "id": "T1485.001",
+    "name": "Lifecycle-Triggered Deletion",
+    "tactic_ids": [
+      "TA0040"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1485"
   },
   {
     "id": "T1486",
@@ -2706,6 +2947,42 @@
     "parent_id": null
   },
   {
+    "id": "T1496.001",
+    "name": "Compute Hijacking",
+    "tactic_ids": [
+      "TA0040"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1496"
+  },
+  {
+    "id": "T1496.002",
+    "name": "Bandwidth Hijacking",
+    "tactic_ids": [
+      "TA0040"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1496"
+  },
+  {
+    "id": "T1496.003",
+    "name": "SMS Pumping",
+    "tactic_ids": [
+      "TA0040"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1496"
+  },
+  {
+    "id": "T1496.004",
+    "name": "Cloud Service Hijacking",
+    "tactic_ids": [
+      "TA0040"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1496"
+  },
+  {
     "id": "T1497",
     "name": "Virtualization/Sandbox Evasion",
     "tactic_ids": [
@@ -2737,7 +3014,7 @@
   },
   {
     "id": "T1497.003",
-    "name": "Time Based Evasion",
+    "name": "Time Based Checks",
     "tactic_ids": [
       "TA0005",
       "TA0007"
@@ -2872,6 +3149,15 @@
     "parent_id": "T1505"
   },
   {
+    "id": "T1505.006",
+    "name": "vSphere Installation Bundles",
+    "tactic_ids": [
+      "TA0003"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1505"
+  },
+  {
     "id": "T1518",
     "name": "Software Discovery",
     "tactic_ids": [
@@ -2883,6 +3169,15 @@
   {
     "id": "T1518.001",
     "name": "Security Software Discovery",
+    "tactic_ids": [
+      "TA0007"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1518"
+  },
+  {
+    "id": "T1518.002",
+    "name": "Backup Software Discovery",
     "tactic_ids": [
       "TA0007"
     ],
@@ -3279,6 +3574,26 @@
     "parent_id": "T1546"
   },
   {
+    "id": "T1546.017",
+    "name": "Udev Rules",
+    "tactic_ids": [
+      "TA0003",
+      "TA0004"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1546"
+  },
+  {
+    "id": "T1546.018",
+    "name": "Python Startup Hooks",
+    "tactic_ids": [
+      "TA0003",
+      "TA0004"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1546"
+  },
+  {
     "id": "T1547",
     "name": "Boot or Logon Autostart Execution",
     "tactic_ids": [
@@ -3432,8 +3747,7 @@
     "id": "T1548",
     "name": "Abuse Elevation Control Mechanism",
     "tactic_ids": [
-      "TA0004",
-      "TA0005"
+      "TA0004"
     ],
     "is_subtechnique": false,
     "parent_id": null
@@ -3442,8 +3756,7 @@
     "id": "T1548.001",
     "name": "Setuid and Setgid",
     "tactic_ids": [
-      "TA0004",
-      "TA0005"
+      "TA0004"
     ],
     "is_subtechnique": true,
     "parent_id": "T1548"
@@ -3452,8 +3765,7 @@
     "id": "T1548.002",
     "name": "Bypass User Account Control",
     "tactic_ids": [
-      "TA0004",
-      "TA0005"
+      "TA0004"
     ],
     "is_subtechnique": true,
     "parent_id": "T1548"
@@ -3462,8 +3774,7 @@
     "id": "T1548.003",
     "name": "Sudo and Sudo Caching",
     "tactic_ids": [
-      "TA0004",
-      "TA0005"
+      "TA0004"
     ],
     "is_subtechnique": true,
     "parent_id": "T1548"
@@ -3472,8 +3783,7 @@
     "id": "T1548.004",
     "name": "Elevated Execution with Prompt",
     "tactic_ids": [
-      "TA0004",
-      "TA0005"
+      "TA0004"
     ],
     "is_subtechnique": true,
     "parent_id": "T1548"
@@ -3482,8 +3792,7 @@
     "id": "T1548.005",
     "name": "Temporary Elevated Cloud Access",
     "tactic_ids": [
-      "TA0004",
-      "TA0005"
+      "TA0004"
     ],
     "is_subtechnique": true,
     "parent_id": "T1548"
@@ -3492,8 +3801,7 @@
     "id": "T1548.006",
     "name": "TCC Manipulation",
     "tactic_ids": [
-      "TA0004",
-      "TA0005"
+      "TA0004"
     ],
     "is_subtechnique": true,
     "parent_id": "T1548"
@@ -3502,7 +3810,6 @@
     "id": "T1550",
     "name": "Use Alternate Authentication Material",
     "tactic_ids": [
-      "TA0005",
       "TA0008"
     ],
     "is_subtechnique": false,
@@ -3512,7 +3819,6 @@
     "id": "T1550.001",
     "name": "Application Access Token",
     "tactic_ids": [
-      "TA0005",
       "TA0008"
     ],
     "is_subtechnique": true,
@@ -3522,7 +3828,6 @@
     "id": "T1550.002",
     "name": "Pass the Hash",
     "tactic_ids": [
-      "TA0005",
       "TA0008"
     ],
     "is_subtechnique": true,
@@ -3532,7 +3837,6 @@
     "id": "T1550.003",
     "name": "Pass the Ticket",
     "tactic_ids": [
-      "TA0005",
       "TA0008"
     ],
     "is_subtechnique": true,
@@ -3542,7 +3846,6 @@
     "id": "T1550.004",
     "name": "Web Session Cookie",
     "tactic_ids": [
-      "TA0005",
       "TA0008"
     ],
     "is_subtechnique": true,
@@ -3577,7 +3880,7 @@
   },
   {
     "id": "T1552.003",
-    "name": "Bash History",
+    "name": "Shell History",
     "tactic_ids": [
       "TA0006"
     ],
@@ -3633,7 +3936,7 @@
     "id": "T1553",
     "name": "Subvert Trust Controls",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": false,
     "parent_id": null
@@ -3642,7 +3945,7 @@
     "id": "T1553.001",
     "name": "Gatekeeper Bypass",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1553"
@@ -3651,7 +3954,7 @@
     "id": "T1553.002",
     "name": "Code Signing",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1553"
@@ -3660,7 +3963,7 @@
     "id": "T1553.003",
     "name": "SIP and Trust Provider Hijacking",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1553"
@@ -3669,7 +3972,7 @@
     "id": "T1553.004",
     "name": "Install Root Certificate",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1553"
@@ -3678,7 +3981,7 @@
     "id": "T1553.005",
     "name": "Mark-of-the-Web Bypass",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1553"
@@ -3687,7 +3990,7 @@
     "id": "T1553.006",
     "name": "Code Signing Policy Modification",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1553"
@@ -3769,8 +4072,8 @@
     "name": "Modify Authentication Process",
     "tactic_ids": [
       "TA0003",
-      "TA0005",
-      "TA0006"
+      "TA0006",
+      "TA0112"
     ],
     "is_subtechnique": false,
     "parent_id": null
@@ -3780,8 +4083,8 @@
     "name": "Domain Controller Authentication",
     "tactic_ids": [
       "TA0003",
-      "TA0005",
-      "TA0006"
+      "TA0006",
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1556"
@@ -3791,8 +4094,8 @@
     "name": "Password Filter DLL",
     "tactic_ids": [
       "TA0003",
-      "TA0005",
-      "TA0006"
+      "TA0006",
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1556"
@@ -3802,8 +4105,8 @@
     "name": "Pluggable Authentication Modules",
     "tactic_ids": [
       "TA0003",
-      "TA0005",
-      "TA0006"
+      "TA0006",
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1556"
@@ -3813,8 +4116,8 @@
     "name": "Network Device Authentication",
     "tactic_ids": [
       "TA0003",
-      "TA0005",
-      "TA0006"
+      "TA0006",
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1556"
@@ -3824,8 +4127,8 @@
     "name": "Reversible Encryption",
     "tactic_ids": [
       "TA0003",
-      "TA0005",
-      "TA0006"
+      "TA0006",
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1556"
@@ -3835,8 +4138,8 @@
     "name": "Multi-Factor Authentication",
     "tactic_ids": [
       "TA0003",
-      "TA0005",
-      "TA0006"
+      "TA0006",
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1556"
@@ -3846,8 +4149,8 @@
     "name": "Hybrid Identity",
     "tactic_ids": [
       "TA0003",
-      "TA0005",
-      "TA0006"
+      "TA0006",
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1556"
@@ -3857,8 +4160,8 @@
     "name": "Network Provider DLL",
     "tactic_ids": [
       "TA0003",
-      "TA0005",
-      "TA0006"
+      "TA0006",
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1556"
@@ -3868,8 +4171,8 @@
     "name": "Conditional Access Policies",
     "tactic_ids": [
       "TA0003",
-      "TA0005",
-      "TA0006"
+      "TA0006",
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1556"
@@ -3886,7 +4189,7 @@
   },
   {
     "id": "T1557.001",
-    "name": "LLMNR/NBT-NS Poisoning and SMB Relay",
+    "name": "Name Resolution Poisoning and SMB Relay",
     "tactic_ids": [
       "TA0006",
       "TA0009"
@@ -3907,6 +4210,16 @@
   {
     "id": "T1557.003",
     "name": "DHCP Spoofing",
+    "tactic_ids": [
+      "TA0006",
+      "TA0009"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1557"
+  },
+  {
+    "id": "T1557.004",
+    "name": "Evil Twin",
     "tactic_ids": [
       "TA0006",
       "TA0009"
@@ -3953,6 +4266,15 @@
   {
     "id": "T1558.004",
     "name": "AS-REP Roasting",
+    "tactic_ids": [
+      "TA0006"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1558"
+  },
+  {
+    "id": "T1558.005",
+    "name": "Ccache Files",
     "tactic_ids": [
       "TA0006"
     ],
@@ -4057,114 +4379,6 @@
     ],
     "is_subtechnique": true,
     "parent_id": "T1561"
-  },
-  {
-    "id": "T1562",
-    "name": "Impair Defenses",
-    "tactic_ids": [
-      "TA0005"
-    ],
-    "is_subtechnique": false,
-    "parent_id": null
-  },
-  {
-    "id": "T1562.001",
-    "name": "Disable or Modify Tools",
-    "tactic_ids": [
-      "TA0005"
-    ],
-    "is_subtechnique": true,
-    "parent_id": "T1562"
-  },
-  {
-    "id": "T1562.002",
-    "name": "Disable Windows Event Logging",
-    "tactic_ids": [
-      "TA0005"
-    ],
-    "is_subtechnique": true,
-    "parent_id": "T1562"
-  },
-  {
-    "id": "T1562.003",
-    "name": "Impair Command History Logging",
-    "tactic_ids": [
-      "TA0005"
-    ],
-    "is_subtechnique": true,
-    "parent_id": "T1562"
-  },
-  {
-    "id": "T1562.004",
-    "name": "Disable or Modify System Firewall",
-    "tactic_ids": [
-      "TA0005"
-    ],
-    "is_subtechnique": true,
-    "parent_id": "T1562"
-  },
-  {
-    "id": "T1562.006",
-    "name": "Indicator Blocking",
-    "tactic_ids": [
-      "TA0005"
-    ],
-    "is_subtechnique": true,
-    "parent_id": "T1562"
-  },
-  {
-    "id": "T1562.007",
-    "name": "Disable or Modify Cloud Firewall",
-    "tactic_ids": [
-      "TA0005"
-    ],
-    "is_subtechnique": true,
-    "parent_id": "T1562"
-  },
-  {
-    "id": "T1562.008",
-    "name": "Disable or Modify Cloud Logs",
-    "tactic_ids": [
-      "TA0005"
-    ],
-    "is_subtechnique": true,
-    "parent_id": "T1562"
-  },
-  {
-    "id": "T1562.009",
-    "name": "Safe Mode Boot",
-    "tactic_ids": [
-      "TA0005"
-    ],
-    "is_subtechnique": true,
-    "parent_id": "T1562"
-  },
-  {
-    "id": "T1562.010",
-    "name": "Downgrade Attack",
-    "tactic_ids": [
-      "TA0005"
-    ],
-    "is_subtechnique": true,
-    "parent_id": "T1562"
-  },
-  {
-    "id": "T1562.011",
-    "name": "Spoof Security Alerting",
-    "tactic_ids": [
-      "TA0005"
-    ],
-    "is_subtechnique": true,
-    "parent_id": "T1562"
-  },
-  {
-    "id": "T1562.012",
-    "name": "Disable or Modify Linux Audit System",
-    "tactic_ids": [
-      "TA0005"
-    ],
-    "is_subtechnique": true,
-    "parent_id": "T1562"
   },
   {
     "id": "T1563",
@@ -4304,6 +4518,24 @@
   {
     "id": "T1564.012",
     "name": "File/Path Exclusions",
+    "tactic_ids": [
+      "TA0005"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1564"
+  },
+  {
+    "id": "T1564.013",
+    "name": "Bind Mounts",
+    "tactic_ids": [
+      "TA0005"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1564"
+  },
+  {
+    "id": "T1564.014",
+    "name": "Extended Attributes",
     "tactic_ids": [
       "TA0005"
     ],
@@ -4500,6 +4732,15 @@
     "parent_id": "T1569"
   },
   {
+    "id": "T1569.003",
+    "name": "Systemctl",
+    "tactic_ids": [
+      "TA0002"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1569"
+  },
+  {
     "id": "T1570",
     "name": "Lateral Tool Transfer",
     "tactic_ids": [
@@ -4557,8 +4798,7 @@
     "id": "T1574",
     "name": "Hijack Execution Flow",
     "tactic_ids": [
-      "TA0003",
-      "TA0004",
+      "TA0002",
       "TA0005"
     ],
     "is_subtechnique": false,
@@ -4566,21 +4806,9 @@
   },
   {
     "id": "T1574.001",
-    "name": "DLL Search Order Hijacking",
+    "name": "DLL",
     "tactic_ids": [
-      "TA0003",
-      "TA0004",
-      "TA0005"
-    ],
-    "is_subtechnique": true,
-    "parent_id": "T1574"
-  },
-  {
-    "id": "T1574.002",
-    "name": "DLL Side-Loading",
-    "tactic_ids": [
-      "TA0003",
-      "TA0004",
+      "TA0002",
       "TA0005"
     ],
     "is_subtechnique": true,
@@ -4590,8 +4818,7 @@
     "id": "T1574.004",
     "name": "Dylib Hijacking",
     "tactic_ids": [
-      "TA0003",
-      "TA0004",
+      "TA0002",
       "TA0005"
     ],
     "is_subtechnique": true,
@@ -4601,8 +4828,7 @@
     "id": "T1574.005",
     "name": "Executable Installer File Permissions Weakness",
     "tactic_ids": [
-      "TA0003",
-      "TA0004",
+      "TA0002",
       "TA0005"
     ],
     "is_subtechnique": true,
@@ -4612,8 +4838,7 @@
     "id": "T1574.006",
     "name": "Dynamic Linker Hijacking",
     "tactic_ids": [
-      "TA0003",
-      "TA0004",
+      "TA0002",
       "TA0005"
     ],
     "is_subtechnique": true,
@@ -4623,8 +4848,7 @@
     "id": "T1574.007",
     "name": "Path Interception by PATH Environment Variable",
     "tactic_ids": [
-      "TA0003",
-      "TA0004",
+      "TA0002",
       "TA0005"
     ],
     "is_subtechnique": true,
@@ -4634,8 +4858,7 @@
     "id": "T1574.008",
     "name": "Path Interception by Search Order Hijacking",
     "tactic_ids": [
-      "TA0003",
-      "TA0004",
+      "TA0002",
       "TA0005"
     ],
     "is_subtechnique": true,
@@ -4645,8 +4868,7 @@
     "id": "T1574.009",
     "name": "Path Interception by Unquoted Path",
     "tactic_ids": [
-      "TA0003",
-      "TA0004",
+      "TA0002",
       "TA0005"
     ],
     "is_subtechnique": true,
@@ -4656,8 +4878,7 @@
     "id": "T1574.010",
     "name": "Services File Permissions Weakness",
     "tactic_ids": [
-      "TA0003",
-      "TA0004",
+      "TA0002",
       "TA0005"
     ],
     "is_subtechnique": true,
@@ -4667,8 +4888,7 @@
     "id": "T1574.011",
     "name": "Services Registry Permissions Weakness",
     "tactic_ids": [
-      "TA0003",
-      "TA0004",
+      "TA0002",
       "TA0005"
     ],
     "is_subtechnique": true,
@@ -4678,8 +4898,7 @@
     "id": "T1574.012",
     "name": "COR_PROFILER",
     "tactic_ids": [
-      "TA0003",
-      "TA0004",
+      "TA0002",
       "TA0005"
     ],
     "is_subtechnique": true,
@@ -4689,8 +4908,7 @@
     "id": "T1574.013",
     "name": "KernelCallbackTable",
     "tactic_ids": [
-      "TA0003",
-      "TA0004",
+      "TA0002",
       "TA0005"
     ],
     "is_subtechnique": true,
@@ -4700,8 +4918,7 @@
     "id": "T1574.014",
     "name": "AppDomainManager",
     "tactic_ids": [
-      "TA0003",
-      "TA0004",
+      "TA0002",
       "TA0005"
     ],
     "is_subtechnique": true,
@@ -4711,7 +4928,7 @@
     "id": "T1578",
     "name": "Modify Cloud Compute Infrastructure",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": false,
     "parent_id": null
@@ -4720,7 +4937,7 @@
     "id": "T1578.001",
     "name": "Create Snapshot",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1578"
@@ -4729,7 +4946,7 @@
     "id": "T1578.002",
     "name": "Create Cloud Instance",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1578"
@@ -4738,7 +4955,7 @@
     "id": "T1578.003",
     "name": "Delete Cloud Instance",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1578"
@@ -4747,7 +4964,7 @@
     "id": "T1578.004",
     "name": "Revert Cloud Instance",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1578"
@@ -4756,7 +4973,7 @@
     "id": "T1578.005",
     "name": "Modify Cloud Compute Configurations",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1578"
@@ -5521,7 +5738,7 @@
     "id": "T1599",
     "name": "Network Boundary Bridging",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": false,
     "parent_id": null
@@ -5530,7 +5747,7 @@
     "id": "T1599.001",
     "name": "Network Address Translation Traversal",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1599"
@@ -5539,7 +5756,7 @@
     "id": "T1600",
     "name": "Weaken Encryption",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": false,
     "parent_id": null
@@ -5548,7 +5765,7 @@
     "id": "T1600.001",
     "name": "Reduce Key Space",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1600"
@@ -5557,7 +5774,7 @@
     "id": "T1600.002",
     "name": "Disable Crypto Hardware",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1600"
@@ -5566,7 +5783,7 @@
     "id": "T1601",
     "name": "Modify System Image",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": false,
     "parent_id": null
@@ -5575,7 +5792,7 @@
     "id": "T1601.001",
     "name": "Patch System Image",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1601"
@@ -5584,7 +5801,7 @@
     "id": "T1601.002",
     "name": "Downgrade System Image",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": true,
     "parent_id": "T1601"
@@ -5707,6 +5924,15 @@
     "parent_id": "T1608"
   },
   {
+    "id": "T1608.007",
+    "name": "AI Result Poisoning",
+    "tactic_ids": [
+      "TA0042"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1608"
+  },
+  {
     "id": "T1609",
     "name": "Container Administration Command",
     "tactic_ids": [
@@ -5719,8 +5945,7 @@
     "id": "T1610",
     "name": "Deploy Container",
     "tactic_ids": [
-      "TA0002",
-      "TA0005"
+      "TA0002"
     ],
     "is_subtechnique": false,
     "parent_id": null
@@ -5820,7 +6045,7 @@
     "id": "T1647",
     "name": "Plist File Modification",
     "tactic_ids": [
-      "TA0005"
+      "TA0112"
     ],
     "is_subtechnique": false,
     "parent_id": null
@@ -5889,15 +6114,6 @@
     "parent_id": null
   },
   {
-    "id": "T1656",
-    "name": "Impersonation",
-    "tactic_ids": [
-      "TA0005"
-    ],
-    "is_subtechnique": false,
-    "parent_id": null
-  },
-  {
     "id": "T1657",
     "name": "Financial Theft",
     "tactic_ids": [
@@ -5921,6 +6137,393 @@
     "name": "Hide Infrastructure",
     "tactic_ids": [
       "TA0011"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1666",
+    "name": "Modify Cloud Resource Hierarchy",
+    "tactic_ids": [
+      "TA0112"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1667",
+    "name": "Email Bombing",
+    "tactic_ids": [
+      "TA0040"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1668",
+    "name": "Exclusive Control",
+    "tactic_ids": [
+      "TA0003"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1669",
+    "name": "Wi-Fi Networks",
+    "tactic_ids": [
+      "TA0001"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1671",
+    "name": "Cloud Application Integration",
+    "tactic_ids": [
+      "TA0003"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1673",
+    "name": "Virtual Machine Discovery",
+    "tactic_ids": [
+      "TA0007"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1674",
+    "name": "Input Injection",
+    "tactic_ids": [
+      "TA0002"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1675",
+    "name": "ESXi Administration Command",
+    "tactic_ids": [
+      "TA0002"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1677",
+    "name": "Poisoned Pipeline Execution",
+    "tactic_ids": [
+      "TA0002"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1678",
+    "name": "Delay Execution",
+    "tactic_ids": [
+      "TA0005"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1679",
+    "name": "Selective Exclusion",
+    "tactic_ids": [
+      "TA0005"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1680",
+    "name": "Local Storage Discovery",
+    "tactic_ids": [
+      "TA0007"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1681",
+    "name": "Search Threat Vendor Data",
+    "tactic_ids": [
+      "TA0043"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1682",
+    "name": "Query Public AI Services",
+    "tactic_ids": [
+      "TA0043"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1683",
+    "name": "Generate Content",
+    "tactic_ids": [
+      "TA0042"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1683.001",
+    "name": "Written Content",
+    "tactic_ids": [
+      "TA0042"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1683"
+  },
+  {
+    "id": "T1683.002",
+    "name": "Audio-Visual Content",
+    "tactic_ids": [
+      "TA0042"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1683"
+  },
+  {
+    "id": "T1684",
+    "name": "Social Engineering",
+    "tactic_ids": [
+      "TA0005"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1684.001",
+    "name": "Impersonation",
+    "tactic_ids": [
+      "TA0005"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1684"
+  },
+  {
+    "id": "T1684.002",
+    "name": "Email Spoofing",
+    "tactic_ids": [
+      "TA0005"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1684"
+  },
+  {
+    "id": "T1685",
+    "name": "Disable or Modify Tools",
+    "tactic_ids": [
+      "TA0112"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1685.001",
+    "name": "Disable or Modify Windows Event Log",
+    "tactic_ids": [
+      "TA0112"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1685"
+  },
+  {
+    "id": "T1685.002",
+    "name": "Disable or Modify Cloud Log",
+    "tactic_ids": [
+      "TA0112"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1685"
+  },
+  {
+    "id": "T1685.003",
+    "name": "Modify or Spoof Tool UI",
+    "tactic_ids": [
+      "TA0112"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1685"
+  },
+  {
+    "id": "T1685.004",
+    "name": "Disable or Modify Linux Audit System Log",
+    "tactic_ids": [
+      "TA0112"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1685"
+  },
+  {
+    "id": "T1685.005",
+    "name": "Clear Windows Event Logs",
+    "tactic_ids": [
+      "TA0112"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1685"
+  },
+  {
+    "id": "T1685.006",
+    "name": "Clear Linux or Mac System Logs",
+    "tactic_ids": [
+      "TA0112"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1685"
+  },
+  {
+    "id": "T1685.007",
+    "name": "Impair Autonomous Defenses",
+    "tactic_ids": [
+      "TA0112"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1685"
+  },
+  {
+    "id": "T1686",
+    "name": "Disable or Modify System Firewall",
+    "tactic_ids": [
+      "TA0112"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1686.001",
+    "name": "Cloud Firewall",
+    "tactic_ids": [
+      "TA0112"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1686"
+  },
+  {
+    "id": "T1686.002",
+    "name": "Network Device Firewall",
+    "tactic_ids": [
+      "TA0112"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1686"
+  },
+  {
+    "id": "T1686.003",
+    "name": "Windows Host Firewall",
+    "tactic_ids": [
+      "TA0112"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1686"
+  },
+  {
+    "id": "T1687",
+    "name": "Exploitation for Defense Impairment",
+    "tactic_ids": [
+      "TA0112"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1688",
+    "name": "Safe Mode Boot",
+    "tactic_ids": [
+      "TA0112"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1689",
+    "name": "Downgrade Attack",
+    "tactic_ids": [
+      "TA0112"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1690",
+    "name": "Prevent Command History Logging",
+    "tactic_ids": [
+      "TA0112"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1696",
+    "name": "Anti-Automation Evasion",
+    "tactic_ids": [
+      "TA0005"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1696.001",
+    "name": "Automate CAPTCHA Completion",
+    "tactic_ids": [
+      "TA0005"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1696"
+  },
+  {
+    "id": "T1696.002",
+    "name": "Avoid CAPTCHA",
+    "tactic_ids": [
+      "TA0005"
+    ],
+    "is_subtechnique": true,
+    "parent_id": "T1696"
+  },
+  {
+    "id": "T1697",
+    "name": "Steal Application Specific Passwords",
+    "tactic_ids": [
+      "TA0006"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1698",
+    "name": "Indirect Prompt Injection",
+    "tactic_ids": [
+      "TA0002"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1699",
+    "name": "Direct Prompt Injection",
+    "tactic_ids": [
+      "TA0002"
+    ],
+    "is_subtechnique": false,
+    "parent_id": null
+  },
+  {
+    "id": "T1700",
+    "name": "AI-Enabled Exfiltration",
+    "tactic_ids": [
+      "TA0010"
     ],
     "is_subtechnique": false,
     "parent_id": null

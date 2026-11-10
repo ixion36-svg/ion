@@ -1,0 +1,147 @@
+{# ATT&CK detection guidance for one rule, as the second drill-down panel.
+
+   The table this opens from says a rule is noisy. This answers the two
+   questions that follow: what the behaviour is supposed to look like, and
+   whether the telemetry to see it is collected at all. Both come from the
+   bundled ATT&CK snapshot -- Detection Strategies and their Analytics, which
+   replaced the free-text detection field at v18.
+
+   Appearance is in the page sheet as `.dha-*`, not as utility classes here,
+   the way cases_attack_path.html carries `.apg-*`. A restyle is then one edit
+   in frontend/ion-pages.css and it is themed through the tokens, which is
+   what the `styled` column in docs/UI_REDESIGN.md is measuring.
+
+   Four states, never collapsed into "nothing to show". A snapshot that did
+   not load, a rule whose alerts carry no technique, and techniques with no
+   matching strategy are three different findings, and only one of them is
+   about the rule. ion/web/ui/detection_health.py::attack_panel decides which.
+
+   The Hide control is in every state, for the reason the disagreements
+   fragment gives: the row this swaps into is un-hidden by the click that
+   requests it, so a state without Hide strands an open row. #}
+
+<div class="dh-drill-panel text-sm p-3 bg-base-300 rounded mt-1">
+  <div class="flex items-start justify-between gap-3">
+    <div class="min-w-0 w-full">
+
+      {% if failed %}
+        <span role="alert">
+          ATT&amp;CK guidance for <span class="font-mono">{{ rule }}</span>
+          could not be read. This is not a statement that MITRE publishes no
+          detection for this rule's techniques: the read failed, so nothing
+          here is known.
+        </span>
+
+      {% elif panel.state == 'unloaded' %}
+        <span role="alert">
+          The bundled ATT&amp;CK snapshot could not be read, so no guidance
+          can be shown. This says nothing about
+          <span class="font-mono">{{ rule }}</span> &mdash; it is a missing
+          data file, not a finding about the rule.
+        </span>
+
+      {% elif panel.state == 'untagged' %}
+        No ATT&amp;CK technique is recorded on any alert
+        <span class="font-mono">{{ rule }}</span> fired in the last
+        {{ panel.period_days }} days, so there is nothing to look guidance up
+        by. That is a gap in the rule's own ATT&amp;CK mapping rather than an
+        absence of guidance.
+
+      {% elif panel.state == 'unmatched' %}
+        This rule's alerts carry
+        {{ panel.without_guidance | join(', ') }}, which the bundled
+        ATT&amp;CK v{{ panel.attack_version }} snapshot has no detection
+        strategy for. Technique ids older than the snapshot usually land here.
+
+      {% else %}
+        <div class="dha-head">
+          <span class="dha-title">ATT&amp;CK detection guidance</span>
+          <span class="dha-ver">v{{ panel.attack_version }}</span>
+          <span class="dha-meta">
+            {{ panel.techniques | length }} technique(s),
+            {{ panel.analytic_total }} analytic(s), from
+            {{ panel.alerts_seen }} alert(s) in {{ panel.period_days }}d
+          </span>
+        </div>
+
+        {% for tech in panel.techniques %}
+          <div class="dha-tech">
+            <div class="dha-tech-head">
+              <span class="dha-tid">{{ tech.technique_id }}</span>
+              {# A retired id is shown beside its replacement, never silently
+                 rewritten: the rule is tagged with the old one, and an
+                 engineer comparing the two needs to see why they differ. #}
+              {% for old in tech.retired_from %}
+                <span class="dha-retired"
+                      title="This rule's alerts are tagged {{ old }}, which ATT&CK retired in favour of {{ tech.technique_id }}. The guidance below is filed under the replacement.">{{ old }} &rarr; retired</span>
+              {% endfor %}
+            </div>
+
+            {% for strategy in tech.strategies %}
+              <div class="dha-strategy">
+                <div class="dha-strategy-name">
+                  {{ strategy.name }}<span class="dha-det">{{ strategy.id }}</span>
+                </div>
+                {% for analytic in strategy.analytics %}
+                  <div class="dha-an">
+                    <div class="dha-an-head">
+                      <span class="dha-an-id">{{ analytic.id }}</span>
+                      {% for platform in analytic.platforms %}
+                        <span class="dha-plat">{{ platform }}</span>
+                      {% endfor %}
+                    </div>
+                    <div class="dha-desc">{{ analytic.description }}</div>
+                    {% if analytic.tunables %}
+                      <div class="dha-tune">
+                        Tune:
+                        {% for t in analytic.tunables %}
+                          <span class="dha-tune-field" title="{{ t.description }}">{{ t.field }}</span>{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                      </div>
+                    {% endif %}
+                  </div>
+                {% endfor %}
+              </div>
+            {% endfor %}
+          </div>
+        {% endfor %}
+
+        {% if panel.without_guidance %}
+          <p class="dha-note">
+            No strategy in the snapshot for
+            {{ panel.without_guidance | join(', ') }}.
+          </p>
+        {% endif %}
+
+        {# The telemetry question, asked once for the rule. An analytic whose
+           log source is not collected cannot run, and that is a different
+           problem from a rule that is tuned badly. #}
+        {% if panel.log_sources %}
+          <div class="dha-tele">
+            <div class="dha-tele-head">
+              Telemetry these analytics read
+              <span class="dha-tele-note">
+                ({{ panel.log_sources | length }} source(s) &mdash; ION does not
+                check whether you collect them)
+              </span>
+            </div>
+            <table class="table table-xs">
+              <thead><tr><th>Log source</th><th>Channel</th><th>For</th></tr></thead>
+              <tbody>
+                {% for source in panel.log_sources %}
+                  <tr>
+                    <td class="font-mono text-xs">{{ source.name or '—' }}</td>
+                    <td class="font-mono text-xs">{{ source.channel or '—' }}</td>
+                    <td class="font-mono text-xs dha-tele-note">{{ source.technique_ids | join(', ') }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+      {% endif %}
+
+    </div>
+    <button class="btn btn-ghost btn-xs shrink-0" data-click-action="dhHide">Hide</button>
+  </div>
+</div>

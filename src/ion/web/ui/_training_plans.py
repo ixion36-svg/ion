@@ -99,13 +99,14 @@ def training_forecast(request: Request,
         and (data.get('totals') is None or _valid_numbers(data['totals'], ('total', 'company', 'self', 'split', 'tbd')))
         and (
             data.get('by_employment_type') is None
-            or (
-                employment is not None
-                and all(
-                    _valid_numbers(d, ('total', 'company', 'self', 'split', 'tbd'), ('headcount', 'certs'))
-                    for d in employment.values()
-                )
-            )
+            # Parenthesised, not just wrapped: `and` already bound tighter
+            # than `or` on the single line, so this is the same expression
+            # with the grouping now visible.
+            or (employment is not None and all(
+                _valid_numbers(d, ('total', 'company', 'self', 'split', 'tbd'),
+                               ('headcount', 'certs'))
+                for d in employment.values()
+            ))
         )
         and _valid_numbers(data, counts=('plan_count',))
     )

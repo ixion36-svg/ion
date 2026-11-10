@@ -22,7 +22,7 @@ page cannot be forgotten. Status is measured, never set by hand.
 | measure | remaining |
 |---|---|
 | templates | 80 |
-| total lines | 46,013 |
+| total lines | 46,014 |
 | inline `<style>` lines | 0 |
 | runtime DOM writes | 0 |
 | literal light-on-dark colours | 0 |
@@ -48,7 +48,7 @@ A restyle here is a markup edit and is fully visible in a screenshot.
 |---|--:|--:|--:|--:|:--:|:--:|:--:|:--:|
 | `alerts.html` | 6577 | 0 | 6007 | 0 | yes | yes | yes | **done** |
 | `training.html` | 6526 | 0 | 5715 | 0 | yes | yes | yes | **done** |
-| `cases.html` | 2393 | 0 | 2102 | 0 | yes | yes | yes | **done** |
+| `cases.html` | 2394 | 0 | 2101 | 0 | yes | yes | yes | **done** |
 | `documents.html` | 1542 | 0 | 1215 | 0 | yes | yes | yes | **done** |
 | `settings.html` | 1536 | 0 | 757 | 0 | yes | yes | yes | **done** |
 | `tools.html` | 1503 | 0 | 1055 | 0 | yes | yes | yes | **done** |
@@ -123,7 +123,7 @@ A restyle here is a markup edit and is fully visible in a screenshot.
 | `service_accounts.html` | 50 | 0 | 0 | 0 | yes | yes | yes | **done** |
 | `threat_intel_actor.html` | 44 | 0 | 0 | 0 | yes | yes | yes | **done** |
 
-Subtotal: 76 templates, 45,259 lines, 0 inline css lines, 0 runtime writes, 0 light-mode literals.
+Subtotal: 76 templates, 45,260 lines, 0 inline css lines, 0 runtime writes, 0 light-mode literals.
 
 ## Cleanup, so nothing is left behind
 

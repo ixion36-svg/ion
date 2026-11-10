@@ -755,7 +755,6 @@ async def _startup_event():
     from ion.storage.database import (
         LOCK_ANALYTICS_BG_LOOP,
         LOCK_CASE_GROUPER_BG,
-        LOCK_INVESTIGATION_BG,
         LOCK_KIBANA_BG_SYNC,
         LOCK_SCHEDULER_BG,
         LOCK_SEED_ANALYTICS_JOBS,
@@ -1039,27 +1038,6 @@ async def _startup_event():
         run_scheduler_loop(interval_s=interval)
         logger.info("Generic scheduler background loop started")
     run_locked(engine, LOCK_SCHEDULER_BG, "scheduler_bg_loop", _start_scheduler,
-               hold_until_close=True)
-
-    # ---------------------------------------------------------------
-    # Autonomous investigation background sweep (single worker —
-    # hold_until_close). Honours ION_INVESTIGATION_LOOP_ENABLED.
-    # ---------------------------------------------------------------
-    def _start_investigation_loop():
-        from ion.services.investigation_service import (
-            should_run_per_alert_sweep,
-            start_investigation_loop_if_enabled,
-        )
-        if not should_run_per_alert_sweep(config):
-            logger.info(
-                "Per-alert investigation sweep NOT started — the case grouper is the "
-                "active investigator (or the loop is disabled). Bob runs per-case at "
-                "case creation instead."
-            )
-            return
-        start_investigation_loop_if_enabled(engine=engine)
-        logger.info("Autonomous investigation loop startup attempted")
-    run_locked(engine, LOCK_INVESTIGATION_BG, "investigation_bg_loop", _start_investigation_loop,
                hold_until_close=True)
 
     # ---------------------------------------------------------------

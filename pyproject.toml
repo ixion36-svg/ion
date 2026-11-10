@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ion"
-version = "0.99.13"
+version = "0.99.15"
 description = "Intelligent Operating Network - Security Operations Portal for Guarded Glass"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -112,6 +112,9 @@ dev = [
     "diff-cover",     # v0.100.0: gates coverage on CHANGED lines, not the total
     "ruff",
     "mypy",
+    # Validates security/ion.csaf.json against OASIS's own schema. Declared so
+    # the check cannot quietly become a skip on a machine without it.
+    "jsonschema>=4.18",
 ]
 
 [project.scripts]

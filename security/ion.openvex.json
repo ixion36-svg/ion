@@ -1,0 +1,193 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://ixion36.dev/vex/ion/0.99.15/ad9c6173634ccdf5",
+  "author": "ION maintainer (ixion36)",
+  "role": "vendor",
+  "timestamp": "2026-11-10T07:53:48Z",
+  "version": 1,
+  "statements": [
+    {
+      "vulnerability": {
+        "name": "CVE-2024-23342"
+      },
+      "products": [
+        {
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.15"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "component_not_present",
+      "impact_statement": "The Minerva timing attack is in `ecdsa`, which reached ION only as a transitive dependency of python-jose. ION migrated to PyJWT, which pulls `cryptography` and no `ecdsa`, so the package is absent from the image."
+    },
+    {
+      "vulnerability": {
+        "name": "MAL-2026-4750"
+      },
+      "products": [
+        {
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.15"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "component_not_present",
+      "impact_statement": "The compromised artefact is the fastapi 0.136.3 wheel, whose metadata adds an undocumented dependency on a typo-squat package. ION pins fastapi >=0.136.1,<0.136.3, so the affected release is never resolved. ION also does not use the [standard] extra through which the typo-squat would have installed."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2025-71176"
+      },
+      "products": [
+        {
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.15"
+        }
+      ],
+      "status": "not_affected",
+      "justification": "component_not_present",
+      "impact_statement": "The /tmp race is in pytest, which is a dev extra. The runtime image installs only the resolved runtime venv, so pytest is not present in a shipped ION container."
+    },
+    {
+      "vulnerability": {
+        "name": "PYSEC-2026-35"
+      },
+      "products": [
+        {
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.15"
+        }
+      ],
+      "status": "fixed",
+      "impact_statement": "DNS constraint bypass in cryptography; ION pins cryptography>=46.0.7."
+    },
+    {
+      "vulnerability": {
+        "name": "PYSEC-2026-161"
+      },
+      "products": [
+        {
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.15"
+        }
+      ],
+      "status": "fixed",
+      "impact_statement": "Host-header URL reconstruction in starlette. ION pins starlette>=1.0.1, which requires fastapi>=0.136.1 to drop its upper cap."
+    },
+    {
+      "vulnerability": {
+        "name": "PYSEC-2026-141"
+      },
+      "products": [
+        {
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.15"
+        }
+      ],
+      "status": "fixed",
+      "impact_statement": "ION pins urllib3>=2.7.0."
+    },
+    {
+      "vulnerability": {
+        "name": "PYSEC-2026-87"
+      },
+      "products": [
+        {
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.15"
+        }
+      ],
+      "status": "fixed",
+      "impact_statement": "lxml, reached as a WeasyPrint dependency. ION pins lxml>=6.1.0."
+    },
+    {
+      "vulnerability": {
+        "name": "PYSEC-2026-3447"
+      },
+      "products": [
+        {
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.15"
+        }
+      ],
+      "status": "fixed",
+      "impact_statement": "ION pins setuptools>=83.0.0."
+    },
+    {
+      "vulnerability": {
+        "name": "PYSEC-2026-120"
+      },
+      "products": [
+        {
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.15"
+        }
+      ],
+      "status": "fixed",
+      "impact_statement": "Critical-header bypass in PyJWT. ION pins PyJWT>=2.12.0 and validates RS256 tokens from Keycloak."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-45409"
+      },
+      "products": [
+        {
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.15"
+        }
+      ],
+      "status": "fixed",
+      "impact_statement": "ION pins idna>=3.15."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-40192"
+      },
+      "products": [
+        {
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.15"
+        }
+      ],
+      "status": "fixed",
+      "impact_statement": "Pillow, reached as a WeasyPrint dependency. ION pins Pillow>=12.2.0."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-30922"
+      },
+      "products": [
+        {
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.15"
+        }
+      ],
+      "status": "fixed",
+      "impact_statement": "Recursion-bomb DoS via crafted ASN.1. ION pins pyasn1>=0.6.3."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-4539"
+      },
+      "products": [
+        {
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.15"
+        }
+      ],
+      "status": "fixed",
+      "impact_statement": "ReDoS in the Pygments AdlLexer, local access only. ION pins pygments>=2.20.0."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-25645"
+      },
+      "products": [
+        {
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.15"
+        }
+      ],
+      "status": "fixed",
+      "impact_statement": "ION pins requests>=2.33.0."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-40347"
+      },
+      "products": [
+        {
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.15"
+        }
+      ],
+      "status": "fixed",
+      "impact_statement": "Multipart DoS. ION pins python-multipart>=0.0.27."
+    }
+  ]
+}
