@@ -111,10 +111,6 @@ class SystemCreateRequest(BaseModel):
     tags: Optional[List[str]] = None
     review_cadence_days: Optional[int] = 90
     next_review_date: Optional[str] = None
-    sign_dept_name: Optional[str] = None
-    sign_dept_date: Optional[str] = None
-    sign_soc_name: Optional[str] = None
-    sign_soc_date: Optional[str] = None
 
 
 class SystemUpdateRequest(BaseModel):
@@ -130,10 +126,6 @@ class SystemUpdateRequest(BaseModel):
     tags: Optional[List[str]] = None
     review_cadence_days: Optional[int] = None
     next_review_date: Optional[str] = None
-    sign_dept_name: Optional[str] = None
-    sign_dept_date: Optional[str] = None
-    sign_soc_name: Optional[str] = None
-    sign_soc_date: Optional[str] = None
 
 
 class DataSourceRequest(BaseModel):
@@ -441,6 +433,14 @@ def due_reviews(session: Session = Depends(get_db_session)):
     return result
 
 
+def _creatable_status(status: Optional[str]) -> str:
+    """A new system starts DRAFT (or RETIRED, for a record of an old one).
+    ACTIVE and the sign-off names come only from cyab_assurance_service."""
+    if status in (None, "", "DRAFT", "RETIRED"):
+        return status or "DRAFT"
+    raise HTTPException(status_code=409, detail="A system becomes ACTIVE by being signed off")
+
+
 @router.post("/systems", dependencies=[Depends(require_permission("case:update"))])
 def create_system(
     req: SystemCreateRequest,
@@ -450,12 +450,9 @@ def create_system(
     sys = CyabSystem(
         name=req.name, department=req.department, department_lead=req.department_lead,
         soc_team=req.soc_team, soc_lead=req.soc_lead, version=req.version,
-        status=req.status or "DRAFT", icon=req.icon or "monitor",
+        status=_creatable_status(req.status), icon=req.icon or "monitor",
         tags=json.dumps(req.tags) if req.tags else None,
         review_cadence_days=req.review_cadence_days or 90,
-        sign_dept_name=req.sign_dept_name, sign_soc_name=req.sign_soc_name,
-        sign_dept_date=_parse_date(req.sign_dept_date),
-        sign_soc_date=_parse_date(req.sign_soc_date),
         created_by=current_user.id,
     )
     if req.next_review_date:
@@ -1294,10 +1291,6 @@ class OnboardingRequest(BaseModel):
     next_review_date: Optional[str] = None
 
     # Step 6 — sign-off (optional; system stays DRAFT if not signed)
-    sign_dept_name: Optional[str] = None
-    sign_dept_date: Optional[str] = None
-    sign_soc_name: Optional[str] = None
-    sign_soc_date: Optional[str] = None
 
 
 @router.post("/onboarding", dependencies=[Depends(require_permission("case:update"))])
@@ -1347,7 +1340,7 @@ def onboarding_create(
         soc_lead=body.soc_lead,
         reference=ref,
         version=body.version or "1.0",
-        status=body.status or "DRAFT",
+        status=_creatable_status(body.status),
         icon=body.icon or "monitor",
         tags=json.dumps(body.tags) if body.tags else None,
         business_unit=body.business_unit,
@@ -1363,10 +1356,6 @@ def onboarding_create(
         sal_tier=body.sal_tier or "SAL-2",
         review_cadence_days=body.review_cadence_days or 90,
         next_review_date=next_review,
-        sign_dept_name=body.sign_dept_name,
-        sign_dept_date=_parse_date(body.sign_dept_date) if body.sign_dept_date else None,
-        sign_soc_name=body.sign_soc_name,
-        sign_soc_date=_parse_date(body.sign_soc_date) if body.sign_soc_date else None,
         created_by=current_user.id if current_user else None,
     )
     session.add(sys)

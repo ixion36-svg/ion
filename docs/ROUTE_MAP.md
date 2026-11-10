@@ -502,61 +502,61 @@ JSON endpoints.
 | GET | `/api/compliance/posture` | `alert:read` | [compliance_api.py:22](src/ion/web/compliance_api.py#L22) |  |  |
 | GET | `/api/compliance/{framework_id}` | `alert:read` | [compliance_api.py:47](src/ion/web/compliance_api.py#L47) |  |  |
 | GET | `/api/compliance/{framework_id}/posture` | `alert:read` | [compliance_api.py:32](src/ion/web/compliance_api.py#L32) |  |  |
-| GET | `/api/cyab/assessment` | `alert:read` | [cyab_api.py:1103](src/ion/web/cyab_api.py#L1103) |  | `detection_engineering.html` |
-| POST | `/api/cyab/assessment` | `case:update` | [cyab_api.py:1069](src/ion/web/cyab_api.py#L1069) |  | `detection_engineering.html` |
-| GET | `/api/cyab/assessment/latest` | `alert:read` | [cyab_api.py:1123](src/ion/web/cyab_api.py#L1123) |  | `detection_engineering.html` |
-| GET | `/api/cyab/assessment/questions` | `alert:read` | [cyab_api.py:1024](src/ion/web/cyab_api.py#L1024) |  | `detection_engineering.html` |
-| GET | `/api/cyab/assessment/{assessment_id}` | `alert:read` | [cyab_api.py:1136](src/ion/web/cyab_api.py#L1136) |  | `detection_engineering.html` |
-| GET | `/api/cyab/audit/feed` | `alert:read` | [cyab_api.py:1783](src/ion/web/cyab_api.py#L1783) |  | `detection_engineering.html` |
-| DELETE | `/api/cyab/checklist/{item_id}` | `case:update` | [cyab_api.py:2838](src/ion/web/cyab_api.py#L2838) |  | `detection_engineering.html` |
-| PUT | `/api/cyab/checklist/{item_id}` | `case:update` | [cyab_api.py:2788](src/ion/web/cyab_api.py#L2788) |  | `detection_engineering.html` |
-| GET | `/api/cyab/coverage/matrix` | `alert:read` | [cyab_api.py:1603](src/ion/web/cyab_api.py#L1603) |  | `detection_engineering.html` |
-| GET | `/api/cyab/dashboard` | `alert:read` | [cyab_api.py:352](src/ion/web/cyab_api.py#L352) |  | `detection_engineering.html` |
-| POST | `/api/cyab/data-sources/bulk-apply` | `case:update` | [cyab_api.py:945](src/ion/web/cyab_api.py#L945) |  | `detection_engineering.html` |
-| POST | `/api/cyab/data-sources/{ds_id}/clone` | `case:update` | [cyab_api.py:894](src/ion/web/cyab_api.py#L894) |  | `detection_engineering.html` |
-| GET | `/api/cyab/data-sources/{ds_id}/use-case-status` | `alert:read` | [cyab_api.py:2417](src/ion/web/cyab_api.py#L2417) |  | `detection_engineering.html` |
-| POST | `/api/cyab/data-sources/{ds_id}/use-case-status` | `case:update` | [cyab_api.py:2442](src/ion/web/cyab_api.py#L2442) |  | `detection_engineering.html` |
-| GET | `/api/cyab/due-reviews` | `alert:read` | [cyab_api.py:427](src/ion/web/cyab_api.py#L427) |  | `detection_engineering.html` |
-| GET | `/api/cyab/icons` | `alert:read` | [cyab_api.py:336](src/ion/web/cyab_api.py#L336) |  | `detection_engineering.html` |
-| GET | `/api/cyab/namespaces` | `alert:read` | [cyab_api.py:798](src/ion/web/cyab_api.py#L798) |  | `detection_engineering.html` |
-| POST | `/api/cyab/onboarding` | `case:update` | [cyab_api.py:1303](src/ion/web/cyab_api.py#L1303) |  | `detection_engineering.html` |
-| GET | `/api/cyab/pillars` | `alert:read` | [cyab_api.py:2134](src/ion/web/cyab_api.py#L2134) |  | `detection_engineering.html` |
-| GET | `/api/cyab/pillars/{pillar_id}/subprofiles` | `alert:read` | [cyab_api.py:2139](src/ion/web/cyab_api.py#L2139) |  | `detection_engineering.html` |
-| POST | `/api/cyab/scoping/convert` | `alert:read` | [cyab_api.py:1534](src/ion/web/cyab_api.py#L1534) |  | `_scoping_summary.html`, `detection_engineering.html` |
-| POST | `/api/cyab/scoping/pdf` | — | [extension.py:1489](.venv/Lib/site-packages/slowapi/extension.py#L1489) |  | `cyab-scoping.js`, `detection_engineering.html` |
-| POST | `/api/cyab/scoping/score` | — | [extension.py:1460](.venv/Lib/site-packages/slowapi/extension.py#L1460) |  | `scoping.html`, `detection_engineering.html` |
-| DELETE | `/api/cyab/sources/{source_id}` | `case:close` | [cyab_api.py:756](src/ion/web/cyab_api.py#L756) |  | `detection_engineering.html` |
-| GET | `/api/cyab/sources/{source_id}` | `alert:read` | [cyab_api.py:709](src/ion/web/cyab_api.py#L709) |  | `detection_engineering.html` |
-| PUT | `/api/cyab/sources/{source_id}` | `case:update` | [cyab_api.py:717](src/ion/web/cyab_api.py#L717) |  | `detection_engineering.html` |
-| POST | `/api/cyab/subprofiles` | `case:update` | [cyab_api.py:2168](src/ion/web/cyab_api.py#L2168) |  | `detection_engineering.html` |
-| GET | `/api/cyab/subprofiles/{sub_id}` | `alert:read` | [cyab_api.py:2159](src/ion/web/cyab_api.py#L2159) |  | `detection_engineering.html` |
-| PATCH | `/api/cyab/subprofiles/{sub_id}` | `case:update` | [cyab_api.py:2205](src/ion/web/cyab_api.py#L2205) |  | `detection_engineering.html` |
-| GET | `/api/cyab/subprofiles/{sub_id}/use-cases/{uc_id}` | `alert:read` | [cyab_api.py:2223](src/ion/web/cyab_api.py#L2223) |  | `detection_engineering.html` |
-| GET | `/api/cyab/systems` | `alert:read` | [cyab_api.py:342](src/ion/web/cyab_api.py#L342) |  | `detection_engineering.html` |
+| GET | `/api/cyab/assessment` | `alert:read` | [cyab_api.py:1100](src/ion/web/cyab_api.py#L1100) |  | `detection_engineering.html` |
+| POST | `/api/cyab/assessment` | `case:update` | [cyab_api.py:1066](src/ion/web/cyab_api.py#L1066) |  | `detection_engineering.html` |
+| GET | `/api/cyab/assessment/latest` | `alert:read` | [cyab_api.py:1120](src/ion/web/cyab_api.py#L1120) |  | `detection_engineering.html` |
+| GET | `/api/cyab/assessment/questions` | `alert:read` | [cyab_api.py:1021](src/ion/web/cyab_api.py#L1021) |  | `detection_engineering.html` |
+| GET | `/api/cyab/assessment/{assessment_id}` | `alert:read` | [cyab_api.py:1133](src/ion/web/cyab_api.py#L1133) |  | `detection_engineering.html` |
+| GET | `/api/cyab/audit/feed` | `alert:read` | [cyab_api.py:1772](src/ion/web/cyab_api.py#L1772) |  | `detection_engineering.html` |
+| DELETE | `/api/cyab/checklist/{item_id}` | `case:update` | [cyab_api.py:2827](src/ion/web/cyab_api.py#L2827) |  | `detection_engineering.html` |
+| PUT | `/api/cyab/checklist/{item_id}` | `case:update` | [cyab_api.py:2777](src/ion/web/cyab_api.py#L2777) |  | `detection_engineering.html` |
+| GET | `/api/cyab/coverage/matrix` | `alert:read` | [cyab_api.py:1592](src/ion/web/cyab_api.py#L1592) |  | `detection_engineering.html` |
+| GET | `/api/cyab/dashboard` | `alert:read` | [cyab_api.py:344](src/ion/web/cyab_api.py#L344) |  | `detection_engineering.html` |
+| POST | `/api/cyab/data-sources/bulk-apply` | `case:update` | [cyab_api.py:942](src/ion/web/cyab_api.py#L942) |  | `detection_engineering.html` |
+| POST | `/api/cyab/data-sources/{ds_id}/clone` | `case:update` | [cyab_api.py:891](src/ion/web/cyab_api.py#L891) |  | `detection_engineering.html` |
+| GET | `/api/cyab/data-sources/{ds_id}/use-case-status` | `alert:read` | [cyab_api.py:2406](src/ion/web/cyab_api.py#L2406) |  | `detection_engineering.html` |
+| POST | `/api/cyab/data-sources/{ds_id}/use-case-status` | `case:update` | [cyab_api.py:2431](src/ion/web/cyab_api.py#L2431) |  | `detection_engineering.html` |
+| GET | `/api/cyab/due-reviews` | `alert:read` | [cyab_api.py:419](src/ion/web/cyab_api.py#L419) |  | `detection_engineering.html` |
+| GET | `/api/cyab/icons` | `alert:read` | [cyab_api.py:328](src/ion/web/cyab_api.py#L328) |  | `detection_engineering.html` |
+| GET | `/api/cyab/namespaces` | `alert:read` | [cyab_api.py:795](src/ion/web/cyab_api.py#L795) |  | `detection_engineering.html` |
+| POST | `/api/cyab/onboarding` | `case:update` | [cyab_api.py:1296](src/ion/web/cyab_api.py#L1296) |  | `detection_engineering.html` |
+| GET | `/api/cyab/pillars` | `alert:read` | [cyab_api.py:2123](src/ion/web/cyab_api.py#L2123) |  | `detection_engineering.html` |
+| GET | `/api/cyab/pillars/{pillar_id}/subprofiles` | `alert:read` | [cyab_api.py:2128](src/ion/web/cyab_api.py#L2128) |  | `detection_engineering.html` |
+| POST | `/api/cyab/scoping/convert` | `alert:read` | [cyab_api.py:1523](src/ion/web/cyab_api.py#L1523) |  | `_scoping_summary.html`, `detection_engineering.html` |
+| POST | `/api/cyab/scoping/pdf` | — | [extension.py:1478](.venv/Lib/site-packages/slowapi/extension.py#L1478) |  | `cyab-scoping.js`, `detection_engineering.html` |
+| POST | `/api/cyab/scoping/score` | — | [extension.py:1449](.venv/Lib/site-packages/slowapi/extension.py#L1449) |  | `scoping.html`, `detection_engineering.html` |
+| DELETE | `/api/cyab/sources/{source_id}` | `case:close` | [cyab_api.py:753](src/ion/web/cyab_api.py#L753) |  | `detection_engineering.html` |
+| GET | `/api/cyab/sources/{source_id}` | `alert:read` | [cyab_api.py:706](src/ion/web/cyab_api.py#L706) |  | `detection_engineering.html` |
+| PUT | `/api/cyab/sources/{source_id}` | `case:update` | [cyab_api.py:714](src/ion/web/cyab_api.py#L714) |  | `detection_engineering.html` |
+| POST | `/api/cyab/subprofiles` | `case:update` | [cyab_api.py:2157](src/ion/web/cyab_api.py#L2157) |  | `detection_engineering.html` |
+| GET | `/api/cyab/subprofiles/{sub_id}` | `alert:read` | [cyab_api.py:2148](src/ion/web/cyab_api.py#L2148) |  | `detection_engineering.html` |
+| PATCH | `/api/cyab/subprofiles/{sub_id}` | `case:update` | [cyab_api.py:2194](src/ion/web/cyab_api.py#L2194) |  | `detection_engineering.html` |
+| GET | `/api/cyab/subprofiles/{sub_id}/use-cases/{uc_id}` | `alert:read` | [cyab_api.py:2212](src/ion/web/cyab_api.py#L2212) |  | `detection_engineering.html` |
+| GET | `/api/cyab/systems` | `alert:read` | [cyab_api.py:334](src/ion/web/cyab_api.py#L334) |  | `detection_engineering.html` |
 | POST | `/api/cyab/systems` | `case:update` | [cyab_api.py:444](src/ion/web/cyab_api.py#L444) |  | `detection_engineering.html` |
-| GET | `/api/cyab/systems/{sys_id}/answers` | `alert:read` | [cyab_api.py:2320](src/ion/web/cyab_api.py#L2320) |  | `detection_engineering.html` |
-| POST | `/api/cyab/systems/{sys_id}/answers` | `case:update` | [cyab_api.py:2352](src/ion/web/cyab_api.py#L2352) |  | `detection_engineering.html` |
-| GET | `/api/cyab/systems/{sys_id}/checklist` | `alert:read` | [cyab_api.py:2772](src/ion/web/cyab_api.py#L2772) |  | `detection_engineering.html` |
-| POST | `/api/cyab/systems/{sys_id}/checklist` | `case:update` | [cyab_api.py:2812](src/ion/web/cyab_api.py#L2812) |  | `detection_engineering.html` |
-| GET | `/api/cyab/systems/{sys_id}/coverage` | `alert:read` | [cyab_api.py:2482](src/ion/web/cyab_api.py#L2482) |  | `detection_engineering.html` |
-| GET | `/api/cyab/systems/{sys_id}/data-sources` | `alert:read` | [cyab_api.py:2387](src/ion/web/cyab_api.py#L2387) |  | `detection_engineering.html` |
-| GET | `/api/cyab/systems/{sys_id}/onboarding-pack` | `case:read` | [cyab_api.py:2693](src/ion/web/cyab_api.py#L2693) |  | `detection_engineering.html` |
-| POST | `/api/cyab/systems/{sys_id}/onboarding-pack/sign` | `case:close` | [cyab_api.py:2726](src/ion/web/cyab_api.py#L2726) |  | `detection_engineering.html` |
-| DELETE | `/api/cyab/systems/{system_id}` | `case:close` | [cyab_api.py:616](src/ion/web/cyab_api.py#L616) |  | `detection_engineering.html` |
-| GET | `/api/cyab/systems/{system_id}` | `alert:read` | [cyab_api.py:478](src/ion/web/cyab_api.py#L478) |  | `detection_engineering.html` |
-| PUT | `/api/cyab/systems/{system_id}` | `case:update` | [cyab_api.py:577](src/ion/web/cyab_api.py#L577) |  | `detection_engineering.html` |
-| GET | `/api/cyab/systems/{system_id}/alert-rollup` | `alert:read` | [cyab_api.py:499](src/ion/web/cyab_api.py#L499) |  | `detection_engineering.html` |
-| GET | `/api/cyab/systems/{system_id}/assessment` | `alert:read` | [cyab_api.py:1192](src/ion/web/cyab_api.py#L1192) |  | `detection_engineering.html` |
-| POST | `/api/cyab/systems/{system_id}/assessment` | `case:update` | [cyab_api.py:1148](src/ion/web/cyab_api.py#L1148) |  | `detection_engineering.html` |
-| GET | `/api/cyab/systems/{system_id}/assessment/latest` | `alert:read` | [cyab_api.py:1214](src/ion/web/cyab_api.py#L1214) |  | `detection_engineering.html` |
-| GET | `/api/cyab/systems/{system_id}/data-health` | `alert:read` | [cyab_api.py:486](src/ion/web/cyab_api.py#L486) |  | `detection_engineering.html` |
-| POST | `/api/cyab/systems/{system_id}/data-sources/from-template` | `case:update` | [cyab_api.py:846](src/ion/web/cyab_api.py#L846) |  | `detection_engineering.html` |
-| GET | `/api/cyab/systems/{system_id}/history` | `alert:read` | [cyab_api.py:786](src/ion/web/cyab_api.py#L786) |  | `detection_engineering.html` |
-| POST | `/api/cyab/systems/{system_id}/mark-reviewed` | `case:close` | [cyab_api.py:633](src/ion/web/cyab_api.py#L633) |  | `detection_engineering.html` |
-| GET | `/api/cyab/systems/{system_id}/sources` | `alert:read` | [cyab_api.py:658](src/ion/web/cyab_api.py#L658) |  | `detection_engineering.html` |
-| POST | `/api/cyab/systems/{system_id}/sources` | `case:update` | [cyab_api.py:666](src/ion/web/cyab_api.py#L666) |  | `detection_engineering.html` |
-| GET | `/api/cyab/templates` | `alert:read` | [cyab_api.py:829](src/ion/web/cyab_api.py#L829) |  | `detection_engineering.html` |
-| GET | `/api/cyab/templates/{template_id}` | `alert:read` | [cyab_api.py:836](src/ion/web/cyab_api.py#L836) |  | `detection_engineering.html` |
+| GET | `/api/cyab/systems/{sys_id}/answers` | `alert:read` | [cyab_api.py:2309](src/ion/web/cyab_api.py#L2309) |  | `detection_engineering.html` |
+| POST | `/api/cyab/systems/{sys_id}/answers` | `case:update` | [cyab_api.py:2341](src/ion/web/cyab_api.py#L2341) |  | `detection_engineering.html` |
+| GET | `/api/cyab/systems/{sys_id}/checklist` | `alert:read` | [cyab_api.py:2761](src/ion/web/cyab_api.py#L2761) |  | `detection_engineering.html` |
+| POST | `/api/cyab/systems/{sys_id}/checklist` | `case:update` | [cyab_api.py:2801](src/ion/web/cyab_api.py#L2801) |  | `detection_engineering.html` |
+| GET | `/api/cyab/systems/{sys_id}/coverage` | `alert:read` | [cyab_api.py:2471](src/ion/web/cyab_api.py#L2471) |  | `detection_engineering.html` |
+| GET | `/api/cyab/systems/{sys_id}/data-sources` | `alert:read` | [cyab_api.py:2376](src/ion/web/cyab_api.py#L2376) |  | `detection_engineering.html` |
+| GET | `/api/cyab/systems/{sys_id}/onboarding-pack` | `case:read` | [cyab_api.py:2682](src/ion/web/cyab_api.py#L2682) |  | `detection_engineering.html` |
+| POST | `/api/cyab/systems/{sys_id}/onboarding-pack/sign` | `case:close` | [cyab_api.py:2715](src/ion/web/cyab_api.py#L2715) |  | `detection_engineering.html` |
+| DELETE | `/api/cyab/systems/{system_id}` | `case:close` | [cyab_api.py:613](src/ion/web/cyab_api.py#L613) |  | `detection_engineering.html` |
+| GET | `/api/cyab/systems/{system_id}` | `alert:read` | [cyab_api.py:475](src/ion/web/cyab_api.py#L475) |  | `detection_engineering.html` |
+| PUT | `/api/cyab/systems/{system_id}` | `case:update` | [cyab_api.py:574](src/ion/web/cyab_api.py#L574) |  | `detection_engineering.html` |
+| GET | `/api/cyab/systems/{system_id}/alert-rollup` | `alert:read` | [cyab_api.py:496](src/ion/web/cyab_api.py#L496) |  | `detection_engineering.html` |
+| GET | `/api/cyab/systems/{system_id}/assessment` | `alert:read` | [cyab_api.py:1189](src/ion/web/cyab_api.py#L1189) |  | `detection_engineering.html` |
+| POST | `/api/cyab/systems/{system_id}/assessment` | `case:update` | [cyab_api.py:1145](src/ion/web/cyab_api.py#L1145) |  | `detection_engineering.html` |
+| GET | `/api/cyab/systems/{system_id}/assessment/latest` | `alert:read` | [cyab_api.py:1211](src/ion/web/cyab_api.py#L1211) |  | `detection_engineering.html` |
+| GET | `/api/cyab/systems/{system_id}/data-health` | `alert:read` | [cyab_api.py:483](src/ion/web/cyab_api.py#L483) |  | `detection_engineering.html` |
+| POST | `/api/cyab/systems/{system_id}/data-sources/from-template` | `case:update` | [cyab_api.py:843](src/ion/web/cyab_api.py#L843) |  | `detection_engineering.html` |
+| GET | `/api/cyab/systems/{system_id}/history` | `alert:read` | [cyab_api.py:783](src/ion/web/cyab_api.py#L783) |  | `detection_engineering.html` |
+| POST | `/api/cyab/systems/{system_id}/mark-reviewed` | `case:close` | [cyab_api.py:630](src/ion/web/cyab_api.py#L630) |  | `detection_engineering.html` |
+| GET | `/api/cyab/systems/{system_id}/sources` | `alert:read` | [cyab_api.py:655](src/ion/web/cyab_api.py#L655) |  | `detection_engineering.html` |
+| POST | `/api/cyab/systems/{system_id}/sources` | `case:update` | [cyab_api.py:663](src/ion/web/cyab_api.py#L663) |  | `detection_engineering.html` |
+| GET | `/api/cyab/templates` | `alert:read` | [cyab_api.py:826](src/ion/web/cyab_api.py#L826) |  | `detection_engineering.html` |
+| GET | `/api/cyab/templates/{template_id}` | `alert:read` | [cyab_api.py:833](src/ion/web/cyab_api.py#L833) |  | `detection_engineering.html` |
 | GET | `/api/cyab/tide/de/actor-readiness` | `alert:read` | [de_tide_api.py:1010](src/ion/web/de_tide_api.py#L1010) |  | `detection_engineering.html` |
 | GET | `/api/cyab/tide/de/disabled-critical` | `alert:read` | [de_tide_api.py:487](src/ion/web/de_tide_api.py#L487) |  | `detection_engineering.html` |
 | GET | `/api/cyab/tide/de/execution` | `alert:read` | [de_tide_api.py:1286](src/ion/web/de_tide_api.py#L1286) |  | `detection_engineering.html` |
@@ -582,7 +582,7 @@ JSON endpoints.
 | GET | `/api/cyab/tide/systems/{system_id}/alerts` | `alert:read` | [de_tide_api.py:196](src/ion/web/de_tide_api.py#L196) |  | `detection_engineering.html` |
 | GET | `/api/cyab/tide/systems/{system_id}/mitre` | `alert:read` | [de_tide_api.py:165](src/ion/web/de_tide_api.py#L165) |  | `detection_engineering.html` |
 | GET | `/api/cyab/tide/systems/{system_id}/use-cases` | `alert:read` | [de_tide_api.py:172](src/ion/web/de_tide_api.py#L172) |  | `detection_engineering.html` |
-| POST | `/api/cyab/use-cases/{uc_id}/tide-stub` | `case:update` | [cyab_api.py:2239](src/ion/web/cyab_api.py#L2239) |  | `detection_engineering.html` |
+| POST | `/api/cyab/use-cases/{uc_id}/tide-stub` | `case:update` | [cyab_api.py:2228](src/ion/web/cyab_api.py#L2228) |  | `detection_engineering.html` |
 | GET | `/api/d3fend/coverage` | `alert:read` | [d3fend_api.py:15](src/ion/web/d3fend_api.py#L15) |  |  |
 | GET | `/api/daily-standup/arkime/high-risk-traffic` | `alert:read` | [daily_standup_api.py:1831](src/ion/web/daily_standup_api.py#L1831) |  |  |
 | GET | `/api/daily-standup/arkime/node-stats` | `alert:read` | [daily_standup_api.py:1928](src/ion/web/daily_standup_api.py#L1928) |  |  |

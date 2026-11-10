@@ -339,3 +339,17 @@ def test_lowering_sal_needs_approval(app_client, db, monkeypatch):
     db.expire_all()
     assert db.get(CyabSystem, sid).sal_tier == "SAL-5"
     assert db.get(CyabSystem, sid).review_cadence_days == cyab_sal.REVIEW_DAYS["SAL-5"]
+
+
+def test_creating_a_system_cannot_sign_or_activate_it(app_client, db):
+    forged = {"sign_dept_name": "Forged", "sign_dept_date": "2026-01-01",
+              "sign_soc_name": "Forged", "sign_soc_date": "2026-01-01"}
+    assert app_client.post("/api/cyab/systems", json={"name": "a", "department": "d", "status": "ACTIVE"}).status_code == 409
+    assert app_client.post("/api/cyab/onboarding", json={"name": "b", "department": "d", "status": "ACTIVE"}).status_code == 409
+    for url, name in (("/api/cyab/systems", "c"), ("/api/cyab/onboarding", "e")):
+        r = app_client.post(url, json={"name": name, "department": "d", **forged})
+        assert r.status_code < 300, r.text
+    db.expire_all()
+    rows = db.scalars(select(CyabSystem)).all()
+    assert {s.name for s in rows} == {"c", "e"}
+    assert all(s.status == "DRAFT" and s.sign_dept_name is None and s.sign_soc_date is None for s in rows)
