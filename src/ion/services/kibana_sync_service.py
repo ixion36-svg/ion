@@ -95,8 +95,15 @@ class KibanaSyncService:
         """
         return await self._sync_case_comments(session, case) or 0
 
-    async def _sync_case_comments(self, session: Session, case: AlertCase) -> Optional[int]:
-        """As sync_case_comments, but None when the comments could not be read."""
+    async def _sync_case_comments(
+        self, session: Session, case: AlertCase, fetch_alerts: bool = True,
+    ) -> Optional[int]:
+        """As sync_case_comments, but None when the comments could not be read.
+
+        Also links alerts attached to the Kibana case. Kibana's comments
+        ``_find`` returns user comments only, so the alerts are a second read,
+        skipped when the caller knows the case has none.
+        """
         if not case.kibana_case_id or not self.kibana_service.enabled:
             return 0
 
@@ -175,7 +182,10 @@ class KibanaSyncService:
                 synced += 1
                 logger.info(f"Synced comment from Kibana to case {case.case_number}")
 
-            linked = await self._link_kibana_alerts(session, case, kibana_comments)
+            linked = 0
+            if fetch_alerts:
+                kibana_alerts = await self._kb(self.kibana_service.get_case_alerts, case.kibana_case_id)
+                linked = await self._link_kibana_alerts(session, case, kibana_alerts or [])
 
             if synced > 0 or linked > 0:
                 session.commit()
@@ -188,29 +198,20 @@ class KibanaSyncService:
         return synced
 
     async def _link_kibana_alerts(
-        self, session: Session, case: AlertCase, kibana_comments: list,
+        self, session: Session, case: AlertCase, kibana_alerts: list,
     ) -> int:
         """Link alerts attached to the Kibana case that ION does not have yet.
 
-        Alert attachments come back in the same comment read, so this costs
-        no extra Kibana request. Without it, alerts an analyst attached in
-        Kibana after the case reached ION never appeared in ION.
+        ``kibana_alerts`` is ``get_case_alerts`` output: dicts with ``id`` and
+        ``index``. Without this, alerts an analyst attached in Kibana after the
+        case reached ION never appeared in ION.
 
         An alert ION already files under a different case is left there:
         ION holds one case per alert, and Kibana may keep an alert on the
         case it was moved away from. Does not commit; the caller does.
         """
-        kibana_ids: list[str] = []
-        index = None
-        for comment in kibana_comments:
-            if comment.get("type") != "alert":
-                continue
-            ids = comment.get("alertId") or []
-            ids = [ids] if isinstance(ids, str) else list(ids)
-            kibana_ids.extend(i for i in ids if i)
-            if index is None:
-                idx = comment.get("index")
-                index = idx[0] if isinstance(idx, list) and idx else idx
+        kibana_ids = [a["id"] for a in kibana_alerts if a.get("id")]
+        index = next((a.get("index") for a in kibana_alerts if a.get("index")), None)
         if not kibana_ids:
             return 0
 
@@ -290,7 +291,10 @@ class KibanaSyncService:
                     signature = self._change_signature(kibana_case)
                     if self._comments_seen.get(case.kibana_case_id) == signature:
                         continue
-                synced = await self._sync_case_comments(session, case)
+                synced = await self._sync_case_comments(
+                    session, case,
+                    fetch_alerts=kibana_cases is None or bool(kibana_case.get("totalAlerts")),
+                )
                 # Only a read that succeeded marks the case as seen; a failed
                 # one is retried next cycle.
                 if signature is not None and synced is not None:
