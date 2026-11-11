@@ -151,14 +151,14 @@ def test_without_embeddings_order_matches_keyword_only():
     keyword = [snip(1, "a", score=30), snip(2, "b", score=20), snip(3, "c", score=10)]
     svc = _Svc(keyword=keyword, vec=None)
 
-    ctx = svc.retrieve_context("kerberos golden ticket", 1, prefs())
+    ctx = svc.retrieve_context("kerberos golden ticket", 1, prefs(), may_read_documents=True, may_read_playbooks=True)
 
     assert [s.source_id for s in ctx.snippets] == [1, 2, 3]
 
 
 def test_without_embeddings_no_vector_query_is_attempted():
     svc = _Svc(keyword=[snip(1, "a")], kb_vec=[snip(99, "never")], vec=None)
-    ctx = svc.retrieve_context("kerberos golden ticket", 1, prefs())
+    ctx = svc.retrieve_context("kerberos golden ticket", 1, prefs(), may_read_documents=True, may_read_playbooks=True)
     assert 99 not in [s.source_id for s in ctx.snippets]
 
 
@@ -168,7 +168,7 @@ def test_vector_hits_join_the_results_when_embeddings_are_available():
         kb_vec=[snip(42, "semantic match", text="chunk")],
         vec=[0.1] * 8,
     )
-    ctx = svc.retrieve_context("how do I spot a golden ticket", 1, prefs())
+    ctx = svc.retrieve_context("how do I spot a golden ticket", 1, prefs(), may_read_documents=True, may_read_playbooks=True)
     assert 42 in [s.source_id for s in ctx.snippets]
 
 
@@ -176,26 +176,26 @@ def test_the_whole_question_is_embedded_not_the_keywords():
     """Dropping stop words discards the phrasing the embedding exists to capture."""
     svc = _Svc(keyword=[snip(1, "a")], vec=[0.1] * 8)
     query = "how would I tell a golden ticket from a silver ticket"
-    svc.retrieve_context(query, 1, prefs())
+    svc.retrieve_context(query, 1, prefs(), may_read_documents=True, may_read_playbooks=True)
     assert svc.embed_calls == [query]
 
 
 def test_disabled_sources_are_not_searched():
     svc = _Svc(keyword=[snip(1, "kb")], kb_vec=[snip(2, "kb vec")], vec=[0.1] * 8)
-    ctx = svc.retrieve_context("kerberos ticket attack", 1, prefs(rag_knowledge_base=False))
+    ctx = svc.retrieve_context("kerberos ticket attack", 1, prefs(rag_knowledge_base=False), may_read_documents=True, may_read_playbooks=True)
     assert ctx.snippets == []
 
 
 def test_a_greeting_retrieves_nothing():
     svc = _Svc(keyword=[snip(1, "a")], vec=[0.1] * 8)
-    assert svc.retrieve_context("hi", 1, prefs()).snippets == []
+    assert svc.retrieve_context("hi", 1, prefs(), may_read_documents=True, may_read_playbooks=True).snippets == []
     assert svc.embed_calls == [], "no embedding call for a greeting"
 
 
 def test_the_char_budget_still_applies():
     big = [snip(i, f"d{i}", text="x" * 2000) for i in range(5)]
     svc = _Svc(keyword=big, vec=None)
-    ctx = svc.retrieve_context("kerberos ticket attack", 1, prefs(max_context_snippets=5))
+    ctx = svc.retrieve_context("kerberos ticket attack", 1, prefs(max_context_snippets=5), may_read_documents=True, may_read_playbooks=True)
     assert sum(len(s.snippet) for s in ctx.snippets) <= 3000 + 3
 
 
@@ -305,7 +305,7 @@ def test_citations_survive_fusion():
 def test_the_query_model_tag_reaches_the_vector_search():
     svc = _Svc(keyword=[snip(1, "a")], kb_vec=[snip(2, "b")], vec=[0.1] * 8,
                tag="nomic-embed-text+tp1")
-    svc.retrieve_context("kerberos golden ticket", 1, prefs())
+    svc.retrieve_context("kerberos golden ticket", 1, prefs(), may_read_documents=True, may_read_playbooks=True)
     assert svc.tags_used, "vector search ran without being told the model tag"
     assert set(svc.tags_used) == {"nomic-embed-text+tp1"}
 

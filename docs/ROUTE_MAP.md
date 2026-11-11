@@ -338,38 +338,38 @@ JSON endpoints.
 | POST | `/api/admin/wizard/save-all` | `integration:manage` | [admin_api.py:2677](src/ion/web/admin_api.py#L2677) |  | `integration-wizard.js` |
 | PUT | `/api/admin/wizard/save/{integration}` | `integration:manage` | [admin_api.py:2552](src/ion/web/admin_api.py#L2552) |  |  |
 | POST | `/api/admin/wizard/test/{integration}` | `integration:manage` | [admin_api.py:2093](src/ion/web/admin_api.py#L2093) |  | `integration-wizard.js` |
-| POST | `/api/ai/analyze/alert` | — | [ai_api.py:657](src/ion/web/ai_api.py#L657) |  | `alert-detail.js` |
-| POST | `/api/ai/case/generate` | — | [ai_api.py:790](src/ion/web/ai_api.py#L790) |  | `alerts.html` |
+| POST | `/api/ai/analyze/alert` | — | [ai_api.py:659](src/ion/web/ai_api.py#L659) |  | `alert-detail.js` |
+| POST | `/api/ai/case/generate` | — | [ai_api.py:792](src/ion/web/ai_api.py#L792) |  | `alerts.html` |
 | POST | `/api/ai/chat` | — | [ai_api.py:275](src/ion/web/ai_api.py#L275) |  |  |
 | POST | `/api/ai/chat/stream` | — | [ai_api.py:358](src/ion/web/ai_api.py#L358) |  | `ai-chat.js`, `chat.html` |
-| POST | `/api/ai/closure/rewrite` | — | [ai_api.py:999](src/ion/web/ai_api.py#L999) |  | `cases.html` |
+| POST | `/api/ai/closure/rewrite` | — | [ai_api.py:1001](src/ion/web/ai_api.py#L1001) |  | `cases.html` |
 | GET | `/api/ai/diagnostic` | — | [ai_api.py:180](src/ion/web/ai_api.py#L180) |  |  |
-| POST | `/api/ai/document/generate` | — | [ai_api.py:1199](src/ion/web/ai_api.py#L1199) |  | `chat.html` |
-| POST | `/api/ai/document/save` | — | [ai_api.py:1258](src/ion/web/ai_api.py#L1258) |  | `chat.html` |
-| POST | `/api/ai/feedback` | — | [ai_api.py:1550](src/ion/web/ai_api.py#L1550) |  | `chat.html` |
-| GET | `/api/ai/files` | — | [ai_api.py:1673](src/ion/web/ai_api.py#L1673) |  | `chat.html` |
-| POST | `/api/ai/files/upload` | — | [ai_api.py:1593](src/ion/web/ai_api.py#L1593) |  | `chat.html` |
-| DELETE | `/api/ai/files/{file_id}` | — | [ai_api.py:1704](src/ion/web/ai_api.py#L1704) |  |  |
-| GET | `/api/ai/files/{file_id}` | — | [ai_api.py:1691](src/ion/web/ai_api.py#L1691) |  |  |
-| POST | `/api/ai/files/{file_id}/download` | — | [ai_api.py:1744](src/ion/web/ai_api.py#L1744) |  |  |
-| POST | `/api/ai/files/{file_id}/edit` | — | [ai_api.py:1716](src/ion/web/ai_api.py#L1716) |  |  |
-| POST | `/api/ai/generate/query` | — | [ai_api.py:1137](src/ion/web/ai_api.py#L1137) |  |  |
-| POST | `/api/ai/history/chat` | — | [ai_api.py:1406](src/ion/web/ai_api.py#L1406) |  |  |
-| GET | `/api/ai/history/sessions` | — | [ai_api.py:1288](src/ion/web/ai_api.py#L1288) |  |  |
-| POST | `/api/ai/history/sessions` | — | [ai_api.py:1319](src/ion/web/ai_api.py#L1319) |  |  |
-| DELETE | `/api/ai/history/sessions/{session_id}` | — | [ai_api.py:1376](src/ion/web/ai_api.py#L1376) |  |  |
-| GET | `/api/ai/history/sessions/{session_id}` | — | [ai_api.py:1343](src/ion/web/ai_api.py#L1343) |  |  |
-| PUT | `/api/ai/history/sessions/{session_id}/title` | — | [ai_api.py:1389](src/ion/web/ai_api.py#L1389) |  |  |
-| GET | `/api/ai/history/stats` | — | [ai_api.py:1489](src/ion/web/ai_api.py#L1489) |  |  |
+| POST | `/api/ai/document/generate` | — | [ai_api.py:1201](src/ion/web/ai_api.py#L1201) |  | `chat.html` |
+| POST | `/api/ai/document/save` | — | [ai_api.py:1260](src/ion/web/ai_api.py#L1260) |  | `chat.html` |
+| POST | `/api/ai/feedback` | — | [ai_api.py:1552](src/ion/web/ai_api.py#L1552) |  | `chat.html` |
+| GET | `/api/ai/files` | — | [ai_api.py:1675](src/ion/web/ai_api.py#L1675) |  | `chat.html` |
+| POST | `/api/ai/files/upload` | — | [ai_api.py:1595](src/ion/web/ai_api.py#L1595) |  | `chat.html` |
+| DELETE | `/api/ai/files/{file_id}` | — | [ai_api.py:1706](src/ion/web/ai_api.py#L1706) |  |  |
+| GET | `/api/ai/files/{file_id}` | — | [ai_api.py:1693](src/ion/web/ai_api.py#L1693) |  |  |
+| POST | `/api/ai/files/{file_id}/download` | — | [ai_api.py:1746](src/ion/web/ai_api.py#L1746) |  |  |
+| POST | `/api/ai/files/{file_id}/edit` | — | [ai_api.py:1718](src/ion/web/ai_api.py#L1718) |  |  |
+| POST | `/api/ai/generate/query` | — | [ai_api.py:1139](src/ion/web/ai_api.py#L1139) |  |  |
+| POST | `/api/ai/history/chat` | — | [ai_api.py:1408](src/ion/web/ai_api.py#L1408) |  |  |
+| GET | `/api/ai/history/sessions` | — | [ai_api.py:1290](src/ion/web/ai_api.py#L1290) |  |  |
+| POST | `/api/ai/history/sessions` | — | [ai_api.py:1321](src/ion/web/ai_api.py#L1321) |  |  |
+| DELETE | `/api/ai/history/sessions/{session_id}` | — | [ai_api.py:1378](src/ion/web/ai_api.py#L1378) |  |  |
+| GET | `/api/ai/history/sessions/{session_id}` | — | [ai_api.py:1345](src/ion/web/ai_api.py#L1345) |  |  |
+| PUT | `/api/ai/history/sessions/{session_id}/title` | — | [ai_api.py:1391](src/ion/web/ai_api.py#L1391) |  |  |
+| GET | `/api/ai/history/stats` | — | [ai_api.py:1491](src/ion/web/ai_api.py#L1491) |  |  |
 | GET | `/api/ai/models` | — | [ai_api.py:239](src/ion/web/ai_api.py#L239) |  |  |
-| POST | `/api/ai/nl-to-query` | — | [ai_api.py:1810](src/ion/web/ai_api.py#L1810) |  | `discover.html` |
-| GET | `/api/ai/preferences` | — | [ai_api.py:1501](src/ion/web/ai_api.py#L1501) |  | `chat.html`, `notes.html` |
-| PUT | `/api/ai/preferences` | — | [ai_api.py:1516](src/ion/web/ai_api.py#L1516) |  | `chat.html`, `notes.html` |
+| POST | `/api/ai/nl-to-query` | — | [ai_api.py:1812](src/ion/web/ai_api.py#L1812) |  | `discover.html` |
+| GET | `/api/ai/preferences` | — | [ai_api.py:1503](src/ion/web/ai_api.py#L1503) |  | `chat.html`, `notes.html` |
+| PUT | `/api/ai/preferences` | — | [ai_api.py:1518](src/ion/web/ai_api.py#L1518) |  | `chat.html`, `notes.html` |
 | GET | `/api/ai/prompts` | — | [ai_api.py:262](src/ion/web/ai_api.py#L262) |  |  |
-| POST | `/api/ai/pull` | — | [ai_api.py:556](src/ion/web/ai_api.py#L556) |  |  |
+| POST | `/api/ai/pull` | — | [ai_api.py:558](src/ion/web/ai_api.py#L558) |  |  |
 | GET | `/api/ai/queue` | — | [ai_api.py:232](src/ion/web/ai_api.py#L232) |  |  |
 | GET | `/api/ai/status` | — | [ai_api.py:172](src/ion/web/ai_api.py#L172) |  | `ai-chat.js`, `alerts.html`, `chat.html`, `integrations.html` |
-| POST | `/api/ai/triage/suggest` | — | [ai_api.py:738](src/ion/web/ai_api.py#L738) |  | `alerts.html` |
+| POST | `/api/ai/triage/suggest` | — | [ai_api.py:740](src/ion/web/ai_api.py#L740) |  | `alerts.html` |
 | GET | `/api/alert-cases/{case_id}/annotations` | `case:read` | [workbench_api.py:378](src/ion/web/workbench_api.py#L378) |  | `cases.html`, `discover.html` |
 | POST | `/api/alert-cases/{case_id}/annotations` | `case:update` | [workbench_api.py:390](src/ion/web/workbench_api.py#L390) |  | `cases.html`, `discover.html` |
 | DELETE | `/api/alert-cases/{case_id}/annotations/{ann_id}` | `case:update` | [workbench_api.py:443](src/ion/web/workbench_api.py#L443) |  | `cases.html`, `discover.html` |

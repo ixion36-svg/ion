@@ -508,6 +508,26 @@ def _run_migrations(engine: Engine) -> None:
         if "tenant_id" not in existing:
             _add_column_tolerant(engine, "users", "tenant_id", "INTEGER")
 
+    # Chat's knowledge-base, playbook and notes sources used to default off,
+    # so almost every stored preference row has them off without anyone
+    # having chosen that. Switch them on once per row; rag_defaults_version
+    # marks a row as done, so a user who turns a source off later keeps it off.
+    if insp.has_table("ai_user_preferences"):
+        existing = {col["name"] for col in insp.get_columns("ai_user_preferences")}
+        if "rag_defaults_version" not in existing:
+            _add_column_tolerant(
+                engine, "ai_user_preferences", "rag_defaults_version",
+                "INTEGER NOT NULL DEFAULT 0",
+            )
+        with engine.begin() as conn:
+            switched = conn.execute(text(
+                "UPDATE ai_user_preferences SET rag_knowledge_base = :on, "
+                "rag_playbooks = :on, rag_user_notes = :on, rag_defaults_version = 1 "
+                "WHERE rag_defaults_version = 0"
+            ), {"on": True}).rowcount
+            if switched:
+                logger.info("Migrated: chat retrieval sources on for %d users", switched)
+
     # (route audit phase 8): DetectionProposal absorbs the retired
     # TuningProposal pipeline. Bob wrote tuning proposals unattended off a
     # false-positive verdict, but DetectionProposal had nowhere to put the

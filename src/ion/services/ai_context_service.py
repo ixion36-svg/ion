@@ -166,9 +166,20 @@ class AIContextService:
         return prefs
 
     def retrieve_context(
-        self, query: str, user_id: int, preferences: AIUserPreference
+        self,
+        query: str,
+        user_id: int,
+        preferences: AIUserPreference,
+        *,
+        may_read_documents: bool,
+        may_read_playbooks: bool,
     ) -> RAGContext:
-        """Retrieve RAG context based on user query and enabled sources."""
+        """Retrieve RAG context based on user query and enabled sources.
+
+        A source is searched only when the user turned it on AND may read it
+        directly (document:read, playbook:read): chat must not quote what the
+        asker could not open themselves.
+        """
         keywords = self._extract_keywords(query)
         if not keywords:
             return RAGContext()
@@ -186,12 +197,15 @@ class AIContextService:
         # similarity never have to be made comparable to each other.
         ranked_lists: List[List[ContextSnippet]] = []
 
+        use_documents = preferences.rag_knowledge_base and may_read_documents
+        use_playbooks = preferences.rag_playbooks and may_read_playbooks
+
         keyword_hits: List[ContextSnippet] = []
-        if preferences.rag_knowledge_base:
+        if use_documents:
             keyword_hits.extend(self._search_knowledge_base(keywords, limit))
         if preferences.rag_user_notes:
             keyword_hits.extend(self._search_user_notes(keywords, user_id, limit))
-        if preferences.rag_playbooks:
+        if use_playbooks:
             keyword_hits.extend(self._search_playbooks(keywords, limit))
         if keyword_hits:
             keyword_hits.sort(key=lambda s: s.score, reverse=True)
@@ -203,9 +217,9 @@ class AIContextService:
         if embedded is not None:
             vec, model_tag = embedded
             vector_hits: List[ContextSnippet] = []
-            if preferences.rag_knowledge_base:
+            if use_documents:
                 vector_hits.extend(self._vector_search_kb(vec, model_tag, limit))
-            if preferences.rag_playbooks:
+            if use_playbooks:
                 vector_hits.extend(
                     self._vector_search_playbooks(vec, model_tag, limit)
                 )
@@ -285,7 +299,11 @@ class AIContextService:
     def _search_user_notes(
         self, keywords: List[str], user_id: int, limit: int
     ) -> List[ContextSnippet]:
-        """Search AnalystNote by title/content (all users)."""
+        """Search the asking user's own AnalystNotes by title/content.
+
+        Notes are personal: every other read path scopes them to the owner,
+        so chat must too, or one analyst's chat quotes another's notes.
+        """
         try:
             filters = []
             for kw in keywords:
@@ -295,6 +313,7 @@ class AIContextService:
 
             notes = (
                 self.db.query(AnalystNote)
+                .filter(AnalystNote.user_id == user_id)
                 .filter(or_(*filters))
                 .limit(30)
                 .all()

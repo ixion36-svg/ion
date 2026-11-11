@@ -2,10 +2,10 @@
 
 Runs under advisory lock ``LOCK_KB_EMBEDDING_BG`` (1020). On each tick:
 
-1. Find Document rows whose collection tree has "Knowledge Base" as the
-   ancestor AND that either (a) have no ``KBChunkEmbedding`` rows yet,
-   or (b) whose stored source_text_hash / model tag differs from current
-   (doc edited, model changed, or chunking scheme bumped).
+1. Find active Document rows anywhere in the document store that either
+   (a) have no ``KBChunkEmbedding`` rows for the current model yet, or
+   (b) whose stored source_text_hash differs from current (doc edited or
+   chunking scheme bumped).
 2. Split the doc into passage chunks (v0.51.0 — see ``_chunk_body``),
    embed each chunk via ``EmbeddingService``.
 3. Replace the doc's ``KBChunkEmbedding`` rows atomically (delete + insert
@@ -32,14 +32,13 @@ import threading
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from sqlalchemy import select
+from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from ion.core import apm
 from ion.core.config import get_config
 from ion.models.document import Document
 from ion.models.kb_document_embedding import KBChunkEmbedding
-from ion.models.template import Collection
 from ion.services.embedding_service import (
     DEFAULT_MODEL,
     get_embedding_service,
@@ -121,70 +120,26 @@ def _hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()
 
 
-def _get_kb_root_id(session: Session) -> Optional[int]:
-    """Return the id of the top-level "Knowledge Base" collection, or None
-    if it hasn't been seeded yet (fresh deploys).
-
-    Tolerant of a duplicated root: if more than one top-level collection is
-    named "Knowledge Base" (e.g. seeded twice across deploys), pick the earliest
-    deterministically rather than raising ``MultipleResultsFound`` — that
-    exception was crashing the KB-embedding background tick on every cycle.
-    """
-    rows = (
-        session.query(Collection.id)
-        .filter(Collection.name == "Knowledge Base")
-        .filter(Collection.parent_id.is_(None))
-        .order_by(Collection.id.asc())
-        .all()
-    )
-    if not rows:
-        return None
-    if len(rows) > 1:
-        logger.warning(
-            "kb_embedding: %d top-level 'Knowledge Base' collections found; "
-            "using the earliest (id=%s). Consider de-duplicating.",
-            len(rows), rows[0][0],
-        )
-    return rows[0][0]
-
-
-def _descendant_collection_ids(session: Session, root_id: int) -> set[int]:
-    """All collection ids under the KB root (recursive).
-
-    Single recursive CTE keeps this cheap even as KB grows.
-    """
-    from sqlalchemy import text as sql_text
-    rows = session.execute(
-        sql_text(
-            """
-            WITH RECURSIVE kb_tree(id) AS (
-                SELECT :root
-                UNION ALL
-                SELECT c.id FROM collections c
-                JOIN kb_tree t ON c.parent_id = t.id
-            )
-            SELECT id FROM kb_tree
-            """
-        ),
-        {"root": root_id},
-    ).all()
-    return {r[0] for r in rows}
-
-
 # ---------------------------------------------------------------------------
 # Core tick
 # ---------------------------------------------------------------------------
 
 
 def run_kb_embedding_once(session: Session) -> Dict[str, Any]:
-    """One pass — chunk + embed new and stale KB documents. Batched.
+    """One pass: chunk and embed new and stale documents. Batched.
 
-    v0.51.0: the batch budget counts CHUNK embeds (Ollama calls), not docs,
-    so a long article costs proportionally. A document is only ever written
-    whole: if any of its chunks fails to embed, the doc is skipped this tick
-    and retried next interval — no partial chunk sets. At least one doc is
+    Every active document in the store is covered, not only the Knowledge
+    Base folder. Documents with no chunks for the current model come first,
+    then the rest of the store, newest edit first, re-hashed for edits and
+    chunk-scheme bumps. The second read only runs if the first leaves budget,
+    so a backlog never costs a full scan. (A fixed "newest N" window used to
+    stop at N: once those were fresh, older documents were never reached.)
+
+    The batch budget counts chunk embeds (Ollama calls), not docs. A document
+    is only ever written whole: if any of its chunks fails to embed, it is
+    skipped this tick and retried next interval. At least one doc is
     processed per tick even when its chunk count exceeds the remaining
-    budget, so a single long article can't stall the queue forever.
+    budget, so a single long document can't stall the queue forever.
     """
     try:
         batch_limit = int(os.environ.get("ION_KB_EMBEDDING_BATCH", "40"))
@@ -195,49 +150,52 @@ def run_kb_embedding_once(session: Session) -> Dict[str, Any]:
     if not svc.is_enabled:
         return {"scanned": 0, "embedded": 0, "disabled": True}
 
-    kb_root = _get_kb_root_id(session)
-    if kb_root is None:
-        return {"scanned": 0, "embedded": 0, "no_kb_root": True}
+    def _stored() -> Dict[int, tuple]:
+        # Chunk 0 stands for the doc: all its chunks share hash and model.
+        return {
+            doc_id: (hsh, model)
+            for doc_id, hsh, model in session.execute(
+                select(
+                    KBChunkEmbedding.document_id,
+                    KBChunkEmbedding.source_text_hash,
+                    KBChunkEmbedding.model_name,
+                ).where(KBChunkEmbedding.chunk_index == 0)
+            ).all()
+        }
 
-    kb_collection_ids = _descendant_collection_ids(session, kb_root)
-    if not kb_collection_ids:
-        return {"scanned": 0, "embedded": 0, "empty_kb_tree": True}
-
-    docs = (
-        session.execute(
+    def _candidates():
+        yield from session.execute(
             select(Document)
-            .where(Document.collection_id.in_(list(kb_collection_ids)))
-            .where(Document.status == "active")
-            .order_by(Document.id.desc())
-            .limit(max(batch_limit, 20) * 4)
-        ).scalars().all()
-    )
-
-    # One representative row per doc is enough for the staleness check —
-    # all of a doc's chunk rows share source_text_hash + model_name.
-    doc_ids = [d.id for d in docs]
-    existing: Dict[int, KBChunkEmbedding] = {}
-    if doc_ids:
-        for row in session.execute(
-            select(KBChunkEmbedding).where(
-                KBChunkEmbedding.document_id.in_(doc_ids),
-                KBChunkEmbedding.chunk_index == 0,
+            .outerjoin(
+                KBChunkEmbedding,
+                and_(
+                    KBChunkEmbedding.document_id == Document.id,
+                    KBChunkEmbedding.chunk_index == 0,
+                    KBChunkEmbedding.model_name == svc.model_tag,
+                ),
             )
-        ).scalars().all():
-            existing[row.document_id] = row
+            .where(Document.status == "active")
+            .where(KBChunkEmbedding.document_id.is_(None))
+            .order_by(Document.id.desc())
+        ).scalars()
+        yield from session.execute(
+            select(Document)
+            .where(Document.status == "active")
+            .order_by(Document.updated_at.desc(), Document.id.desc())
+        ).scalars()
 
+    stored = _stored()
+    seen: set = set()
     docs_embedded = chunks_embedded = skipped = failed_docs = scanned = 0
-    for doc in docs:
-        if chunks_embedded >= batch_limit:
+    for doc in _candidates():
+        if chunks_embedded >= batch_limit or failed_docs >= 3:
             break
+        if doc.id in seen:
+            continue
+        seen.add(doc.id)
         scanned += 1
         hsh = _hash(_kb_doc_hash_input(doc))
-        row = existing.get(doc.id)
-        if (
-            row is not None
-            and row.source_text_hash == hsh
-            and row.model_name == svc.model_tag
-        ):
+        if stored.get(doc.id) == (hsh, svc.model_tag):
             skipped += 1
             continue
 
@@ -245,7 +203,7 @@ def run_kb_embedding_once(session: Session) -> Dict[str, Any]:
         if not chunks:
             continue
 
-        # Embed every chunk BEFORE touching the stored rows — a mid-doc
+        # Embed every chunk BEFORE touching the stored rows: a mid-doc
         # Ollama failure must not leave a partial chunk set behind.
         vectors: list = []
         for chunk in chunks:
@@ -256,12 +214,10 @@ def run_kb_embedding_once(session: Session) -> Dict[str, Any]:
             vectors.append(vec)
         if vectors is None:
             failed_docs += 1
-            if failed_docs >= 3:
-                break
             continue
 
         now = datetime.now(timezone.utc)
-        # "fetch" keeps the session identity map in sync — the re-inserted
+        # "fetch" keeps the session identity map in sync: the re-inserted
         # rows reuse the deleted rows' composite PKs within one transaction.
         session.query(KBChunkEmbedding).filter(
             KBChunkEmbedding.document_id == doc.id
