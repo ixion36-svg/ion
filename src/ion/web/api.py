@@ -2758,15 +2758,9 @@ def team_metrics_payload(session: Session) -> dict:
     ).scalar() or 0
 
     thirty_days_ago = now - timedelta(days=30)
-    closed_cases_30d = session.query(AlertCase).filter(
-        AlertCase.closed_at >= thirty_days_ago,
-        AlertCase.closed_at.isnot(None),
-    ).all()
-
-    mttr = None
-    if closed_cases_30d:
-        durations = [(c.closed_at - c.created_at).total_seconds() / 3600 for c in closed_cases_30d]
-        mttr = round(sum(durations) / len(durations), 1)
+    from ion.services.case_metrics import mean_hours_to_close
+    avg_hours, _ = mean_hours_to_close(session, AlertCase.closed_at >= thirty_days_ago)
+    mttr = round(avg_hours, 1) if avg_hours is not None else None
 
     seven_days_ago = now - timedelta(days=7)
     created_7d = session.query(sqlfunc.count(AlertCase.id)).filter(
