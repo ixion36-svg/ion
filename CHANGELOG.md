@@ -1,13 +1,86 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.16 -->
-<!-- ion-doc:version=0.99.16 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.17 -->
+<!-- ion-doc:version=0.99.17 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-11-10 -->
+<!-- ion-doc:date=2026-11-11 -->
 
 # Changelog
+
+## v0.99.17 — 2026-11-11
+
+ION now works with TIDE 6.4.0 and with Arkime 5's real-time monitoring, both
+checked against live instances. Kibana case sync follows whichever side
+changed a status, the Detection Engineering and Threat Intel pages are
+condensed, and the cases summary stays fast as closed cases pile up.
+Net-new findings: 0C / 0H / 0M / 0L. One MEDIUM finding closed: chat could
+quote another analyst's private notes.
+
+### Added
+
+- **Detection Engineering in five tabs.** Ten tabs and a tall header become
+  a one-line header and Overview, Coverage, Use cases, Rules and Readiness.
+  The overview gathers posture, coverage by tactic, rule quality, use-case
+  readiness, firing rules and a needs-action list. Coverage is an ATT&CK
+  grid with one square per technique, filterable to one system, with D3FEND
+  as a toggle. Old tab links still open the right view.
+- **Threat Intel in five tabs.** Overview, Adversaries, Indicators, Reports
+  and KEV. The overview leads with what works without OpenCTI, and one
+  prompt replaces the empty panels when it isn't connected. KEV pages 50
+  rows at a time with search, ransomware-linked and date filters.
+
+### Changed
+
+- **Chat and Bob read the whole document store.** Embeddings cover every
+  active document, not only the Knowledge Base folder. The document
+  embedder also stopped at the newest 160 documents, so most of the
+  built-in knowledge base was never embedded; it now works through all of
+  them. Chat's knowledge-base, playbook and notes sources are on by
+  default, and existing users get them switched on once.
+- **Kibana status sync follows the side that changed.** Each case stores
+  the status ION and Kibana last agreed on, instead of comparing timestamps
+  from two machines, so a grouper tick or a Kibana comment no longer undoes
+  a real status change. A reopen in Kibana now reopens the ION case.
+- **Alerts added to an existing case reach Kibana.** Add to Case, grouper
+  extends and Arkime commits attached nothing in Kibana after a case was
+  created. The first sync after upgrading attaches the backlog.
+- **The cases summary counts in the database.** It read every closed case
+  into Python on each load: 454 ms at 100,000 cases, now 109 ms.
+- **Real-time Arkime groups its cases.** One case per problem per day
+  (source and domain for DNS, the flow otherwise), not one per Arkime
+  session; a DNS tunnel used to open a case per query.
+
+### Fixed
+
+- **TIDE 6.4.0.** The ATT&CK catalogue comes from ION (TIDE 6 no longer
+  serves it), baselines are listed once rather than once per system, rule
+  quality is banded on TIDE's percentage scale (80/50/25), and SOC Health
+  no longer reads a 46% average as 116%. A comment containing "load" got
+  the whole posture query refused, and three refused queries opened the
+  TIDE circuit breaker and cut every other TIDE read. Checked against a
+  live 6.4.0: all 87 queries answered.
+- **Real-time Arkime on Arkime 5.** ION asked for Moloch-era field names
+  that Arkime 3+ no longer has, so every detector dropped every session.
+  Every session read now uses Arkime's current names. Refused queries and
+  failed PCAP fetches are errors rather than empty results, and DNS to an
+  external resolver no longer scores as a beacon. Checked against a live
+  Arkime 5.5: cleartext credentials, a command channel, a DNS tunnel and a
+  beacon each opened one case.
+- **Firing counts above 10,000** read as exactly 10,000; the alert total is
+  now counted exactly.
+- **Use-case steps with no rules** said "Coverage unavailable"; they say
+  "No rules" when the count succeeded.
+
+### Security
+
+- **Chat quoted other analysts' private notes (MEDIUM).** The notes source
+  searched every user's personal notes and labelled them "Your Note"; any
+  user could switch it on. It now searches only the asker's notes.
+- **Chat retrieval respects read permissions.** Documents are searched only
+  for `document:read` holders and playbooks only for `playbook:read`,
+  because `/api/ai/*` checks sign-in alone.
 
 ## v0.99.16 — 2026-11-10
 

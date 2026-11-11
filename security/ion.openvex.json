@@ -1,9 +1,9 @@
 {
   "@context": "https://openvex.dev/ns/v0.2.0",
-  "@id": "https://ixion36.dev/vex/ion/0.99.16/d54836c3326899ea",
+  "@id": "https://ixion36.dev/vex/ion/0.99.17/25de021e93276f1d",
   "author": "ION maintainer (ixion36)",
   "role": "vendor",
-  "timestamp": "2026-11-10T12:53:08Z",
+  "timestamp": "2026-11-11T12:22:36Z",
   "version": 1,
   "statements": [
     {
@@ -12,7 +12,7 @@
       },
       "products": [
         {
-          "@id": "pkg:docker/fubsxploitapps/ion@0.99.16"
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.17"
         }
       ],
       "status": "not_affected",
@@ -25,7 +25,7 @@
       },
       "products": [
         {
-          "@id": "pkg:docker/fubsxploitapps/ion@0.99.16"
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.17"
         }
       ],
       "status": "not_affected",
@@ -38,7 +38,7 @@
       },
       "products": [
         {
-          "@id": "pkg:docker/fubsxploitapps/ion@0.99.16"
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.17"
         }
       ],
       "status": "not_affected",
@@ -51,7 +51,7 @@
       },
       "products": [
         {
-          "@id": "pkg:docker/fubsxploitapps/ion@0.99.16"
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.17"
         }
       ],
       "status": "fixed",
@@ -63,7 +63,7 @@
       },
       "products": [
         {
-          "@id": "pkg:docker/fubsxploitapps/ion@0.99.16"
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.17"
         }
       ],
       "status": "fixed",
@@ -75,7 +75,7 @@
       },
       "products": [
         {
-          "@id": "pkg:docker/fubsxploitapps/ion@0.99.16"
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.17"
         }
       ],
       "status": "fixed",
@@ -87,7 +87,7 @@
       },
       "products": [
         {
-          "@id": "pkg:docker/fubsxploitapps/ion@0.99.16"
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.17"
         }
       ],
       "status": "fixed",
@@ -99,7 +99,7 @@
       },
       "products": [
         {
-          "@id": "pkg:docker/fubsxploitapps/ion@0.99.16"
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.17"
         }
       ],
       "status": "fixed",
@@ -111,7 +111,7 @@
       },
       "products": [
         {
-          "@id": "pkg:docker/fubsxploitapps/ion@0.99.16"
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.17"
         }
       ],
       "status": "fixed",
@@ -123,7 +123,7 @@
       },
       "products": [
         {
-          "@id": "pkg:docker/fubsxploitapps/ion@0.99.16"
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.17"
         }
       ],
       "status": "fixed",
@@ -135,7 +135,7 @@
       },
       "products": [
         {
-          "@id": "pkg:docker/fubsxploitapps/ion@0.99.16"
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.17"
         }
       ],
       "status": "fixed",
@@ -147,7 +147,7 @@
       },
       "products": [
         {
-          "@id": "pkg:docker/fubsxploitapps/ion@0.99.16"
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.17"
         }
       ],
       "status": "fixed",
@@ -159,7 +159,7 @@
       },
       "products": [
         {
-          "@id": "pkg:docker/fubsxploitapps/ion@0.99.16"
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.17"
         }
       ],
       "status": "fixed",
@@ -171,7 +171,7 @@
       },
       "products": [
         {
-          "@id": "pkg:docker/fubsxploitapps/ion@0.99.16"
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.17"
         }
       ],
       "status": "fixed",
@@ -183,7 +183,7 @@
       },
       "products": [
         {
-          "@id": "pkg:docker/fubsxploitapps/ion@0.99.16"
+          "@id": "pkg:docker/fubsxploitapps/ion@0.99.17"
         }
       ],
       "status": "fixed",
