@@ -1,0 +1,1 @@
+{% if state == 'failed' %}<option value="" disabled selected>Systems unavailable</option>{% else %}<option value="">All systems</option>{% for item in systems or [] %}<option value="{{ item.id }}">{{ item.get('name') if item.get('name') is not none else item.id }}</option>{% endfor %}{% endif %}

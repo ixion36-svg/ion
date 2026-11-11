@@ -69,15 +69,20 @@ def _coverage(playbooks: list[dict[str, Any]] | None) -> None:
             step['coverage_state'] = 'unknown' if total is None else 'covered' if enabled > 0 else 'partial' if total > 0 else 'blind'
 
 
-@router.get('/detection-engineering/killchains', response_class=HTMLResponse)
-def killchains(request: Request, session: Session = Depends(get_db_session)):
-    playbooks = None
+def use_cases(session: Session | None) -> list[dict[str, Any]] | None:
+    """TIDE use cases with each step's coverage_state, or None when unread."""
     try:
         playbooks = _objects(deepcopy(de_tide_api.tide_de_use_cases(session=session)))
         _coverage(playbooks)
+        return playbooks
     except Exception:
         logger.exception('Could not read detection use cases')
-        playbooks = None
+        return None
+
+
+@router.get('/detection-engineering/killchains', response_class=HTMLResponse)
+def killchains(request: Request, session: Session = Depends(get_db_session)):
+    playbooks = use_cases(session)
     view: KillChainsView = {'state': _state(playbooks), 'playbooks': playbooks}
     return render_view(request, '_fragments/detection_engineering_killchains.html', view)
 

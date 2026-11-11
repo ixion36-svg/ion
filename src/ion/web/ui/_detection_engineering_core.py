@@ -34,6 +34,7 @@ class PosturePanel(TypedDict):
     severity: list[dict[str, Any]] | None
     severity_total: int | float | None
     quality: list[dict[str, Any]] | None
+    quality_scale: Literal['percent', 'points'] | None
     avg_quality: int | float | None
     disabled_critical: list[dict[str, Any]] | None
 
@@ -94,8 +95,7 @@ def _severity(payload: object) -> tuple[list[dict[str, Any]] | None, int | float
     return result, total
 
 
-@router.get('/detection-engineering/posture', response_class=HTMLResponse)
-def posture(request: Request, session: Session = Depends(get_db_session)):
+def posture_view(session: Session | None) -> PosturePanel:
     payload = None
     disabled = None
     try:
@@ -125,12 +125,17 @@ def posture(request: Request, session: Session = Depends(get_db_session)):
         'severity':severity, 'severity_total':severity_total, 'quality':quality,
         'avg_quality':_number(quality_payload.get('avg_quality')) if isinstance(quality_payload,dict) else None,
         'disabled_critical':disabled,
+        'quality_scale':quality_payload.get('scale') if isinstance(quality_payload,dict) and quality_payload.get('scale') in QUALITY_LABELS else None,
     }
-    return render_view(request, '_fragments/detection_engineering_posture.html', view)
+    return view
 
 
-@router.get('/detection-engineering/gaps', response_class=HTMLResponse)
-def gaps(request: Request, session: Session = Depends(get_db_session)):
+@router.get('/detection-engineering/posture', response_class=HTMLResponse)
+def posture(request: Request, session: Session = Depends(get_db_session)):
+    return render_view(request, '_fragments/detection_engineering_posture.html', posture_view(session))
+
+
+def gaps_view(session: Session | None) -> GapsPanel:
     payload = None
     try:
         payload = de_tide_api.tide_de_gaps(session=session)
@@ -153,7 +158,12 @@ def gaps(request: Request, session: Session = Depends(get_db_session)):
         'total_blind_spots':total, 'blind_spots_by_tactic':tactics,
         'unmapped_rules':unmapped,'quick_wins':wins,'systems_coverage':systems,
     }
-    return render_view(request, '_fragments/detection_engineering_gaps.html', view)
+    return view
+
+
+@router.get('/detection-engineering/gaps', response_class=HTMLResponse)
+def gaps(request: Request, session: Session = Depends(get_db_session)):
+    return render_view(request, '_fragments/detection_engineering_gaps.html', gaps_view(session))
 
 
 @router.get('/detection-engineering/spaces', response_class=HTMLResponse)

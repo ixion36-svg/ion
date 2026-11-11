@@ -1,0 +1,87 @@
+{# ATT&CK coverage map: one column per tactic, one square per technique.
+   Clicking a column shows that tactic's techniques in the table below. #}
+{% macro num(v) -%}{% if v is number %}{{ '{:,}'.format(v) }}{% else %}—{% endif %}{%- endmacro %}
+{% macro sev(value) -%}{% set key = value|lower if value is string else '' %}<span class="de-sev {{ key if key in ['critical','high','medium','low'] else '' }}">{{ value or 'Unknown' }}</span>{%- endmacro %}
+{% set strict = basis == 'global' %}
+{% set labels = {
+  'on': 'enabled rule' if basis != 'system' else 'enabled rule on this system',
+  'off': 'rule off',
+  'usecase': 'in a use case, no rule' if strict else 'in a use case, no enabled rule',
+  'none': 'no rule' if strict else 'no enabled rule',
+  'unknown': 'rule counts unknown'} %}
+{% if state == 'unconfigured' %}
+<div class="dx-banner">TIDE not configured. Connect it in <a href="/settings#tide">Settings</a> to map coverage.</div>
+{% elif state == 'failed' %}
+<div class="dx-banner warn" role="alert">{{ error }}</div>
+{% else %}
+{% if basis != 'system' %}<span id="de-count-coverage" class="dx-tab-count" hx-swap-oob="true">{{ num(totals.total - totals.on) }} gaps</span>{% endif %}
+<section class="dx-card">
+  <header class="dx-ch">ATT&amp;CK coverage map <span class="dx-n">{{ num(totals.total) }} techniques · each square is a technique{% if system %} · {{ system.name or system.id }}{% endif %}</span>
+    <span class="dx-r dx-legend">{% for key in ['on','off','usecase','none','unknown'] if totals[key] or key in ['on','none'] %}{% if key != 'off' or strict %}<span><i class="s-{{ key }}"></i>{{ labels[key] }} <b class="mono">{{ num(totals[key]) }}</b></span>{% endif %}{% endfor %}</span>
+  </header>
+  <div class="dx-cb">
+    {% for notice in notices %}<div class="dx-note">{{ notice }}</div>{% endfor %}
+    {% if basis == 'system' %}<div class="dx-note">Scoped to the rules applied to {{ system.name or system.id }}. Rule-off state is not measured per system.</div>{% endif %}
+    <div class="dx-matrix" id="de-attack-matrix">
+      {% for tactic in tactics %}
+      <button type="button" class="dx-mcol{{ ' on' if tactic.name == selected }}" data-tactic="{{ tactic.name }}" aria-pressed="{{ 'true' if tactic.name == selected else 'false' }}" data-click-action="deCoverageTactic" data-args='{{ [tactic.name]|tojson }}' title="{{ tactic.name }}: {{ tactic.covered }} of {{ tactic.total }} with an enabled rule">
+        <span class="dx-mtitle">{{ tactic.short }}<span>{{ tactic.id or '' }}{{ ' · ' if tactic.id }}{{ tactic.covered }}/{{ tactic.total }}</span></span>
+        <span class="dx-cells">{% for cell in tactic.cells %}<i class="s-{{ cell.state }}" title="{{ cell.id }} {{ cell.name }} — {{ labels[cell.state] }}"></i>{% endfor %}</span>
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<div class="dx-grid dx-grid-2 dx-mt">
+  <section class="dx-card" id="de-attack-tactics">
+    {% for tactic in tactics %}
+    <div data-tactic-panel="{{ tactic.name }}"{% if tactic.name != selected %} hidden{% endif %}>
+      <header class="dx-ch">{{ tactic.name }} <span class="dx-n">{{ tactic.covered }} of {{ tactic.total }} covered{% if tactic.off %} · {{ tactic.off }} off{% endif %}</span><span class="dx-r dx-mute">selected tactic</span></header>
+      <div class="dx-scroll">
+      <table class="dx-table">
+        <thead><tr><th>Technique</th><th>Rules</th><th>In use case</th>{% if strict %}<th>Systems</th>{% endif %}</tr></thead>
+        <tbody>
+        {% for cell in tactic.rows %}
+        <tr>
+          <td><i class="dx-dot s-{{ cell.state }}"></i><span class="de-mitre-chip">{{ cell.id }}</span> {{ cell.name or 'Unknown' }}</td>
+          <td class="mono">{% if cell.rules %}{% if cell.rules.total is none or cell.rules.enabled is none %}<span class="dx-mute">unknown</span>{% elif cell.rules.enabled %}<span class="dx-ok">{{ cell.rules.enabled }} enabled</span>{% if cell.rules.total > cell.rules.enabled %} / {{ cell.rules.total }}{% endif %}{% elif cell.rules.total %}<span class="dx-warn">{{ cell.rules.total }} off</span>{% else %}<span class="dx-mute">none</span>{% endif %}{% elif cell.state == 'on' %}<span class="dx-ok">enabled</span>{% else %}<span class="dx-mute">no enabled rule</span>{% endif %}</td>
+          <td>{% if cell.use_cases is none %}<span class="dx-mute" title="Use-case read failed">unknown</span>{% elif cell.use_cases %}{{ cell.use_cases|join(', ') }}{% else %}<span class="dx-mute">—</span>{% endif %}</td>
+          {% if strict %}<td>{% if cell.systems %}{{ cell.systems[:3]|join(', ') }}{% if cell.systems|length > 3 %} +{{ cell.systems|length - 3 }}{% endif %}{% else %}<span class="dx-mute">—</span>{% endif %}</td>{% endif %}
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="dx-card">
+    <header class="dx-ch">Quick wins <span class="dx-n">disabled critical/high, good quality or better</span></header>
+    {% if quick_wins is none %}<div class="dx-cb"><div class="dx-empty" role="alert">Quick wins unavailable.</div></div>
+    {% elif not quick_wins %}<div class="dx-cb"><div class="dx-empty">No quick wins found.</div></div>
+    {% else %}
+    <table class="dx-table"><thead><tr><th>Rule</th><th>Severity</th><th class="num">Quality</th><th>Would cover</th></tr></thead><tbody>
+    {% for rule in quick_wins %}<tr><td>{{ rule.get('name') or 'Unknown' }}</td><td>{{ sev(rule.get('severity')) }}</td><td class="mono num">{{ num(rule.get('quality_score')) }}</td><td>{% for tid in rule.get('mitre_ids') or [] %}<span class="de-mitre-chip">{{ tid }}</span> {% else %}<span class="dx-mute">—</span>{% endfor %}</td></tr>{% endfor %}
+    </tbody></table>
+    {% endif %}
+    <header class="dx-ch dx-ch-split">Unmapped rules <span class="dx-n">no ATT&amp;CK mapping{% if unmapped_rules %} · {{ unmapped_rules|length }}{% if unmapped_rules|length >= 100 %}+{% endif %}{% endif %}</span></header>
+    {% if unmapped_rules is none %}<div class="dx-cb"><div class="dx-empty" role="alert">Unmapped rules unavailable.</div></div>
+    {% elif not unmapped_rules %}<div class="dx-cb"><div class="dx-empty">No unmapped rules found.</div></div>
+    {% else %}
+    <div class="dx-scroll sm"><table class="dx-table"><thead><tr><th>Rule</th><th>Severity</th><th>Status</th><th class="num">Quality</th></tr></thead><tbody>
+    {% for rule in unmapped_rules[:50] %}<tr><td>{{ rule.get('name') or 'Unknown' }}</td><td>{{ sev(rule.get('severity')) }}</td><td>{% if rule.get('enabled') is none %}<span class="dx-mute">unknown</span>{% elif rule.enabled %}<span class="dx-ok">Enabled</span>{% else %}<span class="dx-warn">Disabled</span>{% endif %}</td><td class="mono num">{{ num(rule.get('quality_score')) }}</td></tr>{% endfor %}
+    </tbody></table></div>
+    {% endif %}
+    <header class="dx-ch dx-ch-split">Systems <span class="dx-n">applied rules, lowest first</span></header>
+    {% if systems_coverage is none %}<div class="dx-cb"><div class="dx-empty" role="alert">System coverage unavailable.</div></div>
+    {% elif not systems_coverage %}<div class="dx-cb"><div class="dx-empty">No systems in TIDE.</div></div>
+    {% else %}
+    <table class="dx-table"><tbody>
+    {% for item in systems_coverage %}<tr><td>{{ item.get('name') or 'Unknown' }}</td><td class="mono num">{{ num(item.get('applied_rules')) }} rules</td></tr>{% endfor %}
+    </tbody></table>
+    {% endif %}
+  </section>
+</div>
+{% endif %}

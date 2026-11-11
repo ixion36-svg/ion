@@ -134,3 +134,36 @@ def test_a_failing_tide_still_opens_the_breaker(monkeypatch):
     assert not breaker.can_execute()
     from ion.core.circuit_breaker import CircuitState
     breaker._transition(CircuitState.CLOSED)
+
+
+def test_the_execution_alert_total_is_counted_exactly(monkeypatch):
+    """Elasticsearch stops counting at 10,000 unless asked, so a busy week
+    read as exactly 10,000 firing alerts."""
+    import asyncio
+
+    from ion.web import de_tide_api
+
+    sent = {}
+
+    class _ES:
+        is_configured = True
+        alert_index = ".alerts-security.alerts-default"
+
+        async def _request(self, method, path, json=None):
+            sent.update(json or {})
+            return {"hits": {"total": {"value": 25126, "relation": "eq"}}, "aggregations": {}}
+
+    class _Tide:
+        enabled = True
+        space = "default"
+
+        def _query(self, sql, retries=1):
+            return {"rows": []}
+
+        def get_rules_paginated(self, *a, **k):
+            return {"rules": [], "total": 0}
+
+    monkeypatch.setattr(de_tide_api, "ElasticsearchService", lambda: _ES())
+    monkeypatch.setattr(de_tide_api, "get_tide_service", lambda: _Tide())
+    asyncio.run(de_tide_api.tide_de_execution(168))
+    assert sent.get("track_total_hits") is True
