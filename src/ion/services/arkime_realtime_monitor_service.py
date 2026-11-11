@@ -65,6 +65,7 @@ Environment variables:
 * ``ION_ARKIME_RTMON_DNS_CONFIRM_BUDGET``   (default ``5`` — PCAP pulls/pass)
 """
 
+from datetime import datetime, timezone
 import asyncio
 import ipaddress
 import logging
@@ -94,7 +95,9 @@ _RSH_PORTS = {512, 513, 514}
 # Cleartext-credential-bearing protocols (Arkime ``protocols`` tag values).
 _CLEARTEXT_PROTOCOLS = ("ftp", "telnet", "pop3", "imap", "smtp", "snmp", "ldap")
 # Ports we treat as benign for beacon scoring even when periodic (NTP).
-_BEACON_BENIGN_PORTS = {123}
+# Regular by design. DNS to an external resolver read as a perfect beacon
+# (seen against Arkime 5.5); DNS tunnelling has its own detector.
+_BEACON_BENIGN_PORTS = {53, 123}
 
 
 # ── env helpers ────────────────────────────────────────────────────────────
@@ -653,20 +656,62 @@ def _open_case(session, bob_id: int, cand: Dict[str, Any], enqueue_fn) -> None:
         spawn_case_tag_writeback(case_number, [cid])
 
 
+# ── case grouping ──────────────────────────────────────────────────────────
+def _base_domain(name: str) -> str:
+    parts = [p for p in (name or "").lower().split(".") if p]
+    return ".".join(parts[-2:]) if len(parts) >= 2 else (name or "").lower()
+
+
+def _group_markers(cands: List[Dict[str, Any]], day: str) -> List[Dict[str, Any]]:
+    """One case per problem per day, not one per Arkime session.
+
+    Markers used to carry the session's community ID, and every DNS query is
+    its own UDP session, so one tunnel opened a case per query (five a pass,
+    against a live Arkime 5.5). They now key on what an analyst would call
+    the same finding (source and domain for DNS, the flow tuple otherwise)
+    plus the UTC day, so it re-alerts daily while it lasts instead of once
+    ever. The representative session stays on the candidate for PCAP pulls.
+    """
+    counts: Dict[str, int] = {}
+    for c in cands:
+        det, node = c["detector"], c.get("node") or ""
+        if det == "dns_tunneling":
+            key = f"{c.get('src')}:{_base_domain((c.get('evidence') or {}).get('sample_query', ''))}"
+        else:
+            key = f"{c.get('src')}:{c.get('dst')}:{c.get('dst_port')}"
+        c["marker"] = f"rtmon:{det}:{node}:{key}:{day}"[:490]
+        counts[c["marker"]] = counts.get(c["marker"], 0) + 1
+    for c in cands:
+        c.setdefault("evidence", {})["sessions_in_group"] = counts[c["marker"]]
+    return cands
+
+
 # ── pass orchestration ──────────────────────────────────────────────────────
+# What the last pass in this process saw, for its summary log line.
+_last_pass: Dict[str, Any] = {}
+
+
 async def _gather_candidates(svc) -> List[Dict[str, Any]]:
     """Run every enabled content/behaviour detector and return raw candidates."""
     from ion.services.arkime_service import ArkimeError
 
     cands: List[Dict[str, Any]] = []
     window = _window_minutes()
+    _last_pass.update(sweeps=0, failed=0, sessions=0, first_error=None)
 
     async def _sweep(expr: str, win: int) -> List[Dict[str, Any]]:
+        _last_pass["sweeps"] += 1
         try:
-            return await svc.find_recent_sessions_by_expression(expr, window_minutes=win, limit=1000)
+            rows = await svc.find_recent_sessions_by_expression(expr, window_minutes=win, limit=1000)
         except ArkimeError as exc:
-            logger.debug("rtmon: sweep failed (%s): %s", expr[:60], exc)
+            # A failed sweep used to be logged at DEBUG and return nothing,
+            # so a broken query or a login failure read as quiet traffic.
+            _last_pass["failed"] += 1
+            _last_pass["first_error"] = _last_pass["first_error"] or str(exc)
+            logger.warning("rtmon: sweep failed (%s): %s", expr[:60], exc)
             return []
+        _last_pass["sessions"] += len(rows)
+        return rows
 
     if _flag("ION_ARKIME_RTMON_CLEARTEXT_ENABLED", True):
         expr = "(user == EXISTS!) || " + " || ".join(f"protocols == {p}" for p in _CLEARTEXT_PROTOCOLS)
@@ -679,7 +724,8 @@ async def _gather_candidates(svc) -> List[Dict[str, Any]]:
 
     if _flag("ION_ARKIME_RTMON_BEACON_ENABLED", True):
         # Egress only — exclude private destinations at the query to bound volume.
-        expr = "ip.dst != 10.0.0.0/8 && ip.dst != 172.16.0.0/12 && ip.dst != 192.168.0.0/16"
+        expr = ("ip.dst != 10.0.0.0/8 && ip.dst != 172.16.0.0/12 && ip.dst != 192.168.0.0/16 && "
+                + " && ".join(f"port.dst != {p}" for p in sorted(_BEACON_BENIGN_PORTS)))
         cands += _detect_beacon_shape(await _sweep(expr, _beacon_window_minutes()))
 
     if _flag("ION_ARKIME_RTMON_DNS_ENABLED", True):
@@ -691,7 +737,7 @@ async def _gather_candidates(svc) -> List[Dict[str, Any]]:
             expr = "tls.ja4 == [" + ",".join(sorted(blocklist)) + "]"
             cands += _detect_ja4_blocklist(await _sweep(expr, window), blocklist)
 
-    return cands
+    return _group_markers(cands, datetime.now(timezone.utc).strftime("%Y-%m-%d"))
 
 
 async def _run_pass(engine: Engine) -> None:
@@ -710,6 +756,12 @@ async def _run_pass(engine: Engine) -> None:
         return
 
     candidates = await _gather_candidates(svc)
+    logger.info(
+        "rtmon: pass read %d session(s) from %d sweep(s), %d failed%s; %d candidate(s)",
+        _last_pass.get("sessions", 0), _last_pass.get("sweeps", 0), _last_pass.get("failed", 0),
+        f" (first: {_last_pass['first_error']})" if _last_pass.get("first_error") else "",
+        len(candidates),
+    )
 
     factory = get_session_factory(engine)
     session = factory()

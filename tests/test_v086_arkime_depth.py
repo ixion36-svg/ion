@@ -31,7 +31,7 @@ from ion.services.arkime_realtime_monitor_service import (
     _detect_ja4_blocklist,
     _ja4_blocklist,
 )
-from ion.services.arkime_service import ArkimeService
+from ion.services.arkime_service import _db_fields, ArkimeService
 from ion.services.connectors.arkime_connector import ArkimeConnector
 from ion.web.api import get_db_session
 from ion.web.server import app
@@ -180,7 +180,8 @@ def test_depth_fields_requested_then_degraded_on_400():
     # test_depth_fields_kept_when_accepted.
     assert client.get.await_count == 2
     retry_fields = client.get.await_args_list[1].kwargs["params"]["fields"]
-    assert retry_fields == ArkimeService._SESSION_FIELDS
+    # Base fields, in Arkime's current names (see _db_fields).
+    assert retry_fields == _db_fields(ArkimeService._SESSION_FIELDS)
 
     # Once latched, later searches go straight to base fields — no retry.
     client2 = _mock_client([ok])
@@ -188,7 +189,7 @@ def test_depth_fields_requested_then_degraded_on_400():
         _run(svc.find_sessions_by_community_id("n1", "1:abc="))
     assert (
         client2.get.await_args_list[0].kwargs["params"]["fields"]
-        == ArkimeService._SESSION_FIELDS
+        == _db_fields(ArkimeService._SESSION_FIELDS)
     )
 
 
