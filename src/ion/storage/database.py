@@ -433,6 +433,7 @@ def _run_migrations(engine: Engine) -> None:
             "source_alert_ids": "JSON",
             "kibana_case_id": "VARCHAR(100)",
             "kibana_case_version": "VARCHAR(50)",
+            "kibana_synced_status": "VARCHAR(20)",
             "observables": "JSON",
             "dfir_iris_case_id": "INTEGER",
         }
