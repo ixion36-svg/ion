@@ -19,6 +19,12 @@ router = APIRouter(dependencies=[Depends(require_permission('alert:read'))])
 State = Literal['failed', 'unconfigured', 'empty', 'data']
 
 
+# Band labels for the scale TIDE scores on (tide_service._quality_bands).
+QUALITY_LABELS = {
+    'percent': {'excellent': 'Excellent (80%+)', 'good': 'Good (50-79%)', 'fair': 'Fair (25-49%)', 'poor': 'Poor (<25%)'},
+    'points': {'excellent': 'Excellent (30+)', 'good': 'Good (20-29)', 'fair': 'Fair (10-19)', 'poor': 'Poor (<10)'},
+}
+
 class PosturePanel(TypedDict):
     state: State
     stats: dict[str, int | float | None]
@@ -109,7 +115,8 @@ def posture(request: Request, session: Session = Depends(get_db_session)):
     quality_payload = data.get('quality')
     quality = None
     if isinstance(quality_payload, dict):
-        quality = [{'key':key, 'count':_number(quality_payload.get(key)), 'percentage':_percent(quality_payload.get(key),stats['total_rules'])} for key in ('excellent','good','fair','poor')]
+        labels = QUALITY_LABELS.get(quality_payload.get('scale'), QUALITY_LABELS['points'])
+        quality = [{'key':key, 'label':labels[key], 'count':_number(quality_payload.get(key)), 'percentage':_percent(quality_payload.get(key),stats['total_rules'])} for key in ('excellent','good','fair','poor')]
     view: PosturePanel = {
         'state':'failed' if not isinstance(configured, bool) else 'unconfigured' if not configured else 'empty' if stats['total_rules'] == 0 else 'data',
         'stats':stats, 'enabled_pct':_percent(stats['enabled_rules'],stats['total_rules']),

@@ -232,3 +232,17 @@ def test_a_none_quality_does_not_raise_in_the_recommendation_gate():
         "rule_quality_pct": None, "avg_quality": None,
         "total_techniques": None, "covered_techniques": None,
     }, score=None))
+
+
+def test_a_percentage_quality_is_not_divided_by_forty():
+    """TIDE 5.1+ scores in percent. 46.3 used to become 115.8%."""
+    result = _coverage({**_FULL, "total_techniques": 706,
+                        "quality": {"avg_quality": 46.3, "scale": "percent"}})
+    assert result["details"]["rule_quality_pct"] == 46.3
+    assert result["details"]["quality_unit"] == "%"
+
+
+def test_a_points_quality_still_scales_from_forty():
+    result = _coverage({**_FULL, "total_techniques": 706,
+                        "quality": {"avg_quality": 20, "scale": "points"}})
+    assert result["details"]["rule_quality_pct"] == 50.0
