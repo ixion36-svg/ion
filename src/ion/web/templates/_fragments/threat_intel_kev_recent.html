@@ -1,0 +1,55 @@
+{# Threat Intel Overview: the newest entries in the loaded KEV snapshot.
+
+   "Newest" is relative to the snapshot, so the card's heading carries the
+   snapshot date and age out of band. A 96-day-old catalog's newest entry is
+   not this week's news, and a heading that said "7 days" over it would be.
+
+   "tracked" marks a CVE that is open work on ION's own vulnerability
+   register. When that read fails the marks are left off and the card says
+   so: no mark must not read as "not in your estate". #}
+
+{% set st = status or {} %}
+{% set age = st.get('age_days') %}
+<span id="ti-kev-recent-n" hx-swap-oob="outerHTML" class="ti-card-n">
+  {%- if snapshot -%}snapshot {{ snapshot.day }} {{ snapshot.strftime('%b %Y') }}{% if age is number %} &middot; {{ age }} days old{% endif %}
+  {%- elif st.get('catalog_version') -%}catalog {{ st.get('catalog_version') }}
+  {%- endif -%}
+</span>
+
+{% if failed %}
+  <p class="ti-note is-bad" role="alert">The KEV catalog could not be read, so
+    this card cannot say which known-exploited CVEs are newest. This is a fault,
+    not an empty catalog.</p>
+{% elif rows is none %}
+  <p class="ti-note is-bad" role="alert">The KEV read answered with something
+    this card cannot read.</p>
+{% elif not st.get('loaded') and not rows %}
+  <p class="ti-note">No KEV catalog loaded. An operator can import one from
+    Settings.</p>
+{% elif not rows %}
+  <p class="ti-note">Catalog {{ st.get('catalog_version') or 'unknown' }} holds no entries.</p>
+{% else %}
+  <table class="ti-mini">
+    <thead><tr><th>CVE</th><th>Product</th><th>Added</th><th>Due</th><th><span class="sr-only">Flags</span></th></tr></thead>
+    <tbody>
+      {% for e in rows %}
+        {% set cve = (e.get('cve_id') or '')|upper %}
+        <tr>
+          <td class="ti-mono ti-nowrap"><button type="button" class="ti-linkbtn ti-mono" data-click-action="tiKevFind" data-args='[{{ cve|tojson }}]' title="Open in the KEV tab">{{ cve }}</button></td>
+          <td class="ti-ellip" title="{{ e.get('vendor_project') or '' }} {{ e.get('product') or '' }}">{{ e.get('vendor_project') or '' }} {{ e.get('product') or '' }}</td>
+          <td class="ti-mono ti-nowrap">{{ e.get('date_added') or '—' }}</td>
+          <td class="ti-mono ti-nowrap">{{ e.get('due_date') or '—' }}</td>
+          <td class="ti-nowrap">
+            {%- if e.get('known_ransomware') %}<span class="ti-flag is-bad" title="CISA records use by known ransomware campaigns">ransomware</span>{% endif -%}
+            {%- if tracked is not none and cve in tracked %} <span class="ti-flag is-warn" title="Open work on ION's vulnerability register">tracked</span>{% endif -%}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if tracked is none %}
+    <p class="ti-note ti-small is-bad">ION's vulnerability register could not be
+      read, so none of these is marked as tracked. That is not the same as none
+      being in your estate.</p>
+  {% endif %}
+{% endif %}

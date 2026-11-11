@@ -17,13 +17,18 @@
    the same as the request having failed, and the page's catch handled only
    the third. All three are separate here. #}
 
-{# The button, out of band: its label is the state of this panel. #}
-<button id="ai-brief-btn" hx-swap-oob="outerHTML"
-        class="btn btn-ghost btn-xs"
+{# The button, out of band: its label is the state of this panel. It lives
+   in the page header since the condensed layout, so it carries the
+   header's button class and the same request attributes the page gave it. #}
+<button id="ai-brief-btn" type="button" hx-swap-oob="outerHTML"
+        class="ti-hbtn"
         hx-post="/ui/threat-intel/ai-brief"
         hx-target="#ai-brief-content"
-        hx-swap="innerHTML">
-  {%- if failed -%}Retry{%- elif summary -%}Regenerate{%- else -%}Generate{%- endif -%}
+        hx-swap="innerHTML"
+        hx-indicator="#ti-brief">
+  <span aria-hidden="true">&#10022;</span> <span>
+  {%- if failed -%}Retry briefing{%- elif summary -%}Regenerate briefing{%- else -%}AI briefing{%- endif -%}
+  </span>
 </button>
 
 {# The model line, out of band. Hidden when no model was reported, which is
