@@ -70,8 +70,6 @@ class _FakeTide(TideService):
 
     def _query(self, sql: str, retries: int = 1) -> Optional[dict]:
         self.sent.append(sql)
-        if "FROM mitre_techniques" in sql:
-            return {"rows": list(_CATALOG)}
         if "GROUP BY t.technique_id, s.name, s.id" in sql:
             return {"rows": []}
         if "GROUP BY t.technique_id" in sql:
@@ -79,6 +77,13 @@ class _FakeTide(TideService):
         if "count(DISTINCT rule_id) as total" in sql:
             return {"rows": [{"total": 9}]}
         return {"rows": []}
+
+
+@pytest.fixture(autouse=True)
+def _catalogue(monkeypatch):
+    """The technique catalogue is ION's own since TIDE 6 stopped serving it."""
+    from ion.services import attack_catalogue
+    monkeypatch.setattr(attack_catalogue, "techniques", lambda: tuple(_CATALOG))
 
 
 @pytest.fixture
@@ -232,3 +237,12 @@ def test_compliance_treats_a_missing_enabled_count_as_not_covered():
 
 def test_compliance_survives_a_disabled_tide():
     assert _covered_techniques(None) == set()
+
+
+def test_the_catalogue_is_never_asked_of_tide():
+    """TIDE 6 refuses mitre_techniques, so asking it would empty coverage."""
+    svc = _FakeTide([_stats_row("T1059", rule_count=1, enabled=1)])
+    svc.get_global_mitre_coverage()
+    svc.get_mitre_coverage("sys-1")
+    svc.get_gaps_analysis()
+    assert not [q for q in svc.sent if "mitre_techniques" in q]
