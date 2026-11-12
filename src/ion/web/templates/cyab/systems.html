@@ -1,0 +1,118 @@
+{% extends "cyab/_layout.html" %}
+{% from "cyab/_macros.html" import post, stage_pill, meter, step_cell, sal_badge %}
+{% block heading %}Systems{% endblock %}
+{% block body %}
+
+<div class="flex flex-wrap items-center gap-2 mb-3">
+  <div role="tablist" class="flex flex-wrap gap-1" aria-label="Saved views">
+    {% for key, label in views.items() %}
+      <a role="tab" href="{{ link(view=key, page=1) }}" class="btn btn-xs {{ 'btn-soft btn-primary' if filters.view == key else 'btn-ghost' }}"{% if filters.view == key %} aria-selected="true"{% endif %}>{{ label }}</a>
+    {% endfor %}
+  </div>
+  <div class="grow"></div>
+  <div class="join">
+    <a href="{{ link(mode='list') }}" class="join-item btn btn-xs {{ 'btn-active' if mode == 'list' else '' }}">List</a>
+    <a href="{{ link(mode='matrix') }}" class="join-item btn btn-xs {{ 'btn-active' if mode == 'matrix' else '' }}">Matrix</a>
+  </div>
+  <a href="{{ csv_href }}" class="btn btn-xs btn-ghost">Export CSV</a>
+</div>
+
+<form method="get" action="/cyab/systems" class="flex flex-wrap items-end gap-2 mb-3">
+  <input type="hidden" name="view" value="{{ filters.view }}">
+  <input type="hidden" name="mode" value="{{ mode }}">
+  <label class="input input-sm grow min-w-[14rem]">
+    <span class="sr-only">Search</span>
+    <input type="search" name="q" value="{{ filters.q }}" placeholder="Name, department or owner">
+  </label>
+  <select name="stage" class="select select-sm w-40" aria-label="Stage">
+    <option value="">Any stage</option>
+    {% for s in stages %}<option value="{{ s }}" {{ 'selected' if filters.stage == s }}>{{ stage_labels[s] }}</option>{% endfor %}
+  </select>
+  <select name="sal" class="select select-sm w-36" aria-label="SAL">
+    <option value="">Any SAL</option>
+    {% for l in sal_levels %}<option value="{{ l }}" {{ 'selected' if filters.sal == l }}>{{ l }} {{ sal_names[l] }}</option>{% endfor %}
+  </select>
+  <button class="btn btn-sm">Filter</button>
+  {% if filters.q or filters.stage or filters.sal %}<a href="{{ link(q='', stage='', sal='', page=1) }}" class="btn btn-sm btn-ghost">Clear</a>{% endif %}
+</form>
+
+<form {{ post('/cyab/systems/bulk') }} data-cyab-bulk>
+  <input type="hidden" name="back" value="{{ back }}">
+  {% if can_edit %}
+  <div class="flex flex-wrap items-center gap-2 mb-2 rounded-box border border-base-300 bg-base-200 px-3 py-2" data-cyab-bulk-bar>
+    <span class="text-sm" data-cyab-selected>0 selected</span>
+    <div class="grow"></div>
+    <input name="owner" class="input input-xs w-40" placeholder="New owner" aria-label="New owner">
+    <button name="action" value="owner" class="btn btn-xs" data-cyab-needs-selection disabled>Assign owner</button>
+    <select name="sal" class="select select-xs w-28" aria-label="New SAL">
+      {% for l in sal_levels %}<option value="{{ l }}">{{ l }}</option>{% endfor %}
+    </select>
+    <button name="action" value="sal" class="btn btn-xs" data-cyab-needs-selection disabled>Set SAL</button>
+  </div>
+  {% endif %}
+
+  <div class="card bg-base-200 border border-base-300 overflow-x-auto">
+    {% if rows %}
+    <table class="table table-sm">
+      <thead>
+        <tr>
+          {% if can_edit %}<th class="w-8"><input type="checkbox" class="checkbox checkbox-xs" data-cyab-select-all aria-label="Select all on this page"></th>{% endif %}
+          {% set dir = 'desc' if filters.dir != 'desc' else '' %}
+          <th><a class="link link-hover" href="{{ link(sort='name', dir=dir) }}">System</a></th>
+          {% if mode != 'matrix' %}<th>Pillar · sub-profile</th>{% endif %}
+          <th>Owner</th>
+          <th>SAL</th>
+          <th><a class="link link-hover" href="{{ link(sort='stage', dir=dir) }}">Stage</a></th>
+          {% if mode == 'matrix' %}
+            {% for st in steps %}<th class="text-center">{{ stage_labels[st] }}</th>{% endfor %}
+          {% else %}
+            <th><a class="link link-hover" href="{{ link(sort='readiness', dir=dir) }}">Readiness</a></th>
+            <th>Next action</th>
+            <th><a class="link link-hover" href="{{ link(sort='updated', dir='desc' if filters.sort != 'updated' or filters.dir != 'desc' else '') }}">Updated</a></th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for s, r in rows %}
+          <tr class="hover:bg-base-300">
+            {% if can_edit %}<td><input type="checkbox" class="checkbox checkbox-xs" name="ids" value="{{ s.id }}" aria-label="Select {{ s.name }}"></td>{% endif %}
+            <td class="max-w-[16rem]">
+              <a href="/cyab/systems/{{ s.id }}/summary" class="font-medium link link-hover block truncate">{{ s.name }}</a>
+              <div class="text-xs text-base-content/50 truncate">{{ s.department }}</div>
+            </td>
+            {% if mode != 'matrix' %}<td class="text-xs max-w-[14rem]">
+              {% for sid in r.subprofile_ids[:2] %}{% set sp = subprofiles.get(sid) %}{% if sp %}<div class="truncate"><span class="text-base-content/50">{{ sp.pillar }} ·</span> {{ sp.label }}</div>{% endif %}{% else %}<span class="text-base-content/40">none yet</span>{% endfor %}
+              {% if r.subprofile_ids|length > 2 %}<div class="text-base-content/50">+{{ r.subprofile_ids|length - 2 }} more</div>{% endif %}
+            </td>{% endif %}
+            <td class="text-sm whitespace-nowrap">{{ s.soc_analyst_owner or '—' }}</td>
+            <td>{{ sal_badge(r.sal, sal_names) }}</td>
+            <td>{{ stage_pill(r.stage, stage_labels) }}</td>
+            {% if mode == 'matrix' %}
+              {% for st in r.steps %}<td class="text-center">{{ step_cell(st) }}</td>{% endfor %}
+            {% else %}
+              <td>{{ meter(r.pct) }}</td>
+              <td class="text-sm max-w-[18rem]"><a href="/cyab/systems/{{ s.id }}/{{ r.tab }}" class="link link-hover line-clamp-2">{{ r.next_action }}</a></td>
+              <td class="text-xs text-base-content/60 whitespace-nowrap">{{ s.updated_at.strftime('%d %b') if s.updated_at else '' }}</td>
+            {% endif %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <div class="p-6 text-sm text-base-content/70">No systems match. {% if filters.view != 'all' or filters.q or filters.stage or filters.sal %}<a href="/cyab/systems" class="link link-primary">Show all</a>{% elif can_edit %}<a href="/cyab/onboard" class="link link-primary">Onboard one</a>{% endif %}</div>
+    {% endif %}
+  </div>
+</form>
+
+<div class="flex flex-wrap items-center gap-3 mt-3 text-sm text-base-content/70">
+  <span>{{ count }} system{{ '' if count == 1 else 's' }}</span>
+  <div class="grow"></div>
+  {% if pages > 1 %}
+  <div class="join">
+    <a href="{{ link(page=page - 1) }}" class="join-item btn btn-xs {{ 'btn-disabled' if page == 1 }}" aria-label="Previous page">«</a>
+    <span class="join-item btn btn-xs btn-ghost pointer-events-none">Page {{ page }} of {{ pages }}</span>
+    <a href="{{ link(page=page + 1) }}" class="join-item btn btn-xs {{ 'btn-disabled' if page == pages }}" aria-label="Next page">»</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

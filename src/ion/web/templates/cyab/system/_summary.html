@@ -1,0 +1,58 @@
+{% from "cyab/_macros.html" import step_cell %}
+{% set step_tab = {'profile': 'profile', 'sources': 'sources', 'intake': 'profile', 'use_cases': 'use-cases', 'docs': 'signoff', 'signoff': 'signoff'} %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <section class="card bg-base-200 border border-base-300" aria-label="Steps">
+    <div class="card-body p-4 gap-2">
+      <h2 class="font-semibold">Steps</h2>
+      <ul class="flex flex-col gap-1">
+        {% for st in steps %}
+          <li>
+            <a href="/cyab/systems/{{ system.id }}/{{ step_tab[st.key] }}" class="flex items-center gap-3 rounded-field px-2 py-1.5 hover:bg-base-300">
+              <span class="text-sm grow">{{ loop.index }}. {{ st.label }}</span>
+              {{ step_cell(st) }}
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+      {% if rd.use_cases_total %}
+        <p class="text-xs text-base-content/60 mt-1">{{ rd.use_cases_shipped }} of {{ rd.use_cases_total }} use cases shipped.</p>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="card bg-base-200 border border-base-300" aria-label="Agreement">
+    <div class="card-body p-4 gap-2">
+      <h2 class="font-semibold">Agreement</h2>
+      <dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+        <dt class="text-base-content/60">Department</dt><dd>{{ system.department }}</dd>
+        <dt class="text-base-content/60">Department lead</dt><dd>{{ system.department_lead or '—' }}</dd>
+        <dt class="text-base-content/60">SOC owner</dt><dd>{{ system.soc_analyst_owner or '—' }}</dd>
+        <dt class="text-base-content/60">Classification</dt><dd>{{ system.data_classification or '—' }}</dd>
+        <dt class="text-base-content/60">Assurance</dt><dd>{{ rd.sal }} {{ sal_names[rd.sal] }} · reviewed every {{ sal_review_days[rd.sal] }} days</dd>
+        <dt class="text-base-content/60">Signed by</dt>
+        <dd>{% if rd.signed_roles %}{{ rd.signed_roles|map('replace', 'department', 'Department')|map('replace', 'soc', 'SOC')|join(', ') }}{% else %}nobody yet{% endif %}</dd>
+        <dt class="text-base-content/60">Next review</dt>
+        <dd class="{{ 'text-error' if rd.stage == 'review_due' }}">{{ system.next_review_date.strftime('%d %b %Y') if system.next_review_date else 'set at sign-off' }}</dd>
+        <dt class="text-base-content/60">Data sources</dt><dd>{{ system.data_sources|length }}</dd>
+      </dl>
+    </div>
+  </section>
+
+  <section class="card bg-base-200 border border-base-300" aria-label="Activity">
+    <div class="card-body p-4 gap-2">
+      <div class="flex items-baseline"><h2 class="font-semibold">Activity</h2><div class="grow"></div><a href="/cyab/history?system={{ system.id }}" class="link text-xs">All</a></div>
+      {% if activity %}
+        <ul class="flex flex-col gap-2 text-sm">
+          {% for e in activity %}
+            <li>
+              <span class="font-medium">{{ e.who }}</span> <span class="text-base-content/70">{{ e.text }}</span>
+              <div class="text-xs text-base-content/50 font-mono">{{ e.at.strftime('%d %b %Y %H:%M') }}</div>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="text-sm text-base-content/60">Nothing yet.</p>
+      {% endif %}
+    </div>
+  </section>
+</div>

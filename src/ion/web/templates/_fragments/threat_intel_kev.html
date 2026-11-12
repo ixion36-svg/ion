@@ -1,4 +1,5 @@
-{# Threat Intel: the CISA KEV catalog table, and its status bar.
+{# Threat Intel: one page of the CISA KEV catalog, its pager, and its
+   status bar.
 
    Replaces five innerHTML sites across kevRenderStatus, kevSearch, kevRow,
    kevRansomware and kevDetail.
@@ -21,10 +22,15 @@
    That is the worst possible confusion for this panel in particular, since
    its whole purpose is to answer "is this being exploited right now".
 
-   The status bar swaps out of band. One read answers both regions, because
-   GET /api/kev returns the status block alongside the results, which is why
-   the page passed `data.status` to kevRenderStatus rather than reading
-   /kev/status separately. #}
+   Since the condensed page the table pages, 50 rows at a time, says how
+   many rows it was cut from, and filters by date added as well as by term
+   and ransomware use. It used to render the newest 50 and stop, so the
+   other 1,600 entries were reachable only by guessing a search term.
+
+   The pager buttons send the filter form with them (hx-include), so a
+   page turn keeps the filter it was paging through.
+
+   The status bar swaps out of band. One read answers both regions. #}
 
 {# ---- the status bar, out of band ---- #}
 <div id="kev-status-bar" class="mb-4" hx-swap-oob="innerHTML">
@@ -47,7 +53,7 @@
     {%- elif age <= 90 -%}{% set tone = 'ion-amber' %}
     {%- else -%}{% set tone = 'ion-coral' %}
     {%- endif -%}
-    <div class="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
+    <div class="ti-statusbar">
       <span class="text-slate-400">Catalog <b class="text-white">{{ status.get('catalog_version') or '&mdash;'|safe }}</b>
         {%- if status.get('ahead_of_bundle') %} <span class="text-slate-500">(operator import, newer than this build)</span>{% endif -%}
       </span>
@@ -68,6 +74,21 @@
 </div>
 
 {# ---- the results ---- #}
+{% set total = total if total is defined else none %}
+{% set page = page if page is defined and page else 1 %}
+{% set pages = pages if pages is defined else none %}
+{% set per_page = per_page if per_page is defined and per_page else 50 %}
+{% set tracked = tracked if tracked is defined else none %}
+{% set bad_dates = bad_dates if bad_dates is defined else [] %}
+{% set added_from = added_from if added_from is defined else none %}
+{% set added_to = added_to if added_to is defined else none %}
+{% set filtered = q or ransomware_only or added_from or added_to %}
+
+{% if bad_dates %}
+  <p class="ti-note is-warn" role="status">An unreadable {{ bad_dates|join(' and ') }}
+    date was ignored, so the results below are not limited by it.</p>
+{% endif %}
+
 {% if failed %}
   <div class="ti-empty text-[var(--danger)]" role="alert">
     The KEV lookup did not complete. This is a fault rather than an empty
@@ -86,19 +107,47 @@
   <div class="ti-empty">
     No entries in catalog {{ (status or {}).get('catalog_version') or 'unknown' }}
     {%- if q %} for {{ q }}{% endif -%}
-    {%- if ransomware_only %}, with the ransomware-linked filter applied{% endif -%}.
+    {%- if ransomware_only %}, with the ransomware-linked filter applied{% endif -%}
+    {%- if added_from or added_to %}, added{% if added_from %} from {{ added_from }}{% endif %}{% if added_to %} to {{ added_to }}{% endif %}{% endif -%}.
   </div>
 {% else %}
-<table class="ti-table">
+{% set first = (page - 1) * per_page + 1 %}
+{% set last = first + results|length - 1 %}
+{% macro pager(where) -%}
+<div class="ti-pager" role="navigation" aria-label="KEV pages, {{ where }}">
+  <span class="ti-pager-sum">
+    {%- if total is not none -%}
+      <b>{{ '{:,}'.format(first) }}&ndash;{{ '{:,}'.format(last) }}</b> of <b>{{ '{:,}'.format(total) }}</b>{% if filtered %} matching{% endif %}
+    {%- else -%}
+      rows {{ first }}&ndash;{{ last }}; the total was not reported
+    {%- endif -%}
+  </span>
+  {%- if pages and pages > 1 %}
+  <span class="ti-pager-btns">
+    {%- for label, target, enabled in [('First', 1, page > 1), ('Prev', page - 1, page > 1), ('Next', page + 1, page < pages), ('Last', pages, page < pages)] %}
+      <button type="button" class="ti-pbtn"{% if not enabled %} disabled{% endif %}
+              hx-get="/ui/threat-intel/kev?page={{ target }}"
+              hx-include="#kev-form"
+              hx-target="#kev-results"
+              hx-swap="innerHTML">{{ label }}</button>
+      {%- if label == 'Prev' %}<span class="ti-pager-pos">page {{ page }} of {{ pages }}</span>{% endif -%}
+    {%- endfor %}
+  </span>
+  {%- endif %}
+</div>
+{%- endmacro %}
+{{ pager('top') }}
+<table class="ti-table ti-table-tight">
   <thead>
     <tr><th>CVE</th><th>Vendor / product</th><th>Vulnerability</th><th>Added</th><th>Remediate by</th></tr>
   </thead>
   <tbody>
     {% for e in results %}
       {% set i = loop.index0 %}
+      {% set cve = (e.get('cve_id') or '')|upper %}
       <tr class="ti-kev-row" data-click-action="kevToggle" data-args='[{{ i }}]'
           title="Click for the description, required action and CWEs">
-        <td class="ti-name-cell"><span class="ti-kev-caret" id="kev-caret-{{ i }}">&#9656;</span> {{ e.get('cve_id') or '' }}</td>
+        <td class="ti-name-cell ti-nowrap"><span class="ti-kev-caret" id="kev-caret-{{ i }}">&#9656;</span> {{ e.get('cve_id') or '' }}</td>
         <td>{{ e.get('vendor_project') or '' }} {{ e.get('product') or '' }}</td>
         <td>
           {{ e.get('vulnerability_name') or '' }}
@@ -110,9 +159,12 @@
             {%- set raw = e.get('known_ransomware_raw') or 'Unknown' -%}
             <span class="ti-badge ti-badge-unknown" title="CISA has not established ransomware use. This is not the same as ruling it out.">ransomware: {{ raw|lower }}</span>
           {%- endif -%}
+          {%- if tracked is not none and cve in tracked -%}
+            <span class="ti-flag is-warn" title="Open work on ION's vulnerability register">tracked</span>
+          {%- endif -%}
         </td>
-        <td>{{ e.get('date_added') or '' }}</td>
-        <td>{{ e.get('due_date') or '' }}</td>
+        <td class="ti-mono ti-nowrap">{{ e.get('date_added') or '' }}</td>
+        <td class="ti-mono ti-nowrap">{{ e.get('due_date') or '' }}</td>
       </tr>
       <tr class="ti-kev-detail" id="kev-detail-{{ i }}">
         <td colspan="5">
@@ -148,4 +200,10 @@
     {% endfor %}
   </tbody>
 </table>
+{% if pages and pages > 1 %}{{ pager('bottom') }}{% endif %}
+{% if tracked is none %}
+  <p class="ti-note ti-small">ION's vulnerability register was not read for this
+    page, so no row is marked as tracked. That is not the same as none being in
+    your estate.</p>
+{% endif %}
 {% endif %}

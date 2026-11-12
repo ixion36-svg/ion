@@ -104,10 +104,23 @@ OVERVIEW_MATCH_LIMIT = 10
 #: `.slice(0, 5)` on both.
 OVERVIEW_CARD_ROWS = 5
 
-#: What the Overview tab's recently-active widget asks for, from the page's
-#: `?days=30&top_n=8`.
-RECENT_DAYS = 30
+#: What the Overview tab's recently-active widget asks for. Seven days since
+#: the condensed Overview, whose technique bars and techniques tile both say
+#: "7 days"; the two read the same window so they cannot disagree.
+RECENT_DAYS = 7
 RECENT_TOP_N = 8
+
+#: Distinct techniques the Overview's techniques tile asks the same read for.
+#: A count that reaches it is shown as a floor ("50+"), not as an exact figure.
+TECHNIQUE_TILE_CAP = 50
+
+#: The row cap recently_active applies to each table it scans. A triage
+#: sample of exactly this size means the window held more than was read.
+RECENT_SCAN_CAP = 5000
+
+#: Vulnerability statuses that still count as "in your estate" for the KEV
+#: tile: open work, not patched, mitigated, accepted or dropped.
+ESTATE_VULN_STATUSES = ("open", "in_progress")
 
 
 def _rows(payload: Any, key: str) -> list[dict] | None:
@@ -338,9 +351,144 @@ async def threat_intel_stories_fragment(
 # ---------------------------------------------------------------------------
 
 STATS_FRAGMENT = "_fragments/threat_intel_overview_stats.html"
+INTEL_FRAGMENT = "_fragments/threat_intel_overview_intel.html"
+KEV_RECENT_FRAGMENT = "_fragments/threat_intel_kev_recent.html"
+
+#: The window "New KEV" counts over, ending at the snapshot date.
+KEV_NEW_WINDOW_DAYS = 7
+
+#: Rows the Overview's newest-KEV card lists.
+KEV_RECENT_ROWS = 6
 RECENT_FRAGMENT = "_fragments/threat_intel_recently_active.html"
 ACTORS_FRAGMENT = "_fragments/threat_intel_landscape_actors.html"
 IOCS_FRAGMENT = "_fragments/threat_intel_landscape_iocs.html"
+
+
+def _opencti_configured() -> bool | None:
+    """Whether OpenCTI is configured, or None when even that could not be
+    read. `is_configured` is a property and checks settings only; nothing
+    here contacts OpenCTI, so "configured" is all it can claim."""
+    from ion.services.opencti_service import get_opencti_service
+
+    try:
+        return bool(get_opencti_service().is_configured)
+    except Exception:
+        logger.exception("Could not read whether OpenCTI is configured")
+        return None
+
+
+def _snapshot_date(status: dict | None):
+    """The day the loaded KEV snapshot was taken, from its age, or None."""
+    from datetime import datetime, timedelta, timezone
+
+    age = (status or {}).get("age_days")
+    if not isinstance(age, int):
+        return None
+    return datetime.now(timezone.utc).date() - timedelta(days=age)
+
+
+def _tracked_kev_cves(session) -> set[str]:
+    """CVE ids on ION's vulnerability register that are still open work,
+    upper-cased, for marking KEV rows "tracked". Raises rather than
+    returning an empty set, so a failed read is not a clean estate."""
+    from ion.models.vulnerability import Vulnerability
+
+    rows = (session.query(Vulnerability.cve_id)
+            .filter(Vulnerability.cve_id.isnot(None),
+                    Vulnerability.status.in_(ESTATE_VULN_STATUSES))
+            .all())
+    return {str(c).strip().upper() for (c,) in rows if c}
+
+
+def _kev_overview(session) -> dict:
+    """The KEV figures on the Overview: catalog status, how many open
+    tracked vulnerabilities the catalog lists, and how many entries arrived
+    in the week before the snapshot.
+
+    Every figure is None when it was not measured, with the reason beside
+    it, because a zero here reads as "nothing exploited in your estate":
+
+      in_estate   None when ION tracks no vulnerabilities at all. Zero
+                  tracked vulnerabilities is not zero exposure, it is no
+                  source to measure exposure from.
+      new_7d      None when the snapshot is more than a week old or its age
+                  is unknown. The catalog cannot say what CISA added after
+                  it was taken, so a stale snapshot's "0 this week" would
+                  be a guess presented as a count.
+    """
+    from datetime import timedelta
+
+    from sqlalchemy import func
+
+    from ion.models.kev import KevEntry
+    from ion.models.vulnerability import Vulnerability
+    from ion.services import kev_service
+
+    status = kev_service.status(session)
+    status = status if isinstance(status, dict) else None
+    age = (status or {}).get("age_days")
+    snapshot = _snapshot_date(status)
+
+    new_7d = new_7d_ransomware = None
+    if (status and status.get("loaded") and snapshot is not None
+            and isinstance(age, int) and age <= KEV_NEW_WINDOW_DAYS):
+        since = snapshot - timedelta(days=KEV_NEW_WINDOW_DAYS)
+        recent = session.query(KevEntry).filter(KevEntry.date_added > since)
+        new_7d = recent.count()
+        new_7d_ransomware = recent.filter(
+            KevEntry.known_ransomware.is_(True)).count()
+
+    tracked = session.query(func.count(Vulnerability.id)).scalar() or 0
+    in_estate = None
+    if tracked:
+        in_estate = (
+            session.query(func.count(func.distinct(Vulnerability.id)))
+            .join(KevEntry,
+                  func.upper(Vulnerability.cve_id) == func.upper(KevEntry.cve_id))
+            .filter(Vulnerability.status.in_(ESTATE_VULN_STATUSES))
+            .scalar()
+        ) or 0
+
+    return {
+        "failed": False,
+        "status": status,
+        "snapshot": snapshot,
+        "new_7d": new_7d,
+        "new_7d_ransomware": new_7d_ransomware,
+        "window_days": KEV_NEW_WINDOW_DAYS,
+        "tracked_vulns": tracked,
+        "in_estate": in_estate,
+    }
+
+
+def _technique_overview(session) -> dict:
+    """How many distinct ATT&CK techniques alert triage tagged in the
+    window, from the same read as the Overview's technique bars.
+
+    `count` is None when no alert was triaged in the window: no triage is
+    no measurement, not zero techniques. `capped` marks a count that reached
+    the read's own top-N, and `scan_capped` a window holding more triage
+    rows than recently_active scans.
+    """
+    from ion.web.threat_intel_api import recently_active
+
+    payload = recently_active(
+        days=RECENT_DAYS, top_n=TECHNIQUE_TILE_CAP,
+        hide_rule_observables=True, session=session, user=None,
+    )
+    techniques = _rows(payload, "techniques")
+    triaged = payload.get("triage_sample_size") if isinstance(payload, dict) else None
+    if techniques is None or not isinstance(triaged, int):
+        return {"failed": True, "count": None, "triaged": None,
+                "capped": False, "scan_capped": False, "days": RECENT_DAYS}
+    return {
+        "failed": False,
+        "count": len(techniques) if triaged else None,
+        "triaged": triaged,
+        "capped": len(techniques) >= TECHNIQUE_TILE_CAP,
+        "scan_capped": triaged >= RECENT_SCAN_CAP,
+        "days": RECENT_DAYS,
+    }
 
 
 @router.get(
@@ -350,32 +498,138 @@ IOCS_FRAGMENT = "_fragments/threat_intel_landscape_iocs.html"
 )
 def threat_intel_overview_stats_fragment(
     request: Request,
+    current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
 ) -> HTMLResponse:
-    """The four watch-and-match tiles, and the unread badge on the tab.
+    """The Overview's KPI row, plus four small regions out of band: the
+    status pill in the header, the KEV count on its tab, the single Connect
+    OpenCTI prompt, and the unread badge on the Indicators tab.
 
-    Calls get_overview_stats, which is the whole body of GET
-    /api/threat-intel/overview, so the tiles and the JSON cannot disagree.
+    The watch-and-match figures come from get_overview_stats, which is the
+    whole body of GET /api/threat-intel/overview, so the tiles and the JSON
+    cannot disagree. The KEV and technique figures are local reads: the KEV
+    catalog shipped in the image, ION's own vulnerability register, and
+    alert triage. Nothing here calls OpenCTI or Elasticsearch.
 
-    The badge swaps out of band, because it lives in the tab strip rather
-    than in this fragment's target and no second read knows the count.
+    Each group fails on its own. A KEV read raising must not take the
+    watchlist figures with it, and the reverse.
+
+    The KEV figures need alert:read, which /api/kev and /api/vulnerabilities
+    require and this page's observable:read does not imply. Without it the
+    tiles say so rather than reading a table the viewer cannot.
     """
     from ion.services.threat_intel_service import ThreatIntelService
 
+    can_read_alerts = bool(
+        current_user and current_user.has_permission(STORIES_PERMISSION)
+    )
+
     try:
         stats = ThreatIntelService(session).get_overview_stats()
+        failed = False
     except Exception:
         logger.exception("Threat intel overview stats could not be rendered")
-        return templates.TemplateResponse(
-            request=request, name=STATS_FRAGMENT,
-            context={"failed": True, "stats": None}, status_code=200,
-        )
+        stats, failed = None, True
+
+    kev = None
+    if can_read_alerts:
+        try:
+            kev = _kev_overview(session)
+        except Exception:
+            logger.exception("Threat intel KEV overview could not be read")
+            kev = {"failed": True}
+
+    try:
+        techniques = _technique_overview(session)
+    except Exception:
+        logger.exception("Threat intel technique overview could not be read")
+        techniques = {"failed": True, "days": RECENT_DAYS}
 
     return templates.TemplateResponse(
         request=request, name=STATS_FRAGMENT,
-        context={"failed": False,
-                 "stats": stats if isinstance(stats, dict) else None},
+        context={
+            "failed": failed,
+            "stats": stats if isinstance(stats, dict) else None,
+            "opencti_configured": _opencti_configured(),
+            "can_read_alerts": can_read_alerts,
+            "kev": kev,
+            "techniques": techniques,
+        },
+        status_code=200,
     )
+
+
+@router.get(
+    "/threat-intel/overview-intel",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(PERMISSION))],
+)
+def threat_intel_overview_intel_fragment(request: Request) -> HTMLResponse:
+    """The Overview's OpenCTI row: top actors, high-score indicators and the
+    latest watch matches, or nothing at all when OpenCTI is not configured.
+
+    Nothing, because the KPI row already carries the one Connect OpenCTI
+    prompt. Three cards each saying "not configured" is the clutter the
+    condensed Overview removes. A configuration that could not even be read
+    renders the cards, which then report their own outcome.
+    """
+    configured = _opencti_configured()
+    return templates.TemplateResponse(
+        request=request, name=INTEL_FRAGMENT,
+        context={"configured": configured is not False,
+                 "match_limit": OVERVIEW_MATCH_LIMIT},
+        status_code=200,
+    )
+
+
+@router.get(
+    "/threat-intel/kev-recent",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(STORIES_PERMISSION))],
+)
+def threat_intel_kev_recent_fragment(
+    request: Request,
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    """The Overview's newest-KEV card: the latest entries in the loaded
+    snapshot, marked when ION tracks the CVE as open work.
+
+    Gated on alert:read like the KEV tab. "Newest" is relative to the
+    snapshot, and the card states the snapshot's date and age, because a
+    96-day-old catalog's newest entry is not this week's news.
+    """
+    from ion.models.kev import KevEntry
+    from ion.services import kev_service
+
+    def answer(ctx: dict) -> HTMLResponse:
+        return templates.TemplateResponse(
+            request=request, name=KEV_RECENT_FRAGMENT,
+            context={"failed": False, "rows": None, "status": None,
+                     "snapshot": None, "tracked": None,
+                     "window_days": KEV_NEW_WINDOW_DAYS, **ctx},
+            status_code=200,
+        )
+
+    try:
+        status = kev_service.status(session)
+        status = status if isinstance(status, dict) else None
+        rows = (session.query(KevEntry)
+                .order_by(KevEntry.date_added.desc().nullslast(),
+                          KevEntry.cve_id.desc())
+                .limit(KEV_RECENT_ROWS).all())
+        entries = [r.to_dict() for r in rows]
+    except Exception:
+        logger.exception("Threat intel newest-KEV card could not be rendered")
+        return answer({"failed": True})
+
+    try:
+        tracked = _tracked_kev_cves(session)
+    except Exception:
+        logger.exception("Could not read tracked vulnerabilities for KEV")
+        tracked = None
+
+    return answer({"rows": entries, "status": status,
+                   "snapshot": _snapshot_date(status), "tracked": tracked})
 
 
 @router.get(
@@ -427,6 +681,10 @@ def threat_intel_recently_active_fragment(
             "observables": _rows(payload, "observables"),
             "techniques": _rows(payload, "techniques"),
             "days": (payload or {}).get("time_window_days") or RECENT_DAYS,
+            # How many triage rows the technique list was counted over, so
+            # "no techniques tagged" can say across how many alerts.
+            "triaged": (payload or {}).get("triage_sample_size")
+            if isinstance(payload, dict) else None,
         },
     )
 
@@ -796,8 +1054,14 @@ UNIFIED_PER_KIND = 8
 #: left whatever was on screen in place.
 UNIFIED_MIN_CHARS = 2
 
-#: Rows the KEV table shows, from the page's `limit: '50'`.
+#: Rows a KEV page shows. The tab used to render the newest 50 and stop,
+#: which with every row expanded-on-click was still a 4,000 px table and
+#: never reached the other 1,600 entries. It pages now, at the same size.
 KEV_LIMIT = 50
+
+#: The deepest page the route accepts. 1,662 entries is 34 pages; this is
+#: headroom for catalog growth, and a bound so the offset is not unbounded.
+KEV_MAX_PAGE = 400
 
 #: The four kinds the search bar groups its results under, in the order the
 #: page showed them, with the heading each carried.
@@ -862,6 +1126,68 @@ async def threat_intel_unified_search_fragment(
     })
 
 
+def _parse_day(value: str):
+    """A YYYY-MM-DD from a date input, or None for blank. Raises ValueError
+    on anything else, so the route can say it ignored the bound rather than
+    silently widening the result."""
+    from datetime import date
+
+    value = (value or "").strip()
+    return date.fromisoformat(value) if value else None
+
+
+def kev_page(session, *, q: str = "", ransomware_only: bool = False,
+             added_from=None, added_to=None, page: int = 1,
+             per_page: int = KEV_LIMIT) -> dict:
+    """One page of the KEV catalog, newest first, with the total it was cut
+    from and the catalog status.
+
+    The term filter is the one kev_service.search applies, over the same
+    five columns, so the tab and GET /api/kev agree about what a term
+    matches. It is restated here rather than called because that function
+    has no offset and caps at 200 rows, and the tab pages through all of
+    them. A page past the end is clamped to the last page, so a filter that
+    shrinks the result does not leave the reader on an empty page 9.
+    """
+    import math
+
+    from ion.models.kev import KevEntry
+    from ion.services import kev_service
+
+    query = session.query(KevEntry)
+    term = (q or "").strip()
+    if term:
+        like = f"%{term.lower()}%"
+        query = query.filter(
+            KevEntry.cve_id.ilike(like)
+            | KevEntry.vendor_project.ilike(like)
+            | KevEntry.product.ilike(like)
+            | KevEntry.vulnerability_name.ilike(like)
+            | KevEntry.short_description.ilike(like)
+        )
+    if ransomware_only:
+        query = query.filter(KevEntry.known_ransomware.is_(True))
+    if added_from is not None:
+        query = query.filter(KevEntry.date_added >= added_from)
+    if added_to is not None:
+        query = query.filter(KevEntry.date_added <= added_to)
+
+    total = query.count()
+    pages = max(1, math.ceil(total / per_page))
+    page = max(1, min(page, pages))
+    rows = (query.order_by(KevEntry.date_added.desc().nullslast(),
+                           KevEntry.cve_id.desc())
+            .offset((page - 1) * per_page).limit(per_page).all())
+    return {
+        "results": [r.to_dict() for r in rows],
+        "total": total,
+        "page": page,
+        "pages": pages,
+        "per_page": per_page,
+        "status": kev_service.status(session),
+    }
+
+
 @router.get(
     "/threat-intel/kev",
     response_class=HTMLResponse,
@@ -871,43 +1197,77 @@ def threat_intel_kev_fragment(
     request: Request,
     q: str = Query("", max_length=200),
     ransomware_only: bool = Query(False),
+    added_from: str = Query("", max_length=10),
+    added_to: str = Query("", max_length=10),
+    page: int = Query(1, ge=1, le=KEV_MAX_PAGE),
     session: Session = Depends(get_db_session),
 ) -> HTMLResponse:
-    """The KEV catalog table, and the catalog status bar out of band.
+    """One page of the KEV catalog, its pager, and the catalog status bar
+    out of band.
 
     Gated on alert:read, which is what /api/kev requires, and not on this
     page's own observable:read. The tab is withheld from a viewer without
     it; this is the second gate, so a direct request cannot reach what the
     tab does not offer.
 
-    One read answers both regions: GET /api/kev returns the status block
-    alongside the results, which is why the page called kevRenderStatus with
-    `data.status` rather than reading /kev/status separately. The status bar
-    swaps out of band for the same reason it did there.
+    The dates arrive as strings because an empty date input sends
+    `added_from=`, which a `date` parameter would answer with a 422 and
+    take the whole table away. An unreadable one is dropped and the
+    fragment says so, rather than quietly widening the result.
+
+    Rows whose CVE is open work on ION's vulnerability register are marked
+    "tracked". That read failing leaves the marks off and says so, because
+    no mark must not read as "not in your estate".
     """
-    from ion.web.kev_api import kev_search
+    term = q.strip()
+    bad_dates = []
+    try:
+        day_from = _parse_day(added_from)
+    except ValueError:
+        day_from, bad_dates = None, bad_dates + ["from"]
+    try:
+        day_to = _parse_day(added_to)
+    except ValueError:
+        day_to, bad_dates = None, bad_dates + ["to"]
 
     def answer(ctx: dict) -> HTMLResponse:
         return templates.TemplateResponse(
             request=request, name=KEV_FRAGMENT,
-            context={"q": q.strip(), "ransomware_only": ransomware_only,
-                     "failed": False, "results": None, "status": None, **ctx},
+            context={"q": term, "ransomware_only": ransomware_only,
+                     "added_from": day_from, "added_to": day_to,
+                     "bad_dates": bad_dates, "failed": False,
+                     "results": None, "status": None, "total": None,
+                     "page": page, "pages": None, "per_page": KEV_LIMIT,
+                     "tracked": None, **ctx},
             status_code=200,
         )
 
     try:
-        payload = kev_search(
-            q=q.strip(), ransomware_only=ransomware_only, limit=KEV_LIMIT,
-            session=session,
+        payload = kev_page(
+            session, q=term, ransomware_only=ransomware_only,
+            added_from=day_from, added_to=day_to, page=page,
         )
     except Exception:
         logger.exception("Threat intel KEV fragment could not be rendered")
         return answer({"failed": True})
 
-    status = payload.get("status") if isinstance(payload, dict) else None
+    try:
+        tracked = _tracked_kev_cves(session)
+    except Exception:
+        logger.exception("Could not read tracked vulnerabilities for KEV")
+        tracked = None
+
+    if not isinstance(payload, dict):
+        return answer({"results": None})
+    status = payload.get("status")
+    total = payload.get("total")
     return answer({
         "results": _rows(payload, "results"),
         "status": status if isinstance(status, dict) else None,
+        "total": total if isinstance(total, int) else None,
+        "page": payload.get("page") if isinstance(payload.get("page"), int) else page,
+        "pages": payload.get("pages") if isinstance(payload.get("pages"), int) else None,
+        "tracked": tracked,
     })
 
 

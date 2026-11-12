@@ -2,21 +2,21 @@
   "document": {
     "category": "csaf_vex",
     "csaf_version": "2.0",
-    "title": "ION 0.99.15 \u2014 VEX",
+    "title": "ION 0.99.17 \u2014 VEX",
     "publisher": {
       "category": "vendor",
       "name": "ION maintainer (ixion36)",
       "namespace": "https://ixion36.dev"
     },
     "tracking": {
-      "id": "ION-VEX-0.99.15",
-      "initial_release_date": "2026-11-10T07:53:48Z",
-      "current_release_date": "2026-11-10T07:53:48Z",
+      "id": "ION-VEX-0.99.17",
+      "initial_release_date": "2026-11-11T12:22:36Z",
+      "current_release_date": "2026-11-11T12:22:36Z",
       "status": "final",
       "version": "1",
       "revision_history": [
         {
-          "date": "2026-11-10T07:53:48Z",
+          "date": "2026-11-11T12:22:36Z",
           "number": "1",
           "summary": "Generated from security/vex_statements.yaml"
         }
@@ -27,11 +27,11 @@
     "full_product_names": [
       {
         "product_id": "ION",
-        "name": "ION 0.99.15",
+        "name": "ION 0.99.17",
         "product_identification_helper": {
-          "cpe": "cpe:2.3:a:ixion36:ion:0.99.15:*:*:*:*:*:*:*",
+          "cpe": "cpe:2.3:a:ixion36:ion:0.99.17:*:*:*:*:*:*:*",
           "purls": [
-            "pkg:docker/fubsxploitapps/ion@0.99.15"
+            "pkg:docker/fubsxploitapps/ion@0.99.17"
           ]
         }
       }

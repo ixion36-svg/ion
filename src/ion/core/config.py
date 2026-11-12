@@ -3,6 +3,8 @@
 import json
 import logging
 import os
+import threading
+import time
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Dict, Optional
@@ -225,6 +227,13 @@ class Config:
     # PII anonymising proxy (tokenises sensitive fields before LLM calls)
     pii_anon_enabled: bool = False
     pii_fields_file: str = ""  # optional override; empty = use packaged default
+
+    # SSVC deployment inputs, read by ssvc_service. Properties of the estate
+    # ION cannot observe. Empty means not set: the decision then uses the
+    # service's default for that input and reports it as assumed.
+    ssvc_exposure: str = ""
+    ssvc_automatable: str = ""
+    ssvc_human_impact: str = ""
 
     # Investigations
     # was 120; the v0.17.3 fix-pack bumped the module default
@@ -462,7 +471,10 @@ class Config:
             # PII anonymising proxy
             pii_anon_enabled=data.get("pii_anon_enabled", False),
             pii_fields_file=data.get("pii_fields_file", ""),
-            # Investigation loop
+            ssvc_exposure=data.get("ssvc_exposure", ""),
+            ssvc_automatable=data.get("ssvc_automatable", ""),
+            ssvc_human_impact=data.get("ssvc_human_impact", ""),
+            # Investigations
             investigation_llm_timeout_s=data.get("investigation_llm_timeout_s", 300),
             # Attack Path + Bob escalation tier
             attack_path_enabled=data.get("attack_path_enabled", True),
@@ -542,10 +554,30 @@ class Config:
             # db_path back through Path(). Everything else json handles.
             payload[f.name] = str(value) if isinstance(value, Path) else value
 
+        # Written to a temporary file and swapped in, never truncated in
+        # place: every web worker re-reads this file when it changes
+        # (get_config), and one reading mid-write would see half a JSON
+        # document. The temporary file is created 0600, so the secrets are
+        # never readable even briefly, and the swap keeps that mode.
         path.parent.mkdir(parents=True, exist_ok=True)
-        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(payload, f, indent=2)
+        tmp = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=2)
+            for attempt in range(20):
+                try:
+                    os.replace(tmp, path)
+                    break
+                except PermissionError:
+                    # Windows refuses the swap while another process has
+                    # the file open to read it; that lasts milliseconds.
+                    if attempt == 19:
+                        raise
+                    time.sleep(0.05)
+        finally:
+            if tmp.exists():
+                tmp.unlink()
         try:
             os.chmod(path, 0o600)
         except OSError:
@@ -555,6 +587,14 @@ class Config:
 
 
 _config: Optional[Config] = None
+# The configuration get_config() last loaded, and the config.json stamp it
+# was read against. _config differs from _loaded when a caller injected one.
+_loaded: Optional[Config] = None
+_loaded_stamp: tuple = ("", None, None)
+_checked_at = 0.0
+_config_lock = threading.Lock()
+#: How often a worker checks config.json for a change saved by another one.
+RELOAD_CHECK_SECONDS = 2.0
 
 
 def _get_env_bool(key: str, default: bool = False) -> bool:
@@ -567,428 +607,490 @@ def _get_env_bool(key: str, default: bool = False) -> bool:
     return default
 
 
-def get_config() -> Config:
-    """Get the global configuration instance.
+def _load_config() -> Config:
+    """Build the configuration from config.json and the environment.
 
-    Configuration is loaded in order of precedence:
-    1. Environment variables (highest priority)
-    2. Config file (.ion/config.json)
-    3. Default values (lowest priority)
+    Precedence, highest first: environment variables, the config file,
+    the dataclass defaults. Builds into a local and returns it, so a reload
+    never exposes a half-built object to another thread.
     """
-    global _config
-    if _config is None:
-        # Check for data directory override (for Docker)
-        data_dir = os.environ.get("ION_DATA_DIR")
+    # Check for data directory override (for Docker)
+    data_dir = os.environ.get("ION_DATA_DIR")
+    if data_dir:
+        config_path = Path(data_dir) / ".ion" / "config.json"
+    else:
+        config_path = Path.cwd() / ".ion" / "config.json"
+
+    # Load from file if exists
+    if config_path.exists():
+        cfg = Config.from_file(config_path)
+    else:
+        # Use data_dir for db_path when set (Docker), otherwise CWD
         if data_dir:
-            config_path = Path(data_dir) / ".ion" / "config.json"
+            cfg = Config(db_path=Path(data_dir) / ".ion" / "ion.db")
         else:
-            config_path = Path.cwd() / ".ion" / "config.json"
+            cfg = Config()
 
-        # Load from file if exists
-        if config_path.exists():
-            _config = Config.from_file(config_path)
-        else:
-            # Use data_dir for db_path when set (Docker), otherwise CWD
-            if data_dir:
-                _config = Config(db_path=Path(data_dir) / ".ion" / "ion.db")
-            else:
-                _config = Config()
-
-        # Override with environment variables
-        _env_base_url = os.environ.get("ION_BASE_URL", "").strip()
-        if _env_base_url:
-            _config.base_url = _env_base_url.rstrip("/")
-        if os.environ.get("ION_CA_BUNDLE"):
-            _config.ca_bundle = os.environ.get("ION_CA_BUNDLE", "")
-        if os.environ.get("ION_SSL_CERT"):
-            _config.ssl_cert = os.environ.get("ION_SSL_CERT", "")
-        if os.environ.get("ION_SSL_KEY"):
-            _config.ssl_key = os.environ.get("ION_SSL_KEY", "")
-        if os.environ.get("ION_DEV_MODE"):
-            _config.dev_mode = _get_env_bool("ION_DEV_MODE")
-        if os.environ.get("ION_COOKIE_SECURE"):
-            _config.cookie_secure = _get_env_bool("ION_COOKIE_SECURE")
-        elif _config.dev_mode:
-            # Plain-HTTP development: a Secure cookie is never sent back, so
-            # leaving the production default on would silently break login.
-            _config.cookie_secure = False
-        if os.environ.get("ION_DEBUG_MODE"):
-            _config.debug_mode = _get_env_bool("ION_DEBUG_MODE")
-        if os.environ.get("ION_ACCOUNT_LOCKOUT_ENABLED"):
-            _config.account_lockout_enabled = _get_env_bool("ION_ACCOUNT_LOCKOUT_ENABLED")
-        if os.environ.get("ION_IP_BLOCKING_ENABLED"):
-            _config.ip_blocking_enabled = _get_env_bool("ION_IP_BLOCKING_ENABLED")
-        if os.environ.get("ION_WEBHOOK_REQUIRE_SIGNATURE"):
-            _config.webhook_require_signature = _get_env_bool("ION_WEBHOOK_REQUIRE_SIGNATURE")
-        if os.environ.get("ION_ENFORCE_PASSWORD_CHANGE"):
-            _config.enforce_password_change = _get_env_bool("ION_ENFORCE_PASSWORD_CHANGE")
-        if os.environ.get("ION_PASSWORD_MIN_LENGTH"):
-            try:
-                _config.password_min_length = int(os.environ["ION_PASSWORD_MIN_LENGTH"])
-            except ValueError:
-                pass  # keep default (disabled) on a non-integer value
-        if os.environ.get("ION_SESSION_ABSOLUTE_LIFETIME_HOURS"):
-            try:
-                _config.session_absolute_lifetime_hours = int(
-                    os.environ["ION_SESSION_ABSOLUTE_LIFETIME_HOURS"]
-                )
-            except ValueError:
-                pass  # keep the 168h default on a non-integer value
-        if os.environ.get("ION_SECURITY_SCAN_AUTHENTICATED"):
-            _config.security_scan_authenticated = _get_env_bool("ION_SECURITY_SCAN_AUTHENTICATED")
-        if os.environ.get("ION_AUTHZ_ALERT_ENABLED"):
-            _config.authz_alert_enabled = _get_env_bool("ION_AUTHZ_ALERT_ENABLED", True)
-        if os.environ.get("ION_RESPONSE_ACTIONS_ENABLED"):
-            _config.response_actions_enabled = _get_env_bool("ION_RESPONSE_ACTIONS_ENABLED")
-        if os.environ.get("ION_COMM_TEMPLATES_SEED"):
-            _config.comm_templates_seed = _get_env_bool("ION_COMM_TEMPLATES_SEED")
-        if os.environ.get("ION_RESPONSE_ACTIONS_LIVE"):
-            _config.response_actions_live = _get_env_bool("ION_RESPONSE_ACTIONS_LIVE")
-        if os.environ.get("ION_ALERT_DETAIL_V2"):
-            _config.alert_detail_v2 = _get_env_bool("ION_ALERT_DETAIL_V2", True)
-        if os.environ.get("ION_ALERT_FIELD_PINS"):
-            _config.alert_field_pins = _get_env_bool("ION_ALERT_FIELD_PINS", True)
-        if os.environ.get("ION_BOB_CUSTOM_TEMPLATES"):
-            _config.bob_custom_templates = _get_env_bool("ION_BOB_CUSTOM_TEMPLATES", True)
-        if os.environ.get("ION_MULTI_TENANT"):
-            _config.multi_tenant = _get_env_bool("ION_MULTI_TENANT")
-        if os.environ.get("ION_CHAT_GROUNDING_CHECK"):
-            _config.chat_grounding_check = _get_env_bool("ION_CHAT_GROUNDING_CHECK", True)
-        if os.environ.get("ION_CSRF_ENABLED"):
-            _config.csrf_enabled = _get_env_bool("ION_CSRF_ENABLED", True)
-        _env_csrf_origins = os.environ.get("ION_CSRF_EXTRA_ORIGINS", "").strip()
-        if _env_csrf_origins:
-            _config.csrf_extra_origins = _env_csrf_origins
-        if os.environ.get("ION_AUTHZ_ALERT_THRESHOLD"):
-            try:
-                _config.authz_alert_threshold = int(os.environ["ION_AUTHZ_ALERT_THRESHOLD"])
-            except ValueError:
-                pass
-        if os.environ.get("ION_AUTHZ_ALERT_WINDOW_MINUTES"):
-            try:
-                _config.authz_alert_window_minutes = int(os.environ["ION_AUTHZ_ALERT_WINDOW_MINUTES"])
-            except ValueError:
-                pass
-        if os.environ.get("ION_OIDC_ENABLED"):
-            _config.oidc_enabled = _get_env_bool("ION_OIDC_ENABLED", True)
-        if os.environ.get("ION_OIDC_KEYCLOAK_URL"):
-            _config.oidc_keycloak_url = os.environ.get("ION_OIDC_KEYCLOAK_URL", "")
-        if os.environ.get("ION_OIDC_REALM"):
-            _config.oidc_realm = os.environ.get("ION_OIDC_REALM", "")
-        if os.environ.get("ION_OIDC_CLIENT_ID"):
-            _config.oidc_client_id = os.environ.get("ION_OIDC_CLIENT_ID", "")
-        if os.environ.get("ION_OIDC_CLIENT_SECRET"):
-            _config.oidc_client_secret = os.environ.get("ION_OIDC_CLIENT_SECRET", "")
-        if os.environ.get("ION_OIDC_VERIFY_SSL"):
-            _config.oidc_verify_ssl = _get_env_bool("ION_OIDC_VERIFY_SSL", False)
-
-        # GitLab environment variable overrides
-        if os.environ.get("ION_GITLAB_ENABLED"):
-            _config.gitlab_enabled = _get_env_bool("ION_GITLAB_ENABLED", True)
-        if os.environ.get("ION_GITLAB_URL"):
-            _config.gitlab_url = os.environ.get("ION_GITLAB_URL", "")
-        if os.environ.get("ION_GITLAB_TOKEN"):
-            _config.gitlab_token = os.environ.get("ION_GITLAB_TOKEN", "")
-        if os.environ.get("ION_GITLAB_PROJECT_ID"):
-            _config.gitlab_project_id = os.environ.get("ION_GITLAB_PROJECT_ID", "")
-        if os.environ.get("ION_GITLAB_VERIFY_SSL"):
-            _config.gitlab_verify_ssl = _get_env_bool("ION_GITLAB_VERIFY_SSL", False)
-        if os.environ.get("ION_GITLAB_SUDO"):
-            _config.gitlab_sudo_enabled = _get_env_bool("ION_GITLAB_SUDO", False)
-
-        # OpenCTI environment variable overrides
-        if os.environ.get("ION_OPENCTI_ENABLED"):
-            _config.opencti_enabled = _get_env_bool("ION_OPENCTI_ENABLED", True)
-        if os.environ.get("ION_OPENCTI_URL"):
-            _config.opencti_url = os.environ.get("ION_OPENCTI_URL", "")
-        if os.environ.get("ION_OPENCTI_TOKEN"):
-            _config.opencti_token = os.environ.get("ION_OPENCTI_TOKEN", "")
-        if os.environ.get("ION_OPENCTI_VERIFY_SSL"):
-            _config.opencti_verify_ssl = _get_env_bool("ION_OPENCTI_VERIFY_SSL", False)
-
-        # Arkime environment variable overrides
-        if os.environ.get("ION_ARKIME_ENABLED"):
-            _config.arkime_enabled = _get_env_bool("ION_ARKIME_ENABLED", False)
-        if os.environ.get("ION_ARKIME_URL"):
-            _config.arkime_url = os.environ.get("ION_ARKIME_URL", "").rstrip("/")
-        if os.environ.get("ION_ARKIME_USERNAME"):
-            _config.arkime_username = os.environ.get("ION_ARKIME_USERNAME", "")
-        if os.environ.get("ION_ARKIME_PASSWORD"):
-            _config.arkime_password = os.environ.get("ION_ARKIME_PASSWORD", "")
-        if os.environ.get("ION_ARKIME_VERIFY_SSL"):
-            _config.arkime_verify_ssl = _get_env_bool("ION_ARKIME_VERIFY_SSL", False)
-
-        # Elasticsearch environment variable overrides
-        if os.environ.get("ION_ELASTICSEARCH_ENABLED"):
-            _config.elasticsearch_enabled = _get_env_bool("ION_ELASTICSEARCH_ENABLED", True)
-        if os.environ.get("ION_ELASTICSEARCH_URL"):
-            _config.elasticsearch_url = os.environ.get("ION_ELASTICSEARCH_URL", "")
-        if os.environ.get("ION_ELASTICSEARCH_API_KEY"):
-            _config.elasticsearch_api_key = os.environ.get("ION_ELASTICSEARCH_API_KEY", "")
-        if os.environ.get("ION_ELASTICSEARCH_USERNAME"):
-            _config.elasticsearch_username = os.environ.get("ION_ELASTICSEARCH_USERNAME", "")
-        if os.environ.get("ION_ELASTICSEARCH_PASSWORD"):
-            _config.elasticsearch_password = os.environ.get("ION_ELASTICSEARCH_PASSWORD", "")
-        if os.environ.get("ION_ELASTICSEARCH_ALERT_INDEX"):
-            _config.elasticsearch_alert_index = os.environ.get("ION_ELASTICSEARCH_ALERT_INDEX", "")
-        if os.environ.get("ION_ELASTICSEARCH_ESQL_ENABLED"):
-            _config.elasticsearch_esql_enabled = _get_env_bool("ION_ELASTICSEARCH_ESQL_ENABLED")
-        if os.environ.get("ION_ELASTICSEARCH_PROCESS_EVENTS_INDEX"):
-            _config.elasticsearch_process_events_index = os.environ.get(
-                "ION_ELASTICSEARCH_PROCESS_EVENTS_INDEX", ""
+    # Override with environment variables
+    _env_base_url = os.environ.get("ION_BASE_URL", "").strip()
+    if _env_base_url:
+        cfg.base_url = _env_base_url.rstrip("/")
+    if os.environ.get("ION_CA_BUNDLE"):
+        cfg.ca_bundle = os.environ.get("ION_CA_BUNDLE", "")
+    if os.environ.get("ION_SSL_CERT"):
+        cfg.ssl_cert = os.environ.get("ION_SSL_CERT", "")
+    if os.environ.get("ION_SSL_KEY"):
+        cfg.ssl_key = os.environ.get("ION_SSL_KEY", "")
+    if os.environ.get("ION_DEV_MODE"):
+        cfg.dev_mode = _get_env_bool("ION_DEV_MODE")
+    if os.environ.get("ION_COOKIE_SECURE"):
+        cfg.cookie_secure = _get_env_bool("ION_COOKIE_SECURE")
+    elif cfg.dev_mode:
+        # Plain-HTTP development: a Secure cookie is never sent back, so
+        # leaving the production default on would silently break login.
+        cfg.cookie_secure = False
+    if os.environ.get("ION_DEBUG_MODE"):
+        cfg.debug_mode = _get_env_bool("ION_DEBUG_MODE")
+    if os.environ.get("ION_ACCOUNT_LOCKOUT_ENABLED"):
+        cfg.account_lockout_enabled = _get_env_bool("ION_ACCOUNT_LOCKOUT_ENABLED")
+    if os.environ.get("ION_IP_BLOCKING_ENABLED"):
+        cfg.ip_blocking_enabled = _get_env_bool("ION_IP_BLOCKING_ENABLED")
+    if os.environ.get("ION_WEBHOOK_REQUIRE_SIGNATURE"):
+        cfg.webhook_require_signature = _get_env_bool("ION_WEBHOOK_REQUIRE_SIGNATURE")
+    if os.environ.get("ION_ENFORCE_PASSWORD_CHANGE"):
+        cfg.enforce_password_change = _get_env_bool("ION_ENFORCE_PASSWORD_CHANGE")
+    if os.environ.get("ION_PASSWORD_MIN_LENGTH"):
+        try:
+            cfg.password_min_length = int(os.environ["ION_PASSWORD_MIN_LENGTH"])
+        except ValueError:
+            pass  # keep default (disabled) on a non-integer value
+    if os.environ.get("ION_SESSION_ABSOLUTE_LIFETIME_HOURS"):
+        try:
+            cfg.session_absolute_lifetime_hours = int(
+                os.environ["ION_SESSION_ABSOLUTE_LIFETIME_HOURS"]
             )
-        if os.environ.get("ION_ELASTICSEARCH_CASE_INDEX"):
-            _config.elasticsearch_case_index = os.environ.get("ION_ELASTICSEARCH_CASE_INDEX", "ion-cases")
-        if os.environ.get("ION_ELASTICSEARCH_VERIFY_SSL"):
-            _config.elasticsearch_verify_ssl = _get_env_bool("ION_ELASTICSEARCH_VERIFY_SSL", False)
+        except ValueError:
+            pass  # keep the 168h default on a non-integer value
+    if os.environ.get("ION_SECURITY_SCAN_AUTHENTICATED"):
+        cfg.security_scan_authenticated = _get_env_bool("ION_SECURITY_SCAN_AUTHENTICATED")
+    if os.environ.get("ION_AUTHZ_ALERT_ENABLED"):
+        cfg.authz_alert_enabled = _get_env_bool("ION_AUTHZ_ALERT_ENABLED", True)
+    if os.environ.get("ION_RESPONSE_ACTIONS_ENABLED"):
+        cfg.response_actions_enabled = _get_env_bool("ION_RESPONSE_ACTIONS_ENABLED")
+    if os.environ.get("ION_COMM_TEMPLATES_SEED"):
+        cfg.comm_templates_seed = _get_env_bool("ION_COMM_TEMPLATES_SEED")
+    if os.environ.get("ION_RESPONSE_ACTIONS_LIVE"):
+        cfg.response_actions_live = _get_env_bool("ION_RESPONSE_ACTIONS_LIVE")
+    if os.environ.get("ION_ALERT_DETAIL_V2"):
+        cfg.alert_detail_v2 = _get_env_bool("ION_ALERT_DETAIL_V2", True)
+    if os.environ.get("ION_ALERT_FIELD_PINS"):
+        cfg.alert_field_pins = _get_env_bool("ION_ALERT_FIELD_PINS", True)
+    if os.environ.get("ION_BOB_CUSTOM_TEMPLATES"):
+        cfg.bob_custom_templates = _get_env_bool("ION_BOB_CUSTOM_TEMPLATES", True)
+    if os.environ.get("ION_MULTI_TENANT"):
+        cfg.multi_tenant = _get_env_bool("ION_MULTI_TENANT")
+    if os.environ.get("ION_CHAT_GROUNDING_CHECK"):
+        cfg.chat_grounding_check = _get_env_bool("ION_CHAT_GROUNDING_CHECK", True)
+    if os.environ.get("ION_CSRF_ENABLED"):
+        cfg.csrf_enabled = _get_env_bool("ION_CSRF_ENABLED", True)
+    _env_csrf_origins = os.environ.get("ION_CSRF_EXTRA_ORIGINS", "").strip()
+    if _env_csrf_origins:
+        cfg.csrf_extra_origins = _env_csrf_origins
+    if os.environ.get("ION_AUTHZ_ALERT_THRESHOLD"):
+        try:
+            cfg.authz_alert_threshold = int(os.environ["ION_AUTHZ_ALERT_THRESHOLD"])
+        except ValueError:
+            pass
+    if os.environ.get("ION_AUTHZ_ALERT_WINDOW_MINUTES"):
+        try:
+            cfg.authz_alert_window_minutes = int(os.environ["ION_AUTHZ_ALERT_WINDOW_MINUTES"])
+        except ValueError:
+            pass
+    if os.environ.get("ION_OIDC_ENABLED"):
+        cfg.oidc_enabled = _get_env_bool("ION_OIDC_ENABLED", True)
+    if os.environ.get("ION_OIDC_KEYCLOAK_URL"):
+        cfg.oidc_keycloak_url = os.environ.get("ION_OIDC_KEYCLOAK_URL", "")
+    if os.environ.get("ION_OIDC_REALM"):
+        cfg.oidc_realm = os.environ.get("ION_OIDC_REALM", "")
+    if os.environ.get("ION_OIDC_CLIENT_ID"):
+        cfg.oidc_client_id = os.environ.get("ION_OIDC_CLIENT_ID", "")
+    if os.environ.get("ION_OIDC_CLIENT_SECRET"):
+        cfg.oidc_client_secret = os.environ.get("ION_OIDC_CLIENT_SECRET", "")
+    if os.environ.get("ION_OIDC_VERIFY_SSL"):
+        cfg.oidc_verify_ssl = _get_env_bool("ION_OIDC_VERIFY_SSL", False)
 
-        # Ollama environment overrides
-        if os.environ.get("ION_OLLAMA_ENABLED"):
-            _config.ollama_enabled = _get_env_bool("ION_OLLAMA_ENABLED", True)
-        if os.environ.get("ION_OLLAMA_URL") or os.environ.get("OLLAMA_URL"):
-            _config.ollama_url = os.environ.get("ION_OLLAMA_URL") or os.environ.get("OLLAMA_URL", "http://localhost:11434")
-        if os.environ.get("ION_OLLAMA_MODEL"):
-            _config.ollama_model = os.environ.get("ION_OLLAMA_MODEL", "hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF")
-        if os.environ.get("ION_OLLAMA_TIMEOUT"):
-            _config.ollama_timeout = int(os.environ.get("ION_OLLAMA_TIMEOUT", "300"))
-        if os.environ.get("ION_OLLAMA_NUM_CTX"):
+    # GitLab environment variable overrides
+    if os.environ.get("ION_GITLAB_ENABLED"):
+        cfg.gitlab_enabled = _get_env_bool("ION_GITLAB_ENABLED", True)
+    if os.environ.get("ION_GITLAB_URL"):
+        cfg.gitlab_url = os.environ.get("ION_GITLAB_URL", "")
+    if os.environ.get("ION_GITLAB_TOKEN"):
+        cfg.gitlab_token = os.environ.get("ION_GITLAB_TOKEN", "")
+    if os.environ.get("ION_GITLAB_PROJECT_ID"):
+        cfg.gitlab_project_id = os.environ.get("ION_GITLAB_PROJECT_ID", "")
+    if os.environ.get("ION_GITLAB_VERIFY_SSL"):
+        cfg.gitlab_verify_ssl = _get_env_bool("ION_GITLAB_VERIFY_SSL", False)
+    if os.environ.get("ION_GITLAB_SUDO"):
+        cfg.gitlab_sudo_enabled = _get_env_bool("ION_GITLAB_SUDO", False)
+
+    # OpenCTI environment variable overrides
+    if os.environ.get("ION_OPENCTI_ENABLED"):
+        cfg.opencti_enabled = _get_env_bool("ION_OPENCTI_ENABLED", True)
+    if os.environ.get("ION_OPENCTI_URL"):
+        cfg.opencti_url = os.environ.get("ION_OPENCTI_URL", "")
+    if os.environ.get("ION_OPENCTI_TOKEN"):
+        cfg.opencti_token = os.environ.get("ION_OPENCTI_TOKEN", "")
+    if os.environ.get("ION_OPENCTI_VERIFY_SSL"):
+        cfg.opencti_verify_ssl = _get_env_bool("ION_OPENCTI_VERIFY_SSL", False)
+
+    # Arkime environment variable overrides
+    if os.environ.get("ION_ARKIME_ENABLED"):
+        cfg.arkime_enabled = _get_env_bool("ION_ARKIME_ENABLED", False)
+    if os.environ.get("ION_ARKIME_URL"):
+        cfg.arkime_url = os.environ.get("ION_ARKIME_URL", "").rstrip("/")
+    if os.environ.get("ION_ARKIME_USERNAME"):
+        cfg.arkime_username = os.environ.get("ION_ARKIME_USERNAME", "")
+    if os.environ.get("ION_ARKIME_PASSWORD"):
+        cfg.arkime_password = os.environ.get("ION_ARKIME_PASSWORD", "")
+    if os.environ.get("ION_ARKIME_VERIFY_SSL"):
+        cfg.arkime_verify_ssl = _get_env_bool("ION_ARKIME_VERIFY_SSL", False)
+
+    # Elasticsearch environment variable overrides
+    if os.environ.get("ION_ELASTICSEARCH_ENABLED"):
+        cfg.elasticsearch_enabled = _get_env_bool("ION_ELASTICSEARCH_ENABLED", True)
+    if os.environ.get("ION_ELASTICSEARCH_URL"):
+        cfg.elasticsearch_url = os.environ.get("ION_ELASTICSEARCH_URL", "")
+    if os.environ.get("ION_ELASTICSEARCH_API_KEY"):
+        cfg.elasticsearch_api_key = os.environ.get("ION_ELASTICSEARCH_API_KEY", "")
+    if os.environ.get("ION_ELASTICSEARCH_USERNAME"):
+        cfg.elasticsearch_username = os.environ.get("ION_ELASTICSEARCH_USERNAME", "")
+    if os.environ.get("ION_ELASTICSEARCH_PASSWORD"):
+        cfg.elasticsearch_password = os.environ.get("ION_ELASTICSEARCH_PASSWORD", "")
+    if os.environ.get("ION_ELASTICSEARCH_ALERT_INDEX"):
+        cfg.elasticsearch_alert_index = os.environ.get("ION_ELASTICSEARCH_ALERT_INDEX", "")
+    if os.environ.get("ION_ELASTICSEARCH_ESQL_ENABLED"):
+        cfg.elasticsearch_esql_enabled = _get_env_bool("ION_ELASTICSEARCH_ESQL_ENABLED")
+    if os.environ.get("ION_ELASTICSEARCH_PROCESS_EVENTS_INDEX"):
+        cfg.elasticsearch_process_events_index = os.environ.get(
+            "ION_ELASTICSEARCH_PROCESS_EVENTS_INDEX", ""
+        )
+    if os.environ.get("ION_ELASTICSEARCH_CASE_INDEX"):
+        cfg.elasticsearch_case_index = os.environ.get("ION_ELASTICSEARCH_CASE_INDEX", "ion-cases")
+    if os.environ.get("ION_ELASTICSEARCH_VERIFY_SSL"):
+        cfg.elasticsearch_verify_ssl = _get_env_bool("ION_ELASTICSEARCH_VERIFY_SSL", False)
+
+    # Ollama environment overrides
+    if os.environ.get("ION_OLLAMA_ENABLED"):
+        cfg.ollama_enabled = _get_env_bool("ION_OLLAMA_ENABLED", True)
+    if os.environ.get("ION_OLLAMA_URL") or os.environ.get("OLLAMA_URL"):
+        cfg.ollama_url = os.environ.get("ION_OLLAMA_URL") or os.environ.get("OLLAMA_URL", "http://localhost:11434")
+    if os.environ.get("ION_OLLAMA_MODEL"):
+        cfg.ollama_model = os.environ.get("ION_OLLAMA_MODEL", "hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF")
+    if os.environ.get("ION_OLLAMA_TIMEOUT"):
+        cfg.ollama_timeout = int(os.environ.get("ION_OLLAMA_TIMEOUT", "300"))
+    if os.environ.get("ION_OLLAMA_NUM_CTX"):
+        try:
+            cfg.ollama_num_ctx = int(os.environ.get("ION_OLLAMA_NUM_CTX", "16384"))
+        except ValueError:
+            pass
+    if os.environ.get("ION_OLLAMA_VERIFY_SSL"):
+        cfg.ollama_verify_ssl = _get_env_bool("ION_OLLAMA_VERIFY_SSL", False)
+
+    # Kibana Cases environment overrides
+    if os.environ.get("ION_KIBANA_CASES_ENABLED"):
+        cfg.kibana_cases_enabled = _get_env_bool("ION_KIBANA_CASES_ENABLED", True)
+    if os.environ.get("ION_KIBANA_URL"):
+        cfg.kibana_url = os.environ.get("ION_KIBANA_URL", "")
+    if os.environ.get("ION_KIBANA_USERNAME"):
+        cfg.kibana_username = os.environ.get("ION_KIBANA_USERNAME", "")
+    if os.environ.get("ION_KIBANA_PASSWORD"):
+        cfg.kibana_password = os.environ.get("ION_KIBANA_PASSWORD", "")
+    if os.environ.get("ION_KIBANA_SPACE_ID"):
+        cfg.kibana_space_id = os.environ.get("ION_KIBANA_SPACE_ID", "production")
+    if os.environ.get("ION_KIBANA_CASE_OWNER"):
+        cfg.kibana_case_owner = os.environ.get("ION_KIBANA_CASE_OWNER", "securitySolution")
+    if os.environ.get("ION_KIBANA_CUSTOM_FIELDS_ENABLED"):
+        cfg.kibana_custom_fields_enabled = _get_env_bool("ION_KIBANA_CUSTOM_FIELDS_ENABLED")
+    if os.environ.get("ION_KIBANA_VERIFY_SSL"):
+        cfg.kibana_verify_ssl = _get_env_bool("ION_KIBANA_VERIFY_SSL", False)
+
+    # DFIR-IRIS environment overrides
+    if os.environ.get("ION_DFIR_IRIS_ENABLED"):
+        cfg.dfir_iris_enabled = _get_env_bool("ION_DFIR_IRIS_ENABLED")
+    if os.environ.get("ION_DFIR_IRIS_URL"):
+        cfg.dfir_iris_url = os.environ.get("ION_DFIR_IRIS_URL", "")
+    if os.environ.get("ION_DFIR_IRIS_API_KEY"):
+        cfg.dfir_iris_api_key = os.environ.get("ION_DFIR_IRIS_API_KEY", "")
+    if os.environ.get("ION_DFIR_IRIS_VERIFY_SSL"):
+        cfg.dfir_iris_verify_ssl = _get_env_bool("ION_DFIR_IRIS_VERIFY_SSL", False)
+    if os.environ.get("ION_DFIR_IRIS_DEFAULT_CUSTOMER"):
+        cfg.dfir_iris_default_customer = int(os.environ.get("ION_DFIR_IRIS_DEFAULT_CUSTOMER", "1"))
+
+    # VirusTotal environment overrides
+    if os.environ.get("ION_VIRUSTOTAL_ENABLED"):
+        cfg.virustotal_enabled = _get_env_bool("ION_VIRUSTOTAL_ENABLED")
+    if os.environ.get("ION_VIRUSTOTAL_API_KEY"):
+        cfg.virustotal_api_key = os.environ.get("ION_VIRUSTOTAL_API_KEY", "")
+    if os.environ.get("ION_VIRUSTOTAL_URL"):
+        cfg.virustotal_url = os.environ.get("ION_VIRUSTOTAL_URL", "")
+    if os.environ.get("ION_VIRUSTOTAL_VERIFY_SSL"):
+        cfg.virustotal_verify_ssl = _get_env_bool("ION_VIRUSTOTAL_VERIFY_SSL", True)
+    if os.environ.get("ION_VIRUSTOTAL_TIMEOUT"):
+        cfg.virustotal_timeout = int(os.environ.get("ION_VIRUSTOTAL_TIMEOUT", "30"))
+    if os.environ.get("ION_VIRUSTOTAL_RATE_LIMIT"):
+        cfg.virustotal_rate_limit = int(os.environ.get("ION_VIRUSTOTAL_RATE_LIMIT", "4"))
+
+    # Shodan environment overrides
+    if os.environ.get("ION_SHODAN_ENABLED"):
+        cfg.shodan_enabled = _get_env_bool("ION_SHODAN_ENABLED", False)
+    if os.environ.get("ION_SHODAN_API_KEY"):
+        cfg.shodan_api_key = os.environ.get("ION_SHODAN_API_KEY", "")
+    if os.environ.get("ION_SHODAN_URL"):
+        cfg.shodan_url = os.environ.get("ION_SHODAN_URL", "")
+    if os.environ.get("ION_SHODAN_VERIFY_SSL"):
+        cfg.shodan_verify_ssl = _get_env_bool("ION_SHODAN_VERIFY_SSL", True)
+    if os.environ.get("ION_SHODAN_TIMEOUT"):
+        cfg.shodan_timeout = int(os.environ.get("ION_SHODAN_TIMEOUT", "30"))
+
+    # AbuseIPDB environment overrides
+    if os.environ.get("ION_ABUSEIPDB_ENABLED"):
+        cfg.abuseipdb_enabled = _get_env_bool("ION_ABUSEIPDB_ENABLED")
+    if os.environ.get("ION_ABUSEIPDB_API_KEY"):
+        cfg.abuseipdb_api_key = os.environ.get("ION_ABUSEIPDB_API_KEY", "")
+
+    # TIDE environment overrides
+    if os.environ.get("ION_TIDE_ENABLED"):
+        cfg.tide_enabled = _get_env_bool("ION_TIDE_ENABLED")
+    if os.environ.get("ION_TIDE_URL"):
+        cfg.tide_url = os.environ.get("ION_TIDE_URL", "")
+    if os.environ.get("ION_TIDE_API_KEY"):
+        cfg.tide_api_key = os.environ.get("ION_TIDE_API_KEY", "")
+    if os.environ.get("ION_TIDE_VERIFY_SSL"):
+        cfg.tide_verify_ssl = _get_env_bool("ION_TIDE_VERIFY_SSL", False)
+    if os.environ.get("ION_TIDE_SPACE"):
+        cfg.tide_space = os.environ.get("ION_TIDE_SPACE", "default")
+    if os.environ.get("ION_TIDE_CLIENT_ID"):
+        cfg.tide_client_id = os.environ.get("ION_TIDE_CLIENT_ID", "")
+
+    # Detection Engineering module licensing
+    if os.environ.get("ION_DE_LICENSE_ENFORCED"):
+        cfg.de_license_enforced = _get_env_bool("ION_DE_LICENSE_ENFORCED", False)
+    if os.environ.get("ION_WORKFORCE_ENABLED"):
+        cfg.workforce_enabled = _get_env_bool("ION_WORKFORCE_ENABLED", True)
+    if os.environ.get("ION_WORKFORCE_LAPSE_GRACE_DAYS"):
+        try:
+            cfg.workforce_lapse_grace_days = int(
+                os.environ["ION_WORKFORCE_LAPSE_GRACE_DAYS"])
+        except ValueError:
+            logger.warning("ION_WORKFORCE_LAPSE_GRACE_DAYS is not a number; keeping %s",
+                           cfg.workforce_lapse_grace_days)
+    if os.environ.get("ION_DE_MODULE_ENABLED"):
+        cfg.de_module_enabled = _get_env_bool("ION_DE_MODULE_ENABLED", False)
+    if os.environ.get("ION_DE_LICENSE"):
+        cfg.de_license = os.environ.get("ION_DE_LICENSE", "")
+
+    # Generic scheduler env overrides
+    if os.environ.get("ION_SCHEDULER_ENABLED"):
+        cfg.scheduler_enabled = _get_env_bool("ION_SCHEDULER_ENABLED", True)
+    if os.environ.get("ION_SCHEDULER_INTERVAL_S"):
+        try:
+            cfg.scheduler_interval_s = int(os.environ.get("ION_SCHEDULER_INTERVAL_S", "30"))
+        except ValueError:
+            pass
+
+    # Case grouper env overrides
+    if os.environ.get("ION_CASE_GROUPER_ENABLED"):
+        cfg.case_grouper_enabled = _get_env_bool("ION_CASE_GROUPER_ENABLED", True)
+    if os.environ.get("ION_CASE_GROUPER_INTERVAL_S"):
+        try:
+            cfg.case_grouper_interval_s = int(os.environ.get("ION_CASE_GROUPER_INTERVAL_S", "60"))
+        except ValueError:
+            pass
+    if os.environ.get("ION_CASE_GROUPER_WINDOW_MINUTES"):
+        try:
+            cfg.case_grouper_window_minutes = int(os.environ.get("ION_CASE_GROUPER_WINDOW_MINUTES", "15"))
+        except ValueError:
+            pass
+    if os.environ.get("ION_CASE_GROUPER_PUSH_TO_KIBANA"):
+        cfg.case_grouper_push_to_kibana = _get_env_bool("ION_CASE_GROUPER_PUSH_TO_KIBANA", True)
+    if os.environ.get("ION_CASE_GROUPER_AUTO_INVESTIGATE"):
+        cfg.case_grouper_auto_investigate = _get_env_bool("ION_CASE_GROUPER_AUTO_INVESTIGATE", True)
+    if os.environ.get("ION_CASE_GROUPER_STAGGER_S"):
+        try:
+            cfg.case_grouper_stagger_s = float(os.environ.get("ION_CASE_GROUPER_STAGGER_S", "3.0"))
+        except ValueError:
+            pass
+    if os.environ.get("ION_CASE_GROUPER_MIN_CLUSTER_SIZE"):
+        try:
+            cfg.case_grouper_min_cluster_size = int(os.environ.get("ION_CASE_GROUPER_MIN_CLUSTER_SIZE", "1"))
+        except ValueError:
+            pass
+    if os.environ.get("ION_CASE_GROUPER_MAX_ALERTS_PER_CASE"):
+        try:
+            cfg.case_grouper_max_alerts_per_case = int(os.environ.get("ION_CASE_GROUPER_MAX_ALERTS_PER_CASE", "20"))
+        except ValueError:
+            pass
+    if os.environ.get("ION_CASE_GROUPER_INVESTIGATE_PER_CASE"):
+        cfg.case_grouper_investigate_per_case = _get_env_bool("ION_CASE_GROUPER_INVESTIGATE_PER_CASE", True)
+
+    # PII anonymising proxy env overrides
+    if os.environ.get("ION_PII_ANON_ENABLED"):
+        cfg.pii_anon_enabled = _get_env_bool("ION_PII_ANON_ENABLED", False)
+    if os.environ.get("ION_PII_FIELDS_FILE"):
+        cfg.pii_fields_file = os.environ.get("ION_PII_FIELDS_FILE", "")
+
+    # SSVC deployment inputs
+    for _field, _env in (("ssvc_exposure", "ION_SSVC_EXPOSURE"),
+                         ("ssvc_automatable", "ION_SSVC_AUTOMATABLE"),
+                         ("ssvc_human_impact", "ION_SSVC_HUMAN_IMPACT")):
+        if os.environ.get(_env):
+            setattr(cfg, _field, os.environ[_env].strip())
+
+    # Investigation env overrides
+    if os.environ.get("ION_INVESTIGATION_LLM_TIMEOUT_S"):
+        cfg.investigation_llm_timeout_s = int(os.environ.get("ION_INVESTIGATION_LLM_TIMEOUT_S", "300"))
+
+    # Attack Path + Bob escalation-tier env overrides
+    if os.environ.get("ION_ATTACK_PATH_ENABLED"):
+        cfg.attack_path_enabled = _get_env_bool("ION_ATTACK_PATH_ENABLED", True)
+    if os.environ.get("ION_BOB_ESCALATION_TIER_ENABLED"):
+        cfg.bob_escalation_tier_enabled = _get_env_bool("ION_BOB_ESCALATION_TIER_ENABLED", True)
+    if os.environ.get("ION_BOB_ESCALATION_SAMPLES"):
+        try:
+            cfg.bob_escalation_samples = int(os.environ["ION_BOB_ESCALATION_SAMPLES"])
+        except ValueError:
+            pass  # keep default on a non-integer value
+    if os.environ.get("ION_BOB_ESCALATION_MODEL"):
+        cfg.bob_escalation_model = os.environ.get("ION_BOB_ESCALATION_MODEL", "")
+
+    # Active response executor overrides
+    if os.environ.get("ION_EXEC_DRY_RUN"):
+        cfg.exec_dry_run = _get_env_bool("ION_EXEC_DRY_RUN", True)
+    if os.environ.get("ION_EXEC_DEFAULT_TIMEOUT_S"):
+        try:
+            cfg.exec_default_timeout_s = int(os.environ["ION_EXEC_DEFAULT_TIMEOUT_S"])
+        except ValueError:
+            pass
+    if os.environ.get("ION_EXEC_FIREWALL_URL"):
+        cfg.exec_firewall_url = os.environ.get("ION_EXEC_FIREWALL_URL", "")
+    if os.environ.get("ION_EXEC_FIREWALL_API_KEY"):
+        cfg.exec_firewall_api_key = os.environ.get("ION_EXEC_FIREWALL_API_KEY", "")
+    if os.environ.get("ION_EXEC_FIREWALL_VERIFY_SSL"):
+        cfg.exec_firewall_verify_ssl = _get_env_bool("ION_EXEC_FIREWALL_VERIFY_SSL", True)
+    if os.environ.get("ION_EXEC_DNS_SINKHOLE_URL"):
+        cfg.exec_dns_sinkhole_url = os.environ.get("ION_EXEC_DNS_SINKHOLE_URL", "")
+    if os.environ.get("ION_EXEC_DNS_SINKHOLE_API_KEY"):
+        cfg.exec_dns_sinkhole_api_key = os.environ.get("ION_EXEC_DNS_SINKHOLE_API_KEY", "")
+    if os.environ.get("ION_EXEC_DNS_SINKHOLE_VERIFY_SSL"):
+        cfg.exec_dns_sinkhole_verify_ssl = _get_env_bool("ION_EXEC_DNS_SINKHOLE_VERIFY_SSL", True)
+    if os.environ.get("ION_EXEC_EDR_URL"):
+        cfg.exec_edr_url = os.environ.get("ION_EXEC_EDR_URL", "")
+    if os.environ.get("ION_EXEC_EDR_API_KEY"):
+        cfg.exec_edr_api_key = os.environ.get("ION_EXEC_EDR_API_KEY", "")
+    if os.environ.get("ION_EXEC_EDR_VERIFY_SSL"):
+        cfg.exec_edr_verify_ssl = _get_env_bool("ION_EXEC_EDR_VERIFY_SSL", True)
+    if os.environ.get("ION_EXEC_EMAIL_GATEWAY_URL"):
+        cfg.exec_email_gateway_url = os.environ.get("ION_EXEC_EMAIL_GATEWAY_URL", "")
+    if os.environ.get("ION_EXEC_EMAIL_GATEWAY_API_KEY"):
+        cfg.exec_email_gateway_api_key = os.environ.get("ION_EXEC_EMAIL_GATEWAY_API_KEY", "")
+    if os.environ.get("ION_EXEC_EMAIL_GATEWAY_VERIFY_SSL"):
+        cfg.exec_email_gateway_verify_ssl = _get_env_bool("ION_EXEC_EMAIL_GATEWAY_VERIFY_SSL", True)
+    if os.environ.get("ION_EXEC_AD_LDAP_URI"):
+        cfg.exec_ad_ldap_uri = os.environ.get("ION_EXEC_AD_LDAP_URI", "")
+    if os.environ.get("ION_EXEC_AD_BIND_DN"):
+        cfg.exec_ad_bind_dn = os.environ.get("ION_EXEC_AD_BIND_DN", "")
+    if os.environ.get("ION_EXEC_AD_BIND_PASSWORD"):
+        cfg.exec_ad_bind_password = os.environ.get("ION_EXEC_AD_BIND_PASSWORD", "")
+    if os.environ.get("ION_EXEC_AD_USER_SEARCH_BASE"):
+        cfg.exec_ad_user_search_base = os.environ.get("ION_EXEC_AD_USER_SEARCH_BASE", "")
+    if os.environ.get("ION_EXEC_AD_VERIFY_SSL"):
+        cfg.exec_ad_verify_ssl = _get_env_bool("ION_EXEC_AD_VERIFY_SSL", True)
+    if os.environ.get("ION_EXEC_GENERIC_WEBHOOK_API_KEY"):
+        cfg.exec_generic_webhook_api_key = os.environ.get("ION_EXEC_GENERIC_WEBHOOK_API_KEY", "")
+
+    # SMTP environment overrides
+    if os.environ.get("ION_SMTP_ENABLED"):
+        cfg.smtp_enabled = _get_env_bool("ION_SMTP_ENABLED", False)
+    if os.environ.get("ION_SMTP_HOST"):
+        cfg.smtp_host = os.environ.get("ION_SMTP_HOST", "")
+    if os.environ.get("ION_SMTP_PORT"):
+        cfg.smtp_port = int(os.environ.get("ION_SMTP_PORT", "587"))
+    if os.environ.get("ION_SMTP_USERNAME"):
+        cfg.smtp_username = os.environ.get("ION_SMTP_USERNAME", "")
+    if os.environ.get("ION_SMTP_PASSWORD"):
+        cfg.smtp_password = os.environ.get("ION_SMTP_PASSWORD", "")
+    if os.environ.get("ION_SMTP_FROM_ADDRESS"):
+        cfg.smtp_from_address = os.environ.get("ION_SMTP_FROM_ADDRESS", "")
+    if os.environ.get("ION_SMTP_FROM_NAME"):
+        cfg.smtp_from_name = os.environ.get("ION_SMTP_FROM_NAME", "ION")
+    if os.environ.get("ION_SMTP_USE_TLS"):
+        cfg.smtp_use_tls = _get_env_bool("ION_SMTP_USE_TLS", False)
+    if os.environ.get("ION_SMTP_USE_STARTTLS"):
+        cfg.smtp_use_starttls = _get_env_bool("ION_SMTP_USE_STARTTLS", True)
+    if os.environ.get("ION_SMTP_TIMEOUT"):
+        cfg.smtp_timeout = int(os.environ.get("ION_SMTP_TIMEOUT", "30"))
+    if os.environ.get("ION_SMTP_VERIFY_SSL"):
+        cfg.smtp_verify_ssl = _get_env_bool("ION_SMTP_VERIFY_SSL", True)
+
+    return cfg
+
+
+def _file_stamp(path: Path) -> tuple:
+    """What a change to the file would alter: its path, mtime and size."""
+    try:
+        st = path.stat()
+        return (str(path), st.st_mtime_ns, st.st_size)
+    except OSError:
+        return (str(path), None, None)
+
+
+def get_config() -> Config:
+    """The configuration in force, reloaded when config.json changes.
+
+    ION runs several web workers, each its own process with its own copy.
+    A settings save rewrites config.json and reloads only the worker that
+    handled it, so the others kept the old values until a restart: a change
+    saved in Settings reached one worker in four. Each worker now compares
+    the file's mtime and size with what it loaded, at most every
+    RELOAD_CHECK_SECONDS, and rebuilds when they differ.
+
+    Only a configuration this module loaded follows the file. One handed in
+    through set_config(), or put in place by a test, is the caller's and is
+    left alone.
+    """
+    global _config, _loaded, _loaded_stamp, _checked_at
+    current = _config
+    if current is not None:
+        if current is not _loaded:
+            return current
+        now = time.monotonic()
+        if now - _checked_at < RELOAD_CHECK_SECONDS:
+            return current
+        _checked_at = now
+        if _file_stamp(Path(_loaded_stamp[0])) == _loaded_stamp:
+            return current
+    with _config_lock:
+        if _config is not None and _config is not current:
+            return _config  # another thread reloaded first
+        stamp = _file_stamp(_config_file_path())
+        if current is None:
+            fresh = _load_config()
+        else:
             try:
-                _config.ollama_num_ctx = int(os.environ.get("ION_OLLAMA_NUM_CTX", "16384"))
-            except ValueError:
-                pass
-        if os.environ.get("ION_OLLAMA_VERIFY_SSL"):
-            _config.ollama_verify_ssl = _get_env_bool("ION_OLLAMA_VERIFY_SSL", False)
+                fresh = _load_config()
+            except Exception as exc:  # noqa: BLE001 -- keep serving, retry next check
+                # A file another process is replacing, or one hand-edited
+                # into invalid JSON. The settings in force stay in force
+                # rather than every request failing; the next check retries.
+                logger.warning("Settings not reloaded; %s could not be read: %s", stamp[0], exc)
+                _checked_at = time.monotonic()
+                return current
+        _config, _loaded, _loaded_stamp = fresh, fresh, stamp
+        _checked_at = time.monotonic()
+        if current is not None:
+            logger.info("Settings reloaded: %s changed", stamp[0])
+        return fresh
 
-        # Kibana Cases environment overrides
-        if os.environ.get("ION_KIBANA_CASES_ENABLED"):
-            _config.kibana_cases_enabled = _get_env_bool("ION_KIBANA_CASES_ENABLED", True)
-        if os.environ.get("ION_KIBANA_URL"):
-            _config.kibana_url = os.environ.get("ION_KIBANA_URL", "")
-        if os.environ.get("ION_KIBANA_USERNAME"):
-            _config.kibana_username = os.environ.get("ION_KIBANA_USERNAME", "")
-        if os.environ.get("ION_KIBANA_PASSWORD"):
-            _config.kibana_password = os.environ.get("ION_KIBANA_PASSWORD", "")
-        if os.environ.get("ION_KIBANA_SPACE_ID"):
-            _config.kibana_space_id = os.environ.get("ION_KIBANA_SPACE_ID", "production")
-        if os.environ.get("ION_KIBANA_CASE_OWNER"):
-            _config.kibana_case_owner = os.environ.get("ION_KIBANA_CASE_OWNER", "securitySolution")
-        if os.environ.get("ION_KIBANA_CUSTOM_FIELDS_ENABLED"):
-            _config.kibana_custom_fields_enabled = _get_env_bool("ION_KIBANA_CUSTOM_FIELDS_ENABLED")
-        if os.environ.get("ION_KIBANA_VERIFY_SSL"):
-            _config.kibana_verify_ssl = _get_env_bool("ION_KIBANA_VERIFY_SSL", False)
-
-        # DFIR-IRIS environment overrides
-        if os.environ.get("ION_DFIR_IRIS_ENABLED"):
-            _config.dfir_iris_enabled = _get_env_bool("ION_DFIR_IRIS_ENABLED")
-        if os.environ.get("ION_DFIR_IRIS_URL"):
-            _config.dfir_iris_url = os.environ.get("ION_DFIR_IRIS_URL", "")
-        if os.environ.get("ION_DFIR_IRIS_API_KEY"):
-            _config.dfir_iris_api_key = os.environ.get("ION_DFIR_IRIS_API_KEY", "")
-        if os.environ.get("ION_DFIR_IRIS_VERIFY_SSL"):
-            _config.dfir_iris_verify_ssl = _get_env_bool("ION_DFIR_IRIS_VERIFY_SSL", False)
-        if os.environ.get("ION_DFIR_IRIS_DEFAULT_CUSTOMER"):
-            _config.dfir_iris_default_customer = int(os.environ.get("ION_DFIR_IRIS_DEFAULT_CUSTOMER", "1"))
-
-        # VirusTotal environment overrides
-        if os.environ.get("ION_VIRUSTOTAL_ENABLED"):
-            _config.virustotal_enabled = _get_env_bool("ION_VIRUSTOTAL_ENABLED")
-        if os.environ.get("ION_VIRUSTOTAL_API_KEY"):
-            _config.virustotal_api_key = os.environ.get("ION_VIRUSTOTAL_API_KEY", "")
-        if os.environ.get("ION_VIRUSTOTAL_URL"):
-            _config.virustotal_url = os.environ.get("ION_VIRUSTOTAL_URL", "")
-        if os.environ.get("ION_VIRUSTOTAL_VERIFY_SSL"):
-            _config.virustotal_verify_ssl = _get_env_bool("ION_VIRUSTOTAL_VERIFY_SSL", True)
-        if os.environ.get("ION_VIRUSTOTAL_TIMEOUT"):
-            _config.virustotal_timeout = int(os.environ.get("ION_VIRUSTOTAL_TIMEOUT", "30"))
-        if os.environ.get("ION_VIRUSTOTAL_RATE_LIMIT"):
-            _config.virustotal_rate_limit = int(os.environ.get("ION_VIRUSTOTAL_RATE_LIMIT", "4"))
-
-        # Shodan environment overrides
-        if os.environ.get("ION_SHODAN_ENABLED"):
-            _config.shodan_enabled = _get_env_bool("ION_SHODAN_ENABLED", False)
-        if os.environ.get("ION_SHODAN_API_KEY"):
-            _config.shodan_api_key = os.environ.get("ION_SHODAN_API_KEY", "")
-        if os.environ.get("ION_SHODAN_URL"):
-            _config.shodan_url = os.environ.get("ION_SHODAN_URL", "")
-        if os.environ.get("ION_SHODAN_VERIFY_SSL"):
-            _config.shodan_verify_ssl = _get_env_bool("ION_SHODAN_VERIFY_SSL", True)
-        if os.environ.get("ION_SHODAN_TIMEOUT"):
-            _config.shodan_timeout = int(os.environ.get("ION_SHODAN_TIMEOUT", "30"))
-
-        # AbuseIPDB environment overrides
-        if os.environ.get("ION_ABUSEIPDB_ENABLED"):
-            _config.abuseipdb_enabled = _get_env_bool("ION_ABUSEIPDB_ENABLED")
-        if os.environ.get("ION_ABUSEIPDB_API_KEY"):
-            _config.abuseipdb_api_key = os.environ.get("ION_ABUSEIPDB_API_KEY", "")
-
-        # TIDE environment overrides
-        if os.environ.get("ION_TIDE_ENABLED"):
-            _config.tide_enabled = _get_env_bool("ION_TIDE_ENABLED")
-        if os.environ.get("ION_TIDE_URL"):
-            _config.tide_url = os.environ.get("ION_TIDE_URL", "")
-        if os.environ.get("ION_TIDE_API_KEY"):
-            _config.tide_api_key = os.environ.get("ION_TIDE_API_KEY", "")
-        if os.environ.get("ION_TIDE_VERIFY_SSL"):
-            _config.tide_verify_ssl = _get_env_bool("ION_TIDE_VERIFY_SSL", False)
-        if os.environ.get("ION_TIDE_SPACE"):
-            _config.tide_space = os.environ.get("ION_TIDE_SPACE", "default")
-        if os.environ.get("ION_TIDE_CLIENT_ID"):
-            _config.tide_client_id = os.environ.get("ION_TIDE_CLIENT_ID", "")
-
-        # Detection Engineering module licensing
-        if os.environ.get("ION_DE_LICENSE_ENFORCED"):
-            _config.de_license_enforced = _get_env_bool("ION_DE_LICENSE_ENFORCED", False)
-        if os.environ.get("ION_WORKFORCE_ENABLED"):
-            _config.workforce_enabled = _get_env_bool("ION_WORKFORCE_ENABLED", True)
-        if os.environ.get("ION_WORKFORCE_LAPSE_GRACE_DAYS"):
-            try:
-                _config.workforce_lapse_grace_days = int(
-                    os.environ["ION_WORKFORCE_LAPSE_GRACE_DAYS"])
-            except ValueError:
-                logger.warning("ION_WORKFORCE_LAPSE_GRACE_DAYS is not a number; keeping %s",
-                               _config.workforce_lapse_grace_days)
-        if os.environ.get("ION_DE_MODULE_ENABLED"):
-            _config.de_module_enabled = _get_env_bool("ION_DE_MODULE_ENABLED", False)
-        if os.environ.get("ION_DE_LICENSE"):
-            _config.de_license = os.environ.get("ION_DE_LICENSE", "")
-
-        # Generic scheduler env overrides
-        if os.environ.get("ION_SCHEDULER_ENABLED"):
-            _config.scheduler_enabled = _get_env_bool("ION_SCHEDULER_ENABLED", True)
-        if os.environ.get("ION_SCHEDULER_INTERVAL_S"):
-            try:
-                _config.scheduler_interval_s = int(os.environ.get("ION_SCHEDULER_INTERVAL_S", "30"))
-            except ValueError:
-                pass
-
-        # Case grouper env overrides
-        if os.environ.get("ION_CASE_GROUPER_ENABLED"):
-            _config.case_grouper_enabled = _get_env_bool("ION_CASE_GROUPER_ENABLED", True)
-        if os.environ.get("ION_CASE_GROUPER_INTERVAL_S"):
-            try:
-                _config.case_grouper_interval_s = int(os.environ.get("ION_CASE_GROUPER_INTERVAL_S", "60"))
-            except ValueError:
-                pass
-        if os.environ.get("ION_CASE_GROUPER_WINDOW_MINUTES"):
-            try:
-                _config.case_grouper_window_minutes = int(os.environ.get("ION_CASE_GROUPER_WINDOW_MINUTES", "15"))
-            except ValueError:
-                pass
-        if os.environ.get("ION_CASE_GROUPER_PUSH_TO_KIBANA"):
-            _config.case_grouper_push_to_kibana = _get_env_bool("ION_CASE_GROUPER_PUSH_TO_KIBANA", True)
-        if os.environ.get("ION_CASE_GROUPER_AUTO_INVESTIGATE"):
-            _config.case_grouper_auto_investigate = _get_env_bool("ION_CASE_GROUPER_AUTO_INVESTIGATE", True)
-        if os.environ.get("ION_CASE_GROUPER_STAGGER_S"):
-            try:
-                _config.case_grouper_stagger_s = float(os.environ.get("ION_CASE_GROUPER_STAGGER_S", "3.0"))
-            except ValueError:
-                pass
-        if os.environ.get("ION_CASE_GROUPER_MIN_CLUSTER_SIZE"):
-            try:
-                _config.case_grouper_min_cluster_size = int(os.environ.get("ION_CASE_GROUPER_MIN_CLUSTER_SIZE", "1"))
-            except ValueError:
-                pass
-        if os.environ.get("ION_CASE_GROUPER_MAX_ALERTS_PER_CASE"):
-            try:
-                _config.case_grouper_max_alerts_per_case = int(os.environ.get("ION_CASE_GROUPER_MAX_ALERTS_PER_CASE", "20"))
-            except ValueError:
-                pass
-        if os.environ.get("ION_CASE_GROUPER_INVESTIGATE_PER_CASE"):
-            _config.case_grouper_investigate_per_case = _get_env_bool("ION_CASE_GROUPER_INVESTIGATE_PER_CASE", True)
-
-        # PII anonymising proxy env overrides
-        if os.environ.get("ION_PII_ANON_ENABLED"):
-            _config.pii_anon_enabled = _get_env_bool("ION_PII_ANON_ENABLED", False)
-        if os.environ.get("ION_PII_FIELDS_FILE"):
-            _config.pii_fields_file = os.environ.get("ION_PII_FIELDS_FILE", "")
-
-        # Investigation env overrides
-        if os.environ.get("ION_INVESTIGATION_LLM_TIMEOUT_S"):
-            _config.investigation_llm_timeout_s = int(os.environ.get("ION_INVESTIGATION_LLM_TIMEOUT_S", "300"))
-
-        # Attack Path + Bob escalation-tier env overrides
-        if os.environ.get("ION_ATTACK_PATH_ENABLED"):
-            _config.attack_path_enabled = _get_env_bool("ION_ATTACK_PATH_ENABLED", True)
-        if os.environ.get("ION_BOB_ESCALATION_TIER_ENABLED"):
-            _config.bob_escalation_tier_enabled = _get_env_bool("ION_BOB_ESCALATION_TIER_ENABLED", True)
-        if os.environ.get("ION_BOB_ESCALATION_SAMPLES"):
-            try:
-                _config.bob_escalation_samples = int(os.environ["ION_BOB_ESCALATION_SAMPLES"])
-            except ValueError:
-                pass  # keep default on a non-integer value
-        if os.environ.get("ION_BOB_ESCALATION_MODEL"):
-            _config.bob_escalation_model = os.environ.get("ION_BOB_ESCALATION_MODEL", "")
-
-        # Active response executor overrides
-        if os.environ.get("ION_EXEC_DRY_RUN"):
-            _config.exec_dry_run = _get_env_bool("ION_EXEC_DRY_RUN", True)
-        if os.environ.get("ION_EXEC_DEFAULT_TIMEOUT_S"):
-            try:
-                _config.exec_default_timeout_s = int(os.environ["ION_EXEC_DEFAULT_TIMEOUT_S"])
-            except ValueError:
-                pass
-        if os.environ.get("ION_EXEC_FIREWALL_URL"):
-            _config.exec_firewall_url = os.environ.get("ION_EXEC_FIREWALL_URL", "")
-        if os.environ.get("ION_EXEC_FIREWALL_API_KEY"):
-            _config.exec_firewall_api_key = os.environ.get("ION_EXEC_FIREWALL_API_KEY", "")
-        if os.environ.get("ION_EXEC_FIREWALL_VERIFY_SSL"):
-            _config.exec_firewall_verify_ssl = _get_env_bool("ION_EXEC_FIREWALL_VERIFY_SSL", True)
-        if os.environ.get("ION_EXEC_DNS_SINKHOLE_URL"):
-            _config.exec_dns_sinkhole_url = os.environ.get("ION_EXEC_DNS_SINKHOLE_URL", "")
-        if os.environ.get("ION_EXEC_DNS_SINKHOLE_API_KEY"):
-            _config.exec_dns_sinkhole_api_key = os.environ.get("ION_EXEC_DNS_SINKHOLE_API_KEY", "")
-        if os.environ.get("ION_EXEC_DNS_SINKHOLE_VERIFY_SSL"):
-            _config.exec_dns_sinkhole_verify_ssl = _get_env_bool("ION_EXEC_DNS_SINKHOLE_VERIFY_SSL", True)
-        if os.environ.get("ION_EXEC_EDR_URL"):
-            _config.exec_edr_url = os.environ.get("ION_EXEC_EDR_URL", "")
-        if os.environ.get("ION_EXEC_EDR_API_KEY"):
-            _config.exec_edr_api_key = os.environ.get("ION_EXEC_EDR_API_KEY", "")
-        if os.environ.get("ION_EXEC_EDR_VERIFY_SSL"):
-            _config.exec_edr_verify_ssl = _get_env_bool("ION_EXEC_EDR_VERIFY_SSL", True)
-        if os.environ.get("ION_EXEC_EMAIL_GATEWAY_URL"):
-            _config.exec_email_gateway_url = os.environ.get("ION_EXEC_EMAIL_GATEWAY_URL", "")
-        if os.environ.get("ION_EXEC_EMAIL_GATEWAY_API_KEY"):
-            _config.exec_email_gateway_api_key = os.environ.get("ION_EXEC_EMAIL_GATEWAY_API_KEY", "")
-        if os.environ.get("ION_EXEC_EMAIL_GATEWAY_VERIFY_SSL"):
-            _config.exec_email_gateway_verify_ssl = _get_env_bool("ION_EXEC_EMAIL_GATEWAY_VERIFY_SSL", True)
-        if os.environ.get("ION_EXEC_AD_LDAP_URI"):
-            _config.exec_ad_ldap_uri = os.environ.get("ION_EXEC_AD_LDAP_URI", "")
-        if os.environ.get("ION_EXEC_AD_BIND_DN"):
-            _config.exec_ad_bind_dn = os.environ.get("ION_EXEC_AD_BIND_DN", "")
-        if os.environ.get("ION_EXEC_AD_BIND_PASSWORD"):
-            _config.exec_ad_bind_password = os.environ.get("ION_EXEC_AD_BIND_PASSWORD", "")
-        if os.environ.get("ION_EXEC_AD_USER_SEARCH_BASE"):
-            _config.exec_ad_user_search_base = os.environ.get("ION_EXEC_AD_USER_SEARCH_BASE", "")
-        if os.environ.get("ION_EXEC_AD_VERIFY_SSL"):
-            _config.exec_ad_verify_ssl = _get_env_bool("ION_EXEC_AD_VERIFY_SSL", True)
-        if os.environ.get("ION_EXEC_GENERIC_WEBHOOK_API_KEY"):
-            _config.exec_generic_webhook_api_key = os.environ.get("ION_EXEC_GENERIC_WEBHOOK_API_KEY", "")
-
-        # SMTP environment overrides
-        if os.environ.get("ION_SMTP_ENABLED"):
-            _config.smtp_enabled = _get_env_bool("ION_SMTP_ENABLED", False)
-        if os.environ.get("ION_SMTP_HOST"):
-            _config.smtp_host = os.environ.get("ION_SMTP_HOST", "")
-        if os.environ.get("ION_SMTP_PORT"):
-            _config.smtp_port = int(os.environ.get("ION_SMTP_PORT", "587"))
-        if os.environ.get("ION_SMTP_USERNAME"):
-            _config.smtp_username = os.environ.get("ION_SMTP_USERNAME", "")
-        if os.environ.get("ION_SMTP_PASSWORD"):
-            _config.smtp_password = os.environ.get("ION_SMTP_PASSWORD", "")
-        if os.environ.get("ION_SMTP_FROM_ADDRESS"):
-            _config.smtp_from_address = os.environ.get("ION_SMTP_FROM_ADDRESS", "")
-        if os.environ.get("ION_SMTP_FROM_NAME"):
-            _config.smtp_from_name = os.environ.get("ION_SMTP_FROM_NAME", "ION")
-        if os.environ.get("ION_SMTP_USE_TLS"):
-            _config.smtp_use_tls = _get_env_bool("ION_SMTP_USE_TLS", False)
-        if os.environ.get("ION_SMTP_USE_STARTTLS"):
-            _config.smtp_use_starttls = _get_env_bool("ION_SMTP_USE_STARTTLS", True)
-        if os.environ.get("ION_SMTP_TIMEOUT"):
-            _config.smtp_timeout = int(os.environ.get("ION_SMTP_TIMEOUT", "30"))
-        if os.environ.get("ION_SMTP_VERIFY_SSL"):
-            _config.smtp_verify_ssl = _get_env_bool("ION_SMTP_VERIFY_SSL", True)
-
-    return _config
 
 
 # ── Where did a setting come from? ──
@@ -1147,6 +1249,9 @@ ENV_FIELD_MAP: dict[str, str] = {
     "smtp_verify_ssl": "ION_SMTP_VERIFY_SSL",
     "ssl_cert": "ION_SSL_CERT",
     "ssl_key": "ION_SSL_KEY",
+    "ssvc_automatable": "ION_SSVC_AUTOMATABLE",
+    "ssvc_exposure": "ION_SSVC_EXPOSURE",
+    "ssvc_human_impact": "ION_SSVC_HUMAN_IMPACT",
     "tide_api_key": "ION_TIDE_API_KEY",
     "tide_client_id": "ION_TIDE_CLIENT_ID",
     "tide_enabled": "ION_TIDE_ENABLED",
@@ -1275,9 +1380,15 @@ def config_field_sources() -> dict[str, str]:
 
 
 def set_config(config: Optional[Config]) -> None:
-    """Set the global configuration instance. Pass None to clear cache."""
-    global _config
+    """Set the global configuration instance. Pass None to clear cache.
+
+    A configuration set here is pinned: get_config() does not replace it
+    when config.json changes. None makes the next get_config() load afresh.
+    """
+    global _config, _loaded
     _config = config
+    if config is None:
+        _loaded = None
 
 
 from typing import Union

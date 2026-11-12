@@ -44,6 +44,11 @@ ION's version string lives in 10 files. Past releases rotted them (`src/ion/__in
      from either template pulled the previous image.
    - `CHANGELOG.md` → new `## vX.Y.Z — YYYY-MM-DD` heading at top + entries
    - `SECURITY_ASSESSMENT.md` → bump `<!-- ion-doc:version=X.Y.Z -->` + `Assessment Date` + `Application Version`, update the compact **current-posture** table's `(vX.Y.Z)` version header (single cell — the values stay 0 unless a finding lands), and add a "Net-New Surfaces" paragraph if material. (The old 70-column per-version trend table was retired at v0.40.0; the checker only anchors on the `ion-doc:version` stamp.)
+   - `security/ion.openvex.json` and `security/ion.csaf.json` → regenerate with
+     `python scripts/generate_vex.py`. Both documents name the ION version they
+     describe, so a bump leaves them stale and `tests/test_vex_documents.py`
+     fails three tests until they are rebuilt. Added after v0.99.15, the first
+     bump with VEX documents in the tree; the checker does not cover them.
 
 5. **Re-run the checker** — must now report PASS.
 
@@ -59,7 +64,7 @@ ION's version string lives in 10 files. Past releases rotted them (`src/ion/__in
    ```
    chore(release): vX.Y.Z — version bumps + CHANGELOG + SECURITY_ASSESSMENT delta
    ```
-   Applied at the very end of the release ritual, after feature commits land. Touches all 10 files.
+   Applied at the very end of the release ritual, after feature commits land. Touches all 10 files, plus the two VEX documents.
 
 8. **Image push** (after the tag lands and the image is built). ION is a
    Guarded Glass product: distribution is the org's PRIVATE repo only, since

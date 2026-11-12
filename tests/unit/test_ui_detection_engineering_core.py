@@ -111,3 +111,13 @@ def test_space_options_are_safe_and_service_selection_is_preserved(client, monke
         assert option.has_attr('selected')
         assert option.text=='a"<b> (0)'
     assert client.get('/ui/detection-engineering/spaces',headers={'Accept':'application/json'}).json()['state']==state
+
+
+@pytest.mark.parametrize('scale,label', [('percent', 'Excellent (80%+)'), ('points', 'Excellent (30+)'), (None, 'Excellent (30+)')])
+def test_quality_labels_follow_the_scale_tide_scores_on(client, monkeypatch, scale, label):
+    """TIDE 5.1+ scores in percent and ION bands at 80/50/25; the legend
+    must say so rather than name the old points bands."""
+    quality = {'excellent': 1, 'good': 1, 'fair': 1, 'poor': 1, 'avg_quality': 46.3, **({'scale': scale} if scale else {})}
+    monkeypatch.setattr(de_tide_api, 'tide_de_posture', lambda **kwargs: {'enabled': True, 'total_rules': 4, 'quality': quality})
+    monkeypatch.setattr(de_tide_api, 'tide_de_disabled_critical', lambda **kwargs: [])
+    assert label in client.get('/ui/detection-engineering/posture').text

@@ -19,6 +19,12 @@ router = APIRouter(dependencies=[Depends(require_permission('alert:read'))])
 State = Literal['failed', 'unconfigured', 'empty', 'data']
 
 
+# Band labels for the scale TIDE scores on (tide_service._quality_bands).
+QUALITY_LABELS = {
+    'percent': {'excellent': 'Excellent (80%+)', 'good': 'Good (50-79%)', 'fair': 'Fair (25-49%)', 'poor': 'Poor (<25%)'},
+    'points': {'excellent': 'Excellent (30+)', 'good': 'Good (20-29)', 'fair': 'Fair (10-19)', 'poor': 'Poor (<10)'},
+}
+
 class PosturePanel(TypedDict):
     state: State
     stats: dict[str, int | float | None]
@@ -28,6 +34,7 @@ class PosturePanel(TypedDict):
     severity: list[dict[str, Any]] | None
     severity_total: int | float | None
     quality: list[dict[str, Any]] | None
+    quality_scale: Literal['percent', 'points'] | None
     avg_quality: int | float | None
     disabled_critical: list[dict[str, Any]] | None
 
@@ -88,8 +95,7 @@ def _severity(payload: object) -> tuple[list[dict[str, Any]] | None, int | float
     return result, total
 
 
-@router.get('/detection-engineering/posture', response_class=HTMLResponse)
-def posture(request: Request, session: Session = Depends(get_db_session)):
+def posture_view(session: Session | None) -> PosturePanel:
     payload = None
     disabled = None
     try:
@@ -109,7 +115,10 @@ def posture(request: Request, session: Session = Depends(get_db_session)):
     quality_payload = data.get('quality')
     quality = None
     if isinstance(quality_payload, dict):
-        quality = [{'key':key, 'count':_number(quality_payload.get(key)), 'percentage':_percent(quality_payload.get(key),stats['total_rules'])} for key in ('excellent','good','fair','poor')]
+        labels = QUALITY_LABELS.get(quality_payload.get('scale'), QUALITY_LABELS['points'])
+        quality = [{'key':key, 'label':labels[key], 'count':_number(quality_payload.get(key)),
+                    'percentage':_percent(quality_payload.get(key),stats['total_rules'])}
+                   for key in ('excellent','good','fair','poor')]
     view: PosturePanel = {
         'state':'failed' if not isinstance(configured, bool) else 'unconfigured' if not configured else 'empty' if stats['total_rules'] == 0 else 'data',
         'stats':stats, 'enabled_pct':_percent(stats['enabled_rules'],stats['total_rules']),
@@ -118,12 +127,17 @@ def posture(request: Request, session: Session = Depends(get_db_session)):
         'severity':severity, 'severity_total':severity_total, 'quality':quality,
         'avg_quality':_number(quality_payload.get('avg_quality')) if isinstance(quality_payload,dict) else None,
         'disabled_critical':disabled,
+        'quality_scale':quality_payload.get('scale') if isinstance(quality_payload,dict) and quality_payload.get('scale') in QUALITY_LABELS else None,
     }
-    return render_view(request, '_fragments/detection_engineering_posture.html', view)
+    return view
 
 
-@router.get('/detection-engineering/gaps', response_class=HTMLResponse)
-def gaps(request: Request, session: Session = Depends(get_db_session)):
+@router.get('/detection-engineering/posture', response_class=HTMLResponse)
+def posture(request: Request, session: Session = Depends(get_db_session)):
+    return render_view(request, '_fragments/detection_engineering_posture.html', posture_view(session))
+
+
+def gaps_view(session: Session | None) -> GapsPanel:
     payload = None
     try:
         payload = de_tide_api.tide_de_gaps(session=session)
@@ -146,7 +160,12 @@ def gaps(request: Request, session: Session = Depends(get_db_session)):
         'total_blind_spots':total, 'blind_spots_by_tactic':tactics,
         'unmapped_rules':unmapped,'quick_wins':wins,'systems_coverage':systems,
     }
-    return render_view(request, '_fragments/detection_engineering_gaps.html', view)
+    return view
+
+
+@router.get('/detection-engineering/gaps', response_class=HTMLResponse)
+def gaps(request: Request, session: Session = Depends(get_db_session)):
+    return render_view(request, '_fragments/detection_engineering_gaps.html', gaps_view(session))
 
 
 @router.get('/detection-engineering/spaces', response_class=HTMLResponse)

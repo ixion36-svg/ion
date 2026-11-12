@@ -645,11 +645,17 @@ def test_the_stories_and_kev_tabs_are_withheld_without_alert_read():
     observable:read does not imply. KEV rendered the refusal as "Search
     failed: HTTP 403"."""
     page = _page()
-    gate = page.index("{% if can_read_alerts %}")
-    close = page.index("{% endif %}", gate)
-    guarded = page[gate:close]
-    assert 'data-panel="stories"' in guarded
-    assert 'data-panel="kev"' in guarded
+    # Since the condensed page these live in three places: the KEV tab, the
+    # Stories view switch, and the two panels. Each must sit inside an
+    # unclosed `{% if can_read_alerts %}`.
+    for marker in ('data-tab="kev"', 'data-panel="stories"',
+                   'id="panel-stories"', 'id="panel-kev"',
+                   'hx-get="/ui/threat-intel/kev-recent"'):
+        at = page.index(marker)
+        gate = page.rfind("{% if can_read_alerts %}", 0, at)
+        assert gate != -1, marker
+        assert "{% endif %}" not in page[gate:at], (
+            f"{marker} is offered to a viewer without alert:read")
 
 
 def test_the_script_block_holds_no_jinja_so_it_stays_checkable():
@@ -779,10 +785,157 @@ def test_a_stat_the_payload_omits_is_not_printed_as_undefined():
 
 
 def test_a_measured_zero_is_still_shown_as_zero():
-    html = render(STATS, failed=False, stats=dict(_STATS_OK, watched_actors=0))
+    html = render(STATS, failed=False, stats=dict(_STATS_OK, watched_actors=0),
+                  opencti_configured=True, can_read_alerts=False,
+                  techniques=dict(_TECH_OK))
     assert re.search(r">\s*0\s*<", html)
     assert "not recorded" not in html
     assert "unknown" not in html
+
+
+_TECH_OK = {"failed": False, "count": 4, "triaged": 120, "capped": False,
+            "scan_capped": False, "days": 7}
+
+
+def _stats_tiles(**ctx) -> str:
+    """The KPI tiles alone, without the out-of-band regions after them."""
+    html = render(STATS, **ctx)
+    return html[:html.index('id="ti-status-pill"')]
+
+
+def test_a_watch_figure_without_opencti_is_a_dash_not_a_zero():
+    """With OpenCTI unconfigured there is nothing to watch, so a zero there
+    is not a finding about the estate. It reads "needs OpenCTI"."""
+    tiles = flat(_stats_tiles(failed=False, stats=dict(_STATS_OK, watched_actors=0,
+                                                       watched_campaigns=0),
+                              opencti_configured=False, can_read_alerts=False,
+                              techniques=dict(_TECH_OK)))
+    actors = tiles[tiles.index("Watched actors"):tiles.index("Watch matches")]
+    assert "&mdash;" in actors or "\u2014" in actors
+    assert actors.count("needs OpenCTI") == 2
+    assert not re.search(r">\s*0\s*<", actors)
+
+
+def test_a_watch_count_left_over_from_before_is_still_shown():
+    """Watches already on the list are a fact, configured or not."""
+    tiles = flat(_stats_tiles(failed=False, stats=dict(_STATS_OK, watched_actors=4),
+                              opencti_configured=False, can_read_alerts=False,
+                              techniques=dict(_TECH_OK)))
+    assert re.search(r">\s*4\s*<", tiles)
+    assert "OpenCTI not configured" in tiles
+
+
+def test_watch_matches_are_measured_with_or_without_opencti():
+    tiles = flat(_stats_tiles(failed=False, stats=dict(_STATS_OK, matches_7d=0),
+                              opencti_configured=False, can_read_alerts=False,
+                              techniques=dict(_TECH_OK)))
+    matches = tiles[tiles.index("Watch matches"):tiles.index("KEV in your estate")]
+    assert re.search(r">\s*0\s*<", matches)
+
+
+def _kev_ctx(**over):
+    base = {"failed": False,
+            "status": {"loaded": True, "count": 1662, "age_days": 3,
+                       "catalog_version": "2026.11.08"},
+            "snapshot": __import__("datetime").date(2026, 11, 8),
+            "new_7d": 12, "new_7d_ransomware": 3, "window_days": 7,
+            "tracked_vulns": 9, "in_estate": 4}
+    base.update(over)
+    return base
+
+
+def _kev_tile(name: str, kev, can_read_alerts=True) -> str:
+    tiles = flat(_stats_tiles(failed=False, stats=dict(_STATS_OK),
+                              opencti_configured=True,
+                              can_read_alerts=can_read_alerts, kev=kev,
+                              techniques=dict(_TECH_OK)))
+    start = tiles.index(name)
+    return tiles[start:start + 400]
+
+
+def test_kev_in_your_estate_counts_open_tracked_vulnerabilities():
+    tile = _kev_tile("KEV in your estate", _kev_ctx())
+    assert re.search(r">\s*4\s*<", tile)
+    assert "of 9 tracked" in tile
+
+
+def test_kev_in_your_estate_is_a_dash_when_nothing_is_tracked():
+    """No vulnerability register is no source, not zero exposure."""
+    tile = _kev_tile("KEV in your estate", _kev_ctx(tracked_vulns=0, in_estate=None))
+    assert "no vulnerabilities tracked in ION" in tile
+    assert not re.search(r"ti-kpi-v[^>]*>\s*0\s*<", tile)
+
+
+def test_new_kev_is_a_dash_when_the_snapshot_is_older_than_the_window():
+    """A 96-day-old catalog cannot say what CISA added this week."""
+    tile = _kev_tile("New KEV", _kev_ctx(status={"loaded": True, "count": 1662,
+                                                 "age_days": 96},
+                                         new_7d=None, new_7d_ransomware=None))
+    assert "snapshot is 96 days old" in tile
+    assert not re.search(r"ti-kpi-v[^>]*>\s*0\s*<", tile)
+
+
+def test_new_kev_counts_the_week_to_a_fresh_snapshot():
+    tile = _kev_tile("New KEV", _kev_ctx())
+    assert re.search(r">\s*12\s*<", tile)
+    assert "3 ransomware-linked" in tile
+    assert "8 Nov" in tile
+
+
+@pytest.mark.parametrize("tile", ["KEV in your estate", "New KEV"])
+def test_the_kev_tiles_say_what_they_need_without_alert_read(tile):
+    html = _kev_tile(tile, None, can_read_alerts=False)
+    assert "needs alert:read" in html
+
+
+@pytest.mark.parametrize("tile", ["KEV in your estate", "New KEV"])
+def test_a_failed_kev_read_is_unknown_not_zero(tile):
+    html = _kev_tile(tile, {"failed": True})
+    assert "unknown" in html
+    assert not re.search(r"ti-kpi-v[^>]*>\s*0\s*<", html)
+
+
+def test_techniques_with_no_triage_in_the_window_is_a_dash():
+    """No alert triaged is no measurement, not zero techniques."""
+    tiles = flat(_stats_tiles(failed=False, stats=dict(_STATS_OK),
+                              opencti_configured=True, can_read_alerts=False,
+                              techniques=dict(_TECH_OK, count=None, triaged=0)))
+    tile = tiles[tiles.index("Techniques seen"):]
+    assert "no alerts triaged in 7 days" in tile
+
+
+def test_techniques_tagged_nowhere_across_real_triage_is_a_zero():
+    tiles = flat(_stats_tiles(failed=False, stats=dict(_STATS_OK),
+                              opencti_configured=True, can_read_alerts=False,
+                              techniques=dict(_TECH_OK, count=0, triaged=5000,
+                                              scan_capped=True)))
+    tile = tiles[tiles.index("Techniques seen"):]
+    assert re.search(r">\s*0\s*<", tile)
+    assert "the newest 5,000 triaged alerts" in tile
+
+
+def test_the_status_pill_and_connect_prompt_swap_out_of_band():
+    html = render(STATS, failed=False, stats=dict(_STATS_OK),
+                  opencti_configured=False, can_read_alerts=True, kev=_kev_ctx(),
+                  techniques=dict(_TECH_OK))
+    pill = html[html.index('id="ti-status-pill"'):]
+    pill = flat(pill[:pill.index("</span>\n")])
+    assert 'hx-swap-oob="outerHTML"' in pill
+    assert "OpenCTI not configured" in pill
+    assert "KEV snapshot 8 Nov 2026" in pill
+    prompt = html[html.index('id="ti-connect-opencti"'):]
+    assert "Connect OpenCTI" in prompt[:600]
+    assert 'id="ti-kev-count"' in html and "1,662" in html
+
+
+def test_the_connect_prompt_is_empty_once_opencti_is_configured():
+    html = render(STATS, failed=False, stats=dict(_STATS_OK),
+                  opencti_configured=True, can_read_alerts=False,
+                  techniques=dict(_TECH_OK))
+    assert "Connect OpenCTI" not in html
+    assert "OpenCTI configured" in html
+    # No KEV tab for this viewer, so no out-of-band swap aimed at it.
+    assert 'id="ti-kev-count"' not in html
 
 
 @pytest.mark.parametrize("unread,hidden", [(0, True), (None, True), (3, False)])
@@ -976,15 +1129,28 @@ def test_the_page_no_longer_builds_the_overview_in_javascript():
         assert gone not in page, f"{gone} should have been removed"
 
 
+INTEL = "_fragments/threat_intel_overview_intel.html"
+
+
+def _overview_sources() -> str:
+    """The page plus the OpenCTI row it loads. The actor, IOC and match
+    cards moved into that fragment, which renders only when OpenCTI is
+    configured, so their requests are checked where they now live."""
+    return _page() + render(INTEL, configured=True,
+                            match_limit=OVERVIEW_MATCH_LIMIT)
+
+
 @pytest.mark.parametrize("target,url", [
     ("ti-overview-stats", "/ui/threat-intel/overview-stats"),
+    ("ti-overview-intel", "/ui/threat-intel/overview-intel"),
+    ("ti-kev-recent", "/ui/threat-intel/kev-recent"),
     ("ti-overview-actors", "/ui/threat-intel/landscape-actors"),
     ("ti-overview-iocs", "/ui/threat-intel/landscape-iocs"),
     ("overview-matches-body", "/ui/threat-intel/matches?limit=10&amp;show_type=true"),
 ])
 def test_each_overview_region_pulls_its_markup_from_its_fragment(target, url):
-    page = _page()
-    block = page[page.index(f'id="{target}"'):]
+    src = _overview_sources()
+    block = src[src.index(f'id="{target}"'):]
     block = block[:block.index(">") + 500]
     assert url in block, f"{target} does not request {url}"
 
@@ -992,12 +1158,27 @@ def test_each_overview_region_pulls_its_markup_from_its_fragment(target, url):
 def test_the_overview_regions_load_without_a_click():
     """Overview is the tab that is active on first paint, so its regions
     cannot wait for the ti-show a tab click dispatches."""
-    page = _page()
-    for target in ("ti-overview-stats", "ti-overview-actors",
-                   "ti-overview-iocs", "overview-matches-body"):
-        block = page[page.index(f'id="{target}"'):]
+    src = _overview_sources()
+    for target in ("ti-overview-stats", "ti-overview-intel", "ti-kev-recent",
+                   "ti-overview-actors", "ti-overview-iocs",
+                   "overview-matches-body"):
+        block = src[src.index(f'id="{target}"'):]
         block = block[:block.index(">") + 500]
         assert 'hx-trigger="load' in block, target
+
+
+def test_the_opencti_row_is_empty_when_opencti_is_not_configured():
+    """One Connect OpenCTI prompt instead of three cards each saying "not
+    configured"."""
+    assert render(INTEL, configured=False, match_limit=10).strip() == ""
+
+
+def test_the_opencti_row_route_is_empty_on_this_deployment(session):
+    app = _client(session, _User(PERMISSION))
+    with TestClient(app) as client:
+        r = client.get("/ui/threat-intel/overview-intel")
+    assert r.status_code == 200
+    assert "landscape-actors" not in r.text
 
 
 def test_the_hide_rule_observables_toggle_sends_both_of_its_states():
@@ -1017,8 +1198,10 @@ def test_the_hide_rule_observables_toggle_sends_both_of_its_states():
 def test_the_overview_limits_are_the_ones_the_page_asked_for():
     assert OVERVIEW_MATCH_LIMIT == 10
     assert OVERVIEW_CARD_ROWS == 5
-    assert RECENT_DAYS == 30
+    # Seven days since the condensed Overview, whose cards say so.
+    assert RECENT_DAYS == 7
     assert RECENT_TOP_N == 8
+    assert _page().count("7 days &middot;") == 2
 
 
 def test_the_landscape_cards_render_rows_when_opencti_answers(session, monkeypatch):
@@ -2105,14 +2288,16 @@ def _stub_unified(monkeypatch, payload):
 
 
 def _stub_kev(monkeypatch, payload):
-    import ion.web.kev_api as api
+    """The tab reads a page at a time through kev_page since it learned to
+    page; GET /api/kev has no offset."""
+    import ion.web.ui.threat_intel as ui
 
-    def answer(**kw):
+    def answer(_session, **kw):
         if isinstance(payload, Exception):
             raise payload
         return payload
 
-    monkeypatch.setattr(api, "kev_search", answer)
+    monkeypatch.setattr(ui, "kev_page", answer)
 
 
 def test_a_search_payload_missing_a_kind_is_a_failure_for_that_kind(
@@ -2584,7 +2769,7 @@ def test_a_failed_briefing_says_it_concluded_nothing():
     assert "AI service not available" in html
     assert "says nothing about the current threat landscape" in flat(html)
     assert 'role="alert"' in html
-    assert ">Retry<" in html
+    assert ">Retry briefing<" in html
 
 
 def test_a_briefing_that_came_back_empty_is_not_a_failure():
@@ -2592,7 +2777,7 @@ def test_a_briefing_that_came_back_empty_is_not_a_failure():
                   paragraphs=[])
     assert "No summary was generated" in html
     assert 'role="alert"' not in html
-    assert ">Generate<" in html
+    assert ">AI briefing<" in html
 
 
 def test_a_briefing_renders_its_paragraphs_and_names_its_model():
@@ -2601,7 +2786,7 @@ def test_a_briefing_renders_its_paragraphs_and_names_its_model():
     assert "<p class=\"mt-3 first:mt-0\">First.</p>" in html
     assert "Second." in html
     assert "Model: llama3" in html
-    assert ">Regenerate<" in html
+    assert ">Regenerate briefing<" in html
 
 
 def test_the_model_line_is_hidden_when_no_model_was_reported():

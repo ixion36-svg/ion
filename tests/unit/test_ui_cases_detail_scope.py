@@ -9,7 +9,6 @@ PAGE = Path(__file__).resolve().parents[2] / "src/ion/web/templates/cases.html"
 WRITE = re.compile(r"\binnerHTML\s*=")
 NAMES = [
     "loadProcessTreeInto",
-    "loadKibanaComments",
     "loadRuleGuideInto",
     "loadResponseActionLog",
     "loadAnnotations",

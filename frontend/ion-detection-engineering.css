@@ -64,6 +64,15 @@ body[data-page="detection-engineering"] .de-sev.critical{background:var(--sev-cr
 body[data-page="detection-engineering"] .de-sev.high{background:var(--sev-high-dim);color:var(--sev-high)}
 body[data-page="detection-engineering"] .de-sev.medium{background:var(--sev-medium-dim);color:var(--sev-medium)}
 body[data-page="detection-engineering"] .de-sev.low{background:var(--sev-low-dim);color:var(--sev-low)}
+/* SSVC patch decision: the speed to act at, most urgent hottest. */
+body[data-page="detection-engineering"] .de-ssvc{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap}
+body[data-page="detection-engineering"] .de-ssvc-immediate{background:var(--sev-critical-dim);color:var(--sev-critical)}
+body[data-page="detection-engineering"] .de-ssvc-out-of-cycle{background:var(--sev-high-dim);color:var(--sev-high)}
+body[data-page="detection-engineering"] .de-ssvc-scheduled{background:var(--sev-medium-dim);color:var(--sev-medium)}
+body[data-page="detection-engineering"] .de-ssvc-defer{background:var(--sev-low-dim);color:var(--sev-low)}
+body[data-page="detection-engineering"] .de-ssvc-unknown{border:1px dashed currentColor;color:var(--text-muted)}
+body[data-page="detection-engineering"] .de-ssvc-assumed{font-size:.68rem;color:var(--text-muted);margin-top:2px}
+body[data-page="detection-engineering"] .de-ssvc-note{font-size:.8rem;color:var(--text-muted);margin:0 0 .6rem}
 
 /* Enabled/disabled badge */
 body[data-page="detection-engineering"] .de-enabled{color:var(--mitre-covered);font-weight:600}

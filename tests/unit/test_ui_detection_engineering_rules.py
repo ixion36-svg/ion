@@ -146,3 +146,14 @@ def test_permissions_without_licence_gate(client):
     assert all(require_de_module != dep.call for route in ui.router.routes for dep in route.dependant.dependencies)
     c.app.dependency_overrides.clear()
     assert c.get('/ui/detection-engineering/rules').status_code in (401, 403)
+
+
+@pytest.mark.parametrize('measured,text', [(True, 'No rules'), (False, 'Coverage unavailable'), (None, 'Coverage unavailable')])
+def test_a_technique_with_no_rules_row_reads_by_whether_it_was_counted(client, monkeypatch, measured, text):
+    """TIDE's coverage query groups by technique, so a technique with no
+    rules has no row. Counted, that is zero rules; uncounted, it is unknown."""
+    c, ui = client
+    step = {'order': 0, 'name': 'n', 'techniques': ['T1003'], 'tactic': 't'}
+    payload = [{'name': 'pb', 'steps': [step], 'technique_coverage': {}, 'technique_coverage_measured': measured}]
+    monkeypatch.setattr(ui.de_tide_api, 'tide_de_use_cases', lambda **kw: payload)
+    assert text in c.get('/ui/detection-engineering/killchains').text

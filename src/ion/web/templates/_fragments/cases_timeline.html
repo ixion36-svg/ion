@@ -54,8 +54,7 @@
 {%- if not events %}
 <div class="cpanel-empty-hint">No events yet</div>
 {%- else %}
-<div class="case-tl-rail">
-  {%- for e in events %}
+{%- macro event_card(e) %}
   <div class="case-tl-event case-tl-{{ e.kind_key }}">
     <div class="case-tl-marker"></div>
     <div class="case-tl-event-head">
@@ -71,6 +70,29 @@
     <div class="case-tl-detail">{{ e.detail }}{% if e.truncated %}&#8230;{% endif %}</div>
     {%- endif %}
   </div>
+{%- endmacro %}
+<div class="case-tl-rail">
+  {%- for item in entries %}
+  {%- if item.run %}
+  {#- A run of alert links folds to one line; the cards are one click away. -#}
+  <details class="case-tl-event case-tl-system case-tl-run">
+    <summary>
+      <div class="case-tl-marker"></div>
+      <div class="case-tl-event-head">
+        <span class="case-tl-kind">SYSTEM</span>
+        {%- if item.run.first %}<span class="case-tl-when">{{ item.run.first }}
+          {%- if item.run.last and item.run.last != item.run.first %} &ndash; {{ item.run.last }}{% endif %}</span>{% endif %}
+      </div>
+      <div class="case-tl-title">{{ item.run.count }} alerts linked
+        <span class="case-tl-run-toggle">show</span></div>
+    </summary>
+    <div class="case-tl-run-body">
+      {%- for e in item.run.events %}{{ event_card(e) }}{% endfor %}
+    </div>
+  </details>
+  {%- else %}
+  {{- event_card(item.event) }}
+  {%- endif %}
   {%- endfor %}
 </div>
 {%- endif %}

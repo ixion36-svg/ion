@@ -35,20 +35,12 @@ def test_alerts_page_reports_alert_read_and_login_reports_nothing(rows):
     """/alerts is require_page_permission("alert:read"). /login has no gate."""
     assert _one(rows, "/alerts", "GET")["permission"] == "alert:read"
     assert _one(rows, "/login", "GET")["permission"] == ""
-    # slowapi wraps the API login. The handler site is outside src/, and a
-    # junctioned .venv makes Path.resolve() leave the repo. Blanking that
-    # cell is not a permission result.
+    # slowapi wraps the API login. The site must be ION's handler on every
+    # machine: the wrapper's own file only mapped where the venv sat inside
+    # the checkout, so the committed map failed --check on CI.
     api_login = _one(rows, "/api/auth/login", "POST")
     assert api_login["permission"] == ""
-    # Either form, because which one appears is a property of the machine
-    # rather than of the route: the tool can only rebuild a repo-relative
-    # `.venv/...` path when the dependency lives inside the checkout. CI
-    # installs with `pip install -e .[dev]` into the runner's own Python, so
-    # the cell is blank there and this asserted a developer's layout.
-    assert (api_login["file"] == ""
-            or api_login["file"].endswith("slowapi/extension.py")), (
-        f"unexpected handler file for the API login: {api_login['file']!r}"
-    )
+    assert api_login["file"] == "src/ion/web/api.py"
 
 
 def test_an_api_route_still_reports_require_permission(rows):

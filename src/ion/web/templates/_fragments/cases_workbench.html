@@ -47,6 +47,11 @@
 {%- elif state == 'unreadable' %}
 <div class="cpanel-empty-hint col-span-full">The pin list is not in a
   shape this page can read, so whether anything is pinned is unknown.</div>
+{%- elif not uncategorised and not (columns | selectattr('pins') | list) %}
+{#- Three drop columns reading "no pins" took 248 px with nothing to drag
+    between them. The columns come back with the first pin. -#}
+<div class="cpanel-empty-hint col-span-full">No pins yet. Pin an alert as
+  evidence, or add an observation above.</div>
 {%- else %}
 {%- for col in columns %}
 <div class="workbench-col" data-col="{{ col.key }}" data-case="{{ case_id }}"

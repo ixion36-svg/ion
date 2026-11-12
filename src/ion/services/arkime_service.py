@@ -89,6 +89,88 @@ class ArkimeError(Exception):
         self.status_code = status_code
 
 
+# Arkime 3 and later name session fields after ECS (source.ip, network.bytes)
+# and pass `fields=` straight to Elasticsearch, so the Moloch-era names ION's
+# callers were written against (srcIp, totBytes, communityId) come back empty.
+# Requests translate them; responses are mapped back, so callers keep reading
+# the names they use. Expressions are unaffected: Arkime still accepts
+# communityId, ip.src and port.dst there.
+_DB_FIELD = {
+    "srcIp": "source.ip",
+    "dstIp": "destination.ip",
+    "srcPort": "source.port",
+    "dstPort": "destination.port",
+    "bytes": "network.bytes",
+    "totBytes": "network.bytes",
+    "packets": "network.packets",
+    "communityId": "network.community_id",
+    "srcGEO": "source.geo.country_iso_code",
+    "dstGEO": "destination.geo.country_iso_code",
+}
+
+
+def _db_fields(csv: str) -> str:
+    """A `fields=` list with legacy names replaced by Arkime's current ones."""
+    out: List[str] = []
+    for name in (n.strip() for n in csv.split(",")):
+        if not name:
+            continue
+        db = _DB_FIELD.get(name, name)
+        if db not in out:
+            out.append(db)
+    return ",".join(out)
+
+
+def _flatten(value: Any, prefix: str = "", out: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    out = {} if out is None else out
+    for key, item in value.items():
+        name = f"{prefix}{key}"
+        if isinstance(item, dict):
+            _flatten(item, f"{name}.", out)
+        else:
+            out[name] = item
+    return out
+
+
+def normalize_session(session: Dict[str, Any]) -> Dict[str, Any]:
+    """An Arkime session with the legacy keys ION's callers read filled in.
+
+    Accepts the nested shape Arkime 5 returns by default, the dotted shape
+    `flatten=1` returns, and the old flat names, and keeps every key it was
+    given. Legacy keys already present win.
+    Fields Arkime returns as one-element lists (ports, bytes) are unwrapped.
+    """
+    if not isinstance(session, dict):
+        return session
+    flat = _flatten(session)
+    out = dict(flat)
+    out.update(session)  # nested originals stay for callers that read them
+    for legacy, db in _DB_FIELD.items():
+        if out.get(legacy) in (None, "") and flat.get(db) not in (None, ""):
+            value = flat[db]
+            if isinstance(value, list) and len(value) == 1:
+                value = value[0]
+            out[legacy] = value
+    if "totBytes" not in out and out.get("bytes") is not None:
+        out["totBytes"] = out["bytes"]
+    return out
+
+
+def session_rows(payload: Any) -> List[Dict[str, Any]]:
+    """The normalised sessions in an /api/sessions response.
+
+    Arkime answers a bad expression or unknown field with HTTP 200 and an
+    error in the body (`bsqErr`), which used to read as "no sessions": a
+    broken query looked exactly like quiet traffic.
+    """
+    if not isinstance(payload, dict):
+        raise ArkimeError("Arkime returned an unexpected sessions response")
+    err = payload.get("bsqErr") or payload.get("error")
+    if err:
+        raise ArkimeError(f"Arkime refused the query: {str(err)[:200]}")
+    return [normalize_session(s) for s in (payload.get("data") or [])]
+
+
 def escape_arkime_quoted(value: Any) -> str:
     """Escape a value for interpolation inside a double-quoted Arkime
     expression term. communityIds and node names originate from ES documents
@@ -274,7 +356,8 @@ class ArkimeService:
         params = {
             "expression": expression,
             "length": str(limit),
-            "fields": self._fields_param(self._SESSION_FIELDS),
+            "fields": _db_fields(self._fields_param(self._SESSION_FIELDS)),
+            "flatten": "1",
         }
         logger.info(
             "Arkime community_id search: expression=%r (alert node hint=%r)",
@@ -288,8 +371,8 @@ class ArkimeService:
                     headers=headers,
                     params=params,
                 )
-                if self._note_fields_rejected(resp.status_code, params, self._SESSION_FIELDS):
-                    params["fields"] = self._SESSION_FIELDS
+                if self._note_fields_rejected(resp.status_code, params, _db_fields(self._SESSION_FIELDS)):
+                    params["fields"] = _db_fields(self._SESSION_FIELDS)
                     resp = await client.get(
                         f"{self.url}/api/sessions",
                         headers=headers,
@@ -321,10 +404,7 @@ class ArkimeService:
                 raise ArkimeError(
                     f"Arkime response is not valid JSON: {(resp.text or '')[:100]}"
                 )
-            data = payload.get("data") if isinstance(payload, dict) else None
-            if isinstance(data, list):
-                return data
-            return []
+            return session_rows(payload)
         except ArkimeError:
             raise
         except httpx.HTTPError as e:
@@ -400,7 +480,8 @@ class ArkimeService:
             "length": str(limit),
             "startTime": str(start_ts),
             "stopTime": str(stop_ts),
-            "fields": self._fields_param(self._SESSION_FIELDS),
+            "fields": _db_fields(self._fields_param(self._SESSION_FIELDS)),
+            "flatten": "1",
         }
         logger.info(
             "Arkime IP search: expression=%r window=±%dmin anchor=%s limit=%d",
@@ -414,8 +495,8 @@ class ArkimeService:
                     headers=headers,
                     params=params,
                 )
-                if self._note_fields_rejected(resp.status_code, params, self._SESSION_FIELDS):
-                    params["fields"] = self._SESSION_FIELDS
+                if self._note_fields_rejected(resp.status_code, params, _db_fields(self._SESSION_FIELDS)):
+                    params["fields"] = _db_fields(self._SESSION_FIELDS)
                     resp = await client.get(
                         f"{self.url}/api/sessions",
                         headers=headers,
@@ -445,8 +526,7 @@ class ArkimeService:
                 raise ArkimeError(
                     f"Arkime response is not valid JSON: {(resp.text or '')[:100]}"
                 )
-            data = payload.get("data") if isinstance(payload, dict) else None
-            return data if isinstance(data, list) else []
+            return session_rows(payload)
         except ArkimeError:
             raise
         except httpx.HTTPError as e:
@@ -746,7 +826,8 @@ class ArkimeService:
             "stopTime": str(now),
             "order": order,
             "expression": expr,
-            "fields": base_fields if fields else self._fields_param(self._RTMON_FIELDS),
+            "fields": _db_fields(base_fields if fields else self._fields_param(self._RTMON_FIELDS)),
+            "flatten": "1",
         }
         headers = await self._headers()
         try:
@@ -754,8 +835,8 @@ class ArkimeService:
                 resp = await client.get(
                     f"{self.url}/api/sessions", headers=headers, params=params
                 )
-                if self._note_fields_rejected(resp.status_code, params, base_fields):
-                    params["fields"] = base_fields
+                if self._note_fields_rejected(resp.status_code, params, _db_fields(base_fields)):
+                    params["fields"] = _db_fields(base_fields)
                     resp = await client.get(
                         f"{self.url}/api/sessions", headers=headers, params=params
                     )
@@ -766,7 +847,7 @@ class ArkimeService:
                 )
             if "json" not in resp.headers.get("content-type", ""):
                 raise ArkimeError("Arkime returned non-JSON — check auth")
-            return resp.json().get("data") or []
+            return session_rows(resp.json())
         except ArkimeError:
             raise
         except httpx.HTTPError as e:
@@ -861,7 +942,8 @@ class ArkimeService:
             "startTime": str(start_ts),
             "stopTime": str(stop_ts),
             "order": "totBytes:desc",
-            "fields": "protocol,ipProtocol",
+            "fields": _db_fields("protocol,ipProtocol"),
+            "flatten": "1",
         }
         if expression:
             params["expression"] = expression
@@ -874,7 +956,7 @@ class ArkimeService:
                 )
             if resp.status_code != 200 or "json" not in resp.headers.get("content-type", ""):
                 return out
-            for s in (resp.json().get("data") or []):
+            for s in (session_rows(resp.json())):
                 protos = s.get("protocol")
                 if isinstance(protos, str):
                     protos = [protos]
@@ -981,7 +1063,8 @@ class ArkimeService:
             "startTime": str(start_ts),
             "stopTime": str(stop_ts),
             "order": "totBytes:desc",
-            "fields": "srcIp,dstIp,totBytes,packets",
+            "fields": _db_fields("srcIp,dstIp,totBytes,packets"),
+            "flatten": "1",
         }
         if expression:
             params["expression"] = expression
@@ -1004,7 +1087,7 @@ class ArkimeService:
                     f"Arkime returned non-JSON ({content_type}) — check auth"
                 )
             payload = resp.json()
-            sessions = payload.get("data") or []
+            sessions = session_rows(payload)
 
             # Aggregate bytes + session count per src/dst IP
             src_map: Dict[str, Dict[str, int]] = {}
@@ -1197,7 +1280,8 @@ class ArkimeService:
             # 400 the WHOLE query when they appear in `fields=` — which emptied
             # the geo map entirely. `_geo_code` still reads srcGEO/dstGEO OR the
             # nested country{} shape on the response side.
-            "fields": "srcGEO,dstGEO,totBytes",
+            "fields": _db_fields("srcGEO,dstGEO,totBytes"),
+            "flatten": "1",
         }
         if expression:
             params["expression"] = expression
@@ -1220,7 +1304,7 @@ class ArkimeService:
                     f"Arkime returned non-JSON ({content_type}) — check auth"
                 )
             payload = resp.json()
-            sessions = payload.get("data") or []
+            sessions = session_rows(payload)
 
             src_map: Dict[str, Dict[str, int]] = {}
             dst_map: Dict[str, Dict[str, int]] = {}
@@ -1296,7 +1380,8 @@ class ArkimeService:
             "startTime": str(start_ts),
             "stopTime": str(stop_ts),
             "order": "totBytes:desc",
-            "fields": "node,totBytes",
+            "fields": _db_fields("node,totBytes"),
+            "flatten": "1",
         }
         if expression:
             params["expression"] = expression
@@ -1319,7 +1404,7 @@ class ArkimeService:
                     f"Arkime returned non-JSON ({content_type}) — check auth"
                 )
             payload = resp.json()
-            sessions = payload.get("data") or []
+            sessions = session_rows(payload)
 
             node_map: Dict[str, Dict[str, int]] = {}
             for s in sessions:
@@ -1530,7 +1615,8 @@ class ArkimeService:
             "startTime": str(start_ts),
             "stopTime": str(stop_ts),
             "order": "totBytes:desc",
-            "fields": "srcIp,dstIp,totBytes,packets,ipProtocol,dstPort,firstPacket,lastPacket,communityId",
+            "fields": _db_fields("srcIp,dstIp,totBytes,packets,ipProtocol,dstPort,firstPacket,lastPacket,communityId"),
+            "flatten": "1",
         }
         if expression:
             params["expression"] = expression
@@ -1542,7 +1628,7 @@ class ArkimeService:
                 )
             if resp.status_code != 200 or "json" not in resp.headers.get("content-type", ""):
                 return {}
-            sessions = resp.json().get("data") or []
+            sessions = session_rows(resp.json())
         except httpx.HTTPError:
             return {}
         pairs: Dict[Any, Dict[str, Any]] = {}
@@ -1642,7 +1728,8 @@ class ArkimeService:
             "startTime": str(start_ts),
             "stopTime": str(stop_ts),
             "order": "firstPacket:asc",
-            "fields": "node,firstPacket",
+            "fields": _db_fields("node,firstPacket"),
+            "flatten": "1",
         }
         if expression:
             params["expression"] = expression
@@ -1654,7 +1741,7 @@ class ArkimeService:
                 )
             if resp.status_code != 200 or "json" not in resp.headers.get("content-type", ""):
                 return None
-            data = resp.json().get("data") or []
+            data = session_rows(resp.json())
             if not data:
                 return None
             fp = data[0].get("firstPacket")
@@ -1935,6 +2022,14 @@ class ArkimeService:
             body = resp.content
             if not body:
                 raise ArkimeError("Arkime returned an empty PCAP body")
+            # Arkime answers a failed fetch (for example a capture node it
+            # cannot reach) with HTTP 200 and an HTML message, which used to
+            # reach the parser as "not a valid PCAP" and hide the reason.
+            if "text/" in resp.headers.get("content-type", "") or body[:6] == b"Error ":
+                raise ArkimeError(
+                    "Arkime could not serve the PCAP: "
+                    + body[:200].decode("utf-8", "replace")
+                )
             return body
         except httpx.HTTPError as e:
             # Include the exception class name — httpx.ReadTimeout/ConnectTimeout

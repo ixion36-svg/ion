@@ -427,6 +427,13 @@ app.include_router(engineering_analytics_router, prefix="/api/engineering/analyt
 # TIDE + Detection Engineering endpoints, extracted from cyab_api. Mounted on
 # the same prefix so every /api/cyab/tide/... path is unchanged.
 app.include_router(de_tide_router, prefix="/api/cyab")
+# The CyAB workbench itself, archived in v0.99.6 and restored. Its API shares
+# the /api/cyab prefix with the TIDE routes above; the paths do not overlap.
+from ion.web.cyab_api import router as cyab_router  # noqa: E402
+from ion.web.cyab_pages import router as cyab_pages_router  # noqa: E402
+
+app.include_router(cyab_router, prefix="/api/cyab")
+app.include_router(cyab_pages_router)
 app.include_router(wallboard_router, prefix="")
 # translator — page route + /api/translator/* routes share the
 # same router so it owns its own prefixes internally.
@@ -760,6 +767,7 @@ async def _startup_event():
         LOCK_SEED_ANALYTICS_JOBS,
         LOCK_SEED_CAPABILITY_KB,
         LOCK_SEED_COMM_TEMPLATES,
+        LOCK_SEED_CYAB_SUBPROFILES,
         LOCK_SEED_DEFAULT_PLAYBOOKS,
         LOCK_SEED_FORENSIC_PB,
         LOCK_SEED_KEV_CATALOG,
@@ -924,6 +932,24 @@ async def _startup_event():
     run_locked(
         engine, LOCK_SEED_COMM_TEMPLATES, "seed_comm_templates",
         _seed_comm_templates,
+    )
+
+    # ---------------------------------------------------------------
+    # Seed the CyAB onboarding catalogue (6 pillars, 14 sub-profiles) and
+    # backfill cyab_data_sources.subprofile_id from the legacy
+    # data_source_type. Idempotent; operator-edited sub-profiles
+    # (is_custom=true) are preserved.
+    # ---------------------------------------------------------------
+    def _seed_cyab_subprofiles():
+        from ion.services.cyab_subprofile_service import (
+            backfill_subprofile_ids,
+            seed_catalogue,
+        )
+        seed_catalogue()
+        backfill_subprofile_ids()
+    run_locked(
+        engine, LOCK_SEED_CYAB_SUBPROFILES,
+        "seed_cyab_subprofiles", _seed_cyab_subprofiles,
     )
 
     # ---------------------------------------------------------------

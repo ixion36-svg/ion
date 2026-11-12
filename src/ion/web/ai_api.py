@@ -428,7 +428,9 @@ async def chat_stream(
 
                     if last_user_msg:
                         rag_context = ctx_service.retrieve_context(
-                            last_user_msg, current_user.id, prefs
+                            last_user_msg, current_user.id, prefs,
+                            may_read_documents=current_user.has_permission("document:read"),
+                            may_read_playbooks=current_user.has_permission("playbook:read"),
                         )
                         if rag_context.snippets:
                             citations_metadata = rag_context.to_citations_metadata()

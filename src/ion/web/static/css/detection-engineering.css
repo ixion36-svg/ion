@@ -1,0 +1,275 @@
+/* Detection Engineering: the one-line header, five tabs, and the dense glass
+   widgets of the Overview and Coverage panels. The older sub-views keep the
+   de-* rules compiled from frontend/ion-detection-engineering.css.
+
+   Colours come from the theme's own tokens (severity, MITRE and quality
+   scales, surfaces and borders), so the page follows light mode and the
+   glass surfaces in ion-glass.css without restating them. Dynamic widths
+   arrive through data-ion-style; nothing here needs an inline style. */
+
+body[data-page="detection-engineering"] {
+    --dx-panel: var(--ion-surface, rgba(255, 255, 255, .05));
+    --dx-panel-2: var(--ion-surface-2, rgba(255, 255, 255, .075));
+    --dx-line: var(--ion-border, rgba(255, 255, 255, .11));
+    --dx-line-2: var(--ion-border-strong, rgba(255, 255, 255, .18));
+    --dx-text: var(--text-primary, #e6ebf5);
+    --dx-muted: var(--text-secondary, #94a3b8);
+    --dx-accent: var(--primary, #6de4ff);
+    --dx-ok: var(--mitre-covered, #3fb950);
+    --dx-warn: var(--sev-medium, #d29922);
+    --dx-bad: var(--sev-critical, #f85149);
+    --dx-track: color-mix(in srgb, var(--dx-text) 9%, transparent);
+    --dx-rowline: color-mix(in srgb, var(--dx-text) 6%, transparent);
+    --dx-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+
+body[data-page="detection-engineering"] [hidden] { display: none !important; }
+
+body[data-page="detection-engineering"] .dx-page {
+    position: relative; z-index: 10; width: 100%; max-width: 1920px; margin: 0 auto;
+    padding: 16px 24px 32px;
+}
+@media (max-width: 640px) { body[data-page="detection-engineering"] .dx-page { padding: 12px 16px 24px; } }
+
+/* ── Header: one line ───────────────────────────── */
+body[data-page="detection-engineering"] .dx-head {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 10px 12px; margin-bottom: 12px;
+}
+body[data-page="detection-engineering"] .dx-title h1 {
+    margin: 0; font-size: 22px; line-height: 1.2; font-weight: 650; letter-spacing: -.01em; color: var(--dx-text);
+}
+body[data-page="detection-engineering"] .dx-eyebrow {
+    font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--dx-accent);
+}
+body[data-page="detection-engineering"] .dx-grow { flex: 1 1 0; }
+body[data-page="detection-engineering"] .dx-pill {
+    display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px; border-radius: 999px;
+    border: 1px solid var(--dx-line); background: var(--dx-panel); font-size: 12px; color: var(--dx-muted); white-space: nowrap;
+}
+body[data-page="detection-engineering"] .dx-pill > span { display: inline-flex; align-items: center; gap: 7px; }
+body[data-page="detection-engineering"] .dx-select {
+    display: inline-flex; align-items: center; gap: 6px; padding: 0 0 0 10px; border-radius: 8px;
+    border: 1px solid var(--dx-line); background: var(--dx-panel); font-size: 12px; color: var(--dx-muted);
+}
+body[data-page="detection-engineering"] .dx-select select {
+    min-width: 120px; max-width: 220px; padding: 6px 8px; border: 0; border-left: 1px solid var(--dx-line);
+    border-radius: 0 8px 8px 0; background-color: transparent; color: var(--dx-text); font-size: 12.5px; cursor: pointer;
+}
+body[data-page="detection-engineering"] .dx-select select option { color: initial; }
+body[data-page="detection-engineering"] .dx-btn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px;
+    border: 1px solid var(--dx-line-2); background: var(--dx-panel-2); color: var(--dx-text);
+    font-size: 12.5px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: border-color .15s, background .15s;
+}
+body[data-page="detection-engineering"] .dx-btn:hover { border-color: var(--dx-accent); }
+body[data-page="detection-engineering"] .dx-btn.ghost { background: transparent; border-color: var(--dx-line); color: var(--dx-muted); }
+body[data-page="detection-engineering"] .dx-btn.sm { padding: 4px 9px; font-size: 11.5px; }
+body[data-page="detection-engineering"] .dx-icon { width: 13px; height: 13px; }
+
+/* ── Tabs and sub-views ─────────────────────────── */
+body[data-page="detection-engineering"] .dx-tabs {
+    display: flex; gap: 4px; padding: 4px; margin-bottom: 14px; width: fit-content; max-width: 100%; overflow-x: auto;
+    border: 1px solid var(--dx-line); border-radius: 12px; background: var(--dx-panel);
+}
+body[data-page="detection-engineering"] .dx-tab,
+body[data-page="detection-engineering"] .dx-subtab {
+    padding: 7px 14px; border: 0; border-radius: 9px; background: transparent; color: var(--dx-muted);
+    font-size: 12.5px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: color .15s, background .15s;
+}
+body[data-page="detection-engineering"] .dx-tab:hover,
+body[data-page="detection-engineering"] .dx-subtab:hover { color: var(--dx-text); }
+body[data-page="detection-engineering"] .dx-tab.active,
+body[data-page="detection-engineering"] .dx-subtab.active {
+    background: color-mix(in srgb, var(--dx-accent) 14%, transparent); color: var(--dx-accent);
+}
+body[data-page="detection-engineering"] .dx-tab-count:not(:empty) {
+    margin-left: 6px; font: 600 11px var(--dx-mono); color: var(--dx-muted); opacity: .8;
+}
+body[data-page="detection-engineering"] .dx-subnav {
+    display: flex; gap: 2px; padding: 3px; margin-bottom: 12px; width: fit-content; max-width: 100%; overflow-x: auto;
+    border: 1px solid var(--dx-line); border-radius: 10px;
+}
+body[data-page="detection-engineering"] .dx-subtab { padding: 5px 12px; font-size: 12px; border-radius: 7px; }
+
+/* ── Cards ──────────────────────────────────────── */
+body[data-page="detection-engineering"] .dx-grid { display: grid; gap: 14px; }
+body[data-page="detection-engineering"] .dx-grid-ov { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr); }
+body[data-page="detection-engineering"] .dx-grid-2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+@media (max-width: 1280px) {
+    body[data-page="detection-engineering"] .dx-grid-ov { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    body[data-page="detection-engineering"] .dx-grid-ov > :first-child { grid-column: 1 / -1; }
+}
+@media (max-width: 860px) {
+    body[data-page="detection-engineering"] .dx-grid-ov,
+    body[data-page="detection-engineering"] .dx-grid-2 { grid-template-columns: minmax(0, 1fr); }
+}
+body[data-page="detection-engineering"] .dx-mt { margin-top: 14px; }
+body[data-page="detection-engineering"] .dx-card {
+    min-width: 0; border: 1px solid var(--dx-line); border-radius: 12px; background: var(--dx-panel); overflow: hidden;
+}
+html[data-glass="on"][data-mode="dark"] body[data-page="detection-engineering"] :is(.dx-card, .dx-kpi) {
+    box-shadow: var(--glass-edge), 0 8px 28px rgba(0, 0, 0, .22);
+}
+body[data-page="detection-engineering"] .dx-ch {
+    display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--dx-line);
+    font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--dx-text);
+}
+body[data-page="detection-engineering"] .dx-ch-split { border-top: 1px solid var(--dx-line); }
+body[data-page="detection-engineering"] .dx-n { color: var(--dx-muted); font-weight: 600; opacity: .85; }
+body[data-page="detection-engineering"] .dx-r {
+    margin-left: auto; font-size: 12px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--dx-accent);
+}
+body[data-page="detection-engineering"] button.dx-r,
+body[data-page="detection-engineering"] .dx-link {
+    padding: 0; border: 0; background: none; color: var(--dx-accent); font-weight: 600; cursor: pointer;
+}
+body[data-page="detection-engineering"] button.dx-r:hover,
+body[data-page="detection-engineering"] .dx-link:hover { text-decoration: underline; }
+body[data-page="detection-engineering"] .dx-cb { padding: 12px 14px; }
+body[data-page="detection-engineering"] .dx-mute { color: var(--dx-muted); }
+body[data-page="detection-engineering"] .small { font-size: 12px; }
+body[data-page="detection-engineering"] .mono { font-family: var(--dx-mono); font-size: 12px; }
+body[data-page="detection-engineering"] .dx-ok { color: var(--dx-ok); }
+body[data-page="detection-engineering"] .dx-warn,
+body[data-page="detection-engineering"] .mono.warn { color: var(--dx-warn); }
+body[data-page="detection-engineering"] .dx-dash { color: var(--dx-muted); cursor: help; }
+body[data-page="detection-engineering"] .dx-more { padding-top: 8px; }
+body[data-page="detection-engineering"] .dx-empty {
+    padding: 12px; border: 1px dashed var(--dx-line-2); border-radius: 10px; color: var(--dx-muted); font-size: 12.5px;
+}
+body[data-page="detection-engineering"] .dx-banner {
+    padding: 10px 14px; margin-bottom: 12px; border: 1px solid var(--dx-line); border-radius: 10px;
+    background: var(--dx-panel); color: var(--dx-muted); font-size: 13px;
+}
+body[data-page="detection-engineering"] .dx-banner.warn { border-color: color-mix(in srgb, var(--dx-warn) 55%, transparent); color: var(--dx-text); }
+body[data-page="detection-engineering"] .dx-banner a { color: var(--dx-accent); font-weight: 600; }
+body[data-page="detection-engineering"] .dx-note {
+    margin-bottom: 10px; padding: 7px 10px; border-radius: 8px; font-size: 12px; color: var(--dx-muted);
+    background: color-mix(in srgb, var(--dx-accent) 6%, transparent); border: 1px dashed color-mix(in srgb, var(--dx-accent) 30%, transparent);
+}
+
+/* ── KPI row ────────────────────────────────────── */
+body[data-page="detection-engineering"] .dx-kpis {
+    display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px;
+}
+@media (max-width: 1280px) { body[data-page="detection-engineering"] .dx-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 640px) { body[data-page="detection-engineering"] .dx-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+body[data-page="detection-engineering"] .dx-kpi {
+    position: relative; overflow: hidden; min-width: 0; padding: 12px 14px;
+    border: 1px solid var(--dx-line); border-radius: 12px; background: var(--dx-panel);
+}
+body[data-page="detection-engineering"] .dx-k { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--dx-muted); }
+body[data-page="detection-engineering"] .dx-v {
+    display: flex; align-items: baseline; gap: 8px; margin-top: 2px; font-size: 24px; font-weight: 700; color: var(--dx-text);
+}
+body[data-page="detection-engineering"] .dx-v small { font-size: 12px; font-weight: 600; color: var(--dx-muted); }
+body[data-page="detection-engineering"] .dx-v.warn { color: var(--dx-warn); }
+body[data-page="detection-engineering"] .dx-s {
+    font-size: 11.5px; color: var(--dx-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; position: relative; z-index: 1;
+}
+body[data-page="detection-engineering"] .dx-spark {
+    position: absolute; right: 10px; bottom: 10px; width: 90px; height: 28px; fill: none;
+    stroke: var(--dx-bad); stroke-width: 2; stroke-linejoin: round; opacity: .85;
+}
+
+/* Bars and tracks share one fill rule. A non-zero sliver keeps a visible
+   width, so 3 of 706 does not draw as nothing. */
+body[data-page="detection-engineering"] .dx-bar { height: 5px; margin-top: 8px; border-radius: 3px; background: var(--dx-track); overflow: hidden; }
+body[data-page="detection-engineering"] .dx-track { height: 8px; border-radius: 4px; background: var(--dx-track); overflow: hidden; }
+body[data-page="detection-engineering"] :is(.dx-bar, .dx-track) > i { display: block; height: 100%; border-radius: inherit; width: 0; }
+body[data-page="detection-engineering"] :is(.dx-bar, .dx-track) > i.nz { min-width: 6px; }
+body[data-page="detection-engineering"] :is(.dx-bar, .dx-track) > i.ok { background: var(--dx-ok); }
+body[data-page="detection-engineering"] :is(.dx-bar, .dx-track) > i.warn { background: var(--dx-warn); }
+body[data-page="detection-engineering"] .q-excellent { background: var(--quality-excellent, var(--dx-ok)); stroke: var(--quality-excellent, var(--dx-ok)); }
+body[data-page="detection-engineering"] .q-good { background: var(--quality-good, #56d364); stroke: var(--quality-good, #56d364); }
+body[data-page="detection-engineering"] .q-fair { background: var(--quality-fair, var(--dx-warn)); stroke: var(--quality-fair, var(--dx-warn)); }
+body[data-page="detection-engineering"] .q-poor { background: var(--quality-poor, var(--dx-bad)); stroke: var(--quality-poor, var(--dx-bad)); }
+
+/* ── Tables ─────────────────────────────────────── */
+body[data-page="detection-engineering"] .dx-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+body[data-page="detection-engineering"] .dx-table th {
+    position: sticky; top: 0; text-align: left; padding: 7px 12px; white-space: nowrap; background: var(--dx-panel);
+    border-bottom: 1px solid var(--dx-line); color: var(--dx-muted); font-size: 10.5px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+}
+body[data-page="detection-engineering"] .dx-table td { padding: 7px 12px; border-bottom: 1px solid var(--dx-rowline); color: var(--dx-text); vertical-align: middle; }
+body[data-page="detection-engineering"] .dx-table tr:last-child td { border-bottom: 0; }
+body[data-page="detection-engineering"] .dx-table .num { text-align: right; }
+body[data-page="detection-engineering"] .dx-table .dx-w45 { width: 45%; }
+body[data-page="detection-engineering"] .dx-ellipsis { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body[data-page="detection-engineering"] .dx-scroll { max-height: 360px; overflow: auto; }
+body[data-page="detection-engineering"] .dx-scroll.sm { max-height: 220px; }
+body[data-page="detection-engineering"] .dx-tag {
+    display: inline-block; padding: 2px 6px; border-radius: 5px; font-size: 9.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+    color: var(--dx-muted); background: color-mix(in srgb, var(--dx-muted) 16%, transparent); white-space: nowrap;
+}
+body[data-page="detection-engineering"] .dx-tag.warn { color: var(--dx-warn); background: color-mix(in srgb, var(--dx-warn) 16%, transparent); }
+
+/* ── Quality ring and severity grid ─────────────── */
+body[data-page="detection-engineering"] .dx-quality { display: flex; align-items: center; gap: 16px; }
+body[data-page="detection-engineering"] .dx-ring { flex: 0 0 auto; width: 104px; height: 104px; }
+body[data-page="detection-engineering"] .dx-ring circle { fill: none; stroke-width: 5; }
+body[data-page="detection-engineering"] .dx-ring .dx-ring-bg { stroke: var(--dx-track); }
+body[data-page="detection-engineering"] .dx-ring .dx-ring-fg { stroke-linecap: round; background: none; }
+body[data-page="detection-engineering"] .dx-ring text { fill: var(--dx-text); font-size: 8px; font-weight: 700; }
+body[data-page="detection-engineering"] .dx-qrows { flex: 1 1 auto; min-width: 0; }
+body[data-page="detection-engineering"] .dx-qrow {
+    display: grid; grid-template-columns: minmax(96px, auto) 1fr 36px; gap: 10px; align-items: center; margin: 7px 0; font-size: 12.5px;
+}
+body[data-page="detection-engineering"] .dx-qrow .mono { text-align: right; }
+body[data-page="detection-engineering"] .dx-sevgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; text-align: center; }
+body[data-page="detection-engineering"] .dx-sevgrid .mono { margin-top: 6px; }
+
+/* ── Needs action and use cases ─────────────────── */
+body[data-page="detection-engineering"] .dx-feed .dx-row {
+    display: grid; grid-template-columns: 74px minmax(0, 1fr) auto; gap: 10px; align-items: center;
+    padding: 7px 0; border-bottom: 1px solid var(--dx-rowline); font-size: 12.5px;
+}
+body[data-page="detection-engineering"] .dx-feed .dx-row:last-of-type { border-bottom: 0; }
+body[data-page="detection-engineering"] .dx-feed .dx-row > :first-child { justify-self: start; }
+body[data-page="detection-engineering"] .dx-feed b { color: var(--dx-text); }
+body[data-page="detection-engineering"] .dx-uc {
+    display: grid; grid-template-columns: minmax(0, 190px) 1fr 44px; gap: 10px; align-items: center;
+    padding: 7px 0; border-bottom: 1px solid var(--dx-rowline); font-size: 12.5px;
+}
+body[data-page="detection-engineering"] .dx-uc:last-of-type { border-bottom: 0; }
+body[data-page="detection-engineering"] .dx-uc > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body[data-page="detection-engineering"] .dx-uc > .mono { text-align: right; }
+body[data-page="detection-engineering"] .dx-steps { display: flex; gap: 3px; }
+body[data-page="detection-engineering"] .dx-steps i { flex: 1; height: 10px; border-radius: 3px; background: var(--dx-track); }
+body[data-page="detection-engineering"] .dx-steps i.covered { background: var(--dx-ok); }
+body[data-page="detection-engineering"] .dx-steps i.partial { background: var(--dx-warn); }
+body[data-page="detection-engineering"] .dx-steps i.blind { background: color-mix(in srgb, var(--dx-bad) 60%, transparent); }
+
+/* ── ATT&CK coverage map ────────────────────────── */
+body[data-page="detection-engineering"] .dx-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-weight: 500; color: var(--dx-muted); }
+body[data-page="detection-engineering"] .dx-legend i,
+body[data-page="detection-engineering"] .dx-dot {
+    display: inline-block; width: 10px; height: 10px; margin-right: 5px; border-radius: 2px; vertical-align: -1px;
+}
+body[data-page="detection-engineering"] .dx-legend b { color: var(--dx-text); font-weight: 600; font-size: 11px; }
+body[data-page="detection-engineering"] #de-attack-matrix {
+    display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; min-width: 1080px;
+}
+body[data-page="detection-engineering"] .dx-cb:has(> #de-attack-matrix) { overflow-x: auto; }
+body[data-page="detection-engineering"] .dx-mcol {
+    display: flex; flex-direction: column; align-items: stretch; gap: 6px; min-width: 0; padding: 5px;
+    border: 1px solid transparent; border-radius: 8px; background: transparent; color: inherit; text-align: left; cursor: pointer;
+    transition: border-color .15s, background .15s;
+}
+body[data-page="detection-engineering"] .dx-mcol:hover { border-color: var(--dx-line-2); }
+body[data-page="detection-engineering"] .dx-mcol.on { border-color: var(--dx-accent); background: color-mix(in srgb, var(--dx-accent) 7%, transparent); }
+body[data-page="detection-engineering"] .dx-mtitle {
+    display: block; min-height: 40px; font-size: 10px; font-weight: 700; line-height: 1.2; letter-spacing: .04em;
+    text-transform: uppercase; color: var(--dx-text); overflow-wrap: break-word;
+}
+body[data-page="detection-engineering"] .dx-mtitle span { display: block; margin-top: 2px; font: 600 10px var(--dx-mono); color: var(--dx-muted); letter-spacing: 0; }
+body[data-page="detection-engineering"] .dx-cells { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; }
+body[data-page="detection-engineering"] .dx-cells i { display: block; height: 12px; border-radius: 2px; }
+body[data-page="detection-engineering"] .s-on { background: color-mix(in srgb, var(--dx-ok) 88%, transparent); }
+body[data-page="detection-engineering"] .s-off { background: color-mix(in srgb, var(--dx-warn) 88%, transparent); }
+body[data-page="detection-engineering"] .s-usecase { background: color-mix(in srgb, var(--dx-bad) 58%, transparent); }
+body[data-page="detection-engineering"] .s-none { background: var(--dx-track); }
+body[data-page="detection-engineering"] .s-unknown {
+    background: repeating-linear-gradient(45deg, var(--dx-track) 0 3px, transparent 3px 6px);
+}
+body[data-page="detection-engineering"] .dx-dot { margin-right: 6px; }

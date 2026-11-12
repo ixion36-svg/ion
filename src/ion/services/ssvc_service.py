@@ -14,7 +14,9 @@ The table is CERT/CC's, transcribed by
 Exploitation is derived from what ION knows -- a KEV entry, an in-the-wild
 flag, a published exploit. System exposure, automatability and human impact
 are properties of the deployment ION has no way to observe, so they come from
-configuration and every result says which inputs were assumed. A decision
+Settings (``ssvc_exposure``, ``ssvc_automatable``, ``ssvc_human_impact``, or
+the ``ION_SSVC_*`` variable that overrides each) and every result says which
+inputs were assumed. A decision
 presented as measured, when three quarters of it was a default nobody set, is
 worse than no decision: it is a number an engineer will act on.
 """
@@ -23,7 +25,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -50,6 +51,12 @@ _ENV = {
     "exposure": "ION_SSVC_EXPOSURE",
     "automatable": "ION_SSVC_AUTOMATABLE",
     "human_impact": "ION_SSVC_HUMAN_IMPACT",
+}
+#: Each input's setting. get_config() applies the variable above over it.
+_SETTING = {
+    "exposure": "ssvc_exposure",
+    "automatable": "ssvc_automatable",
+    "human_impact": "ssvc_human_impact",
 }
 
 _TABLE: Optional[Dict[str, Any]] = None
@@ -98,24 +105,33 @@ def decision_points() -> Dict[str, List[str]]:
 def configured_inputs() -> Dict[str, Dict[str, Any]]:
     """The three deployment inputs, their value, and where it came from.
 
-    An env value the table does not know is refused rather than passed into a
+    Read from Settings, where the ``ION_SSVC_*`` variable overrides each.
+    A value the table does not know is refused rather than passed into a
     lookup that would simply miss. A missing row and a configured row are not
     distinguishable downstream, so the bad value is caught here where it can
-    still be named.
+    still be named, and reported as ``invalid``.
     """
+    from ion.core.config import get_config
+
+    config = get_config()
     points = decision_points()
     out: Dict[str, Dict[str, Any]] = {}
     for key, env_name in _ENV.items():
-        raw = (os.environ.get(env_name) or "").strip().lower()
+        setting = _SETTING[key]
+        raw = str(getattr(config, setting, "") or "").strip().lower()
         legal = points.get(key, [])
+        invalid = None
         if raw and legal and raw not in legal:
             logger.warning("%s=%r is not one of %s; using the default %r",
-                           env_name, raw, legal, _DEFAULTS[key])
-            raw = ""
+                           setting, raw, legal, _DEFAULTS[key])
+            invalid, raw = raw, ""
         out[key] = {
             "value": raw or _DEFAULTS[key],
             "configured": bool(raw),
+            "setting": setting,
             "env": env_name,
+            "invalid": invalid,
+            "legal": list(legal),
         }
     return out
 
@@ -169,6 +185,8 @@ def assess(vuln: Any, kev_entry: Any = None,
     table_status = status()
     exploitation = exploitation_for(vuln, kev_entry, kev_age_days)
     assumed = configured_inputs()
+    unset = [a["env"] for a in assumed.values() if not a["configured"]]
+    unset_settings = [a["setting"] for a in assumed.values() if not a["configured"]]
 
     if not table_status["loaded"]:
         return {
@@ -176,7 +194,9 @@ def assess(vuln: Any, kev_entry: Any = None,
             "reason": "the SSVC table could not be read",
             "exploitation": exploitation,
             "assumed": assumed,
-            "assumed_count": len(assumed),
+            "assumed_count": len(unset),
+            "unset_env": unset,
+            "unset_settings": unset_settings,
             "table": table_status,
         }
 
@@ -186,7 +206,6 @@ def assess(vuln: Any, kev_entry: Any = None,
         assumed["automatable"]["value"],
         assumed["human_impact"]["value"],
     )
-    unset = [a["env"] for a in assumed.values() if not a["configured"]]
     return {
         "decision": decision,
         "reason": None if decision else
@@ -197,5 +216,6 @@ def assess(vuln: Any, kev_entry: Any = None,
         # having had the chance to say how much of it was assumed.
         "assumed_count": sum(1 for a in assumed.values() if not a["configured"]),
         "unset_env": unset,
+        "unset_settings": unset_settings,
         "table": table_status,
     }

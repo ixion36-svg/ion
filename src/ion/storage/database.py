@@ -433,6 +433,7 @@ def _run_migrations(engine: Engine) -> None:
             "source_alert_ids": "JSON",
             "kibana_case_id": "VARCHAR(100)",
             "kibana_case_version": "VARCHAR(50)",
+            "kibana_synced_status": "VARCHAR(20)",
             "observables": "JSON",
             "dfir_iris_case_id": "INTEGER",
         }
@@ -507,6 +508,26 @@ def _run_migrations(engine: Engine) -> None:
         existing = {col["name"] for col in insp.get_columns("users")}
         if "tenant_id" not in existing:
             _add_column_tolerant(engine, "users", "tenant_id", "INTEGER")
+
+    # Chat's knowledge-base, playbook and notes sources used to default off,
+    # so almost every stored preference row has them off without anyone
+    # having chosen that. Switch them on once per row; rag_defaults_version
+    # marks a row as done, so a user who turns a source off later keeps it off.
+    if insp.has_table("ai_user_preferences"):
+        existing = {col["name"] for col in insp.get_columns("ai_user_preferences")}
+        if "rag_defaults_version" not in existing:
+            _add_column_tolerant(
+                engine, "ai_user_preferences", "rag_defaults_version",
+                "INTEGER NOT NULL DEFAULT 0",
+            )
+        with engine.begin() as conn:
+            switched = conn.execute(text(
+                "UPDATE ai_user_preferences SET rag_knowledge_base = :on, "
+                "rag_playbooks = :on, rag_user_notes = :on, rag_defaults_version = 1 "
+                "WHERE rag_defaults_version = 0"
+            ), {"on": True}).rowcount
+            if switched:
+                logger.info("Migrated: chat retrieval sources on for %d users", switched)
 
     # (route audit phase 8): DetectionProposal absorbs the retired
     # TuningProposal pipeline. Bob wrote tuning proposals unattended off a
@@ -902,6 +923,19 @@ def _run_migrations(engine: Engine) -> None:
         existing = {col["name"] for col in insp.get_columns("cyab_systems")}
         if "containment_authority" not in existing:
             _add_column_tolerant(engine, "cyab_systems", "containment_authority", "TEXT")
+
+    # cyab_data_sources.use_case_status holds a JSON map of every use case's
+    # status, which VARCHAR(64) cut off after two or three. varchar -> text
+    # is a catalogue-only change on Postgres; SQLite never enforced the limit.
+    if _is_postgres(engine) and insp.has_table("cyab_data_sources"):
+        cols = {c["name"]: c for c in insp.get_columns("cyab_data_sources")}
+        ucs = cols.get("use_case_status")
+        if ucs is not None and getattr(ucs["type"], "length", None):
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "ALTER TABLE cyab_data_sources ALTER COLUMN use_case_status TYPE TEXT"
+                ))
+            logger.info("Migrated: cyab_data_sources.use_case_status -> TEXT")
 
     # Performance indexes on hot tables (alert_cases, alert_triage).
     # create_all() creates indexes for new tables but NOT for tables that

@@ -1,0 +1,124 @@
+{% from "cyab/_macros.html" import post %}
+{% macro doc_row(item, required) %}
+  {% set exc = docs.exceptions.get(item.id) %}
+  {% set open = required and item.status not in ('done', 'na') and not exc %}
+  <li class="border-t border-base-300/60 first:border-t-0 py-2.5">
+    <div class="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-2 items-center">
+      <div class="min-w-0">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="font-medium text-sm">{{ item.label }}</span>
+          {% if item.is_critical %}<span class="badge badge-xs badge-error badge-soft">critical</span>{% endif %}
+          {% if open %}<span class="badge badge-xs badge-warning badge-soft">open</span>{% endif %}
+          {% if exc %}<span class="badge badge-xs badge-info badge-soft">accepted until {{ exc.until.strftime('%d %b %Y') }}</span>{% endif %}
+          {% if item.url %}<a href="{{ item.url }}" class="link link-primary text-xs" rel="noopener noreferrer" target="_blank">view</a>{% endif %}
+        </div>
+        {% if exc %}<div class="text-xs text-base-content/60 mt-0.5">{{ exc.approver }}: {{ exc.reason }}</div>{% endif %}
+      </div>
+      {% if can_edit %}
+      <form class="flex flex-wrap items-center gap-2" {{ post('/cyab/checklist/' ~ item.id) }}>
+        <select name="status" class="select select-xs w-32" aria-label="Status of {{ item.label }}">
+          {% for s in doc_statuses %}<option value="{{ s }}" {{ 'selected' if item.status == s }}>{{ s|replace('_', ' ')|replace('na', 'n/a') }}</option>{% endfor %}
+        </select>
+        <input name="url" type="url" value="{{ item.url or '' }}" placeholder="https:// link" class="input input-xs w-56" aria-label="Link to {{ item.label }}">
+        <button class="btn btn-xs">Save</button>
+      </form>
+      {% endif %}
+    </div>
+    {% if exc and can_approve %}
+      <form class="mt-1" {{ post('/cyab/exceptions/' ~ exc.id ~ '/revoke') }} hx-confirm="Revoke this acceptance? The gap opens again.">
+        <button class="btn btn-xs btn-ghost">Revoke acceptance</button>
+      </form>
+    {% elif open and can_approve %}
+      <details class="mt-1">
+        <summary class="text-xs link link-hover w-fit">Accept this gap</summary>
+        <form class="mt-2 grid grid-cols-1 md:grid-cols-[1fr_12rem_9rem_auto] gap-2 items-end" {{ post('/cyab/checklist/' ~ item.id ~ '/accept') }}>
+          <label class="flex flex-col gap-1"><span class="text-xs text-base-content/60">Reason</span>
+            <input name="reason" required maxlength="2000" class="input input-xs w-full" placeholder="Why the system can be signed off without it"></label>
+          <label class="flex flex-col gap-1"><span class="text-xs text-base-content/60">Approver ({{ approver }})</span>
+            <input name="approver" required maxlength="255" class="input input-xs w-full"></label>
+          <label class="flex flex-col gap-1"><span class="text-xs text-base-content/60">Until</span>
+            <input name="until" type="date" required min="{{ (today).isoformat() }}" max="{{ max_until.isoformat() }}" value="{{ default_until.isoformat() }}" class="input input-xs w-full"></label>
+          <button class="btn btn-xs btn-warning">Accept gap</button>
+        </form>
+      </details>
+    {% endif %}
+  </li>
+{% endmacro %}
+
+<div class="grid grid-cols-1 xl:grid-cols-5 gap-4">
+  <section class="card bg-base-200 border border-base-300 xl:col-span-3" aria-label="Documents">
+    <div class="card-body p-4 gap-2">
+      <div class="flex flex-wrap items-baseline gap-3">
+        <h2 class="font-semibold">Required at {{ rd.sal }}</h2>
+        <span class="text-xs text-base-content/60">{{ docs.required|length - docs.open }} of {{ docs.required|length }} closed · a gap can be accepted for up to {{ (max_until - today).days }} days by the {{ approver }}</span>
+      </div>
+      <ul>
+        {% for item in docs.required %}{{ doc_row(item, true) }}{% endfor %}
+      </ul>
+      {% if docs.other %}
+      <details class="mt-2">
+        <summary class="text-sm font-medium cursor-pointer">Other documents ({{ docs.other|length }})</summary>
+        <ul class="mt-1">
+          {% for item in docs.other %}{{ doc_row(item, false) }}{% endfor %}
+        </ul>
+      </details>
+      {% endif %}
+    </div>
+  </section>
+
+  <div class="xl:col-span-2 flex flex-col gap-4">
+    <section class="card bg-base-200 border border-base-300" aria-label="Sign-off">
+      <div class="card-body p-4 gap-3">
+        <h2 class="font-semibold">Sign-off</h2>
+        {% if gate %}
+          <p class="text-sm text-base-content/70">Finish {{ gate|map(attribute='label')|map('lower')|join(', ') }} to open sign-off.</p>
+        {% endif %}
+        {% for role in roles %}
+          {% set label = 'Department' if role == 'department' else 'SOC' %}
+          {% set last = history|selectattr('role', 'equalto', role)|first %}
+          <div class="rounded-box border border-base-300 bg-base-100/40 p-3 flex flex-col gap-2">
+            <div class="flex items-center gap-2">
+              <span class="font-medium text-sm grow">{{ label }}</span>
+              {% if last %}<span class="badge badge-sm badge-success badge-soft">signed</span>{% else %}<span class="badge badge-sm badge-ghost">not signed</span>{% endif %}
+            </div>
+            {% if last %}<div class="text-xs text-base-content/60">{{ last.signer_name }} · {{ last.signed_at.strftime('%d %b %Y %H:%M') }} · {{ last.sal_tier }} at {{ last.readiness_pct }}%</div>{% endif %}
+            {% if can_approve and not gate %}
+              <form class="flex gap-2" {{ post('/cyab/systems/' ~ system.id ~ '/sign') }}>
+                <input type="hidden" name="role" value="{{ role }}">
+                <input name="note" maxlength="2000" class="input input-xs grow" placeholder="Note (optional)" aria-label="Note for {{ label }} sign-off">
+                <button class="btn btn-xs btn-primary">{{ 'Sign again' if last else 'Sign' }} as {{ user.display_name or user.username }}</button>
+              </form>
+            {% endif %}
+          </div>
+        {% endfor %}
+        {% if rd.stage in ('signed', 'review_due') and can_approve %}
+          <form class="flex flex-wrap items-center gap-2 border-t border-base-300 pt-3" {{ post('/cyab/systems/' ~ system.id ~ '/review') }}>
+            <span class="text-sm grow">{% if rd.stage == 'review_due' %}<span class="text-error">Review overdue</span>{% else %}Next review {{ system.next_review_date.strftime('%d %b %Y') if system.next_review_date }}{% endif %}</span>
+            <input name="note" maxlength="2000" class="input input-xs w-40" placeholder="Note" aria-label="Review note">
+            <button class="btn btn-xs">Mark reviewed</button>
+          </form>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="card bg-base-200 border border-base-300" aria-label="Sign-off history">
+      <div class="card-body p-4 gap-2">
+        <h2 class="font-semibold">History</h2>
+        {% if history %}
+          <ul class="flex flex-col gap-2 text-sm">
+            {% for h in history %}
+              <li>
+                <span class="font-medium">{{ h.signer_name }}</span>
+                <span class="text-base-content/70">{{ 'reviewed' if h.role == 'review' else 'signed as ' ~ ('department' if h.role == 'department' else 'SOC') }}</span>
+                <div class="text-xs text-base-content/50 font-mono">{{ h.signed_at.strftime('%d %b %Y %H:%M') }} · {{ h.sal_tier }} · {{ h.readiness_pct }}%</div>
+                {% if h.note %}<div class="text-xs text-base-content/70">{{ h.note }}</div>{% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="text-sm text-base-content/60">No sign-offs yet.</p>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+</div>
