@@ -63,7 +63,18 @@ fi
 # Wait for PostgreSQL
 # =============================================================================
 echo "Waiting for database..."
-echo "  URL: ${ION_DATABASE_URL%@*}@***"
+# Redact the credential, not the host: ${VAR%@*} strips from the last @, so it
+# keeps the password and hides where it points, writing the DSN password to the
+# container log on every start. Split on the last @, not the first, so a
+# password that itself contains one still redacts.
+_db_rest="${ION_DATABASE_URL#*://}"
+_db_creds="${_db_rest%@*}"
+if [ "$_db_creds" != "$_db_rest" ] && [ "${_db_creds%%:*}" != "$_db_creds" ]; then
+  echo "  URL: ${ION_DATABASE_URL%%://*}://${_db_creds%%:*}:***@${_db_rest##*@}"
+else
+  echo "  URL: ${ION_DATABASE_URL}"
+fi
+unset _db_rest _db_creds
 python -c "
 import time, os, socket
 
