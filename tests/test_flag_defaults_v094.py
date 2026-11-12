@@ -264,89 +264,83 @@ def test_no_flag_env_var_leaked_into_this_process():
 
 
 # --------------------------------------------------------------------------
-# .env.deploy claims, in its own header, that every flag is "shown at its
-# built-in default". Nothing enforced that, which is how four lines came to
-# advertise the opposite of what the code did.
+# .env.deploy shows each optional knob at its built-in default, apart from the
+# master switch of an opt-in section. Nothing enforced that, which is how four
+# lines came to advertise the opposite of what the code did. The UI-managed
+# flags this used to check left the file: Settings shows their live values.
 # --------------------------------------------------------------------------
 
+_KNOB_BLOCK_HEADER = "Optional knobs with no settings-UI field"
 
-# Only the feature-flag block promises to show built-in defaults. Elsewhere a
-# commented `#ION_X=true` is a fill-in-the-blanks template for enabling an
-# integration, sitting beside `#ION_X_URL=REPLACE_WITH_...`, and means the
-# opposite thing.
-_FLAG_BLOCK_HEADER = "Feature flags"
+# Shown set to the value that enables them; their code default is off.
+_OPT_IN_SWITCHES = {
+    "ION_METRICS_ENABLED",
+    "ION_APM_ENABLED",
+    "ION_ARKIME_RTMON_ENABLED",
+    "ION_AI_LARGE_PDF_ENABLED",
+}
 
 
-def _env_deploy_bool_flags():
-    """Commented `#ION_*=true|false` lines inside the feature-flag block only."""
+def _documented_knobs() -> dict[str, str]:
     import re
 
-    path = Path(__file__).resolve().parent.parent / ".env.deploy"
-    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-
-    start = next(
-        (i for i, ln in enumerate(lines) if _FLAG_BLOCK_HEADER in ln and ln.startswith("#")),
-        None,
-    )
-    assert start is not None, (
-        f"no {_FLAG_BLOCK_HEADER!r} block in .env.deploy — this test is scoped to it"
-    )
-
-    out = {}
-    for line in lines[start:]:
-        m = re.match(r"^#(ION_[A-Z0-9_]+)=(true|false)\s*(?:#.*)?$", line.strip())
-        if m:
-            out[m.group(1)] = m.group(2) == "true"
-    assert out, "feature-flag block parsed as empty"
-    return out
-
-
-def _code_bool_defaults():
-    """Map ION_* env var -> the Config field default it overrides."""
-    import ast
-    import re
-
-    src = (Path(__file__).resolve().parent.parent / "src/ion/core/config.py").read_text(
-        encoding="utf-8"
-    )
-    cls = next(
-        n for n in ast.parse(src).body if isinstance(n, ast.ClassDef) and n.name == "Config"
-    )
-    field_default = {
-        n.target.id: ast.literal_eval(n.value)
-        for n in cls.body
-        if isinstance(n, ast.AnnAssign)
-        and isinstance(n.annotation, ast.Name)
-        and n.annotation.id == "bool"
-        and n.value is not None
+    text = (Path(__file__).resolve().parent.parent / ".env.deploy").read_text(encoding="utf-8")
+    assert _KNOB_BLOCK_HEADER in text, f"no {_KNOB_BLOCK_HEADER!r} block in .env.deploy"
+    block = text[text.index(_KNOB_BLOCK_HEADER):]
+    return {
+        k: v.split("#")[0].strip()
+        for k, v in re.findall(r"^#([A-Z_][A-Z0-9_]*)=(.*)$", block, re.M)
     }
-    out = {}
-    # The override block builds into a local `cfg` (config._load_config).
-    for m in re.finditer(r'\bcfg\.(\w+)\s*=\s*_get_env_bool\(\s*"([^"]+)"', src):
-        field, var = m.group(1), m.group(2)
-        if field in field_default:
-            out[var] = field_default[field]
-    # A pattern that stopped matching would compare nothing and pass.
-    assert len(out) > 20, f"found only {len(out)} boolean env overrides in config.py"
+
+
+def _literal_defaults() -> dict[str, set[str]]:
+    """VAR -> the literal defaults its readers pass, normalised to text.
+
+    A default given as a named constant is not literal and is left out, so
+    a knob read only that way is not checked here.
+    """
+    import re
+
+    call = re.compile(
+        r'\w+\(\s*["\'](ION_[A-Z0-9_]+)["\']\s*,\s*'
+        r'(?:["\']([^"\']*)["\']|(True|False|-?\d+(?:\.\d+)?))\s*\)'
+    )
+    out: dict[str, set[str]] = {}
+    for path in (Path(__file__).resolve().parent.parent / "src/ion").rglob("*.py"):
+        for var, text, bare in call.findall(path.read_text(encoding="utf-8", errors="ignore")):
+            out.setdefault(var, set()).add((text if not bare else bare).lower())
     return out
+
+
+def _same(documented: str, code: str) -> bool:
+    try:
+        return float(documented) == float(code)
+    except ValueError:
+        return documented.lower() == code
 
 
 def test_env_deploy_advertises_the_real_defaults():
-    documented = _env_deploy_bool_flags()
-    actual = _code_bool_defaults()
-
+    documented = _documented_knobs()
+    actual = _literal_defaults()
+    checked = [
+        k for k in documented
+        if k in actual and k not in _OPT_IN_SWITCHES and "REPLACE_WITH" not in documented[k]
+    ]
+    # A pattern that stopped matching would compare nothing and pass.
+    assert len(checked) > 30, f"only {len(checked)} knobs had a literal default"
     drift = {
-        var: (documented[var], actual[var])
-        for var in documented.keys() & actual.keys()
-        if documented[var] != actual[var]
+        k: (documented[k], sorted(actual[k]))
+        for k in checked
+        if not any(_same(documented[k], c) for c in actual[k])
     }
     assert not drift, "\n".join(
-        f"  {var}: .env.deploy says {d}, config.py defaults to {a}"
-        for var, (d, a) in sorted(drift.items())
+        f"  {k}: .env.deploy says {d!r}, code defaults to {c}" for k, (d, c) in sorted(drift.items())
     )
 
 
-def test_the_graduated_flags_are_documented_as_on():
-    documented = _env_deploy_bool_flags()
-    for var in FLAG_ENV.values():
-        assert documented.get(var) is True, f"{var} not shown as on in .env.deploy"
+def test_opt_in_switches_are_really_off_by_default():
+    actual = _literal_defaults()
+    documented = _documented_knobs()
+    for var in _OPT_IN_SWITCHES:
+        assert documented.get(var) == "true", f"{var} not shown as the switch to turn on"
+        assert actual.get(var, {""}) <= {"", "false", "0"}, f"{var} defaults on: {actual.get(var)}"
