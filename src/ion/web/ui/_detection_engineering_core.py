@@ -116,7 +116,9 @@ def posture_view(session: Session | None) -> PosturePanel:
     quality = None
     if isinstance(quality_payload, dict):
         labels = QUALITY_LABELS.get(quality_payload.get('scale'), QUALITY_LABELS['points'])
-        quality = [{'key':key, 'label':labels[key], 'count':_number(quality_payload.get(key)), 'percentage':_percent(quality_payload.get(key),stats['total_rules'])} for key in ('excellent','good','fair','poor')]
+        quality = [{'key':key, 'label':labels[key], 'count':_number(quality_payload.get(key)),
+                    'percentage':_percent(quality_payload.get(key),stats['total_rules'])}
+                   for key in ('excellent','good','fair','poor')]
     view: PosturePanel = {
         'state':'failed' if not isinstance(configured, bool) else 'unconfigured' if not configured else 'empty' if stats['total_rules'] == 0 else 'data',
         'stats':stats, 'enabled_pct':_percent(stats['enabled_rules'],stats['total_rules']),

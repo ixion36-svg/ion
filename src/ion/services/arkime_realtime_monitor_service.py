@@ -65,13 +65,13 @@ Environment variables:
 * ``ION_ARKIME_RTMON_DNS_CONFIRM_BUDGET``   (default ``5`` — PCAP pulls/pass)
 """
 
-from datetime import datetime, timezone
 import asyncio
 import ipaddress
 import logging
 import math
 import os
 import re
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.engine import Engine

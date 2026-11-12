@@ -58,9 +58,9 @@ from ion.models.case_evidence import (  # noqa: F401
     PinSourceType,
 )
 from ion.models.cyab import CyabDataSource, CyabSnapshot, CyabSystem
+from ion.models.cyab_assurance import CyabChecklistException, CyabSignoff  # noqa: F401
 from ion.models.cyab_doc_checklist import CyabDocChecklistItem  # noqa: F401
 from ion.models.cyab_subprofile import CyabPillar, CyabSubProfile
-from ion.models.cyab_assurance import CyabChecklistException, CyabSignoff  # noqa: F401
 from ion.models.detection_proposal import (  # noqa: F401
     DetectionProposal,
     DetectionProposalChangeType,

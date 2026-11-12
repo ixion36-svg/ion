@@ -66,18 +66,18 @@ Server-rendered fragments. `render_view` routes also answer the view model as JS
 | GET | `/ui/cases/detail/process-tree/{alert_id}` | `case:read` | [_cases_detail_process.py:133](src/ion/web/ui/_cases_detail_process.py#L133) | `_fragments/cases_detail_process.html` | `cases.html` |
 | POST | `/ui/cases/detail/rule-guide` | `case:read` | [_cases_detail_process.py:150](src/ion/web/ui/_cases_detail_process.py#L150) | `_fragments/cases_detail_rule_guide.html` | `cases.html` |
 | POST | `/ui/cases/note-translation` | `case:read` | [_cases_detail_notes.py:90](src/ion/web/ui/_cases_detail_notes.py#L90) | `_fragments/cases_detail_translation.html` | `cases.html` |
-| GET | `/ui/cases/summary` | `case:read` | [cases.py:681](src/ion/web/ui/cases.py#L681) | `_fragments/cases_summary.html` | `cases_summary.html`, `cases.html` |
+| GET | `/ui/cases/summary` | `case:read` | [cases.py:680](src/ion/web/ui/cases.py#L680) | `_fragments/cases_summary.html` | `cases_summary.html`, `cases.html` |
 | GET | `/ui/cases/{case_id}/annotations` | `case:read` | [_cases_detail_notes.py:80](src/ion/web/ui/_cases_detail_notes.py#L80) | `_fragments/cases_detail_annotations.html`<br>`_fragments/forensics_annotations.html` | `cases.html` |
-| GET | `/ui/cases/{case_id}/attack-path` | `case:read` | [cases.py:1885](src/ion/web/ui/cases.py#L1885) | `_fragments/cases_attack_path.html` | `cases.html` |
-| GET | `/ui/cases/{case_id}/panel` | `case:read` | [cases.py:2399](src/ion/web/ui/cases.py#L2399) | `_fragments/cases_panel.html` | `cases.html` |
-| GET | `/ui/cases/{case_id}/playbooks` | `case:read` | [cases.py:1620](src/ion/web/ui/cases.py#L1620) | `_fragments/cases_playbooks.html` | `cases.html` |
+| GET | `/ui/cases/{case_id}/attack-path` | `case:read` | [cases.py:1884](src/ion/web/ui/cases.py#L1884) | `_fragments/cases_attack_path.html` | `cases.html` |
+| GET | `/ui/cases/{case_id}/panel` | `case:read` | [cases.py:2398](src/ion/web/ui/cases.py#L2398) | `_fragments/cases_panel.html` | `cases.html` |
+| GET | `/ui/cases/{case_id}/playbooks` | `case:read` | [cases.py:1619](src/ion/web/ui/cases.py#L1619) | `_fragments/cases_playbooks.html` | `cases.html` |
 | POST | `/ui/cases/{case_id}/response-actions` | `case:read + playbook:read` | [_cases_detail_response.py:174](src/ion/web/ui/_cases_detail_response.py#L174) | `_fragments/cases_detail_response_actions.html` | `cases.html` |
 | GET | `/ui/cases/{case_id}/response-log` | `case:read + playbook:read` | [_cases_detail_response.py:190](src/ion/web/ui/_cases_detail_response.py#L190) | `_fragments/cases_detail_response_log.html` | `cases.html` |
-| GET | `/ui/cases/{case_id}/similar` | `case:read` | [cases.py:812](src/ion/web/ui/cases.py#L812) | `_fragments/cases_similar.html` | `cases.html` |
-| GET | `/ui/cases/{case_id}/similar-observables` | `case:read` | [cases.py:1299](src/ion/web/ui/cases.py#L1299) | `_fragments/cases_observables.html` | `cases.html` |
+| GET | `/ui/cases/{case_id}/similar` | `case:read` | [cases.py:811](src/ion/web/ui/cases.py#L811) | `_fragments/cases_similar.html` | `cases.html` |
+| GET | `/ui/cases/{case_id}/similar-observables` | `case:read` | [cases.py:1298](src/ion/web/ui/cases.py#L1298) | `_fragments/cases_observables.html` | `cases.html` |
 | GET | `/ui/cases/{case_id}/sync-status` | `case:read + (alert:read or integration:read)` | [_cases_detail_response.py:164](src/ion/web/ui/_cases_detail_response.py#L164) | `_fragments/cases_detail_sync.html` | `cases.html` |
-| GET | `/ui/cases/{case_id}/timeline` | `case:read` | [cases.py:1115](src/ion/web/ui/cases.py#L1115) | `_fragments/cases_timeline.html` | `cases.html` |
-| GET | `/ui/cases/{case_id}/workbench` | `case:read` | [cases.py:1595](src/ion/web/ui/cases.py#L1595) | `_fragments/cases_workbench.html` | `cases.html` |
+| GET | `/ui/cases/{case_id}/timeline` | `case:read` | [cases.py:1114](src/ion/web/ui/cases.py#L1114) | `_fragments/cases_timeline.html` | `cases.html` |
+| GET | `/ui/cases/{case_id}/workbench` | `case:read` | [cases.py:1594](src/ion/web/ui/cases.py#L1594) | `_fragments/cases_workbench.html` | `cases.html` |
 | GET | `/ui/change-requests` | `system:settings` | [change_requests.py:106](src/ion/web/ui/change_requests.py#L106) | `_fragments/change_requests.html` | `change_requests.html` |
 | POST | `/ui/chat/answer-meta` | `ai:chat` | [chat.py:200](src/ion/web/ui/chat.py#L200) | `_fragments/chat_answer_meta.html` | `chat.html` |
 | GET | `/ui/chat/files` | `ai:chat` | [chat.py:405](src/ion/web/ui/chat.py#L405) | `_fragments/chat_files.html` | `chat.html` |
@@ -114,16 +114,16 @@ Server-rendered fragments. `render_view` routes also answer the view model as JS
 | GET | `/ui/detection-engineering/emulation` | `alert:read` | [_detection_engineering_catalogue.py:92](src/ion/web/ui/_detection_engineering_catalogue.py#L92) | `_fragments/detection_engineering_emulation.html` | `detection_engineering.html` |
 | GET | `/ui/detection-engineering/emulation/{plan_id}` | `alert:read` | [_detection_engineering_catalogue.py:110](src/ion/web/ui/_detection_engineering_catalogue.py#L110) | `_fragments/detection_engineering_emulation_detail.html` |  |
 | GET | `/ui/detection-engineering/execution` | `alert:read` | [_detection_engineering_execution.py:116](src/ion/web/ui/_detection_engineering_execution.py#L116) | `_fragments/detection_engineering_execution.html` | `detection_engineering.html` |
-| GET | `/ui/detection-engineering/gaps` | `alert:read` | [_detection_engineering_core.py:164](src/ion/web/ui/_detection_engineering_core.py#L164) | `_fragments/detection_engineering_gaps.html` |  |
+| GET | `/ui/detection-engineering/gaps` | `alert:read` | [_detection_engineering_core.py:166](src/ion/web/ui/_detection_engineering_core.py#L166) | `_fragments/detection_engineering_gaps.html` |  |
 | GET | `/ui/detection-engineering/killchains` | `alert:read` | [_detection_engineering_rules.py:83](src/ion/web/ui/_detection_engineering_rules.py#L83) | `_fragments/detection_engineering_killchains.html` | `detection_engineering.html` |
 | GET | `/ui/detection-engineering/overview` | `alert:read` | [_detection_engineering_overview.py:221](src/ion/web/ui/_detection_engineering_overview.py#L221) | `_fragments/detection_engineering_overview.html`<br>`_fragments/forensics_overview.html` | `detection_engineering.html` |
-| GET | `/ui/detection-engineering/posture` | `alert:read` | [_detection_engineering_core.py:133](src/ion/web/ui/_detection_engineering_core.py#L133) | `_fragments/detection_engineering_posture.html` |  |
+| GET | `/ui/detection-engineering/posture` | `alert:read` | [_detection_engineering_core.py:135](src/ion/web/ui/_detection_engineering_core.py#L135) | `_fragments/detection_engineering_posture.html` |  |
 | GET | `/ui/detection-engineering/progression` | `alert:read` | [_detection_engineering_rules.py:105](src/ion/web/ui/_detection_engineering_rules.py#L105) | `_fragments/detection_engineering_progression.html` | `detection_engineering.html` |
 | GET | `/ui/detection-engineering/readiness` | `alert:read` | [_detection_engineering_execution.py:122](src/ion/web/ui/_detection_engineering_execution.py#L122) | `_fragments/detection_engineering_readiness_shell.html` | `detection_engineering.html` |
 | GET | `/ui/detection-engineering/readiness/actors` | `alert:read` | [_detection_engineering_execution.py:134](src/ion/web/ui/_detection_engineering_execution.py#L134) | `_fragments/detection_engineering_readiness_actors.html` | `detection_engineering.html` |
 | POST | `/ui/detection-engineering/readiness/system` | `alert:read` | [_detection_engineering_execution.py:153](src/ion/web/ui/_detection_engineering_execution.py#L153) | `_fragments/detection_engineering_readiness_system.html` | `detection_engineering.html` |
 | GET | `/ui/detection-engineering/rules` | `alert:read` | [_detection_engineering_rules.py:90](src/ion/web/ui/_detection_engineering_rules.py#L90) | `_fragments/detection_engineering_rules.html` | `detection_engineering.html` |
-| GET | `/ui/detection-engineering/spaces` | `alert:read` | [_detection_engineering_core.py:169](src/ion/web/ui/_detection_engineering_core.py#L169) | `_fragments/detection_engineering_spaces.html` | `detection_engineering.html` |
+| GET | `/ui/detection-engineering/spaces` | `alert:read` | [_detection_engineering_core.py:171](src/ion/web/ui/_detection_engineering_core.py#L171) | `_fragments/detection_engineering_spaces.html` | `detection_engineering.html` |
 | GET | `/ui/detection-engineering/system-options` | `alert:read` | [_detection_engineering_overview.py:357](src/ion/web/ui/_detection_engineering_overview.py#L357) | `_fragments/detection_engineering_system_options.html` | `detection_engineering.html` |
 | GET | `/ui/detection-engineering/vulns` | `alert:read` | [_detection_engineering_catalogue.py:76](src/ion/web/ui/_detection_engineering_catalogue.py#L76) | `_fragments/detection_engineering_vulns.html` | `detection_engineering.html` |
 | GET | `/ui/detection-health/attack` | `security:read` | [detection_health.py:438](src/ion/web/ui/detection_health.py#L438) | `_fragments/detection_health_attack.html` |  |
@@ -435,9 +435,9 @@ JSON endpoints.
 | GET | `/api/arkime/traffic/topology` | `alert:read` | [arkime_traffic_analytics_api.py:309](src/ion/web/arkime_traffic_analytics_api.py#L309) |  | `network_topology.html` |
 | GET | `/api/attack-stories` | `alert:read` | [attack_story_api.py:15](src/ion/web/attack_story_api.py#L15) |  |  |
 | GET | `/api/audit-logs` | `system:audit_view` | [api.py:1304](src/ion/web/api.py#L1304) |  |  |
-| POST | `/api/auth/change-password` | — | [extension.py:580](.venv/Lib/site-packages/slowapi/extension.py#L580) |  | `profile.html` |
+| POST | `/api/auth/change-password` | — | [api.py:580](src/ion/web/api.py#L580) |  | `profile.html` |
 | POST | `/api/auth/focus-mode` | — | [api.py:395](src/ion/web/api.py#L395) |  | `app.js` |
-| POST | `/api/auth/login` | — | [extension.py:269](.venv/Lib/site-packages/slowapi/extension.py#L269) |  | `login.html` |
+| POST | `/api/auth/login` | — | [api.py:269](src/ion/web/api.py#L269) |  | `login.html` |
 | POST | `/api/auth/logout` | — | [api.py:326](src/ion/web/api.py#L326) |  | `app.js`, `profile.html` |
 | GET | `/api/auth/me` | — | [api.py:383](src/ion/web/api.py#L383) |  | `app.js`, `alert_prompt_templates.html`, `analyst.html`, `gitlab.html` +1 |
 | GET | `/api/auth/oidc/callback` | — | [api.py:663](src/ion/web/api.py#L663) |  |  |
@@ -528,8 +528,8 @@ JSON endpoints.
 | GET | `/api/cyab/pillars` | `alert:read` | [cyab_api.py:2123](src/ion/web/cyab_api.py#L2123) |  | `detection_engineering.html` |
 | GET | `/api/cyab/pillars/{pillar_id}/subprofiles` | `alert:read` | [cyab_api.py:2128](src/ion/web/cyab_api.py#L2128) |  | `detection_engineering.html` |
 | POST | `/api/cyab/scoping/convert` | `alert:read` | [cyab_api.py:1523](src/ion/web/cyab_api.py#L1523) |  | `_scoping_summary.html`, `detection_engineering.html` |
-| POST | `/api/cyab/scoping/pdf` | — | [extension.py:1478](.venv/Lib/site-packages/slowapi/extension.py#L1478) |  | `cyab-scoping.js`, `detection_engineering.html` |
-| POST | `/api/cyab/scoping/score` | — | [extension.py:1449](.venv/Lib/site-packages/slowapi/extension.py#L1449) |  | `scoping.html`, `detection_engineering.html` |
+| POST | `/api/cyab/scoping/pdf` | — | [cyab_api.py:1478](src/ion/web/cyab_api.py#L1478) |  | `cyab-scoping.js`, `detection_engineering.html` |
+| POST | `/api/cyab/scoping/score` | — | [cyab_api.py:1449](src/ion/web/cyab_api.py#L1449) |  | `scoping.html`, `detection_engineering.html` |
 | DELETE | `/api/cyab/sources/{source_id}` | `case:close` | [cyab_api.py:753](src/ion/web/cyab_api.py#L753) |  | `detection_engineering.html` |
 | GET | `/api/cyab/sources/{source_id}` | `alert:read` | [cyab_api.py:706](src/ion/web/cyab_api.py#L706) |  | `detection_engineering.html` |
 | PUT | `/api/cyab/sources/{source_id}` | `case:update` | [cyab_api.py:714](src/ion/web/cyab_api.py#L714) |  | `detection_engineering.html` |
