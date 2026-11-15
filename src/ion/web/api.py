@@ -30,7 +30,7 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.responses import JSONResponse, RedirectResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -44,6 +44,7 @@ from ion.core.config import (
     get_ssl_verify,
 )
 from ion.core.safe_errors import safe_error
+from ion.core.severity import SEVERITIES
 from ion.services.ai_feedback_service import record_close_feedback_safe
 from ion.services.dfir_iris_service import get_dfir_iris_service
 from ion.services.kibana_cases_service import get_kibana_cases_service
@@ -2932,6 +2933,27 @@ from ion.models.alert_triage import (
 OBSERVABLE_TYPES = {"hostname", "source_ip", "destination_ip", "url", "domain", "user_account"}
 
 
+TRIAGE_PRIORITIES = SEVERITIES
+
+
+def _triage_priority(value: Optional[str]) -> Optional[str]:
+    """Hold a triage priority to the severities the queue renders.
+
+    The column is free text, and a lab-fixture alert's severity is read
+    straight from it, so anything accepted here is shown to every analyst as
+    that alert's severity. Blank means "not set", which is how the page sends
+    an untouched control.
+    """
+    if value is None:
+        return None
+    cleaned = str(value).strip().lower()
+    if not cleaned:
+        return None
+    if cleaned not in TRIAGE_PRIORITIES:
+        raise ValueError("priority must be one of: " + ", ".join(TRIAGE_PRIORITIES))
+    return cleaned
+
+
 class TriageUpdate(BaseModel):
     status: Optional[str] = None
     assigned_to_id: Optional[int] = None
@@ -2941,6 +2963,8 @@ class TriageUpdate(BaseModel):
     analyst_notes: Optional[str] = None
     observables: Optional[List[dict]] = None
     mitre_techniques: Optional[List[dict]] = None
+
+    _check_priority = field_validator("priority")(_triage_priority)
 
 
 class AlertClosureRequest(BaseModel):
@@ -2971,6 +2995,8 @@ class BulkTriageUpdate(BaseModel):
     # it a triage row created here has no name and the case rail shows the
     # document id.
     rule_names: Optional[Dict[str, str]] = None
+
+    _check_priority = field_validator("priority")(_triage_priority)
 
 
 class AutoPopulateRequest(BaseModel):

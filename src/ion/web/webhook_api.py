@@ -7,6 +7,8 @@ from typing import Optional
 from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel
 
+from ion.core.severity import normalize_severity
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
@@ -79,7 +81,11 @@ async def receive_alert_webhook(
             es_alert_id=alert_id,
             status=AlertTriageStatus.OPEN,
             source_system=alert.source,
-            priority=alert.severity,
+            # Normalised, not refused: a 422 here drops an alert, and the
+            # sender's own wording is kept verbatim in the evidence row below.
+            # What must not happen is the raw string landing in `priority`,
+            # which the queue shows to every analyst as the severity.
+            priority=normalize_severity(alert.severity),
             rule_name=alert.title,
         )
         session.add(triage)

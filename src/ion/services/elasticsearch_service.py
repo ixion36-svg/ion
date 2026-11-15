@@ -20,6 +20,7 @@ from ion.core.circuit_breaker import es_breaker
 from ion.core.concurrency import map_bounded
 from ion.core.config import get_config, get_elasticsearch_config, get_ssl_verify
 from ion.core.safe_errors import safe_error
+from ion.core.severity import normalize_severity
 
 from ion.core.async_http import dispose_client as _shared_dispose_client
 
@@ -1053,15 +1054,7 @@ class ElasticsearchService:
             source.get("level") or
             "medium"
         )
-        # Normalize severity
-        severity_map = {
-            "1": "critical", "critical": "critical", "crit": "critical",
-            "2": "high", "high": "high",
-            "3": "medium", "medium": "medium", "med": "medium", "warning": "medium",
-            "4": "low", "low": "low",
-            "5": "info", "info": "info", "informational": "info",
-        }
-        severity = severity_map.get(str(severity).lower(), "medium")
+        severity = normalize_severity(severity)
 
         # Status — prefer workflow_status (what ION syncs) over alert status
         status = (
