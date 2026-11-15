@@ -39,6 +39,14 @@ def build_ion_custom_fields(
     ]
 
 
+#: Alerts per attach request. Kibana caps a case at 1,000 alerts in total;
+#: 100 per request keeps each request well inside its body and timeout limits.
+ATTACH_CHUNK_SIZE = 100
+
+#: Kibana's maximum perPage for cases/_find.
+FIND_PAGE_SIZE = 100
+
+
 class KibanaCasesService:
     """Service for interacting with Kibana Cases API."""
 
@@ -518,19 +526,63 @@ class KibanaCasesService:
         if not self.enabled:
             return []
 
+        return self.fetch_case_comments(case_id) or []
+
+    def fetch_case_comments(self, case_id: str) -> Optional[List[Dict[str, Any]]]:
+        """Every comment on a case, or None when Kibana did not answer.
+
+        Reads every page, not just the first: a case with more than 100
+        attachments (alert attachments count) used to lose every comment
+        added after the hundredth.
+        """
+        if not self.enabled:
+            return None
         try:
             path = self._get_api_path(f"/api/cases/{case_id}/comments/_find")
-            response = self.client.get(path, params={"perPage": 100})
-
-            if response.status_code == 200:
+            comments: List[Dict[str, Any]] = []
+            page = 1
+            while True:
+                response = self.client.get(
+                    path, params={"perPage": FIND_PAGE_SIZE, "page": page},
+                )
+                if response.status_code != 200:
+                    logger.error(f"Failed to get comments: {response.status_code}")
+                    return None
                 data = response.json()
-                return data.get("comments", [])
-            else:
-                logger.error(f"Failed to get comments: {response.status_code}")
-                return []
+                batch = data.get("comments", [])
+                comments.extend(batch)
+                if not batch or len(comments) >= data.get("total", 0):
+                    return comments
+                page += 1
         except Exception as e:
             logger.error(f"Error getting Kibana case comments: {e}")
-            return []
+            return None
+
+    def find_all_cases(self) -> Optional[Dict[str, Dict[str, Any]]]:
+        """Every case Kibana holds, keyed by id, from paged ``_find`` calls.
+
+        One request per 100 cases replaces a ``get_case`` per linked case.
+        Returns None when any page fails, so callers can tell "Kibana has no
+        such case" apart from "Kibana did not answer".
+        """
+        if not self.enabled:
+            return None
+        cases: Dict[str, Dict[str, Any]] = {}
+        page = 1
+        while True:
+            result = self.list_cases(
+                page=page, per_page=FIND_PAGE_SIZE,
+                sort_field="updatedAt", sort_order="desc",
+            )
+            if result.get("error"):
+                return None
+            batch = result.get("cases", [])
+            for case in batch:
+                if case.get("id"):
+                    cases[case["id"]] = case
+            if not batch or page * FIND_PAGE_SIZE >= result.get("total", 0):
+                return cases
+            page += 1
 
     def get_case_alerts(self, case_id: str) -> List[Dict[str, Any]]:
         """Get all alerts attached to a case.
@@ -611,32 +663,52 @@ class KibanaCasesService:
         path = self._get_api_path(f"/api/cases/{case_id}/comments")
         last_response = None
 
-        # Attach alerts one at a time to avoid ES version_conflict_engine_exception
-        # when Kibana's syncAlerts updates alert documents concurrently.
-        for aid in alert_ids:
+        def _post(ids: List[str]) -> Optional[httpx.Response]:
+            # alertId and index are parallel arrays of equal length. The
+            # v0.9.34 batch sent index as a bare string, which Kibana
+            # rejects; that, not batching, is what failed then.
+            payload = {
+                "type": "alert",
+                "alertId": ids,
+                "index": [alert_index] * len(ids),
+                "owner": owner,
+                "rule": {
+                    "id": "manual-attachment",
+                    "name": "Manual Alert Attachment",
+                },
+            }
             try:
-                payload = {
-                    "type": "alert",
-                    "alertId": [aid],
-                    "index": [alert_index],
-                    "owner": owner,
-                    "rule": {
-                        "id": "manual-attachment",
-                        "name": "Manual Alert Attachment",
-                    },
-                }
+                return self.client.post(path, json=payload)
+            except Exception as e:
+                logger.error("Error attaching %d alert(s) to Kibana case %s: %s",
+                             len(ids), case_id, e)
+                return None
 
-                response = self.client.post(path, json=payload)
-
-                if response.status_code in (200, 201):
-                    last_response = response.json()
-                else:
+        # One request per chunk instead of one per alert. A rejected chunk
+        # falls back to one alert per request, so a single bad id or a
+        # version conflict on one alert costs that alert only.
+        for start in range(0, len(alert_ids), ATTACH_CHUNK_SIZE):
+            chunk = list(alert_ids[start:start + ATTACH_CHUNK_SIZE])
+            response = _post(chunk)
+            if response is not None and response.status_code in (200, 201):
+                last_response = response.json()
+                continue
+            if response is not None:
+                logger.warning(
+                    "Batch attach of %d alerts to case %s failed (%s), retrying one by one",
+                    len(chunk), case_id, response.status_code,
+                )
+            if len(chunk) == 1:
+                continue
+            for aid in chunk:
+                single = _post([aid])
+                if single is not None and single.status_code in (200, 201):
+                    last_response = single.json()
+                elif single is not None:
                     logger.error(
                         "Failed to attach alert %s to case %s: %s - %s",
-                        aid, case_id, response.status_code, response.text,
+                        aid, case_id, single.status_code, single.text,
                     )
-            except Exception as e:
-                logger.error("Error attaching alert %s to Kibana case %s: %s", aid, case_id, e)
 
         return last_response
 
