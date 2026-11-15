@@ -1,0 +1,50 @@
+{% extends "cyab/_layout.html" %}
+{% from "cyab/_macros.html" import stage_pill, sal_badge %}
+{% block crumb %}<a href="/cyab/systems" class="link link-hover">Systems</a> / {{ system.department }}{% endblock %}
+{% block heading %}{{ system.name }}{% endblock %}
+{% block body %}
+
+<section class="card bg-base-200 border border-base-300 mb-4" aria-label="Progress">
+  <div class="card-body p-4 gap-4">
+    <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
+      <div class="flex items-center gap-3">
+        <div class="radial-progress {{ 'text-success' if rd.pct >= 100 else ('text-warning' if rd.pct >= 50 else 'text-error') }} text-sm font-mono" role="progressbar" aria-valuenow="{{ rd.pct }}" aria-valuemin="0" aria-valuemax="100" data-ion-style="--value:{{ rd.pct }}">{{ rd.pct }}%</div>
+        <div>
+          <div class="flex items-center gap-2">{{ stage_pill(rd.stage, stage_labels) }} {{ sal_badge(rd.sal, sal_names) }}</div>
+          <div class="text-xs text-base-content/60 mt-1">
+            {{ sal_names[rd.sal] }} assurance · owner {{ system.soc_analyst_owner or 'unassigned' }}
+            {% if rd.missing_docs %} · <span class="text-warning">{{ rd.missing_docs|length }} required doc{{ '' if rd.missing_docs|length == 1 else 's' }} open</span>{% endif %}
+          </div>
+        </div>
+      </div>
+      <ol class="flex flex-wrap items-center gap-1 grow" aria-label="Onboarding steps">
+        {% for st in steps %}
+          {% set current = st.key == rd.stage %}
+          <li class="flex items-center gap-1">
+            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs border
+              {{ 'border-success/50 bg-success/20 text-success' if st.complete else ('border-primary bg-primary/20 text-primary font-semibold' if current else 'border-base-300 text-base-content/60') }}"
+              {% if current %}aria-current="step"{% endif %} title="{{ st.done }} of {{ st.total }}">
+              {% if st.complete %}<span aria-hidden="true">✓</span>{% else %}<span class="font-mono" aria-hidden="true">{{ loop.index }}</span>{% endif %}
+              {{ st.label }}
+            </span>
+            {% if not loop.last %}<span class="w-3 h-px bg-base-300" aria-hidden="true"></span>{% endif %}
+          </li>
+        {% endfor %}
+      </ol>
+    </div>
+    <div class="flex flex-wrap items-center gap-3 rounded-box border border-primary/30 bg-primary/10 px-4 py-3">
+      <span class="text-[0.65rem] uppercase tracking-widest text-primary">Next</span>
+      <span class="font-medium grow">{{ rd.next_action }}</span>
+      {% if rd.tab != tab %}<a href="/cyab/systems/{{ system.id }}/{{ rd.tab }}" class="btn btn-sm btn-primary">Go</a>{% endif %}
+    </div>
+  </div>
+</section>
+
+<div role="tablist" class="tabs tabs-border mb-4 overflow-x-auto flex-nowrap">
+  {% for key, label in tabs %}
+    <a role="tab" href="/cyab/systems/{{ system.id }}/{{ key }}" class="tab whitespace-nowrap {{ 'tab-active' if key == tab }}"{% if key == tab %} aria-selected="true"{% endif %}>{{ label }}</a>
+  {% endfor %}
+</div>
+
+{% include "cyab/system/_" ~ tab|replace('-', '_') ~ ".html" %}
+{% endblock %}

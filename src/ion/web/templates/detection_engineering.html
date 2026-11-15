@@ -3,48 +3,65 @@
 {% block title %}Detection Engineering - ION{% endblock %}
 {% block page_id %}detection-engineering{% endblock %}
 
+{% block head_css %}
+<link rel="stylesheet" href="/static/css/detection-engineering.css?v={{ ion_version }}">
+{% endblock %}
+
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
-<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
-<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-  <div class="basis-full md:basis-auto md:flex-1">
-    <div class="flex items-center gap-3 mb-4">
-      <svg class="w-4 h-4 text-ion-cyan"><use href="#i-target"/></svg>
-      <span class="label-tiny text-ion-cyan">Detection posture · TIDE</span>
-    </div>
-    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Detection Engineering</h1>
-    <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Rule coverage, quality, MITRE mapping and live execution across your stack.</p>
-  </div>
-  <div class="flex items-center gap-2 flex-wrap">
-    <span id="de-tide-badge" title="Click for sync status" class="badge badge-outline gap-2 cursor-pointer">
-      <span class="de-tide-dot h-1.5 w-1.5 rounded-full bg-ion-lime"></span> TIDE
-    </span>
-    <select id="de-space-select" data-change-action="deChangeSpace" data-args='["$value"]' class="select select-sm font-mono min-w-[120px]" title="SIEM / Kibana space filter">
-      <option value="">Loading spaces…</option>
-    </select>
-    <button data-click-action="deSyncTide" title="Pull fresh data from TIDE now" class="btn btn-ghost btn-sm gap-2"><svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg>Sync TIDE</button>
-    <button data-click-action="deRefresh" class="btn btn-ghost btn-sm">Refresh</button>
-  </div>
-</section>
+<div class="dx-page">
+<header class="dx-head">
+  <div class="dx-title"><div class="dx-eyebrow">Engineering</div><h1>Detection Engineering</h1></div>
+  <span class="dx-grow"></span>
+  <span id="de-tide-badge" class="dx-pill" title="Age of ION's cached TIDE data"><span class="de-tide-dot"></span><span data-sync-label>TIDE</span></span>
+  <label class="dx-select"><span>Space</span>
+    <select id="de-space-select" data-change-action="deChangeSpace" data-args='["$value"]' title="SIEM / Kibana space filter"><option value="">Loading spaces…</option></select>
+  </label>
+  <label class="dx-select" id="de-system-wrap" hidden><span>System</span>
+    <select id="de-system-select" data-change-action="deChangeSystem" data-args='["$value"]' title="Scopes the coverage map and readiness assessments to one system's applied rules"><option value="">All systems</option></select>
+  </label>
+  <button type="button" class="dx-btn" data-click-action="deSyncTide" title="Pull fresh data from TIDE now"><svg class="dx-icon" aria-hidden="true"><use href="#i-refresh"/></svg>Sync</button>
+  <button type="button" class="dx-btn ghost" data-click-action="deRefresh" title="Reload these panels from ION's cached TIDE data">Reload</button>
+</header>
 
-<!-- Tabs -->
-<div class="de-tabs" id="de-tabs">
-    <button class="de-tab active" data-tab="posture" data-click-action="deSwitch" data-args='["posture"]'>Posture</button>
-    <button class="de-tab" data-tab="killchains" data-click-action="deSwitch" data-args='["killchains"]'>Use Cases</button>
-    <button class="de-tab" data-tab="rules" data-click-action="deSwitch" data-args='["rules"]'>Rules</button>
-    <button class="de-tab" data-tab="execution" data-click-action="deSwitch" data-args='["execution"]'>Execution</button>
-    <button class="de-tab" data-tab="readiness" data-click-action="deSwitch" data-args='["readiness"]'>Actor Readiness</button>
-    <button class="de-tab" data-tab="progression" data-click-action="deSwitch" data-args='["progression"]'>Kill Chain</button>
-    <button class="de-tab" data-tab="gaps" data-click-action="deSwitch" data-args='["gaps"]'>Gaps</button>
-    <button class="de-tab" data-tab="d3fend" data-click-action="deSwitch" data-args='["d3fend"]'>D3FEND</button>
-    <button class="de-tab" data-tab="emulation" data-click-action="deSwitch" data-args='["emulation"]'>Emulation</button>
-    <button class="de-tab" data-tab="vulns" data-click-action="deSwitch" data-args='["vulns"]'>Vulnerabilities</button>
+{# Five tabs. The ten older tab ids still resolve: deSwitch() and the URL
+   hash map each one to its tab and sub-view (posture → Overview, gaps →
+   Coverage, execution → Rules, and so on). #}
+<nav class="dx-tabs" id="de-tabs" role="tablist">
+  <button type="button" class="dx-tab active" role="tab" data-tab="overview" data-click-action="deTab" data-args='["overview"]'>Overview</button>
+  <button type="button" class="dx-tab" role="tab" data-tab="coverage" data-click-action="deTab" data-args='["coverage"]'>Coverage<span id="de-count-coverage" class="dx-tab-count"></span></button>
+  <button type="button" class="dx-tab" role="tab" data-tab="usecases" data-click-action="deTab" data-args='["usecases"]'>Use cases<span id="de-count-usecases" class="dx-tab-count"></span></button>
+  <button type="button" class="dx-tab" role="tab" data-tab="rules" data-click-action="deTab" data-args='["rules"]'>Rules<span id="de-count-rules" class="dx-tab-count"></span></button>
+  <button type="button" class="dx-tab" role="tab" data-tab="readiness" data-click-action="deTab" data-args='["readiness"]'>Readiness</button>
+</nav>
+
+<div class="de-panel active" id="de-tab-overview" data-tab-panel="overview">
+  <div class="dx-subpanel" id="de-panel-overview" data-sub="overview"></div>
 </div>
-
-<!-- Tab panels -->
-<div class="de-panel active" id="de-panel-posture"></div>
-<div class="de-panel" id="de-panel-killchains"></div>
-<div class="de-panel" id="de-panel-rules"></div>
+<div class="de-panel" id="de-tab-coverage" data-tab-panel="coverage">
+  <div class="dx-subnav" role="tablist">
+    <button type="button" class="dx-subtab active" data-subtab="attack" data-click-action="deSwitch" data-args='["attack"]'>ATT&amp;CK</button>
+    <button type="button" class="dx-subtab" data-subtab="d3fend" data-click-action="deSwitch" data-args='["d3fend"]'>D3FEND</button>
+  </div>
+  <div class="dx-subpanel" id="de-panel-attack" data-sub="attack"></div>
+  <div class="dx-subpanel" id="de-panel-d3fend" data-sub="d3fend" hidden></div>
+</div>
+<div class="de-panel" id="de-tab-usecases" data-tab-panel="usecases">
+  <div class="dx-subnav" role="tablist">
+    <button type="button" class="dx-subtab active" data-subtab="killchains" data-click-action="deSwitch" data-args='["killchains"]'>Use cases</button>
+    <button type="button" class="dx-subtab" data-subtab="progression" data-click-action="deSwitch" data-args='["progression"]'>Kill chain progression</button>
+  </div>
+  <div class="dx-subpanel" id="de-panel-killchains" data-sub="killchains"></div>
+  <div class="dx-subpanel" id="de-panel-progression" data-sub="progression" hidden></div>
+</div>
+<div class="de-panel" id="de-tab-rules" data-tab-panel="rules">
+  <div class="dx-subnav" role="tablist">
+    <button type="button" class="dx-subtab active" data-subtab="rules" data-click-action="deSwitch" data-args='["rules"]'>Rules</button>
+    <button type="button" class="dx-subtab" data-subtab="execution" data-click-action="deSwitch" data-args='["execution"]'>Execution</button>
+  </div>
+  <div class="dx-subpanel" id="de-panel-rules" data-sub="rules"></div>
+  <div class="dx-subpanel" id="de-panel-execution" data-sub="execution" hidden></div>
+</div>
 <template id="de-rules-toolbar-template"><div>
     <div class="de-rules-toolbar">
         <input type="text" id="de-rules-search" placeholder="Search rules or MITRE IDs..." data-enter-key-action="deRulesSearch">
@@ -53,15 +70,18 @@
         <button class="btn btn-secondary" data-click-action="deRulesSearch">Search</button>
     </div><div id="de-rules-body"></div>
 </div></template>
-<div class="de-panel" id="de-panel-execution"></div>
-<div class="de-panel" id="de-panel-readiness"></div>
-<div class="de-panel" id="de-panel-progression"></div>
-<div class="de-panel" id="de-panel-gaps"></div>
-<div class="de-panel" id="de-panel-d3fend"></div>
-<div class="de-panel" id="de-panel-emulation"></div>
-<div class="de-panel" id="de-panel-vulns"></div>
+<div class="de-panel" id="de-tab-readiness" data-tab-panel="readiness">
+  <div class="dx-subnav" role="tablist">
+    <button type="button" class="dx-subtab active" data-subtab="readiness" data-click-action="deSwitch" data-args='["readiness"]'>Actor readiness</button>
+    <button type="button" class="dx-subtab" data-subtab="emulation" data-click-action="deSwitch" data-args='["emulation"]'>Emulation</button>
+    <button type="button" class="dx-subtab" data-subtab="vulns" data-click-action="deSwitch" data-args='["vulns"]'>Vulnerabilities</button>
+  </div>
+  <div class="dx-subpanel" id="de-panel-readiness" data-sub="readiness"></div>
+  <div class="dx-subpanel" id="de-panel-emulation" data-sub="emulation" hidden></div>
+  <div class="dx-subpanel" id="de-panel-vulns" data-sub="vulns" hidden></div>
+</div>
 
-</div><!-- /ion-tw inner -->
+</div><!-- /dx-page -->
 </div><!-- /ion-tw -->
 {% endblock %}
 
@@ -73,10 +93,18 @@
 'use strict';
 
 const API = '/api/cyab';
-let _activeTab = 'posture';
+/* Each sub-view belongs to one of the five tabs. The ten tab ids the page
+   used to have are sub-view ids here, or aliases of one, so deSwitch('gaps'),
+   deSwitch('posture') and a #execution link all still land somewhere. */
+const SUB_TAB = {overview:'overview', attack:'coverage', d3fend:'coverage', killchains:'usecases', progression:'usecases',
+                 rules:'rules', execution:'rules', readiness:'readiness', emulation:'readiness', vulns:'readiness'};
+const ALIASES = {posture:'overview', gaps:'attack', coverage:'attack', usecases:'killchains'};
+let _tabSub = {overview:'overview', coverage:'attack', usecases:'killchains', rules:'rules', readiness:'readiness'};
+let _activeSub = 'overview';
 let _rulesPage = {search:'', severity:'', enabled:'', offset:0, limit:50};
 let _execHours = 168;
-let _loaded = {posture:false, killchains:false, rules:false, execution:false, readiness:false, progression:false, gaps:false, d3fend:false, emulation:false, vulns:false};
+let _selectedSystemId = '';
+let _loaded = {};
 
 /* ── Helpers ──────────────────────────────────── */
 async function apiFetch(path) {
@@ -86,22 +114,37 @@ async function apiFetch(path) {
 }
 function $(id){ return document.getElementById(id); }
 
-/* ── Tab switching ────────────────────────────── */
-window.deSwitch = function(tab) {
-    _activeTab = tab;
-    document.querySelectorAll('.de-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-    document.querySelectorAll('.de-panel').forEach(p => p.classList.toggle('active', p.id === 'de-panel-'+tab));
-    if (!_loaded[tab]) loadTab(tab);
+/* ── Tab and sub-view switching ───────────────── */
+window.deTab = function(tab) { deSwitch(_tabSub[tab] || tab); };
+
+window.deSwitch = function(id) {
+    const sub = ALIASES[id] || id;
+    const tab = SUB_TAB[sub];
+    if (!tab) return;
+    _activeSub = sub;
+    _tabSub[tab] = sub;
+    document.querySelectorAll('.dx-tab').forEach(t => {
+        const on = t.dataset.tab === tab;
+        t.classList.toggle('active', on);
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    document.querySelectorAll('.de-panel').forEach(p => p.classList.toggle('active', p.dataset.tabPanel === tab));
+    const panel = $('de-tab-' + tab);
+    panel.querySelectorAll('.dx-subtab').forEach(b => b.classList.toggle('active', b.dataset.subtab === sub));
+    panel.querySelectorAll('.dx-subpanel').forEach(p => { p.hidden = p.dataset.sub !== sub; });
+    if (location.hash !== '#' + sub) history.replaceState(null, '', '#' + sub);
+    if (!_loaded[sub]) loadTab(sub);
 };
 
 window.deRefresh = function() {
-    _loaded = {posture:false, killchains:false, rules:false, execution:false, readiness:false, progression:false, gaps:false, d3fend:false, emulation:false, vulns:false};
-    loadTab(_activeTab);
+    _loaded = {};
+    loadTab(_activeSub);
 };
 
-function loadTab(tab) {
-    switch(tab) {
-        case 'posture': loadPosture(); break;
+function loadTab(sub) {
+    switch(sub) {
+        case 'overview': loadOverview(); break;
+        case 'attack': loadCoverage(); break;
         case 'killchains': loadKillChains(); break;
         case 'rules': loadRules(); break;
         case 'execution': loadExecution(); break;
@@ -110,14 +153,54 @@ function loadTab(tab) {
         case 'vulns': loadVulns(); break;
         case 'readiness': loadReadiness(); break;
         case 'progression': loadProgression(); break;
-        case 'gaps': loadGaps(); break;
     }
 }
 
-/* ── Posture tab ──────────────────────────────── */
-async function loadPosture() {
-    _loaded.posture = await deLoadFragment('/ui/detection-engineering/posture', 'de-panel-posture', 'Loading detection posture...');
+/* ── Overview ─────────────────────────────────── */
+async function loadOverview() {
+    _loaded.overview = await deLoadFragment('/ui/detection-engineering/overview', 'de-panel-overview', 'Loading detection overview...');
 }
+window.deOpenRule = function(name) {
+    _rulesPage = {search: name || '', severity:'', enabled:'', offset:0, limit:50};
+    _loaded.rules = false;
+    deSwitch('rules');
+};
+
+/* ── Coverage map ─────────────────────────────── */
+async function loadCoverage() {
+    const query = _selectedSystemId ? '?system_id=' + encodeURIComponent(_selectedSystemId) : '';
+    _loaded.attack = await deLoadFragment('/ui/detection-engineering/coverage' + query, 'de-panel-attack', 'Loading ATT&CK coverage...');
+}
+window.deCoverageTactic = function(name) {
+    const root = $('de-panel-attack');
+    root.querySelectorAll('.dx-mcol').forEach(c => {
+        const on = c.dataset.tactic === name;
+        c.classList.toggle('on', on);
+        c.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    root.querySelectorAll('[data-tactic-panel]').forEach(p => { p.hidden = p.dataset.tacticPanel !== name; });
+};
+
+/* ── System scope ─────────────────────────────── */
+async function deLoadSystems() {
+    const selector = $('de-system-select');
+    const ok = await deLoadFragment('/ui/detection-engineering/system-options', selector, 'Loading systems...', {failure:'Systems unavailable'});
+    /* Shown only when TIDE has systems to choose between. */
+    $('de-system-wrap').hidden = !ok || selector.options.length < 2;
+    selector.value = _selectedSystemId;
+}
+window.deChangeSystem = function(id) {
+    _selectedSystemId = id || '';
+    const header = $('de-system-select');
+    if (header && header.value !== _selectedSystemId) header.value = _selectedSystemId;
+    const local = $('de-readiness-system');
+    if (local && local.value !== _selectedSystemId) local.value = _selectedSystemId;
+    document.querySelectorAll('#de-readiness-body [data-click-action="deGenerateReport"]').forEach(button => {
+        button.textContent = _selectedSystemId ? 'Assess (System)' : 'Assess (Global)';
+    });
+    _loaded.attack = false;
+    if (_activeSub === 'attack') loadCoverage();
+};
 
 /* ── Use Cases tab (TIDE baselines / playbooks) ─── */
 async function loadKillChains() {
@@ -167,9 +250,8 @@ async function loadExecution() {
 
 /* ── Actor Readiness tab ──────────────────────── */
 let _readinessSearch = '';
-let _selectedSystemId = '';
 window.__setSelectedSystemId = function(event) {
-    _selectedSystemId = event.target.value;
+    deChangeSystem(event.target.value);
 };
 async function loadReadiness() {
     if (!await deLoadFragment('/ui/detection-engineering/readiness', 'de-panel-readiness', 'Loading systems...')) return;
@@ -179,7 +261,7 @@ async function loadReadiness() {
 }
 window.deReadinessSearch = function() {
     _readinessSearch = $('de-readiness-search').value;
-    _selectedSystemId = $('de-readiness-system').value;
+    deChangeSystem($('de-readiness-system').value);
     fetchReadiness();
 };
 async function fetchReadiness() {
@@ -262,11 +344,6 @@ window.deProgSetHours = function(h) {
 
 async function loadProgression() {
     _loaded.progression = await deLoadFragment('/ui/detection-engineering/progression?hours=' + encodeURIComponent(_progHours), 'de-panel-progression', 'Scanning for kill chain progressions...');
-}
-
-/* ── Gaps tab ─────────────────────────────────── */
-async function loadGaps() {
-    _loaded.gaps = await deLoadFragment('/ui/detection-engineering/gaps', 'de-panel-gaps', 'Loading detection gaps...');
 }
 
 /* ────────────────────────────────────────────────────────────────────── */
@@ -381,20 +458,33 @@ window.deSyncTide = async function() {
             deSetBadge(payload && typeof payload.error === 'string' ? 'TIDE (' + payload.error + ')' : 'TIDE (sync failed)');
             return;
         }
-        deSetBadge('TIDE synced (' + (payload.synced ?? 'Unknown') + '/' + (payload.total ?? 'Unknown') + ')', true);
+        deSetBadge('TIDE · synced ' + (payload.synced ?? 'Unknown') + '/' + (payload.total ?? 'Unknown') + ' just now', true);
         deRefresh();
     } catch (error) {
         deSetBadge('TIDE (sync failed)');
     }
 };
 
+function deAge(seconds) {
+    if (seconds < 90) return 'just now';
+    if (seconds < 5400) return Math.round(seconds / 60) + ' min ago';
+    if (seconds < 129600) return Math.round(seconds / 3600) + ' h ago';
+    return Math.round(seconds / 86400) + ' d ago';
+}
+
 async function deCheckSyncStatus() {
     try {
         const payload = await apiFetch('/tide/de/sync-status');
-        if (!payload || typeof payload !== 'object') throw new Error('Invalid sync status');
-        deSetBadge('TIDE (' + (payload.healthy ?? 'Unknown') + '/' + (payload.total_datasets ?? 'Unknown') + ' cached)', payload.healthy > 0);
+        if (!payload || typeof payload !== 'object' || !payload.datasets || typeof payload.datasets !== 'object') throw new Error('Invalid sync status');
+        const healthy = Object.values(payload.datasets).filter(d => d && !d.error && typeof d.age_seconds === 'number');
+        const total = payload.total_datasets;
+        if (!healthy.length) { deSetBadge('TIDE · not synced yet'); return; }
+        /* The oldest healthy dataset, so the pill never claims fresher data than it has. */
+        const age = deAge(Math.max(...healthy.map(d => d.age_seconds)));
+        const complete = typeof total === 'number' && healthy.length >= total;
+        deSetBadge('TIDE · ' + (complete ? '' : healthy.length + '/' + (total ?? '?') + ' datasets · ') + 'synced ' + age, complete);
     } catch (error) {
-        deSetBadge('TIDE (status unavailable)');
+        deSetBadge('TIDE · status unavailable');
     }
 }
 
@@ -421,7 +511,19 @@ window.deChangeSpace = async function(space) {
     }
 };
 /* ── Init ─────────────────────────────────────── */
-document.addEventListener('DOMContentLoaded', () => { deLoadSpaces(); loadTab('posture'); deCheckSyncStatus(); });
+document.addEventListener('DOMContentLoaded', () => {
+    const wanted = decodeURIComponent((location.hash || '').slice(1));
+    deSwitch(SUB_TAB[ALIASES[wanted] || wanted] ? wanted : 'overview');
+    deLoadSpaces();
+    deLoadSystems();
+    deCheckSyncStatus();
+});
+/* A link to #gaps or #execution from elsewhere on the page, or the back
+   button, lands on that sub-view without a reload. */
+window.addEventListener('hashchange', () => {
+    const wanted = decodeURIComponent((location.hash || '').slice(1));
+    if (SUB_TAB[ALIASES[wanted] || wanted] && (ALIASES[wanted] || wanted) !== _activeSub) deSwitch(wanted);
+});
 
 })();
 </script>

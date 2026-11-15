@@ -592,6 +592,16 @@ class KibanaCasesService:
         """
         if not self.enabled:
             return []
+        return self.fetch_case_alerts(case_id) or []
+
+    def fetch_case_alerts(self, case_id: str) -> Optional[List[Dict[str, Any]]]:
+        """As get_case_alerts, but None when Kibana did not answer.
+
+        A caller deciding which alerts are missing from a case must not read
+        a failed request as a case with no alerts.
+        """
+        if not self.enabled:
+            return None
 
         try:
             # Kibana 9.x: dedicated alerts endpoint
@@ -604,6 +614,11 @@ class KibanaCasesService:
                         {"id": a["id"], "index": a.get("index", ".alerts-security.alerts-default")}
                         for a in alerts_data
                     ]
+            elif alerts_response.status_code != 404:
+                # Only a Kibana without the endpoint (404) falls back below;
+                # on 9.x the comments list never holds alerts, so a failed
+                # alerts read there would come back as "no alerts".
+                return None
 
             # Kibana 8.x fallback: alerts stored as comment type "alert"
             path = self._get_api_path(f"/api/cases/{case_id}/comments/_find")
@@ -638,7 +653,7 @@ class KibanaCasesService:
             return alerts
         except Exception as e:
             logger.error(f"Error getting Kibana case alerts: {e}")
-            return []
+            return None
 
     def attach_alerts_to_case(
         self,

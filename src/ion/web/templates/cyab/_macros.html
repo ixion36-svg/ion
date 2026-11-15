@@ -1,0 +1,32 @@
+{# Shared CyAB pieces. Forms post through htmx and swap #cyab-main from the
+   page the handler redirects to. #}
+
+{% macro post(url) -%}
+hx-post="{{ url }}" hx-target="#cyab-main" hx-select="#cyab-main" hx-swap="outerHTML"
+{%- endmacro %}
+
+{% set STAGE_TONE = {
+  'profile': 'badge-secondary', 'sources': 'badge-info', 'intake': 'badge-info',
+  'use_cases': 'badge-accent', 'docs': 'badge-warning', 'signoff': 'badge-warning',
+  'signed': 'badge-success', 'review_due': 'badge-error', 'retired': 'badge-ghost',
+} %}
+
+{% macro stage_pill(stage, labels) -%}
+<span class="badge badge-sm badge-soft {{ STAGE_TONE.get(stage, 'badge-ghost') }} whitespace-nowrap">{{ labels[stage] }}</span>
+{%- endmacro %}
+
+{% macro meter(pct) -%}
+<div class="flex items-center gap-2 min-w-[7rem]">
+  <progress class="progress {{ 'progress-success' if pct >= 100 else ('progress-warning' if pct >= 50 else 'progress-error') }} w-20" value="{{ pct }}" max="100"></progress>
+  <span class="text-xs font-mono tabular-nums w-9 text-right">{{ pct }}%</span>
+</div>
+{%- endmacro %}
+
+{% macro step_cell(step) -%}
+{% set tone = 'bg-success/20 text-success' if step.complete else ('bg-warning/20 text-warning' if step.done else 'bg-error/10 text-error') %}
+<span class="inline-flex min-w-[3.25rem] justify-center rounded px-1.5 py-0.5 text-xs font-mono tabular-nums {{ tone }}">{{ step.done }}/{{ step.total }}</span>
+{%- endmacro %}
+
+{% macro sal_badge(level, names) -%}
+<span class="badge badge-sm badge-outline font-mono whitespace-nowrap" title="{{ names.get(level, '') }}">{{ level }}</span>
+{%- endmacro %}

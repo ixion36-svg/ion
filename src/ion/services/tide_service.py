@@ -12,6 +12,7 @@ import httpx
 
 from ion.core.circuit_breaker import tide_breaker
 from ion.core.config import get_ssl_verify, get_tide_config
+from ion.services import attack_catalogue
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,27 @@ _SPACE_RE = re.compile(r"^[A-Za-z0-9_.\- ]{1,64}$")
 #: cross it, and the rejection comes back as a 4xx that _query turns into
 #: None, which every caller reads as "no rows".
 _MAX_SQL_CHARS = 4000
+
+
+def _strip_sql_comments(sql: str) -> str:
+    """Drop ``--`` comments, leaving quoted text alone.
+
+    TIDE refuses a statement if a word like LOAD, SET or UPDATE appears
+    anywhere in it, comments included, so an explanatory comment such as
+    "load-bearing" took down the whole posture query.
+    """
+    out, i, n, quoted = [], 0, len(sql), False
+    while i < n:
+        ch = sql[i]
+        if ch == "'":
+            quoted = not quoted
+        elif not quoted and sql.startswith("--", i):
+            end = sql.find("\n", i)
+            i = n if end == -1 else end
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
 
 
 def _quoted_id_batches(ids, budget: int):
@@ -129,6 +151,12 @@ def _cache_put(sql: str, value: Optional[dict]) -> None:
 class TideService:
     """Client for TIDE's /api/external/query endpoint."""
 
+    # Learnt once from TIDE's schema; None until asked. Whether baselines are
+    # copied per system (TIDE 6), and whether rule scores are percentages
+    # (TIDE 5.1+).
+    _per_system_baselines: Optional[bool] = None
+    _percent_scores: Optional[bool] = None
+
     def __init__(self):
         cfg = get_tide_config()
         self.url = (cfg.get("url") or "").rstrip("/")
@@ -179,6 +207,7 @@ class TideService:
         #    an absence of data rather than as an error. Catching it here
         #    names the offender in the log instead of leaving a page quietly
         #    reporting zero coverage. See _quoted_id_batches.
+        sql = _strip_sql_comments(sql)
         if len(sql) > _MAX_SQL_CHARS:
             logger.error(
                 "TIDE query is %d chars, over the %d limit, so it was not sent. "
@@ -354,7 +383,11 @@ class TideService:
                     "TIDE query failed: HTTP %d: %s | sql=%s",
                     resp.status_code, detail, sql[:60],
                 )
-                tide_breaker.record_failure()
+                # A 400 is TIDE refusing this one statement, so TIDE is up.
+                # Counting it opened the breaker after three refusals and
+                # cut every other TIDE read off with them.
+                if resp.status_code != 400:
+                    tide_breaker.record_failure()
                 _cache_put(sql, None)
                 return None
 
@@ -485,11 +518,8 @@ class TideService:
         """)
         covered_ids = {r["technique_id"] for r in (covered["rows"] if covered else [])}
 
-        # All techniques in the MITRE database
-        all_tech = self._query(
-            "SELECT id as technique_id, name, tactic FROM mitre_techniques ORDER BY id"
-        )
-        techniques = all_tech["rows"] if all_tech else []
+        # The catalogue is ION's own: TIDE 6 does not serve it (see attack_catalogue).
+        techniques = [dict(t) for t in attack_catalogue.techniques()]
 
         return {
             "covered": list(covered_ids),
@@ -502,13 +532,8 @@ class TideService:
         if not self.enabled:
             return None
 
-        # 1. All known MITRE techniques
-        all_tech = self._query(
-            "SELECT id as technique_id, name, tactic FROM mitre_techniques ORDER BY id"
-        )
-        if not all_tech:
-            return None
-        techniques = all_tech["rows"]
+        # 1. All known MITRE techniques, from ION's catalogue (see attack_catalogue).
+        techniques = [dict(t) for t in attack_catalogue.techniques()]
         tech_catalog = {t["technique_id"]: t for t in techniques}
 
         # 2. Per-technique rule stats (LATERAL unnest for DuckDB compatibility)
@@ -651,6 +676,7 @@ class TideService:
         if not self.enabled:
             return None
 
+        excellent, good, fair = self._quality_bands()
         # Round-trip 1: everything from detection_rules + mitre coverage in ONE CTE query.
         result = self._query(f"""
             WITH
@@ -664,10 +690,10 @@ class TideService:
                     count(*) FILTER (WHERE enabled = 1) AS enabled_rules,
                     count(*) FILTER (WHERE enabled = 0) AS disabled_rules,
                     count(*) FILTER (WHERE mitre_ids IS NULL OR len(mitre_ids) = 0) AS unmapped_rules,
-                    count(*) FILTER (WHERE quality_score >= 30) AS q_excellent,
-                    count(*) FILTER (WHERE quality_score >= 20 AND quality_score < 30) AS q_good,
-                    count(*) FILTER (WHERE quality_score >= 10 AND quality_score < 20) AS q_fair,
-                    count(*) FILTER (WHERE quality_score < 10) AS q_poor,
+                    count(*) FILTER (WHERE quality_score >= {excellent}) AS q_excellent,
+                    count(*) FILTER (WHERE quality_score >= {good} AND quality_score < {excellent}) AS q_good,
+                    count(*) FILTER (WHERE quality_score >= {fair} AND quality_score < {good}) AS q_fair,
+                    count(*) FILTER (WHERE quality_score < {fair}) AS q_poor,
                     round(avg(quality_score), 1) AS avg_quality,
                     min(quality_score) AS min_quality,
                     max(quality_score) AS max_quality
@@ -718,7 +744,7 @@ class TideService:
             except Exception:
                 pass
 
-        # Round-trip 2: counts from mitre_techniques + systems (small, fast tables).
+        # Round-trip 2: the systems count.
         counts = self._query(
             "SELECT (SELECT count(*) FROM systems) AS total_systems"
         )
@@ -726,26 +752,9 @@ class TideService:
         if counts and counts["rows"]:
             total_systems = counts["rows"][0].get("total_systems", 0)
 
-        # Asked separately, and allowed to be unavailable.
-        #
-        # TIDE 6 moved the ATT&CK catalogue into a shared reference database
-        # attached as `ref`, and dropped the per-tenant copy. The external
-        # query API's allow-list is built from the tenant's own tables, so
-        # `FROM mitre_techniques` is refused in every form: bare, `ref.` and
-        # `ref.main.`. ATTACH and SET are both blocklisted, so there is no way
-        # to reach it from here. Verified against 6.0.2 on 2026-10-12.
-        #
-        # This used to share one statement with the systems count, so the
-        # refusal took a figure that is perfectly readable down with it, and
-        # then total_techniques was defaulted to 0. A technique total of zero
-        # makes SOC Health compute covered/0 as 0% and present it as measured
-        # detection coverage. None says what is true: nobody counted.
-        techniques = self._query(
-            "SELECT count(*) AS total_techniques FROM mitre_techniques"
-        )
-        total_techniques = None
-        if techniques and techniques["rows"]:
-            total_techniques = techniques["rows"][0].get("total_techniques")
+        # TIDE 6 moved the ATT&CK catalogue into a reference database its query
+        # API refuses to read, so the total comes from ION's own catalogue.
+        total_techniques = len(attack_catalogue.techniques())
 
         return {
             "total_rules": r["total_rules"],
@@ -753,6 +762,7 @@ class TideService:
             "disabled_rules": r["disabled_rules"],
             "severity": severity,
             "quality": {
+                "scale": "percent" if self._scores_are_percentages() else "points",
                 "excellent": r["q_excellent"],
                 "good": r["q_good"],
                 "fair": r["q_fair"],
@@ -782,6 +792,41 @@ class TideService:
         """)
         return result["rows"] if result else []
 
+    # Lower bounds of the excellent, good and fair quality bands. TIDE 5.1
+    # moved rule scores from points (about 0-40) to a percentage; the
+    # percentage bands follow TIDE's own colouring (green from 80, amber from 50).
+    _POINT_BANDS = (30, 20, 10)
+    _PERCENT_BANDS = (80, 50, 25)
+
+    def _scores_are_percentages(self) -> bool:
+        """True from TIDE 5.1. Scoring v2 arrived with checkedRule.rule_id,
+        a tenant table every TIDE creates up front (rule_score_history, which
+        carries scoring_version, only exists once rules have been synced).
+        Assumed until TIDE can be asked, since current TIDE scores that way."""
+        if self._percent_scores is None:
+            if self._query("SELECT count(*) AS n FROM checkedRule") is None:
+                return True
+            self._percent_scores = (
+                self._query("SELECT rule_id FROM checkedRule LIMIT 0") is not None
+            )
+        return self._percent_scores
+
+    def _quality_bands(self) -> tuple[int, int, int]:
+        return self._PERCENT_BANDS if self._scores_are_percentages() else self._POINT_BANDS
+
+    def _baselines_are_per_system(self) -> Optional[bool]:
+        """True on TIDE 6, where playbooks carry a system_id; None if TIDE
+        could not be asked. The external query API refuses schema lookups,
+        so the column itself is the probe: when the table answers and the
+        column is refused, the column is absent."""
+        if self._per_system_baselines is None:
+            if self._query("SELECT count(*) AS n FROM playbooks") is None:
+                return None
+            self._per_system_baselines = (
+                self._query("SELECT system_id FROM playbooks LIMIT 0") is not None
+            )
+        return self._per_system_baselines
+
     def get_playbooks_with_kill_chains(self) -> list[dict]:
         """Return playbooks (baselines) with steps, techniques, detections, and system coverage.
 
@@ -793,7 +838,14 @@ class TideService:
         """
         if not self.enabled:
             return []
-        pb = self._query("SELECT id, name, description FROM playbooks ORDER BY name")
+        per_system = self._baselines_are_per_system()
+        if per_system is None:
+            return []
+        # TIDE 6 gives every system its own copy of each baseline it applies,
+        # in the same table. The catalogue is the templates, the rows with no
+        # system; listing every row showed each baseline once per system.
+        where = "WHERE system_id IS NULL " if per_system else ""
+        pb = self._query(f"SELECT id, name, description FROM playbooks {where}ORDER BY name")
         if not pb or not pb["rows"]:
             return []
         playbooks = pb["rows"]
@@ -846,13 +898,25 @@ class TideService:
             p["steps"] = step_list
 
             # Get systems that have this baseline applied
-            sys_result = self._query(f"""
-                SELECT sb.system_id, s.name as system_name
-                FROM system_baselines sb
-                JOIN systems s ON s.id = sb.system_id
-                WHERE sb.playbook_id = '{p["id"]}'
-                ORDER BY s.name
-            """)
+            if per_system:
+                # A system's link points at its own copy, and TIDE 6 cleared
+                # the copy's template_id, so the copy is found by name.
+                safe_name = str(p["name"]).replace("'", "''")
+                sys_result = self._query(f"""
+                    SELECT DISTINCT pc.system_id, s.name as system_name
+                    FROM playbooks pc
+                    JOIN systems s ON s.id = pc.system_id
+                    WHERE pc.system_id IS NOT NULL AND pc.name = '{safe_name}'
+                    ORDER BY s.name
+                """)
+            else:
+                sys_result = self._query(f"""
+                    SELECT sb.system_id, s.name as system_name
+                    FROM system_baselines sb
+                    JOIN systems s ON s.id = sb.system_id
+                    WHERE sb.playbook_id = '{safe_pid}'
+                    ORDER BY s.name
+                """)
             p["applied_systems"] = sys_result["rows"] if sys_result else []
 
             # For each technique in steps, get rule coverage
@@ -944,13 +1008,11 @@ class TideService:
         if not self.enabled:
             return None
 
-        # 1. All techniques
-        all_tech = self._query(
-            "SELECT id AS technique_id, name, tactic FROM mitre_techniques ORDER BY tactic, id"
+        # 1. All techniques, from ION's catalogue (see attack_catalogue).
+        techniques = sorted(
+            (dict(t) for t in attack_catalogue.techniques()),
+            key=lambda t: (t["tactic"] is None, t["tactic"] or "", t["technique_id"]),
         )
-        if not all_tech:
-            return None
-        techniques = all_tech["rows"]
 
         # 2. Covered techniques. enabled = 1, so a gap analysis cannot clear a
         # tactic on the strength of rules nobody switched on. This function
@@ -988,11 +1050,12 @@ class TideService:
         """)
         unmapped_rules = unmapped["rows"] if unmapped else []
 
+        _, good, _ = self._quality_bands()
         quick = self._query(f"""
             SELECT DISTINCT rule_id, name, severity, quality_score, mitre_ids
             FROM detection_rules
             WHERE space = '{self.space}' AND enabled = 0
-              AND quality_score >= 20 AND severity IN ('critical', 'high')
+              AND quality_score >= {good} AND severity IN ('critical', 'high')
             ORDER BY quality_score DESC, severity
             LIMIT 20
         """)

@@ -51,6 +51,14 @@
     <i class="icon-alert-triangle"></i> reaches impact</span>
   {%- endif %}
 </div>
+{#- With no connections the lanes are a column of unrelated boxes: 672 px
+    for CASE-0239's ten hosts. They stay one click away. -#}
+{%- set unlinked = stats.edges == 0 and edges_readable %}
+{%- if unlinked %}
+<details class="apg-unlinked">
+  <summary>{{ fig(stats.nodes, 'Not recorded') }} nodes, no connections between
+    them <span class="apg-unlinked-toggle">show nodes</span></summary>
+{%- endif %}
 <div class="apg-legend">
   {%- for e in legend %}
   <span class="apg-legend-item">
@@ -86,4 +94,7 @@
     {%- endfor %}
   </div>
 </div>
+{%- if unlinked %}
+</details>
+{%- endif %}
 {%- endif %}

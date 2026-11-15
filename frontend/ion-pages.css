@@ -1428,6 +1428,40 @@ body[data-page="detection_health"] #dh-modal-overlay.show > .modal-box{
 body[data-page="detection_health"] .dh-bar{display:inline-block;height:10px;border-radius:3px;background:color-mix(in oklab, var(--color-base-content) 12%, transparent);width:70px;vertical-align:middle;overflow:hidden;margin-right:6px}
 body[data-page="detection_health"] .dh-bar-fill{display:block;height:100%;border-radius:3px}
 
+/* ATT&CK guidance drill-down. Appearance lives here rather than as utility
+   classes on the fragment, so a restyle is one edit and the rules are themed
+   through the tokens like every other page sheet. Every colour is a
+   color-mix over a theme token: a literal would go invisible on the light
+   page, which is what the `light` column in docs/UI_REDESIGN.md measures. */
+body[data-page="detection_health"] .dha-head{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+body[data-page="detection_health"] .dha-title{font-weight:600}
+body[data-page="detection_health"] .dha-meta{color:color-mix(in oklab, var(--color-base-content) 60%, transparent);font-size:.75rem}
+body[data-page="detection_health"] .dha-ver{font-family:ui-monospace,monospace;font-size:.6875rem;padding:1px 6px;border-radius:4px;border:1px solid color-mix(in oklab, var(--color-base-content) 20%, transparent);color:color-mix(in oklab, var(--color-base-content) 70%, transparent)}
+body[data-page="detection_health"] .dha-tech{margin-bottom:14px}
+body[data-page="detection_health"] .dha-tech-head{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+body[data-page="detection_health"] .dha-tid{font-family:ui-monospace,monospace;font-size:.6875rem;padding:2px 7px;border-radius:4px;background:color-mix(in oklab, var(--color-primary) 14%, transparent);color:var(--color-primary);border:1px solid color-mix(in oklab, var(--color-primary) 28%, transparent)}
+/* Amber, because a retired id is a caution and not an error: the guidance
+   below it is correct, it is just filed under the replacement. */
+body[data-page="detection_health"] .dha-retired{font-family:ui-monospace,monospace;font-size:.6875rem;padding:2px 7px;border-radius:4px;background:color-mix(in oklab, var(--color-warning) 14%, transparent);color:var(--color-warning);border:1px solid color-mix(in oklab, var(--color-warning) 30%, transparent)}
+body[data-page="detection_health"] .dha-strategy{margin:6px 0 0 2px;padding-left:12px;border-left:1px solid color-mix(in oklab, var(--color-base-content) 18%, transparent)}
+body[data-page="detection_health"] .dha-strategy-name{font-weight:500;max-width:100%;overflow-wrap:break-word}
+body[data-page="detection_health"] .dha-det{font-family:ui-monospace,monospace;font-size:.6875rem;color:color-mix(in oklab, var(--color-base-content) 55%, transparent);margin-left:6px}
+body[data-page="detection_health"] .dha-an{margin-top:8px}
+body[data-page="detection_health"] .dha-an-head{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+body[data-page="detection_health"] .dha-an-id{font-family:ui-monospace,monospace;font-size:.6875rem;color:color-mix(in oklab, var(--color-base-content) 55%, transparent)}
+body[data-page="detection_health"] .dha-plat{font-size:.625rem;letter-spacing:.3px;padding:1px 6px;border-radius:4px;border:1px solid color-mix(in oklab, var(--color-base-content) 22%, transparent);color:color-mix(in oklab, var(--color-base-content) 75%, transparent)}
+/* Capped in ch, not px: the panel sits in a colspan cell of an auto-layout
+   table, so a px cap wider than the cell clips the line instead of wrapping it. */
+body[data-page="detection_health"] .dha-desc{margin-top:3px;max-width:96ch;overflow-wrap:break-word;color:color-mix(in oklab, var(--color-base-content) 85%, transparent)}
+body[data-page="detection_health"] .dha-tune{margin-top:3px;font-size:.6875rem;color:color-mix(in oklab, var(--color-base-content) 55%, transparent)}
+body[data-page="detection_health"] .dha-tune-field{font-family:ui-monospace,monospace}
+body[data-page="detection_health"] .dha-tele{margin-top:14px}
+body[data-page="detection_health"] .dha-tele-head{font-weight:500;margin-bottom:4px}
+body[data-page="detection_health"] .dha-tele-note{font-size:.6875rem;color:color-mix(in oklab, var(--color-base-content) 55%, transparent);font-weight:400}
+body[data-page="detection_health"] .dha-tele table{width:100%;table-layout:fixed}
+body[data-page="detection_health"] .dha-tele td,body[data-page="detection_health"] .dha-tele th{overflow-wrap:break-word}
+body[data-page="detection_health"] .dha-note{font-size:.6875rem;color:color-mix(in oklab, var(--color-base-content) 55%, transparent);margin-top:6px}
+
 /* ── entity_timeline.html ─────────────────────────────────── */
 /* JS innerHTML: entity header after search. Not daisyUI card markup. */
 body[data-page="entity_timeline"] .et-header{

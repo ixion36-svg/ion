@@ -3,11 +3,11 @@
 import logging
 import os
 import platform
+import re
 import sys
+from dataclasses import fields as dataclass_fields
 from datetime import datetime
 from pathlib import Path
-import re
-from dataclasses import fields as dataclass_fields
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -224,7 +224,7 @@ _SECRET_HINTS = (
 _EDITABLE_PREFIXES = (
     "elasticsearch_", "kibana_", "gitlab_", "opencti_", "tide_",
     "arkime_", "ollama_", "oidc_", "dfir_iris_", "abuseipdb_",
-    "virustotal_",
+    "virustotal_", "ssvc_",
 )
 _EDITABLE_EXTRA = frozenset({
     "base_url", "default_format", "auto_save", "max_versions_to_keep",

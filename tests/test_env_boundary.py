@@ -63,38 +63,45 @@ def test_template_holds_every_required_key(name):
     )
 
 
-def test_deploy_template_sets_no_ui_managed_key():
-    """.env.deploy is a working template people deploy from.
+# docker-compose.yml always injects these into the ion container, so they are
+# environment-held whatever .env says and the template is where they are set.
+COMPOSE_INJECTED = frozenset({"ION_BASE_URL", "ION_OLLAMA_URL", "ION_CA_BUNDLE"})
 
-    It is not held to the 8-key boundary, because it legitimately carries
-    deployment tuning with no Config field (resource limits, Postgres tuning,
-    pool sizes). But a live key that ION also exposes in the settings UI would
-    silently override that UI on every deployment made from this file.
-    """
-    repo_root = Path(__file__).resolve().parents[1]
-    path = repo_root / ".env.deploy"
+
+def _deploy_template() -> str:
+    path = Path(__file__).resolve().parents[1] / ".env.deploy"
     if not path.exists():
         pytest.skip(".env.deploy not present")
-    live = set(re.findall(r"^([A-Z_]+)=", path.read_text(encoding="utf-8"), re.M))
-    # Scope: the integration sections the settings UI exposes. ENV_FIELD_MAP
-    # now covers every environment override get_config() applies (150 of them),
-    # which is right for source reporting but wrong as the guard here: it would
-    # also flag deployment-level policy such as ION_PASSWORD_MIN_LENGTH and
-    # ION_IP_BLOCKING_ENABLED, which have no settings-UI section and belong in
-    # a deployment template.
-    sections = (
-        "ELASTICSEARCH", "KIBANA", "GITLAB", "OPENCTI", "ARKIME", "TIDE",
-        "OLLAMA", "OIDC", "DFIR_IRIS", "ABUSEIPDB", "VIRUSTOTAL",
-    )
-    managed = {
-        env for env in ENV_FIELD_MAP.values()
-        if any(env.startswith(f"ION_{s}_") for s in sections)
-    }
-    stray = sorted(live & managed)
+    return path.read_text(encoding="utf-8")
+
+
+def test_deploy_template_names_no_ui_managed_key():
+    """.env.deploy is a working template people deploy from.
+
+    It is not held to the 8-key boundary, because it carries deployment
+    tuning with no Config field (resource limits, Postgres tuning, pool
+    sizes). Every ENV_FIELD_MAP key is editable on the Settings page, and a
+    live one here would silently override it on every deployment made from
+    this file. Commented ones count too: they invite exactly that.
+    """
+    named = set(re.findall(r"^#?\s?([A-Z_][A-Z0-9_]*)=", _deploy_template(), re.M))
+    stray = sorted((named & set(ENV_FIELD_MAP.values())) - COMPOSE_INJECTED)
     assert stray == [], (
-        ".env.deploy sets keys managed in the settings UI, which would "
+        ".env.deploy names keys managed in the settings UI, which would "
         "silently override it: " + ", ".join(stray)
     )
+
+
+def test_deploy_template_sets_both_structural_secrets():
+    live = set(re.findall(r"^([A-Z_]+)=", _deploy_template(), re.M))
+    assert STRUCTURAL_ENV_KEYS <= live
+
+
+def test_deploy_template_sets_no_database_url():
+    """Compose builds ION_DATABASE_URL from ION_DB_PASSWORD and its
+    `environment:` entry outranks env_file, so a URL here is dead and a
+    second copy of the password to get out of step."""
+    assert not re.search(r"^ION_DATABASE_URL=", _deploy_template(), re.M)
 
 
 # ── Consequences of the pruning ──

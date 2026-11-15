@@ -46,8 +46,6 @@ class _FakeTide(TideService):
         for needle in self.refuse:
             if needle in sql:
                 return None  # what _query returns for a 4xx from TIDE
-        if "FROM mitre_techniques" in sql:
-            return {"rows": [{"total_techniques": 918}]}
         if "FROM systems" in sql:
             return {"rows": [{"total_systems": 4}]}
         if "AS covered" in sql or "total_rules" in sql:
@@ -66,38 +64,20 @@ class _FakeTide(TideService):
 # ---------------------------------------------------------------------------
 
 
-def test_the_two_counts_are_asked_for_separately():
-    """Pre-fix they shared a statement, so a refused technique count also
-    zeroed the system count. This is the control for that regression."""
-    svc = _FakeTide()
-    svc.get_posture_stats()
-    combined = [s for s in svc.sent
-                if "FROM mitre_techniques" in s and "FROM systems" in s]
-    assert not combined, (
-        "the technique and system counts are back in one statement, so a "
-        "refusal of the first destroys the second"
-    )
+def test_the_technique_total_is_ions_catalogue_not_a_tide_query():
+    """ION counts its own catalogue, so a TIDE that refuses mitre_techniques
+    (every TIDE 6) no longer leaves the total unknown."""
+    from ion.services import attack_catalogue
 
-
-def test_a_refused_technique_count_leaves_the_system_count_intact():
     svc = _FakeTide(refuse=("FROM mitre_techniques",))
     stats = svc.get_posture_stats()
-    assert stats["total_techniques"] is None
-    assert stats["total_systems"] == 4
+    assert stats["total_techniques"] == len(attack_catalogue.techniques())
+    assert not [q for q in svc.sent if "mitre_techniques" in q]
 
 
-def test_a_served_technique_count_comes_through():
+def test_the_system_count_still_comes_from_tide():
     stats = _FakeTide().get_posture_stats()
-    assert stats["total_techniques"] == 918
     assert stats["total_systems"] == 4
-
-
-def test_a_refused_count_is_none_not_zero():
-    """Zero is a measurement. None is the absence of one."""
-    stats = _FakeTide(refuse=("FROM mitre_techniques",)).get_posture_stats()
-    assert stats["total_techniques"] is not None or True  # readability
-    assert stats["total_techniques"] is None
-    assert stats["total_techniques"] != 0
 
 
 # ---------------------------------------------------------------------------
@@ -252,3 +232,17 @@ def test_a_none_quality_does_not_raise_in_the_recommendation_gate():
         "rule_quality_pct": None, "avg_quality": None,
         "total_techniques": None, "covered_techniques": None,
     }, score=None))
+
+
+def test_a_percentage_quality_is_not_divided_by_forty():
+    """TIDE 5.1+ scores in percent. 46.3 used to become 115.8%."""
+    result = _coverage({**_FULL, "total_techniques": 706,
+                        "quality": {"avg_quality": 46.3, "scale": "percent"}})
+    assert result["details"]["rule_quality_pct"] == 46.3
+    assert result["details"]["quality_unit"] == "%"
+
+
+def test_a_points_quality_still_scales_from_forty():
+    result = _coverage({**_FULL, "total_techniques": 706,
+                        "quality": {"avg_quality": 20, "scale": "points"}})
+    assert result["details"]["rule_quality_pct"] == 50.0

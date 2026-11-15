@@ -1,55 +1,179 @@
-{# Threat Intel Overview: the four watch-and-match tiles.
+{# Threat Intel Overview: the KPI row, and four small regions out of band.
 
-   Replaces the four textContent writes in loadOverview plus the unread
-   badge toggle. The tiles are this fragment's target; the badge swaps out
-   of band, because it lives in the tab strip and no other read knows the
-   count.
+   Target: #ti-overview-stats, the six tiles. Out of band: the status pill
+   in the header, the KEV count on its tab, the one Connect OpenCTI prompt,
+   and the unread badge on the Indicators tab. One read keeps all of them
+   in step, and none of them needs a second request.
 
-   The defect: loadOverview's catch was console.error and rendered nothing
-   at all, so a failed read left all four tiles showing the dash they ship
-   with and the page looked like it was still loading. The figures went in
-   as `stats.watched_actors` with no guard, so a payload missing a key
-   printed the string "undefined" into the tile.
+   The rule every tile follows, because this page is read to decide whether
+   anything needs looking at:
 
-   Every figure is guarded with `is not none`. Zero watched actors is a
-   finding about this estate. An unmeasured count is not, and a confident
-   zero in its place is the thing this whole conversion exists to stop. #}
+     a number      measured. Zero is shown as 0 and means zero.
+     unknown       the read failed. Never a zero in its place.
+     not recorded  the read answered without that figure.
+     a dash        not measurable here, with the reason beneath it: OpenCTI
+                   not configured, no vulnerabilities tracked, a KEV
+                   snapshot older than the window, or no alert:read.
 
-{% macro tile(label, value, colour, sub) -%}
-<div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-  <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">{{ label }}</div>
-  <div class="text-[28px] font-semibold {{ colour }} font-mono">
-    {%- if failed or stats is none -%}
-      <span class="text-slate-600 text-base font-sans font-normal">unknown</span>
-    {%- elif value is not none -%}
-      {{ value }}
-    {%- else -%}
-      <span class="text-slate-600 text-base font-sans font-normal">not recorded</span>
+   The watch-and-match figures keep their old guards word for word: a
+   failed read says unknown in every tile, and a missing key says not
+   recorded rather than printing "undefined". #}
+
+{% set kev = kev if kev is defined else none %}
+{% set techniques = techniques if techniques is defined else none %}
+{% set can_read_alerts = can_read_alerts if can_read_alerts is defined else false %}
+{% set opencti = opencti_configured if opencti_configured is defined else none %}
+
+{% macro na(text) -%}<span class="ti-kpi-na">{{ text }}</span>{%- endmacro %}
+{% macro dash() -%}<span class="ti-kpi-dash" aria-label="not measured">&mdash;</span>{%- endmacro %}
+
+{% macro watch_tile(label, value) -%}
+<div class="ti-kpi">
+  <div class="ti-kpi-k">{{ label }}</div>
+  <div class="ti-kpi-v">
+    {%- if failed or stats is none -%}{{ na('unknown') }}
+    {%- elif value is none and opencti is false -%}{{ dash() }}
+    {%- elif value is none -%}{{ na('not recorded') }}
+    {%- elif opencti is false and value == 0 -%}{{ dash() }}
+    {%- else -%}{{ value }}
     {%- endif -%}
   </div>
-  <div class="text-[11px] text-slate-500 mt-1">{{ sub }}</div>
+  <div class="ti-kpi-s">
+    {%- if opencti is false and not (value is number and value > 0) -%}needs OpenCTI
+    {%- elif opencti is false -%}on the watchlist &middot; OpenCTI not configured
+    {%- else -%}on the watchlist{%- endif -%}
+  </div>
 </div>
 {%- endmacro %}
 
 {% if failed or stats is none %}
-  <div role="alert" class="col-span-2 md:col-span-4 rounded-xl border border-ion-coral/30 bg-ion-coral/[0.06] p-3 text-xs text-ion-coral">
-    The threat intel overview could not be read, so the counts below say
-    unknown rather than zero. A watchlist with nothing on it and a watchlist
-    nobody could read are different situations, and only one of them means
-    there is nothing to look at.
+  <div role="alert" class="ti-kpi-alert">
+    The threat intel overview could not be read, so the watchlist counts
+    below say unknown rather than zero. A watchlist with nothing on it and a
+    watchlist nobody could read are different situations, and only one of
+    them means there is nothing to look at.
   </div>
 {% endif %}
 
-{{ tile('Watched Actors', (stats or {}).get('watched_actors'), 'text-white', 'on the watchlist') }}
-{{ tile('Watched Campaigns', (stats or {}).get('watched_campaigns'), 'text-ion-cyan', 'on the watchlist') }}
-{{ tile('Matches (7d)', (stats or {}).get('matches_7d'), 'text-ion-coral', 'across alerts') }}
-{{ tile('Unread Alerts', (stats or {}).get('unread_alerts'), 'text-ion-amber', 'match alerts pending') }}
+{{ watch_tile('Watched actors', (stats or {}).get('watched_actors')) }}
+{{ watch_tile('Watched campaigns', (stats or {}).get('watched_campaigns')) }}
 
-{# Out of band, so one read keeps the tab badge in step with the tiles.
-   `> 0`, so an unread count of zero and an unmeasured one both hide the
-   badge rather than painting a zero on the tab: the badge exists to draw
-   the eye, and one reading 0 does that for nothing. #}
+{# Matches are local: enrichment comparing observables against the
+   watchlist. A zero is measured whether or not OpenCTI is configured. #}
+{% set m7 = (stats or {}).get('matches_7d') %}
 {% set unread = (stats or {}).get('unread_alerts') %}
+<div class="ti-kpi">
+  <div class="ti-kpi-k">Watch matches (7d)</div>
+  <div class="ti-kpi-v{% if m7 is number and m7 > 0 %} is-bad{% endif %}">
+    {%- if failed or stats is none -%}{{ na('unknown') }}
+    {%- elif m7 is none -%}{{ na('not recorded') }}
+    {%- else -%}{{ m7 }}{%- endif -%}
+  </div>
+  <div class="ti-kpi-s">
+    {%- if unread is number and unread > 0 -%}<button type="button" class="ti-linkbtn" data-click-action="tiSwitchTab" data-args='["watchlist"]'>{{ unread }} unread</button> in your alerts
+    {%- else -%}in your alerts{%- endif -%}
+  </div>
+</div>
+
+{# KEV in your estate: ION's own vulnerability register joined to the
+   catalog. No register, no figure. #}
+<div class="ti-kpi">
+  <div class="ti-kpi-k">KEV in your estate</div>
+  {%- if not can_read_alerts -%}
+    <div class="ti-kpi-v">{{ dash() }}</div><div class="ti-kpi-s">needs alert:read</div>
+  {%- elif kev is none or kev.get('failed') -%}
+    <div class="ti-kpi-v">{{ na('unknown') }}</div><div class="ti-kpi-s">the KEV read failed</div>
+  {%- elif not (kev.get('status') or {}).get('loaded') -%}
+    <div class="ti-kpi-v">{{ dash() }}</div><div class="ti-kpi-s">no KEV catalog loaded</div>
+  {%- elif kev.get('in_estate') is none -%}
+    <div class="ti-kpi-v">{{ dash() }}</div><div class="ti-kpi-s">no vulnerabilities tracked in ION</div>
+  {%- else -%}
+    {%- set n = kev.get('in_estate') -%}
+    <div class="ti-kpi-v{% if n > 0 %} is-warn{% endif %}">{{ n }}</div>
+    <div class="ti-kpi-s" title="Open or in-progress vulnerabilities on ION's register whose CVE is in the KEV catalog">open vulns in KEV &middot; of {{ kev.get('tracked_vulns') }} tracked</div>
+  {%- endif -%}
+</div>
+
+{# New KEV: the week to the snapshot date. A snapshot older than the window
+   cannot say what CISA added this week. #}
+<div class="ti-kpi">
+  <div class="ti-kpi-k">New KEV ({{ (kev or {}).get('window_days') or 7 }}d)</div>
+  {%- if not can_read_alerts -%}
+    <div class="ti-kpi-v">{{ dash() }}</div><div class="ti-kpi-s">needs alert:read</div>
+  {%- elif kev is none or kev.get('failed') -%}
+    <div class="ti-kpi-v">{{ na('unknown') }}</div><div class="ti-kpi-s">the KEV read failed</div>
+  {%- elif not (kev.get('status') or {}).get('loaded') -%}
+    <div class="ti-kpi-v">{{ dash() }}</div><div class="ti-kpi-s">no KEV catalog loaded</div>
+  {%- elif kev.get('new_7d') is none -%}
+    {%- set age = (kev.get('status') or {}).get('age_days') -%}
+    <div class="ti-kpi-v">{{ dash() }}</div>
+    <div class="ti-kpi-s">{% if age is number %}snapshot is {{ age }} days old{% else %}snapshot age unknown{% endif %}</div>
+  {%- else -%}
+    <div class="ti-kpi-v">{{ kev.get('new_7d') }}</div>
+    <div class="ti-kpi-s">{{ kev.get('new_7d_ransomware') }} ransomware-linked &middot; to {{ (kev.get('snapshot').day ~ ' ' ~ kev.get('snapshot').strftime('%b')) if kev.get('snapshot') else 'the snapshot' }}</div>
+  {%- endif -%}
+</div>
+
+{# Techniques: distinct ATT&CK ids alert triage tagged in the window. No
+   triage in the window is no measurement. #}
+{% set t = techniques or {} %}
+<div class="ti-kpi">
+  <div class="ti-kpi-k">Techniques seen ({{ t.get('days') or 7 }}d)</div>
+  {%- if techniques is none or t.get('failed') -%}
+    <div class="ti-kpi-v">{{ na('unknown') }}</div><div class="ti-kpi-s">the triage read failed</div>
+  {%- elif t.get('count') is none -%}
+    <div class="ti-kpi-v">{{ dash() }}</div><div class="ti-kpi-s">no alerts triaged in {{ t.get('days') }} days</div>
+  {%- else -%}
+    <div class="ti-kpi-v">{{ t.get('count') }}{% if t.get('capped') %}+{% endif %}</div>
+    <div class="ti-kpi-s">in {% if t.get('scan_capped') %}the newest {% endif %}{{ '{:,}'.format(t.get('triaged')) }} triaged alerts</div>
+  {%- endif -%}
+</div>
+
+{# ---- out of band ---- #}
+
+{# The header's status pill. "Configured" is all the page can claim about
+   OpenCTI without calling it, so that is the word. The KEV part names the
+   snapshot's date and age, because "not in KEV" means nothing without them. #}
+{% set kst = (kev or {}).get('status') if kev and not kev.get('failed') else none %}
+{% set kage = (kst or {}).get('age_days') %}
+{% set fresh = kage is number and kage <= 30 %}
+<span id="ti-status-pill" hx-swap-oob="outerHTML"
+      class="ti-pill {% if opencti and (fresh or not can_read_alerts) %}is-ok{% else %}is-warn{% endif %}">
+  <span class="ti-dot" aria-hidden="true"></span>
+  {%- if opencti is true -%}OpenCTI configured
+  {%- elif opencti is false -%}OpenCTI not configured
+  {%- else -%}OpenCTI status unknown{%- endif -%}
+  {%- if can_read_alerts -%}
+    {%- if kst and kst.get('loaded') %} &middot; KEV snapshot {{ (kev.get('snapshot').day ~ ' ' ~ kev.get('snapshot').strftime('%b %Y')) if kev.get('snapshot') else (kst.get('catalog_version') or 'of unknown date') }}{% if kage is number %} &middot; {{ kage }} days old{% endif %}
+    {%- elif kst %} &middot; no KEV catalog loaded
+    {%- else %} &middot; KEV status unknown{%- endif -%}
+  {%- endif -%}
+</span>
+
+{# The KEV tab's count. Only for a viewer who has the tab, because an
+   out-of-band swap into an absent element is an htmx error. #}
+{% if can_read_alerts %}
+<span id="ti-kev-count" hx-swap-oob="outerHTML" class="ti-tab-c">
+  {%- if kst and kst.get('count') is not none -%}{{ '{:,}'.format(kst.get('count')) }}{%- endif -%}
+</span>
+{% endif %}
+
+{# The one Connect OpenCTI prompt. Empty when OpenCTI is configured. #}
+<div id="ti-connect-opencti" hx-swap-oob="innerHTML">
+  {%- if opencti is false -%}
+    <div class="ti-connect">
+      <span class="ti-connect-i" aria-hidden="true">&#9881;</span>
+      <div><b>Connect OpenCTI</b> to fill actors, campaigns, the IOC feed and
+        reports. An administrator sets it up under
+        <a href="/settings#opencti">Settings &rarr; OpenCTI</a>.</div>
+    </div>
+  {%- endif -%}
+</div>
+
+{# The unread badge, on the Indicators tab. `> 0`, so an unread count of
+   zero and an unmeasured one both hide the badge rather than painting a
+   zero on the tab: the badge exists to draw the eye, and one reading 0
+   does that for nothing. #}
 <span id="ti-unread-badge" hx-swap-oob="outerHTML"
       class="ti-badge{% if not (unread is number and unread > 0) %} hidden{% endif %}">
   {{- unread if unread is number and unread > 0 else 0 -}}

@@ -1,0 +1,32 @@
+{% extends "cyab/_layout.html" %}
+{% block heading %}History{% endblock %}
+{% block body %}
+<form method="get" action="/cyab/history" class="flex flex-wrap items-end gap-2 mb-3">
+  <select name="system" class="select select-sm w-72" aria-label="System">
+    <option value="">All systems</option>
+    {% for sid, name in systems %}<option value="{{ sid }}" {{ 'selected' if system_id == sid }}>{{ name }}</option>{% endfor %}
+  </select>
+  <button class="btn btn-sm">Show</button>
+  <div class="grow"></div>
+  <a href="{{ csv_href }}" class="btn btn-sm btn-ghost">Export CSV</a>
+</form>
+<section class="card bg-base-200 border border-base-300 overflow-x-auto">
+  {% if events %}
+  <table class="table table-sm">
+    <thead><tr><th class="w-40">When</th><th>Who</th><th>System</th><th>What</th></tr></thead>
+    <tbody>
+      {% for e in events %}
+        <tr>
+          <td class="font-mono text-xs whitespace-nowrap">{{ e.at.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td class="text-sm whitespace-nowrap">{{ e.who }}</td>
+          <td class="text-sm"><a href="/cyab/systems/{{ e.system_id }}/summary" class="link link-hover">{{ e.system }}</a></td>
+          <td class="text-sm">{{ e.text }}{% if e.note %}<div class="text-xs text-base-content/60">{{ e.note }}</div>{% endif %}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p class="p-6 text-sm text-base-content/60">Nothing recorded yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

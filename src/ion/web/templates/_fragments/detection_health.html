@@ -126,7 +126,19 @@
                 {# The column exists for every reader so the table's shape
                    does not depend on who is looking; the button inside it
                    only for a reader whose POST would be accepted. #}
-                <td>
+                {# ATT&CK guidance swaps into the same drill row as the Bob
+                   rate: one open panel per rule, so the table keeps its shape
+                   and colspan. It is a read gated by the fragment's own
+                   security:read, so unlike Propose tuning it is offered to
+                   every reader who can see the table at all. #}
+                <td class="whitespace-nowrap">
+                  <button class="btn btn-ghost btn-sm"
+                          data-click-action="dhReveal"
+                          data-drill="dh-drill-{{ row.index }}"
+                          hx-get="{{ row.attack_url }}"
+                          hx-target="#dh-drill-{{ row.index }} .dh-drill"
+                          hx-swap="innerHTML"
+                          title="What MITRE says to look for behind this rule's ATT&CK techniques, and the telemetry it needs">ATT&amp;CK</button>
                   {%- if can_propose -%}
                     <button class="btn btn-ghost btn-sm" data-click-action="dhPropose"
                             data-rule="{{ row.name }}">Propose tuning</button>

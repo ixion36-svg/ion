@@ -130,3 +130,53 @@ def test_permissions_have_no_licence_dependency(client):
         assert route.response_class.__name__ == 'HTMLResponse'
         assert all(dep.call is not require_de_module for dep in route.dependant.dependencies)
         assert any('alert:read' in (cell.cell_contents for cell in (dep.call.__closure__ or ())) for dep in route.dependant.dependencies if dep.call.__closure__)
+
+
+def _ssvc(decision, assumed=3, basis='listed in the CISA KEV catalogue'):
+    return {'decision': decision, 'assumed_count': assumed, 'reason': None if decision else 'no row',
+            'exploitation': {'value': 'active', 'basis': basis}}
+
+
+def test_the_patch_decision_is_shown_with_how_much_was_assumed(client, monkeypatch):
+    from bs4 import BeautifulSoup
+    c, ui = client
+    monkeypatch.setattr(ui.vulnerability_service, 'coverage_overview', lambda session: {
+        'vulnerabilities': [{'id': 1, 'title': 'A', 'ssvc': _ssvc('out-of-cycle')},
+                            {'id': 2, 'title': 'B', 'ssvc': _ssvc('immediate', assumed=0)},
+                            {'id': 3, 'title': 'C', 'ssvc': _ssvc(None)}],
+        'summary': {'total': 3, 'ssvc_unset': ['ssvc_exposure', 'ssvc_automatable', 'ssvc_human_impact']}})
+    soup = BeautifulSoup(c.get('/ui/detection-engineering/vulns').text, 'html.parser')
+    pills = soup.select('.de-ssvc')
+    assert [p.get_text(strip=True) for p in pills] == ['out-of-cycle', 'immediate', 'no decision']
+    assert 'de-ssvc-out-of-cycle' in pills[0]['class']
+    assert 'listed in the CISA KEV catalogue' in pills[0]['title'] and '3 of 3' in pills[0]['title']
+    assert [d.get_text(strip=True) for d in soup.select('.de-ssvc-assumed')] == ['3 assumed']
+    note = soup.select_one('.de-ssvc-note').get_text(' ', strip=True)
+    assert 'assume 3 of 3' in note and 'ssvc_exposure' in note
+
+
+def test_no_assumption_note_once_every_input_is_set(client, monkeypatch):
+    from bs4 import BeautifulSoup
+    c, ui = client
+    monkeypatch.setattr(ui.vulnerability_service, 'coverage_overview', lambda session: {
+        'vulnerabilities': [{'id': 1, 'title': 'A', 'ssvc': _ssvc('defer', assumed=0)}],
+        'summary': {'total': 1, 'ssvc_unset': []}})
+    soup = BeautifulSoup(c.get('/ui/detection-engineering/vulns').text, 'html.parser')
+    assert soup.select_one('.de-ssvc-note') is None
+    assert soup.select_one('.de-ssvc-defer').get_text(strip=True) == 'defer'
+
+
+def test_the_list_reads_kev_once_for_every_row(monkeypatch):
+    from types import SimpleNamespace
+    from ion.services import kev_service, vulnerability_service
+
+    calls = []
+    monkeypatch.setattr(kev_service, 'lookup_many', lambda s, ids: calls.append(list(ids)) or {'CVE-2024-0001': object()})
+    monkeypatch.setattr(kev_service, 'status', lambda s: {'age_days': 3})
+    monkeypatch.setattr(kev_service, 'lookup', lambda *a: (_ for _ in ()).throw(AssertionError('per-row lookup')))
+    vulns = [SimpleNamespace(id=i, cve_id=c, exploit_available=False, exploit_in_the_wild=False)
+             for i, c in [(1, 'cve-2024-0001'), (2, 'CVE-2024-0002'), (3, None)]]
+    out = vulnerability_service._ssvc_for_many(None, vulns)
+    assert len(calls) == 1 and sorted(calls[0]) == ['CVE-2024-0002', 'cve-2024-0001']
+    assert out[1]['exploitation']['value'] == 'active'
+    assert out[2]['exploitation']['value'] == 'none' and '3 days old' in out[2]['exploitation']['basis']
