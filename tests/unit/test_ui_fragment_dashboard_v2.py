@@ -1597,6 +1597,48 @@ def test_the_page_assigns_no_markup_from_javascript():
     assert "insertAdjacentHTML" not in source
 
 
+def test_each_customize_toggle_hides_only_its_own_section():
+    """Defect: a toggle that hides more than its label says.
+
+    `saveDashPref` hides the element whose id the checkbox names. "Threat
+    Feed" named the grid that also holds the KPI stack, and "My Cases" named
+    the grid that also holds the handover card, so two of the four toggles
+    took a second section with them.
+    """
+    from html.parser import HTMLParser
+
+    void = {"input", "br", "hr", "img", "meta", "link", "use"}
+
+    class Outline(HTMLParser):
+        def __init__(self) -> None:
+            super().__init__()
+            self.open: list[Optional[str]] = []
+            self.ancestors: dict[str, list[str]] = {}
+            self.targets: list[str] = []
+
+        def handle_starttag(self, tag, attrs):
+            found = dict(attrs)
+            if found.get("data-dash-section"):
+                self.targets.append(found["data-dash-section"])
+            if found.get("id"):
+                self.ancestors[found["id"]] = [i for i in self.open if i]
+            if tag not in void:
+                self.open.append(found.get("id"))
+
+        def handle_endtag(self, tag):
+            if tag not in void and self.open:
+                self.open.pop()
+
+    outline = Outline()
+    outline.feed(strip_comments(PAGE.read_text(encoding="utf-8")))
+
+    assert len(outline.targets) == 4
+    for target in outline.targets:
+        assert target in outline.ancestors, f"{target} names no element"
+        inside = set(outline.ancestors[target]) & set(outline.targets)
+        assert not inside, f"hiding {inside} also hides {target}"
+
+
 def test_the_page_uses_no_htmx_feature_that_compiles_a_string():
     """Defect: a dead control that reads as a working one.
 
