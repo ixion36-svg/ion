@@ -131,6 +131,8 @@ LOCK_SEED_KEV_CATALOG       = 1029  # v0.79.1  — seed the bundled CISA KEV sna
 LOCK_ARKIME_RETENTION_BG    = 1030  # v0.86.0  — PCAP-retention awareness / analysis rescue
 LOCK_SEED_TENANTS           = 1031  # seed the default tenant row
 LOCK_SEED_COMM_TEMPLATES    = 1032  # seed the default incident-notification templates (opt-in: config.comm_templates_seed)
+LOCK_RULE_NAME_BACKFILL_BG  = 1033  # name triage rows that were saved without their rule name
+LOCK_SEED_WORKFORCE         = 1034  # seed the induction and starter role profiles on an empty deployment
 
 
 @contextmanager
@@ -1253,6 +1255,11 @@ def _run_migrations(engine: Engine) -> None:
         if "grace_until" not in existing:
             ts_type = "TIMESTAMPTZ" if _is_postgres(engine) else "DATETIME"
             _add_column_tolerant(engine, "user_journeys", "grace_until", ts_type)
+        if "role_already_held" not in existing:
+            _add_column_tolerant(
+                engine, "user_journeys", "role_already_held",
+                "BOOLEAN NOT NULL DEFAULT FALSE" if _is_postgres(engine)
+                else "INTEGER NOT NULL DEFAULT 0")
 
     if insp.has_table("journey_requirements"):
         existing = {col["name"] for col in insp.get_columns("journey_requirements")}

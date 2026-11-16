@@ -70,6 +70,21 @@ ITEM_TONE: dict[str, tuple[str, str]] = {
 
 
 @router.get(
+    "/workforce/orbat/closed",
+    dependencies=[Depends(require_permission("workforce:read"))],
+    response_class=HTMLResponse,
+)
+def closed_fragment() -> HTMLResponse:
+    """Nothing, swapped into the post panel to close it.
+
+    The panel hides itself when it is empty, so closing is an ordinary
+    swap. ION serves no inline script and no unsafe-eval, which rules out
+    doing this with hx-on.
+    """
+    return HTMLResponse("")
+
+
+@router.get(
     "/workforce/orbat/person/{journey_id}",
     dependencies=[Depends(require_permission("workforce:read"))],
     response_class=HTMLResponse,

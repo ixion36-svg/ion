@@ -71,7 +71,7 @@
   </li>
 {% endmacro %}
 
-<div class="grid gap-5 xl:grid-cols-[1fr_360px] items-start">
+<div>
 
   <div class="card bg-base-200 border border-base-300">
     <div class="card-body p-5">
@@ -93,15 +93,9 @@
     </div>
   </div>
 
-  <div id="orbat-detail" class="xl:sticky xl:top-4">
-    <div class="card bg-base-200 border border-base-300">
-      <div class="card-body p-5">
-        <h2 class="card-title text-base">No post selected</h2>
-        <p class="text-sm text-base-content/70">Choose a post on the left to
-          see the full state of that person's onboarding and the training
-          objectives they still have open.</p>
-      </div>
-    </div>
-  </div>
+  {# The selected post opens over the page instead of beside it, so the
+     chart keeps the full width. Empty means closed: the layer hides itself
+     with :empty, and the panel's own close controls swap it back to empty. #}
+  <div id="orbat-detail" class="empty:hidden fixed inset-0 z-[200] flex justify-end"></div>
 
 </div>

@@ -3056,6 +3056,7 @@ function switchTab(tabId) {
     if (tab) tab.classList.add('active');
     const btn = document.querySelector(`.training-tab[data-tab="${tabId}"]`);
     if (btn) btn.classList.add('active');
+    history.replaceState(null, '', '#' + tabId);
     if (tabId === 'tab-pathways') setTimeout(drawConnectors, 50);
     if (tabId === 'tab-assessment') renderAssessmentForm();
     if (tabId === 'tab-rolematch') rmInit();
@@ -6564,6 +6565,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (e) { /* ignore */ }
     // Show forecast section for leads
     tpShowForecastIfLead();
+    // /training#tab-myplan opens that tab, so other pages can link to one.
+    const wanted = location.hash.slice(1);
+    if (document.querySelector('.training-tab[data-tab="' + CSS.escape(wanted) + '"]:not(.hidden)')) {
+        switchTab(wanted);
+    }
 });
 </script>
 

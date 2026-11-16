@@ -47,6 +47,11 @@
   </div>
 {% endif %}
 
+<p class="text-sm text-base-content/70 mb-4">
+  Courses from this onboarding are tracked in
+  <a class="link" href="/training#tab-myplan">My Training Plan</a>.
+</p>
+
 {% if journeys|length > 1 %}
   <div role="tablist" class="tabs tabs-boxed mb-4 justify-start">
     {% for j in journeys %}
@@ -110,6 +115,10 @@
         {% if has_access %}The permissions of your role are active, with no
         new sign-in needed.{% else %}Access is held at person level while
         another of your roles is still gated.{% endif %}
+      {% elif active.role_already_held %}
+        You already hold this role, so nothing here is holding your access
+        back. These are the mandatory items still to be recorded against
+        it: you record what you have completed and your lead verifies it.
       {% else %}
         These must be verified before you can use ION. You record what you
         have completed; your lead verifies it, so nothing here grants access

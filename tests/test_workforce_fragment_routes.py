@@ -385,6 +385,36 @@ class TestSetupSchema:
         assert "Profile created." in r.text
         assert db.query(RoleProfile).filter_by(name="Hunter").count() == 1
 
+    def test_an_empty_setup_offers_the_catalogue_and_the_induction(self, as_lead):
+        r = as_lead.get("/ui/workforce/setup")
+        assert 'hx-post="/ui/workforce/catalogue/adopt"' in r.text
+        assert 'name="is_baseline"' in r.text
+
+    def test_adopting_a_catalogue_role_creates_its_draft(self, db, as_lead):
+        from ion.data.soc_role_catalogue import SOC_ROLE_CATALOGUE
+
+        entry = SOC_ROLE_CATALOGUE[0]
+        r = as_lead.post("/ui/workforce/catalogue/adopt",
+                         data={"role_id": entry["id"]})
+        assert "Adopted as a draft." in r.text
+        assert db.query(RoleProfile).filter_by(name=entry["name"]).count() == 1
+        assert f'<option value="{entry["id"]}">' not in r.text
+
+    def test_adopting_nothing_is_refused(self, db, as_lead):
+        r = as_lead.post("/ui/workforce/catalogue/adopt", data={"role_id": ""})
+        assert "Choose a role to adopt." in r.text
+        assert db.query(RoleProfile).count() == 0
+
+    def test_a_profile_can_be_made_the_induction_once(self, db, as_lead):
+        r = as_lead.post("/ui/workforce/profiles",
+                         data={"name": "Induction", "is_baseline": "1"})
+        assert db.query(RoleProfile).filter_by(name="Induction").one().is_baseline
+        assert 'name="is_baseline"' not in r.text
+
+    def test_a_profile_is_not_the_induction_unless_ticked(self, db, as_lead):
+        as_lead.post("/ui/workforce/profiles", data={"name": "Hunter"})
+        assert not db.query(RoleProfile).filter_by(name="Hunter").one().is_baseline
+
     def test_a_blank_profile_name_is_refused(self, db, as_lead):
         r = as_lead.post("/ui/workforce/profiles", data={"name": "  "})
         assert "Give the role a name." in r.text

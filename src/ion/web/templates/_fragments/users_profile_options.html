@@ -1,0 +1,36 @@
+{# The "onboard into" picker for one of the two user modals.
+
+   `field_id` is looked up from ion.web.ui.users.PROFILE_FIELDS rather than
+   taken from the query string. The page reads the chosen value by that id;
+   when no <select> is rendered it reads nothing and sends no profile. #}
+{% if not enabled %}
+  <p class="text-sm text-slate-400">The Workforce module is switched off in this deployment.</p>
+{% elif not allowed %}
+  <p class="text-sm text-slate-400">
+    Opening a role's onboarding needs the Workforce manage permission, which
+    your account does not hold.
+  </p>
+{% elif failed %}
+  <div role="alert" class="alert alert-error text-sm">
+    The role profiles could not be read. The account can still be saved; no
+    onboarding will be opened.
+  </div>
+{% elif not profiles %}
+  <p class="text-sm text-slate-400">
+    No role profile is published yet. Publish one in
+    <a class="link" href="/workforce?tab=setup">Workforce setup</a> to onboard
+    accounts into it.
+  </p>
+{% else %}
+  <select class="select w-full" id="{{ field_id }}">
+    <option value="">No role onboarding</option>
+    {% for profile in profiles %}
+      <option value="{{ profile.id }}">{{ profile.name }}</option>
+    {% endfor %}
+  </select>
+  <p class="mt-1 text-xs text-slate-400">
+    For a role the person has still to earn. Roles ticked above are held
+    from now and get their Workforce journey without this. A profile
+    picked here holds its role back until its gate items are verified.
+  </p>
+{% endif %}

@@ -501,6 +501,8 @@ def enrol_on_role(session: Session, user: User, *, profile_id: int,
                 "Role profile %s has no published version; %s enrolled on "
                 "no role", profile.name, user.username)
             return None
+        if _live_journey_for_profile(session, user.id, profile.id) is not None:
+            return None
         return assign_profile(session, user=user, version=version,
                               assigner=assigner)
     except Exception:  # noqa: BLE001
@@ -512,6 +514,142 @@ def enrol_on_role(session: Session, user: User, *, profile_id: int,
         except Exception:  # noqa: BLE001
             pass
         return None
+
+
+def open_journeys_for_held_roles(session: Session, user: User, *,
+                                 assigner: User) -> list[UserJourney]:
+    """Put a person on the role profile of each access role they hold.
+
+    The Users page is where access roles are assigned, and Workforce used
+    to know nothing of it: an account could hold ``senior_analyst`` for a
+    year while its Workforce page said no role had been assigned. A
+    profile's ``grants_role_id`` is the link between the two, so every
+    role the person holds opens the profile that grants it.
+
+    These journeys are marked ``role_already_held``. Without that mark the
+    gate would treat the role as not yet earned and take it away from
+    somebody who was working with it this morning.
+
+    When several profiles grant one role, the one earliest in the SOC role
+    catalogue is taken, then the oldest: one access role cannot say which
+    of them the person is, and the catalogue lists the general roles
+    before the specialisms. A profile the person has
+    ever had a journey for is left alone, so a journey a lead closed on
+    purpose does not come back.
+    """
+    from ion.data.soc_role_catalogue import SOC_ROLE_CATALOGUE
+
+    rank = {entry["id"]: n for n, entry in enumerate(SOC_ROLE_CATALOGUE)}
+    opened: list[UserJourney] = []
+    for role in list(user.roles):
+        candidates = (
+            session.query(RoleProfile)
+            .filter(RoleProfile.grants_role_id == role.id,
+                    RoleProfile.is_active.is_(True))
+            .all()
+        )
+        profile = min(
+            candidates, default=None,
+            key=lambda p: (rank.get(p.catalogue_id, len(rank)), p.id))
+        version = latest_published(session, profile.id) if profile else None
+        if version is None:
+            continue
+        ever = (
+            session.query(UserJourney.id)
+            .join(RoleProfileVersion,
+                  UserJourney.version_id == RoleProfileVersion.id)
+            .filter(UserJourney.user_id == user.id,
+                    RoleProfileVersion.profile_id == profile.id)
+            .first()
+        )
+        if ever is not None:
+            continue
+        journey = assign_profile(
+            session, user=user, version=version, assigner=assigner,
+            role_already_held=True)
+        seat_journey(session, journey, actor=assigner)
+        opened.append(journey)
+    return opened
+
+
+def a_workforce_manager(session: Session) -> Optional[User]:
+    """Somebody to act as when no person is acting: a start-up pass, or a
+    Keycloak sign-in. The longest-standing active account that may manage
+    Workforce, which on every deployment is the built-in admin."""
+    users = session.query(User).filter(User.is_active.is_(True)).order_by(User.id)
+    return next((u for u in users if u.has_permission("workforce:manage")), None)
+
+
+def seat_journey(session: Session, journey: UserJourney, *,
+                 actor: User) -> Optional[OrgPost]:
+    """Put a journey in a post for its role, so the person is on the ORBAT.
+
+    A vacant post for the role is taken first. When every post is filled
+    one more is added beside them: the person holds the role, and a chart
+    that leaves them off is wrong about who is in the SOC. That raises the
+    role's establishment by one, which a lead can see and correct in Setup.
+
+    A role with no posts at all is left alone. Its first post needs a unit,
+    and which unit a role sits under is the chain of command, not something
+    to guess.
+    """
+    profile_id = journey.version.profile_id if journey.version else None
+    if profile_id is None:
+        return None
+    posts = (
+        session.query(OrgPost)
+        .filter(OrgPost.profile_id == profile_id)
+        .order_by(OrgPost.ordering, OrgPost.id)
+        .all()
+    )
+    if not posts or any(p.filled_by_journey_id == journey.id for p in posts):
+        return None
+    vacant = next((p for p in posts if p.filled_by_journey_id is None), None)
+    if vacant is None:
+        profile = session.get(RoleProfile, profile_id)
+        set_establishment(session, profile=profile, count=len(posts) + 1,
+                          actor=actor)
+        vacant = (
+            session.query(OrgPost)
+            .filter(OrgPost.profile_id == profile_id,
+                    OrgPost.filled_by_journey_id.is_(None))
+            .order_by(OrgPost.id.desc())
+            .first()
+        )
+    return fill_post(session, post=vacant, journey_id=journey.id, actor=actor)
+
+
+def follow_held_roles(session: Session, user: User, *,
+                      assigner: User) -> list[UserJourney]:
+    """open_journeys_for_held_roles for callers whose own work must stand.
+
+    Creating an account and changing its roles both end here. Neither may
+    fail because Workforce could not follow, so this returns nothing and
+    logs instead of raising.
+    """
+    try:
+        return open_journeys_for_held_roles(session, user, assigner=assigner)
+    except Exception:  # noqa: BLE001
+        logger.exception("Could not open Workforce journeys for the roles %s holds",
+                         getattr(user, "username", "?"))
+        try:
+            session.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        return []
+
+
+def assignable_profiles(session: Session) -> list[RoleProfile]:
+    """The roles an account can be onboarded into: active, not the baseline
+    everybody gets anyway, and with a published version to copy from."""
+    profiles = (
+        session.query(RoleProfile)
+        .filter(RoleProfile.is_active.is_(True),
+                RoleProfile.is_baseline.is_(False))
+        .order_by(RoleProfile.name.asc())
+        .all()
+    )
+    return [p for p in profiles if latest_published(session, p.id) is not None]
 
 
 def enrol_on_baseline(session: Session,
@@ -643,8 +781,14 @@ def _carryable(journey: UserJourney, today: Optional[date] = None) -> dict:
 def assign_profile(session: Session, *, user: User, version: RoleProfileVersion,
                    assigner: User, is_cover: bool = False,
                    sponsor: Optional[User] = None,
-                   supersede: bool = False) -> UserJourney:
+                   supersede: bool = False,
+                   role_already_held: bool = False) -> UserJourney:
     """Start a journey for ``user`` against ``version``.
+
+    ``role_already_held`` says an administrator had already given this
+    person the access role the profile grants. The journey then tracks
+    their training and never takes the role away; superseding such a
+    journey keeps that standing.
 
     Requirements are copied, not referenced. Gate items the person has already
     satisfied elsewhere are carried across as verified rather than reissued.
@@ -682,6 +826,8 @@ def assign_profile(session: Session, *, user: User, version: RoleProfileVersion,
     inherited = _carryable(superseded) if superseded is not None else {}
 
     journey = UserJourney(
+        role_already_held=role_already_held or bool(
+            superseded is not None and superseded.role_already_held),
         user_id=user.id, version_id=version.id, is_cover=is_cover,
         stage=STAGE_PRE_ACCESS, sponsor_id=sponsor.id if sponsor else None,
     )
@@ -1148,7 +1294,10 @@ def sync_granted_roles(session: Session, user: User,
         role_id = getattr(profile, "grants_role_id", None)
         if role_id is None:
             continue
-        (earned if confers_role(journey, now) else withheld).add(role_id)
+        if confers_role(journey, now):
+            earned.add(role_id)
+        elif not journey.role_already_held:
+            withheld.add(role_id)
 
     # One journey earning a role beats another withholding it.
     withheld -= earned
@@ -1936,6 +2085,7 @@ def journey_summary(session: Session, journey: UserJourney) -> dict:
         "role": profile.name if profile else "(unknown)",
         "version": version.version if version else 0,
         "is_cover": journey.is_cover,
+        "role_already_held": journey.role_already_held,
         "stage": journey.stage,
         "gate_total": len(gate),
         "gate_done": sum(1 for r in gate if r.satisfied),

@@ -148,6 +148,7 @@ def _view(
         "units": [], "unit_paths": [], "seatable": [], "profile_names": {},
         "post_state": POST_STATE, "stage_label": STAGE_LABEL,
         "profiles": [], "profile_id": profile_id, "draft": None,
+        "catalogue": [], "has_baseline": False,
         "ion_roles": [], "kinds": list(KINDS), "phases": list(PHASES),
         "can_manage": user.has_permission("workforce:manage"),
     }
@@ -183,7 +184,27 @@ def _view(
         "ion_roles": list(roles_available.get("roles") or []),
         "draft": draft,
     })
+    base["catalogue"] = _unadopted(base["profiles"])
+    base["has_baseline"] = any(p.get("is_baseline") for p in base["profiles"])
     return base
+
+
+def _unadopted(profiles: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Catalogue roles this SOC has not taken on, grouped for a <select>.
+
+    Matched by name, the same test adopt_catalogue_role uses to decide that
+    a second adoption is a double click.
+    """
+    from ion.data.soc_role_catalogue import by_category
+
+    held = {p.get("name") for p in profiles}
+    groups = []
+    for category, roles in by_category().items():
+        free = [{"id": r["id"], "name": r["name"]} for r in roles
+                if r["name"] not in held]
+        if free:
+            groups.append({"category": category, "roles": free})
+    return groups
 
 
 @router.get(
@@ -239,6 +260,39 @@ def _write(
 
 
 @router.post(
+    "/workforce/catalogue/adopt",
+    dependencies=[Depends(require_permission("workforce:manage"))],
+    response_class=HTMLResponse,
+)
+def adopt_catalogue_role(
+    request: Request,
+    role_id: str = Form(""),
+    session: Session = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """Take a role from the SOC role catalogue as an editable draft."""
+    adopted: dict[str, Any] = {}
+
+    def run():
+        from ion.web.workforce_api import adopt_role
+
+        if not role_id.strip():
+            raise wf.WorkforceError("Choose a role to adopt.")
+        adopted.update(adopt_role(role_id=role_id.strip(), session=session,
+                                  user=user)["profile"])
+
+    notice = ("Adopted as a draft. Review what it asks for, add its "
+              "mandatory items if it grants a role, then publish.")
+    response = _write(request, session, user, run, None, notice)
+    if adopted.get("id"):
+        return render_view(
+            request, FRAGMENT,
+            _view(session, user, adopted["id"], "", notice),
+        )
+    return response
+
+
+@router.post(
     "/workforce/profiles",
     dependencies=[Depends(require_permission("workforce:manage"))],
     response_class=HTMLResponse,
@@ -247,10 +301,16 @@ def create_profile(
     request: Request,
     name: str = Form(""),
     nice_work_role: str = Form(""),
+    is_baseline: str = Form(""),
     session: Session = Depends(get_db_session),
     user: User = Depends(get_current_user),
 ):
-    """Add a role profile. It starts as a draft with no requirements."""
+    """Add a role profile. It starts as a draft with no requirements.
+
+    ``is_baseline`` marks the induction every new account is put on. That
+    flag had no control anywhere, so a deployment could not create the one
+    profile the Me tab is built around.
+    """
     created: dict[str, Any] = {}
 
     def run():
@@ -261,7 +321,8 @@ def create_profile(
             raise wf.WorkforceError("Give the role a name.")
         out = api_create(
             payload=ProfileIn(name=name.strip(),
-                              nice_work_role=nice_work_role.strip()),
+                              nice_work_role=nice_work_role.strip(),
+                              is_baseline=bool(is_baseline)),
             session=session, _user=user,
         )
         created.update(out)

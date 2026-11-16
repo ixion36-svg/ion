@@ -217,3 +217,85 @@ class TestTheWiring:
         assigned by hand, which is exactly what we are not doing yet."""
         code = self._code_only()
         assert "sync_granted_roles" not in code
+
+
+class TestRolesHeldAtSignInReachTheOrderOfBattle:
+    """Somebody signs in through Keycloak holding a role, and from then on
+    they are on that role's profile and seated on the chart, with the role
+    intact."""
+
+    def _signed_in(self, db, user):
+        from types import SimpleNamespace
+
+        from ion.auth.oidc import OIDCUserSync
+
+        OIDCUserSync(db, SimpleNamespace())._follow_held_roles(user)
+
+    def _l1(self, db, admin, analyst):
+        from ion.models.workforce import OrgPost, OrgUnit
+
+        profile = wf.create_profile(db, name="SOC Analyst (L1)")
+        profile.grants_role_id = analyst.id
+        version = wf.draft_version(db, profile)
+        wf.add_requirement(db, version, name="Acceptable use agreement",
+                           kind="document", phase=PHASE_GATE)
+        db.commit()
+        wf.publish_version(db, version, admin)
+        unit = OrgUnit(name="Operations")
+        db.add(unit)
+        db.flush()
+        db.add(OrgPost(unit_id=unit.id, title="SOC Analyst (L1) #1",
+                       profile_id=profile.id))
+        db.commit()
+        return profile
+
+    def test_the_role_they_hold_puts_them_in_a_post(self, db, admin):
+        from ion.models.workforce import OrgPost
+
+        analyst = Role(name="analyst")
+        db.add(analyst)
+        db.commit()
+        self._l1(db, admin, analyst)
+        user = oidc_user(db)
+        user.roles = [analyst]
+        db.commit()
+
+        self._signed_in(db, user)
+
+        journey = db.query(UserJourney).filter_by(user_id=user.id).one()
+        assert journey.role_already_held is True
+        assert db.query(OrgPost).one().filled_by_journey_id == journey.id
+        assert [r.name for r in user.roles] == ["analyst"]
+
+    def test_signing_in_again_changes_nothing(self, db, admin):
+        analyst = Role(name="analyst")
+        db.add(analyst)
+        db.commit()
+        self._l1(db, admin, analyst)
+        user = oidc_user(db)
+        user.roles = [analyst]
+        db.commit()
+
+        self._signed_in(db, user)
+        self._signed_in(db, user)
+
+        assert db.query(UserJourney).filter_by(user_id=user.id).count() == 1
+
+    def test_a_workforce_failure_does_not_stop_the_sign_in(self, db, admin,
+                                                           monkeypatch):
+        analyst = Role(name="analyst")
+        db.add(analyst)
+        db.commit()
+        self._l1(db, admin, analyst)
+        user = oidc_user(db)
+        user.roles = [analyst]
+        db.commit()
+
+        def boom(*_a, **_k):
+            raise RuntimeError("workforce is down")
+
+        monkeypatch.setattr(wf, "assign_profile", boom)
+        self._signed_in(db, user)
+
+        assert [r.name for r in user.roles] == ["analyst"]
+        assert db.query(UserJourney).filter_by(user_id=user.id).count() == 0

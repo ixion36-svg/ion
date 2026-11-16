@@ -13,7 +13,7 @@
    Expects `profiles`, `profile_id`, `draft`, `ion_roles`, `kinds`,
    `phases`. #}
 
-<div class="card bg-base-200 border border-base-300 mb-5">
+<div id="profiles" class="card bg-base-200 border border-base-300 mb-5">
   <div class="card-body p-5">
     <h2 class="card-title text-base">Role profiles</h2>
     <p class="text-sm text-base-content/70">What a role requires: the
@@ -24,7 +24,9 @@
       <div class="flex flex-col gap-3">
         <ul class="flex flex-col gap-1">
           {% if not profiles %}
-            <li class="text-sm text-base-content/50">None yet.</li>
+            <li class="text-sm text-base-content/50">None yet. Workforce
+              stays empty for everyone until a profile is published: adopt
+              a role below, or create one.</li>
           {% endif %}
           {% for p in profiles %}
             <li>
@@ -32,7 +34,7 @@
                       class="btn btn-sm w-full justify-start {{ 'btn-primary' if p.id == profile_id else 'btn-ghost' }}"
                       hx-get="/ui/workforce/setup?profile={{ p.id }}"
                       hx-target="#wf-tab" hx-swap="innerHTML">
-                <span class="grow text-left">{{ p.name }}</span>
+                <span class="grow text-left">{{ p.name }}{% if p.is_baseline %} (induction){% endif %}</span>
                 <span class="badge badge-xs {{ 'badge-success' if p.published_version else 'badge-ghost' }}">
                   {{ 'v' ~ p.published_version if p.published_version else 'draft' }}
                 </span>
@@ -40,6 +42,25 @@
             </li>
           {% endfor %}
         </ul>
+
+        {% if catalogue %}
+        <form class="border-t border-base-300 pt-3 flex flex-col gap-2"
+              hx-post="/ui/workforce/catalogue/adopt" hx-target="#wf-tab" hx-swap="innerHTML">
+          <label class="label text-xs py-0" for="wf-adopt-role">Start from the SOC role catalogue</label>
+          <select id="wf-adopt-role" name="role_id" required
+                  class="select select-sm select-bordered w-full">
+            <option value="">Choose a role</option>
+            {% for group in catalogue %}
+              <optgroup label="{{ group.category }}">
+                {% for role in group.roles %}
+                  <option value="{{ role.id }}">{{ role.name }}</option>
+                {% endfor %}
+              </optgroup>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn btn-sm mt-1">Adopt as a draft</button>
+        </form>
+        {% endif %}
 
         <form class="border-t border-base-300 pt-3 flex flex-col gap-2"
               hx-post="/ui/workforce/profiles" hx-target="#wf-tab" hx-swap="innerHTML">
@@ -49,6 +70,14 @@
           <label class="label text-xs py-0" for="wf-new-nice">NICE work role, if you use them</label>
           <input id="wf-new-nice" name="nice_work_role" type="text"
                  class="input input-sm input-bordered w-full" placeholder="Defensive Cybersecurity">
+          {% if not has_baseline %}
+          <label class="flex items-start gap-2 text-xs">
+            <input type="checkbox" name="is_baseline" value="1" class="checkbox checkbox-xs mt-0.5">
+            <span>This is the mandatory induction every new account is put
+              on. There is none yet, so new accounts start with no
+              onboarding.</span>
+          </label>
+          {% endif %}
           <button type="submit" class="btn btn-sm btn-primary mt-1">Create profile</button>
         </form>
       </div>

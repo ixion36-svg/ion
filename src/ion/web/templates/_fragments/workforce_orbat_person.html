@@ -7,6 +7,15 @@
    do", and a lead planning a quarter reads the second without wanting to
    filter the first by eye. #}
 
+<button type="button" aria-label="Close" tabindex="-1"
+        class="absolute inset-0 w-full h-full bg-black/50 cursor-default"
+        hx-get="/ui/workforce/orbat/closed" hx-target="#orbat-detail" hx-swap="innerHTML"></button>
+<aside class="relative w-[480px] max-w-[92vw] h-full overflow-y-auto bg-base-100 border-l border-base-300 p-4"
+       aria-label="Selected post">
+<div class="flex justify-end mb-2">
+  <button type="button" class="btn btn-sm btn-ghost"
+          hx-get="/ui/workforce/orbat/closed" hx-target="#orbat-detail" hx-swap="innerHTML">Close</button>
+</div>
 {% if failed %}
   <div role="alert" class="alert alert-error">
     <span>That person's onboarding could not be read.</span>
@@ -127,3 +136,4 @@
   </div>
 </div>
 {% endif %}
+</aside>
