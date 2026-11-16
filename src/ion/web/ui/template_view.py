@@ -329,8 +329,12 @@ def _document_type(value: object) -> Optional[dict[str, Optional[str]]]:
     if value is None or value == "":
         return None
     text = str(value)
-    css = "doc-type-" + text if _DOC_CLASS.fullmatch(text) else None
-    return {"label": text, "css": css}
+    # The attribute carries the type itself rather than a class built from
+    # it. A value that is not a bare token matches no row in the scale, and
+    # the chip falls back to muted -- which is what an unrecognised type
+    # should look like, and used to need a hand-written base rule to get.
+    token = text if _DOC_CLASS.fullmatch(text) else None
+    return {"label": text, "doctype": token}
 
 
 def _tags(value: object) -> Optional[list]:

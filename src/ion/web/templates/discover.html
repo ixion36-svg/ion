@@ -2,13 +2,7 @@
 
 {% block title %}Discover - ION{% endblock %}
 
-{% block head_css %}
-{# The page's own rules, for the classes the server-rendered fragments
-   emit. head_css loads at base.html line 50, so this beats ion.css and
-   ion-migrated-styles.css and loses to ion-workspace.css; neither of the
-   selectors here appears in that sheet. #}
-<link rel="stylesheet" href="/static/css/discover-page.css?v={{ ion_version }}">
-{% endblock %}
+{% block page_id %}discover{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
@@ -410,7 +404,7 @@
 {# The AI query builder. Static markup, so it is here rather than
    built from a string in JavaScript at first open: three of its
    colours were arbitrary Tailwind values the page owned, and are
-   classes in discover-page.css now. #}
+   classes in frontend/ion-pages.css now, under this page's scope. #}
 <div id="nl-query-modal" class="modal-overlay hidden">
   <div class="modal-dialog max-w-[560px]">
     <div class="modal-header">
@@ -1280,7 +1274,7 @@ async function toggleFavorite(searchId) {
 // ==================== NL-to-ES Query (AI) ====================
 // The modal is static markup, so it lives in the page rather than being
 // built from a string at first open. That also took three hard-coded
-// hex colours out of JavaScript and into discover-page.css.
+// hex colours out of JavaScript and into frontend/ion-pages.css.
 function openNlQueryModal() {
     const modal = document.getElementById('nl-query-modal');
     if (!modal) return;

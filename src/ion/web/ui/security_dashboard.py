@@ -200,18 +200,6 @@ def _words(value: object) -> Optional[str]:
     return raw.replace("_", " ").title()
 
 
-def _badge(kind: str, value: Optional[str]) -> str:
-    """``severity-badge severity-critical`` / ``status-badge status-false-positive``.
-
-    The status class uses hyphens because the stylesheet keys
-    ``.status-false-positive`` and the enum value uses an underscore.
-    """
-    base = f"{kind}-badge"
-    if not value:
-        return base
-    return base + " " + kind + "-" + value.replace("_", "-")
-
-
 def _blank(value: object) -> Optional[str]:
     """A display string, or None when nothing was recorded.
 
@@ -355,11 +343,13 @@ def event_view(event: Any) -> dict[str, Any]:
         "title": _blank(getattr(event, "title", None)),
         "description": _blank(getattr(event, "description", None)),
         "source_ip": _blank(getattr(event, "source_ip", None)),
+        # The template emits the raw value as data-sev / data-status and the
+        # shared scale in ion-value-scales.css owns the colour. No class is
+        # built here, so the underscore in `false_positive` stays an
+        # underscore instead of being rewritten to match a selector.
         "severity": severity,
-        "severity_class": _badge("severity", severity),
         "status": status,
         "status_label": _words(status),
-        "status_class": _badge("status", status),
         "type_label": _words(event_type),
         "created_at": getattr(event, "created_at", None),
         "first_seen": getattr(event, "first_seen", None),

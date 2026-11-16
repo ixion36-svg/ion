@@ -1,0 +1,146 @@
+/* The semantic value scales, declared once.
+ *
+ * ION's CSP sets style-src-attr:none, so a server-computed colour cannot be
+ * an inline style and has to reach the page as a class. That is correct and
+ * stays. What was wrong is that each page froze its own table: severity is
+ * declared by .severity-*, .donut-*, .case-seg-*, .case-dot-*, .rail-sev-*,
+ * .ds-sev-text-* and .alert-attn-chip-* across six sheets, drawing on four
+ * unrelated token families, so no two pages agree and a palette change
+ * cannot propagate.
+ *
+ * Here the server emits the fact it already knows as a data attribute, this
+ * table maps the fact to --v, and a consumer class spends it. Data
+ * attributes are untouched by CSP. Because --v resolves through ION's own
+ * --color-ion-*, the light-mode flip is inherited rather than repeated.
+ *
+ * Adding a scale means adding rows here, not a sheet.
+ */
+
+/* Severity resolves through the existing --sev-* ramp rather than the accent
+   tokens. That ramp is defined for both modes and tests/test_severity_contrast.py
+   holds it to a WCAG ratio on its own tint and as a solid stripe, so a chip
+   built from --color-ion-* would be a second severity palette with none of
+   that guarantee. --v-soft is the tested tint; scales below that have no ramp
+   fall back to a mix in .v-chip. */
+[data-sev="critical"] { --v: var(--sev-critical); --v-soft: var(--sev-critical-dim); }
+[data-sev="high"]     { --v: var(--sev-high);     --v-soft: var(--sev-high-dim); }
+[data-sev="medium"]   { --v: var(--sev-medium);   --v-soft: var(--sev-medium-dim); }
+[data-sev="low"]      { --v: var(--sev-low);      --v-soft: var(--sev-low-dim); }
+[data-sev="info"]     { --v: var(--sev-info);     --v-soft: var(--sev-info-dim); }
+/* The threat banner's fifth level. It is an absence of elevated severity,
+   which is what info means here. */
+[data-sev="normal"]   { --v: var(--sev-info);     --v-soft: var(--sev-info-dim); }
+
+/* Alert and case status */
+[data-status="open"]          { --v: var(--color-ion-cyan); }
+[data-status="new"]           { --v: var(--color-ion-cyan); }
+[data-status="acknowledged"]  { --v: var(--color-ion-amber); }
+[data-status="investigating"] { --v: var(--color-ion-amber); }
+[data-status="confirmed"]     { --v: var(--sev-critical); }
+[data-status="false_positive"]{ --v: var(--sev-low); }
+[data-status="mitigated"]     { --v: var(--color-ion-lime); }
+[data-status="resolved"]      { --v: var(--color-ion-lime); }
+[data-status="closed"]        { --v: #64748b; }
+
+/* Closure reason and verdict. `other` is the fallback for a reason the map
+   does not know; it must not resolve to a verdict that means something. */
+[data-verdict="true_positive"]        { --v: var(--color-ion-coral); }
+[data-verdict="benign_true_positive"] { --v: var(--color-ion-amber); }
+[data-verdict="false_positive"]       { --v: #64748b; }
+[data-verdict="duplicate"]            { --v: var(--color-ion-iris); }
+[data-verdict="inconclusive"]         { --v: var(--color-ion-amber); }
+[data-verdict="insufficient_data"]    { --v: #64748b; }
+[data-verdict="not_applicable"]       { --v: #64748b; }
+[data-verdict="unspecified"]          { --v: #64748b; }
+[data-verdict="other"]                { --v: #64748b; }
+
+/* RAG health, however a page spells it */
+[data-rag="good"]    { --v: var(--color-ion-lime); }
+[data-rag="fair"]    { --v: var(--color-ion-amber); }
+[data-rag="poor"]    { --v: var(--color-ion-coral); }
+[data-rag="unknown"] { --v: #64748b; }
+
+/* Who produced a record */
+[data-actor="analyst"] { --v: var(--color-ion-cyan); }
+[data-actor="bob"]     { --v: var(--color-ion-iris); }
+[data-actor="system"]  { --v: #64748b; }
+[data-actor="unknown"] { --v: #64748b; }
+
+/* Document type. Free-form on the model (`[A-Za-z0-9_-]+`), not an enum, so
+   this cannot be exhaustive -- and does not need to be: a type with no row
+   sets no --v and .v-chip falls back to muted. The old arrangement had a
+   base rule doing that job by hand, after a type with no rule of its own
+   was measured at 1.00:1.
+ *
+ * Three sheets declared this domain and had drifted: SOI was green on
+ * /templates and cyan on /documents, WI and RUNBOOK were indigo and purple
+ * on two pages and iris on the third, and /template-view set no text colour
+ * on three of them. The pairs that shared a colour before still share one. */
+[data-doctype="SOP"]              { --v: var(--color-ion-cyan); }
+[data-doctype="DETECTION_RULE"]   { --v: var(--color-ion-cyan); }
+[data-doctype="SOI"]              { --v: var(--color-ion-lime); }
+[data-doctype="KB"]               { --v: var(--color-ion-lime); }
+[data-doctype="WI"]               { --v: var(--color-ion-iris); }
+[data-doctype="RUNBOOK"]          { --v: var(--color-ion-iris); }
+[data-doctype="IRP"]              { --v: var(--sev-critical); }
+[data-doctype="THREAT_ADVISORY"]  { --v: var(--sev-medium); }
+[data-doctype="AAR"]              { --v: var(--sev-high); }
+
+/* Categorical series for charts and workload bars, cycled by index. The
+   count here is the count a view model may emit. */
+[data-series="0"] { --v: var(--color-ion-cyan); }
+[data-series="1"] { --v: var(--color-ion-iris); }
+[data-series="2"] { --v: var(--color-ion-lime); }
+[data-series="3"] { --v: var(--color-ion-amber); }
+[data-series="4"] { --v: var(--color-ion-coral); }
+[data-series="5"] { --v: #7dd3fc; }
+[data-series="6"] { --v: #c4b5fd; }
+[data-series="7"] { --v: #94a3b8; }
+
+/* Consumers. A scale is spent as text, a tinted chip, a fill or a stroke;
+   nothing else needs to know which scale produced it. */
+.v-text   { color: var(--v, var(--ion-text-muted)); }
+.v-fill   { background: var(--v, var(--ion-text-muted)); }
+.v-stroke { stroke: var(--v, var(--ion-text-muted)); }
+.v-svg    { fill: var(--v, var(--ion-text-muted)); }
+.v-border { border-color: var(--v, var(--ion-border)); }
+
+/* Comfortable by default; compact inside .ion-dense. The density is taken
+   from the region rather than from a modifier class, so a chip is the right
+   size wherever it lands and there is nothing to remember. */
+.v-chip {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  color: var(--v, var(--ion-text-muted));
+  /* --v-soft where a tested tint exists; otherwise mix one at the same
+     weight the ramp uses, so the two read alike. */
+  background: var(--v-soft, color-mix(in oklab, var(--v, #64748b) 18%, transparent));
+}
+
+.ion-dense .v-chip {
+  padding: 1px 7px;
+  font-size: 10.5px;
+}
+
+/* Severity is a rank, and ION has always set it in caps. A status is a
+   phrase and is title-cased by the view model, so it is left alone. */
+.v-chip[data-sev] {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* A 3px rail reads severity without colouring the whole row, which is what
+   keeps a 400-row queue legible. */
+.v-rail {
+  display: inline-block;
+  width: 3px;
+  height: 15px;
+  border-radius: 2px;
+  vertical-align: middle;
+  background: var(--v, var(--ion-border));
+}

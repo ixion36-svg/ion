@@ -27,7 +27,6 @@ alerts, and an empty render proves nothing about the rows.
 """
 from __future__ import annotations
 
-import html
 import inspect
 import json
 import re
@@ -38,6 +37,7 @@ from typing import Any, Optional
 import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
+from page_css import page_css
 
 from ion.models.alert_triage import (
     AlertCase,
@@ -68,7 +68,9 @@ from ion.web.ui.alerts import (
 
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = ROOT / "src/ion/web/templates/alerts.html"
-PAGE_CSS = ROOT / "src/ion/web/static/css/alerts-page.css"
+#: Retired into the one build; this is the
+#: body[data-page="alerts"] block and only that block.
+PAGE_CSS_TEXT = page_css("alerts")
 SERVER = ROOT / "src/ion/web/server.py"
 FRAGMENTS = ROOT / "src/ion/web/templates/_fragments"
 
@@ -1209,7 +1211,7 @@ def test_the_page_additions_carry_nothing_the_csp_would_block():
 
 
 def test_the_status_colour_classes_the_card_emits_have_rules_in_the_stylesheet():
-    css = PAGE_CSS.read_text(encoding="utf-8")
+    css = PAGE_CSS_TEXT
     for status in ("open", "acknowledged", "closed"):
         assert f".side-panel .list-item-count.case-status-{status} {{" in css
     assert ".ai-case-summary.visible.ion-busy:empty::before" in css

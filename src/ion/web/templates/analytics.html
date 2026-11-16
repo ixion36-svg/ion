@@ -2,12 +2,7 @@
 
 {% block title %}Analytics Engine - ION{% endblock %}
 
-{% block head_css %}
-{# The page's own rules, for the classes the server-rendered panels emit.
-   head_css loses to ion-workspace.css and base.html's two in-body blocks,
-   and neither of the selectors here appears in those. #}
-<link rel="stylesheet" href="/static/css/analytics-page.css?v={{ ion_version }}">
-{% endblock %}
+{% block page_id %}analytics{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
@@ -307,7 +302,7 @@ function renderStaleInvestigations() {
 // were null, and the second of those went into a number input's value
 // attribute, so the field was unusable until retyped. The two status
 // colours were text-[#ef4444] and text-[#22c55e] written into the row,
-// so they ignored the theme; they are classes in analytics-page.css now.
+// so they ignored the theme; they are classes in frontend/ion-pages.css now.
 function renderConfig() {
     htmx.ajax('GET', '/ui/analytics/config', {
         source: document.getElementById('config-content'),

@@ -15,6 +15,11 @@ ROOT = Path(__file__).resolve().parents[1]
 SHEETS = ROOT / "src/ion/web/static/css"
 TPL = ROOT / "src/ion/web/templates"
 MAP = ROOT / "tools/hashed_class_map.json"
+#: Both destinations moved out of their own linked sheet and into the one
+#: build. The rule bodies are asserted against the source they are authored
+#: in, because the shipped ion.css is minified and the selectors there have
+#: lost their quotes.
+PAGES_CSS = ROOT / "frontend/ion-pages.css"
 
 EVENT_SELECTOR = 'body[data-page="data_flow"] .df-winlog-row .df-event-id'
 TITLE_SELECTOR = 'body[data-page="maturity"] .mat-title'
@@ -50,9 +55,19 @@ def test_the_event_id_weight_beats_the_generic_value_and_the_others_stay_600():
     A one-class replacement loses the same way, so the destination has to
     be that specific, and it has to be the Event ID only.
     """
-    sheet = (SHEETS / "data-flow-page.css").read_text(encoding="utf-8")
+    sheet = PAGES_CSS.read_text(encoding="utf-8")
     body = _rule_body(sheet, EVENT_SELECTOR)
     assert "font-weight:900" in body
+
+    # It ties with the .val rule on specificity, so it wins only by coming
+    # later in this file. Inside one sheet that ordering is the whole
+    # guarantee, where before it was "head_css loads after ion.css".
+    code = _code(sheet)
+    generic = 'body[data-page="data_flow"] .df-winlog-row .val'
+    assert code.index(EVENT_SELECTOR) > code.index(generic), (
+        "the Event ID rule moved above the .val rule it ties with, so 600 wins "
+        "and the Event ID stops being heavy"
+    )
 
     # The generic value rule is not restated at 900. Doing that would make
     # Keywords and Task Category heavy too, which the mock-up did not.
@@ -69,9 +84,12 @@ def test_the_event_id_weight_beats_the_generic_value_and_the_others_stay_600():
 
     claim = _rules()["_ion-s-92fb99917f"]["replaced_by"]
     assert claim == [EVENT_SELECTOR]
-    assert EVENT_SELECTOR in _sheets()
+    assert EVENT_SELECTOR in PAGES_CSS.read_text(encoding="utf-8")
     page = (TPL / "data_flow.html").read_text(encoding="utf-8")
-    assert "data-flow-page.css" in page
+    assert "data-flow-page.css" not in page, "the page sheet is retired"
+    assert "{% block page_id %}data_flow{% endblock %}" in page, (
+        "without the scope, every body[data-page=data_flow] rule matches nothing"
+    )
 
 
 def test_the_activity_bar_height_survived_as_a_hook_and_not_as_css():
@@ -98,7 +116,7 @@ def test_the_maturity_title_keeps_its_input_rule_and_the_notes_do_not():
     is still `#mat-title`. daisyUI's `.input` paints a different control;
     these eight declarations are the ones that left.
     """
-    sheet = (SHEETS / "maturity-page.css").read_text(encoding="utf-8")
+    sheet = PAGES_CSS.read_text(encoding="utf-8")
     body = _rule_body(sheet, TITLE_SELECTOR)
     for declaration in (
         "flex:1",
@@ -122,6 +140,9 @@ def test_the_maturity_title_keeps_its_input_rule_and_the_notes_do_not():
 
     claim = _rules()["_ion-s-56b5cc5749"]["replaced_by"]
     assert claim == [TITLE_SELECTOR]
-    assert TITLE_SELECTOR in _sheets()
+    assert TITLE_SELECTOR in PAGES_CSS.read_text(encoding="utf-8")
     page = (TPL / "maturity.html").read_text(encoding="utf-8")
-    assert "maturity-page.css" in page
+    assert "maturity-page.css" not in page, "the page sheet is retired"
+    assert "{% block page_id %}maturity{% endblock %}" in page, (
+        "without the scope, body[data-page=maturity] .mat-title matches nothing"
+    )

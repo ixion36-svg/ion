@@ -1,13 +1,8 @@
 {% extends "base.html" %}
 {% block title %}ION - PCAP Analyzer{% endblock %}
 
-{% block head_css %}
-{# The page's own rules, for the classes the server-rendered panels emit.
-   head_css loads after ion.css and before ion-workspace.css and
-   ion-shell.css; none of the 138 selectors here appears in either of
-   those two, measured before the move. #}
-<link rel="stylesheet" href="/static/css/pcap-page.css?v={{ ion_version }}">
-{% endblock %}
+{% block page_id %}pcap{% endblock %}
+
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">

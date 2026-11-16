@@ -2,10 +2,13 @@
 
 > **Scope after the page-sheet retirement (2026-11-16).** The page sheets these
 > removals targeted were retired into `frontend/ion-pages.css` on
-> `feat/titanium-ui-contract`, so only the removals in `ion-legacy.css`,
-> `ion-migrated-styles.css` and `ion-pages.css` (22 rules) ship. The JSON
-> manifests keep only those sheets. The page-sheet decisions below are a
-> worklist to re-apply against the scoped blocks, not a record of what shipped.
+> `feat/titanium-ui-contract`, so only the removals in `ion-legacy.css` and
+> `ion-migrated-styles.css` (13 rules) ship. The `ion-pages.css` removals are
+> deferred too: that sheet now holds the retired page sheets' rules, which carry
+> candidate classes nobody has reviewed, so the proof cannot cover it. The JSON
+> manifests keep only the shipped sheets. The page-sheet and `ion-pages.css`
+> decisions below are a worklist to re-apply against the scoped blocks, not a
+> record of what shipped.
 
 Branch `codex/dead-css-round-two`, exact base
 `74d034481588bb55cd02612961fa6395f55c82e0` on `fix/dead-css-vetting`.

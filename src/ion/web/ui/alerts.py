@@ -2340,7 +2340,7 @@ ANALYTICS_TOP_N = 7
 
 #: The severity donut's buckets, in the order the page listed them. The
 #: colours used to live here too, as a tuple travelling into every arc of
-#: the view model. They are in alerts-page.css now, keyed by these names,
+#: the view model. They are in frontend/ion-pages.css now, keyed by these names,
 #: for the reason tide_band's band moved: which colour paints "critical"
 #: is this stylesheet's answer, and a model that carries it makes every
 #: reader of /ui/alerts/analytics inherit ION's palette.

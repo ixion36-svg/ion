@@ -1,25 +1,46 @@
 """Guard that ion.css was built by the pinned Tailwind release.
 
-frontend/tailwindcss.exe is gitignored, so a clone has no toolchain and
-whoever rebuilds uses whatever binary is on their box. Tailwind's minor
-releases change utility codegen: v4.2.2 emits `calc(var(--spacing) * 0)`
-where v4.3.3 emits `0`, drops `.start`/`.end`, and ships a different
-preflight font stack. A build from the wrong binary therefore rewrites
-most of the stylesheet while looking like an ordinary diff, and nothing
-downstream notices.
+Tailwind's minor releases change utility codegen: v4.2.2 emits
+`calc(var(--spacing) * 0)` where v4.3.3 emits `0`, drops `.start`/`.end`,
+and ships a different preflight font stack. A build from the wrong version
+therefore rewrites most of the stylesheet while looking like an ordinary
+diff, and nothing downstream notices.
 
 frontend/TAILWIND_VERSION is the pin. The banner Tailwind writes into its
-own output is what proves which binary produced the shipped file.
+own output is what proves which toolchain produced the shipped file.
+
+The toolchain is frontend/package.json plus its lockfile. It used to be a
+gitignored frontend/tailwindcss.exe, which meant the two build tests below
+skipped everywhere the binary was absent -- CI included, so they never ran
+there at all. `npm ci` puts the CLI in node_modules/.bin, so they do now.
+The binary is still accepted when a checkout has one.
 """
 
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PIN = ROOT / "frontend" / "TAILWIND_VERSION"
 BUILT = ROOT / "src" / "ion" / "web" / "static" / "css" / "ion.css"
-BINARY = ROOT / "frontend" / "tailwindcss.exe"
+NODE_BIN = ROOT / "frontend" / "node_modules" / ".bin"
+
+
+def _toolchain() -> list[str] | None:
+    """The pinned CLI, however this checkout has it. None when absent."""
+    for name in ("tailwindcss.cmd", "tailwindcss"):
+        candidate = NODE_BIN / name
+        if candidate.exists():
+            return [str(candidate)]
+    legacy = ROOT / "frontend" / "tailwindcss.exe"
+    if legacy.exists():
+        return [str(legacy)]
+    found = shutil.which("tailwindcss")
+    return [found] if found else None
+
+
+BINARY = _toolchain()
 
 BANNER = re.compile(r"tailwindcss v(\d+\.\d+\.\d+)")
 ANSI = re.compile(r"\[[0-9;]*m")
@@ -42,13 +63,13 @@ def test_shipped_css_was_built_by_the_pinned_version():
 
 
 def test_local_binary_matches_the_pin_when_present():
-    """Skipped in CI, where the gitignored binary is absent."""
-    if not BINARY.exists():
+    """Skipped only where no toolchain is installed at all."""
+    if BINARY is None:
         return
-    out = subprocess.run([str(BINARY), "--help"], capture_output=True, text=True, timeout=60).stdout
+    out = subprocess.run(BINARY + ["--help"], capture_output=True, text=True, timeout=60).stdout
     found = BANNER.search(ANSI.sub("", out))
-    assert found, "could not read a version from the local Tailwind binary"
-    assert found.group(1) == _pinned(), f"frontend/tailwindcss.exe is {found.group(1)}, pin is {_pinned()}. Building with it would rewrite ion.css."
+    assert found, "could not read a version from the local Tailwind CLI"
+    assert found.group(1) == _pinned(), f"the installed Tailwind CLI is {found.group(1)}, pin is {_pinned()}. Building with it would rewrite ion.css."
 
 
 def _selectors(css: str) -> set[str]:
@@ -78,17 +99,17 @@ def test_shipped_css_is_up_to_date_with_the_templates():
     rests on: moving markup to the server does make it reachable from the
     stylesheet, but only once the stylesheet is rebuilt.
 
-    Skipped where the gitignored binary is absent, like the test above.
+    Skipped only where no toolchain is installed, like the test above.
     """
-    if not BINARY.exists():
+    if BINARY is None:
         return
     import tempfile
 
     with tempfile.TemporaryDirectory() as tmp:
         fresh = Path(tmp) / "fresh.css"
         proc = subprocess.run(
-            [str(BINARY), "-i", str(ROOT / "frontend" / "tailwind-daisy.input.css"),
-             "-o", str(fresh), "--minify"],
+            BINARY + ["-i", str(ROOT / "frontend" / "tailwind-daisy.input.css"),
+                      "-o", str(fresh), "--minify"],
             capture_output=True, text=True, timeout=300, cwd=ROOT,
         )
         assert proc.returncode == 0, f"Tailwind build failed: {proc.stderr[-400:]}"
@@ -98,7 +119,6 @@ def test_shipped_css_is_up_to_date_with_the_templates():
     assert not missing, (
         "ion.css is missing rules a fresh build emits, so these utilities are "
         "named in a template or a scanned module and do nothing on the page: "
-        f"{sorted(missing)[:20]}. Rebuild with "
-        "./frontend/tailwindcss.exe -i ./frontend/tailwind-daisy.input.css "
-        "-o ./src/ion/web/static/css/ion.css --minify"
+        f"{sorted(missing)[:20]}. Rebuild with: "
+        "cd frontend && npm ci && npm run build:css"
     )

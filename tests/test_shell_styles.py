@@ -70,12 +70,25 @@ def test_base_links_the_shell_and_no_longer_carries_a_style_block():
 
 
 def test_login_moves_its_rules_and_still_overrides_the_page_min_height():
+    """login-page.css is retired into the one build.
+
+    The override used to hold because the <link> sat after ion.css. The
+    rules are inside ion.css now, and .ion-tw-page is redefined later in
+    that same file, so order would lose it. It holds on specificity
+    instead: the selector is compound, `body[data-page="login"].ion-tw-page`
+    at 0,2,1 against the plain class at 0,1,0.
+
+    Compound, not descendant: .ion-tw-page is on the <body> itself here, so
+    `body[data-page="login"] .ion-tw-page` would match nothing.
+    """
     page = (TPL / "login.html").read_text(encoding="utf-8")
     assert not re.search(r"<style[^>]*>.*?</style>", page, re.S)
-    assert page.index("ion.css") < page.index("login-page.css")
-    css = (CSS / "login-page.css").read_text(encoding="utf-8")
-    assert "min-height:100vh" in _rule(css, ".ion-tw-page")
-    assert "display:none" in _rule(css, "#error-message")
-    shown = _rule(css, "#error-message.show")
+    assert "login-page.css" not in page, "the retired sheet is linked again"
+    assert 'data-page="login"' in page, "standalone page carries its scope on <body>"
+
+    css = (ROOT / "frontend" / "ion-pages.css").read_text(encoding="utf-8")
+    assert "min-height:100vh" in _rule(css, 'body[data-page="login"].ion-tw-page')
+    assert "display:none" in _rule(css, 'body[data-page="login"] #error-message')
+    shown = _rule(css, 'body[data-page="login"] #error-message.show')
     assert "display:flex" in shown
     assert "display:none" not in shown
