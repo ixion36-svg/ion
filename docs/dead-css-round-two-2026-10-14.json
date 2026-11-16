@@ -1,0 +1,299 @@
+{
+  "base": "74d034481588bb55cd02612961fa6395f55c82e0",
+  "sheets": {
+    "ion-legacy.css": {
+      "original_candidate_classes": [
+        "nav-dropdown-toggle",
+        "nav-links"
+      ],
+      "rules": [
+        {
+          "selector": ".nav-links",
+          "sha256": "cc93492339d630343c7c891ace6c9b527f173ea07fddf1c48fa6faff2aaab135",
+          "classes": [
+            "nav-links"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".nav-links > li > a:not(.nav-dropdown-toggle)",
+          "sha256": "fd898e55d137f69dbb846cb4878f555245fad6c762643b117b137548184b4b98",
+          "classes": [
+            "nav-dropdown-toggle",
+            "nav-links"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "Complex/negated selector deliberately retained under existing proof policy."
+        },
+        {
+          "selector": ".nav-links > li > a:not(.nav-dropdown-toggle):hover",
+          "sha256": "83442664045db8c45b8e74cdb2664ba545b50340703a9b5a7072165dc0507402",
+          "classes": [
+            "nav-dropdown-toggle",
+            "nav-links"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "Complex/negated selector deliberately retained under existing proof policy."
+        },
+        {
+          "selector": ".nav-links a",
+          "sha256": "cef99296cefdb5cbe341124fb1aea95e92e5bc5f91f197a1c24918af82717308",
+          "classes": [
+            "nav-links"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".nav-links a",
+          "sha256": "4be927b34cae69d0bc082c5945f097cb4ff96f5bb50bc8dc41eadbe1cbefe26e",
+          "classes": [
+            "nav-links"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".nav-links",
+          "sha256": "3bb52fc8e1771c359ef99163b861dbee89ba4597058bb02229a3231a73fd9234",
+          "classes": [
+            "nav-links"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".nav-links a",
+          "sha256": "561c1a00dea9308e6f900ee1e7021eb2254d9195c3486080e9c638cd19466e0c",
+          "classes": [
+            "nav-links"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        },
+        {
+          "selector": ".nav-links",
+          "sha256": "72a6bfbd1e0e2f64c7ffa4a1f5509d738a95b9722c61f7539d9a2fec38f0c69a",
+          "classes": [
+            "nav-links"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Whole-source absence and reviewed constructors; complete all-dead rule only. See round-two evidence."
+        }
+      ]
+    },
+    "ion-migrated-styles.css": {
+      "original_candidate_classes": [
+        "_ion-s-09b0c9a2e1",
+        "_ion-s-0a1c7436f5",
+        "_ion-s-5eaab7cb30",
+        "_ion-s-78cae35616",
+        "_ion-s-8bc7ebe99c",
+        "_ion-s-a55ef5c079",
+        "_ion-s-b2ff45bb5d",
+        "_ion-s-b76ce82a4d",
+        "_ion-s-d28cf57fed",
+        "_ion-s-e080dc03bc",
+        "_ion-s-e26f061ab9",
+        "_ion-s-e62e34ae9b",
+        "_ion-s-eaadf28b85"
+      ],
+      "rules": [
+        {
+          "selector": "._ion-s-8bc7ebe99c",
+          "sha256": "3e6ccab4914ce86b1e0835fbc3294a36681d227fa5e2eb5c3f7ce2aa32f0d064",
+          "classes": [
+            "_ion-s-8bc7ebe99c"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Existing replaced_by claim verified against live an-dist-track/pb-preview-step/forensic-progress definitions and markup."
+        },
+        {
+          "selector": "._ion-s-0a1c7436f5",
+          "sha256": "5de8ce96aee46d3663a00cc1351826fd589e94d884820bf86d0584929016c20f",
+          "classes": [
+            "_ion-s-0a1c7436f5"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "No recorded independently verified replacement; retain migration rule and map."
+        },
+        {
+          "selector": "._ion-s-e080dc03bc",
+          "sha256": "bdc6797899bdf445e3b5154fa359b98642fa34ba1ac7818d33157e7bdb2e3cc0",
+          "classes": [
+            "_ion-s-e080dc03bc"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "No recorded independently verified replacement; retain migration rule and map."
+        },
+        {
+          "selector": "._ion-s-e62e34ae9b",
+          "sha256": "0570ecb68b99861788876053a156b44d47296d804391a6717202f8646eec27f7",
+          "classes": [
+            "_ion-s-e62e34ae9b"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "No recorded independently verified replacement; retain migration rule and map."
+        },
+        {
+          "selector": "._ion-s-09b0c9a2e1",
+          "sha256": "a4d717b3d811fed0ea53ff71ba437db74930a00dcd28b99b72651c08ff8eed00",
+          "classes": [
+            "_ion-s-09b0c9a2e1"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "No recorded independently verified replacement; retain migration rule and map."
+        },
+        {
+          "selector": "._ion-s-b2ff45bb5d",
+          "sha256": "9c5dcda85dc2c7be9a47a29030fc87dafd26eaaa7d8560abc12a4fc1885fd9ce",
+          "classes": [
+            "_ion-s-b2ff45bb5d"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "No recorded independently verified replacement; retain migration rule and map."
+        },
+        {
+          "selector": "._ion-s-d28cf57fed",
+          "sha256": "ac6ee490935982acd992da8e146dd79b7dd9518ec3a1bf0f8c0911d6fe3a4125",
+          "classes": [
+            "_ion-s-d28cf57fed"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "No recorded independently verified replacement; retain migration rule and map."
+        },
+        {
+          "selector": "._ion-s-eaadf28b85",
+          "sha256": "70c70a6f856f7e68aa5cf2dc1d0c23bde0a4bdcb6c3b87677a885624b39a9471",
+          "classes": [
+            "_ion-s-eaadf28b85"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "No recorded independently verified replacement; retain migration rule and map."
+        },
+        {
+          "selector": "._ion-s-78cae35616",
+          "sha256": "e3559ed2c5a501adc01b39ec72222f22d4f09e71b14d9ac9512e9d4c17c71073",
+          "classes": [
+            "_ion-s-78cae35616"
+          ],
+          "whole_rule": true,
+          "decision": "keep",
+          "reason": "No recorded independently verified replacement; retain migration rule and map."
+        },
+        {
+          "selector": "._ion-s-e26f061ab9",
+          "sha256": "0d65f81416bae2b040ea3f7c986784fd357d73ef73f3968eb626d281588f0b45",
+          "classes": [
+            "_ion-s-e26f061ab9"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Existing replaced_by claim verified against live an-dist-track/pb-preview-step/forensic-progress definitions and markup."
+        },
+        {
+          "selector": "._ion-s-b76ce82a4d",
+          "sha256": "73642bfb04b2ef923de6126c6ad08ccd957f960ce3821a57cbffa7b4e49cfce7",
+          "classes": [
+            "_ion-s-b76ce82a4d"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Existing replaced_by claim verified against live an-dist-track/pb-preview-step/forensic-progress definitions and markup."
+        },
+        {
+          "selector": "._ion-s-5eaab7cb30",
+          "sha256": "2f24e02b2b0c2bf5d6780408c678e69e479a968a97ed43a4ccddac2bbc5080f8",
+          "classes": [
+            "_ion-s-5eaab7cb30"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Existing replaced_by claim verified against live an-dist-track/pb-preview-step/forensic-progress definitions and markup."
+        },
+        {
+          "selector": "._ion-s-a55ef5c079",
+          "sha256": "e0c60f15b92e868ee1342e417bd880debc8753c700513438cb6b513cbfe457e2",
+          "classes": [
+            "_ion-s-a55ef5c079"
+          ],
+          "whole_rule": true,
+          "decision": "remove",
+          "reason": "Existing replaced_by claim verified against live an-dist-track/pb-preview-step/forensic-progress definitions and markup."
+        }
+      ]
+    },
+    "ion-shell.css": {
+      "original_candidate_classes": [
+        "bg-grid",
+        "bg-ink-950",
+        "bg-white",
+        "border-white"
+      ],
+      "rules": [
+        {
+          "selector": "[data-theme=\"light\"] .ion-tw-page .bg-ink-900\\/50,\n    [data-theme=\"light\"] .ion-tw-page .bg-ink-900\\/40,\n    [data-theme=\"light\"] .ion-tw-page .bg-ink-900\\/60,\n    [data-theme=\"light\"] .ion-tw-page .bg-ink-950\\/60",
+          "sha256": "7f292d347231fc0fe02f3e94dc1071d0bb1b8ae68d382c0ad1439b6fd32c2058",
+          "classes": [
+            "bg-ink-900",
+            "bg-ink-950",
+            "ion-tw-page"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "[data-theme=\"light\"] .ion-tw-page .border-white\\/5,\n    [data-theme=\"light\"] .ion-tw-page .border-white\\/10",
+          "sha256": "144977f76fdb0754b5cc1e93e5cea964dcbe72e525de54569ce62556cfa4184f",
+          "classes": [
+            "border-white",
+            "ion-tw-page"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "[data-theme=\"light\"] .ion-tw-page .bg-white\\/5",
+          "sha256": "3ab8518da4819e76b891735156fff15459a837ac6b132df43db318202f323b96",
+          "classes": [
+            "bg-white",
+            "ion-tw-page"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        },
+        {
+          "selector": "[data-theme=\"light\"] .ion-tw-page .bg-grid",
+          "sha256": "29890e791556544ae0d98e40a77f90fd4b6e3120845255dae51aced71085b6ff",
+          "classes": [
+            "bg-grid",
+            "ion-tw-page"
+          ],
+          "whole_rule": false,
+          "decision": "keep",
+          "reason": "Whole mixed selector retained; no strict deletion or selector splitting."
+        }
+      ]
+    }
+  }
+}
