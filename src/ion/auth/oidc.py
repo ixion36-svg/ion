@@ -375,17 +375,21 @@ class OIDCUserSync:
         held and withhold nothing.
 
         The sign-in is committed first because the workforce call rolls the
-        session back when it fails, and that must not undo the login.
+        session back when it fails, and that must not undo the login. That
+        commit is outside the guard below on purpose: it is the login's own
+        write, so if it fails the login has failed and the caller has to see
+        the real error. Swallowing it would log "the login continues" over a
+        session that raises on its next statement.
         """
+        if not user.roles:
+            return
+        self.session.commit()
         try:
             from ion.services.workforce_service import (
                 a_workforce_manager,
                 follow_held_roles,
             )
 
-            if not user.roles:
-                return
-            self.session.commit()
             assigner = a_workforce_manager(self.session)
             if assigner is not None:
                 follow_held_roles(self.session, user, assigner=assigner)
@@ -394,6 +398,10 @@ class OIDCUserSync:
                 "Could not follow the roles of OIDC user %s into Workforce; "
                 "the login continues", user.username,
             )
+            # Nothing of the login's is pending after the commit above, and
+            # a failed statement leaves PostgreSQL refusing every later one
+            # until the transaction is rolled back.
+            self.session.rollback()
 
     def _guard_rebind(
         self, candidate: Optional[User], token_data: OIDCTokenData

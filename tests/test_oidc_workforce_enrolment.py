@@ -299,3 +299,44 @@ class TestRolesHeldAtSignInReachTheOrderOfBattle:
 
         assert [r.name for r in user.roles] == ["analyst"]
         assert db.query(UserJourney).filter_by(user_id=user.id).count() == 0
+
+    def test_a_sign_in_that_cannot_be_saved_fails_as_itself(self, db, admin,
+                                                            monkeypatch):
+        """The commit before the workforce call is the login's own write. If
+        it fails the login has failed, and saying it continues would hand the
+        caller a session that raises on its next statement."""
+        analyst = Role(name="analyst")
+        db.add(analyst)
+        db.commit()
+        self._l1(db, admin, analyst)
+        user = oidc_user(db)
+        user.roles = [analyst]
+        db.commit()
+
+        def refuse():
+            raise RuntimeError("database refused the sign-in")
+
+        monkeypatch.setattr(db, "commit", refuse)
+        with pytest.raises(RuntimeError, match="database refused the sign-in"):
+            self._signed_in(db, user)
+
+    def test_the_session_is_still_usable_after_a_workforce_failure(
+            self, db, admin, monkeypatch):
+        analyst = Role(name="analyst")
+        db.add(analyst)
+        db.commit()
+        self._l1(db, admin, analyst)
+        user = oidc_user(db)
+        user.roles = [analyst]
+        db.commit()
+
+        def broken_lookup(session):
+            from sqlalchemy import text
+
+            session.execute(text("SELECT * FROM no_such_table"))
+
+        monkeypatch.setattr(wf, "a_workforce_manager", broken_lookup)
+        self._signed_in(db, user)
+
+        assert db.query(User).filter_by(username=user.username).count() == 1
+        assert [r.name for r in user.roles] == ["analyst"]
