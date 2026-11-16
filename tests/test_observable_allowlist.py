@@ -42,7 +42,16 @@ from ion.services.observable_allowlist import (
     normalise_pattern,
 )
 
-NOW = datetime.now(timezone.utc)
+
+def _now():
+    """Read at call time, never at import.
+
+    pytest imports every module at collection, so a module-level constant is
+    hours stale by the time a long run reaches this file. An expiry set a day
+    ahead of a stale constant is already in the past, and the rule stops
+    matching -- a failure that appears only in a full suite.
+    """
+    return datetime.now(timezone.utc)
 
 
 def rule(pattern, match_type, obs_type=None, expires_at=None, is_active=True):
@@ -193,12 +202,12 @@ class TestLifecycle:
     def test_an_expired_rule_stops_matching(self):
         """An expiry that does not expire is a comment, not a control."""
         r = rule("10.0.0.0/8", MatchType.CIDR,
-                 expires_at=NOW - timedelta(minutes=1))
+                 expires_at=_now() - timedelta(minutes=1))
         assert not r.matches("ip", "10.1.1.1")
 
     def test_a_future_expiry_still_matches(self):
         r = rule("10.0.0.0/8", MatchType.CIDR,
-                 expires_at=NOW + timedelta(days=1))
+                 expires_at=_now() + timedelta(days=1))
         assert r.matches("ip", "10.1.1.1")
 
     def test_a_naive_expiry_is_treated_as_utc(self):
@@ -206,7 +215,7 @@ class TestLifecycle:
         an aware datetime raises, and an allowlist that raises mid-extraction
         takes the ingest path down with it."""
         r = rule("10.0.0.0/8", MatchType.CIDR,
-                 expires_at=(NOW + timedelta(days=1)).replace(tzinfo=None))
+                 expires_at=(_now() + timedelta(days=1)).replace(tzinfo=None))
         assert r.matches("ip", "10.1.1.1") is True
 
 
