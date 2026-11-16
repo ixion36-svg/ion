@@ -61,6 +61,26 @@ def bulk_assign(request: Request, data: BulkAlertRequest, current_user: User = D
 def bulk_close(request: Request, data: BulkCloseRequest, current_user: User = Depends(get_current_user), session: Session = Depends(get_db_session)):
     from ion.services.bulk_operations_service import bulk_close_alerts
     try:
-        return _sanitize_result(bulk_close_alerts(session, data.alert_ids, current_user.id, data.closure_reason))
+        result = bulk_close_alerts(session, data.alert_ids, current_user.id, data.closure_reason)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Bulk close failed: {safe_error(e, 'bulk_close')}")
+    _close_alerts_in_es(data.alert_ids)
+    return _sanitize_result(result)
+
+
+def _close_alerts_in_es(alert_ids: list[str]) -> None:
+    """Mirror a bulk close onto the alerts' Elasticsearch status. Best-effort.
+
+    Left open there, the alerts page sent that "open" back on its next load
+    and reopened the alerts in ION. This handler runs in the threadpool, so
+    the async client gets a throwaway loop, which its pool supports.
+    """
+    try:
+        import asyncio
+
+        from ion.services.elasticsearch_service import ElasticsearchService
+        es = ElasticsearchService()
+        if es.is_configured and alert_ids:
+            asyncio.run(es.update_alert_workflow_status(list(alert_ids), "closed"))
+    except Exception as e:  # noqa: BLE001 — the ION-side close already stands
+        logger.warning("Bulk close: alert status not mirrored to Elasticsearch: %s", e)

@@ -180,6 +180,27 @@ class TrainingPlanItem(Base, TimestampMixin):
     cert_name: Mapped[str] = mapped_column(String(200), nullable=False)
     provider: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
     price: Mapped[float] = mapped_column(Float, nullable=False, default=0)
+    #: What `price` is denominated in, as an ISO 4217 code.
+    #:
+    #: NULL means the estate's configured currency (Config.currency). That
+    #: is what every existing row is: there was no currency column, every
+    #: price in the product was GBP, and six templates put a "£" in front
+    #: of the number. Backfilling them to a literal "GBP" would assert
+    #: something nobody recorded, so they keep deferring to the setting
+    #: and only a row that states a currency overrides it.
+    #:
+    #: It exists because the prices worth recording are not all in one
+    #: currency -- GIAC quotes USD, Centri quotes GBP -- and a forecast
+    #: that adds them is wrong in a way no reader can see.
+    currency: Mapped[Optional[str]] = mapped_column(String(3), nullable=True)
+    #: Where the figure came from: a URL, or a few words naming the quote.
+    #: A price with no provenance cannot be checked, and an unverifiable
+    #: number in a budget is worse than a blank.
+    price_source: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    #: When the figure was last confirmed against that source. Vendor
+    #: pricing moves, so a price is only as good as its date, and a stale
+    #: one should be able to show as stale rather than as current.
+    price_checked_on: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     difficulty: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # beginner, intermediate, advanced, expert
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="planned")  # planned, in_progress, completed, skipped
     funding_type: Mapped[str] = mapped_column(String(20), nullable=False, default="tbd")  # company, self, split, tbd

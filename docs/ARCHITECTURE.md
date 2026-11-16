@@ -164,7 +164,6 @@ ION's business logic lives in `src/ion/services/` (80+ modules). Key services:
 | `ShiftHandoverService` | `shift_handover_service.py` | End-of-shift report generation |
 | `SchedulerService` | `scheduler_service.py` | Cron-based background job scheduling |
 | `NetworkMapperService` | `network_mapper_service.py` | Automated network asset discovery |
-| `SLAService` | `sla_service.py` | Response time targets and compliance tracking |
 | `PlaybookExecutorService` | `playbook_executor_service.py` | Step-by-step playbook execution engine |
 | `PlaybookActionService` | `playbook_action_service.py` | Automated response actions (block, quarantine, etc.) |
 

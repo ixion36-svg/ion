@@ -51,7 +51,15 @@ PAGE_CSS = ROOT / "src/ion/web/static/css/alerts-page.css"
 FRAGMENTS = ROOT / "src/ion/web/templates/_fragments"
 URL = "/ui/alerts/analytics"
 
-NOW = datetime.now(timezone.utc)
+def _now():
+    """Read at call time, never at import.
+
+    pytest imports every module at collection, so a module-level constant is
+    hours stale by the time a long run reaches this file. The page buckets the
+    last 24 hours against the real clock, so a fixture written a couple of
+    hours back falls out of the window -- a failure only a full suite sees.
+    """
+    return datetime.now(timezone.utc)
 
 
 def text_of(markup: str) -> str:
@@ -74,7 +82,7 @@ def _alert(hours_ago=2, severity="high", host="ws-01", rule="Odd login",
            country="Germany", alert_id=None):
     row: dict[str, Any] = {
         "id": alert_id or f"a{hours_ago}-{host}-{rule}",
-        "timestamp": (NOW - timedelta(hours=hours_ago)).isoformat(),
+        "timestamp": (_now() - timedelta(hours=hours_ago)).isoformat(),
         "severity": severity, "host": host, "rule_name": rule,
     }
     if country is not None:
@@ -193,7 +201,7 @@ def test_the_bucket_plan_is_the_one_the_page_chose(hours, buckets):
     """Asserted on the helper. The boundaries are the point, and driving a
     720 hour window through a render would need 30 buckets of synthetic
     alerts to say anything about the plan."""
-    out = trend_buckets([], hours, now=NOW)
+    out = trend_buckets([], hours, now=_now())
     assert len(out["buckets"]) == buckets
 
 
@@ -206,7 +214,7 @@ def test_an_alert_with_no_timestamp_is_not_bucketed(read):
 
 
 def test_an_alert_outside_the_window_is_not_bucketed():
-    out = trend_buckets([_alert(hours_ago=48)], 24, now=NOW)
+    out = trend_buckets([_alert(hours_ago=48)], 24, now=_now())
     assert out["total"] == 0
 
 
@@ -378,7 +386,7 @@ def test_a_geo_block_with_no_country_is_counted_as_unattributed(read):
     """The page skipped these silently, so a window whose alerts were all
     geolocated to nowhere read as a window with no geo data at all."""
     read["payload"] = {"alerts": [{
-        "id": "x", "timestamp": NOW.isoformat(), "severity": "high",
+        "id": "x", "timestamp": _now().isoformat(), "severity": "high",
         "host": "h", "rule_name": "r",
         "raw_data": {"source": {"geo": {"continent_name": "Europe"}}}}]}
     body = get().text
@@ -524,10 +532,10 @@ def test_the_bucket_count_rounds_up_for_a_partial_bucket():
     that can tell them apart, and flooring it would drop the newest partial
     bucket, which is the one holding the alerts that just arrived."""
     # 730 hours takes the daily branch: 30 whole days plus a partial one.
-    assert len(trend_buckets([], 730, now=NOW)["buckets"]) == 31
+    assert len(trend_buckets([], 730, now=_now())["buckets"]) == 31
     # 100 and 25 take the six-hourly branch, and neither divides evenly.
-    assert len(trend_buckets([], 100, now=NOW)["buckets"]) == 17
-    assert len(trend_buckets([], 25, now=NOW)["buckets"]) == 5
+    assert len(trend_buckets([], 100, now=_now())["buckets"]) == 17
+    assert len(trend_buckets([], 25, now=_now())["buckets"]) == 5
 
 
 def test_the_bars_are_ordered_by_count_not_by_name():

@@ -53,6 +53,9 @@
        not render unstyled — the v0.77.0 lesson. #}
     <link rel="stylesheet" href="/static/css/ion-workspace.css?v={{ ion_version }}">
     <link rel="stylesheet" href="/static/css/ion-shell.css?v={{ ion_version }}">
+    {# Glass surfaces for dark mode. Last, so it restates the page sheets'
+       surfaces without editing them; off when localStorage ion-glass=off. #}
+    <link rel="stylesheet" href="/static/css/ion-glass.css?v={{ ion_version }}">
     <!-- tell HTMX not to inject its indicator <style> block at runtime.
          Inline-injected styles can't carry our per-request CSP nonce, so they'd
          be blocked by `style-src 'self' 'nonce-XXX'`. ION does not use the

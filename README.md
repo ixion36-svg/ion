@@ -9,7 +9,7 @@
 
 # ION - Intelligent Operating Network
 
-![Version](https://img.shields.io/badge/version-0.99.12-blue)
+![Version](https://img.shields.io/badge/version-0.99.17-blue)
 ![Python](https://img.shields.io/badge/python-3.14-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Docker](https://img.shields.io/badge/docker-fubsxploitapps%2Fion-blue)
@@ -26,7 +26,7 @@ ION is a server-rendered Security Operations Centre portal for threat detection,
 - **Detection Engineering** — TIDE analytics (posture, gap analysis, MITRE coverage, ATT&CK Navigator export) plus the optional **DE module**: DE Metrics / Noise Campaigns, Detection Proposals, System Quirks register, and a Bob improvement loop (perms `de:read` / `de:propose` / `de:verify` / `de:approve`).
 - **Threat Intel & integrations** — Unified threat-intel page (actors, IOCs, reports, watchlist), knowledge graph, canaries, and observable enrichment across OpenCTI, VirusTotal, Shodan, AbuseIPDB, and DFIR-IRIS.
 - **Playbooks & response** — 25+ SOC playbooks with execution tracking and analytics, full DFIR forensics pipeline (chain of custody, timeline, IOC extraction), PCAP analysis (protocol heuristics, JA3, file/credential extraction), and 6 approval-gated response actions (block IP, disable account, quarantine host, DNS sinkhole, email block, webhook).
-- **Reporting & operations** — SOC health scorecard, executive/compliance report scheduler, analyst efficiency, SLA tracking, morning briefing, shift handover, on-call roster, and a configurable command-centre dashboard.
+- **Reporting & operations** — SOC health scorecard, executive/compliance report scheduler, analyst efficiency, morning briefing, shift handover, and a configurable command-centre dashboard.
 - **Knowledge & reference** — Knowledge base (~392 articles across 28 collections), the SOC roles and daily-duties reference, skills and schedule tracking, and the interactive ION Guide.
 
 Also included: an optional **MCP server mode** (`POST /api/mcp`, `ION_MCP_ENABLED`, default off) exposing core SOC data as MCP tools, and optional **observability** (Prometheus `/metrics` + Elastic APM, both default off).

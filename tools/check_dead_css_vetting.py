@@ -66,7 +66,7 @@ def main() -> None:
     removed = 0
     for sheet, review in data["sheets"].items():
         path = sheet_path(sheet)
-        original = baseline(path, data["base"])
+        original = baseline(path, review.get("base", data["base"]))
         original_rules = {rule["sha256"]: rule for rule in rules(original)}
         candidates = set(review["original_candidate_classes"])
         covered = {key for key, rule in original_rules.items() if set(rule["classes"]) & candidates}

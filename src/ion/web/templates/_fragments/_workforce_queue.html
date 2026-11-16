@@ -1,0 +1,57 @@
+{# Items a verifier has to act on, oldest first.
+
+   Rendered at the top of the Team tab rather than behind a tab of its
+   own: it is the only part of this page that asks the reader to do
+   something, and it was previously a page nothing linked to from the
+   navigation.
+
+   Expects `items` and `can_verify` from the including view. #}
+
+<div class="card bg-base-200 border border-base-300 mb-5">
+  <div class="card-body p-5">
+    <div class="flex items-center gap-3 flex-wrap">
+      <h2 class="card-title text-base">Waiting on you</h2>
+      {% if items %}<span class="badge badge-warning">{{ items | length }}</span>{% endif %}
+    </div>
+
+    {% if not items %}
+      <p class="text-sm text-base-content/60">Nothing is waiting. Submissions
+        arrive here the moment someone records an item as complete.</p>
+    {% else %}
+      <p class="text-sm text-base-content/70">Verifying a gate item can grant
+        that person access to ION straight away.</p>
+      <ul class="flex flex-col mt-1">
+        {% for i in items %}
+          <li class="flex items-center gap-3 py-3 flex-wrap border-t border-base-300/60 first:border-t-0">
+            <div class="grow min-w-0">
+              <div class="text-sm font-medium">{{ i.user }}</div>
+              <div class="text-sm">{{ i.name }}</div>
+              <div class="text-xs text-base-content/60">
+                {{ i.role }}{% if i.completed_on %}, completed {{ i.completed_on }}{% endif %}{% if i.evidence_ref %}, reference {{ i.evidence_ref }}{% endif %}
+              </div>
+            </div>
+            {% if i.phase == 'gate' %}
+              <span class="badge badge-sm badge-warning shrink-0">Gate</span>
+            {% else %}
+              <span class="badge badge-sm badge-ghost shrink-0">{{ i.kind }}</span>
+            {% endif %}
+            {% if i.waiting %}
+              <span class="text-xs text-base-content/60 shrink-0">waiting {{ i.waiting }}</span>
+            {% endif %}
+            {% if can_verify %}
+              <form class="shrink-0" hx-post="/ui/workforce/requirements/{{ i.id }}/verify"
+                    hx-target="#wf-tab" hx-swap="innerHTML">
+                <button type="submit" class="btn btn-xs btn-primary">Verify</button>
+              </form>
+              <form class="shrink-0" hx-post="/ui/workforce/requirements/{{ i.id }}/send-back"
+                    hx-target="#wf-tab" hx-swap="innerHTML">
+                <button type="submit" class="btn btn-xs btn-ghost"
+                        aria-label="Send {{ i.name }} back to {{ i.user }}">Send back</button>
+              </form>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+</div>

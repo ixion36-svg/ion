@@ -256,18 +256,12 @@
   </div>
   {%- endif %}
 </div>
-{%- if kibana_case_id %}
 <div class="cpanel-section" data-tab="notes">
-  <div class="cpanel-section-title">Kibana Comments
-    <span class="cpanel-section-badge" id="kibana-comment-count">...</span></div>
-  <div id="kibana-comments-container">
-    <p class="text-[0.8rem] text-[var(--text-secondary)]">Loading comments...</p>
-  </div>
-</div>
-{%- endif %}
-<div class="cpanel-section" data-tab="notes">
-  <div class="cpanel-section-title">Investigation Notes
-    ({{ note_count if note_count is not none else '?' }})</div>
+  <div class="cpanel-section-title">Notes
+    ({{ note_count if note_count is not none else '?' }})
+    {%- if kibana_case_id %}
+    <span class="cpanel-section-badge" title="Kibana comments arrive here on the next sync, and notes added here are posted to Kibana">synced with Kibana</span>
+    {%- endif %}</div>
   {%- if notes is none %}{{ unreadable('note list') }}
   {%- else %}
   {%- for n in notes %}
@@ -276,6 +270,9 @@
       <span class="cpanel-note-user">
         <i class="icon-user text-[0.65rem] mr-[0.2rem]"></i>
         {{- n.user or 'Unknown' -}}</span>
+      {%- if n.from_kibana %}
+      <span class="cpanel-note-source" title="Comment added in Kibana">Kibana</span>
+      {%- endif %}
       <span>{{ fig(n.when, 'No time recorded for this note') }}</span>
       <button class="cpanel-note-translate" type="button"
               data-click-action="translateCaseNote"

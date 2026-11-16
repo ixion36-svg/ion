@@ -1,0 +1,198 @@
+{# Overview: posture, gaps, use cases and execution on one screen. A figure a
+   read could not supply is a dash with the reason beside it, never a zero. #}
+{% macro num(v) -%}{% if v is number %}{{ '{:,}'.format(v) }}{% else %}—{% endif %}{%- endmacro %}
+{% macro dash(reason) -%}<span class="dx-dash" title="{{ reason }}">—</span>{%- endmacro %}
+{% macro sev(value) -%}{% set key = value|lower if value is string else '' %}<span class="de-sev {{ key if key in ['critical','high','medium','low'] else '' }}">{{ value or 'Unknown' }}</span>{%- endmacro %}
+{% macro quality(v) -%}{% if v is none %}—{% elif posture.quality_scale == 'percent' %}{{ v|round|int }}%{% else %}{{ v }}{% endif %}{%- endmacro %}
+{% set s = posture.stats %}
+{% set uc = use_case_counts %}
+{% set na = needs_action %}
+<span id="de-count-coverage" class="dx-tab-count" hx-swap-oob="true">{% if blind_spots is number %}{{ num(blind_spots) }} gaps{% endif %}</span>
+<span id="de-count-usecases" class="dx-tab-count" hx-swap-oob="true">{% if uc %}{{ uc.total }}{% endif %}</span>
+<span id="de-count-rules" class="dx-tab-count" hx-swap-oob="true">{% if s.total_rules is number %}{{ num(s.total_rules) }}{% endif %}</span>
+{% if state == 'unconfigured' %}
+<div class="dx-banner">TIDE not configured. Connect it in <a href="/settings#tide">Settings</a> to see detection posture.</div>
+{% else %}
+{% if state == 'failed' %}<div class="dx-banner warn" role="alert">Failed to load posture. Panels fed by other reads are still shown.</div>
+{% elif state == 'empty' %}<div class="dx-banner">No detection rules found in the active space.</div>{% endif %}
+
+<div class="dx-kpis">
+  <div class="dx-kpi">
+    <div class="dx-k">Rules</div>
+    <div class="dx-v" data-field="total_rules">{{ num(s.total_rules) }}</div>
+    <div class="dx-s">{% if s.total_rules is none %}TIDE posture unavailable{% else %}{{ num(s.enabled_rules) }} enabled · {{ num(s.disabled_rules) }} disabled{% endif %}</div>
+    {% if posture.enabled_pct is number %}<div class="dx-bar"><i class="ok" data-ion-style="width:{{ posture.enabled_pct }}%"></i></div>{% endif %}
+  </div>
+  <div class="dx-kpi">
+    <div class="dx-k">ATT&amp;CK coverage</div>
+    {% if coverage_pct is number %}
+    <div class="dx-v" data-field="coverage_pct">{{ coverage_pct }}% <small>{{ num(s.covered_techniques) }} / {{ num(s.total_techniques) }}</small></div>
+    <div class="dx-s">techniques with an enabled rule</div>
+    <div class="dx-bar"><i class="ok{{ ' nz' if s.covered_techniques }}" data-ion-style="width:{{ coverage_pct }}%"></i></div>
+    {% elif s.covered_techniques is number %}
+    <div class="dx-v" data-field="coverage_pct">{{ num(s.covered_techniques) }}</div>
+    <div class="dx-s">techniques with an enabled rule; TIDE gave no technique total</div>
+    {% else %}
+    <div class="dx-v" data-field="coverage_pct">{{ dash('No covered-technique count') }}</div>
+    <div class="dx-s">covered-technique count unavailable</div>
+    {% endif %}
+  </div>
+  <div class="dx-kpi">
+    <div class="dx-k">Avg rule quality</div>
+    {% set avg = posture.avg_quality %}
+    {% if avg is number %}
+    <div class="dx-v" data-field="avg_quality">{{ quality(avg) }} <small>{{ 'TIDE score' if posture.quality_scale == 'percent' else 'points' if posture.quality_scale == 'points' else 'scale unknown' }}</small></div>
+    {% set bands = posture.quality or [] %}
+    <div class="dx-s">{% for item in bands if item.key in ['excellent','poor'] %}{{ num(item.count) }} {{ item.key }}{{ ' · ' if not loop.last }}{% endfor %}</div>
+    {% if posture.quality_scale == 'percent' %}<div class="dx-bar"><i class="q-{{ 'excellent' if avg >= 80 else 'good' if avg >= 50 else 'fair' if avg >= 25 else 'poor' }}" data-ion-style="width:{{ [avg, 100]|min }}%"></i></div>{% endif %}
+    {% else %}
+    <div class="dx-v" data-field="avg_quality">{{ dash('No quality scores') }}</div>
+    <div class="dx-s">quality scores unavailable</div>
+    {% endif %}
+  </div>
+  <div class="dx-kpi">
+    <div class="dx-k">Use cases ready</div>
+    {% if uc %}
+    <div class="dx-v" data-field="use_cases_ready">{{ uc.ready }} / {{ uc.total }}</div>
+    <div class="dx-s">{% set parts = [] %}{% for key in ['partial','blind','unknown','empty'] if uc[key] %}{% set _ = parts.append(uc[key] ~ ' ' ~ {'partial':'partial','blind':'blind','unknown':'coverage unknown','empty':'no steps'}[key]) %}{% endfor %}{{ parts|join(' · ') if parts else ('all steps covered' if uc.total else 'no use cases in TIDE') }}</div>
+    {% if uc.total %}<div class="dx-bar"><i class="warn{{ ' nz' if uc.ready }}" data-ion-style="width:{{ (uc.ready / uc.total * 100)|round(1) }}%"></i></div>{% endif %}
+    {% else %}
+    <div class="dx-v" data-field="use_cases_ready">{{ dash('Use-case read failed') }}</div>
+    <div class="dx-s">use-case read failed</div>
+    {% endif %}
+  </div>
+  <div class="dx-kpi">
+    <div class="dx-k">Firing ({{ (firing.hours / 24)|round|int }}d)</div>
+    {% if firing.total is number %}
+    <div class="dx-v" data-field="firing_total"{% if firing.capped %} title="Elasticsearch stopped counting at {{ num(firing.total) }} hits"{% endif %}>{{ '≥' if firing.capped }}{{ num(firing.total) }}</div>
+    <div class="dx-s">{{ num(firing.rules) }} rules · {{ num(firing.noisy) }} high-volume</div>
+    {% if firing.spark %}<svg class="dx-spark" viewBox="0 0 90 28" aria-hidden="true"><polyline points="{{ firing.spark }}"/></svg>{% endif %}
+    {% else %}
+    <div class="dx-v" data-field="firing_total">{{ dash(firing.reason) }}</div>
+    <div class="dx-s">{{ firing.reason }}</div>
+    {% endif %}
+  </div>
+  <div class="dx-kpi">
+    <div class="dx-k">Needs action</div>
+    {% if na.total is number %}
+    <div class="dx-v{{ ' warn' if na.total }}" data-field="needs_action"{% if na.partial %} title="At least this many: some sources were unavailable"{% endif %}>{{ '≥' if na.partial }}{{ num(na.total) }}</div>
+    {% else %}
+    <div class="dx-v" data-field="needs_action">{{ dash('No source could be read') }}</div>
+    {% endif %}
+    <div class="dx-s" title="{% for part in na.parts %}{{ num(part.count) if part.count is number else 'unknown' }} {{ part.label }}{{ ' · ' if not loop.last }}{% endfor %}">{% for part in na.parts %}{% if part.count is number %}{{ num(part.count) }} {{ part.label }}{% else %}<span title="{{ part.reason }}">{{ part.label }} unknown</span>{% endif %}{{ ' · ' if not loop.last }}{% endfor %}</div>
+  </div>
+</div>
+
+<div class="dx-grid dx-grid-ov">
+  <section class="dx-card">
+    <header class="dx-ch">Coverage by tactic <span class="dx-n">enabled rules</span><button type="button" class="dx-r" data-click-action="deSwitch" data-args='["attack"]'>Open coverage map →</button></header>
+    {% if tactics is none %}
+    <div class="dx-cb"><div class="dx-empty" role="alert">Coverage by tactic unavailable: the TIDE gap analysis could not be read.</div></div>
+    {% else %}
+    <table class="dx-table">
+      <thead><tr><th>Tactic</th><th class="dx-w45">Covered</th><th class="num">Techniques</th><th class="num">Gaps</th></tr></thead>
+      <tbody>
+      {% for row in tactics %}
+      <tr><td>{{ row.name }}</td><td><div class="dx-track" title="{{ row.covered }} of {{ row.total }} ({{ row.pct }}%)"><i class="ok{{ ' nz' if row.covered }}" data-ion-style="width:{{ row.pct or 0 }}%"></i></div></td><td class="mono num">{{ row.total }}</td><td class="mono num">{{ row.gaps }}</td></tr>
+      {% endfor %}
+      {% if tactics_hidden %}<tr><td colspan="4" class="dx-mute">+ {{ tactics_hidden }} tactics with no coverage · <button type="button" class="dx-link" data-click-action="deSwitch" data-args='["attack"]'>see all</button></td></tr>{% endif %}
+      </tbody>
+    </table>
+    {% endif %}
+  </section>
+
+  <section class="dx-card">
+    <header class="dx-ch">Rule quality <span class="dx-n">{{ 'TIDE scoring v2 · percent' if posture.quality_scale == 'percent' else 'TIDE points' if posture.quality_scale == 'points' else '' }}</span></header>
+    <div class="dx-cb dx-quality">
+      {% if posture.quality is none %}
+      <div class="dx-empty">Quality distribution unavailable.</div>
+      {% else %}
+      {% set avg = posture.avg_quality %}
+      <svg class="dx-ring" viewBox="0 0 42 42" role="img" aria-label="Average quality {{ quality(avg) }}">
+        <circle class="dx-ring-bg" cx="21" cy="21" r="16" pathLength="100"/>
+        {% if avg is number and posture.quality_scale == 'percent' %}<circle class="dx-ring-fg q-{{ 'excellent' if avg >= 80 else 'good' if avg >= 50 else 'fair' if avg >= 25 else 'poor' }}" cx="21" cy="21" r="16" pathLength="100" stroke-dasharray="{{ [avg, 100]|min }} {{ 100 - [avg, 100]|min }}" stroke-dashoffset="25"/>{% endif %}
+        <text x="21" y="23.5" text-anchor="middle">{{ quality(avg) }}</text>
+      </svg>
+      <div class="dx-qrows">
+        {% for item in posture.quality %}
+        <div class="dx-qrow"><span>{{ item.label }}</span><div class="dx-track"><i class="q-{{ item.key }}{{ ' nz' if item.count }}" data-ion-style="width:{{ item.percentage or 0 }}%"></i></div><span class="mono">{{ num(item.count) }}</span></div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    <header class="dx-ch dx-ch-split">Severity <span class="dx-n">enabled / total</span></header>
+    <div class="dx-cb">
+      {% if posture.severity is none %}
+      <div class="dx-empty">Severity breakdown unavailable.</div>
+      {% else %}
+      <div class="dx-sevgrid">
+        {% for item in posture.severity %}
+        <div><span class="de-sev {{ item.key }}">{{ item.key }}</span><div class="mono{{ ' warn' if item.enabled is number and item.total is number and item.enabled < item.total }}">{{ num(item.enabled) }} / {{ num(item.total) }}</div></div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="dx-card">
+    <header class="dx-ch">Needs action <span class="dx-n">{{ ('≥' if na.partial else '') ~ num(na.total) if na.total is number else '' }}</span></header>
+    <div class="dx-cb dx-feed">
+      {% for item in na['items'] %}
+      <div class="dx-row">
+        {% if item.kind == 'silent' %}<span class="dx-tag">silent</span>{% else %}{{ sev(item.severity) }}{% endif %}
+        <div><b>{{ item.name or 'Unknown rule' }}</b> {% if item.kind == 'disabled' %}is disabled{% elif item.kind == 'unmapped' %}has no ATT&amp;CK mapping{% else %}has not fired in {{ (firing.hours / 24)|round|int }} days{% endif %}
+          <div class="dx-mute small">{% set bits = [] %}{% if item.kind == 'unmapped' and item.enabled is not none %}{% set _ = bits.append('Enabled' if item.enabled else 'Disabled') %}{% endif %}{% if item.quality is not none %}{% set _ = bits.append('Quality ' ~ quality(item.quality)) %}{% endif %}{% for tid in item.mitre_ids[:2] %}{% set _ = bits.append(tid) %}{% endfor %}{% if item.quick_win %}{% set _ = bits.append('quick win') %}{% endif %}{{ bits|join(' · ') }}</div>
+        </div>
+        {% if item.kind == 'silent' %}<button type="button" class="dx-btn sm" data-click-action="deSwitch" data-args='["execution"]'>Execution</button>
+        {% else %}<button type="button" class="dx-btn sm" data-click-action="deOpenRule" data-args='{{ [item.name or ""]|tojson }}'>Find rule</button>{% endif %}
+      </div>
+      {% else %}
+      <div class="dx-empty">{% if na.total == 0 and not na.partial %}Nothing needs action.{% else %}Rule lists unavailable{% for part in na.parts if part.count is none %}{{ ': ' if loop.first else '; ' }}{{ part.reason }}{% endfor %}.{% endif %}</div>
+      {% endfor %}
+      {% if na.more %}<div class="dx-mute small dx-more">+ {{ na.more }} more listed in Coverage and Execution</div>{% endif %}
+    </div>
+    <header class="dx-ch dx-ch-split">Use cases <span class="dx-n">steps covered</span><button type="button" class="dx-r" data-click-action="deSwitch" data-args='["killchains"]'>All →</button></header>
+    <div class="dx-cb">
+      {% if use_cases is none %}
+      <div class="dx-empty" role="alert">Use cases unavailable: the TIDE use-case read failed.</div>
+      {% elif not use_cases %}
+      <div class="dx-empty">No use cases in TIDE.</div>
+      {% else %}
+      {% for case in use_cases[:6] %}
+      <div class="dx-uc"><span title="{{ case.name or 'Unnamed use case' }}">{{ case.name or 'Unnamed use case' }}</span>
+        <div class="dx-steps">{% for step in case.steps %}<i class="{{ step }}" title="Step {{ loop.index }}: {{ step }}"></i>{% else %}<span class="dx-mute small">no steps</span>{% endfor %}</div>
+        <span class="mono">{% if case.pct is number %}{{ case.pct }}%{% else %}<span class="dx-dash" title="Step coverage unknown">—</span>{% endif %}</span></div>
+      {% endfor %}
+      {% if use_cases|length > 6 %}<div class="dx-mute small dx-more">+ {{ use_cases|length - 6 }} more</div>{% endif %}
+      {% endif %}
+    </div>
+  </section>
+</div>
+
+<section class="dx-card dx-mt">
+  <header class="dx-ch">Firing rules <span class="dx-n">{{ (firing.hours / 24)|round|int }} days · from ION's alert index</span><button type="button" class="dx-r" data-click-action="deSwitch" data-args='["execution"]'>Execution →</button></header>
+  {% if firing.top is none %}
+  <div class="dx-cb"><div class="dx-empty" role="alert">Firing rules unavailable{% if firing.reason %}: {{ firing.reason }}{% endif %}.</div></div>
+  {% elif not firing.top %}
+  <div class="dx-cb"><div class="dx-empty">No rules fired in this window.</div></div>
+  {% else %}
+  <table class="dx-table">
+    <thead><tr><th>Rule</th><th>TIDE severity</th><th class="num">Alerts</th><th class="num">Open</th><th class="num">Closed</th><th class="num">TIDE quality</th><th>ATT&amp;CK</th><th>State</th></tr></thead>
+    <tbody>
+    {% for rule in firing.top %}
+    <tr>
+      <td class="dx-ellipsis" title="{{ rule.get('rule_name', '') }}">{{ rule.get('rule_name') or 'Unknown' }}</td>
+      <td>{% if rule.get('in_tide') %}{{ sev(rule.get('tide_severity')) }}{% else %}<span class="dx-mute" title="No TIDE rule has this name">—</span>{% endif %}</td>
+      <td class="mono num">{{ num(rule.get('alert_count')) }}</td>
+      <td class="mono num">{{ num(rule.get('open')) }}</td>
+      <td class="mono num">{% if rule.get('close_rate') is number %}{{ rule.close_rate }}%{% else %}—{% endif %}</td>
+      <td class="mono num">{% if rule.get('in_tide') and rule.get('tide_quality') is number %}{{ quality(rule.tide_quality) }}{% else %}<span class="dx-mute" title="{{ 'TIDE has no score for this rule' if rule.get('in_tide') else 'Not a TIDE rule' }}">—</span>{% endif %}</td>
+      <td>{% for tid in (rule.get('mitre_ids') or [])[:3] %}<span class="de-mitre-chip">{{ tid }}</span> {% else %}<span class="dx-mute">—</span>{% endfor %}</td>
+      <td>{% if rule.get('rule_name') in firing.noisy_names %}<span class="dx-tag warn">high volume</span>{% elif not rule.get('in_tide') %}<span class="dx-tag">not in TIDE</span>{% else %}<span class="dx-mute">ok</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+{% endif %}

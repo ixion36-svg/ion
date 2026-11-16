@@ -16,6 +16,7 @@ from __future__ import annotations
 import pytest
 
 from ion.services import mitre_navigator_service as svc
+from ion.services.attack_detection_service import attack_version
 
 
 class TestTagAlert:
@@ -189,7 +190,21 @@ class TestNavigatorLayer:
     def test_the_schema_version_block_is_present(self):
         """Navigator refuses a layer whose version block it does not recognise."""
         versions = svc.generate_navigator_layer(_Tide({"techniques": {}}))["versions"]
-        assert versions == {"attack": "14", "navigator": "4.9.1", "layer": "4.5"}
+        assert set(versions) == {"attack", "navigator", "layer"}
+        assert versions["navigator"] == "4.9.1"
+        assert versions["layer"] == "4.5"
+
+    def test_the_layer_declares_the_bundled_attack_version(self):
+        """Asserted against the snapshot, not a literal.
+
+        This block pinned "attack": "14" through five ATT&CK releases while the
+        bundled data moved on, so an exported layer told Navigator a version
+        ION was not built from.
+        """
+        versions = svc.generate_navigator_layer(_Tide({"techniques": {}}))["versions"]
+        expected = (attack_version() or svc._FALLBACK_ATTACK_VERSION).split(".")[0]
+        assert versions["attack"] == expected
+        assert versions["attack"].isdigit()
 
     def test_every_technique_in_the_map_is_represented(self):
         tide = _Tide({"techniques": {

@@ -34,6 +34,10 @@ class TrainingForecastView(TypedDict):
     total_certs: int | None
     completion: int | None
     company_liability: float | None
+    #: Non-empty only when the plans span more than one currency, in
+    #: which case the totals added amounts that cannot be added and the
+    #: fragment says so instead of printing one.
+    mixed_currencies: list[str]
 
 
 def _liability(values: dict[str, Any] | None) -> float | None:
@@ -97,7 +101,17 @@ def training_forecast(request: Request,
         forecasts is not None
         and all(_valid_numbers(f, ('total_cost', 'company_cost', 'self_cost'), ('item_count', 'completed_count')) for f in forecasts)
         and (data.get('totals') is None or _valid_numbers(data['totals'], ('total', 'company', 'self', 'split', 'tbd')))
-        and (data.get('by_employment_type') is None or employment is not None and all(_valid_numbers(d, ('total', 'company', 'self', 'split', 'tbd'), ('headcount', 'certs')) for d in employment.values()))
+        and (
+            data.get('by_employment_type') is None
+            # Parenthesised, not just wrapped: `and` already bound tighter
+            # than `or` on the single line, so this is the same expression
+            # with the grouping now visible.
+            or (employment is not None and all(
+                _valid_numbers(d, ('total', 'company', 'self', 'split', 'tbd'),
+                               ('headcount', 'certs'))
+                for d in employment.values()
+            ))
+        )
         and _valid_numbers(data, counts=('plan_count',))
     )
     if not valid:
@@ -113,5 +127,6 @@ def training_forecast(request: Request,
         'forecasts': forecasts, 'totals': totals, 'by_employment_type': employment,
         'plan_count': data.get('plan_count'), 'total_certs': total_certs,
         'completion': completion, 'company_liability': _liability(totals),
+        'mixed_currencies': data.get('mixed_currencies') or [],
     }
     return render_view(request, '_fragments/training_plans_forecast.html', view)

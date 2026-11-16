@@ -124,10 +124,43 @@ class TestManageStaysNarrow:
 
 
 class TestTheVerificationPathIsStillGuarded:
-    def test_the_people_page_still_requires_verify(self):
-        """Widening who holds the permission must not remove the check."""
-        server = (_SRC / "ion" / "web" / "server.py").read_text(encoding="utf-8")
-        assert 'require_page_permission("workforce:verify")' in server
+    def test_verifying_still_requires_verify(self):
+        """Widening who holds the permission must not remove the check.
+
+        The check used to sit on the /workforce/people page route. That
+        page is now the Team tab of /workforce, so the gate moved to the
+        fragment and to the write itself -- which is the better place for
+        it, since the write is the thing that grants somebody access.
+        """
+        team = (_SRC / "ion" / "web" / "ui" / "workforce_team.py").read_text(
+            encoding="utf-8")
+        assert team.count('require_permission("workforce:verify")') >= 2, (
+            "both writes must carry it. Accepting an item and sending one "
+            "back are each a verifier's decision, and the tab itself is "
+            "gated on workforce:read, so a gate on the view would not "
+            "cover either POST."
+        )
+
+    def test_the_team_tab_does_not_read_the_queue_without_verify(self):
+        """Calling an endpoint function directly skips its own gate.
+
+        ui/workforce_team.py calls the functions behind
+        /api/workforce/{verification-queue,people} rather than going
+        through HTTP, so FastAPI never resolves their dependencies and the
+        permission each one declares does not run. The tab's own gate is
+        workforce:read. /api/workforce/verification-queue is declared
+        workforce:verify, so an unguarded call would put who submitted
+        what, with their evidence references, into the markup for everyone
+        who can read the roster -- hiding the buttons would not help,
+        because the data would already be on the page.
+        """
+        team = (_SRC / "ion" / "web" / "ui" / "workforce_team.py").read_text(
+            encoding="utf-8")
+        call = team.split("verification_queue(session=session")[1][:140]
+        assert "if can_verify" in call, (
+            "the verification queue must only be read when the caller "
+            "holds workforce:verify; this call site is unguarded"
+        )
 
     def test_a_sponsor_may_still_verify_their_own_people(self):
         """The existing escape hatch: a named sponsor can verify without

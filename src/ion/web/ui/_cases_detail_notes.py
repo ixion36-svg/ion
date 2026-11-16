@@ -1,4 +1,4 @@
-"""Case comments, annotations and explicitly requested note translations."""
+"""Case annotations and explicitly requested note translations."""
 
 from __future__ import annotations
 
@@ -11,24 +11,12 @@ from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_permission
 from ion.storage.database import get_db_session
-from ion.web import kibana_api, translator_api, workbench_api
+from ion.web import translator_api, workbench_api
 from ion.web.ui._shared import instant_label, render_view, rows
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 READ = require_permission("case:read")
-
-
-class Comment(TypedDict):
-    author: str
-    created: str | None
-    body: str
-
-
-class CommentsView(TypedDict):
-    state: Literal["failed", "empty", "data"]
-    comments: list[Comment] | None
-    count: int | None
 
 
 class Annotation(TypedDict):
@@ -50,25 +38,6 @@ class TranslationView(TypedDict):
     state: Literal["failed", "empty", "data"]
     translation: str | None
     error: str | None
-
-
-def comments_view(payload: object) -> CommentsView:
-    records = rows(payload, "comments")
-    if records is not None and not all(isinstance(item, dict) for item in records):
-        records = None
-    comments = (
-        [
-            {
-                "author": item.get("created_by") if isinstance(item.get("created_by"), str) and item["created_by"] else "kibana",
-                "created": instant_label(item.get("created_at")),
-                "body": item.get("comment") if isinstance(item.get("comment"), str) else "",
-            }
-            for item in records
-        ]
-        if records is not None
-        else None
-    )
-    return {"state": "failed" if comments is None else "data" if comments else "empty", "comments": comments, "count": len(comments) if comments is not None else None}
 
 
 def annotations_view(payload: object, case_id: int, user) -> AnnotationsView:
@@ -106,16 +75,6 @@ def translation_view(payload: object, error: str | None = None) -> TranslationVi
         "translation": translated,
         "error": error or ("Unreadable translation response" if translated is None else None),
     }
-
-
-@router.get("/cases/kibana/{kibana_id}/comments", response_class=HTMLResponse)
-async def comments(request: Request, kibana_id: str, user=Depends(READ)):
-    try:
-        payload = await kibana_api.get_kibana_case(case_id=kibana_id, current_user=user)
-    except Exception:
-        logger.exception("Case comments could not be read")
-        payload = None
-    return render_view(request, "_fragments/cases_detail_comments.html", comments_view(payload))
 
 
 @router.get("/cases/{case_id}/annotations", response_class=HTMLResponse)

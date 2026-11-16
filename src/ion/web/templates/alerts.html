@@ -1553,6 +1553,13 @@ async function loadTriageBatch() {
                 triageCache[alertId].case_title = triageInfo.case_title;
             }
         }
+        // The server's answer is now the status this page knows. Left as the
+        // ES snapshot from page load, the next call would send that back and
+        // undo whatever ION changed since, such as a false-positive close.
+        for (const a of allAlerts) {
+            const t = triageMap[a.id];
+            if (t && t.status) a.status = t.status;
+        }
         // Re-render table with case info
         renderAlerts();
         updateStatsBar();

@@ -30,7 +30,7 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.responses import JSONResponse, RedirectResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -44,6 +44,7 @@ from ion.core.config import (
     get_ssl_verify,
 )
 from ion.core.safe_errors import safe_error
+from ion.core.severity import SEVERITIES
 from ion.services.ai_feedback_service import record_close_feedback_safe
 from ion.services.dfir_iris_service import get_dfir_iris_service
 from ion.services.kibana_cases_service import get_kibana_cases_service
@@ -83,6 +84,7 @@ limiter = Limiter(
 OIDC_STATE_COOKIE_NAME = "oidc_state"
 from ion.auth.dependencies import (
     SESSION_COOKIE_NAME,
+    audit_refusal,
     get_auth_service,
     get_client_ip,
     get_current_user,
@@ -583,8 +585,13 @@ async def change_password(
     request: Request,
     current_user: User = Depends(get_current_user),
     auth_service: AuthService = Depends(get_auth_service),
+    session_token: Optional[str] = Depends(get_session_token),
 ):
-    """Change current user's password."""
+    """Change current user's password.
+
+    A successful change revokes the user's other sessions; this caller's own
+    token is passed through so the tab they are standing in survives.
+    """
     ip_address = get_client_ip(request)
 
     success, error = auth_service.change_password(
@@ -592,6 +599,7 @@ async def change_password(
         current_password=password_request.current_password,
         new_password=password_request.new_password,
         ip_address=ip_address,
+        current_session_token=session_token,
     )
 
     if not success:
@@ -1059,6 +1067,8 @@ def update_user(
         if existing:
             raise HTTPException(status_code=400, detail="Email already exists")
 
+    was_active = user.is_active
+
     user_repo.update(
         user=user,
         username=user_update.username,
@@ -1066,6 +1076,21 @@ def update_user(
         display_name=user_update.display_name,
         is_active=user_update.is_active,
     )
+
+    # Deactivation is the one account action that works on every kind of
+    # account, and on an OIDC estate it is the only lever an admin has: the
+    # password reset below is refused for an account Keycloak holds the
+    # credential for, and must_change_password does nothing to a user who
+    # never types an ION password. validate_session already refuses an
+    # inactive user, but the rows survive, so reactivating the account would
+    # hand a stolen cookie back its access. Delete them.
+    if was_active and user.is_active is False:
+        AuthService(session).revoke_sessions(
+            user,
+            reason="account_deactivated",
+            actor_user_id=current_user.id,
+            ip_address=get_client_ip(request),
+        )
 
     # Update employment type if provided
     if user_update.employment_type and user_update.employment_type in ("cs", "contractor", "military", "other"):
@@ -1192,12 +1217,24 @@ def reset_user_password(
             ip_address=get_client_ip(request),
         )
     except ValueError as exc:
-        # Password-policy violation (opt-in F6) — surface as a 400 rather than 500.
+        # Either the target has no ION-local password (an OIDC or service
+        # account — see AuthService.reset_password) or the new password
+        # violates the opt-in F6 policy. Both are the admin's mistake to fix,
+        # so a 400 rather than a 500. Recorded on its own committed session,
+        # because the raise abandons this one and "who tried to put a local
+        # password on an SSO account" is worth being able to answer.
+        audit_refusal(
+            "password_reset_refused",
+            current_user,
+            request,
+            target_user=user.username,
+            reason=str(exc),
+        )
         raise HTTPException(status_code=400, detail=str(exc))
 
     session.commit()
 
-    return {"message": "Password reset successfully"}
+    return {"message": "Password reset successfully; the account's sessions were revoked"}
 
 
 # =============================================================================
@@ -2722,15 +2759,9 @@ def team_metrics_payload(session: Session) -> dict:
     ).scalar() or 0
 
     thirty_days_ago = now - timedelta(days=30)
-    closed_cases_30d = session.query(AlertCase).filter(
-        AlertCase.closed_at >= thirty_days_ago,
-        AlertCase.closed_at.isnot(None),
-    ).all()
-
-    mttr = None
-    if closed_cases_30d:
-        durations = [(c.closed_at - c.created_at).total_seconds() / 3600 for c in closed_cases_30d]
-        mttr = round(sum(durations) / len(durations), 1)
+    from ion.services.case_metrics import mean_hours_to_close
+    avg_hours, _ = mean_hours_to_close(session, AlertCase.closed_at >= thirty_days_ago)
+    mttr = round(avg_hours, 1) if avg_hours is not None else None
 
     seven_days_ago = now - timedelta(days=7)
     created_7d = session.query(sqlfunc.count(AlertCase.id)).filter(
@@ -2896,6 +2927,27 @@ from ion.models.alert_triage import (
 OBSERVABLE_TYPES = {"hostname", "source_ip", "destination_ip", "url", "domain", "user_account"}
 
 
+TRIAGE_PRIORITIES = SEVERITIES
+
+
+def _triage_priority(value: Optional[str]) -> Optional[str]:
+    """Hold a triage priority to the severities the queue renders.
+
+    The column is free text, and a lab-fixture alert's severity is read
+    straight from it, so anything accepted here is shown to every analyst as
+    that alert's severity. Blank means "not set", which is how the page sends
+    an untouched control.
+    """
+    if value is None:
+        return None
+    cleaned = str(value).strip().lower()
+    if not cleaned:
+        return None
+    if cleaned not in TRIAGE_PRIORITIES:
+        raise ValueError("priority must be one of: " + ", ".join(TRIAGE_PRIORITIES))
+    return cleaned
+
+
 class TriageUpdate(BaseModel):
     status: Optional[str] = None
     assigned_to_id: Optional[int] = None
@@ -2905,6 +2957,8 @@ class TriageUpdate(BaseModel):
     analyst_notes: Optional[str] = None
     observables: Optional[List[dict]] = None
     mitre_techniques: Optional[List[dict]] = None
+
+    _check_priority = field_validator("priority")(_triage_priority)
 
 
 class AlertClosureRequest(BaseModel):
@@ -2935,6 +2989,8 @@ class BulkTriageUpdate(BaseModel):
     # it a triage row created here has no name and the case rail shows the
     # document id.
     rule_names: Optional[Dict[str, str]] = None
+
+    _check_priority = field_validator("priority")(_triage_priority)
 
 
 class AutoPopulateRequest(BaseModel):
@@ -3584,6 +3640,17 @@ async def get_batch_triage(
                 triage = triage_map.get(alert_id)
                 if triage:
                     ion_status = triage.status.value if hasattr(triage.status, "value") else str(triage.status)
+                    # An alert on a closed case stays closed, as the case
+                    # does (closed is terminal in ION; reopen the case to
+                    # reopen it). The page's ES snapshot predates ION's own
+                    # writes, and replaying it reopened alerts a false-
+                    # positive close had just closed.
+                    case_closed = (
+                        triage.case is not None
+                        and getattr(triage.case.status, "value", triage.case.status) == "closed"
+                    )
+                    if case_closed and es_status_lower != "closed":
+                        continue
                     if ion_status.lower() != es_status_lower:
                         triage.status = AlertTriageStatus(es_status_lower)
                         logger.debug("Synced ES status '%s' → ION triage for alert %s", es_status_lower, alert_id)

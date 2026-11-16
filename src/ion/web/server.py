@@ -427,6 +427,13 @@ app.include_router(engineering_analytics_router, prefix="/api/engineering/analyt
 # TIDE + Detection Engineering endpoints, extracted from cyab_api. Mounted on
 # the same prefix so every /api/cyab/tide/... path is unchanged.
 app.include_router(de_tide_router, prefix="/api/cyab")
+# The CyAB workbench itself, archived in v0.99.6 and restored. Its API shares
+# the /api/cyab prefix with the TIDE routes above; the paths do not overlap.
+from ion.web.cyab_api import router as cyab_router  # noqa: E402
+from ion.web.cyab_pages import router as cyab_pages_router  # noqa: E402
+
+app.include_router(cyab_router, prefix="/api/cyab")
+app.include_router(cyab_pages_router)
 app.include_router(wallboard_router, prefix="")
 # translator — page route + /api/translator/* routes share the
 # same router so it owns its own prefixes internally.
@@ -755,12 +762,12 @@ async def _startup_event():
     from ion.storage.database import (
         LOCK_ANALYTICS_BG_LOOP,
         LOCK_CASE_GROUPER_BG,
-        LOCK_INVESTIGATION_BG,
         LOCK_KIBANA_BG_SYNC,
         LOCK_SCHEDULER_BG,
         LOCK_SEED_ANALYTICS_JOBS,
         LOCK_SEED_CAPABILITY_KB,
         LOCK_SEED_COMM_TEMPLATES,
+        LOCK_SEED_CYAB_SUBPROFILES,
         LOCK_SEED_DEFAULT_PLAYBOOKS,
         LOCK_SEED_FORENSIC_PB,
         LOCK_SEED_KEV_CATALOG,
@@ -928,6 +935,24 @@ async def _startup_event():
     )
 
     # ---------------------------------------------------------------
+    # Seed the CyAB onboarding catalogue (6 pillars, 14 sub-profiles) and
+    # backfill cyab_data_sources.subprofile_id from the legacy
+    # data_source_type. Idempotent; operator-edited sub-profiles
+    # (is_custom=true) are preserved.
+    # ---------------------------------------------------------------
+    def _seed_cyab_subprofiles():
+        from ion.services.cyab_subprofile_service import (
+            backfill_subprofile_ids,
+            seed_catalogue,
+        )
+        seed_catalogue()
+        backfill_subprofile_ids()
+    run_locked(
+        engine, LOCK_SEED_CYAB_SUBPROFILES,
+        "seed_cyab_subprofiles", _seed_cyab_subprofiles,
+    )
+
+    # ---------------------------------------------------------------
     # Warm the lazily-imported AI stack per worker. The first import of
     # the investigation chain (skill loader, Ollama request queue, PII
     # anonymiser) costs ~10s and used to land inside the first
@@ -1039,27 +1064,6 @@ async def _startup_event():
         run_scheduler_loop(interval_s=interval)
         logger.info("Generic scheduler background loop started")
     run_locked(engine, LOCK_SCHEDULER_BG, "scheduler_bg_loop", _start_scheduler,
-               hold_until_close=True)
-
-    # ---------------------------------------------------------------
-    # Autonomous investigation background sweep (single worker —
-    # hold_until_close). Honours ION_INVESTIGATION_LOOP_ENABLED.
-    # ---------------------------------------------------------------
-    def _start_investigation_loop():
-        from ion.services.investigation_service import (
-            should_run_per_alert_sweep,
-            start_investigation_loop_if_enabled,
-        )
-        if not should_run_per_alert_sweep(config):
-            logger.info(
-                "Per-alert investigation sweep NOT started — the case grouper is the "
-                "active investigator (or the loop is disabled). Bob runs per-case at "
-                "case creation instead."
-            )
-            return
-        start_investigation_loop_if_enabled(engine=engine)
-        logger.info("Autonomous investigation loop startup attempted")
-    run_locked(engine, LOCK_INVESTIGATION_BG, "investigation_bg_loop", _start_investigation_loop,
                hold_until_close=True)
 
     # ---------------------------------------------------------------
@@ -1883,7 +1887,7 @@ async def verdict_review_page(request: Request, user: User = Depends(require_pag
 
 @app.get("/workforce", response_class=HTMLResponse)
 async def workforce_page(request: Request, user: User = Depends(require_page_auth), _gate: None = Depends(require_workforce_module)):
-    """A person's own journey: the gate, then role readiness.
+    """The whole of workforce: Me, Team and Setup, on one page.
 
     Signed in is the only requirement, deliberately. This needed
     ``workforce:read``, which on a real estate only admin and
@@ -1895,45 +1899,54 @@ async def workforce_page(request: Request, user: User = Depends(require_page_aut
     mandatory training is verified, and the training was listed behind a
     permission, so a joiner could not start.
 
-    Nothing leaks by opening it. The page renders from
-    ``/api/workforce/journeys/me``, which resolves the caller's own
-    journeys and nobody else's. The other three workforce pages keep their
-    permissions, because the profile builder, the verification queue and
-    the roster are other people's business.
+    That is why the PAGE is open and the TABS are gated instead. Someone
+    with no permissions sees Me and nothing else; the queue, the order of
+    battle and the role profiles appear for the people whose business they
+    are. Each fragment re-checks its own permission, so the tab list is a
+    courtesy to the reader and never the thing enforcing anything.
+
+    Me, Team and Setup were /workforce, /workforce/people,
+    /workforce/orbat and /workforce/profiles. nav.py carried one entry for
+    the four, so three were reachable only by spotting a ghost button in
+    another page's header -- including the verification queue, which is a
+    lead's daily work and sat two unmarked hops from the navigation.
     """
+    tabs = [{"id": "me", "label": "Me"}]
+    if user.has_permission("workforce:read"):
+        tabs.append({"id": "team", "label": "Team"})
+    if user.has_permission("workforce:manage"):
+        tabs.append({"id": "setup", "label": "Setup"})
+
+    subtitles = {
+        "me": "What you need to complete, and how far your lead has got with verifying it.",
+        "team": "What is waiting on you, who holds which post, and how far along they are.",
+        "setup": "Role profiles, how many posts each role has, and who is leaving.",
+    }
+
+    wanted = request.query_params.get("tab") or "me"
+    # An unknown tab, or one this person may not open, falls back to Me
+    # rather than 403ing: the tab is a view of a page they are entitled to.
+    if wanted not in {t["id"] for t in tabs}:
+        wanted = "me"
+
     return templates.TemplateResponse(
-        request=request, name="workforce_journey.html",
-        context={"current_user": user},
+        request=request, name="workforce.html",
+        context={"current_user": user, "tabs": tabs, "tab": wanted,
+                 "tab_subtitle": subtitles[wanted]},
     )
 
 
-@app.get("/workforce/profiles", response_class=HTMLResponse)
-async def workforce_profiles_page(request: Request, user: User = Depends(require_page_permission("workforce:manage")), _gate: None = Depends(require_workforce_module)):
-    """Role profile builder — the schema a SOC edits for itself."""
-    return templates.TemplateResponse(
-        request=request, name="workforce_profiles.html",
-        context={"current_user": user},
-    )
+# /workforce/profiles is gone too: the schema a SOC edits for itself is the
+# Setup tab of /workforce, beside the establishment, because what a role
+# requires and how many of that role you need are halves of one decision.
+# All four workforce pages are now one.
 
 
-@app.get("/workforce/people", response_class=HTMLResponse)
-async def workforce_people_page(request: Request, user: User = Depends(require_page_permission("workforce:verify")), _gate: None = Depends(require_workforce_module)):
-    """The lead's roster and verification queue."""
-    return templates.TemplateResponse(
-        request=request, name="workforce_people.html",
-        context={"current_user": user,
-                 "can_manage": user.has_permission("workforce:manage")},
-    )
-
-
-@app.get("/workforce/orbat", response_class=HTMLResponse)
-async def workforce_orbat_page(request: Request, user: User = Depends(require_page_permission("workforce:read")), _gate: None = Depends(require_workforce_module)):
-    """Who holds which role, primary and cover, and where cover is thin."""
-    return templates.TemplateResponse(
-        request=request, name="workforce_orbat.html",
-        context={"current_user": user,
-                 "can_manage": user.has_permission("workforce:manage")},
-    )
+# /workforce/people and /workforce/orbat are gone: the roster, the
+# verification queue and the order of battle are the Team tab of
+# /workforce. Removed rather than redirected, by request -- they were
+# never in nav.py and were only ever reached from another page's header,
+# so there is no menu entry left pointing at them.
 
 
 @app.get("/de-metrics", response_class=HTMLResponse)

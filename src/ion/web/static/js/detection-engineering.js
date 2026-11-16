@@ -27,7 +27,7 @@ async function deLoadFragment(url, targetId, loadingMessage = 'Loading...', opti
     document.addEventListener('htmx:afterRequest', outcome);
     const showFailure = () => {
         if (deFragmentRequests.get(target) !== request) return;
-        if (target.tagName === 'SELECT') deMessage(target, 'Spaces unavailable');
+        if (target.tagName === 'SELECT') deMessage(target, options.failure || 'Spaces unavailable');
         else if (target.querySelector('[data-loading-message]')) deMessage(target, options.failure || 'Unable to load this panel. Refresh to try again.');
     };
     try {

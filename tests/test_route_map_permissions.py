@@ -35,12 +35,12 @@ def test_alerts_page_reports_alert_read_and_login_reports_nothing(rows):
     """/alerts is require_page_permission("alert:read"). /login has no gate."""
     assert _one(rows, "/alerts", "GET")["permission"] == "alert:read"
     assert _one(rows, "/login", "GET")["permission"] == ""
-    # slowapi wraps the API login. The handler site is outside src/, and a
-    # junctioned .venv makes Path.resolve() leave the repo. Blanking that
-    # cell is not a permission result.
+    # slowapi wraps the API login. The site must be ION's handler on every
+    # machine: the wrapper's own file only mapped where the venv sat inside
+    # the checkout, so the committed map failed --check on CI.
     api_login = _one(rows, "/api/auth/login", "POST")
     assert api_login["permission"] == ""
-    assert api_login["file"].endswith("slowapi/extension.py")
+    assert api_login["file"] == "src/ion/web/api.py"
 
 
 def test_an_api_route_still_reports_require_permission(rows):
@@ -77,5 +77,11 @@ def test_enrichment_lookup_reports_observable_enrich(rows):
 
 def test_a_module_gate_is_not_reported_as_a_permission(rows):
     """require_workforce_module 404s when the feature is off. It is not a
-    permission, and it sits beside workforce:manage on this page."""
-    assert _one(rows, "/workforce/profiles", "GET")["permission"] == "workforce:manage"
+    permission, and it sits beside workforce:manage on this route.
+
+    Was /workforce/profiles, which is now the Setup tab of /workforce. The
+    gate moved with it and onto the router rather than each route, so this
+    also checks the tool reads a router-level dependency -- the earlier
+    version only ever saw one declared per route.
+    """
+    assert _one(rows, "/ui/workforce/setup", "GET")["permission"] == "workforce:manage"

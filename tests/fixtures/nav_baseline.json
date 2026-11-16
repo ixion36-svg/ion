@@ -75,6 +75,10 @@
       "/compliance",
       "group:GRC"
     ],
+    "/cyab": [
+      "/cyab",
+      "group:Engineering"
+    ],
     "/daily-work": [
       "/daily-work",
       "group:Knowledge"
@@ -402,6 +406,10 @@
           {
             "href": "/de-bob",
             "label": "Bob Improvement"
+          },
+          {
+            "href": "/cyab",
+            "label": "CyAB"
           },
           {
             "href": "/network-map",

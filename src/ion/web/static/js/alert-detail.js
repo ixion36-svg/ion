@@ -80,7 +80,13 @@
   }
 
   // Both host pages load static/js/app.js, which defines these globally.
-  function escapeHtml(s) { return window.escapeHtml ? window.escapeHtml(s) : String(s == null ? '' : s); }
+  // Without app.js the fallback still escapes: returning the raw string would
+  // turn a load-order mistake into every sink in this file being open.
+  const _ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  function escapeHtml(s) {
+    if (window.escapeHtml) return window.escapeHtml(s);
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => _ESCAPES[c]);
+  }
   function showToast(m, k) { if (window.showToast) window.showToast(m, k); }
 
   // ── host adapter ─────────────────────────────────────────────────────────
@@ -862,7 +868,7 @@
                   return `
                   <div class="related-alert-item ${inSameCase ? 'same-case' : ''}">
                       <div class="related-alert-main" data-click-action="showAlertDetail" data-args='["${escapeHtml(a.id)}"]'>
-                          <span class="severity-badge severity-${a.severity}">${a.severity}</span>
+                          <span class="severity-badge severity-${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
                           <span class="similarity-badge similarity-${similarity.level}" title="${similarity.reasons.join(', ')}">${similarity.score}%</span>
                           <span class="related-alert-title" title="${escapeHtml(a.title)}">${escapeHtml(a.title)}</span>
                           <span class="related-alert-meta">${_fmtDate(a.timestamp)}</span>
@@ -1344,11 +1350,11 @@
     html += `<div class="alert-meta-grid">
         <div class="alert-meta-item">
             <div class="alert-meta-label">Severity</div>
-            <div class="alert-meta-value"><span class="severity-badge severity-${alert.severity}">${alert.severity}</span></div>
+            <div class="alert-meta-value"><span class="severity-badge severity-${escapeHtml(alert.severity)}">${escapeHtml(alert.severity)}</span></div>
         </div>
         <div class="alert-meta-item">
             <div class="alert-meta-label">Status</div>
-            <div class="alert-meta-value"><span class="status-badge alert-status-${alert.status}">${alert.status}</span></div>
+            <div class="alert-meta-value"><span class="status-badge alert-status-${escapeHtml(alert.status)}">${escapeHtml(alert.status)}</span></div>
         </div>
         <div class="alert-meta-item">
             <div class="alert-meta-label">Host</div>

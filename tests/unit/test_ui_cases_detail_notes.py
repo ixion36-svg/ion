@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from ion.auth.dependencies import get_current_user
 from ion.storage.database import get_db_session
-from ion.web import kibana_api, translator_api, workbench_api
+from ion.web import translator_api, workbench_api
 
 
 @pytest.fixture
@@ -30,74 +30,56 @@ def client():
     return TestClient(app), user
 
 
-@pytest.mark.parametrize("kind", ["comments", "annotations"])
 @pytest.mark.parametrize(
     "payload,state",
     [
         (None, "failed"),
         ({}, "failed"),
-        ({"KEY": None}, "failed"),
-        ({"KEY": []}, "empty"),
-        ({"KEY": [{"id": 3, "body": "<script>bad</script>", "comment": "<script>bad</script>", "timeline_ts": "2026-10-14T12:00:00", "created_at": "2026-10-14T13:00:00+01:00"}]}, "data"),
+        ({"annotations": None}, "failed"),
+        ({"annotations": []}, "empty"),
+        ({"annotations": [{"id": 3, "body": "<script>bad</script>", "timeline_ts": "2026-10-14T12:00:00"}]}, "data"),
     ],
 )
-def test_read_outcomes(client, monkeypatch, kind, payload, state):
+def test_read_outcomes(client, monkeypatch, payload, state):
     c, _ = client
-    payload = {kind: payload["KEY"]} if isinstance(payload, dict) and "KEY" in payload else payload
     calls = []
-    if kind == "comments":
 
-        async def read(**kwargs):
-            calls.append(kwargs)
-            return payload
+    def read(**kwargs):
+        calls.append(kwargs)
+        return payload
 
-        monkeypatch.setattr(kibana_api, "get_kibana_case", read)
-        url = "/ui/cases/kibana/external-1/comments"
-    else:
-
-        def read(**kwargs):
-            calls.append(kwargs)
-            return payload
-
-        monkeypatch.setattr(workbench_api, "list_annotations_endpoint", read)
-        url = "/ui/cases/12/annotations"
+    monkeypatch.setattr(workbench_api, "list_annotations_endpoint", read)
+    url = "/ui/cases/12/annotations"
     response = c.get(url, headers={"Accept": "application/json"})
     assert response.status_code == 200
     assert response.json()["state"] == state
-    assert calls[0]["case_id"] == ("external-1" if kind == "comments" else 12)
+    assert calls[0]["case_id"] == 12
     html = c.get(url).text
     assert "<script>bad</script>" not in html
     if state == "failed":
-        assert ("Could not load Kibana comments" if kind == "comments" else "Failed to load annotations") in html
-        assert "No comments in Kibana" not in html
+        assert "Failed to load annotations" in html
     if state == "data":
         assert "2026-10-14 12:00 UTC" in html
-    if kind == "comments":
-        assert 'id="kibana-comment-count"' in html
-    else:
-        assert 'id="annotations-count-12"' in html
+    assert 'id="annotations-count-12"' in html
 
 
-@pytest.mark.parametrize("kind", ["comments", "annotations"])
-def test_read_exceptions_are_failed(client, monkeypatch, kind):
+def test_read_exceptions_are_failed(client, monkeypatch):
     c, _ = client
-    if kind == "comments":
 
-        async def read(**kwargs):
-            raise HTTPException(403, "Denied")
+    def read(**kwargs):
+        raise HTTPException(500, "Failure")
 
-        monkeypatch.setattr(kibana_api, "get_kibana_case", read)
-        url = "/ui/cases/kibana/x/comments"
-    else:
-
-        def read(**kwargs):
-            raise HTTPException(500, "Failure")
-
-        monkeypatch.setattr(workbench_api, "list_annotations_endpoint", read)
-        url = "/ui/cases/12/annotations"
-    response = c.get(url, headers={"Accept": "application/json"})
+    monkeypatch.setattr(workbench_api, "list_annotations_endpoint", read)
+    response = c.get("/ui/cases/12/annotations", headers={"Accept": "application/json"})
     assert response.status_code == 200
     assert response.json()["state"] == "failed"
+
+
+def test_the_kibana_comments_route_is_gone(client):
+    """Kibana comments are imported as case notes and shown in the notes
+    list; the separate read listed each one a second time."""
+    c, _ = client
+    assert c.get("/ui/cases/kibana/x/comments").status_code == 404
 
 
 def test_annotation_callback_args_and_readonly(client, monkeypatch):
@@ -159,7 +141,7 @@ def test_translation_error_remains_visible(client, monkeypatch):
     assert "[translation failed: Translator unavailable]" in response.text
 
 
-@pytest.mark.parametrize("url,method", [("/ui/cases/kibana/x/comments", "get"), ("/ui/cases/12/annotations", "get"), ("/ui/cases/note-translation", "post")])
+@pytest.mark.parametrize("url,method", [("/ui/cases/12/annotations", "get"), ("/ui/cases/note-translation", "post")])
 def test_case_permission_runs_before_source_read(monkeypatch, url, method):
     ui = importlib.import_module("ion.web.ui._cases_detail_notes")
     app = FastAPI()
@@ -167,7 +149,6 @@ def test_case_permission_runs_before_source_read(monkeypatch, url, method):
     app.dependency_overrides[get_current_user] = lambda: SimpleNamespace(has_permission=lambda permission: False)
     app.dependency_overrides[get_db_session] = lambda: None
     calls = []
-    monkeypatch.setattr(kibana_api, "get_kibana_case", lambda **kwargs: calls.append(kwargs))
     monkeypatch.setattr(workbench_api, "list_annotations_endpoint", lambda **kwargs: calls.append(kwargs))
     monkeypatch.setattr(translator_api, "translate", lambda **kwargs: calls.append(kwargs))
     c = TestClient(app)
@@ -186,20 +167,10 @@ def test_translation_body_validation_before_model(client, monkeypatch, body):
     assert calls == []
 
 
-@pytest.mark.parametrize("kind", ["comments", "annotations"])
-def test_malformed_list_child_is_failure(client, monkeypatch, kind):
+def test_malformed_list_child_is_failure(client, monkeypatch):
     c, _ = client
-    if kind == "comments":
-
-        async def read(**kwargs):
-            return {"comments": [None]}
-
-        monkeypatch.setattr(kibana_api, "get_kibana_case", read)
-        url = "/ui/cases/kibana/x/comments"
-    else:
-        monkeypatch.setattr(workbench_api, "list_annotations_endpoint", lambda **kwargs: {"annotations": [None]})
-        url = "/ui/cases/12/annotations"
-    response = c.get(url, headers={"Accept": "application/json"})
+    monkeypatch.setattr(workbench_api, "list_annotations_endpoint", lambda **kwargs: {"annotations": [None]})
+    response = c.get("/ui/cases/12/annotations", headers={"Accept": "application/json"})
     assert response.status_code == 200
     assert response.json()["state"] == "failed"
     assert response.json()["count"] is None

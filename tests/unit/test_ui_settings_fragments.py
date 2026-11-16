@@ -386,7 +386,12 @@ def test_page_secret_template_is_rendered_outside_script():
         )
     )
     soup = BeautifulSoup(page, "html.parser")
-    assert soup.select_one("template#settings-secret-status-template > span") is not None
+    # Walked, not CSS-selected: a `<template>`'s children live in a separate
+    # document fragment, and from beautifulsoup4 4.15 a child combinator no
+    # longer descends into one, while `.contents` still holds the span.
+    secret_template = soup.find("template", id="settings-secret-status-template")
+    assert secret_template is not None
+    assert secret_template.find("span") is not None
     assert soup.select_one('[data-click-action="createBackup"]') is None
     assert soup.select_one('[data-click-action="cleanupDatabase"]') is None
     assert soup.select_one('[data-click-action="openIntegrationWizard"]') is None

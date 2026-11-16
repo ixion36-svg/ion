@@ -1,0 +1,135 @@
+{# Coverage: cover by role, day-to-day pillar coverage, and what lapses soon.
+
+   The old ORBAT page's side panels, lost when that page was folded into
+   Team and restored here. The figures are kept apart throughout, never
+   summed into one: a self-rating, a certificate and somebody whose job it
+   is are different evidence, and one total would make them look alike.
+
+   Expects `coverage` (or `coverage_failed`) and `pillar_state`. #}
+
+{% if coverage_failed %}
+  <div role="alert" class="alert alert-warning mt-5">
+    <span>Coverage could not be read. The team above is current; cover,
+      pillar coverage and expiries are unknown rather than clear.</span>
+  </div>
+{% elif coverage %}
+<div class="grid gap-4 mt-5 lg:grid-cols-4">
+
+  <div class="card bg-base-200 border border-base-300">
+    <div class="card-body p-4">
+      <h2 class="card-title text-sm">Cover by role</h2>
+      {% if not coverage.cover %}
+        <p class="text-sm text-base-content/50">Nobody holds, or is training for, any role yet.</p>
+      {% else %}
+        <ul class="flex flex-col gap-1.5">
+          {% for c in coverage.cover %}
+            <li>
+              <div class="flex items-baseline gap-2 text-sm">
+                <span class="grow truncate">{{ c.role }}</span>
+                <span class="font-mono text-xs {{ 'text-base-content/60' if c.weighted else 'text-warning' }}"
+                      title="{{ c.primary }} primary, {{ c.cover }} cover, weighted {{ '%g' | format(c.weighted) }}">{{ c.primary }}p + {{ c.cover }}c = {{ '%g' | format(c.weighted) }}</span>
+              </div>
+              {% if c.in_training or c.blocked %}
+                <div class="text-xs text-base-content/50">
+                  {%- if c.in_training %}{{ c.in_training }} in training{% endif -%}
+                  {%- if c.in_training and c.blocked %} · {% endif -%}
+                  {%- if c.blocked %}{{ c.blocked }} suspended or withdrawn{% endif -%}
+                </div>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+      <p class="text-xs text-base-content/50 mt-1">A cover holder counts
+        {{ coverage.cover_weight }} against a primary, so depth cannot
+        disguise a thin rota.</p>
+    </div>
+  </div>
+
+  {# Twice the width of its neighbours: it is the one with names to read. #}
+  <div class="card bg-base-200 border border-base-300 lg:col-span-2">
+    <div class="card-body p-4">
+      <h2 class="card-title text-sm">Day-to-day coverage</h2>
+      <div class="flex flex-col">
+        {% for pl in coverage.pillars %}
+          {% set st = pillar_state.get(pl.state, pillar_state['unmeasured']) %}
+          <details class="group">
+            <summary class="flex items-center gap-2 rounded px-1 py-1 cursor-pointer hover:bg-base-300/50 list-none">
+              <span class="text-[0.6rem] text-base-content/40 w-3 group-open:rotate-90 transition-transform">▸</span>
+              <span class="text-sm grow truncate">{{ pl.pillar }}</span>
+              <span class="font-mono text-xs text-base-content/60 shrink-0"
+                    title="{{ pl.primary }} whose job it is, {{ pl.secondary }} self-rated capable, {{ pl.certified }} holding a current certificate">{{ pl.primary }}p · {{ pl.secondary }}s · {{ pl.certified }}c</span>
+              <span class="badge badge-xs shrink-0 {{ st[1] }}">{{ st[0] }}</span>
+            </summary>
+            <div class="flex flex-col gap-1 pl-4 pb-2">
+              <div class="text-xs text-base-content/70">{{ pl.headline }}</div>
+              {% for person in pl.people %}
+                <div class="flex items-baseline gap-2 text-xs">
+                  <span class="grow truncate">{{ person.name }}</span>
+                  <span class="text-base-content/50 shrink-0">{{ person.evidence }}</span>
+                  <span class="font-mono text-base-content/40 shrink-0">{{ '%.2f' | format(person.weight) }}</span>
+                </div>
+              {% endfor %}
+              {% if pl.in_training %}
+                <div class="text-xs text-warning">{{ pl.in_training }} in training for a
+                  role that owns this, which is not cover yet.</div>
+              {% endif %}
+              {% if pl.expired_certs %}
+                <div class="text-xs text-warning">{{ pl.expired_certs }} with a lapsed
+                  certificate in it, so there is a renewal to book.</div>
+              {% endif %}
+              {% if not pl.people and pl.owners %}
+                <div class="text-xs text-base-content/50">Roles that would own it: {{ pl.owners | join(', ') }}</div>
+              {% endif %}
+            </div>
+          </details>
+        {% endfor %}
+      </div>
+      <p class="text-xs text-base-content/50 mt-1">
+        {%- if not coverage.measured -%}
+          Nothing recorded yet: no journeys, assessments or certificates, so
+          none of this is measured.
+        {%- else -%}
+          p = whose job it is ({{ coverage.weights.primary }}), s = self-rated
+          outside their role ({{ coverage.weights.secondary }}), c = current
+          certificate ({{ coverage.weights.certificate }}). Capped at 1.00 a person.
+          {%- if coverage.self_rated_pillars %} {{ coverage.self_rated_pillars }}
+            pillar(s) rest on self-rating alone.{% endif -%}
+          {%- if coverage.unplaced %} {{ coverage.unplaced | length }} in post whose
+            role the skills matrix cannot place, so they count towards no pillar:
+            {{ coverage.unplaced | join(', ') }}.{% endif -%}
+        {%- endif -%}
+      </p>
+    </div>
+  </div>
+
+  <div class="card bg-base-200 border border-base-300">
+    <div class="card-body p-4">
+      <h2 class="card-title text-sm">Expiring soon</h2>
+      {% if not coverage.expiring %}
+        <p class="text-sm text-base-content/50">Nothing due in the next {{ coverage.expiring_days }} days.</p>
+      {% else %}
+        <ul class="flex flex-col">
+          {% for i in coverage.expiring %}
+            <li class="flex items-center gap-2 py-1.5 {{ 'border-t border-base-300/60' if not loop.first }}">
+              <div class="grow min-w-0">
+                <div class="text-xs truncate">{{ i.requirement }}</div>
+                <div class="text-xs text-base-content/50 truncate">{{ i.name }}</div>
+              </div>
+              {# A lapsed gate item suspends somebody's access; a lapsed
+                 role item does not. The badge says which kind is due. #}
+              <span class="badge badge-xs {{ 'badge-error' if i.phase == 'gate' else 'badge-warning' }}">{{ 'GATE' if i.phase == 'gate' else 'ROLE' }}</span>
+              <span class="text-xs font-mono {{ 'text-error' if i.days_left < 0 else 'text-base-content/60' }}"
+                    title="{{ i.expires_on }}">{{ 'lapsed' if i.days_left < 0 else i.days_left ~ 'd' }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+        {% if coverage.expiring_more %}
+          <p class="text-xs text-base-content/50 mt-1">and {{ coverage.expiring_more }} more in the next {{ coverage.expiring_days }} days.</p>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endif %}
