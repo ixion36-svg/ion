@@ -1682,10 +1682,14 @@
       // right. Single column below 1100px via CSS.
       var MAIN = { fields: 1, guide: 1, rawdata: 1, autoinvestigate: 1 };
       var folds = _foldPrefs();
+      // A host that arranges the sections (static/js/ion-arrange.js) folds
+      // them itself and remembers that with their places, so the head carries
+      // no fold action of its own: two handlers would toggle it twice.
+      var foldAction = _opts.arrange ? '' : ' data-click-action="ionAlertDetailFold"';
       function sectionHtml(s) {
         var folded = folds[s.id] != null ? folds[s.id] : (s.id === 'rawdata');
         return '<section class="iad-section iad-boxed' + (folded ? ' iad-folded' : '') + '" id="iad-sec-' + s.id + '">'
-           + '<div class="iad-sec-head" data-click-action="ionAlertDetailFold" data-section="' + s.id + '">'
+           + '<div class="iad-sec-head"' + foldAction + ' data-section="' + s.id + '">'
            + '<h4 class="iad-section-title">' + s.label + '</h4>'
            + '<span class="iad-fold-chev" aria-hidden="true">\u25BC</span>'
            + '</div>'

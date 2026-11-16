@@ -1082,6 +1082,7 @@
 <!-- the triage queue. Takes every dependency through mount() rather than reading
      this page's globals, so it cannot repeat the v0.79.5 ambient-global failure. -->
 <script nonce="{{ csp_nonce }}" src="/static/js/alerts-queue.js?v={{ ion_version }}"></script>
+<script nonce="{{ csp_nonce }}" src="/static/js/ion-arrange.js?v={{ ion_version }}"></script>
 <script nonce="{{ csp_nonce }}" src="/static/js/alerts-window.js?v={{ ion_version }}"></script>
 
 <script nonce="{{ csp_nonce }}">
@@ -5049,6 +5050,7 @@ async function showAlertDetail(alertId) {
 
     ionAlertDetail.mount(document.getElementById('alert-detail-body'), alert, {
         layout: 'stacked',           // sections, not tabs — same layout /cases proved
+        arrange: true,               // ionAlertWindow.show() arranges them
         aiAvailable: aiAvailable,
         arkimeEnabled: arkimeEnabled,
         detailV2: document.querySelector('[data-alert-detail-v2]')?.dataset.alertDetailV2 === '1',

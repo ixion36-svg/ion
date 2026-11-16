@@ -18,6 +18,62 @@
   'use strict';
 
   var host = null;
+  var arranger = null;
+
+  // The alert's sections, arranged the way the case window's are: movable
+  // between columns, foldable, hideable, one arrangement remembered for every
+  // alert. Triage is the two columns the window always had, working material
+  // beside context; the left column exists for an analyst with the width to
+  // use it and gives its space back while it is empty.
+  var WORKING = { fields: 1, guide: 1, rawdata: 1, autoinvestigate: 1 };
+  var COLUMNS = {
+    left: 'minmax(260px,1fr)', centre: 'minmax(0,1.5fr)', right: 'minmax(260px,1fr)', full: null
+  };
+  var PRESETS = [
+    { id: 'triage', label: 'Triage', col: null },
+    { id: 'wide', label: 'Wide', col: function (key) {
+        if (key === 'autoinvestigate' || key === 'guide') return 'left';
+        return WORKING[key] ? 'centre' : 'right';
+    } },
+    { id: 'focus', label: 'Focus', col: function () { return 'centre'; } }
+  ];
+
+  // A hidden section's jump link would scroll to nothing.
+  function syncJumpLinks() {
+    var body = el('alert-detail-body');
+    Array.prototype.forEach.call(body.querySelectorAll('.iad-jump-link'), function (link) {
+      var sec = el('iad-sec-' + link.dataset.section);
+      link.hidden = !!sec && sec.hidden;
+    });
+  }
+
+  function arrangeSections() {
+    var body = el('alert-detail-body');
+    if (!arranger) {
+      var tools = panel().querySelector('.aw-tools');
+      arranger = window.ionArrange.create({
+        body: body,
+        candidates: '.iad-section',
+        storageKey: 'ion-alert-window-layout-v1',
+        columns: COLUMNS,
+        defaultCol: function (key) { return WORKING[key] ? 'centre' : 'right'; },
+        presets: PRESETS,
+        keyFor: function (sec) { return sec.id.replace('iad-sec-', ''); },
+        titleOf: function (sec) { return sec.querySelector('.iad-section-title'); },
+        headOf: function (sec) { return sec.querySelector('.iad-sec-head'); },
+        collapsedClass: 'iad-folded',
+        defaultCollapsed: function (key) { return key === 'rawdata'; },
+        toolsHost: tools,
+        toolsBefore: tools.querySelector('.ion-ws-close'),
+        onChange: syncJumpLinks
+      });
+    }
+    // The component rendered its two fixed columns; the sections leave them
+    // for the grid, and the emptied wrapper goes.
+    var fixed = body.querySelector('.iad-cols');
+    arranger.apply();
+    if (fixed) fixed.remove();
+  }
 
   function el(id) { return document.getElementById(id); }
   function panel() { return el('alert-window'); }
@@ -74,6 +130,7 @@
 
   function show(alert) {
     el('alert-detail-title').textContent = alert.title || alert.rule_name || alert.id;
+    arrangeSections();
     open();
     setAddress('/alerts/' + encodeURIComponent(alert.id));
     el('alert-detail-body').scrollTop = 0;
