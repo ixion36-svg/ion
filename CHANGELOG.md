@@ -1,13 +1,92 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.17 -->
-<!-- ion-doc:version=0.99.17 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.18 -->
+<!-- ion-doc:version=0.99.18 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-11-11 -->
+<!-- ion-doc:date=2026-11-16 -->
 
 # Changelog
+
+## v0.99.18 — 2026-11-16
+
+Workforce now follows the roles people already hold. An account with an
+access role is put on that role's profile and seated on the order of
+battle, whether the role came from Keycloak or the Users page, and a fresh
+install no longer opens on empty tabs. Detection Health stops bucketing
+alerts as "(unmapped)" when Elasticsearch knows the rule. Bob's custom
+investigation guide can be corrected by hand, and two layout faults in the
+case window are fixed.
+Net-new findings: 0C / 0H / 0M / 0L.
+
+### Added
+
+- **Roles lead Workforce.** Each access role a person holds opens the
+  profile that grants it: at Keycloak sign-in, when an administrator saves
+  roles or creates the account, and at startup for every active account.
+  These journeys record training against a role the person already has
+  and never take it away while they are open. Leaving, a withdrawn
+  journey, or a lapsed mandatory item still removes the role.
+- **People are seated automatically.** A journey opened from a held role
+  takes a vacant post for that role, or one more post beside them when
+  every post is filled, which raises that role's establishment by one.
+- **A fresh install starts with an induction and starter roles.** When no
+  role profile exists, startup creates the Mandatory Induction, eight
+  roles linked to ION's access roles, and catalogue-strength posts. A
+  deployment with any profile of its own is left alone.
+- **Onboard into, on the Users page.** Both account dialogs can put a
+  person on a role profile they have still to earn. It needs
+  `workforce:manage`; the API refuses the choice without it.
+- **Bob's custom investigation guide can be edited.** The Guide tab has
+  Edit beside Approve and Reject. Saving returns the guide to pending
+  review whatever its status was, so an edit to an approved guide is
+  reviewed before it is the default again. The badge reads "edited by an
+  analyst" once the words are no longer Bob's, Regenerate asks before it
+  discards a person's edits, and each edit is written to the audit log.
+- **Setup can adopt and create what it lacked.** Roles can be adopted from
+  the SOC role catalogue, and a profile can be made the mandatory
+  induction. Both were API-only, so the induction could not be created
+  from any page.
+
+### Changed
+
+- **The order of battle uses the page.** The chart takes the full window
+  width and the selected post opens as a panel over the page, closed from
+  its button or the dimmed area.
+- **87 unused CSS rules and one unused helper are removed.** The dead-CSS
+  scanner now reads class names assembled by conditional Jinja
+  concatenation, which it had missed.
+- **Workforce menus are reachable.** Setup has links to its sections and to
+  Users, the Me tab links to My Training Plan, and Training tabs can be
+  linked by address (`/training#tab-myplan`).
+
+### Fixed
+
+- **"(unmapped)" rules.** Most paths that create an alert's triage row had
+  only its id, so the row was saved without a rule name and Detection
+  Health and DE Metrics could not attribute it. A background pass now
+  fills missing names from Elasticsearch, 30 seconds after start and every
+  15 minutes, which also repairs rows from earlier releases.
+- **Observables overlapping in the case window.** A long URL or hash ran
+  out through its chip's border in the narrow column. The value now
+  truncates inside the chip and the full value stays in its title.
+- **Attack path off-centre.** The lanes were pinned to the left of the
+  graph; they are centred while they fit.
+- **Team chart overlap.** The chart forced its column wider than the page
+  and pushed the side panel off the edge, and its left end could not be
+  scrolled to.
+
+### Upgrade notes
+
+- Three columns are added: `user_journeys.role_already_held`, and
+  `rule_investigation_templates.edited_by_id` and `.edited_at`.
+- A deployment with no role profile is seeded on first start, and every
+  active account holding a mapped role then gets a journey and a post.
+  Service accounts holding a mapped role are included.
+- Journeys opened at sign-in and at startup are recorded in the audit log
+  under the longest-standing account with `workforce:manage`, because ION
+  has no system actor.
 
 ## v0.99.17 — 2026-11-11
 
