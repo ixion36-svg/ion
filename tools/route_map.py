@@ -174,10 +174,8 @@ def permission_of(route) -> str:
 def _repo_relative(path: str) -> str:
     """A source path relative to the repo.
 
-    ``Path.resolve()`` follows a junction. A worktree whose ``.venv`` is a
-    junction to another checkout then fails ``relative_to`` and the map
-    drops the handler site, which is how the slowapi limiter lines went
-    blank. The ``.venv`` suffix is the same path the map already records.
+    ``Path.resolve()`` follows a junction, so the unresolved path is tried
+    first and a worktree whose ``src`` sits behind a junction still maps.
     """
     raw = pathlib.Path(path)
     for candidate in (raw, raw.resolve()):
@@ -185,19 +183,20 @@ def _repo_relative(path: str) -> str:
             return str(candidate.relative_to(ROOT)).replace("\\", "/")
         except ValueError:
             continue
-    resolved = str(raw.resolve())
-    marker = f"{os.sep}.venv{os.sep}"
-    idx = resolved.lower().find(marker.lower())
-    if idx != -1:
-        return resolved[idx + 1:].replace("\\", "/")
     raise ValueError(path)
 
 
 def handler_site(endpoint) -> tuple[str, int]:
-    """Where the handler is written, relative to the repo."""
+    """Where the handler is written, relative to the repo.
+
+    Unwrapped first: a slowapi limit wraps the handler, and the wrapper's
+    site is slowapi's own file, which only maps when the venv happens to sit
+    inside the checkout. That made the map differ between machines.
+    """
     try:
         import inspect
 
+        endpoint = inspect.unwrap(endpoint)
         f = inspect.getsourcefile(endpoint) or ""
         _, line = inspect.getsourcelines(endpoint)
         return (_repo_relative(f), line)

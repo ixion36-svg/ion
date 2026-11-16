@@ -58,6 +58,27 @@ def _observables_for_kibana(session: Session, observables) -> list:
         return list(observables or [])
 
 
+_ION_TO_KIBANA_STATUS = {"open": "open", "acknowledged": "in-progress", "closed": "closed"}
+_KIBANA_STATUSES = frozenset(_ION_TO_KIBANA_STATUS.values())
+
+
+def status_sync_direction(ion: str, kibana: str, agreed: Optional[str]) -> Optional[str]:
+    """Which way a case's status should move: "pull", "push" or None.
+
+    All three statuses are in Kibana's vocabulary. The side that still holds
+    the agreed status did not change, so the other side's status wins. When
+    both changed, or nothing is agreed yet, a close wins, and otherwise ION.
+    """
+    if ion == kibana:
+        return None
+    if agreed is not None:
+        if ion == agreed:
+            return "pull"
+        if kibana == agreed:
+            return "push"
+    return "pull" if kibana == "closed" else "push"
+
+
 class KibanaSyncService:
     """Service to sync comments bidirectionally between ION and Kibana."""
 
@@ -65,11 +86,48 @@ class KibanaSyncService:
         self.kibana_service = get_kibana_cases_service()
         self._running = False
         self._task: Optional[asyncio.Task] = None
+        # Kibana case id -> the change signature its comments were last read
+        # at. A case whose signature has not moved has no new comments.
+        self._comments_seen: dict[str, tuple] = {}
+        # ION case id -> the Elastic alert ids it held when last checked
+        # against Kibana, and alerts Kibana refused to attach.
+        self._alerts_seen: dict[int, frozenset] = {}
+        self._attach_refused: set[tuple[str, str]] = set()
+
+    @staticmethod
+    async def _kb(fn, *args, **kwargs):
+        """Run a blocking Kibana call on a worker thread.
+
+        The Kibana client is synchronous and this loop shares its event loop
+        with the web worker's requests: called inline, every round trip
+        stalled every request on that worker.
+        """
+        return await asyncio.to_thread(fn, *args, **kwargs)
+
+    @staticmethod
+    def _change_signature(kibana_case: dict) -> tuple:
+        """What moves when a Kibana case or its comments change."""
+        return (
+            kibana_case.get("version"),
+            kibana_case.get("updated_at"),
+            kibana_case.get("totalComment"),
+        )
 
     async def sync_case_comments(self, session: Session, case: AlertCase) -> int:
         """Sync comments from Kibana to ION for a specific case.
 
         Returns number of new comments synced.
+        """
+        return await self._sync_case_comments(session, case) or 0
+
+    async def _sync_case_comments(
+        self, session: Session, case: AlertCase, fetch_alerts: bool = True,
+    ) -> Optional[int]:
+        """As sync_case_comments, but None when the comments could not be read.
+
+        Also links alerts attached to the Kibana case. Kibana's comments
+        ``_find`` returns user comments only, so the alerts are a second read,
+        skipped when the caller knows the case has none.
         """
         if not case.kibana_case_id or not self.kibana_service.enabled:
             return 0
@@ -77,7 +135,9 @@ class KibanaSyncService:
         synced = 0
         try:
             # Get comments from Kibana
-            kibana_comments = self.kibana_service.get_case_comments(case.kibana_case_id)
+            kibana_comments = await self._kb(self.kibana_service.fetch_case_comments, case.kibana_case_id)
+            if kibana_comments is None:
+                return None
 
             # Get existing note contents to avoid duplicates
             # Separate Kibana-synced notes from user notes
@@ -147,17 +207,151 @@ class KibanaSyncService:
                 synced += 1
                 logger.info(f"Synced comment from Kibana to case {case.case_number}")
 
-            if synced > 0:
+            linked = 0
+            if fetch_alerts:
+                kibana_alerts = await self._kb(self.kibana_service.get_case_alerts, case.kibana_case_id)
+                linked = await self._link_kibana_alerts(session, case, kibana_alerts or [])
+
+            if synced > 0 or linked > 0:
                 session.commit()
 
         except Exception as e:
             logger.error(f"Error syncing comments for case {case.case_number}: {e}")
             session.rollback()
+            return None
 
         return synced
 
-    async def sync_all_cases(self) -> dict:
-        """Sync comments for all cases that have Kibana links."""
+    async def _link_kibana_alerts(
+        self, session: Session, case: AlertCase, kibana_alerts: list,
+    ) -> int:
+        """Link alerts attached to the Kibana case that ION does not have yet.
+
+        ``kibana_alerts`` is ``get_case_alerts`` output: dicts with ``id`` and
+        ``index``. Without this, alerts an analyst attached in Kibana after the
+        case reached ION never appeared in ION.
+
+        An alert ION already files under a different case is left there:
+        ION holds one case per alert, and Kibana may keep an alert on the
+        case it was moved away from. Does not commit; the caller does.
+        """
+        kibana_ids = [a["id"] for a in kibana_alerts if a.get("id")]
+        index = next((a.get("index") for a in kibana_alerts if a.get("index")), None)
+        if not kibana_ids:
+            return 0
+
+        triage_by_alert = {
+            t.es_alert_id: t
+            for t in session.query(AlertTriage)
+            .filter(AlertTriage.es_alert_id.in_(set(kibana_ids)))
+            .all()
+        }
+        new_ids = [
+            aid for aid in dict.fromkeys(kibana_ids)
+            if aid not in triage_by_alert or triage_by_alert[aid].case_id is None
+        ]
+        if not new_ids:
+            return 0
+
+        rule_names: dict[str, Optional[str]] = {}
+        try:
+            es = ElasticsearchService()
+            if es.is_configured:
+                for alert in await es.get_alerts_by_ids(new_ids, index) or []:
+                    rule_names[alert.id] = alert.rule_name
+        except Exception as exc:
+            logger.debug("Rule names for Kibana-attached alerts unavailable: %s", exc)
+
+        case_status = case.status.value if hasattr(case.status, "value") else case.status
+        triage_status = (
+            AlertTriageStatus.CLOSED if case_status == "closed"
+            else AlertTriageStatus.ACKNOWLEDGED
+        )
+        for aid in new_ids:
+            triage = triage_by_alert.get(aid)
+            if triage is None:
+                triage = AlertTriage(es_alert_id=aid, status=triage_status,
+                                     rule_name=rule_names.get(aid))
+                session.add(triage)
+            elif not triage.rule_name and rule_names.get(aid):
+                triage.rule_name = rule_names[aid]
+            triage.case_id = case.id
+
+        known = list(case.source_alert_ids or [])
+        case.source_alert_ids = known + [a for a in new_ids if a not in known]
+        logger.info("Linked %d alert(s) attached in Kibana to case %s",
+                    len(new_ids), case.case_number)
+        return len(new_ids)
+
+    async def push_new_alerts_to_kibana(self, session: Session, kibana_cases: dict) -> int:
+        """Attach alerts added to ION cases after those cases reached Kibana.
+
+        Kibana's alert list is read only for a case whose Elastic alerts
+        outnumber Kibana's, or whose alerts changed since it was last
+        checked, so unchanged cases cost nothing. Alerts from outside Elastic
+        (Arkime markers) are never sent, and one Kibana refused is not
+        retried. Returns how many alerts were attached.
+        """
+        if self.kibana_service.config.get("case_owner", "securitySolution") != "securitySolution":
+            return 0
+
+        alerts_by_case: dict[int, set] = {}
+        for case_id, alert_id in (
+            session.query(AlertTriage.case_id, AlertTriage.es_alert_id)
+            .join(AlertCase, AlertCase.id == AlertTriage.case_id)
+            .filter(AlertCase.kibana_case_id.isnot(None))
+            .filter(AlertTriage.source_system.is_(None))
+            .all()
+        ):
+            alerts_by_case.setdefault(case_id, set()).add(alert_id)
+        kibana_id_of = dict(
+            session.query(AlertCase.id, AlertCase.kibana_case_id)
+            .filter(AlertCase.id.in_(list(alerts_by_case)))
+            .all()
+        ) if alerts_by_case else {}
+
+        space_id = self.kibana_service.config.get("space_id", "default")
+        index = f".alerts-security.alerts-{space_id}"
+        attached = 0
+        for case_id, ion_ids in alerts_by_case.items():
+            kibana_id = kibana_id_of.get(case_id)
+            kibana_case = kibana_cases.get(kibana_id)
+            if kibana_case is None:
+                continue
+            current = frozenset(ion_ids)
+            seen = self._alerts_seen.get(case_id)
+            outnumbered = len(current) > (kibana_case.get("totalAlerts") or 0)
+            if not outnumbered and (seen is None or seen == current):
+                self._alerts_seen[case_id] = current
+                continue
+
+            kibana_alerts = await self._kb(self.kibana_service.fetch_case_alerts, kibana_id)
+            if kibana_alerts is None:
+                continue
+            on_kibana = {a.get("id") for a in kibana_alerts}
+            missing = sorted(
+                a for a in current - on_kibana if (kibana_id, a) not in self._attach_refused
+            )
+            if missing:
+                await self._kb(self.kibana_service.attach_alerts_to_case,
+                               kibana_id, missing, index)
+                after = await self._kb(self.kibana_service.fetch_case_alerts, kibana_id)
+                if after is None:
+                    continue
+                landed = {a.get("id") for a in after}
+                self._attach_refused.update((kibana_id, a) for a in missing if a not in landed)
+                attached += sum(1 for a in missing if a in landed)
+            self._alerts_seen[case_id] = current
+        return attached
+
+    async def sync_all_cases(self, kibana_cases: Optional[dict] = None) -> dict:
+        """Sync comments for cases that have Kibana links.
+
+        With ``kibana_cases`` (one ``_find`` sweep, keyed by id) only cases
+        whose Kibana change signature moved since their comments were last
+        read are fetched, and cases Kibana no longer has are skipped. Without
+        it every linked case is fetched, as before.
+        """
         if not self.kibana_service.enabled:
             return {"synced": 0, "cases": 0, "error": "Kibana not enabled"}
 
@@ -175,8 +369,23 @@ class KibanaSyncService:
             cases_processed = 0
 
             for case in cases:
-                synced = await self.sync_case_comments(session, case)
-                total_synced += synced
+                signature = None
+                if kibana_cases is not None:
+                    kibana_case = kibana_cases.get(case.kibana_case_id)
+                    if kibana_case is None:
+                        continue
+                    signature = self._change_signature(kibana_case)
+                    if self._comments_seen.get(case.kibana_case_id) == signature:
+                        continue
+                synced = await self._sync_case_comments(
+                    session, case,
+                    fetch_alerts=kibana_cases is None or bool(kibana_case.get("totalAlerts")),
+                )
+                # Only a read that succeeded marks the case as seen; a failed
+                # one is retried next cycle.
+                if signature is not None and synced is not None:
+                    self._comments_seen[case.kibana_case_id] = signature
+                total_synced += synced or 0
                 cases_processed += 1
 
             return {
@@ -186,16 +395,22 @@ class KibanaSyncService:
         finally:
             session.close()
 
-    async def sync_case_status_from_kibana(self, session: Session, case: AlertCase) -> bool:
+    async def sync_case_status_from_kibana(
+        self, session: Session, case: AlertCase, kibana_case: Optional[dict] = None,
+        *, allow_reopen: bool = False,
+    ) -> bool:
         """Sync case status from Kibana to ION.
 
+        A closed ION case is only reopened with ``allow_reopen``, which the
+        loop passes when Kibana is the side that moved off closed.
         Returns True if status was updated.
         """
         if not case.kibana_case_id or not self.kibana_service.enabled:
             return False
 
         try:
-            kibana_case = self.kibana_service.get_case(case.kibana_case_id)
+            if kibana_case is None:
+                kibana_case = await self._kb(self.kibana_service.get_case, case.kibana_case_id)
             if not kibana_case:
                 return False
 
@@ -221,7 +436,7 @@ class KibanaSyncService:
             # surfaced. ION-closed sticks; the analyst must re-open
             # explicitly. Kibana-closed propagates eagerly (handled at the
             # caller level — see sync_all_case_statuses).
-            if current_status == "closed" and ion_status != "closed":
+            if current_status == "closed" and ion_status != "closed" and not allow_reopen:
                 logger.debug(
                     "Kibana sync: refusing to flip case %s from CLOSED to %s "
                     "(closed is terminal in ION; re-open manually if intended)",
@@ -230,6 +445,11 @@ class KibanaSyncService:
                 return False
 
             if current_status != ion_status:
+                if current_status == "closed":
+                    case.closure_reason = None
+                    case.closure_notes = None
+                    case.closed_by_id = None
+                    case.closed_at = None
                 case.status = ion_status
                 case.kibana_case_version = kibana_case.get("version")
 
@@ -266,7 +486,9 @@ class KibanaSyncService:
             logger.error(f"Error syncing status for case {case.case_number}: {e}")
             return False
 
-    async def sync_case_status_to_kibana(self, session: Session, case: AlertCase) -> bool:
+    async def sync_case_status_to_kibana(
+        self, session: Session, case: AlertCase, kibana_case: Optional[dict] = None,
+    ) -> bool:
         """Sync case status from ION to Kibana.
 
         Returns True if Kibana was updated.
@@ -276,7 +498,8 @@ class KibanaSyncService:
 
         try:
             # Get current Kibana case to check status and get version
-            kibana_case = self.kibana_service.get_case(case.kibana_case_id)
+            if kibana_case is None:
+                kibana_case = await self._kb(self.kibana_service.get_case, case.kibana_case_id)
             if not kibana_case:
                 return False
 
@@ -298,7 +521,7 @@ class KibanaSyncService:
 
             # Only update if different
             if kibana_status != target_kibana_status:
-                result = self.kibana_service.update_case(
+                result = await self._kb(self.kibana_service.update_case,
                     case_id=case.kibana_case_id,
                     version=kibana_version,
                     status=target_kibana_status,
@@ -315,11 +538,19 @@ class KibanaSyncService:
             logger.error(f"Error syncing status to Kibana for case {case.case_number}: {e}")
             return False
 
-    async def sync_all_case_statuses(self, session: Session) -> dict:
+    async def sync_all_case_statuses(
+        self, session: Session, kibana_cases: Optional[dict] = None,
+    ) -> dict:
         """Bidirectional sync of case statuses between ION and Kibana.
 
-        Uses last-update-wins strategy based on updated_at timestamps.
-        Returns dict with sync statistics.
+        Each side is compared with the status they last agreed on
+        (``kibana_synced_status``), so whichever side changed wins. Timestamps
+        are not compared: they come from two machines and move on unrelated
+        writes, so the side that changed status used to lose.
+
+        With ``kibana_cases`` (one ``_find`` sweep, keyed by id) no per-case
+        GET is made, and a case Kibana no longer has is skipped. Returns
+        dict with sync statistics.
         """
         if not self.kibana_service.enabled:
             return {"from_kibana": 0, "to_kibana": 0, "error": "Kibana not enabled"}
@@ -328,87 +559,63 @@ class KibanaSyncService:
         to_kibana = 0
 
         try:
-            # Get all cases with Kibana IDs
             cases = session.query(AlertCase).filter(
                 AlertCase.kibana_case_id.isnot(None)
             ).all()
 
             for case in cases:
                 try:
-                    kibana_case = self.kibana_service.get_case(case.kibana_case_id)
+                    if kibana_cases is not None:
+                        kibana_case = kibana_cases.get(case.kibana_case_id)
+                    else:
+                        kibana_case = await self._kb(self.kibana_service.get_case, case.kibana_case_id)
                     if not kibana_case:
                         continue
 
-                    # Parse timestamps
-                    kibana_updated = kibana_case.get("updated_at") or kibana_case.get("created_at")
-                    ion_updated = case.updated_at or case.created_at
-
-                    # "closed" is a terminal state and gets eager
-                    # bidirectional propagation regardless of the timestamp
-                    # gate, so close events can't be defeated by clock skew
-                    # or async-push latency. Pre-fix:
-                    #
-                    # * Close-in-ION flap — the 60s loop could fire after
-                    #   ION committed close but before the ION→Kibana
-                    #   background sync push completed. Kibana still showed
-                    #   "in-progress" → reverse-sync flipped ION back to
-                    #   "acknowledged". (sync_case_status_from_kibana now
-                    #   also refuses to demote ION's CLOSED back to a
-                    #   non-closed state — closed is terminal.)
-                    #
-                    # * Close-in-Kibana never reaching ION — happened when
-                    #   ION's updated_at was newer than Kibana's (clock
-                    #   skew, or ION had any other recent write); the
-                    #   timestamp gate routed to to_kibana and Kibana's
-                    #   closed never propagated.
                     kibana_status = kibana_case.get("status")
                     ion_status = case.status.value if hasattr(case.status, "value") else case.status
+                    ion_as_kibana = _ION_TO_KIBANA_STATUS.get(ion_status)
+                    if kibana_status not in _KIBANA_STATUSES or ion_as_kibana is None:
+                        continue
 
-                    if kibana_status == "closed" and ion_status != "closed":
-                        if await self.sync_case_status_from_kibana(session, case):
+                    direction = status_sync_direction(
+                        ion_as_kibana, kibana_status, case.kibana_synced_status,
+                    )
+                    if direction is None:
+                        case.kibana_synced_status = kibana_status
+                    elif direction == "pull":
+                        if await self.sync_case_status_from_kibana(
+                            session, case, kibana_case, allow_reopen=True,
+                        ):
+                            case.kibana_synced_status = kibana_status
                             from_kibana += 1
-                        continue
-                    if ion_status == "closed" and kibana_status != "closed":
-                        if await self.sync_case_status_to_kibana(session, case):
-                            to_kibana += 1
-                        continue
-
-                    # Convert Kibana timestamp to datetime for comparison
-                    if kibana_updated:
-                        from datetime import datetime
-                        kibana_dt = datetime.fromisoformat(kibana_updated.replace("Z", "+00:00"))
-                        # Make ion_updated timezone-aware if needed
-                        if ion_updated.tzinfo is None:
-                            from datetime import timezone
-                            ion_updated = ion_updated.replace(tzinfo=timezone.utc)
-
-                        # Last update wins
-                        if kibana_dt > ion_updated:
-                            if await self.sync_case_status_from_kibana(session, case):
-                                from_kibana += 1
-                        else:
-                            if await self.sync_case_status_to_kibana(session, case):
-                                to_kibana += 1
-                    else:
-                        # No Kibana timestamp, sync from ion
-                        if await self.sync_case_status_to_kibana(session, case):
-                            to_kibana += 1
+                    elif await self.sync_case_status_to_kibana(session, case, kibana_case):
+                        case.kibana_synced_status = ion_as_kibana
+                        to_kibana += 1
 
                 except Exception as e:
                     logger.warning(f"Error syncing status for case {case.case_number}: {e}")
+                    session.rollback()
                     continue
 
+            session.commit()
             return {"from_kibana": from_kibana, "to_kibana": to_kibana}
 
         except Exception as e:
             logger.error(f"Error in bidirectional status sync: {e}")
             return {"from_kibana": from_kibana, "to_kibana": to_kibana, "error": str(e)}
 
-    async def import_cases_from_kibana(self, session: Session) -> dict:
+    async def import_cases_from_kibana(
+        self, session: Session, kibana_cases: Optional[dict] = None,
+    ) -> dict:
         """Import cases created in Kibana that don't exist in ION.
 
         Imports the case with attached alerts, extracting observables and
         building evidence summary to match ION's case format.
+
+        With ``kibana_cases`` (one ``_find`` sweep, keyed by id) every open
+        and in-progress case is considered. Without it only the newest 100
+        of each status are, which is how cases used to go unimported.
 
         Returns dict with import statistics.
         """
@@ -421,10 +628,14 @@ class KibanaSyncService:
 
         try:
             # Get only open + in-progress cases from Kibana (skip closed investigations)
-            cases_list = []
-            for case_status in ("open", "in-progress"):
-                result = self.kibana_service.list_cases(status=case_status, per_page=100)
-                cases_list.extend(result.get("cases", []))
+            if kibana_cases is not None:
+                cases_list = [c for c in kibana_cases.values()
+                              if c.get("status") in ("open", "in-progress")]
+            else:
+                cases_list = []
+                for case_status in ("open", "in-progress"):
+                    result = await self._kb(self.kibana_service.list_cases, status=case_status, per_page=100)
+                    cases_list.extend(result.get("cases", []))
 
             # Get existing Kibana case IDs in ION
             existing_kibana_ids = {
@@ -479,7 +690,7 @@ class KibanaSyncService:
                     )
 
                     # Get attached alerts from Kibana case
-                    kibana_alerts = self.kibana_service.get_case_alerts(kibana_id)
+                    kibana_alerts = await self._kb(self.kibana_service.get_case_alerts, kibana_id)
                     alert_ids = [a["id"] for a in kibana_alerts]
                     alert_index = kibana_alerts[0]["index"] if kibana_alerts else None
 
@@ -605,52 +816,8 @@ class KibanaSyncService:
                             session.flush()
                         triage.case_id = new_case.id
 
-                    # Trigger autonomous investigation on each alert added to this newly-synced case.
-                    # Fire-and-forget, never raises out of the sync path.
-                    try:
-                        from ion.services.investigation_service import get_investigation_service
-                        investigation_service = get_investigation_service()
-                        for alert_id in (source_alert_ids or []):
-                            try:
-                                try:
-                                    loop = asyncio.get_running_loop()
-                                    loop.create_task(
-                                        investigation_service.investigate_alert(
-                                            alert_id=alert_id, force=False, triggered_by="kibana_sync",
-                                        )
-                                    )
-                                except RuntimeError:
-                                    # No running loop — run in a background thread
-                                    import threading
-                                    def _bg(aid=alert_id):
-                                        asyncio.run(
-                                            investigation_service.investigate_alert(
-                                                alert_id=aid, force=False, triggered_by="kibana_sync",
-                                            )
-                                        )
-                                    threading.Thread(target=_bg, daemon=True).start()
-                            except Exception as inv_exc:
-                                logger.debug("Enqueue investigation failed for %s: %s", alert_id, inv_exc)
-                    except Exception as hook_exc:
-                        logger.warning("Kibana-sync investigation hook failed: %s", hook_exc)
-
-                    # Push standardized description back to Kibana
-                    kibana_version = kibana_case.get("version")
-                    if kibana_version:
-                        try:
-                            updated = self.kibana_service.update_case(
-                                case_id=kibana_id,
-                                version=kibana_version,
-                                title=f"[{case_number}] {standardized_title}",
-                                description=formatted_description,
-                            )
-                            if updated:
-                                new_case.kibana_case_version = updated.get("version")
-                        except Exception as e:
-                            logger.warning(f"Failed to push formatted description back to Kibana case {kibana_id}: {e}")
-
                     # Import user comments from Kibana (not alert attachments)
-                    comments = self.kibana_service.get_case_comments(kibana_id)
+                    comments = await self._kb(self.kibana_service.get_case_comments, kibana_id)
                     for comment in comments:
                         if comment.get("type") != "user":
                             continue
@@ -676,6 +843,52 @@ class KibanaSyncService:
 
                         session.add(note)
 
+                    # Commit the import before renaming the Kibana case. The
+                    # "[CASE-" title marks a case as ION's, and later cycles
+                    # skip such cases: renamed first and then lost to a
+                    # failed commit, it was never imported.
+                    session.commit()
+
+                    # Trigger autonomous investigation on each alert added to this newly-synced case.
+                    # Fire-and-forget, never raises out of the sync path.
+                    try:
+                        from ion.services.investigation_service import get_investigation_service
+                        investigation_service = get_investigation_service()
+                        for alert_id in (source_alert_ids or []):
+                            try:
+                                # A thread with its own loop, not a task on the
+                                # sync loop's: investigations make blocking calls.
+                                import threading
+
+                                def _bg(aid=alert_id):
+                                    asyncio.run(
+                                        investigation_service.investigate_alert(
+                                            alert_id=aid, force=False, triggered_by="kibana_sync",
+                                        )
+                                    )
+                                threading.Thread(target=_bg, daemon=True).start()
+                            except Exception as inv_exc:
+                                logger.debug("Enqueue investigation failed for %s: %s", alert_id, inv_exc)
+                    except Exception as hook_exc:
+                        logger.warning("Kibana-sync investigation hook failed: %s", hook_exc)
+
+                    # Push standardized description back to Kibana
+                    kibana_version = kibana_case.get("version")
+                    if kibana_version:
+                        try:
+                            updated = await self._kb(self.kibana_service.update_case,
+                                case_id=kibana_id,
+                                version=kibana_version,
+                                title=f"[{case_number}] {standardized_title}",
+                                description=formatted_description,
+                            )
+                            if updated:
+                                new_case.kibana_case_version = updated.get("version")
+                        except Exception as e:
+                            logger.warning(f"Failed to push formatted description back to Kibana case {kibana_id}: {e}")
+
+                    session.commit()
+
                     imported += 1
                     logger.info(
                         f"Imported case from Kibana: {case_number} "
@@ -684,6 +897,7 @@ class KibanaSyncService:
                     )
 
                 except Exception as e:
+                    session.rollback()
                     errors.append(f"Failed to import {kibana_id}: {str(e)}")
                     logger.error(f"Error importing case {kibana_id}: {e}")
 
@@ -713,7 +927,7 @@ class KibanaSyncService:
             # Get only open + in-progress cases from Kibana (skip closed investigations)
             cases_list = []
             for case_status in ("open", "in-progress"):
-                result = self.kibana_service.list_cases(status=case_status, per_page=100)
+                result = await self._kb(self.kibana_service.list_cases, status=case_status, per_page=100)
                 cases_list.extend(result.get("cases", []))
 
             # Get existing Kibana case IDs in ION
@@ -802,9 +1016,9 @@ class KibanaSyncService:
 
                     if case.kibana_case_id:
                         # Partial failure retry — fetch current version, then update
-                        existing = self.kibana_service.get_case(case.kibana_case_id)
+                        existing = await self._kb(self.kibana_service.get_case, case.kibana_case_id)
                         if existing and existing.get("version"):
-                            kibana_result = self.kibana_service.update_case(
+                            kibana_result = await self._kb(self.kibana_service.update_case,
                                 case_id=case.kibana_case_id,
                                 version=existing["version"],
                                 title=title,
@@ -815,7 +1029,7 @@ class KibanaSyncService:
                         else:
                             # Kibana case not found — clear stale ID and create fresh
                             case.kibana_case_id = None
-                            kibana_result = self.kibana_service.create_case(
+                            kibana_result = await self._kb(self.kibana_service.create_case,
                                 title=title,
                                 description=description,
                                 severity=severity,
@@ -823,7 +1037,7 @@ class KibanaSyncService:
                             )
                     else:
                         # Create new case in Kibana with ion tag to prevent re-import
-                        kibana_result = self.kibana_service.create_case(
+                        kibana_result = await self._kb(self.kibana_service.create_case,
                             title=title,
                             description=description,
                             severity=severity,
@@ -852,7 +1066,7 @@ class KibanaSyncService:
 
                                 username = note.user.username if note.user else "unknown"
                                 comment_text = f"**{username}:** {note.content}"
-                                self.kibana_service.add_comment(
+                                await self._kb(self.kibana_service.add_comment,
                                     case_id=case.kibana_case_id,
                                     comment=comment_text,
                                 )
@@ -887,6 +1101,55 @@ class KibanaSyncService:
             "errors": errors if errors else None,
         }
 
+    async def run_sync_cycle(self) -> None:
+        """One import / export / status / comment pass.
+
+        Kibana's side of every case comes from one paged ``_find`` sweep, so a
+        cycle costs one request per 100 Kibana cases plus one comment read per
+        case that changed, not two or three requests per linked case. When
+        the sweep fails only the export runs; the next cycle retries the rest.
+        """
+        engine = get_engine()
+        factory = get_session_factory(engine)
+        session = factory()
+        try:
+            kibana_cases = await self._kb(self.kibana_service.find_all_cases)
+            if kibana_cases is None:
+                logger.warning("Kibana sync: case sweep failed, import, status and comment sync skipped")
+
+            # Import new cases created in Kibana
+            if kibana_cases is not None:
+                import_result = await self.import_cases_from_kibana(session, kibana_cases)
+                if import_result.get("imported", 0) > 0:
+                    logger.info(f"Kibana sync: {import_result['imported']} cases imported from Kibana")
+
+            # Export ION cases to Kibana
+            export_result = await self.export_cases_to_kibana(session)
+            if export_result.get("exported", 0) > 0:
+                logger.info(f"Kibana sync: {export_result['exported']} cases exported to Kibana")
+
+            if kibana_cases is None:
+                return
+
+            attached = await self.push_new_alerts_to_kibana(session, kibana_cases)
+            if attached:
+                logger.info(f"Kibana sync: {attached} alerts attached to existing Kibana cases")
+
+            # Bidirectional status sync
+            status_result = await self.sync_all_case_statuses(session, kibana_cases)
+            if status_result.get("from_kibana", 0) > 0 or status_result.get("to_kibana", 0) > 0:
+                logger.info(
+                    f"Kibana sync: status synced - {status_result['from_kibana']} from Kibana, "
+                    f"{status_result['to_kibana']} to Kibana"
+                )
+        finally:
+            session.close()
+
+        # Sync comments for existing linked cases
+        result = await self.sync_all_cases(kibana_cases)
+        if result.get("synced", 0) > 0:
+            logger.info(f"Kibana sync: {result['synced']} comments synced from {result['cases']} cases")
+
     async def _background_sync_loop(self, interval_seconds: int = DEFAULT_SYNC_INTERVAL_SECONDS):
         """Background loop to periodically sync between ION and Kibana.
 
@@ -908,35 +1171,7 @@ class KibanaSyncService:
                 continue
 
             try:
-                engine = get_engine()
-                factory = get_session_factory(engine)
-                session = factory()
-                try:
-                    # Import new cases created in Kibana
-                    import_result = await self.import_cases_from_kibana(session)
-                    if import_result.get("imported", 0) > 0:
-                        logger.info(f"Kibana sync: {import_result['imported']} cases imported from Kibana")
-
-                    # Export ION cases to Kibana
-                    export_result = await self.export_cases_to_kibana(session)
-                    if export_result.get("exported", 0) > 0:
-                        logger.info(f"Kibana sync: {export_result['exported']} cases exported to Kibana")
-
-                    # Bidirectional status sync (last-update-wins)
-                    status_result = await self.sync_all_case_statuses(session)
-                    if status_result.get("from_kibana", 0) > 0 or status_result.get("to_kibana", 0) > 0:
-                        logger.info(
-                            f"Kibana sync: status synced - {status_result['from_kibana']} from Kibana, "
-                            f"{status_result['to_kibana']} to Kibana"
-                        )
-                finally:
-                    session.close()
-
-                # Sync comments for existing linked cases
-                result = await self.sync_all_cases()
-                if result.get("synced", 0) > 0:
-                    logger.info(f"Kibana sync: {result['synced']} comments synced from {result['cases']} cases")
-
+                await self.run_sync_cycle()
                 kibana_breaker.record_success()
             except Exception as e:
                 if isinstance(e, (httpx.ConnectError, httpx.TimeoutException, httpx.ReadError, httpx.NetworkError)):

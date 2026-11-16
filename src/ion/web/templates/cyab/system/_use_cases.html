@@ -1,0 +1,58 @@
+{% from "cyab/_macros.html" import post %}
+{% set tone = {'shipped': 'select-success', 'partial': 'select-warning', 'gap': 'select-error', 'n/a': ''} %}
+{% if not grid %}
+  <section class="card bg-base-200 border border-base-300">
+    <div class="card-body p-4">
+      <p class="text-sm text-base-content/70">Use cases come from the sub-profiles of this system's data sources. <a href="/cyab/systems/{{ system.id }}/sources" class="link link-primary">Choose a sub-profile for a source</a> to see them.</p>
+    </div>
+  </section>
+{% endif %}
+{% for g in grid %}
+<section class="card bg-base-200 border border-base-300 mb-4" aria-label="{{ g.subprofile.label }} use cases">
+  <div class="card-body p-4 gap-3">
+    <div class="flex flex-wrap items-baseline gap-3">
+      <h2 class="font-semibold">{{ g.subprofile.label }}</h2>
+      <span class="text-xs text-base-content/60">{{ g.subprofile.pillar }} · {{ g.set }} of {{ g.rows|length }} set · {{ g.shipped }} shipped</span>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Use case</th>
+            <th class="w-20">Kind</th>
+            {% for ds in g.sources %}<th class="min-w-[9rem]">{{ ds.name }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in g.rows %}
+            <tr>
+              <td class="max-w-[28rem]">
+                <div class="font-medium text-sm">{{ row.uc.title }}</div>
+                <div class="text-xs text-base-content/60 line-clamp-1">{{ row.uc.summary }}</div>
+                {% if row.uc.mitre_ids %}<div class="text-[0.65rem] font-mono text-base-content/50">{{ row.uc.mitre_ids|join(' · ') }}</div>{% endif %}
+              </td>
+              <td><span class="badge badge-xs {{ 'badge-info' if row.kind == 'Detection' else 'badge-ghost' }}">{{ row.kind }}</span>
+                {% if row.uc.risk %}<div class="text-[0.65rem] uppercase text-base-content/50 mt-1">{{ row.uc.risk }}</div>{% endif %}</td>
+              {% for ds, status in row.cells %}
+                <td>
+                  {% if can_edit %}
+                    <form {{ post('/cyab/sources/' ~ ds.id ~ '/use-case') }} hx-trigger="change">
+                      <input type="hidden" name="uc" value="{{ row.uc.id }}">
+                      <select name="status" class="select select-xs w-full {{ tone.get(status, '') }}" aria-label="{{ row.uc.title }} on {{ ds.name }}">
+                        <option value="">Not set</option>
+                        {% for st in uc_statuses %}<option value="{{ st }}" {{ 'selected' if status == st }}>{{ st }}</option>{% endfor %}
+                      </select>
+                    </form>
+                  {% else %}
+                    <span class="text-sm">{{ status or '—' }}</span>
+                  {% endif %}
+                </td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endfor %}

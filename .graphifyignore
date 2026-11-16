@@ -1,0 +1,7 @@
+# Graphify index exclusions (gitignore syntax). Only affects the code graph.
+
+# Third-party minified bundles; one dominates Graphify's code-area view.
+src/ion/web/static/js/*.min.js
+
+# KB and ATT&CK seed data, not logic.
+src/ion/data/

@@ -1,0 +1,47 @@
+{# Threat Intel Overview: the OpenCTI row.
+
+   Rendered only when OpenCTI is configured. Otherwise this is empty, and
+   the KPI row's single Connect OpenCTI prompt stands in for all three
+   cards: three panels each saying "not configured" is the clutter the
+   condensed Overview exists to remove.
+
+   Each card loads itself as soon as it lands, from the fragments that
+   already separate an unconfigured OpenCTI from a failing one. -#}
+{%- if configured -%}
+<div class="ti-grid ti-grid-3">
+  <section class="ti-card">
+    <header class="ti-card-h">Top threat actors
+      <button type="button" class="ti-card-r" data-click-action="tiSwitchTab" data-args='["actors"]'>Adversaries &rarr;</button></header>
+    <div class="ti-card-b" id="ti-overview-actors"
+         hx-get="/ui/threat-intel/landscape-actors"
+         hx-trigger="load, ti-show"
+         hx-swap="innerHTML">
+      <p class="ti-note">Loading actors&hellip;</p>
+    </div>
+  </section>
+  <section class="ti-card">
+    <header class="ti-card-h">Latest high-score IOCs
+      <button type="button" class="ti-card-r" data-click-action="tiSwitchTab" data-args='["ioc"]'>Indicators &rarr;</button></header>
+    <div class="ti-card-b" id="ti-overview-iocs"
+         hx-get="/ui/threat-intel/landscape-iocs"
+         hx-trigger="load, ti-show"
+         hx-swap="innerHTML">
+      <p class="ti-note">Loading indicators&hellip;</p>
+    </div>
+  </section>
+  <section class="ti-card">
+    <header class="ti-card-h">Recent watch matches
+      <button type="button" class="ti-card-r" data-click-action="tiSwitchTab" data-args='["watchlist"]'>Watchlist &rarr;</button></header>
+    {# The same fragment the Watchlist uses, with its own limit and
+       show_type for this table's fourth column: one definition of a match
+       row, not two. #}
+    <table class="ti-table ti-table-tight" id="overview-matches-table">
+      <thead><tr><th>Time</th><th>Observable</th><th>Matched entity</th><th>Type</th><th>Actions</th></tr></thead>
+      <tbody id="overview-matches-body"
+             hx-get="/ui/threat-intel/matches?limit={{ match_limit }}&amp;show_type=true"
+             hx-trigger="load, ti-show"
+             hx-swap="innerHTML"><tr><td colspan="5" class="ti-empty">Loading&hellip;</td></tr></tbody>
+    </table>
+  </section>
+</div>
+{%- endif -%}

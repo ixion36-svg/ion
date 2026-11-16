@@ -160,6 +160,14 @@
                 </div>
             </div>
             <div class="flex flex-col gap-2">
+                <h3 class="text-sm font-semibold">Surfaces</h3>
+                <div class="join">
+                    <button type="button" class="btn btn-sm join-item glass-btn" data-glass="on" data-click-action="setGlass" data-args='["on"]'>Glass</button>
+                    <button type="button" class="btn btn-sm join-item glass-btn" data-glass="off" data-click-action="setGlass" data-args='["off"]'>Solid</button>
+                </div>
+                <p class="text-xs opacity-60">Glass applies in dark mode.</p>
+            </div>
+            <div class="flex flex-col gap-2">
                 <h3 class="text-sm font-semibold">Accent Color</h3>
                 <div class="theme-options">
                     <button class="theme-option" data-theme="cyan" title="Cyan (Default)" data-click-action="setTheme" data-args='["cyan"]'></button>
@@ -313,9 +321,22 @@ function setMode(mode) {
     showToast(`Switched to ${mode} mode`, 'success');
 }
 
+function setGlass(value) {
+    document.documentElement.setAttribute('data-glass', value);
+    try { localStorage.setItem('ion-glass', value); } catch (e) { /* private mode */ }
+    document.querySelectorAll('.glass-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.glass === value);
+    });
+    showToast(value === 'on' ? 'Glass surfaces on' : 'Solid surfaces on', 'success');
+}
+
 function loadTheme() {
     const savedTheme = localStorage.getItem('ion-theme') || 'cyan';
     const savedMode = localStorage.getItem('ion-mode') || 'dark';
+    const savedGlass = localStorage.getItem('ion-glass') || 'on';
+    document.querySelectorAll('.glass-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.glass === savedGlass);
+    });
 
     document.documentElement.setAttribute('data-theme', savedTheme);
     document.documentElement.setAttribute('data-mode', savedMode);

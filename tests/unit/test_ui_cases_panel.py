@@ -446,13 +446,13 @@ def test_a_note_with_no_author_or_date_says_so(case):
 def test_the_note_count_is_reported(case):
     case(payload=_case(notes=[{"id": 1, "content": "a"},
                               {"id": 2, "content": "b"}]))
-    assert "Investigation Notes (2)" in flat(_get(_reader()).text)
+    assert "Notes (2)" in flat(_get(_reader()).text)
 
 
 def test_an_unreadable_note_list_is_not_zero_notes(case):
     case(payload=_case(notes="one note"))
     body = flat(_get(_reader()).text)
-    assert "Investigation Notes (0)" not in body
+    assert "Notes (0)" not in body
     assert "not in a shape" in body
 
 
@@ -502,11 +502,28 @@ def test_the_kibana_link_appears_only_with_a_url(case):
     assert "View in Kibana" not in flat(_get(_reader()).text)
 
 
-def test_the_kibana_comments_section_appears_only_when_synced(case):
-    case(payload=_case(kibana_case_id="kb-1"))
-    assert "Kibana Comments" in flat(_get(_reader()).text)
+def test_kibana_comments_are_listed_once_among_the_notes(case):
+    """A Kibana comment is imported as a note with a "[From Kibana - who]"
+    prefix. It shows under its Kibana author with a badge, and there is no
+    second Kibana Comments section listing it again."""
+    case(payload=_case(kibana_case_id="kb-1", notes=[
+        {"id": 1, "user": "system", "content": "[From Kibana - elastic] seen on two hosts"},
+        {"id": 2, "user": "admin", "content": "isolating the host"}]))
+    html = _get(_reader()).text
+    body = flat(html)
+    assert "Kibana Comments" not in body
+    assert "kibana-comments-container" not in html
+    assert "Notes (2)" in body
+    assert "synced with Kibana" in body
+    assert body.count("elastic") == 1
+    assert 'data-note-raw="seen on two hosts"' in html
+    assert "[From Kibana" not in html
+    assert html.count('class="cpanel-note-source"') == 1
+
+
+def test_an_unlinked_case_does_not_claim_kibana_sync(case):
     case(payload=_case(kibana_case_id=None))
-    assert "Kibana Comments" not in flat(_get(_reader()).text)
+    assert "synced with Kibana" not in flat(_get(_reader()).text)
 
 
 # ---------------------------------------------------------------------------
@@ -591,14 +608,13 @@ def test_both_client_date_formatters_are_gone():
     one in London were shown different times for the same row. The server
     formats and labels them now.
 
-    loadKibanaComments is still asserted present because it is the caller
-    whose conversion made the deletion correct. If it goes too, this test
-    should say so rather than quietly covering less.
+    loadKibanaComments has gone too: Kibana comments arrive as case notes
+    and are listed with them, so the separate read showed each one twice.
     """
     body = _scripts()
     assert "function ageLabel" not in body
     assert "fmtDate" not in body
-    assert "loadKibanaComments" in body
+    assert "loadKibanaComments" not in body
 
 
 def test_a_rail_subtitle_cannot_inject_markup(case):

@@ -415,7 +415,11 @@ def test_run_pass_dedups_already_actioned_marker(monkeypatch):
     _isolate_to(monkeypatch, "CLEARTEXT")
     svc = _FakeArkime({"user == EXISTS!": [_sess(user="root", protocol=["ftp"])]})
     # marker already actioned in a prior pass → the batched dedup skips it
-    session = _FakeSession(actioned=["rtmon:cleartext_credentials:cap01:1:abc="])
+    marker = rtmon._group_markers(
+        rtmon._detect_cleartext_credentials([_sess(user="root", protocol=["ftp"])]),
+        rtmon.datetime.now(rtmon.timezone.utc).strftime("%Y-%m-%d"),
+    )[0]["marker"]
+    session = _FakeSession(actioned=[marker])
     enqueue_calls = []
     _wire_run_pass(monkeypatch, svc, session, enqueue_calls)
 
@@ -545,9 +549,11 @@ class _LoopProbeSession(_FakeSession):
 
 def _three_cleartext_sessions():
     return [
-        _sess(user="root", protocol=["ftp"], communityId="1:aaa="),
-        _sess(user="admin", protocol=["telnet"], communityId="1:bbb="),
-        _sess(user="svc", protocol=["ftp"], communityId="1:ccc="),
+        # Three destinations: three findings. Sessions on one flow tuple
+        # now share a case (see test_sessions_on_one_flow_share_a_case).
+        _sess(user="root", protocol=["ftp"], communityId="1:aaa=", dstIp="10.0.0.9"),
+        _sess(user="admin", protocol=["telnet"], communityId="1:bbb=", dstIp="10.0.0.10"),
+        _sess(user="svc", protocol=["ftp"], communityId="1:ccc=", dstIp="10.0.0.11"),
     ]
 
 
@@ -580,3 +586,16 @@ def test_run_pass_dedup_lookup_is_batched(monkeypatch):
     assert session.triage_queries == 1, (
         f"expected one batched dedup query, saw {session.triage_queries}"
     )
+
+
+def test_sessions_on_one_flow_share_a_case():
+    """Every DNS query is its own UDP session; one tunnel opened a case per
+    query against a live Arkime 5.5. Grouped, it is one case a day."""
+    q = lambda i: _sess(communityId=f"1:q{i}=", dstIp="8.8.8.8",
+                        **{"dns.host": [f"{'a' * 50}{i}.exfil.example.com"]})
+    cands = rtmon._group_markers(rtmon._detect_dns_tunneling([q(i) for i in range(40)]), "2026-11-11")
+    assert len({c["marker"] for c in cands}) == 1
+    assert cands[0]["marker"].endswith(":10.0.0.5:example.com:2026-11-11")
+    assert cands[0]["evidence"]["sessions_in_group"] == 40
+    tomorrow = rtmon._group_markers(rtmon._detect_dns_tunneling([q(0)]), "2026-11-12")
+    assert tomorrow[0]["marker"] != cands[0]["marker"]

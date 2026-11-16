@@ -456,3 +456,55 @@ def test_the_page_no_longer_writes_the_timeline(answers):
     assert "rgba(" not in block.group(0)
     assert "#6de4ff" not in block.group(0)
     assert "toLocaleString" not in block.group(0)
+
+
+# ---------------------------------------------------------------------------
+# Runs of alert links fold to one line
+# ---------------------------------------------------------------------------
+
+
+def _link(n, ts="2026-09-01T10:30:00"):
+    return _event(kind="system", title="Alert linked: a-%d" % n,
+                  detail="Status: open", source_type="alert",
+                  source_id="a-%d" % n, ts=ts)
+
+
+def test_consecutive_alert_links_fold_into_one_line(answers):
+    """Ten links drew ten cards, about 850 px of CASE-0239's timeline."""
+    answers(payload=_payload(events=[
+        _event(kind="system", title="Case opened: x", source_type="case"),
+        _link(1, "2026-09-01T10:31:00"), _link(2), _link(3, "2026-09-01T10:40:00"),
+        _event(kind="analyst", title="Note from admin", source_type="note"),
+    ]))
+    html = _get(PERMISSION).text
+    body = flat(html)
+    assert html.count('class="case-tl-event case-tl-system case-tl-run"') == 1
+    assert "3 alerts linked" in body
+    assert "2026-09-01 10:31 UTC – 2026-09-01 10:40 UTC" in body
+    for n in (1, 2, 3):
+        assert "Alert linked: a-%d" % n in body
+    assert "Case opened: x" in body and "Note from admin" in body
+
+
+def test_a_single_alert_link_is_not_folded(answers):
+    answers(payload=_payload(events=[_link(1)]))
+    html = _get(PERMISSION).text
+    assert "case-tl-run" not in html
+    assert "Alert linked: a-1" in flat(html)
+
+
+def test_a_note_between_links_splits_the_run(answers):
+    answers(payload=_payload(events=[
+        _link(1), _link(2),
+        _event(kind="analyst", title="Note from admin", source_type="note"),
+        _link(3), _link(4)]))
+    html = _get(PERMISSION).text
+    assert html.count("case-tl-run\"") == 2
+    assert flat(html).count("2 alerts linked") == 2
+
+
+def test_other_system_events_are_not_folded_as_alert_links(answers):
+    answers(payload=_payload(events=[
+        _event(kind="system", title="Case opened", source_type="case"),
+        _event(kind="system", title="Case closed", source_type="case")]))
+    assert "case-tl-run" not in _get(PERMISSION).text

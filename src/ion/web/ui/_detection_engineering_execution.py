@@ -82,8 +82,7 @@ def _chart_rows(payload: Any, key: str, fields: tuple[str, ...]) -> list[dict[st
     return [{**row, **{field: _measurement(row.get(field)) for field in fields}} for row in found]
 
 
-@router.get('/detection-engineering/execution', response_class=HTMLResponse)
-async def execution(request: Request, hours: int = 168):
+async def execution_view(hours: int = 168) -> ExecutionView:
     data = None
     try:
         data = await de_tide_api.tide_de_execution(hours=hours)
@@ -111,6 +110,12 @@ async def execution(request: Request, hours: int = 168):
         'volume_incomplete': any(t['count'] is None for t in timeline or []),
         'severity_incomplete': any(t[s] is None for t in severity_timeline or [] for s in severities),
     }
+    return view
+
+
+@router.get('/detection-engineering/execution', response_class=HTMLResponse)
+async def execution(request: Request, hours: int = 168):
+    view = await execution_view(hours)
     return render_view(request, '_fragments/detection_engineering_execution.html', view)
 
 
