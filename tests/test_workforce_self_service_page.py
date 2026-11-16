@@ -24,6 +24,14 @@ ever render their own. Only the page route was over-gated.
 The other three workforce pages keep their permissions: profiles is the
 schema a SOC edits for itself, people is the lead's verification queue,
 and orbat is everybody's roster. Those are other people's business.
+
+The four pages are now one. /workforce/people and /workforce/orbat are
+gone and their content is the Team tab of /workforce; Setup holds the
+establishment and offboarding. The page stayed open to anybody signed in,
+for the reason above, and the gates moved to the TABS and the fragments
+behind them -- so this file now checks them there. The guarantee is
+unchanged and is the one this class has always made: opening the joiner's
+own page must not open everybody else's.
 """
 
 from __future__ import annotations
@@ -39,6 +47,9 @@ if str(_SRC) not in sys.path:
 _SERVER = (_SRC / "ion" / "web" / "server.py").read_text(encoding="utf-8")
 
 
+_UI = _SRC / "ion" / "web" / "ui"
+
+
 def _route(path: str) -> str:
     """The decorator and signature for a page route."""
     match = re.search(
@@ -46,6 +57,31 @@ def _route(path: str) -> str:
         _SERVER, re.DOTALL)
     assert match, f"no route found for {path}"
     return match.group(1)
+
+
+def _fragment(module: str, path: str) -> str:
+    """The decorator block for one /ui fragment route.
+
+    Scanned to the following `def` rather than pattern-matched on the
+    decorator's shape. The first version matched a decorator whose only
+    argument was the path, and adding `response_class=HTMLResponse` to
+    every route broke it -- not by failing the assertion it makes, but
+    by finding no route at all, which is the worse way for a test to
+    break because the message points at the wrong thing.
+
+    Read from the source, like _route above, so a gate that is present
+    but wired wrong still reads as present here; the complementary
+    runtime check in test_workforce_who_verifies.py is what catches
+    that.
+    """
+    source = (_UI / f"{module}.py").read_text(encoding="utf-8")
+    for match in re.finditer(r"@router\.(?:get|post)\(", source):
+        tail = source[match.start():]
+        body_at = tail.index("\ndef ")
+        decorator = tail[:body_at]
+        if f'"{path}"' in decorator:
+            return decorator
+    raise AssertionError(f"no route found for {path} in ui/{module}.py")
 
 
 class TestTheJoinersOwnPage:
@@ -78,16 +114,46 @@ class TestTheOtherPagesAreUnchanged:
     """Opening the joiner's own page must not open everybody else's."""
 
     def test_profiles_still_needs_manage(self):
-        assert 'require_page_permission("workforce:manage")' in _route(
-            "/workforce/profiles")
+        """The schema editor, now part of the Setup tab."""
+        assert 'require_permission("workforce:manage")' in _fragment(
+            "workforce_setup", "/workforce/setup")
 
-    def test_people_still_needs_verify(self):
-        assert 'require_page_permission("workforce:verify")' in _route(
-            "/workforce/people")
+    def test_editing_the_schema_still_needs_manage(self):
+        """Every write behind Setup, not just the view of it.
 
-    def test_orbat_still_needs_read(self):
-        assert 'require_page_permission("workforce:read")' in _route(
-            "/workforce/orbat")
+        The old page put one gate on the route and the editor's writes
+        went to /api, which carried their own. Both halves live here now,
+        so each write states it rather than inheriting from a page.
+        """
+        setup = (_UI / "workforce_setup.py").read_text(encoding="utf-8")
+        writes = setup.count('require_permission("workforce:manage")')
+        assert writes >= 8, (
+            f"only {writes} routes in ui/workforce_setup.py carry "
+            "workforce:manage; the schema, establishment and offboarding "
+            "writes must each hold it"
+        )
+
+    def test_the_team_fragment_still_needs_read(self):
+        """The roster and the order of battle, now the Team tab."""
+        assert 'require_permission("workforce:read")' in _fragment(
+            "workforce_team", "/workforce/team")
+
+    def test_the_setup_fragment_still_needs_manage(self):
+        """The establishment and offboarding, now the Setup tab."""
+        assert 'require_permission("workforce:manage")' in _fragment(
+            "workforce_setup", "/workforce/setup")
+
+    def test_verifying_still_needs_verify(self):
+        """The write the old /workforce/people page gated by being behind
+        workforce:verify. The page is gone; the write is not."""
+        assert 'require_permission("workforce:verify")' in _fragment(
+            "workforce_team", "/workforce/requirements/{requirement_id}/verify")
+
+    def test_the_me_fragment_is_open_like_its_page(self):
+        """Same reasoning as the page: a joiner has no permission yet, and
+        the route resolves their own journeys and nobody else's."""
+        assert "require_permission" not in _fragment(
+            "workforce_journey", "/workforce/me")
 
 
 class TestTheApiWasAlreadyRight:

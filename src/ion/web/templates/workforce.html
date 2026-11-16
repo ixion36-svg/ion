@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Workforce - ION{% endblock %}
+
+{# The one workforce page. Me, Team and Setup were four separate pages, and
+   nav.py has only ever carried one workforce entry, so three of them were
+   reachable only by noticing a ghost button in another page's header: a
+   lead's verification queue, which is daily work, sat two unmarked hops
+   from the navigation.
+
+   The tabs a person sees are the ones their permissions allow, decided on
+   the server. The page itself requires nothing beyond being signed in,
+   and that is deliberate rather than an oversight: permissions here are
+   withheld until mandatory training is verified, so a page that told a
+   joiner what to complete and then required a permission to read it could
+   never be opened by the people it is for. Someone with nothing gets Me,
+   which is exactly what they need. #}
+
+{% block content %}
+<div class="p-6 max-w-[1400px] mx-auto">
+
+  <div class="flex items-end gap-4 mb-4">
+    <div>
+      <h1 class="text-2xl font-semibold">Workforce</h1>
+      <p class="text-sm text-base-content/60">{{ tab_subtitle }}</p>
+    </div>
+  </div>
+
+  <div role="tablist" class="tabs tabs-boxed mb-5 justify-start">
+    {% for t in tabs %}
+      <a role="tab" class="tab {{ 'tab-active' if t.id == tab }}"
+         href="/workforce?tab={{ t.id }}"
+         hx-get="/ui/workforce/{{ t.id }}"
+         hx-target="#wf-tab" hx-swap="innerHTML"
+         hx-push-url="/workforce?tab={{ t.id }}">{{ t.label }}</a>
+    {% endfor %}
+  </div>
+
+  <div id="wf-tab" hx-get="/ui/workforce/{{ tab }}"
+       hx-trigger="load" hx-swap="innerHTML">
+    <div class="text-center p-10 text-base-content/60">
+      <span class="loading loading-spinner loading-sm text-primary"></span>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

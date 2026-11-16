@@ -1,0 +1,107 @@
+{# The order of battle as an org chart, with the person detail beside it.
+
+   A unit's box holds its own posts, lead first, and the units form the
+   tree. Putting every post in the tree would branch a ten-person SOC into
+   something unreadable on a laptop, and what a reader traces here is
+   command, which runs between units.
+
+   Connectors come from .ion-orbat in frontend/ion-daisy-theme.css. They
+   are pseudo-elements, so the markup stays a plain nested <ul>: the
+   structure a screen reader walks is the structure the lines draw.
+
+   Expects `units`, `post_state` and `stage_label`. #}
+
+{% macro post_row(p, lead=False) %}
+  {% set state = post_state.get(p.state, ('Unknown', 'badge-ghost', 'border-base-300')) %}
+  {% if p.occupant %}
+    <button type="button"
+            class="text-left w-full rounded-md border px-2 py-1.5 bg-base-100 hover:border-primary/60
+                   {{ 'border-primary/40' if lead else 'border-base-300' }}"
+            hx-get="/ui/workforce/orbat/person/{{ p.occupant.journey_id }}"
+            hx-target="#orbat-detail" hx-swap="innerHTML">
+      <div class="flex items-center gap-1.5 flex-wrap">
+        <span class="text-xs font-medium grow">{{ p.title }}</span>
+        {% if lead %}<span class="badge badge-xs badge-primary">Commands</span>{% endif %}
+        <span class="badge badge-xs {{ state[1] }}">{{ state[0] }}</span>
+      </div>
+      <div class="flex items-center gap-1.5 flex-wrap">
+        <span class="text-xs text-base-content/80">{{ p.occupant.name }}</span>
+        {% if p.occupant.is_cover %}<span class="badge badge-xs badge-secondary">Cover</span>{% endif %}
+        <span class="text-xs text-base-content/50">{{ stage_label.get(p.occupant.stage, p.occupant.stage) }}</span>
+      </div>
+    </button>
+  {% else %}
+    <div class="rounded-md border border-dashed px-2 py-1.5
+                {{ 'border-error/50 bg-error/5' if lead else 'border-base-300' }}">
+      <div class="flex items-center gap-1.5 flex-wrap">
+        <span class="text-xs font-medium grow">{{ p.title }}</span>
+        {% if lead %}<span class="badge badge-xs badge-primary">Commands</span>{% endif %}
+        <span class="badge badge-xs {{ state[1] }}">{{ state[0] }}</span>
+      </div>
+      <div class="text-xs {{ 'text-error' if lead else 'text-base-content/50' }}">
+        {% if lead %}Nobody answers for this unit{% else %}Vacant{% endif %}
+      </div>
+    </div>
+  {% endif %}
+{% endmacro %}
+
+{% macro unit_node(u) %}
+  {% set all_posts = (u.leads or []) + (u.posts or []) %}
+  {% set gapped = all_posts | selectattr('state', 'equalto', 'gapped') | list | length %}
+  <li>
+    <div class="w-[260px] rounded-lg border border-base-300 bg-base-200 p-3 text-left">
+      <div class="flex items-baseline gap-2 flex-wrap mb-2">
+        <span class="text-sm font-semibold grow">{{ u.name }}</span>
+        <span class="text-xs {{ 'text-error' if gapped else 'text-base-content/50' }}">
+          {{ all_posts | length }} {{ 'post' if all_posts | length == 1 else 'posts' }}{% if gapped %}, {{ gapped }} gapped{% endif %}
+        </span>
+      </div>
+      {% if not all_posts %}
+        <p class="text-xs text-base-content/50">No posts in this unit.</p>
+      {% else %}
+        <div class="flex flex-col gap-1.5">
+          {% for p in u.leads %}{{ post_row(p, lead=True) }}{% endfor %}
+          {% for p in u.posts %}{{ post_row(p) }}{% endfor %}
+        </div>
+      {% endif %}
+    </div>
+    {% if u.children %}
+      <ul>{% for child in u.children %}{{ unit_node(child) }}{% endfor %}</ul>
+    {% endif %}
+  </li>
+{% endmacro %}
+
+<div class="grid gap-5 xl:grid-cols-[1fr_360px] items-start">
+
+  <div class="card bg-base-200 border border-base-300">
+    <div class="card-body p-5">
+      <div class="flex items-baseline gap-3 flex-wrap">
+        <h2 class="card-title text-base">Chain of command</h2>
+        <span class="text-sm text-base-content/60">Select a post to see that person's onboarding</span>
+      </div>
+
+      {% if not units %}
+        <p class="text-sm text-base-content/60 mt-2">No units yet. Add one on
+          Setup to start laying out the establishment.</p>
+      {% else %}
+        {# Scrolls rather than wraps: a wrapped org chart draws reporting
+           lines to the wrong boxes, which is worse than a scrollbar. #}
+        <div class="ion-orbat overflow-x-auto pb-2 mt-3">
+          <ul>{% for u in units %}{{ unit_node(u) }}{% endfor %}</ul>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div id="orbat-detail" class="xl:sticky xl:top-4">
+    <div class="card bg-base-200 border border-base-300">
+      <div class="card-body p-5">
+        <h2 class="card-title text-base">No post selected</h2>
+        <p class="text-sm text-base-content/70">Choose a post on the left to
+          see the full state of that person's onboarding and the training
+          objectives they still have open.</p>
+      </div>
+    </div>
+  </div>
+
+</div>

@@ -1,0 +1,129 @@
+{# One occupant's onboarding, opened from a post on the ORBAT.
+
+   Three questions in order: where are they, what is outstanding, and what
+   training is still to come. The objectives repeat items already listed
+   under readiness, deliberately -- the checklist answers "what is left on
+   this journey" and the objectives answer "what is this person booked to
+   do", and a lead planning a quarter reads the second without wanting to
+   filter the first by eye. #}
+
+{% if failed %}
+  <div role="alert" class="alert alert-error">
+    <span>That person's onboarding could not be read.</span>
+  </div>
+
+{% elif not found %}
+  <div class="card bg-base-200 border border-base-300">
+    <div class="card-body p-5">
+      <h2 class="card-title text-base">No longer there</h2>
+      <p class="text-sm text-base-content/70">That journey has been closed or
+        removed. Reload the order of battle.</p>
+    </div>
+  </div>
+
+{% else %}
+{% set overdue = journey.stage in ('pre_access', 'role_training')
+                 and journey.days_elapsed > journey.target_days %}
+
+<div class="card bg-base-200 border border-base-300">
+  <div class="card-body p-5">
+
+    <div class="flex items-center gap-2 flex-wrap">
+      <h2 class="card-title text-base grow">{{ person }}</h2>
+      <span class="badge badge-sm {{ 'badge-success' if journey.stage == 'operational'
+                                     else 'badge-error' if journey.stage == 'suspended'
+                                     else 'badge-warning' }}">
+        {{ stage_label.get(journey.stage, journey.stage) }}
+      </span>
+    </div>
+    <p class="text-sm text-base-content/70">
+      {{ journey.role }}, version {{ journey.version }}{% if journey.is_cover %}, held as cover{% endif %}
+    </p>
+
+    <div class="flex gap-4 flex-wrap mt-2">
+      <div>
+        <div class="text-xs text-base-content/60">Access gate</div>
+        <div class="text-sm font-medium {{ 'text-success' if journey.gate_cleared else 'text-warning' }}">
+          {{ journey.gate_done }} of {{ journey.gate_total }}{{ ' cleared' if journey.gate_cleared else ' verified' }}
+        </div>
+      </div>
+      <div>
+        <div class="text-xs text-base-content/60">Role readiness</div>
+        <div class="text-sm font-medium">{{ journey.readiness_done }} of {{ journey.readiness_total }}</div>
+      </div>
+      {% if journey.stage in ('pre_access', 'role_training') %}
+        <div>
+          <div class="text-xs text-base-content/60">Elapsed</div>
+          <div class="text-sm font-medium {{ 'text-warning' if overdue }}">
+            day {{ journey.days_elapsed }} of {{ journey.target_days }}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="divider my-2"></div>
+
+    <h3 class="text-sm font-semibold">Access gate</h3>
+    {% if not gate %}
+      <p class="text-sm text-base-content/50">No gate items on this role.</p>
+    {% else %}
+      <ul class="flex flex-col gap-1">
+        {% for r in gate %}
+          <li class="flex items-center gap-2 flex-wrap">
+            <span class="w-2 h-2 rounded-full shrink-0 {{ r.dot }}"></span>
+            <span class="text-xs grow {{ 'text-base-content/50 line-through' if r.satisfied }}">{{ r.name }}</span>
+            <span class="text-xs text-base-content/60 shrink-0">{{ r.label }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    <h3 class="text-sm font-semibold mt-3">Role readiness</h3>
+    {% if not readiness %}
+      <p class="text-sm text-base-content/50">No readiness items on this role.</p>
+    {% else %}
+      <ul class="flex flex-col gap-1">
+        {% for r in readiness %}
+          <li class="flex items-center gap-2 flex-wrap">
+            <span class="w-2 h-2 rounded-full shrink-0 {{ r.dot }}"></span>
+            <span class="text-xs grow {{ 'text-base-content/50 line-through' if r.satisfied }}">{{ r.name }}</span>
+            {% if r.expires_on %}
+              <span class="text-xs text-base-content/50 shrink-0">expires {{ r.expires_on }}</span>
+            {% endif %}
+            <span class="text-xs text-base-content/60 shrink-0">{{ r.label }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    <div class="divider my-2"></div>
+
+    <h3 class="text-sm font-semibold">Current training objectives</h3>
+    {% if not objectives %}
+      <p class="text-sm text-base-content/60">Nothing outstanding. Every
+        course and certificate this role asks for has been met.</p>
+    {% else %}
+      <ul class="flex flex-col gap-1">
+        {% for o in objectives %}
+          <li class="flex items-center gap-2 flex-wrap">
+            <span class="badge badge-xs badge-ghost shrink-0">{{ o.kind }}</span>
+            <span class="text-xs grow">{{ o.name }}</span>
+            {% if o.cost %}
+              <span class="text-xs text-base-content/60 shrink-0">{{ money(o.cost) }}</span>
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+      <p class="text-xs text-base-content/50 mt-2">
+        Tracked on the <span class="font-medium">{{ plan_name }}</span> plan,
+        with the spend and forecast, on <a href="/training" class="text-primary">Training</a>.
+      </p>
+    {% endif %}
+
+    <p class="text-xs text-base-content/50 mt-3">
+      Spent {{ money(journey.spend) }}, committed {{ money(journey.committed) }}.
+    </p>
+
+  </div>
+</div>
+{% endif %}

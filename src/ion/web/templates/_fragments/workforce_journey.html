@@ -1,0 +1,166 @@
+{# A person's own onboarding: where they stand, and what is left to do.
+
+   Replaces the five-step stepper and the per-row forms that
+   workforce_journey.html built with createElement. Three of the wizard's
+   five steps carried no action, and its two lists were never on screen
+   together, so this renders both and leads with the counts.
+
+   Every row's form sits behind a `<details>`. The wizard called
+   form.classList.remove('hidden') on each pending row, so a joiner with
+   eight outstanding items met eight date pickers, eight text inputs and
+   eight buttons stacked down the page before they had read a single item
+   name. Collapsed by default, `<details>` needs no JavaScript, is keyboard
+   reachable and leaves one open form at a time by the reader's choice.
+
+   Tone classes are written out literally in the maps below rather than
+   composed from `r.tone`, because Tailwind only emits a rule for a class it
+   can read in a template. A class built by string concatenation at render
+   time is a class that has no CSS. #}
+
+{% if failed %}
+  <div role="alert" class="alert alert-error">
+    <span>Your onboarding could not be read. This is not an empty
+      onboarding: the query failed, so anything outstanding is unknown
+      rather than nothing. Reload the page, and tell your lead if it
+      persists.</span>
+  </div>
+
+{% elif not journeys %}
+  <div class="card bg-base-200 border border-base-300">
+    <div class="card-body">
+      <h2 class="card-title text-base">No role assigned yet</h2>
+      <p class="text-sm text-base-content/70">Your onboarding starts as soon
+        as a lead assigns you a role profile. Access to ION is granted once
+        every mandatory item on it has been verified.</p>
+    </div>
+  </div>
+
+{% else %}
+{% set dot = {'success': 'bg-success', 'warning': 'bg-warning',
+              'error': 'bg-error', 'todo': 'bg-base-content/30'} %}
+{% set ink = {'success': 'text-success', 'warning': 'text-warning',
+              'error': 'text-error', 'todo': 'text-base-content/60'} %}
+
+{% if error %}
+  <div role="alert" class="alert alert-warning mb-4">
+    <span>{{ error }}</span>
+  </div>
+{% endif %}
+
+{% if journeys|length > 1 %}
+  <div role="tablist" class="tabs tabs-boxed mb-4 justify-start">
+    {% for j in journeys %}
+      <a role="tab" class="tab {{ 'tab-active' if j.id == active.id }}"
+         hx-get="/ui/workforce/me?journey={{ j.id }}"
+         hx-target="#wf-tab" hx-swap="innerHTML">
+        {{ j.role }}{% if j.is_cover %} (cover){% endif %}
+      </a>
+    {% endfor %}
+  </div>
+{% endif %}
+
+{% if active.stage == 'suspended' %}
+  {% set lapsed = active.requirements | selectattr('status', 'equalto', 'expired')
+                                     | map(attribute='name') | list %}
+  <div role="alert" class="alert alert-error mb-4">
+    <span>Your access is suspended because a mandatory item has lapsed{% if lapsed %}:
+      {{ lapsed | join(', ') }}{% endif %}. Renew it and submit it again to have
+      it re-verified.</span>
+  </div>
+{% elif active.stage == 'operational' %}
+  <div role="alert" class="alert alert-success mb-4">
+    <span>Onboarding for {{ active.role }} is complete. Expiry dates are
+      tracked from here, and you and your lead are reminded at 90, 60, 30 and
+      7 days.</span>
+  </div>
+{% endif %}
+
+<div class="stats stats-vertical sm:stats-horizontal w-full bg-base-200 border border-base-300 mb-5">
+  <div class="stat">
+    <div class="stat-title">Verified</div>
+    <div class="stat-value text-primary">{{ done }}<span class="text-base-content/40"> / {{ total }}</span></div>
+    <div class="stat-desc">{{ active.role }}, version {{ active.version }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-title">Access gate</div>
+    <div class="stat-value {{ 'text-success' if active.gate_cleared else 'text-warning' }}">{{ active.gate_done }}<span class="text-base-content/40"> / {{ active.gate_total }}</span></div>
+    <div class="stat-desc">{{ 'cleared' if active.gate_cleared else 'holds your access' }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-title">Role readiness</div>
+    <div class="stat-value">{{ active.readiness_done }}<span class="text-base-content/40"> / {{ active.readiness_total }}</span></div>
+    <div class="stat-desc">training and certifications</div>
+  </div>
+  <div class="stat">
+    <div class="stat-title">Day</div>
+    <div class="stat-value {{ 'text-warning' if overdue }}">{{ active.days_elapsed }}<span class="text-base-content/40"> / {{ active.target_days }}</span></div>
+    <div class="stat-desc">{{ 'past the target' if overdue else 'of the target' }}</div>
+  </div>
+</div>
+
+<div class="card bg-base-200 border border-base-300 mb-5">
+  <div class="card-body p-5">
+    <div class="flex items-baseline gap-3 flex-wrap">
+      <h2 class="card-title text-base">Access gate</h2>
+      <span class="text-sm text-base-content/60">{{ active.gate_done }} of {{ active.gate_total }} verified</span>
+    </div>
+    <p class="text-sm text-base-content/70">
+      {% if active.gate_cleared %}
+        Every mandatory item is verified.
+        {% if has_access %}The permissions of your role are active, with no
+        new sign-in needed.{% else %}Access is held at person level while
+        another of your roles is still gated.{% endif %}
+      {% else %}
+        These must be verified before you can use ION. You record what you
+        have completed; your lead verifies it, so nothing here grants access
+        to yourself.
+      {% endif %}
+    </p>
+
+    {% if not gate %}
+      <p class="text-sm text-base-content/50 mt-2">This role has no gate items.</p>
+    {% else %}
+      <ul class="flex flex-col mt-2">
+        {% for r in gate %}
+          {% include "_fragments/_workforce_requirement.html" %}
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card bg-base-200 border border-base-300 {{ '' if active.gate_cleared else 'opacity-70' }}">
+  <div class="card-body p-5">
+    <div class="flex items-baseline gap-3 flex-wrap">
+      <h2 class="card-title text-base">Role readiness</h2>
+      <span class="text-sm text-base-content/60">{{ active.readiness_done }} of {{ active.readiness_total }} complete</span>
+    </div>
+    <p class="text-sm text-base-content/70">
+      {% if active.gate_cleared %}
+        The training and certifications your role requires. Courses complete
+        from your enrolment; certificates need your date and reference, then
+        verification.
+      {% else %}
+        This is what follows the gate. You can start recording items now, but
+        the gate above is what releases your access.
+      {% endif %}
+    </p>
+
+    {% if not readiness %}
+      <p class="text-sm text-base-content/50 mt-2">This role has no readiness items.</p>
+    {% else %}
+      <ul class="flex flex-col mt-2">
+        {% for r in readiness %}
+          {% include "_fragments/_workforce_requirement.html" %}
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    <p class="text-sm text-base-content/50 mt-3">
+      Training spend so far {{ money(active.spend) }}, with
+      {{ money(active.committed) }} committed.
+    </p>
+  </div>
+</div>
+
+{% endif %}

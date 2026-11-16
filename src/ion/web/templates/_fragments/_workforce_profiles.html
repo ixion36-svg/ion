@@ -1,0 +1,173 @@
+{# Role profiles: what each role requires before somebody may do it.
+
+   This was /workforce/profiles, "The schema". It sits above the
+   establishment because the two are halves of one decision -- what a role
+   requires, and how many of that role you are supposed to have -- and
+   reading one while editing the other used to mean changing page.
+
+   Publishing applies to new assignments only. That is stated on screen
+   rather than in a tooltip, because the opposite assumption (that editing
+   a profile changes what people already onboarding must do) is the
+   dangerous one.
+
+   Expects `profiles`, `profile_id`, `draft`, `ion_roles`, `kinds`,
+   `phases`. #}
+
+<div class="card bg-base-200 border border-base-300 mb-5">
+  <div class="card-body p-5">
+    <h2 class="card-title text-base">Role profiles</h2>
+    <p class="text-sm text-base-content/70">What a role requires: the
+      mandatory gate, and the training that follows it.</p>
+
+    <div class="grid gap-5 lg:grid-cols-[280px_1fr] items-start mt-2">
+
+      <div class="flex flex-col gap-3">
+        <ul class="flex flex-col gap-1">
+          {% if not profiles %}
+            <li class="text-sm text-base-content/50">None yet.</li>
+          {% endif %}
+          {% for p in profiles %}
+            <li>
+              <button type="button"
+                      class="btn btn-sm w-full justify-start {{ 'btn-primary' if p.id == profile_id else 'btn-ghost' }}"
+                      hx-get="/ui/workforce/setup?profile={{ p.id }}"
+                      hx-target="#wf-tab" hx-swap="innerHTML">
+                <span class="grow text-left">{{ p.name }}</span>
+                <span class="badge badge-xs {{ 'badge-success' if p.published_version else 'badge-ghost' }}">
+                  {{ 'v' ~ p.published_version if p.published_version else 'draft' }}
+                </span>
+              </button>
+            </li>
+          {% endfor %}
+        </ul>
+
+        <form class="border-t border-base-300 pt-3 flex flex-col gap-2"
+              hx-post="/ui/workforce/profiles" hx-target="#wf-tab" hx-swap="innerHTML">
+          <label class="label text-xs py-0" for="wf-new-name">New role name</label>
+          <input id="wf-new-name" name="name" type="text" required
+                 class="input input-sm input-bordered w-full" placeholder="SOC Analyst L1">
+          <label class="label text-xs py-0" for="wf-new-nice">NICE work role, if you use them</label>
+          <input id="wf-new-nice" name="nice_work_role" type="text"
+                 class="input input-sm input-bordered w-full" placeholder="Defensive Cybersecurity">
+          <button type="submit" class="btn btn-sm btn-primary mt-1">Create profile</button>
+        </form>
+      </div>
+
+      <div>
+        {% if not draft %}
+          <p class="text-sm text-base-content/60">Select a profile to edit what
+            it requires, or create one.</p>
+        {% else %}
+          <div class="flex items-center gap-3 flex-wrap">
+            <h3 class="text-sm font-semibold grow">
+              {{ draft.profile.name }}, version {{ draft.version }} draft
+            </h3>
+            <form hx-post="/ui/workforce/versions/{{ draft.version_id }}/publish"
+                  hx-target="#wf-tab" hx-swap="innerHTML">
+              <input type="hidden" name="profile" value="{{ draft.profile.id }}">
+              <button type="submit" class="btn btn-sm btn-primary">Publish</button>
+            </form>
+          </div>
+
+          <div role="alert" class="alert alert-info mt-2 text-sm">
+            <span>
+              {% if draft.live_version %}
+                Version {{ draft.live_version }} is live for {{ draft.people_on_live }}
+                {{ 'person' if draft.people_on_live == 1 else 'people' }}. Publishing applies
+                to new assignments only, so anyone already onboarding keeps the
+                version they started on.
+              {% else %}
+                Nothing published yet. The first published version is what can
+                be assigned.
+              {% endif %}
+            </span>
+          </div>
+
+          <form class="flex items-end gap-2 flex-wrap mt-4"
+                hx-post="/ui/workforce/profiles/{{ draft.profile.id }}/grants"
+                hx-target="#wf-tab" hx-swap="innerHTML" hx-trigger="change">
+            <div>
+              <label class="label text-xs py-0" for="wf-grants">Grants this ION role once the gate is verified</label>
+              <select id="wf-grants" name="role_id" class="select select-sm select-bordered min-w-[240px]">
+                <option value="">None, journey tracking only</option>
+                {% for r in ion_roles %}
+                  <option value="{{ r.id }}" {{ 'selected' if r.id == draft.profile.grants_role_id }}>
+                    {{ r.name }} ({{ r.permissions }} permissions)
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <span class="text-xs text-base-content/50 pb-2">Held back until every
+              mandatory item is verified, and removed again if one lapses.</span>
+          </form>
+
+          <h4 class="text-sm font-semibold mt-4">Requirements</h4>
+          {% if not draft.requirements %}
+            <p class="text-sm text-base-content/50">None yet. A profile with no
+              gate items grants its role as soon as it is assigned.</p>
+          {% else %}
+            <ul class="flex flex-col mt-1">
+              {% for r in draft.requirements %}
+                <li class="flex items-center gap-3 py-2 border-t border-base-300/60 first:border-t-0">
+                  <span class="badge badge-xs shrink-0 {{ 'badge-warning' if r.phase == 'gate' else 'badge-success' }}">
+                    {{ 'Gate' if r.phase == 'gate' else 'Role' }}
+                  </span>
+                  <span class="badge badge-xs badge-ghost shrink-0">{{ r.kind }}</span>
+                  <span class="grow text-sm">{{ r.name }}</span>
+                  <span class="text-xs text-base-content/50 shrink-0">
+                    {% if r.validity_months %}renew every {{ r.validity_months }} months{% else %}no expiry{% endif %}{% if r.cost %}, {{ money(r.cost) }}{% endif %}
+                  </span>
+                  <form hx-post="/ui/workforce/profile-requirements/{{ r.id }}/remove"
+                        hx-target="#wf-tab" hx-swap="innerHTML" class="shrink-0">
+                    <input type="hidden" name="profile" value="{{ draft.profile.id }}">
+                    <button type="submit" class="btn btn-xs btn-ghost"
+                            aria-label="Remove {{ r.name }}">Remove</button>
+                  </form>
+                </li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+
+          <form class="grid grid-cols-2 md:grid-cols-6 gap-2 items-end mt-4 pt-4 border-t border-base-300"
+                hx-post="/ui/workforce/versions/{{ draft.version_id }}/requirements"
+                hx-target="#wf-tab" hx-swap="innerHTML">
+            <input type="hidden" name="profile" value="{{ draft.profile.id }}">
+            <div class="col-span-2">
+              <label class="label text-xs py-0" for="wf-r-name">Add a requirement</label>
+              <input id="wf-r-name" name="name" type="text" required
+                     class="input input-sm input-bordered w-full" placeholder="BPSS vetting">
+            </div>
+            <div>
+              <label class="label text-xs py-0" for="wf-r-phase">Phase</label>
+              <select id="wf-r-phase" name="phase" class="select select-sm select-bordered w-full">
+                {% for ph in phases %}
+                  <option value="{{ ph }}">{{ 'Gate' if ph == 'gate' else 'Readiness' }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label class="label text-xs py-0" for="wf-r-kind">Kind</label>
+              <select id="wf-r-kind" name="kind" class="select select-sm select-bordered w-full">
+                {% for k in kinds %}<option value="{{ k }}">{{ k }}</option>{% endfor %}
+              </select>
+            </div>
+            <div>
+              <label class="label text-xs py-0" for="wf-r-validity">Valid, months</label>
+              <input id="wf-r-validity" name="validity_months" type="number" min="1" max="120"
+                     class="input input-sm input-bordered w-full">
+            </div>
+            <div>
+              <label class="label text-xs py-0" for="wf-r-cost">Cost</label>
+              <input id="wf-r-cost" name="cost" type="number" min="0" step="1" value="0"
+                     class="input input-sm input-bordered w-full">
+            </div>
+            <div class="col-span-2 md:col-span-6">
+              <button type="submit" class="btn btn-sm">Add requirement</button>
+            </div>
+          </form>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+</div>

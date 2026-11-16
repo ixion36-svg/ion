@@ -25,6 +25,24 @@ class Config:
     auto_save: bool = True
     max_versions_to_keep: int = 100
 
+    # The currency every stored amount is in, as an ISO 4217 code.
+    #
+    # ION had no such field and no currency column anywhere in the money
+    # path: training plan items, profile requirements and journey
+    # requirements all stored a bare float, and six templates rendered it
+    # with a hardcoded "£". That worked only because every price in the
+    # product happened to be GBP. It stops working the moment somebody
+    # records a GIAC attempt at its quoted $999, because nothing would
+    # convert it and nothing would notice -- the forecast would add it to
+    # the pounds and put a £ in front of the total.
+    #
+    # Defaulting to GBP keeps every existing row meaning exactly what it
+    # meant before. Changing it does NOT convert anything: it states what
+    # the stored numbers already are, so an estate that switches has to
+    # restate its own figures, which is the honest behaviour for a setting
+    # that cannot know a rate or a date.
+    currency: str = "GBP"
+
     # Base URL for OIDC redirect URIs (e.g., https://ion.example.org)
     base_url: str = "https://ion.guardedglass.internal"
 

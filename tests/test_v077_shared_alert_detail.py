@@ -462,3 +462,21 @@ def test_dead_fields_dropdown_machinery_is_gone(cases):
     for dead in ("_extractedValuesBlock", "renderFlatAlertFields", "addFieldsAsEvidence",
                  "_alertObsByFieldsId", "_fieldsIdToCaseId", "_alertKeyFieldsByFieldsId"):
         assert not re.search(rf"^(?:const|let|var|function|async function)\s+{dead}\b", js, re.M), dead
+
+
+def test_severity_and_status_are_escaped_wherever_they_reach_markup(module_js):
+    """Defect: a value the server usually normalises, trusted as if it always
+    were. A lab-fixture alert's severity is the triage row's free-text
+    `priority`, so the v1 head and the related-alerts list wrote a string an
+    analyst can set straight into another analyst's page."""
+    bare = re.findall(r"\$\{(?:alert|a)\.(?:severity|status)\}", module_js)
+    assert not bare, f"interpolated without escapeHtml: {sorted(set(bare))}"
+
+
+def test_the_local_escaper_escapes_even_without_app_js(module_js):
+    """Defect: an escaper that fails open. The wrapper returned the raw string
+    when `window.escapeHtml` was missing, so a load-order slip in base.html
+    would have opened every sink in the file at once."""
+    assert not re.search(r"window\.escapeHtml\(s\)\s*:\s*String\(", module_js)
+    wrapper = module_js[module_js.index("function escapeHtml(s)"):][:400]
+    assert ".replace(/[&<>\"']/g" in wrapper

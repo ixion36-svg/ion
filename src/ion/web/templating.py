@@ -176,6 +176,45 @@ def _safe_url(value: object, fallback: str = "") -> str:
     return fallback
 
 
+#: Symbols for the currencies an estate is likely to be configured in.
+#: Anything else renders as its ISO code and a space ("SEK 1,200"), which
+#: is correct rather than apologetic: a wrong symbol is worse than none.
+_CURRENCY_SYMBOLS: dict[str, str] = {
+    "GBP": "£", "USD": "$", "EUR": "€", "JPY": "¥",
+    "AUD": "A$", "CAD": "C$", "NZD": "NZ$", "CHF": "CHF ",
+}
+
+
+def _money(amount: object, currency: str | None = None) -> str:
+    """Format an amount in the estate's configured currency.
+
+    One definition, because there were six templates with a hardcoded "£"
+    in front of a bare float. That was right only while every price in
+    the product was GBP, and it is the half of the currency bug that
+    shows: a dollar figure rendered with a pound sign is not a display
+    nit, it is a wrong number on a budget screen.
+
+    `currency` overrides the configured one, for an amount that records
+    what it is denominated in. Without it the configured currency is
+    read per call, so changing the setting does not need a restart.
+
+    None renders as an em dash rather than as zero. "No price recorded"
+    and "free" are different claims and only one of them is a number.
+    """
+    if amount is None or amount == "":
+        return "—"
+    try:
+        value = float(amount)
+    except (TypeError, ValueError):
+        return "—"
+
+    code = (currency or getattr(get_config(), "currency", "GBP") or "GBP").upper()
+    symbol = _CURRENCY_SYMBOLS.get(code, f"{code} ")
+    # No decimals: every price in ION is a course or exam fee, and
+    # "£8,780.00" is noise next to "£8,780".
+    return f"{symbol}{value:,.0f}"
+
+
 def make_templates(directory: Path | None = None) -> Jinja2Templates:
     """Return a Jinja2Templates env configured identically across the app.
 
@@ -199,6 +238,9 @@ def make_templates(directory: Path | None = None) -> Jinja2Templates:
     # callables, not values, so a licence change is read per render without a
     # template reload.
     templates.env.globals["ts_parts"] = _ts_parts
+    # Callable, not a value, so the configured currency is read per render
+    # rather than frozen at startup.
+    templates.env.globals["money"] = _money
     templates.env.filters["safe_url"] = _safe_url
     templates.env.globals["nav_items"] = nav.NAV
     templates.env.globals["nav_mobile_items"] = nav.mobile_items
