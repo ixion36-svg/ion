@@ -1250,6 +1250,17 @@ def _run_migrations(engine: Engine) -> None:
                 f"{bool_type} NOT NULL DEFAULT 0" if not _is_postgres(engine)
                 else f"{bool_type} NOT NULL DEFAULT FALSE")
 
+    if insp.has_table("rule_investigation_templates"):
+        existing = {col["name"] for col in insp.get_columns("rule_investigation_templates")}
+        if "edited_by_id" not in existing:
+            _add_column_tolerant(
+                engine, "rule_investigation_templates", "edited_by_id",
+                "INTEGER REFERENCES users(id)")
+        if "edited_at" not in existing:
+            ts_type = "TIMESTAMPTZ" if _is_postgres(engine) else "DATETIME"
+            _add_column_tolerant(
+                engine, "rule_investigation_templates", "edited_at", ts_type)
+
     if insp.has_table("user_journeys"):
         existing = {col["name"] for col in insp.get_columns("user_journeys")}
         if "grace_until" not in existing:

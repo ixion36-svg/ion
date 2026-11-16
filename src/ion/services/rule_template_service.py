@@ -147,6 +147,36 @@ def upsert_generated(
     row.generated_from = json.dumps(evidence_ids or [])
     row.reviewed_by_id = None
     row.reviewed_at = None
+    row.edited_by_id = None
+    row.edited_at = None
+    session.commit()
+    session.refresh(row)
+    return row
+
+
+def edit_text(
+    session: Session, template_id: int, checklist_text: str, user_id: int
+) -> Optional[RuleInvestigationTemplate]:
+    """Replace Bob's text with a person's correction.
+
+    The guide goes back to pending review whatever its status was. Approval
+    is a statement about particular words, and these are different words:
+    an edit to an approved guide would otherwise put text nobody reviewed
+    in front of every analyst as the trusted default.
+    """
+    row = (
+        session.query(RuleInvestigationTemplate)
+        .filter(RuleInvestigationTemplate.id == template_id)
+        .one_or_none()
+    )
+    if row is None:
+        return None
+    row.checklist_text = checklist_text
+    row.status = STATUS_PENDING
+    row.reviewed_by_id = None
+    row.reviewed_at = None
+    row.edited_by_id = user_id
+    row.edited_at = datetime.now(timezone.utc)
     session.commit()
     session.refresh(row)
     return row
