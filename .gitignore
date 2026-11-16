@@ -1,10 +1,7 @@
-# Tailwind CLI binary. Superseded by frontend/package.json + the lockfile,
-# which every checkout and CI can install; kept ignored so an old local copy
-# does not get committed. Build with: cd frontend && npm ci && npm run build:css
+# Tailwind CLI binary (large, platform-specific — download locally)
 frontend/tailwindcss
 frontend/tailwindcss.exe
 frontend/tailwindcss-*
-frontend/node_modules/
 
 # Local scratch / prototype artifacts (not for the production image)
 dashboard_prototype.html

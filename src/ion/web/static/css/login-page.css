@@ -1,0 +1,26 @@
+/* The sign-in page. login.html does not extend base.html.
+ *
+ * These rules were its inline style block. The link takes that
+ * block's place, after ion.css and ion-migrated-styles.css, so
+ * .ion-tw-page still overrides the compiled min-height. That is
+ * the only selector shared with ion.css.
+ */
+/* Standalone pre-auth page has no 56px nav; .ion-tw-page subtracts that. */
+  .ion-tw-page { min-height: 100vh; }
+
+  /* Hairline grid overlay. Cannot share background-image with .ion-tw-page radials. */
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(to right, var(--ion-grid-line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--ion-grid-line) 1px, transparent 1px);
+    background-size: 56px 56px;
+    pointer-events: none;
+    opacity: 0.5;
+    z-index: 0;
+  }
+
+  /* JS toggles .show on #error-message. daisyUI .alert is visible by default. */
+  #error-message { display: none; }
+  #error-message.show { display: flex; }

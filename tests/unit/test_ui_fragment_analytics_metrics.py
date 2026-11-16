@@ -30,7 +30,6 @@ from pathlib import Path
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from page_css import page_css
 
 from ion.web.ui.analytics import IOC_DANGER_DAYS, PERMISSION, router
 
@@ -345,7 +344,8 @@ def test_the_distribution_bar_has_its_track(job):
     job(result={"threat_distribution": {"critical": 3}})
     html = _get(_reader(), VELOCITY).text
     assert "an-dist-track" in html
-    sheet = page_css("analytics")
+    sheet = (ROOT / "src/ion/web/static/css/analytics-page.css").read_text(
+        encoding="utf-8")
     rule = re.search(r"\.an-dist-track\s*\{([^}]*)\}", sheet)
     assert rule, "the track rule"
     for declaration in ("flex", "background", "border-radius", "height",

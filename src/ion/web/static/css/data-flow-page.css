@@ -1,0 +1,12 @@
+/* /data-flow. The Event ID in the source-event mock-up.
+
+   _ion-s-92fb99917f was font-weight:900 on that one value. It never
+   painted: body[data-page=data_flow] .df-winlog-row .val in the compiled
+   sheet is font-weight:600, one element plus one attribute plus two
+   classes, and the hashed class is a single class. This matches that
+   specificity and loads from head_css, after ion.css. The other .val
+   cells stay at 600. */
+
+body[data-page="data_flow"] .df-winlog-row .df-event-id {
+    font-weight: 900;
+}

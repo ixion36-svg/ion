@@ -1,20 +1,16 @@
 # Dead CSS round two, 2026-10-14
 
-> **Scope after the page-sheet retirement (2026-11-16).** The page sheets these
-> removals targeted were retired into `frontend/ion-pages.css` on
-> `feat/titanium-ui-contract`, so only the removals in `ion-legacy.css` and
-> `ion-migrated-styles.css` (13 rules) ship. The `ion-pages.css` removals are
-> deferred too: that sheet now holds the retired page sheets' rules, which carry
-> candidate classes nobody has reviewed, so the proof cannot cover it. The JSON
-> manifests keep only the shipped sheets. The page-sheet and `ion-pages.css`
-> decisions below are a worklist to re-apply against the scoped blocks, not a
-> record of what shipped.
+> **Re-applied after the titanium revert (2026-11-16).** Titanium left main, so these
+> removals land on the per-page sheets again. `threat-intel.css`, `cases-page.css` and
+> `ion-pages.css` changed on main after the review, so the manifest proves them against
+> the round-one commit on this branch; on `threat-intel.css` only the four stat-card
+> rules survive.
 
 Branch `codex/dead-css-round-two`, exact base
 `74d034481588bb55cd02612961fa6395f55c82e0` on `fix/dead-css-vetting`.
 
 The original worklist has 112 candidate classes, 86 whole-rule candidates and
-157 candidate-touching rule records. The new manifest records **62 REMOVE and
+157 candidate-touching rule records. The new manifest records **54 REMOVE and
 95 KEEP** decisions. All mixed selectors remain intact. No bulk `--write` or
 `--strict` deletion is used.
 
@@ -31,7 +27,7 @@ KEEP counts include mixed rules that were never wholly removable.
 | Sheet | Remove | Keep | Reason for retaining candidates |
 | --- | ---: | ---: | --- |
 | cases-page.css | 0 | 25 | Inline host prefix constructs a live fields table; showall is queried. Preserve the family and all mixed rules. |
-| threat-intel.css | 12 | 0 | Old wrappers have no source producer; current markup uses utilities. |
+| threat-intel.css | 4 | 0 | Old stat-card wrappers have no source producer. `.ti-page` is live again and left the candidate set; the header and search rules were already gone. |
 | integrations-page.css | 7 | 12 | Mixed flow-active compounds retained. topo-page-wrap is absent from markup, including history. |
 | alerts-page.css | 6 | 13 | Mixed header/table compounds retained. |
 | discover-page.css | 6 | 1 | Mixed container rule retained as a whole. |

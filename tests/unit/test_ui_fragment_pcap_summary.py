@@ -57,9 +57,7 @@ from ion.web.ui.pcap import PERMISSION, router
 
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = ROOT / "src/ion/web/templates/pcap.html"
-#: The page sheet was retired; these rules are nested under
-#: body[data-page="pcap"] in the one build.
-SHEET = ROOT / "frontend/ion-pages.css"
+SHEET = ROOT / "src/ion/web/static/css/pcap-page.css"
 
 SUMMARY = "/ui/pcap/7/summary"
 NETWORK = "/ui/pcap/7/network"
@@ -536,7 +534,5 @@ def test_the_page_no_longer_reads_the_verdict_unguarded():
 def test_the_page_links_the_sheet_that_carries_those_rules():
     """A sheet nobody links is the mistake that left the forensics
     preview bare, and it is the one these rules now depend on."""
-    page = PAGE.read_text(encoding="utf-8")
-    assert "pcap-page.css" not in page
-    assert "{% block page_id %}pcap{% endblock %}" in page
+    assert "pcap-page.css" in PAGE.read_text(encoding="utf-8")
     assert "<style" not in PAGE.read_text(encoding="utf-8")

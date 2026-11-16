@@ -23,8 +23,7 @@ from fastapi.testclient import TestClient
 
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = ROOT / "src/ion/web/templates/playbooks.html"
-#: Retired into the one build, nested under body[data-page="playbooks"].
-CSS = ROOT / "frontend/ion-pages.css"
+CSS = ROOT / "src/ion/web/static/css/playbooks-page.css"
 
 LIBRARY = "/ui/playbooks/library"
 VIEW = "/ui/playbooks/7"
@@ -101,9 +100,7 @@ def test_the_page_has_no_inline_style_block():
     text = _src(PAGE)
     assert "<style" not in text
     assert CSS.is_file()
-    page = PAGE.read_text(encoding="utf-8")
-    assert "playbooks-page.css" not in page, "the retired sheet is linked again"
-    assert "{% block page_id %}playbooks{% endblock %}" in page
+    assert 'href="/static/css/playbooks-page.css' in PAGE.read_text(encoding="utf-8")
 
 
 def test_the_library_and_the_badge_load_through_htmx_and_the_names_stay():

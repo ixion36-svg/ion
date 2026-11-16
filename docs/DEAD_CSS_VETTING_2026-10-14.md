@@ -1,12 +1,5 @@
 # Dead CSS vetting, 2026-10-14
 
-> **Scope after the page-sheet retirement (2026-11-16).** The page sheets these
-> removals targeted were retired into `frontend/ion-pages.css` on
-> `feat/titanium-ui-contract`, so only the removals in `ion-legacy.css`,
-> `ion-migrated-styles.css` and `ion-pages.css` (22 rules) ship. The JSON
-> manifests keep only those sheets. The page-sheet decisions below are a
-> worklist to re-apply against the scoped blocks, not a record of what shipped.
-
 Base release `9edf38f91f3c10ba3884fbc69187b0eb02bec0d6`.
 Branch `codex/dead-css-vetting`.
 
