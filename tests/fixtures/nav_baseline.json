@@ -95,6 +95,10 @@
       "/de-metrics",
       "group:Reporting"
     ],
+    "/de-oversight": [
+      "/de-oversight",
+      "group:Engineering"
+    ],
     "/de-proposals": [
       "/de-proposals",
       "group:Engineering"
@@ -406,6 +410,10 @@
           {
             "href": "/de-bob",
             "label": "Bob Improvement"
+          },
+          {
+            "href": "/de-oversight",
+            "label": "Abuse Monitor"
           },
           {
             "href": "/cyab",
