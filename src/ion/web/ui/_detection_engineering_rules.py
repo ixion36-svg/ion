@@ -53,9 +53,13 @@ def _coverage(playbooks: list[dict[str, Any]] | None) -> None:
         return
     for playbook in playbooks:
         coverage = playbook.get('technique_coverage')
+        # The coverage query groups by technique, so a technique with no rules
+        # has no row. When every batch was answered, a missing row is zero
+        # rules, not an unknown.
+        absent = {'rule_count': 0, 'enabled_rules': 0} if playbook.get('technique_coverage_measured') is True else None
         for step in playbook.get('steps') or []:
             techniques = step.get('techniques')
-            counts = [coverage.get(tid) for tid in techniques] if isinstance(coverage, dict) and isinstance(techniques, list) else None
+            counts = [coverage.get(tid, absent) for tid in techniques] if isinstance(coverage, dict) and isinstance(techniques, list) else None
             total = enabled = None
             if counts and all(isinstance(c, dict) and isinstance(c.get('rule_count'), (int, float)) and isinstance(c.get('enabled_rules'), (int, float)) for c in counts):
                 total = sum(c['rule_count'] for c in counts)
@@ -65,15 +69,20 @@ def _coverage(playbooks: list[dict[str, Any]] | None) -> None:
             step['coverage_state'] = 'unknown' if total is None else 'covered' if enabled > 0 else 'partial' if total > 0 else 'blind'
 
 
-@router.get('/detection-engineering/killchains', response_class=HTMLResponse)
-def killchains(request: Request, session: Session = Depends(get_db_session)):
-    playbooks = None
+def use_cases(session: Session | None) -> list[dict[str, Any]] | None:
+    """TIDE use cases with each step's coverage_state, or None when unread."""
     try:
         playbooks = _objects(deepcopy(de_tide_api.tide_de_use_cases(session=session)))
         _coverage(playbooks)
+        return playbooks
     except Exception:
         logger.exception('Could not read detection use cases')
-        playbooks = None
+        return None
+
+
+@router.get('/detection-engineering/killchains', response_class=HTMLResponse)
+def killchains(request: Request, session: Session = Depends(get_db_session)):
+    playbooks = use_cases(session)
     view: KillChainsView = {'state': _state(playbooks), 'playbooks': playbooks}
     return render_view(request, '_fragments/detection_engineering_killchains.html', view)
 

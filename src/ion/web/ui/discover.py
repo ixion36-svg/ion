@@ -49,7 +49,6 @@ from typing import Any, Optional, TypedDict
 
 from fastapi import APIRouter, Depends, Form, Request, Response
 from fastapi.responses import HTMLResponse
-
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import get_current_user, require_permission

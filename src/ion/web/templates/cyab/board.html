@@ -1,0 +1,97 @@
+{% extends "cyab/_layout.html" %}
+{% from "cyab/_macros.html" import stage_pill, meter %}
+{% block heading %}Onboarding board{% endblock %}
+{% block body %}
+
+<section class="card bg-base-200 border border-base-300 mb-4" aria-label="Pipeline">
+  <div class="card-body p-4 gap-3">
+    <div class="flex flex-wrap items-baseline gap-3">
+      <h2 class="font-semibold">Pipeline</h2>
+      <span class="text-xs text-base-content/60">{{ total }} systems · {{ signed_pct }}% signed off</span>
+    </div>
+    {% if total %}
+    <ol class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2">
+      {% for key, label, n in pipeline %}
+        <li>
+          <a href="/cyab/systems?stage={{ key }}" class="block rounded-box border border-base-300 bg-base-100/40 px-3 py-2 hover:border-primary transition-colors">
+            <div class="text-[0.65rem] uppercase tracking-widest text-base-content/50">{{ loop.index }} · {{ label }}</div>
+            <div class="text-2xl font-semibold font-mono tabular-nums {{ 'text-error' if key == 'review_due' and n else ('text-success' if key == 'signed' else '') }}">{{ n }}</div>
+          </a>
+        </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+      <p class="text-sm text-base-content/70">No systems yet. {% if can_edit %}<a href="/cyab/onboard" class="link link-primary">Onboard the first one</a>, or send stakeholders the <a href="/cyab/scoping" class="link">scoping questionnaire</a>.{% endif %}</p>
+    {% endif %}
+  </div>
+</section>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <section class="card bg-base-200 border border-base-300 lg:col-span-2" aria-label="My queue">
+    <div class="card-body p-4 gap-3">
+      <div class="flex items-baseline gap-3">
+        <h2 class="font-semibold">My queue</h2>
+        <span class="text-xs text-base-content/60">systems you own that are not signed off</span>
+        <div class="grow"></div>
+        {% if queue_total > queue|length %}<a href="/cyab/systems?view=mine" class="link text-xs">All {{ queue_total }}</a>{% endif %}
+      </div>
+      {% if queue %}
+        <ul>
+          {% for s, r in queue %}
+            <li class="border-t border-base-300/60 first:border-t-0 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-1">
+              <a href="/cyab/systems/{{ s.id }}/{{ r.tab }}" class="font-medium link link-hover min-w-0 truncate">{{ s.name }}</a>
+              {{ stage_pill(r.stage, stage_labels) }}
+              <span class="text-sm text-base-content/70 grow min-w-0">{{ r.next_action }}</span>
+              {{ meter(r.pct) }}
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="text-sm text-base-content/60">Nothing waiting on you. Systems list you as owner when their SOC owner is your name.</p>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="card bg-base-200 border border-base-300" aria-label="Needs attention">
+    <div class="card-body p-4 gap-2">
+      <h2 class="font-semibold">Needs attention</h2>
+      <ul class="flex flex-col gap-1">
+        {% for view, label, n in attention %}
+          <li>
+            <a href="/cyab/systems?view={{ view }}" class="flex items-center gap-3 rounded-field px-2 py-1.5 hover:bg-base-300">
+              <span class="text-sm grow">{{ label }}</span>
+              <span class="badge badge-sm font-mono {{ 'badge-error badge-soft' if n else 'badge-ghost' }}">{{ n }}</span>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+</div>
+
+<section class="card bg-base-200 border border-base-300 mt-4" aria-label="Recent activity">
+  <div class="card-body p-4 gap-2">
+    <div class="flex items-baseline">
+      <h2 class="font-semibold">Recent activity</h2>
+      <div class="grow"></div>
+      <a href="/cyab/history" class="link text-xs">History</a>
+    </div>
+    {% if activity %}
+      <ul>
+        {% for e in activity %}
+          <li class="border-t border-base-300/60 first:border-t-0 py-2 flex flex-wrap items-baseline gap-x-2 text-sm">
+            <span class="font-medium">{{ e.who }}</span>
+            <span class="text-base-content/70">{{ e.text }}</span>
+            <span class="text-base-content/50">on</span>
+            <a href="/cyab/systems/{{ e.system_id }}/summary" class="link link-hover">{{ e.system }}</a>
+            <span class="grow"></span>
+            <time class="text-xs text-base-content/50 font-mono" datetime="{{ e.at.isoformat() }}">{{ e.at.strftime('%d %b %H:%M') }}</time>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="text-sm text-base-content/60">Nothing yet.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

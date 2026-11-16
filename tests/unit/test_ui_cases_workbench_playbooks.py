@@ -195,14 +195,16 @@ def test_an_unreadable_pins_payload_is_not_an_empty_workbench(pins):
     assert "not in a shape" in body
 
 
-def test_a_genuinely_empty_workbench_still_says_no_pins(pins):
+def test_a_genuinely_empty_workbench_is_one_line(pins):
+    """Three empty drop columns took 248 px with nothing to drag."""
     pins(payload={"pins": []})
-    body = flat(_get(WORKBENCH, _reader()).text)
-    assert body.count("no pins") == 3, body
+    html = _get(WORKBENCH, _reader()).text
+    assert "No pins yet" in flat(html)
+    assert "data-col=" not in html
 
 
 def test_the_three_columns_are_unchanged(pins):
-    pins(payload={"pins": []})
+    pins(payload={"pins": [_pin(id=1, finding_status="confirmed", title="one")]})
     html = _get(WORKBENCH, _reader()).text
     for key in ("triage", "confirmed", "reported"):
         assert 'data-col="%s"' % key in html, key

@@ -4,6 +4,23 @@ import pytest
 from fastapi.testclient import TestClient
 
 
+def _pin_engine(engine):
+    """Bind the module-level engine and session-factory caches to this test's
+    database now, rather than leaving them for whoever asks first.
+
+    Left empty, the first caller fills them, and a caller holding the
+    unpatched get_engine (a middleware built on the first request in a worker,
+    or a thread left running by an earlier test) fills them with the default
+    database. Every route after that reads the wrong one, so tests that pass
+    alone fail in a full parallel run depending on what ran before them.
+    """
+    from sqlalchemy.orm import sessionmaker
+
+    import ion.storage.database as database
+    database._engine = engine
+    database._session_factory = sessionmaker(bind=engine, expire_on_commit=False)
+
+
 @pytest.fixture
 def client(temp_db, monkeypatch):
     """TestClient with the FastAPI app and a fresh DB.
@@ -18,6 +35,7 @@ def client(temp_db, monkeypatch):
     # sees; reset it before each test so the per-test temp_db is actually used.
     from ion.storage.database import reset_engine
     reset_engine()
+    _pin_engine(temp_db)
     from ion.models.user import User
     from ion.web.server import app
 

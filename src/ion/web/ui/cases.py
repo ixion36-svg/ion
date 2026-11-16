@@ -81,6 +81,7 @@ from __future__ import annotations
 
 import logging
 import math
+import re
 from datetime import datetime, timezone
 from typing import Any, Optional, TypedDict
 
@@ -931,6 +932,27 @@ class TimelineEvent(TypedDict):
     title: Optional[str]
     detail: Optional[str]
     truncated: bool
+    source_type: Optional[str]
+
+
+class TimelineRun(TypedDict):
+    """Consecutive alert-link events, shown as one folded line.
+
+    A case of ten alerts drew ten "Alert linked" cards, about 850 px of a
+    1,474 px timeline, between the events an analyst reads it for.
+    """
+
+    count: int
+    first: Optional[str]
+    last: Optional[str]
+    events: list[TimelineEvent]
+
+
+class TimelineEntry(TypedDict):
+    """Exactly one of the two is set."""
+
+    event: Optional[TimelineEvent]
+    run: Optional[TimelineRun]
 
 
 class TimelineCounts(TypedDict):
@@ -944,6 +966,7 @@ class TimelineCounts(TypedDict):
 
 class TimelineView(TypedDict):
     events: Optional[list[TimelineEvent]]
+    entries: Optional[list[TimelineEntry]]
     narrative: Optional[TimelineNarrative]
     counts: TimelineCounts
 
@@ -1023,7 +1046,36 @@ def timeline_event(raw: Any) -> Optional[TimelineEvent]:
         "title": str(title) if title is not None else None,
         "detail": text[:TIMELINE_DETAIL_CHARS] if text else None,
         "truncated": bool(text) and len(text) > TIMELINE_DETAIL_CHARS,
+        "source_type": raw.get("source_type") if isinstance(raw.get("source_type"), str) else None,
     }
+
+
+def _is_alert_link(event: TimelineEvent) -> bool:
+    return event["kind_key"] == "system" and event["source_type"] == "alert"
+
+
+def timeline_entries(events: list[TimelineEvent]) -> list[TimelineEntry]:
+    """The events, with each run of two or more alert links folded into one."""
+    entries: list[TimelineEntry] = []
+    run: list[TimelineEvent] = []
+
+    def flush() -> None:
+        if len(run) == 1:
+            entries.append({"event": run[0], "run": None})
+        elif run:
+            entries.append({"event": None, "run": {
+                "count": len(run), "first": run[0]["when"],
+                "last": run[-1]["when"], "events": list(run)}})
+        run.clear()
+
+    for event in events:
+        if _is_alert_link(event):
+            run.append(event)
+            continue
+        flush()
+        entries.append({"event": event, "run": None})
+    flush()
+    return entries
 
 
 def timeline_counts(raw: Any) -> TimelineCounts:
@@ -1047,12 +1099,13 @@ def timeline_view(payload: Any) -> TimelineView:
     """
     found = _rows(payload, "events")
     if found is None:
-        return {"events": None, "narrative": None,
+        return {"events": None, "entries": None, "narrative": None,
                 "counts": timeline_counts(None)}
     raw = payload if isinstance(payload, dict) else {}
+    events = [e for e in (timeline_event(r) for r in found) if e is not None]
     return {
-        "events": [e for e in (timeline_event(r) for r in found)
-                   if e is not None],
+        "events": events,
+        "entries": timeline_entries(events),
         "narrative": narrative_view(raw.get("narrative")),
         "counts": timeline_counts(raw.get("counts")),
     }
@@ -1943,6 +1996,7 @@ class PanelNote(TypedDict):
     user: Optional[str]
     when: Optional[str]
     raw: str
+    from_kibana: bool
 
 
 class PanelTag(TypedDict):
@@ -2196,9 +2250,20 @@ def panel_alerts(alerts: Any, case_severity: str) -> Optional[list[PanelAlert]]:
     return out
 
 
+# The sync stores a Kibana comment as an ION note with this prefix
+# (kibana_sync_service), which is also how it recognises one it already has.
+_KIBANA_NOTE = re.compile(r"\A\[From Kibana - (?P<author>[^\]]*)\] ?")
+
+
 def panel_notes(notes: Any) -> Optional[list[PanelNote]]:
     """The notes, raw. Markdown rendering stays client-side because ION
-    has no HTML sanitiser, which ui/template_render.py records."""
+    has no HTML sanitiser, which ui/template_render.py records.
+
+    A note imported from Kibana is shown under its Kibana author with the
+    sync's prefix removed. This list is the one place notes and Kibana
+    comments appear: the separate Kibana Comments section listed each
+    comment a second time.
+    """
     if not isinstance(notes, list):
         return None
     out: list[PanelNote] = []
@@ -2207,12 +2272,19 @@ def panel_notes(notes: Any) -> Optional[list[PanelNote]]:
             continue
         identifier = entry.get("id")
         content = entry.get("content")
+        raw = content if isinstance(content, str) else ""
+        user = _panel_text(entry.get("user"))
+        imported = _KIBANA_NOTE.match(raw)
+        if imported:
+            user = imported.group("author").strip() or user
+            raw = raw[imported.end():]
         out.append({
             "note_id": ("cnote-%s" % identifier if identifier is not None
                         else "cnote-i%d" % index),
-            "user": _panel_text(entry.get("user")),
+            "user": user,
             "when": instant_label(entry.get("created_at")),
-            "raw": content if isinstance(content, str) else "",
+            "raw": raw,
+            "from_kibana": imported is not None,
         })
     return out
 

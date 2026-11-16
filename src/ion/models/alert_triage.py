@@ -98,6 +98,9 @@ class AlertCase(Base, TimestampMixin):
     # Kibana Cases integration
     kibana_case_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     kibana_case_version: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    # The Kibana status ION and Kibana last agreed on. The sync loop compares
+    # each side against it to tell which one changed; NULL until first agreed.
+    kibana_synced_status: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
     # DFIR-IRIS integration
     dfir_iris_case_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)

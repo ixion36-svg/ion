@@ -7,9 +7,9 @@ End-to-end pipeline that pulls OPEN alerts from Elasticsearch and runs:
     prompt template + memory context)  →  severity verdict  →  writeback
     to the Investigation row + the source alert.
 
-The service is designed to sit behind a single-worker Postgres advisory
-lock (``LOCK_INVESTIGATION_BG``) so uvicorn's N worker processes don't
-duplicate each other's work.
+Nothing runs it on alert arrival. Bob investigates a case when the case is
+created (by hand, from Kibana, or by the case grouper); the open-alert
+sweep runs only when an analyst starts it from the investigation API.
 
 Design notes
 ------------
@@ -33,7 +33,6 @@ import json
 import logging
 import os
 import re
-import threading
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
@@ -45,7 +44,6 @@ from ion.storage import investigation_memory_repository as inv_repo
 from ion.storage.database import (
     get_engine,
     get_session_factory,
-    run_locked,
 )
 
 logger = logging.getLogger(__name__)
@@ -357,24 +355,6 @@ def _should_escalate_deep_pass(
     if not _severity_is_high(severity, parsed.get("severity")):
         return False
     return _compute_confidence(parsed) < _get_bob_confidence_threshold(template)
-
-
-def should_run_per_alert_sweep(config) -> bool:
-    """Whether the standalone per-alert investigation sweep should run.
-
-    Bob's automatic runs are meant to come from the case grouper (one cluster
-    investigation per case at case creation). The old per-alert background sweep
-    ran ``investigate_alert`` over every open alert and mostly timed out. So it is
-    OFF whenever the case grouper is the active investigator, and only runs as a
-    fallback when the grouper isn't investigating (and the loop is enabled).
-    """
-    if not getattr(config, "investigation_loop_enabled", True):
-        return False
-    grouper_investigating = (
-        getattr(config, "case_grouper_enabled", True)
-        and getattr(config, "case_grouper_auto_investigate", True)
-    )
-    return not grouper_investigating
 
 
 def _render_bob_case_note(parsed: Dict[str, Any], cluster_size: int,
@@ -799,7 +779,6 @@ _FIRST_JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
 # Default sweep batch — kept in sync with the env-var default documented
 # in the Integration Checklist.
 _DEFAULT_MAX_PER_SWEEP = 50
-_DEFAULT_SWEEP_INTERVAL_S = 900
 # bumped 120 → 300. Real investigation prompts on an 8B model
 # (full alert context + observables + history + MITRE chain) routinely
 # take 130-180s warm (longer cold / on CPU); the previous 120s gate was firing in the middle of a
@@ -1349,10 +1328,6 @@ def _parse_llm_json(content: str) -> Dict[str, Any]:
 
 class InvestigationService:
     """Autonomous investigation pipeline for OPEN ES alerts."""
-
-    def __init__(self) -> None:
-        self._stop_event = threading.Event()
-        self._loop_thread: Optional[threading.Thread] = None
 
     # ------------------------------------------------------------------ #
     # Dependency accessors (lazy, so missing services fail softly)
@@ -3383,57 +3358,6 @@ class InvestigationService:
 
         return summary
 
-    # ------------------------------------------------------------------ #
-    # Background loop (threading-based, asyncio.run per iteration)
-    # ------------------------------------------------------------------ #
-
-    def run_investigation_sweep_loop(
-        self,
-        interval_s: int = _DEFAULT_SWEEP_INTERVAL_S,
-    ) -> None:
-        """Spawn the background sweep thread (idempotent)."""
-        if self._loop_thread is not None and self._loop_thread.is_alive():
-            logger.info("Investigation sweep loop already running — skipping")
-            return
-
-        def _loop() -> None:
-            logger.info(
-                "Investigation sweep loop started (interval=%ds)", interval_s
-            )
-            while not self._stop_event.is_set():
-                try:
-                    max_per = _DEFAULT_MAX_PER_SWEEP
-                    try:
-                        from ion.core.config import get_config
-                        cfg = get_config()
-                        max_per = int(
-                            getattr(cfg, "investigation_max_per_sweep", _DEFAULT_MAX_PER_SWEEP)
-                        )
-                    except Exception:
-                        pass
-                    with apm.background_transaction("investigation_sweep_loop"):
-                        result = asyncio.run(
-                            self.investigate_open_alerts_sweep(max_alerts=max_per)
-                        )
-                    logger.info(
-                        "Investigation sweep complete: %s",
-                        json.dumps(result, default=str),
-                    )
-                except Exception as exc:
-                    logger.warning("Investigation sweep iteration error: %s", exc)
-                self._stop_event.wait(interval_s)
-            logger.info("Investigation sweep loop stopped")
-
-        self._loop_thread = threading.Thread(
-            target=_loop, daemon=True, name="ion-investigation-sweep"
-        )
-        self._loop_thread.start()
-
-    def stop_investigation_sweep_loop(self) -> None:
-        """Signal the background thread to exit on its next poll boundary."""
-        self._stop_event.set()
-
-
 # ---------------------------------------------------------------------------
 # Singleton
 # ---------------------------------------------------------------------------
@@ -3452,84 +3376,4 @@ def get_investigation_service() -> InvestigationService:
 def reset_investigation_service() -> None:
     """Reset the singleton — used in tests / config reloads."""
     global _investigation_service
-    if _investigation_service is not None:
-        _investigation_service.stop_investigation_sweep_loop()
     _investigation_service = None
-
-
-# ---------------------------------------------------------------------------
-# Startup hook (leader-elected via pg advisory lock 1016)
-# ---------------------------------------------------------------------------
-
-
-def start_investigation_loop_if_enabled(engine=None) -> bool:
-    """Leader-elected wrapper that starts the sweep loop under a pg lock.
-
-    Honours the ``ION_INVESTIGATION_LOOP_ENABLED`` env var + config
-    attribute (default True). Uses ``LOCK_INVESTIGATION_BG = 1016`` —
-    the new constant documented in the Integration Checklist. Falls back
-    to ``LOCK_KIBANA_BG_SYNC`` as a dev-mode sentinel **only if** the
-    real lock constant hasn't been added to ``storage/database.py`` yet;
-    in that degenerate case we refuse to start to avoid colliding with
-    an existing loop, and log a warning so the operator fixes it.
-
-    Returns True if this worker actually started the loop, False
-    otherwise (disabled, another worker holds the lock, or the lock
-    constant is missing).
-    """
-    import os
-
-    # Resolve enabled flag — env wins, then Config, then default True.
-    env_flag = os.environ.get("ION_INVESTIGATION_LOOP_ENABLED", "").strip().lower()
-    if env_flag in ("false", "0", "no", "off"):
-        logger.info("Investigation loop disabled via ION_INVESTIGATION_LOOP_ENABLED")
-        return False
-
-    try:
-        from ion.core.config import get_config
-        cfg = get_config()
-        if env_flag == "" and not getattr(cfg, "investigation_loop_enabled", True):
-            logger.info("Investigation loop disabled via config.investigation_loop_enabled")
-            return False
-        interval_s = int(
-            getattr(cfg, "investigation_sweep_interval_s", _DEFAULT_SWEEP_INTERVAL_S)
-        )
-    except Exception:
-        interval_s = _DEFAULT_SWEEP_INTERVAL_S
-    env_interval = os.environ.get("ION_INVESTIGATION_SWEEP_INTERVAL_S")
-    if env_interval:
-        try:
-            interval_s = int(env_interval)
-        except ValueError:
-            pass
-
-    # Pick the lock id — prefer the canonical constant, require it for
-    # production so we never race another loop.
-    try:
-        from ion.storage.database import LOCK_INVESTIGATION_BG  # type: ignore
-        lock_id = LOCK_INVESTIGATION_BG
-    except ImportError:
-        logger.warning(
-            "LOCK_INVESTIGATION_BG not found in storage.database — refusing to "
-            "start sweep loop. Add `LOCK_INVESTIGATION_BG = 1016` to "
-            "src/ion/storage/database.py (see Integration Checklist)."
-        )
-        return False
-
-    if engine is None:
-        engine = get_engine()
-
-    service = get_investigation_service()
-
-    def _start() -> None:
-        service.run_investigation_sweep_loop(interval_s=interval_s)
-
-    return run_locked(
-        engine,
-        lock_id,
-        "investigation_bg_loop",
-        _start,
-        hold_until_close=True,
-    )
-
-

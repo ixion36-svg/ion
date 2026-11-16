@@ -370,3 +370,21 @@ def test_the_overlay_still_refuses_to_draw_a_missing_endpoint():
     assert draw, "drawAttackPathEdges"
     assert _re.search(r"if \(!s \|\| !t\)\s*return", draw.group(0)), (
         "the overlay must skip an edge whose endpoint was not rendered")
+
+
+def test_a_path_with_no_connections_folds_to_one_line(path):
+    """CASE-0239's ten unconnected hosts drew a 672 px column of boxes."""
+    path(payload=_payload(edges=[], stats={"nodes": 2, "alerts": 4,
+                                           "edges": {"total": 0}}))
+    html = _get(_reader()).text
+    body = flat(html)
+    assert '<details class="apg-unlinked">' in html
+    assert "2 nodes, no connections between them" in body
+    assert "data-apg-node" in html
+
+
+def test_a_connected_path_is_drawn_open(path):
+    path(payload=_payload())
+    html = _get(_reader()).text
+    assert "apg-unlinked" not in html
+    assert "apg-graph" in html

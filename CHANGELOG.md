@@ -1,13 +1,325 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.13 -->
-<!-- ion-doc:version=0.99.13 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.17 -->
+<!-- ion-doc:version=0.99.17 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-10-16 -->
+<!-- ion-doc:date=2026-11-11 -->
 
 # Changelog
+
+## v0.99.17 — 2026-11-11
+
+ION now works with TIDE 6.4.0 and with Arkime 5's real-time monitoring, both
+checked against live instances. Kibana case sync follows whichever side
+changed a status, the Detection Engineering and Threat Intel pages are
+condensed, and the cases summary stays fast as closed cases pile up.
+Net-new findings: 0C / 0H / 0M / 0L. One MEDIUM finding closed: chat could
+quote another analyst's private notes.
+
+### Added
+
+- **Detection Engineering in five tabs.** Ten tabs and a tall header become
+  a one-line header and Overview, Coverage, Use cases, Rules and Readiness.
+  The overview gathers posture, coverage by tactic, rule quality, use-case
+  readiness, firing rules and a needs-action list. Coverage is an ATT&CK
+  grid with one square per technique, filterable to one system, with D3FEND
+  as a toggle. Old tab links still open the right view.
+- **Threat Intel in five tabs.** Overview, Adversaries, Indicators, Reports
+  and KEV. The overview leads with what works without OpenCTI, and one
+  prompt replaces the empty panels when it isn't connected. KEV pages 50
+  rows at a time with search, ransomware-linked and date filters.
+
+### Changed
+
+- **Chat and Bob read the whole document store.** Embeddings cover every
+  active document, not only the Knowledge Base folder. The document
+  embedder also stopped at the newest 160 documents, so most of the
+  built-in knowledge base was never embedded; it now works through all of
+  them. Chat's knowledge-base, playbook and notes sources are on by
+  default, and existing users get them switched on once.
+- **Kibana status sync follows the side that changed.** Each case stores
+  the status ION and Kibana last agreed on, instead of comparing timestamps
+  from two machines, so a grouper tick or a Kibana comment no longer undoes
+  a real status change. A reopen in Kibana now reopens the ION case.
+- **Alerts added to an existing case reach Kibana.** Add to Case, grouper
+  extends and Arkime commits attached nothing in Kibana after a case was
+  created. The first sync after upgrading attaches the backlog.
+- **The cases summary counts in the database.** It read every closed case
+  into Python on each load: 454 ms at 100,000 cases, now 109 ms.
+- **Real-time Arkime groups its cases.** One case per problem per day
+  (source and domain for DNS, the flow otherwise), not one per Arkime
+  session; a DNS tunnel used to open a case per query.
+
+### Fixed
+
+- **TIDE 6.4.0.** The ATT&CK catalogue comes from ION (TIDE 6 no longer
+  serves it), baselines are listed once rather than once per system, rule
+  quality is banded on TIDE's percentage scale (80/50/25), and SOC Health
+  no longer reads a 46% average as 116%. A comment containing "load" got
+  the whole posture query refused, and three refused queries opened the
+  TIDE circuit breaker and cut every other TIDE read. Checked against a
+  live 6.4.0: all 87 queries answered.
+- **Real-time Arkime on Arkime 5.** ION asked for Moloch-era field names
+  that Arkime 3+ no longer has, so every detector dropped every session.
+  Every session read now uses Arkime's current names. Refused queries and
+  failed PCAP fetches are errors rather than empty results, and DNS to an
+  external resolver no longer scores as a beacon. Checked against a live
+  Arkime 5.5: cleartext credentials, a command channel, a DNS tunnel and a
+  beacon each opened one case.
+- **Firing counts above 10,000** read as exactly 10,000; the alert total is
+  now counted exactly.
+- **Use-case steps with no rules** said "Coverage unavailable"; they say
+  "No rules" when the count succeeded.
+
+### Security
+
+- **Chat quoted other analysts' private notes (MEDIUM).** The notes source
+  searched every user's personal notes and labelled them "Your Note"; any
+  user could switch it on. It now searches only the asker's notes.
+- **Chat retrieval respects read permissions.** Documents are searched only
+  for `document:read` holders and playbooks only for `playbook:read`,
+  because `/api/ai/*` checks sign-in alone.
+
+## v0.99.16 — 2026-11-10
+
+CyAB returns, rebuilt around one question per system: what is left to do,
+and who does it. Alongside it: ATT&CK v20.1 detection guidance, SSVC patch
+decisions, VEX documents for the SBOM, glass surfaces in dark mode, a
+shorter case window, and settings saves that reach every web worker.
+Net-new findings: 0C / 0H / 0M / 0L. CyAB's restored API carried writes
+gated on read access; they are closed here, before any release shipped
+them.
+
+### Added
+
+- **CyAB is back, rebuilt.** The Cyber Assurance Baseline module was
+  archived in v0.99.6. On v0.99.4 several of its pages did not work: intake
+  save, "+ Add source", sign-off, use-case status and every row action. It
+  returns as five places:
+  - the **Board** (`/cyab`) shows the stage pipeline, your queue, what needs
+    attention and recent activity;
+  - **Systems** (`/cyab/systems`) is one filtered set shown as a list or a
+    matrix, with saved views, paging, bulk owner and SAL changes, and CSV
+    export. `/cyab/coverage` now redirects to the matrix;
+  - **a system page** shows its stage, readiness and next action, with a
+    linkable tab for the summary, profile and intake, sources, a use-case
+    grid, and docs and sign-off;
+  - **Onboard** is one form that creates a draft system;
+  - **History** (`/cyab/history`) replaces Audit, with CSV export.
+
+  A system moves through profile, sources, intake, use cases, docs and
+  sign-off. Its stage and readiness are computed from its records rather
+  than stored, so they cannot drift.
+- **CyAB sign-off you can rely on.** A sign-off is the signed-in user's,
+  kept as a record (`cyab_signoffs`). It needs both department and SOC, and
+  it opens only once the earlier steps are complete. Signing starts the
+  review clock. A missing document can be accepted with a reason, an
+  approver and an end date (`cyab_checklist_exceptions`), and it opens
+  again when that date passes.
+- **SAL 1 to 5**, as `docs/CyAB_SAL.md` defines them. The UI offered three
+  levels and the level changed nothing. It now decides which documents are
+  required, the review interval (730 days down to 91), and the longest a gap
+  may stay accepted.
+
+- **ATT&CK v20.1 detection guidance.** ION pinned ATT&CK v15.1. Since v18 the
+  catalogue carries detection guidance as Detection Strategies and Analytics
+  rather than a free-text field, so the old snapshot had none. The bundled
+  data now holds 706 strategies and 1,758 analytics, and Detection Health
+  gains an ATT&CK drill-down per rule (`GET /ui/detection-health/attack`).
+  The bump was not additive: 16 techniques were revoked, the whole `T1562`
+  sub-tree among them. ION resolves revoked ids forward on both sides of
+  every coverage intersection, so the NIST 800-53 `AU-2` / `AU-12` and ISO
+  `A.8.15` controls no longer read as detection gaps because their mapped ids
+  retired. The exported Navigator layer now names the ATT&CK version of its
+  data rather than a fixed "14".
+- **SSVC patch decisions.** CERT/CC's deployer tree turns KEV, in-the-wild
+  and exploit-availability evidence into `defer`, `scheduled`,
+  `out-of-cycle` or `immediate`. The Detection Engineering vulnerability table
+  shows the decision for every row, from one KEV query for the whole list.
+  The tree's other three inputs are properties of the estate ION cannot
+  observe: they are settings (`ssvc_exposure`, `ssvc_automatable`,
+  `ssvc_human_impact`, each overridable by its `ION_SSVC_*` variable), and
+  until they are set every decision says how many inputs it assumed. A value
+  the tree does not know is refused and named rather than used. An unreadable
+  table declines to decide rather than returning `defer`.
+- **VEX documents.** The image's SPDX SBOM lists every installed package, so a
+  scanner reports advisories ION has already pinned past. Fifteen statements
+  (13 `fixed`, 2 `not_affected`), each transcribed from a decision recorded
+  against a pin, now ship beside it as OpenVEX 0.2.0 and CSAF 2.0
+  (`/app/ion.openvex.json`, `/app/ion.csaf.json`). CSAF is validated against
+  OASIS's own schema, vendored so the check runs offline. The release
+  checklist now regenerates both documents, which name the version they
+  describe.
+- **Glass surfaces in dark mode.** Panels are translucent over a fixed
+  gradient tinted by the accent colour; the header, the case window, dialogs,
+  drawers, menus and sticky table headers are frosted. On by default, with a
+  Glass / Solid switch on the profile page. Light mode and Solid are
+  unchanged.
+
+### Changed
+
+- **The public CyAB scoping questionnaire works signed out.** It extended
+  the main layout, whose `app.js` sends any signed-out visitor to `/login`,
+  so it had never been reachable without an account. It has its own layout
+  now. Its PDF download and "Convert to system" buttons were nested forms the
+  browser discarded, and both work again.
+- **A shorter case window.** CASE-0239 (10 alerts, 7 notes) went from 3,899 to
+  2,591 px tall at 1440 × 900. Kibana comments, which the sync already
+  imports as case notes, are listed once among the notes with a Kibana badge
+  instead of again in their own section; a new Kibana comment appears after
+  the next sync, up to 15 s later. A run of alert links folds into one
+  timeline line, an attack path with no connections folds to a summary line,
+  and an empty section is one line instead of a card.
+
+### Fixed
+
+- **A settings save reaches every web worker.** Each uvicorn worker cached
+  its own configuration, so a save applied to roughly one request in four
+  until a restart. `get_config()` now reloads when `config.json` changes,
+  checking at most every 2 s. A save writes a temporary file and swaps it
+  in, so no worker reads half a file. Services that copy settings when they
+  are built, the Kibana client among them, still hold their starting values.
+- **CyAB use-case statuses save on Postgres.**
+  `cyab_data_sources.use_case_status` holds a status for every use case and
+  was `varchar(64)`, so most saves were refused. It is widened to `text`, a
+  catalogue-only change.
+
+### Security
+
+- **CyAB permissions.** Reads need `alert:read` and edits `case:update`.
+  Signing off, closing a review, accepting or revoking a gap, removing a
+  source and lowering a SAL need `case:close`.
+- **Closed before release.** The restored API had eight write routes under
+  `alert:read`. The system update and both create routes could set `ACTIVE`
+  and the sign-off names directly. No route can now set a
+  sign-off except by recording one, and a test walks every CyAB write route.
+  The archived onboarding wizard is removed, and so is a bulk route that
+  changed data under read access.
+
+## v0.99.15 — 2026-11-10
+
+Case creation no longer freezes ION, alerts attached in Kibana reach ION,
+and Bob no longer investigates alerts as they arrive. Found by load-testing
+v0.99.14 against a live Elasticsearch, Kibana and Postgres. No new route,
+permission, dependency or schema change; three settings are removed.
+
+### Performance
+
+- **Investigations run off the request event loop.** Creating a case
+  started its Bob investigation as a task on the event loop that serves the
+  web worker's requests. The investigation makes blocking calls, the first a
+  synchronous request to Ollama's embeddings endpoint while it builds the
+  prompt, and the worker served nothing until it returned. A load test of
+  200 cases of 10 alerts, 10 at a time, took 1,174 s; case creation's median
+  was 38 s and `/api/health` waited a median 11.3 s. On v0.99.15 the same
+  load takes 45 s, the median create 2.0 s and the median health check 6 ms.
+  That stack had no Ollama host, which lengthens every embeddings call; with
+  Ollama present each call is shorter, but the worker still waits on it, and
+  longest when Ollama is busy generating. Every place that started
+  background AI work this way now uses a thread with its own event loop:
+  case creation, the case grouper, the Kibana import hook, manual investigate
+  and sweep, and PCAP analysis.
+
+### Fixed
+
+- **Alerts attached to a case in Kibana never reached ION.** v0.99.14
+  claimed this and did not deliver it: it read the alerts from Kibana's
+  comments `_find`, which returns user comments only, and its tests passed
+  against a fake Kibana that did otherwise. A changed case with alerts now
+  also reads `GET /api/cases/{id}/alerts`, and the alerts arrive within one
+  sync cycle.
+
+### Removed
+
+- **The automatic per-alert investigation sweep.** A background thread sent
+  up to 50 open alerts to Bob every 15 minutes whenever the case grouper was
+  not investigating, so an estate that creates cases by hand had each alert
+  investigated on arrival and again with its case. It is gone, with its
+  settings `investigation_loop_enabled`, `investigation_sweep_interval_s` and
+  `investigation_max_per_sweep` (`ION_INVESTIGATION_LOOP_ENABLED`,
+  `ION_INVESTIGATION_SWEEP_INTERVAL_S`, `ION_INVESTIGATION_MAX_PER_SWEEP`). A
+  `config.json` that still carries them loads, and they drop out on the next
+  save. Investigations at case creation, case grouper investigations and the
+  manual sweep are unchanged.
+
+### Known gaps
+
+- **A status change made in Kibana can be pushed back over by ION.** Status
+  sync keeps whichever side changed last, judged by the case's `updated_at`,
+  which every ION write moves, including ION's own sync bookkeeping. A note,
+  an enrichment or a Bob write to the case before the next sync cycle can
+  undo a reopen made in Kibana. Reproduced on a live stack; not yet fixed.
+- **An alert storm with the case grouper on stalls the sync loop.** The loop
+  exports new cases to Kibana one at a time, about one a second, and nothing
+  else syncs meanwhile: 133 cases took one 132 s cycle.
+
+## v0.99.14 — 2026-11-10
+
+Case work against Kibana is faster, cases created in Kibana import in full,
+and a false-positive close now stays closed. No new route, permission,
+configuration field, dependency or schema change.
+
+### Performance
+
+- **Alerts are attached to a Kibana case in batches.** Case creation posted
+  one Kibana request per alert, in sequence: a 50-alert case took 51 requests
+  (7.75 s against a fake Kibana at 150 ms a request), and a 300-alert case
+  about 45 s. Alerts now go 100 per request, falling back to one at a time
+  only for a batch Kibana rejects, so one bad alert id still cannot sink the
+  rest. The same 50-alert case is 2 requests and 0.37 s.
+- **Kibana calls no longer block the web worker.** The Kibana client is
+  synchronous and was called straight from async request handlers and from
+  the sync loop, which runs inside one web worker. Every request routed to
+  that worker waited on Kibana. Case create, case detail, the case-update
+  push and every call in the sync loop now run in a thread. Against 150
+  linked cases, the worst event-loop stall in a sync cycle fell from 14.2 s
+  to 0.02 s.
+- **A sync cycle costs the same however many cases are linked.** Each 15 s
+  cycle read every linked case from Kibana twice, plus its comments: 452
+  requests for 150 cases. A cycle now makes one paged `_find` sweep of all
+  cases and reads comments only for a case whose version, update time or
+  comment count changed. A quiet cycle is 3 requests.
+
+### Fixed
+
+- **Comment sync read only the first 100 comments of a case.** It now pages
+  to the end.
+- **A failed comment read was recorded as seen**, so those comments were
+  never retried. The case is now read again next cycle.
+- **Cases deleted in Kibana were polled for ever.** A case missing from the
+  sweep is now skipped.
+- **Cases created in Kibana: some were never imported.** Import looked only
+  at the newest 100 open and 100 in-progress cases. It now works from the
+  full sweep.
+- **Cases created in Kibana: an import could be lost for good.** ION renamed
+  the Kibana case to `[CASE-…]` before committing the import, and the import
+  skips cases with that prefix, so a failed commit left a renamed case that no
+  later cycle would pick up. The commit now comes first, and a failed import
+  rolls back cleanly before the next case.
+- **Alerts attached to a case in Kibana never reached ION.** Alerts added in
+  Kibana after the case was linked are now filed under the ION case, with a
+  triage row created where none exists. An alert ION already files under a
+  different case is left there.
+- **A false-positive close was undone by the alerts page.** Close-as-FP, the
+  known-false-positive auto-close on case creation and bulk close closed the
+  case and its triage rows, and since v0.96.3 the Kibana case too, but left
+  the alerts open in Elasticsearch. The alerts page sends each alert's
+  Elasticsearch status, from the list it fetched at load, to the batch triage
+  endpoint, which copied it onto the triage rows, so the next page load
+  reopened every alert the close had closed. All three paths now close the
+  alerts in Elasticsearch, the batch endpoint no longer reopens an alert
+  whose case is closed, and the page keeps the server's status after a batch
+  instead of resending its snapshot. A reopen made in Kibana still reaches an
+  alert that is not on a closed case.
+
+### Known gaps
+
+Title, severity and assignee are still pulled from Kibana only at import.
+A failed status push to Kibana is still reported as a success, leaving the
+sync loop to correct it. The status push in close-as-FP, the known-FP
+auto-close and `/close` still runs on the event loop.
 
 ## v0.99.13 — 2026-10-16
 

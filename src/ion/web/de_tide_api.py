@@ -1315,6 +1315,9 @@ async def tide_de_execution(hours: int = 168):
 
     query = {
         "size": 0,
+        # Without this Elasticsearch stops counting at 10,000, so the alert
+        # total read 10,000 while the per-status buckets summed past it.
+        "track_total_hits": True,
         "query": {
             "bool": {
                 "must": [

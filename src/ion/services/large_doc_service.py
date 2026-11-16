@@ -380,9 +380,9 @@ def _worker(job_id: str, text: str, task: str, custom_prompt: Optional[str]) -> 
     request session across threads)."""
     import asyncio
 
-    from ion.models.service_desk import DocAnalysisJob
     from sqlalchemy.orm import sessionmaker
 
+    from ion.models.service_desk import DocAnalysisJob
     from ion.storage.database import get_engine
 
     def _own_session():

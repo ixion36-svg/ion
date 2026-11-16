@@ -446,7 +446,10 @@ async def _background_kibana_case_sync(
                     except Exception as e:
                         logger.debug("Background Elastic UID resolve failed: %s", e)
 
-        new_version, _ = sync_case_update_to_kibana(
+        # async def BackgroundTasks run on the event loop, so the
+        # synchronous Kibana call goes to a worker thread.
+        new_version, _ = await asyncio.to_thread(
+            sync_case_update_to_kibana,
             kibana_case_id=kibana_case_id,
             case_number=case_number,
             title=fields.get("title"),
@@ -1146,7 +1149,10 @@ async def create_case(
         create_assignee_uid = _resolve_kibana_assignee_uid(
             session, new_case.assigned_to_id
         )
-        kibana_result = sync_new_case_to_kibana(
+        # On a worker thread: the Kibana client is synchronous, and inline it
+        # froze every request on this worker for the whole exchange.
+        kibana_result = await asyncio.to_thread(
+            sync_new_case_to_kibana,
             case_number=case_number,
             title=data.title,
             description=data.description,
@@ -1212,6 +1218,11 @@ async def create_case(
                 # otherwise the Kibana case stays open with only the note and
                 # waits on the periodic reconciler.
                 push_case_status_to_kibana(session, new_case)
+            # Close the alerts in Elasticsearch too, or the alerts page
+            # reopens them from their stale "open" on its next load.
+            await _background_alert_workflow_sync(
+                [t.es_alert_id for t in new_case.triage_entries], "closed",
+            )
 
             auto_closed = True
             auto_closed_kfp = fp
@@ -1760,7 +1771,9 @@ async def get_case_detail(
             from ion.services.kibana_cases_service import get_kibana_cases_service
             kb = get_kibana_cases_service()
             if kb.enabled:
-                kb_case = kb.get_case(case.kibana_case_id)
+                # Worker thread: the client is synchronous, and every case
+                # open used to stall this worker's event loop for the call.
+                kb_case = await asyncio.to_thread(kb.get_case, case.kibana_case_id)
                 if kb_case:
                     raw_assignees = kb_case.get("assignees") or []
                     uids = [a.get("uid") for a in raw_assignees if isinstance(a, dict) and a.get("uid")]
@@ -2607,6 +2620,12 @@ async def close_case_as_known_fp(
     await _sync_case_to_es(case, session)
     # Mirror the close to the linked Kibana case, as every close path must.
     push_case_status_to_kibana(session, case)
+    # And to the alerts themselves. Left open in Elasticsearch, the alerts
+    # page sent that "open" back on its next load and reopened every alert
+    # this close had just closed.
+    await _background_alert_workflow_sync(
+        [t.es_alert_id for t in case.triage_entries], "closed",
+    )
 
     return {
         "id": case.id,
