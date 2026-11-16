@@ -10,7 +10,7 @@
 # ION Codebase Map
 
 A dependency-level map of ION, built from the Graphify code graph of
-`origin/main` at commit `cc03623`. It complements `ARCHITECTURE.md` (components
+`origin/main` at commit `02cc7ae`. It complements `ARCHITECTURE.md` (components
 and data flow) with *what depends on what*, so a change can be sized before it is
 made. Line numbers and counts drift — re-query the graph rather than trusting
 them after a large change.
@@ -19,8 +19,8 @@ them after a large change.
 
 | | |
 |---|---|
-| Graph | 37,594 nodes, 96,008 edges, one connected component |
-| `src/ion/data` | 16 files, ~127k lines — KB and ATT&CK seed data, not logic |
+| Graph | 34,941 nodes, 82,118 edges, 1,420 code areas |
+| `src/ion/data` | 16 files, ~127k lines — KB and ATT&CK seed data, not indexed |
 | `src/ion/services` | 167 files, ~82k lines |
 | `src/ion/web` | 180 files, ~81k lines — 83 `*_api.py` routers, 362 Jinja templates |
 | `src/ion/models` | 62 files, ~10k lines |
@@ -28,9 +28,14 @@ them after a large change.
 | `src/ion/core` / `auth` / `cli` | ~3.8k / ~2.5k / ~2.2k lines |
 | `tests/` | ~12,600 definitions — about two-thirds of all definitions in the graph |
 
-The graph finds a single community: almost everything is reachable through
-`storage/database.py`, `core/config.py` and `models/user.py`. Use the directory
-layout, not clustering, to reason about subsystems.
+`.graphifyignore` keeps the vendored `static/js/*.min.js` bundles and
+`src/ion/data/` out of the graph. With the bundles in, their dense internal edges
+collapsed the whole repo into one code area labelled `mermaid.min.js`; adding a
+new vendored bundle without a matching ignore rule brings that back.
+
+The hubs below
+(`storage/database.py`, `core/config.py`, `models/user.py`) still connect nearly
+everything, so reason about subsystems by directory first.
 
 ## Layers
 
