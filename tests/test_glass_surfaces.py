@@ -35,6 +35,15 @@ def _rules(text: str):
                 start = i + 1
 
 
+def _leaf_rules(text: str):
+    """Every rule's own declarations, descending into nested blocks."""
+    for sel, body in _rules(text):
+        if "{" in body:
+            yield from _leaf_rules(body)
+            body = re.sub(r"[^{};]*\{[^{}]*\}", "", body)
+        yield sel, body
+
+
 def test_every_glass_rule_is_gated_on_dark_mode_and_the_switch():
     """Light mode and the Solid setting must render exactly as before."""
     for selector, body in _rules(GLASS):
@@ -52,10 +61,12 @@ def test_every_token_backed_sticky_header_is_frosted():
     frosted = GLASS[GLASS.index("Sticky headers"):]
     frosted = frosted[:frosted.index("}")]
     missing = []
-    for sheet in sorted(CSS.glob("*.css")):
-        if sheet.name in {"ion.css", "ion-glass.css"}:
-            continue
-        for selector, body in _rules(sheet.read_text(encoding="utf-8", errors="ignore")):
+    # Page rules are compiled into ion.css from frontend/, nested under a
+    # body[data-page] scope, so the scan has to read those and descend.
+    sheets = [s for s in sorted(CSS.glob("*.css")) if s.name not in {"ion.css", "ion-glass.css"}]
+    sheets += sorted((ROOT / "frontend").glob("ion-*.css"))
+    for sheet in sheets:
+        for selector, body in _leaf_rules(sheet.read_text(encoding="utf-8", errors="ignore")):
             if not re.search(r"position\s*:\s*sticky", body) or not TOKEN_BG.search(body):
                 continue
             for part in selector.split(","):
