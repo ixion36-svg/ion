@@ -39,12 +39,15 @@ from pathlib import Path
 import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
+from page_css import page_css
 
 from ion.web.ui.cases import PERMISSION, router
 
 ROOT = Path(__file__).resolve().parents[2]
 FRAGMENT = ROOT / "src/ion/web/templates/_fragments/cases_similar.html"
-SHEET = ROOT / "src/ion/web/static/css/cases-page.css"
+#: The page sheet was retired into the one build; this is the
+#: body[data-page="cases"] block, and only that block.
+SHEET_TEXT = page_css("cases")
 
 URL = "/ui/cases/7/similar"
 
@@ -300,7 +303,7 @@ def test_the_verdict_badge_names_its_reason_for_the_stylesheet(
 def test_the_stylesheet_paints_every_closure_class_the_panel_can_emit():
     """A class the fragment emits and the sheet does not know renders as an
     unstyled chip, which no route test can see."""
-    sheet = SHEET.read_text(encoding="utf-8")
+    sheet = SHEET_TEXT
     for reason in ["true_positive", "false_positive", "benign_true_positive",
                    "duplicate", "insufficient_data", "not_applicable",
                    "other"]:
@@ -309,7 +312,7 @@ def test_the_stylesheet_paints_every_closure_class_the_panel_can_emit():
 
 def test_the_similarity_badge_is_themeable():
     """It was `text-[#6de4ff]`, the brand cyan, hard-coded into the page."""
-    sheet = SHEET.read_text(encoding="utf-8")
+    sheet = SHEET_TEXT
     assert ".case-sim-badge" in sheet
 
 
@@ -332,7 +335,7 @@ def test_nothing_later_in_the_cascade_paints_the_badge_itself():
     `.cpanel-alert-badge.case-closure-x`, or the two groups need to swap
     order in the sheet.
     """
-    sheet = SHEET.read_text(encoding="utf-8")
+    sheet = SHEET_TEXT
     block = re.search(r"\.cpanel-alert-badge\s*\{([^}]*)\}", sheet)
     assert block, "the rule the chips sit on top of"
     declarations = block.group(1)
@@ -344,7 +347,7 @@ def test_the_badge_rule_is_still_the_later_one_so_the_guard_above_is_needed():
     """If the order ever reverses, the guard above becomes unnecessary and
     should be deleted rather than left looking load-bearing. Asserting the
     order is what makes the difference visible."""
-    sheet = SHEET.read_text(encoding="utf-8")
+    sheet = SHEET_TEXT
     badge = re.search(r"\.cpanel-alert-badge\s*\{", sheet)
     closure = re.search(r"\.case-closure-\w+", sheet)
     assert badge and closure

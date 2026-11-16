@@ -42,7 +42,7 @@
             until this change, so it had never rendered. #}
         {%- if c.closure_short %} <span class="closure-reason-badge reason-{{ c.closure_reason }} text-[0.625rem] py-[0.0625rem] px-[0.3rem] ml-1">{{ c.closure_short }}</span>{% endif -%}
       </span>
-      {# The status colour is a class with a rule in alerts-page.css, not a
+      {# The status colour is a class with a rule in frontend/ion-pages.css, not a
          style attribute (style-src-attr 'none') and not a JS property
          assignment after the swap. `is not none` on the count: the service
          emits an integer for every row today, and if that ever stops the

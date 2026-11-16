@@ -95,6 +95,12 @@
 /* ION's semantic mapping. Must come after daisyui.css. */
 @import "./ion-daisy-theme.css";
 
+/* The box contract. After the theme so it beats daisyUI's .card, before the
+   page sheets so a page can still override its own box. */
+@import "./ion-box.css";
+@import "./ion-value-scales.css";
+@import "./ion-density.css";
+
 /* Page sheets, last so they keep the precedence their inline
    <style> blocks had. See the header of ion-pages.css. */
 @import "./ion-pages.css";

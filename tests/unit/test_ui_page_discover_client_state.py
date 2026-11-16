@@ -138,7 +138,7 @@ def test_the_modal_markup_is_inside_the_content_block():
 def test_the_modal_colours_are_in_the_stylesheet():
     """They were text-[#f87171], bg-[#1e293b] and text-[#e2e8f0] inside a
     JavaScript template string."""
-    sheet = (ROOT / "src/ion/web/static/css/discover-page.css").read_text(
+    sheet = (ROOT / "frontend/ion-pages.css").read_text(
         encoding="utf-8")
     assert ".dsc-nl-error" in sheet
     assert ".dsc-nl-output" in sheet
@@ -170,11 +170,13 @@ def test_the_page_has_no_inline_style_block():
     assert "<style" not in page()
 
 
-def test_the_page_links_its_stylesheet_from_head_css():
-    head = re.search(r"\{%\s*block head_css\s*%\}(.*?)\{%\s*endblock\s*%\}",
-                     PAGE.read_text(encoding="utf-8"), re.S)
-    assert head, "linked from head_css"
-    assert "discover-page.css" in head.group(1)
+def test_the_page_declares_the_scope_that_reaches_its_rules():
+    """The sheet is retired. The rules are nested under
+    body[data-page="discover"] in the one build, so the page_id block is
+    what joins the markup to them; without it they match nothing."""
+    page = PAGE.read_text(encoding="utf-8")
+    assert "discover-page.css" not in page
+    assert "{% block page_id %}discover{% endblock %}" in page
 
 
 def test_nothing_that_outranks_the_sheet_claims_its_selectors():
@@ -183,8 +185,20 @@ def test_nothing_that_outranks_the_sheet_claims_its_selectors():
     base.html's body, linked after ion-workspace, so an overlap is a rule
     that is present and never wins. Measured as empty before the move;
     asserted so adding one is a failing test rather than a silent restyle."""
-    sheet = (ROOT / "src/ion/web/static/css/discover-page.css").read_text(
-        encoding="utf-8")
+    # Only this page's block. ion-pages.css carries every page, so reading
+    # the whole file would compare other pages' rules -- and their keyframe
+    # stops, which parse as selectors called "0%" and "50%".
+    whole = (ROOT / "frontend/ion-pages.css").read_text(encoding="utf-8")
+    opener = 'body[data-page="discover"] {'
+    start = whole.index(opener) + len(opener)
+    depth, i = 1, start
+    while depth:
+        if whole[i] == "{":
+            depth += 1
+        elif whole[i] == "}":
+            depth -= 1
+        i += 1
+    sheet = whole[start:i - 1]
     selectors = set()
     for match in re.finditer(r"(^|\})\s*([^{}@][^{}]*?)\s*\{", sheet, re.M):
         for part in match.group(2).split(","):

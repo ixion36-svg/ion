@@ -32,9 +32,21 @@ from ion.web.ui.threat_intel import (
 
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = ROOT / "src/ion/web/templates/threat_intel.html"
-CSS = ROOT / "src/ion/web/static/css/threat-intel.css"
+PAGES_CSS = ROOT / "frontend/ion-pages.css"
 KEV = "_fragments/threat_intel_kev.html"
 KEV_RECENT = "_fragments/threat_intel_kev_recent.html"
+
+
+def _page_css() -> str:
+    """This page's scope block only; ion-pages.css carries every page."""
+    whole = PAGES_CSS.read_text(encoding="utf-8")
+    m = re.search(r'body\[data-page="threat_intel"\]\s*(?:,[^{]*)?\{', whole)
+    assert m, "the threat_intel scope block is gone"
+    depth, i = 1, m.end()
+    while depth:
+        depth += {"{": 1, "}": -1}.get(whole[i], 0)
+        i += 1
+    return whole[m.end():i - 1]
 
 
 def flat(html: str) -> str:
@@ -142,7 +154,7 @@ def test_the_unread_badge_rides_on_the_indicators_tab():
 
 
 def test_the_view_classes_the_script_toggles_have_rules():
-    css = CSS.read_text(encoding="utf-8")
+    css = _page_css()
     for rule in (".ti-group.active", ".ti-panel.active", ".ti-sub.active",
                  ".ti-tab.active"):
         assert rule in css, rule

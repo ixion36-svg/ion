@@ -2,13 +2,7 @@
 
 {% block title %}AI Assistant - ION{% endblock %}
 
-{% block head_css %}
-{# The page's own rules. head_css loads after ai-chat.css, which is what
-   keeps the twelve selectors and the two keyframes they share winning
-   here, and before ion-workspace.css and base.html's in-body blocks,
-   neither of which declares anything this sheet does. #}
-<link rel="stylesheet" href="/static/css/chat-page.css?v={{ ion_version }}">
-{% endblock %}
+{% block page_id %}chat{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">

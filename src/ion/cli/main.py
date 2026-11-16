@@ -456,12 +456,22 @@ def upgrade() -> None:
             conn.execute(text("CREATE INDEX ix_notes_created_at ON notes(created_at)"))
             migrations_applied.append("notes table")
 
-            # Migrate data from old tables if they exist
+            # Migrate data from old tables if they exist.
+            #
+            # Enum literals below are the member NAME, uppercase, and columns
+            # carried over from an old table go through UPPER(). Every column
+            # these migrations target that is SQLEnum(native_enum=False)
+            # stores the name, and raw SQL bypasses the bind processor that
+            # would otherwise convert it. There is no CHECK constraint, so a
+            # value written in the wrong case inserts cleanly and then raises
+            # LookupError on every ORM read of the table -- the whole query,
+            # not just the offending row. _repair_enum_name_storage in
+            # storage/database.py heals databases migrated before this.
             if 'alert_comments' in inspector.get_table_names():
                 console.print("  Migrating data from 'alert_comments' to 'notes'...")
                 conn.execute(text("""
                     INSERT INTO notes (entity_type, entity_id, user_id, content, created_at)
-                    SELECT 'alert', es_alert_id, user_id, content, created_at
+                    SELECT 'ALERT', es_alert_id, user_id, content, created_at
                     FROM alert_comments
                 """))
                 migrations_applied.append("alert_comments data migration")
@@ -470,7 +480,7 @@ def upgrade() -> None:
                 console.print("  Migrating data from 'case_notes' to 'notes'...")
                 conn.execute(text("""
                     INSERT INTO notes (entity_type, entity_id, user_id, content, created_at)
-                    SELECT 'case', CAST(case_id AS VARCHAR), user_id, content, created_at
+                    SELECT 'CASE', CAST(case_id AS VARCHAR), user_id, content, created_at
                     FROM case_notes
                 """))
                 migrations_applied.append("case_notes data migration")
@@ -505,7 +515,7 @@ def upgrade() -> None:
                 console.print("  Migrating data from 'observable_alert_links' to 'observable_links'...")
                 conn.execute(text("""
                     INSERT INTO observable_links (observable_id, link_type, entity_id, context, extracted_from, created_at)
-                    SELECT observable_id, 'alert', alert_triage_id, context, extracted_from, created_at
+                    SELECT observable_id, 'ALERT', alert_triage_id, context, extracted_from, created_at
                     FROM observable_alert_links
                 """))
                 migrations_applied.append("observable_alert_links data migration")
@@ -514,7 +524,7 @@ def upgrade() -> None:
                 console.print("  Migrating data from 'observable_case_links' to 'observable_links'...")
                 conn.execute(text("""
                     INSERT INTO observable_links (observable_id, link_type, entity_id, context, extracted_from, created_at)
-                    SELECT observable_id, 'case', case_id, context, 'manual', created_at
+                    SELECT observable_id, 'CASE', case_id, context, 'manual', created_at
                     FROM observable_case_links
                 """))
                 migrations_applied.append("observable_case_links data migration")
@@ -524,7 +534,7 @@ def upgrade() -> None:
                 conn.execute(text("""
                     INSERT INTO observable_links (observable_id, link_type, entity_id, context, extracted_from, created_at)
                     SELECT observable_id,
-                           CASE source_type WHEN 'alert' THEN 'alert' WHEN 'case' THEN 'case' ELSE 'manual' END,
+                           CASE source_type WHEN 'alert' THEN 'ALERT' WHEN 'case' THEN 'CASE' ELSE 'MANUAL' END,
                            COALESCE(source_id, 0),
                            COALESCE(context, source_type),
                            'sighting',
@@ -577,9 +587,9 @@ def upgrade() -> None:
                     INSERT INTO integration_events (event_type, integration_type, webhook_id, webhook_event_type,
                                                      payload, headers, source_ip, status, error_message,
                                                      response_time_ms, created_at)
-                    SELECT 'webhook',
-                           COALESCE((SELECT source_type FROM webhooks WHERE id = webhook_logs.webhook_id), 'custom'),
-                           webhook_id, event_type, payload, headers, source_ip, status,
+                    SELECT 'WEBHOOK',
+                           UPPER(COALESCE((SELECT source_type FROM webhooks WHERE id = webhook_logs.webhook_id), 'custom')),
+                           webhook_id, event_type, payload, headers, source_ip, UPPER(status),
                            error_message, processing_time_ms, created_at
                     FROM webhook_logs
                 """))
@@ -590,7 +600,7 @@ def upgrade() -> None:
                 conn.execute(text("""
                     INSERT INTO integration_events (event_type, integration_type, level, action, message,
                                                      details, user_id, created_at)
-                    SELECT 'activity', integration_type, level, action, message, details, user_id, timestamp
+                    SELECT 'ACTIVITY', UPPER(integration_type), UPPER(level), action, message, details, user_id, timestamp
                     FROM integration_logs
                 """))
                 migrations_applied.append("integration_logs data migration")
@@ -600,7 +610,7 @@ def upgrade() -> None:
                 conn.execute(text("""
                     INSERT INTO integration_events (event_type, integration_type, health_status,
                                                      response_time_ms, error_message, details, created_at)
-                    SELECT 'health_check', integration_type, status, response_time_ms,
+                    SELECT 'HEALTH_CHECK', UPPER(integration_type), UPPER(status), response_time_ms,
                            error_message, check_metadata, checked_at
                     FROM integration_health_checks
                 """))

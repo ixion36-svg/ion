@@ -23,7 +23,10 @@ from fastapi.testclient import TestClient
 
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = ROOT / "src/ion/web/templates/network_topology.html"
-CSS = ROOT / "src/ion/web/static/css/network-topology-page.css"
+#: The page sheet was retired into the one build; its rules are nested
+#: under body[data-page="network_topology"] in frontend/ion-pages.css, and
+#: tests/test_retired_page_sheets.py is what pins them there.
+CSS = ROOT / "frontend/ion-pages.css"
 
 BOARD = "/ui/network-topology/board"
 NODE = "/ui/network-topology/node"
@@ -170,8 +173,10 @@ def test_the_page_has_no_inline_style_block_except_the_cytoscape_suppressor():
     blocks = re.findall(r"<style[^>]*>(.*?)</style>", text, flags=re.S)
     assert blocks == [""] or blocks == ["\n"] or all(not b.strip() for b in blocks)
     assert "__________cytoscape_stylesheet" in text
-    assert CSS.is_file()
-    assert "network-topology-page.css" in text
+    # The sheet is retired; the rules moved into the one build under
+    # body[data-page="network_topology"], which this block is what selects.
+    assert "network-topology-page.css" not in text
+    assert "{% block page_id %}network_topology{% endblock %}" in text
 
 
 def test_unconfigured_and_empty_are_different_sentences_on_the_page():

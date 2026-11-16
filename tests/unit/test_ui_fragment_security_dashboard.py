@@ -302,29 +302,30 @@ def test_the_severity_pill_reads_the_value_not_the_enum_repr():
     html = one(severity=SecurityEventSeverity.CRITICAL)
     assert "SecurityEventSeverity" not in html
     assert ">critical<" in html
-    assert "severity-critical" in html
+    assert 'data-sev="critical"' in html
 
 
-@pytest.mark.parametrize("severity,css", [
-    ("critical", "severity-critical"),
-    ("high", "severity-high"),
-    ("medium", "severity-medium"),
-    ("low", "severity-low"),
-    ("info", "severity-info"),
-])
-def test_each_severity_keeps_its_colour(severity, css):
-    assert css in one(severity=severity)
+@pytest.mark.parametrize("severity", ["critical", "high", "medium", "low", "info"])
+def test_each_severity_keeps_its_colour(severity):
+    """The colour comes from [data-sev] in ion-value-scales.css now, not a
+    severity-<level> class. tests/test_security_dashboard_scales.py asserts
+    every enum member has a row there; this asserts the markup carries the
+    value that selects it."""
+    html = one(severity=severity)
+    assert f'data-sev="{severity}"' in html
+    assert "severity-badge" not in html
 
 
-def test_the_status_pill_reads_the_value_and_uses_hyphens():
-    """The stylesheet keys ``.status-false-positive``. The enum value uses
-    an underscore, and the repr uses a dot. Either one leaves the pill
-    uncoloured."""
+def test_the_status_pill_reads_the_value_not_the_enum_repr():
+    """The attribute carries the enum value, so the underscore stays an
+    underscore. The old class form rewrote it to a hyphen to match a
+    selector; `[data-status="false_positive"]` needs no rewrite, and the
+    rewrite coming back would leave the pill uncoloured."""
     html = one(status=SecurityEventStatus.FALSE_POSITIVE)
     assert "SecurityEventStatus" not in html
     assert ">False Positive<" in html
-    assert "status-false-positive" in html
-    assert "status-false_positive" not in html
+    assert 'data-status="false_positive"' in html
+    assert "status-false-positive" not in html
 
 
 def test_the_type_is_words_not_the_enum_repr():
@@ -866,7 +867,7 @@ def test_the_banner_level_is_the_json_endpoints(app, session):
     assert resp.status_code == 200
     assert level == "critical"
     assert "Threat Level: CRITICAL" in resp.text
-    assert "threat-level flex items-center gap-4 critical" in resp.text
+    assert 'class="threat-level v-text flex items-center gap-4" data-sev="critical"' in resp.text
     assert "crit-probe" in resp.text
     assert "SecurityEventSeverity" not in resp.text
     assert f'<time datetime="{occurred.isoformat()}"' in resp.text

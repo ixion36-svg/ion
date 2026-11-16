@@ -167,7 +167,7 @@
   </div>
 {% else %}
   <div class="alert alert-info mb-6 flex flex-wrap items-center justify-between gap-4" id="threat-banner" role="alert">
-    <div class="threat-level flex items-center gap-4 {{ summary.level_class }}">
+    <div class="threat-level v-text flex items-center gap-4" data-sev="{{ summary.level_class }}">
       <span class="threat-icon text-2xl"><i class="icon-shield-alert"></i></span>
       <span class="threat-text text-xl font-semibold">Threat Level: {% if summary.threat_level is not none %}{{ summary.threat_level|upper }}{% else %}UNKNOWN{% endif %}</span>
     </div>
@@ -254,13 +254,13 @@
               {% for event in events %}
                 <tr class="cursor-pointer" data-click-action="showEventDetail" data-args='{{ [event.id]|tojson }}'>
                   <td>{{ ts(event.created_at) }}</td>
-                  <td><span class="{{ event.severity_class }}">{{ event.severity if event.severity is not none else '—' }}</span></td>
+                  <td><span class="v-chip" data-sev="{{ event.severity or '' }}">{{ event.severity if event.severity is not none else '—' }}</span></td>
                   <td>{{ event.type_label if event.type_label is not none else '—' }}</td>
                   <td class="font-mono">{{ event.source_ip if event.source_ip is not none else '—' }}</td>
                   <td>{{ event.title if event.title is not none else '—' }}</td>
                   <td class="matched-content" title="{{ event.matched.title }}"><code>{{ event.matched.text }}</code></td>
                   <td class="event-count">{% if event.event_count is not none %}{{ event.event_count }}{% else %}—{% endif %}</td>
-                  <td><span class="{{ event.status_class }}">{{ event.status_label if event.status_label is not none else '—' }}</span></td>
+                  <td><span class="v-chip" data-status="{{ event.status or '' }}">{{ event.status_label if event.status_label is not none else '—' }}</span></td>
                   {% if can_manage %}
                     <td>
                       {% if event.source_ip is not none %}

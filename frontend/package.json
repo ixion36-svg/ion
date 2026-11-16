@@ -1,0 +1,12 @@
+{
+  "name": "ion-css-build",
+  "private": true,
+  "description": "Pinned Tailwind CLI for building src/ion/web/static/css/ion.css. Replaces the gitignored tailwindcss.exe so a clone and CI can both rebuild the stylesheet.",
+  "scripts": {
+    "build:css": "tailwindcss -i ./tailwind-daisy.input.css -o ../src/ion/web/static/css/ion.css --minify"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "4.3.3",
+    "tailwindcss": "4.3.3"
+  }
+}

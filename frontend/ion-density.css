@@ -1,0 +1,169 @@
+/* The compact density tier, and the primitives that use it.
+ *
+ * Titanium has one density, tuned for reading one record thoroughly: 22px
+ * cards, 15/16px cells, 132px queue rows. Measured at ION's volume that
+ * shows 6 of 400 alerts at once and 52,640px of scroll, so it is not a tier
+ * ION can adopt for a queue.
+ *
+ * .ion-dense is the second tier: ION's row rhythm kept, the containment
+ * contract added. Measured at 33.8px per row, 13,519px for 400. Everything
+ * outside it stays on the comfortable tier.
+ *
+ * Opt in on the scroll container, not the table, so the sticky header has
+ * something to stick to.
+ */
+.ion-dense {
+  --row-y: 6px;
+  --row-x: 10px;
+  --row-font: 12.5px;
+  --row-leading: 1.45;
+}
+
+.ion-dense {
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.ion-dense table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--row-font);
+  line-height: var(--row-leading);
+  /* Below this the columns are squeezed under their content and
+     overflow-wrap:anywhere starts breaking a rule name one character per
+     line. Scrolling the table is the lesser failure. */
+  min-width: 940px;
+}
+
+.ion-dense thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 8px var(--row-x);
+  text-align: left;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ion-text-muted);
+  background: var(--ion-surface-2);
+  border-bottom: 1px solid var(--ion-border-strong);
+  white-space: nowrap;
+}
+
+.ion-dense tbody td {
+  padding: var(--row-y) var(--row-x);
+  border-bottom: 1px solid var(--ion-border);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* nowrap above is what keeps the row one line. The cell that may hold an
+   unbounded string opts back into the contract instead. */
+.ion-dense td.cell-wrap {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  /* anywhere needs a floor, or a narrow column breaks every word. */
+  min-width: 220px;
+}
+
+.ion-dense tbody tr {
+  transition: background-color 0.12s ease;
+}
+.ion-dense tbody tr:hover {
+  background: var(--ion-row-hover);
+}
+.ion-dense tbody tr[aria-selected="true"] {
+  background: color-mix(in oklab, var(--color-ion-cyan) 10%, transparent);
+  box-shadow: inset 3px 0 var(--color-ion-cyan);
+}
+
+/* Row controls reserve their space, so revealing them shifts nothing. */
+.ion-dense .row-actions {
+  visibility: hidden;
+  display: inline-flex;
+  gap: 4px;
+}
+.ion-dense tr:hover .row-actions,
+.ion-dense tr[aria-selected="true"] .row-actions {
+  visibility: visible;
+}
+.ion-dense .row-actions button {
+  border: 1px solid var(--ion-border);
+  background: var(--ion-surface-2);
+  color: var(--ion-text-muted);
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 10.5px;
+  line-height: 1.6;
+  cursor: pointer;
+}
+.ion-dense .row-actions button:hover {
+  color: var(--ion-text);
+  border-color: var(--ion-border-strong);
+}
+
+/* Figures line up only with tabular figures; Geist defaults to
+   proportional, so an age or a score column jitters without this. */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Panel: the box contract as a named surface, for pages not built on
+   daisyUI's .card. Same hairline, same 12px, same flatness. */
+.ion-panel {
+  border: 1px solid var(--ion-border);
+  border-radius: 12px;
+  background: var(--ion-surface);
+  min-width: 0;
+}
+.ion-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 16px;
+  min-height: 52px;
+  border-bottom: 1px solid var(--ion-border);
+}
+.ion-panel-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.ion-panel-body {
+  padding: 18px;
+}
+
+/* Label and value, the two roles a fact grid needs. The value carries the
+   wrap policy because it is where a hash or a path lands. */
+.ion-field-label {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--ion-text-muted);
+}
+.ion-field-value {
+  font-size: 13px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+/* Evidence block. pre-wrap rather than pre: an encoded command is the exact
+   case that clipped at the card edge before. */
+.ion-source {
+  font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  font-size: 11.5px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: var(--ion-bg);
+  border: 1px solid var(--ion-border);
+  border-radius: 10px;
+  padding: 14px;
+}

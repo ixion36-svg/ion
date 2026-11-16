@@ -132,7 +132,7 @@
     <div class="flex flex-wrap items-center gap-2">
       {% if format is not none %}<span class="badge badge-info" id="template-format">{{ format }}</span>{% endif %}
       {% if document_type %}
-        <span class="doc-type-badge{% if document_type.css %} {{ document_type.css }}{% endif %}" id="template-doctype-badge">{{ document_type.label }}</span>
+        <span class="v-chip" id="template-doctype-badge" data-doctype="{{ document_type.doctype or '' }}">{{ document_type.label }}</span>
       {% endif %}
       {# `is not none`, so version 0 still reads as v0. A missing version
          says it is unknown rather than rendering v0, which would be a
