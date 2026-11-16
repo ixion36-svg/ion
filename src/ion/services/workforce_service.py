@@ -17,6 +17,7 @@ from __future__ import annotations
 import calendar
 import json
 import logging
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import List, Optional, Sequence
@@ -1574,6 +1575,120 @@ def establish_from_catalogue(session: Session, *, actor: User) -> dict:
         ))
     session.commit()
     return {"posts_created": created, "roles": roles_done}
+
+
+#: A ceiling on one role's establishment. Not a judgement about how big
+#: a SOC can be -- it is there because this is driven by a number typed
+#: into a form, and a fat finger should not create nine hundred posts
+#: that then have to be deleted one at a time.
+MAX_ESTABLISHMENT = 200
+
+
+def set_establishment(session: Session, *, profile: RoleProfile, count: int,
+                      actor: User) -> dict:
+    """Set how many posts a role has, creating or removing to match.
+
+    The number a lead actually wants to edit. establish_from_catalogue
+    seeds a starting shape and only ever adds; this is the one that can
+    also take posts away, which is why the rules below exist.
+
+    **An occupied post is never removed.** Reducing the establishment
+    deletes vacant posts only, and refuses outright if there are not
+    enough of them rather than removing somebody from their post as a
+    side effect of a number going down. Whoever wants that has to move
+    the person first, which is a deliberate act with its own audit line.
+
+    **A lead post is never removed either.** A vacant lead post is the
+    most valuable thing on the ORBAT -- it is "nobody answers for this
+    unit" -- and deleting it would silently resolve that gap by hiding
+    it. Reducing past the lead posts refuses for the same reason.
+
+    New posts go in the unit the role's existing posts occupy, so a role
+    does not scatter across the tree. A role with no posts yet has no
+    such unit, so it needs one chosen, and that is a refusal rather than
+    a guess: putting an analyst post under the wrong function makes the
+    chain of command wrong, which is the one thing the ORBAT is for.
+    """
+    if not actor.has_permission("workforce:manage"):
+        raise WorkforceError("Permission denied")
+    if count < 0:
+        raise WorkforceError("An establishment cannot be negative.")
+    if count > MAX_ESTABLISHMENT:
+        raise WorkforceError(
+            f"{count} posts is beyond the {MAX_ESTABLISHMENT} this screen "
+            f"will create at once."
+        )
+
+    posts = (
+        session.query(OrgPost)
+        .filter(OrgPost.profile_id == profile.id)
+        .order_by(OrgPost.ordering, OrgPost.id)
+        .all()
+    )
+    before = len(posts)
+    created = removed = 0
+
+    if count > before:
+        units = {p.unit_id for p in posts}
+        if not units:
+            raise WorkforceError(
+                f"{profile.name} has no posts yet, so there is no unit to "
+                f"add to. Add its first post under Structure below, where "
+                f"the unit is chosen explicitly."
+            )
+        # Where most of them already sit, so a role split across two units
+        # grows in the one it mostly occupies rather than the lowest id.
+        unit_id = max(units, key=lambda u: sum(1 for p in posts if p.unit_id == u))
+        # Continue the numbering rather than restart it: two posts called
+        # "#2" cannot be told apart in the tree.
+        used = set()
+        for post in posts:
+            match = re.search(r"#(\d+)$", post.title or "")
+            if match:
+                used.add(int(match.group(1)))
+        next_n = max(used) + 1 if used else before + 1
+
+        for _ in range(count - before):
+            session.add(OrgPost(
+                unit_id=unit_id,
+                title=f"{profile.name} #{next_n}",
+                profile_id=profile.id,
+                ordering=next_n,
+                is_lead=False,
+            ))
+            next_n += 1
+            created += 1
+
+    elif count < before:
+        # Newest first, so the posts a lead just added are the ones that
+        # go back if they overshoot.
+        removable = [
+            p for p in reversed(posts)
+            if p.filled_by_journey_id is None and not p.is_lead
+        ]
+        wanted = before - count
+        if len(removable) < wanted:
+            held = before - len(removable)
+            raise WorkforceError(
+                f"{profile.name} has {held} post(s) that are filled or are "
+                f"lead posts, so it cannot go below {held}. Move the people "
+                f"out first, or delete a specific post on the order of "
+                f"battle."
+            )
+        for post in removable[:wanted]:
+            session.delete(post)
+            removed += 1
+
+    if created or removed:
+        session.add(AuditLog(
+            user_id=actor.id, action="workforce_establishment_set",
+            resource_type="role_profile", resource_id=profile.id,
+            details=f"{actor.username} set {profile.name} to {count} post(s): "
+                    f"{created} created, {removed} removed (was {before})",
+        ))
+    session.commit()
+    return {"role": profile.name, "before": before, "after": count,
+            "created": created, "removed": removed}
 
 
 def establishment_summary(session: Session) -> dict:

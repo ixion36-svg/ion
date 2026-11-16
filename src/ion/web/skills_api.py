@@ -206,6 +206,29 @@ def get_career_goal(
     return {"current_role": goal.current_role, "target_role": goal.target_role}
 
 
+@router.get("/suggested-certifications")
+def suggested_certifications(
+    current_user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Certificates for the caller's current role and the one they want.
+
+    Scoped to the caller, like the rest of this file's own-data routes:
+    it reads their career goal and their recorded certificates and
+    resolves nobody else's.
+
+    The payload carries its own caveat. The catalogue these come from is
+    explicit that they are what adverts and vendor pathways usually list
+    for a role rather than what somebody needs to do the job, and any of
+    them can be met by assessed proficiency instead.
+    """
+    from ion.services.role_skills_service import (
+        suggested_certifications as build,
+    )
+
+    return build(session, current_user.id)
+
+
 @router.post("/career-goal")
 def save_career_goal(
     payload: CareerGoalSave,
@@ -1113,9 +1136,21 @@ def get_training_forecast(
         .all()
     )
 
+    from ion.core.config import get_config
+
     user_forecasts = []
     totals = {"total": 0, "company": 0, "self": 0, "split": 0, "tbd": 0}
     by_emp_type = {}  # emp_type -> {total, company, self, split, tbd, headcount}
+
+    # Every amount added below has to be in the same currency for the sum to
+    # mean anything. Until there was a currency column it always was, by
+    # accident: every price in the product was GBP. A row that states
+    # something else now has to be noticed rather than added in, so the
+    # currencies actually seen are collected and reported. A NULL defers to
+    # the estate's configured currency, which is what the un-backfilled rows
+    # are.
+    estate_currency = (getattr(get_config(), "currency", "GBP") or "GBP").upper()
+    currencies_seen: set[str] = set()
 
     for plan in plans:
         user = session.query(User).filter(User.id == plan.user_id).first()
@@ -1125,6 +1160,9 @@ def get_training_forecast(
             session.query(TrainingPlanItem)
             .filter(TrainingPlanItem.plan_id == plan.id, TrainingPlanItem.status != "skipped")
             .all()
+        )
+        currencies_seen.update(
+            (it.currency or estate_currency).upper() for it in items
         )
         plan_total = sum(it.price for it in items)
         plan_company = sum(it.price for it in items if it.funding_type == "company")
@@ -1174,6 +1212,17 @@ def get_training_forecast(
         "totals": totals,
         "by_employment_type": by_emp_type,
         "plan_count": len(user_forecasts),
+        # What the figures above are in. One currency is the normal case
+        # and the answer; more than one means the totals added amounts
+        # that cannot be added, and a reader has to be told rather than
+        # shown a number with a symbol picked from the configured
+        # setting. Nothing is converted here: that needs a rate and a
+        # date, neither of which this endpoint has any business inventing.
+        "currency": (
+            next(iter(currencies_seen)) if len(currencies_seen) == 1
+            else estate_currency
+        ),
+        "mixed_currencies": sorted(currencies_seen) if len(currencies_seen) > 1 else [],
     }
 
 

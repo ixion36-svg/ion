@@ -93,10 +93,13 @@
     </div>
 
     <!-- ── MAIN GRID ── -->
-    <main id="hero-section" class="grid grid-cols-12 gap-6">
+    {# Each Customize toggle hides one column, never the grid around it: the
+       ids sit on the columns so that "Threat Feed" does not take the KPI
+       stack with it and "My Cases" does not take the handover card. #}
+    <main class="grid grid-cols-12 gap-6">
 
       <!-- ┌─── LEFT: CRITICAL FEED (HERO) ───┐ -->
-      <section class="col-span-12 lg:col-span-8 min-w-0 rise d-2">
+      <section id="hero-section" class="col-span-12 lg:col-span-8 min-w-0 rise d-2">
         <div class="card bg-base-200 shadow">
           <div class="card-body">
             {# Controls outside #alerts-panel, so a render that says the read
@@ -192,10 +195,10 @@
     </main>
 
     <!-- ═══════════════════ SECONDARY ROW ═══════════════════ -->
-    <section id="cases-section" class="grid grid-cols-12 gap-6 mt-10 lg:mt-14">
+    <section class="grid grid-cols-12 gap-6 mt-10 lg:mt-14">
 
       <!-- My open cases -->
-      <div class="col-span-12 lg:col-span-5 min-w-0 rise d-4 card bg-base-200 shadow">
+      <div id="cases-section" class="col-span-12 lg:col-span-5 min-w-0 rise d-4 card bg-base-200 shadow">
         <div class="card-body">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex flex-wrap items-baseline gap-3">

@@ -1,11 +1,20 @@
-{% macro value(v, money=false) -%}{% if v is not none %}{% if money %}£{{ '{:,.0f}'.format(v) }}{% else %}{{ v }}{% endif %}{% else %}Unknown{% endif %}{%- endmacro %}
+{# `as_money`, not `money`: the parameter would shadow the money()
+   global inside this macro and the call below would try to invoke a
+   boolean. #}
+{% macro value(v, as_money=false) -%}{% if v is not none %}{% if as_money %}{{ money(v) }}{% else %}{{ v }}{% endif %}{% else %}Unknown{% endif %}{%- endmacro %}
 {% set t = totals or {} %}
 {% if state == 'failed' %}
 <div class="tp-empty" role="alert">Failed to load forecast data.</div>
 {% else %}
+{% if mixed_currencies %}
+{# The totals below added amounts in different currencies. Nothing here
+   can convert them -- that needs a rate and a date -- so the reader is
+   told rather than shown a figure with a symbol chosen by a setting. #}
+<div class="tp-empty" role="alert">These plans record prices in {{ mixed_currencies | join(", ") }}. The totals below add them together, so treat them as unreliable until the plans use one currency.</div>
+{% endif %}
 <div class="tp-summary" id="tp-forecast-totals">
-{% for label, v, money in [('Personnel with Plans', plan_count, false), ('Total Certifications', total_certs, false), ('Total Forecast', t.get('total'), true), ('Est. Company Liability', company_liability, true), ('Confirmed Company', t.get('company'), true), ('Self Funded', t.get('self'), true), ('Unclassified (TBD)', t.get('tbd'), true)] %}
-<div class="tp-summary-card"><div class="tp-summary-value">{{ value(v, money) }}</div><div class="tp-summary-label">{{ label }}</div></div>
+{% for label, v, as_money in [('Personnel with Plans', plan_count, false), ('Total Certifications', total_certs, false), ('Total Forecast', t.get('total'), true), ('Est. Company Liability', company_liability, true), ('Confirmed Company', t.get('company'), true), ('Self Funded', t.get('self'), true), ('Unclassified (TBD)', t.get('tbd'), true)] %}
+<div class="tp-summary-card"><div class="tp-summary-value">{{ value(v, as_money) }}</div><div class="tp-summary-label">{{ label }}</div></div>
 {% endfor %}
 <div class="tp-summary-card tp-summary-card-progress">{% if completion is not none %}<div class="tp-progress-bar"><div class="tp-progress-fill" data-ion-style="width:{{ completion }}%"></div></div>{% endif %}<div class="tp-summary-label">{{ value(completion) }}{% if completion is not none %}%{% endif %} Team Completion</div></div>
 </div>
@@ -16,7 +25,7 @@
 {% else %}<div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
 {% for kind, d in by_employment_type.items() %}
 <div class="tp-summary-card"><strong>{{ {'cs':'Civil Servant','contractor':'Contractor','military':'Military','other':'Other'}.get(kind, kind) }}</strong>
-{% for label, key, money in [('Personnel','headcount',false), ('Certifications','certs',false), ('Total Cost','total',true), ('Company','company',true), ('Self','self',true)] %}<div>{{ label }}: {{ value(d.get(key), money) }}</div>{% endfor %}
+{% for label, key, as_money in [('Personnel','headcount',false), ('Certifications','certs',false), ('Total Cost','total',true), ('Company','company',true), ('Self','self',true)] %}<div>{{ label }}: {{ value(d.get(key), as_money) }}</div>{% endfor %}
 <div>Est. Liability: {{ value(d.get('company_liability'), true) }}</div></div>
 {% endfor %}</div>{% endif %}
 </div>

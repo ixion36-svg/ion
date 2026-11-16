@@ -77,5 +77,11 @@ def test_enrichment_lookup_reports_observable_enrich(rows):
 
 def test_a_module_gate_is_not_reported_as_a_permission(rows):
     """require_workforce_module 404s when the feature is off. It is not a
-    permission, and it sits beside workforce:manage on this page."""
-    assert _one(rows, "/workforce/profiles", "GET")["permission"] == "workforce:manage"
+    permission, and it sits beside workforce:manage on this route.
+
+    Was /workforce/profiles, which is now the Setup tab of /workforce. The
+    gate moved with it and onto the router rather than each route, so this
+    also checks the tool reads a router-level dependency -- the earlier
+    version only ever saw one declared per route.
+    """
+    assert _one(rows, "/ui/workforce/setup", "GET")["permission"] == "workforce:manage"
