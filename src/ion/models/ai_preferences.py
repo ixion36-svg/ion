@@ -15,10 +15,13 @@ class AIUserPreference(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
 
-    # RAG opt-in flags (all default False — user must explicitly enable)
-    rag_knowledge_base = Column(Boolean, default=False, nullable=False)
-    rag_user_notes = Column(Boolean, default=False, nullable=False)
-    rag_playbooks = Column(Boolean, default=False, nullable=False)
+    # Retrieval sources, on by default. Notes are only ever the user's own.
+    rag_knowledge_base = Column(Boolean, default=True, nullable=False)
+    rag_user_notes = Column(Boolean, default=True, nullable=False)
+    rag_playbooks = Column(Boolean, default=True, nullable=False)
+    # Rows from before the sources defaulted on carry 0 and are switched on
+    # once at startup (storage/database.py); new rows start at 1.
+    rag_defaults_version = Column(Integer, default=1, nullable=False)
 
     # Response settings
     show_citations = Column(Boolean, default=True, nullable=False)

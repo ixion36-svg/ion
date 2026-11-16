@@ -49,6 +49,7 @@ router = APIRouter()
 
 FRAGMENT = "_fragments/detection_health.html"
 DISAGREEMENTS_FRAGMENT = "_fragments/detection_health_disagreements.html"
+ATTACK_FRAGMENT = "_fragments/detection_health_attack.html"
 
 #: The permission both reads carry. One name, so the two fragments and the
 #: two JSON endpoints they mirror cannot drift apart one at a time.
@@ -203,6 +204,55 @@ def drill_url(rule_name: str | None, days: int | None) -> str:
     return "/ui/detection-health/disagreements?" + urlencode(params)
 
 
+def attack_url(rule_name: str | None, days: int | None) -> str:
+    """The ATT&CK-guidance URL for one rule, encoded like drill_url."""
+    params: dict[str, Any] = {"rule": "" if rule_name is None else rule_name}
+    if days is not None:
+        params["days"] = days
+    return "/ui/detection-health/attack?" + urlencode(params)
+
+
+def attack_panel(payload: dict[str, Any]) -> dict[str, Any]:
+    """One view dict for the ATT&CK guidance panel.
+
+    Resolves to exactly one of four states, because collapsing any two of
+    them tells an engineer something that is not true:
+
+      * ``unloaded`` -- the bundled snapshot could not be read. Not "MITRE
+        publishes no guidance", which would read as a finding about the rule.
+      * ``untagged`` -- the rule's alerts carry no ATT&CK technique at all,
+        so there is nothing to look guidance up by. That is a gap in the
+        rule's own mapping, and it is actionable in a different way.
+      * ``unmatched`` -- techniques are present but none has a strategy in
+        the snapshot, which usually means ids older than the catalogue.
+      * ``ok`` -- guidance follows.
+    """
+    snapshot = payload.get("snapshot") or {}
+    techniques = payload.get("techniques") or []
+    without = payload.get("techniques_without_guidance") or []
+
+    if not snapshot.get("loaded"):
+        state = "unloaded"
+    elif not techniques and not without:
+        state = "untagged"
+    elif not techniques:
+        state = "unmatched"
+    else:
+        state = "ok"
+
+    return {
+        "state": state,
+        "rule": payload.get("rule_name"),
+        "period_days": payload.get("period_days"),
+        "attack_version": snapshot.get("attack_version"),
+        "alerts_seen": payload.get("alerts_seen"),
+        "techniques": techniques,
+        "without_guidance": without,
+        "log_sources": payload.get("log_sources") or [],
+        "analytic_total": sum(t.get("analytic_count") or 0 for t in techniques),
+    }
+
+
 def rule_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
     """One view dict per table row, worst first as the service sorted them."""
     thresholds = payload.get("thresholds") or {}
@@ -227,6 +277,7 @@ def rule_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
             # the drill-down, so it gets no band of its own.
             "bob": rate_cell(rule.get("bob_disagreement_rate"), NEUTRAL_BANDS),
             "drill_url": drill_url(name, days),
+            "attack_url": attack_url(name, days),
             "flags": [
                 {"label": label, "badge": badge}
                 for key, badge, label in FLAG_BADGES
@@ -381,4 +432,48 @@ def detection_health_disagreements_fragment(
             "rule": payload.get("rule_name") or rule,
             "disagreements": payload.get("disagreements") or [],
         },
+    )
+
+
+@router.get(
+    "/detection-health/attack",
+    response_class=HTMLResponse,
+    dependencies=[Depends(require_permission(READ_PERMISSION))],
+)
+def detection_health_attack_fragment(
+    request: Request,
+    rule: str = Query(..., description="Rule name, or (unmapped)"),
+    days: int = Query(90, ge=1, le=365),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    """MITRE's detection guidance for the techniques one rule's alerts carry.
+
+    Carries the same `security:read` as the rest of this panel and the same
+    `days` bounds, so it is not a softer way into the alert history than the
+    table it opens from.
+
+    The rule arrives as a query parameter for the reason drill_url gives:
+    free text, and "(unmapped)" is a legal value.
+    """
+    from ion.services.detection_health_service import get_rule_attack_guidance
+
+    try:
+        payload = get_rule_attack_guidance(session, rule, days=days)
+    except Exception:
+        logger.exception("ATT&CK guidance could not be rendered for rule %r",
+                         rule)
+        # Not an empty panel: "MITRE has nothing for this rule" is a
+        # conclusion about the detection, and this is a failed read.
+        return templates.TemplateResponse(
+            request=request,
+            name=ATTACK_FRAGMENT,
+            context={"failed": True, "panel": None, "rule": rule},
+            status_code=200,
+        )
+
+    return templates.TemplateResponse(
+        request=request,
+        name=ATTACK_FRAGMENT,
+        context={"failed": False, "panel": attack_panel(payload),
+                 "rule": rule},
     )

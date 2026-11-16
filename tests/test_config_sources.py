@@ -143,8 +143,8 @@ def test_env_field_map_matches_override_block():
 
     derived = {}
     pattern = re.compile(
-        r"_config\.([a-z_0-9]+)\s*=\s*(.+?)"
-        r"(?=\n\s*(?:if|elif|else|_config\.|#|try|except|for|return|\Z))",
+        r"\bcfg\.([a-z_0-9]+)\s*=\s*(.+?)"
+        r"(?=\n\s*(?:if|elif|else|cfg\.|#|try|except|for|return|\Z))",
         re.S,
     )
     for match in pattern.finditer(text):
@@ -157,6 +157,11 @@ def test_env_field_map_matches_override_block():
         ]
         if envs:
             derived.setdefault(field, envs[0])
+
+    # The override block builds into a local called `cfg` (_load_config). A
+    # rename this pattern missed would derive nothing and pass, so a floor:
+    # the block assigns well over a hundred fields from the environment.
+    assert len(derived) > 100, f"derived only {len(derived)} overrides; did the loader's local change name?"
 
     missing = sorted(set(derived) - set(ENV_FIELD_MAP))
     assert missing == [], (

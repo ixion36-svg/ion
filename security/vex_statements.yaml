@@ -1,0 +1,134 @@
+# VEX statements for ION — the authored source of truth.
+#
+# `scripts/generate_vex.py` turns this into security/ion.openvex.json and
+# security/ion.csaf.json, both shipped in the image beside sbom.spdx.json. A
+# scanner reading the SBOM sees every dependency ION installs; these say what
+# ION asserts about the advisories against them.
+#
+# Every statement below is transcribed from a decision already recorded in
+# pyproject.toml, so the pin and the assertion cannot drift apart silently —
+# tests/test_vex_documents.py fails if an advisory named in pyproject has no
+# statement here.
+#
+# Rules the generator enforces, from the OpenVEX spec. It refuses to write
+# rather than emitting a document that asserts something malformed:
+#   status            one of not_affected | affected | fixed | under_investigation
+#   not_affected      MUST carry a justification from the five legal values:
+#                       component_not_present
+#                       vulnerable_code_not_present
+#                       vulnerable_code_not_in_execute_path
+#                       vulnerable_code_cannot_be_controlled_by_adversary
+#                       inline_mitigations_already_exist
+#   affected          MUST carry an action_statement
+#
+# `evidence` is ION's own, not part of either output format. It names where
+# the claim can be checked, so a reviewer never has to take a status on trust.
+
+product:
+  name: ION
+  # Interpolated with the version in pyproject.toml at generation time, so the
+  # document can never assert about a release it was not built from.
+  purl_template: "pkg:docker/fubsxploitapps/ion@{version}"
+  cpe_template: "cpe:2.3:a:ixion36:ion:{version}:*:*:*:*:*:*:*"
+
+author: "ION maintainer (ixion36)"
+author_role: "vendor"
+
+statements:
+
+  # ── not_affected ────────────────────────────────────────────────────────
+
+  - vulnerability: CVE-2024-23342
+    status: not_affected
+    justification: component_not_present
+    impact_statement: >-
+      The Minerva timing attack is in `ecdsa`, which reached ION only as a
+      transitive dependency of python-jose. ION migrated to PyJWT, which pulls
+      `cryptography` and no `ecdsa`, so the package is absent from the image.
+    evidence: "pyproject.toml — PyJWT[crypto] replaced python-jose[cryptography]"
+
+  - vulnerability: MAL-2026-4750
+    status: not_affected
+    justification: component_not_present
+    impact_statement: >-
+      The compromised artefact is the fastapi 0.136.3 wheel, whose metadata
+      adds an undocumented dependency on a typo-squat package. ION pins
+      fastapi >=0.136.1,<0.136.3, so the affected release is never resolved.
+      ION also does not use the [standard] extra through which the
+      typo-squat would have installed.
+    evidence: "pyproject.toml — fastapi>=0.136.1,<0.136.3"
+
+  - vulnerability: CVE-2025-71176
+    status: not_affected
+    justification: component_not_present
+    impact_statement: >-
+      The /tmp race is in pytest, which is a dev extra. The runtime image
+      installs only the resolved runtime venv, so pytest is not present in a
+      shipped ION container.
+    evidence: "pyproject.toml — pytest is under [project.optional-dependencies] dev"
+
+  # ── fixed: shipped at or above the patched version ──────────────────────
+
+  - vulnerability: PYSEC-2026-35
+    status: fixed
+    impact_statement: "DNS constraint bypass in cryptography; ION pins cryptography>=46.0.7."
+    evidence: "pyproject.toml — cryptography>=46.0.7"
+
+  - vulnerability: PYSEC-2026-161
+    status: fixed
+    impact_statement: >-
+      Host-header URL reconstruction in starlette. ION pins starlette>=1.0.1,
+      which requires fastapi>=0.136.1 to drop its upper cap.
+    evidence: "pyproject.toml — starlette>=1.0.1"
+
+  - vulnerability: PYSEC-2026-141
+    status: fixed
+    impact_statement: "ION pins urllib3>=2.7.0."
+    evidence: "pyproject.toml — urllib3>=2.7.0"
+
+  - vulnerability: PYSEC-2026-87
+    status: fixed
+    impact_statement: "lxml, reached as a WeasyPrint dependency. ION pins lxml>=6.1.0."
+    evidence: "pyproject.toml — lxml>=6.1.0"
+
+  - vulnerability: PYSEC-2026-3447
+    status: fixed
+    impact_statement: "ION pins setuptools>=83.0.0."
+    evidence: "pyproject.toml — setuptools>=83.0.0"
+
+  - vulnerability: PYSEC-2026-120
+    status: fixed
+    impact_statement: >-
+      Critical-header bypass in PyJWT. ION pins PyJWT>=2.12.0 and validates
+      RS256 tokens from Keycloak.
+    evidence: "pyproject.toml — PyJWT[crypto]>=2.12.0"
+
+  - vulnerability: CVE-2026-45409
+    status: fixed
+    impact_statement: "ION pins idna>=3.15."
+    evidence: "pyproject.toml — idna>=3.15"
+
+  - vulnerability: CVE-2026-40192
+    status: fixed
+    impact_statement: "Pillow, reached as a WeasyPrint dependency. ION pins Pillow>=12.2.0."
+    evidence: "pyproject.toml — Pillow>=12.2.0"
+
+  - vulnerability: CVE-2026-30922
+    status: fixed
+    impact_statement: "Recursion-bomb DoS via crafted ASN.1. ION pins pyasn1>=0.6.3."
+    evidence: "pyproject.toml — pyasn1>=0.6.3"
+
+  - vulnerability: CVE-2026-4539
+    status: fixed
+    impact_statement: "ReDoS in the Pygments AdlLexer, local access only. ION pins pygments>=2.20.0."
+    evidence: "pyproject.toml — pygments>=2.20.0"
+
+  - vulnerability: CVE-2026-25645
+    status: fixed
+    impact_statement: "ION pins requests>=2.33.0."
+    evidence: "pyproject.toml — requests>=2.33.0"
+
+  - vulnerability: CVE-2026-40347
+    status: fixed
+    impact_statement: "Multipart DoS. ION pins python-multipart>=0.0.27."
+    evidence: "pyproject.toml — python-multipart>=0.0.27"

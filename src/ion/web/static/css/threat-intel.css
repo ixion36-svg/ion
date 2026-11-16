@@ -1,28 +1,272 @@
 /* Threat Intel page styles.
-   Extracted from the inline <style> in templates/threat_intel.html so
-   the markup has one definition and a stylesheet sweep can reach these
-   rules. Linked from that template's head_css block. */
-.ti-page { max-width: 1400px; margin: 0 auto; }
-.ti-header { margin-bottom: 24px; }
-.ti-header h1 { font-size: 1.5rem; margin: 0 0 4px; }
-.ti-header p { color: var(--text-secondary); font-size: .85rem; margin: 0; }
 
-/* v0.27.0: pill-style tabs with cyan active state — ported from
-   the old /threat-landscape colour palette. The cards / cells inside
-   tabs keep using the existing ti-* CSS, but the strip itself is
-   Tailwind-driven so it picks up the brand colours. */
+   Linked from threat_intel.html's head_css block. Since the condensed
+   layout (five tabs, compact header, KPI row) the page's own chrome lives
+   here rather than in Tailwind utilities: daisyUI's colours are not
+   Tailwind theme colours, so most of the opacity and hover variants this
+   layout needs do not exist in the build, and a page sheet needs no
+   rebuild.
+
+   Colours come from the theme (--color-base-*, --color-primary and the
+   status colours) mixed down with color-mix, so light mode and the glass
+   surfaces both follow without restating them. ion-glass.css loads after
+   this sheet and turns --color-base-200 translucent in glass mode. */
+
+.ti-page {
+    --ti-line: var(--ion-border, color-mix(in srgb, var(--color-base-content) 12%, transparent));
+    --ti-line-2: color-mix(in srgb, var(--color-base-content) 18%, transparent);
+    --ti-panel: var(--color-base-200);
+    --ti-panel-2: color-mix(in srgb, var(--color-base-content) 7%, transparent);
+    --ti-text: var(--color-base-content);
+    --ti-muted: color-mix(in srgb, var(--color-base-content) 64%, transparent);
+    --ti-dim: color-mix(in srgb, var(--color-base-content) 46%, transparent);
+    --ti-primary: var(--color-primary, #6de4ff);
+    --ti-ok: var(--color-success, #4ade80);
+    --ti-warn: var(--color-warning, #fbbf24);
+    --ti-bad: var(--color-error, #f87171);
+    --ti-high: #fb923c;
+    --ti-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+
+    position: relative; z-index: 10;
+    width: min(1720px, 100%); margin: 0 auto;
+    padding: 18px clamp(16px, 1.6vw, 28px) 40px;
+    font-size: 13px; line-height: 1.45;
+}
+
+/* main.container caps every page at 1400px with 2rem padding. :has()
+   lifts that for this page only, as notes does, so the layout can use a
+   wide screen the way the approved design does. */
+main.container:has(> .ti-page) { max-width: 100%; padding: 0; }
+
+/* ── Header ─────────────────────────────────────── */
+.ti-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 12px; }
+.ti-eyebrow { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ti-primary); }
+.ti-title { font-size: 22px; font-weight: 650; letter-spacing: -.01em; margin: 0; color: var(--ti-text); line-height: 1.2; }
+.ti-grow { flex: 1 1 auto; min-width: 0; }
+.ti-pill {
+    display: inline-flex; align-items: center; gap: 7px; padding: 5px 11px;
+    border-radius: 999px; border: 1px solid var(--ti-line); background: var(--ti-panel);
+    font-size: 12px; color: var(--ti-muted); white-space: nowrap;
+}
+.ti-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--ti-dim); flex: none; }
+.ti-pill.is-ok .ti-dot { background: var(--ti-ok); }
+.ti-pill.is-warn .ti-dot { background: var(--ti-warn); }
+.ti-hbtn {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 8px;
+    border: 1px solid var(--ti-line-2); background: var(--ti-panel-2); color: var(--ti-text);
+    white-space: nowrap; cursor: pointer; transition: border-color .15s, background .15s;
+}
+.ti-hbtn:hover { border-color: var(--ti-primary); }
+.ti-hbtn.htmx-request { opacity: .6; cursor: progress; }
+
+/* The briefing panel, revealed by the header button. */
+.ti-brief {
+    border: 1px solid color-mix(in srgb, var(--ti-warn) 30%, transparent);
+    background: color-mix(in srgb, var(--ti-warn) 5%, var(--ti-panel));
+    border-radius: 12px; padding: 10px 14px 12px; margin-bottom: 12px;
+}
+.ti-brief-h { display: flex; align-items: center; gap: 10px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ti-warn); }
+.ti-brief-wait { display: none; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--ti-muted); }
+.ti-brief.htmx-request .ti-brief-wait { display: inline; }
+.ti-brief-b { margin-top: 6px; font-size: 13px; line-height: 1.6; color: var(--ti-text); }
+.ti-x { margin-left: auto; background: none; border: 0; color: var(--ti-muted); font-size: 18px; line-height: 1; cursor: pointer; }
+.ti-x:hover { color: var(--ti-text); }
+
+/* ── Search bar ─────────────────────────────────── */
+.ti-searchbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.ti-search { flex: 1 1 auto; min-width: 0; height: 2.25rem; font-size: 13px; }
+
+/* ── Tabs ───────────────────────────────────────── */
+.ti-tabs {
+    display: flex; gap: 4px; padding: 4px; width: fit-content; max-width: 100%;
+    overflow-x: auto; border: 1px solid var(--ti-line); border-radius: 12px;
+    background: var(--ti-panel); margin-bottom: 14px;
+}
 .ti-tab {
-    background: transparent; border: none; cursor: pointer;
-    color: rgb(148 163 184); /* slate-400 */
+    display: inline-flex; align-items: baseline; gap: 6px; padding: 7px 14px;
+    border-radius: 9px; border: 0; background: transparent; cursor: pointer;
+    color: var(--ti-muted); font-weight: 600; font-size: 12.5px; white-space: nowrap;
 }
-.ti-tab:hover { color: #fff; }
-.ti-tab.active {
-    background: var(--ion-cyan, #6de4ff);
-    color: #0a0c12; /* ink-950 */
-    box-shadow: 0 0 18px -4px rgba(109,228,255,0.8);
-}
+.ti-tab:hover { color: var(--ti-text); }
+.ti-tab.active { background: color-mix(in srgb, var(--ti-primary) 14%, transparent); color: var(--ti-primary); }
+.ti-tab-c { font: 600 11px var(--ti-mono); color: var(--ti-dim); }
+.ti-tab.active .ti-tab-c { color: color-mix(in srgb, var(--ti-primary) 70%, transparent); }
+.ti-tab-c:empty { display: none; }
+
+/* A tab holds one or two views; only the active ones show. */
+.ti-group { display: none; }
+.ti-group.active { display: block; }
 .ti-panel { display: none; }
 .ti-panel.active { display: block; }
+
+.ti-subtabs { display: flex; gap: 2px; margin: -4px 0 12px; border-bottom: 1px solid var(--ti-line); }
+.ti-sub {
+    padding: 7px 12px 8px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px;
+    background: none; color: var(--ti-muted); font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.ti-sub:hover { color: var(--ti-text); }
+.ti-sub.active { color: var(--ti-primary); border-bottom-color: var(--ti-primary); }
+
+/* ── Filters row ────────────────────────────────── */
+.ti-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.ti-filters .select { width: auto; min-width: 9rem; }
+.ti-field { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ti-muted); white-space: nowrap; }
+.ti-date { width: 9.5rem; color-scheme: dark; }
+html[data-mode="light"] .ti-date { color-scheme: light; }
+
+/* ── KPI row ────────────────────────────────────── */
+.ti-kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+.ti-kpi {
+    padding: 11px 14px; border: 1px solid var(--ti-line); border-radius: 12px;
+    background: var(--ti-panel); min-width: 0;
+}
+.ti-kpi-wide, .ti-kpi-alert { grid-column: 1 / -1; }
+.ti-kpi-k { color: var(--ti-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ti-kpi-v { font-size: 24px; font-weight: 700; margin-top: 2px; color: var(--ti-text); line-height: 1.25; font-variant-numeric: tabular-nums; }
+.ti-kpi-v.is-warn { color: var(--ti-warn); }
+.ti-kpi-v.is-bad { color: var(--ti-bad); }
+.ti-kpi-s { color: var(--ti-muted); font-size: 11.5px; margin-top: 1px; }
+.ti-kpi-dash { color: var(--ti-dim); }
+.ti-kpi-na { color: var(--ti-dim); font-size: 14px; font-weight: 500; }
+.ti-kpi-alert {
+    border: 1px solid color-mix(in srgb, var(--ti-bad) 35%, transparent);
+    background: color-mix(in srgb, var(--ti-bad) 7%, transparent);
+    color: var(--ti-bad); border-radius: 10px; padding: 8px 12px; font-size: 12px;
+}
+
+/* ── Cards and grids ────────────────────────────── */
+.ti-grid { display: grid; gap: 14px; margin-bottom: 14px; }
+.ti-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ti-grid-ov { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); }
+.ti-grid-ov.is-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ti-grid-watch { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); align-items: start; }
+.ti-card { border: 1px solid var(--ti-line); border-radius: 12px; background: var(--ti-panel); min-width: 0; overflow: hidden; }
+.ti-card-pad { padding: 10px 14px; }
+.ti-card-h {
+    display: flex; align-items: center; gap: 8px; padding: 9px 14px;
+    border-bottom: 1px solid var(--ti-line);
+    font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    color: color-mix(in srgb, var(--ti-text) 82%, transparent);
+}
+.ti-card-n { color: var(--ti-dim); font-weight: 600; letter-spacing: .04em; white-space: nowrap; }
+.ti-card-r {
+    margin-left: auto; background: none; border: 0; padding: 0; cursor: pointer;
+    font-size: 12px; font-weight: 600; letter-spacing: 0; text-transform: none;
+    color: var(--ti-primary); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+}
+.ti-card-r:hover { text-decoration: underline; }
+.ti-toggle { color: var(--ti-muted); font-weight: 500; cursor: pointer; }
+.ti-toggle:hover { text-decoration: none; color: var(--ti-text); }
+.ti-card-b { padding: 10px 14px 12px; }
+.ti-card > .ti-table, .ti-card > .ti-mini { margin: 0; }
+#ti-overview-intel:empty { display: none; }
+#ti-connect-opencti:empty { display: none; }
+
+/* Notes and small text */
+.ti-note { margin: 0; color: var(--ti-muted); font-size: 12.5px; padding: 2px 0; }
+.ti-card > .ti-note { padding: 10px 14px; }
+.ti-note.is-bad { color: var(--ti-bad); }
+.ti-note.is-warn { color: var(--ti-warn); margin-bottom: 8px; }
+.ti-small { font-size: 11.5px; margin-top: 8px; }
+.ti-mono { font-family: var(--ti-mono); font-size: 12px; }
+.ti-dim { color: var(--ti-dim); }
+.ti-nowrap { white-space: nowrap; }
+.ti-ellip { max-width: 0; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ti-linkbtn { background: none; border: 0; padding: 0; color: var(--ti-primary); cursor: pointer; font: inherit; text-align: left; }
+.ti-linkbtn:hover { text-decoration: underline; }
+.ti-kpi-s .ti-linkbtn { font-weight: 600; }
+
+/* Tags and flags */
+.ti-otag {
+    display: inline-block; font-size: 9.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+    padding: 2px 6px; border-radius: 5px; color: #ddd6fe; background: rgba(167, 139, 250, .15);
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+html[data-mode="light"] .ti-otag { color: #5b21b6; }
+.ti-flag {
+    display: inline-block; margin-left: 6px; font-size: 9.5px; font-weight: 700; letter-spacing: .05em;
+    text-transform: uppercase; padding: 2px 6px; border-radius: 5px; vertical-align: 1px;
+}
+.ti-flag.is-bad { color: var(--ti-bad); background: color-mix(in srgb, var(--ti-bad) 16%, transparent); }
+.ti-flag.is-warn { color: var(--ti-warn); background: color-mix(in srgb, var(--ti-warn) 15%, transparent); }
+
+/* The one Connect OpenCTI prompt */
+.ti-connect {
+    display: flex; gap: 10px; align-items: center; margin: 0 14px 14px; padding: 10px 12px;
+    border: 1px dashed var(--ti-line-2); border-radius: 10px; color: var(--ti-muted); font-size: 12.5px;
+}
+.ti-connect b { color: var(--ti-text); }
+.ti-connect a { color: var(--ti-primary); font-weight: 600; text-decoration: none; }
+.ti-connect a:hover { text-decoration: underline; }
+.ti-connect-i { font-size: 18px; color: var(--ti-dim); }
+
+/* Observable feed */
+.ti-feed { list-style: none; margin: 0; padding: 0; }
+.ti-feed-row {
+    display: grid; grid-template-columns: 78px minmax(0, 1fr) auto; gap: 10px; align-items: center;
+    padding: 6px 0; border-bottom: 1px solid color-mix(in srgb, var(--ti-text) 5%, transparent); font-size: 12.5px;
+}
+.ti-feed-row:last-child { border-bottom: 0; }
+.ti-feed-v { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ti-text); }
+
+/* Technique bars. Widths arrive as data-ion-style. */
+.ti-bars { display: grid; gap: 7px; }
+.ti-bar-row { display: grid; grid-template-columns: 96px minmax(0, 1fr) 52px; gap: 10px; align-items: center; font-size: 12.5px; }
+.ti-bar-row > :last-child { text-align: right; }
+.ti-track { height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--ti-text) 7%, transparent); overflow: hidden; }
+.ti-track i { display: block; height: 100%; width: 0; border-radius: 4px; background: var(--ti-primary); }
+.ti-track i.is-crit { background: var(--ti-bad); }
+.ti-track i.is-high { background: var(--ti-high); }
+.ti-track i.is-med { background: var(--ti-warn); }
+
+/* Compact tables in cards */
+.ti-mini { width: 100%; border-collapse: collapse; font-size: 12.5px; table-layout: auto; }
+.ti-mini th {
+    text-align: left; color: var(--ti-dim); font-size: 10.5px; font-weight: 700; letter-spacing: .07em;
+    text-transform: uppercase; padding: 7px 12px; border-bottom: 1px solid var(--ti-line); white-space: nowrap;
+}
+.ti-mini td { padding: 6px 12px; border-bottom: 1px solid color-mix(in srgb, var(--ti-text) 5%, transparent); }
+.ti-mini tr:last-child td { border-bottom: 0; }
+
+/* KEV status bar and pager */
+.ti-statusbar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 20px; padding: 8px 14px;
+    border: 1px solid var(--ti-line); border-radius: 10px; background: var(--ti-panel); font-size: 12px;
+}
+.ti-pager {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    padding: 8px 12px; font-size: 12px; color: var(--ti-muted);
+}
+.ti-pager:first-child { border-bottom: 1px solid var(--ti-line); }
+.ti-pager:not(:first-child) { border-top: 1px solid var(--ti-line); }
+.ti-pager b { color: var(--ti-text); font-variant-numeric: tabular-nums; }
+.ti-pager-btns { display: inline-flex; align-items: center; gap: 4px; }
+.ti-pager-pos { padding: 0 8px; font-variant-numeric: tabular-nums; }
+.ti-pbtn {
+    padding: 3px 10px; border-radius: 7px; border: 1px solid var(--ti-line-2); background: var(--ti-panel-2);
+    color: var(--ti-text); font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.ti-pbtn:hover:not(:disabled) { border-color: var(--ti-primary); color: var(--ti-primary); }
+.ti-pbtn:disabled { opacity: .35; cursor: default; }
+
+/* Glass: the page's surfaces get the same lit edge as .card. */
+html[data-glass="on"][data-mode="dark"] :is(.ti-card, .ti-kpi, .ti-tabs, .ti-statusbar) {
+    box-shadow: var(--glass-edge), 0 8px 28px rgba(0, 0, 0, 0.22);
+}
+
+@media (max-width: 1400px) {
+    .ti-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 1200px) {
+    .ti-grid-ov, .ti-grid-ov.is-two, .ti-grid-3, .ti-grid-watch { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 700px) {
+    .ti-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ti-pill { white-space: normal; }
+}
+
+/* ── Legacy page pieces, carried over ───────────── */
 
 /* Stat cards */
 .ti-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
@@ -33,15 +277,6 @@
 .ti-stat-value { font-size: 1.8rem; font-weight: 700; color: var(--accent); }
 .ti-stat-label { font-size: .78rem; color: var(--text-secondary); margin-top: 4px; }
 
-/* Search bar */
-.ti-search-bar { display: flex; gap: 10px; margin-bottom: 20px; }
-.ti-search-input {
-    flex: 1; padding: 8px 14px; background: var(--bg-secondary);
-    border: 1px solid var(--ion-border); border-radius: var(--radius);
-    color: var(--text-primary); font-size: .85rem;
-}
-.ti-search-input::placeholder { color: var(--text-secondary); }
-.ti-search-input:focus { outline: none; border-color: var(--accent); }
 .ti-btn {
     padding: 8px 16px; background: var(--accent); color: #000; border: none;
     border-radius: var(--radius); cursor: pointer; font-size: .82rem; font-weight: 600; white-space: nowrap;
@@ -58,24 +293,27 @@
 .ti-btn-watch { background: var(--neon-orange); }
 .ti-btn-watched { background: transparent; border: 1px solid var(--success); color: var(--success); }
 
-/* Tables */
-.ti-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+/* Tables. Denser than they were: 7px rows where they had 10px, and the
+   header in the small caps the cards use. */
+.ti-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .ti-table th {
-    text-align: left; padding: 10px 12px; color: var(--text-secondary);
-    border-bottom: 1px solid var(--ion-border); font-weight: 600; font-size: .78rem;
-    text-transform: uppercase; letter-spacing: .5px;
+    text-align: left; padding: 8px 12px; color: var(--ti-dim, var(--text-secondary));
+    border-bottom: 1px solid var(--ion-border); font-weight: 700; font-size: 10.5px;
+    text-transform: uppercase; letter-spacing: .07em; white-space: nowrap;
 }
-.ti-table td { padding: 10px 12px; border-bottom: 1px solid var(--ion-border); vertical-align: top; }
+.ti-table td { padding: 7px 12px; border-bottom: 1px solid color-mix(in srgb, var(--color-base-content) 6%, transparent); vertical-align: top; }
 .ti-table tr:hover td { background: rgba(255,255,255,.02); }
+.ti-table tbody tr:last-child td { border-bottom: 0; }
+.ti-table-tight td { padding: 6px 12px; }
 .ti-table .ti-name-cell { cursor: pointer; color: var(--accent); font-weight: 600; }
 .ti-table .ti-name-cell:hover { text-decoration: underline; }
 
 /* Detail row */
 .ti-detail-row { display: none; }
 .ti-detail-row.open { display: table-row; }
-.ti-detail-row td { padding: 16px 20px; background: var(--bg-secondary); }
+.ti-detail-row td { padding: 14px 18px; background: var(--bg-secondary); }
 .ti-detail-section { margin-bottom: 12px; }
-.ti-detail-section h4 { font-size: .82rem; color: var(--text-secondary); margin: 0 0 6px; text-transform: uppercase; letter-spacing: .5px; }
+.ti-detail-section h4 { font-size: .78rem; color: var(--text-secondary); margin: 0 0 6px; text-transform: uppercase; letter-spacing: .5px; }
 .ti-detail-section p { margin: 0; font-size: .82rem; line-height: 1.5; color: var(--text-primary); }
 .ti-detail-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .ti-tag {
@@ -101,7 +339,7 @@
 .ti-confidence.low { color: var(--success); }
 
 /* Loading / empty states */
-.ti-loading, .ti-empty { text-align: center; padding: 40px; color: var(--text-secondary); font-size: .85rem; }
+.ti-loading, .ti-empty { text-align: center; padding: 28px 16px; color: var(--text-secondary); font-size: .82rem; }
 .ti-spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--ion-border); border-top-color: var(--accent); border-radius: 50%; animation: ti-spin .6s linear infinite; margin-right: 8px; vertical-align: middle; }
 @keyframes ti-spin { to { transform: rotate(360deg); } }
 
@@ -111,7 +349,7 @@
 /* `display` is conditional: this element is also written with Tailwind's `hidden`, and an unconditional display here beats it. */
 .ti-badge:not(.hidden) { display: inline-block; }
 
-/* Report cards — clickable */
+/* Report cards: clickable */
 .ti-report-card { cursor: pointer; transition: border-color .15s; }
 .ti-report-card:hover { border-color: var(--accent); }
 .ti-report-body { margin: 0; font-size: .82rem; line-height: 1.6; color: var(--text-primary); white-space: pre-wrap; max-height: 320px; overflow-y: auto; }
@@ -122,8 +360,8 @@
    The stage pills carried a bare `active` class and no rule for a bare
    .active exists in this file or in ion.css, so a kill-chain stage the
    attacker reached looked exactly like one they never got to. Namespaced
-   here and given the cyan treatment .ti-tab.active already uses, which
-   is this page's existing vocabulary for an active state. */
+   here and given the cyan treatment, which is this page's vocabulary for
+   an active state. */
 .ti-chain-stage {
     padding: 3px 8px; border-radius: 4px; font-size: .7rem;
     font-weight: 600; text-transform: uppercase; white-space: nowrap;

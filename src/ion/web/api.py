@@ -2758,15 +2758,9 @@ def team_metrics_payload(session: Session) -> dict:
     ).scalar() or 0
 
     thirty_days_ago = now - timedelta(days=30)
-    closed_cases_30d = session.query(AlertCase).filter(
-        AlertCase.closed_at >= thirty_days_ago,
-        AlertCase.closed_at.isnot(None),
-    ).all()
-
-    mttr = None
-    if closed_cases_30d:
-        durations = [(c.closed_at - c.created_at).total_seconds() / 3600 for c in closed_cases_30d]
-        mttr = round(sum(durations) / len(durations), 1)
+    from ion.services.case_metrics import mean_hours_to_close
+    avg_hours, _ = mean_hours_to_close(session, AlertCase.closed_at >= thirty_days_ago)
+    mttr = round(avg_hours, 1) if avg_hours is not None else None
 
     seven_days_ago = now - timedelta(days=7)
     created_7d = session.query(sqlfunc.count(AlertCase.id)).filter(
@@ -3620,6 +3614,17 @@ async def get_batch_triage(
                 triage = triage_map.get(alert_id)
                 if triage:
                     ion_status = triage.status.value if hasattr(triage.status, "value") else str(triage.status)
+                    # An alert on a closed case stays closed, as the case
+                    # does (closed is terminal in ION; reopen the case to
+                    # reopen it). The page's ES snapshot predates ION's own
+                    # writes, and replaying it reopened alerts a false-
+                    # positive close had just closed.
+                    case_closed = (
+                        triage.case is not None
+                        and getattr(triage.case.status, "value", triage.case.status) == "closed"
+                    )
+                    if case_closed and es_status_lower != "closed":
+                        continue
                     if ion_status.lower() != es_status_lower:
                         triage.status = AlertTriageStatus(es_status_lower)
                         logger.debug("Synced ES status '%s' → ION triage for alert %s", es_status_lower, alert_id)

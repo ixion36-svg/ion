@@ -114,6 +114,7 @@ def _detection_coverage() -> dict[str, Any]:
         details["covered_techniques"] = covered_tech
         details["total_techniques"] = total_tech
         details["avg_quality"] = avg_quality
+        details["quality_unit"] = "%" if quality.get("scale") == "percent" else "/40"
 
         # No denominator, no percentage.
         #
@@ -152,12 +153,10 @@ def _detection_coverage() -> dict[str, Any]:
         # no dimension. Without quality there is still coverage, measured, and
         # reporting it on a stated narrower basis beats reporting nothing.
         #
-        # avg_quality is NOT recalibrated here. ION divides by 40 while TIDE's
-        # quality group maxes at 57 by default (mapping 37, field type 12,
-        # search time 8), and ION's 30/20/10 buckets sit against TIDE's own
-        # 80/70/50 out of 100. Both are wrong and both change the grade, so
-        # they are a separate decision; this change only stops an absent
-        # figure being scored as a bad one.
+        # TIDE 5.1+ scores quality as a percentage (posture says so in
+        # quality.scale), so it is used as is; dividing it by the old
+        # 40-point maximum reported 46% as 116%. Older TIDE still scores
+        # in points out of 40.
         if avg_quality is None:
             details["rule_quality_pct"] = None
             details["score_basis"] = "technique coverage only"
@@ -167,7 +166,10 @@ def _detection_coverage() -> dict[str, Any]:
             )
             score = _clamp(tech_pct)
         else:
-            quality_pct = avg_quality / 40 * 100 if avg_quality > 0 else 0
+            if quality.get("scale") == "percent":
+                quality_pct = max(avg_quality, 0)
+            else:
+                quality_pct = avg_quality / 40 * 100 if avg_quality > 0 else 0
             details["rule_quality_pct"] = round(quality_pct, 1)
             details["score_basis"] = "technique coverage and rule quality"
             # Combined: 60% technique coverage + 40% quality
@@ -596,7 +598,7 @@ def _build_recommendations(dimensions: dict[str, dict]) -> list[dict[str, str]]:
                     "area": "Detection Coverage",
                     "message": (
                         f"Average rule quality score is "
-                        f"{details.get('avg_quality')}/40. "
+                        f"{details.get('avg_quality')}{details.get('quality_unit', '/40')}. "
                         "Tune low-quality rules to reduce false positives and improve fidelity."
                     ),
                     "priority": "medium",
