@@ -28,19 +28,9 @@
 /* Alerts Investigation Page Styles */
 
 
-.alerts-filters select,
-.alerts-filters .search-input {
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--ion-border);
-    border-radius: var(--radius);
-    font-size: 0.875rem;
-    background: var(--bg-secondary);
-}
 
-.alerts-filters .search-input {
-    flex: 1;
-    min-width: 200px;
-}
+
+
 
 .custom-time-range {
     align-items: center;
@@ -246,10 +236,7 @@
     position: relative;
 }
 
-.context-menu-submenu .submenu-arrow {
-    margin-left: auto;
-    font-size: 0.75rem;
-}
+
 
 .context-submenu {
     display: none;
@@ -437,8 +424,8 @@
 }
 /* Main column shrinks to its grid track; table inside scrolls horizontally */
 .alerts-grid > :first-child { min-width: 0; }
-.alerts-grid .card-wide { min-width: 0; max-width: 100%; }
-.alerts-grid .card-wide .card-body { overflow-x: auto; }
+
+
 .alerts-grid .data-table { min-width: 900px; } /* sane minimum so columns aren't crushed */
 
 @media (max-width: 1200px) {
@@ -637,12 +624,8 @@
 }
 
 
-.ad-sys-card.mapped .ad-sys-card-hdr::before {
-    background: linear-gradient(90deg, var(--success), rgba(76,175,80,0.2));
-}
-.ad-sys-card:not(.mapped) .ad-sys-card-hdr::before {
-    background: linear-gradient(90deg, var(--warning), rgba(255,152,0,0.2));
-}
+
+
 
 
 
@@ -740,9 +723,7 @@
     border-spacing: 0;
 }
 
-.card-wide .card-body {
-    overflow-x: auto;
-}
+
 
 #alerts-table thead th {
     background: var(--bg-tertiary);
@@ -810,13 +791,7 @@
 .alert-status-resolved     { background: rgba(16, 185, 129, .12); color: var(--success); border-color: rgba(16, 185, 129, .3); }
 
 /* Side panel — refreshed in v0.9.72 with hover-lift + count pill */
-.side-panel .list-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-height: 240px;
-    overflow-y: auto;
-}
+
 
 .side-panel .list-item {
     display: flex;
@@ -984,10 +959,7 @@
 }
 
 /* Keyboard Navigation */
-.alert-row.keyboard-selected {
-    outline: 2px solid var(--primary);
-    outline-offset: -2px;
-}
+
 
 kbd {
     display: inline-block;
@@ -1386,7 +1358,7 @@ kbd {
 
 
 
-.mitre-add-row input.mitre-name-input { width: 140px; }
+
 
 
 /* MITRE Heatmap */

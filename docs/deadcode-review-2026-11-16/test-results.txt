@@ -1,0 +1,8 @@
+Command: python -m pytest --noconftest -o addopts= tests/test_dead_css.py tests/unit/test_dead_css_sheet_coverage.py tests/unit/test_dead_css_vetting_proof.py tests/test_migrated_css_sweep.py tests/test_css_is_current.py tests/test_tailwind_build_pin.py tests/unit/test_chat_stylesheet_cascade.py tests/test_shell_styles.py tests/test_glass_surfaces.py tests/test_ui_rewrite_theme_parity.py tests/test_slides_tailwind_classes.py tests/unit/test_ui_settings_integration_styles.py -q
+
+........................................................................ [ 80%]
+..................                                                       [100%]
+90 passed in 13.00s
+
+Scope: CSS scanner, removal proof, theme/shell contracts, pinned Tailwind build and build-output equality.
+Full application suite and live-browser checks were not run.

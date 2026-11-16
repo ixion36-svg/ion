@@ -200,14 +200,7 @@ body[data-page="observables"] .timeline-event-time{
 }
 
 /* Badge for watchlist count */
-body[data-page="observables"] .header-actions .badge{
-    background: var(--warning);
-    color: #000;
-    padding: 0.15rem 0.4rem;
-    border-radius: 10px;
-    font-size: 0.7rem;
-    margin-left: 0.3rem;
-}
+
 
 body[data-page="observables"] .stat-label{
     font-size: 0.75rem;
@@ -220,20 +213,9 @@ body[data-page="observables"] .stat-label{
 /* Filters */
 
 
-body[data-page="observables"] .observables-filters select, body[data-page="observables"] .observables-filters .search-input{
-    padding: 0.5rem 0.75rem;
-    border: 1px solid var(--ion-border);
-    border-radius: var(--radius);
-    font-size: 0.875rem;
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    transition: border-color 0.2s;
-}
 
-body[data-page="observables"] .observables-filters .search-input{
-    flex: 1;
-    min-width: 250px;
-}
+
+
 
 /* Observable Type Badges */
 body[data-page="observables"] .obs-type-badge{
@@ -730,11 +712,11 @@ body[data-page="observables"] .context-badge{
     letter-spacing: 0.03em;
     vertical-align: middle;
 }
-body[data-page="observables"] .context-badge.ctx-source{ background: rgba(59, 130, 246, 0.12); color: #60a5fa; }
-body[data-page="observables"] .context-badge.ctx-dest{ background: rgba(249, 115, 22, 0.12); color: var(--neon-orange); }
-body[data-page="observables"] .context-badge.ctx-subject{ background: rgba(168, 85, 247, 0.12); color: var(--neon-purple); }
-body[data-page="observables"] .context-badge.ctx-target{ background: rgba(239, 68, 68, 0.12); color: var(--danger); }
-body[data-page="observables"] .context-badge.ctx-host{ background: rgba(34, 197, 94, 0.12); color: var(--success); }
+
+
+
+
+
 body[data-page="observables"] .context-badge.ctx-generic{ background: rgba(156, 163, 175, 0.12); color: var(--text-secondary); }
 
 body[data-page="observables"] .ion-fragment-loading, body[data-page="observables"] .ion-fragment-message{text-align:center;padding:2rem;color:var(--text-secondary);}

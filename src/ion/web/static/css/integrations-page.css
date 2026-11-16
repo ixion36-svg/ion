@@ -250,19 +250,19 @@ body[data-page="integrations"] .topo-detail-head{
     display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
 }
 
-body[data-page="integrations"] .topo-detail-icon.healthy{ background: rgba(34,197,94,.12); color: var(--success); }
-body[data-page="integrations"] .topo-detail-icon.error{ background: rgba(239,68,68,.12); color: var(--danger); }
-body[data-page="integrations"] .topo-detail-icon.disabled{ background: rgba(107,114,128,.12); color: var(--text-muted); }
-body[data-page="integrations"] .topo-detail-icon.checking{ background: rgba(234,179,8,.12); color: var(--warning); }
+
+
+
+
 
 /* Brand overrides on detail cards */
-body[data-page="integrations"] .topo-detail-card[data-service="elasticsearch"] .topo-detail-icon.healthy{ background: rgba(0,191,179,.12); color: #00bfb3; }
-body[data-page="integrations"] .topo-detail-card[data-service="kibana"] .topo-detail-icon.healthy{ background: rgba(0,191,179,.12); color: #00bfb3; }
-body[data-page="integrations"] .topo-detail-card[data-service="gitlab"] .topo-detail-icon.healthy{ background: rgba(252,109,38,.12); color: #fc6d26; }
-body[data-page="integrations"] .topo-detail-card[data-service="opencti"] .topo-detail-icon.healthy{ background: rgba(0,27,218,.12); color: #6366f1; }
-body[data-page="integrations"] .topo-detail-card[data-service="tide"] .topo-detail-icon.healthy{ background: rgba(16,185,129,.12); color: #10b981; }
-body[data-page="integrations"] .topo-detail-card[data-service="ollama"] .topo-detail-icon.healthy{ background: rgba(168,85,247,.12); color: #a855f7; }
-body[data-page="integrations"] .topo-detail-card[data-service="dfir_iris"] .topo-detail-icon.healthy{ background: rgba(59,130,246,.12); color: #3b82f6; }
+
+
+
+
+
+
+
 
 body[data-page="integrations"] .topo-detail-title{ font-size: .95rem; font-weight: 700; color: var(--text-primary); }
 body[data-page="integrations"] .topo-detail-status{ display: flex; align-items: center; gap: 6px; font-size: .78rem; margin-top: 2px; }
@@ -554,7 +554,7 @@ body[data-page="integrations"] .flow-pipe-step.active .flow-stage-card{
     50%      { box-shadow: 0 0 18px 6px var(--glow-color, var(--primary-dim)); }
 }
 /* For fork/merge zones in active state */
-body[data-page="integrations"] .flow-pipe-step.active .flow-fork-arm-line, body[data-page="integrations"] .flow-pipe-step.active .flow-fork-stem, body[data-page="integrations"] .flow-pipe-step.active .flow-merge-arm-line, body[data-page="integrations"] .flow-pipe-step.active .flow-merge-stem{ opacity: .8; }
+
 
 /* ── Responsive ───────────────────────────────────────────────── */
 @media (max-width: 1200px) {

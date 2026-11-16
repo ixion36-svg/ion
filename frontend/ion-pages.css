@@ -59,40 +59,25 @@ body[data-page="guide"] #g-content code{
 /* Org-chart connectors. The tree is nested ul/li; each li draws the two
    halves of the line above itself, and each child ul draws the drop from its
    parent. Only-children keep just the vertical stub. */
-body[data-page="workforce_orbat"] .wf-tree{ --wf-line: color-mix(in srgb, currentColor 22%, transparent); }
-body[data-page="workforce_orbat"] .wf-tree ul{
-    display: flex; align-items: flex-start; justify-content: center;
-    padding: 26px 0 0; margin: 0; position: relative;
-}
-body[data-page="workforce_orbat"] .wf-tree li{
-    list-style: none; position: relative;
-    display: flex; flex-direction: column; align-items: center;
-    padding: 26px 10px 0;
-}
-body[data-page="workforce_orbat"] .wf-tree li::before, body[data-page="workforce_orbat"] .wf-tree li::after{
-    content: ''; position: absolute; top: 0; right: 50%;
-    border-top: 2px solid var(--wf-line); width: 50%; height: 26px;
-}
-body[data-page="workforce_orbat"] .wf-tree li::after{ right: auto; left: 50%; border-left: 2px solid var(--wf-line); }
-body[data-page="workforce_orbat"] .wf-tree li:only-child::before, body[data-page="workforce_orbat"] .wf-tree li:only-child::after{ display: none; }
-body[data-page="workforce_orbat"] .wf-tree li:first-child::before, body[data-page="workforce_orbat"] .wf-tree li:last-child::after{ border: 0 none; }
-body[data-page="workforce_orbat"] .wf-tree li:last-child::before{
-    border-right: 2px solid var(--wf-line); border-radius: 0 8px 0 0;
-}
-body[data-page="workforce_orbat"] .wf-tree li:first-child::after{ border-radius: 8px 0 0 0; }
-body[data-page="workforce_orbat"] .wf-tree ul ul::before{
-    content: ''; position: absolute; top: 0; left: 50%;
-    border-left: 2px solid var(--wf-line); width: 0; height: 26px;
-}
+
+
+
+
+
+
+
+
+
+
 /* A real establishment is wider than a laptop. Scroll the tree inside its
    own box rather than letting it push the page sideways, which hides the
    right-hand functions behind a scrollbar nobody notices. */
-body[data-page="workforce_orbat"] .wf-tree{ overflow-x: auto; padding-bottom: 8px; }
-body[data-page="workforce_orbat"] .wf-tree > ul{ min-width: max-content; }
+
+
 /* Roots: no connectors above the top card. */
-body[data-page="workforce_orbat"] .wf-tree > ul{ padding-top: 0; }
-body[data-page="workforce_orbat"] .wf-tree > ul > li{ padding-top: 0; }
-body[data-page="workforce_orbat"] .wf-tree > ul > li::before, body[data-page="workforce_orbat"] .wf-tree > ul > li::after{ display: none; }
+
+
+
 
 /* ── notes.html ─────────────────────────────────── */
 /* JS querySelector('.notes-page') is the page-init guard. :has() punches
@@ -898,7 +883,7 @@ body[data-page="compliance"] .cmp-fw-bar-fill{ height: 100%; }
        long table can never run underneath it. */
     padding-bottom: 13vh;
   }
-  body[data-page="daily_standup_slides"] .deck-slide.title-slide{ padding: 0; }
+
   /* The body region takes whatever the heading leaves. min-h-0 is what
      lets a flex child shrink rather than forcing its parent taller. */
   body[data-page="daily_standup_slides"] .deck-body{ display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
@@ -907,17 +892,13 @@ body[data-page="compliance"] .cmp-fw-bar-fill{ height: 100%; }
 
   body[data-page="daily_standup_slides"] .deck-h-title{ margin-bottom: 2.5vh; flex-shrink: 0; }
 
-  body[data-page="daily_standup_slides"] .deck-h-row .deck-h-title{ margin-bottom: 0; }
+
 
 
 
 
   /* Title-slide wordmark uses background-clip text. */
-  body[data-page="daily_standup_slides"] .deck-slide.title-slide .deck-title{
-    background: linear-gradient(180deg, #f8fafc 0%, #94a3b8 100%);
-    -webkit-background-clip: text; background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
+
 
   /* JS toggles .active / .passed on these dots. */
   body[data-page="daily_standup_slides"] .deck-progress-dot{
@@ -2422,8 +2403,8 @@ body[data-page="template_render"] .se-edit-area textarea:focus{
     box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-primary) 20%, transparent);
 }
 
-body[data-page="template_render"] .se-meta-header .se-rendered{ padding: 1rem; }
-body[data-page="template_render"] .se-meta-header .rendered-content{ font-size: 0.85rem; }
+
+
 
 /* JS innerHTML injects .rendered-content / .rendered-output / .error into the preview. */
 body[data-page="template_render"] #output-container .rendered-content{

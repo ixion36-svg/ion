@@ -366,6 +366,9 @@ def constructed_prefixes(text: str, kind: str = "all") -> set[str]:
     # ending in a separator becomes a live family. In minified JavaScript that
     # harvested `L-`, `n_`, `b_`, `c-` and the like.
     if markup:
+        # Jinja's ~ joins strings too, including a leading space inside a
+        # conditional class: {{ ' hbar-' ~ kind if kind }}.
+        out.update(re.findall(r'''([A-Za-z][A-Za-z0-9_-]*[-_])["']\s*~''', text))
         out.update(re.findall(r'''["']([A-Za-z][A-Za-z0-9_-]*[-_])["']''', text))
         out.update(macro_class_prefixes(text))
     # The host option is often inline JavaScript inside a template.
@@ -406,44 +409,13 @@ def page_style_blocks() -> str:
     return "\n".join(parts)
 
 
-def css_internal_refs(css: str) -> set[str]:
-    """Classes another rule pairs with: `.panel .row`, `.a.b`, `.x:hover`.
-
-    NOT used for liveness any more, and the reason is worth recording. It used
-    to be: keep `.panel` because `.panel .row` depends on it. That is backwards.
-    If no element ever carries `panel`, then `.panel .row` cannot match either,
-    so both are dead and keeping the ancestor keeps a rule that can never fire.
-
-    Worse, it made any class with a compound rule immortal. `.settings-tab.active`
-    kept `.settings-tab` alive purely through its own declaration, even though
-    nothing in the app has ever carried that class -- 0 occurrences in class
-    attributes and 0 in JS strings. That single mistake was holding roughly 19KB
-    of unreachable CSS in style.css.
-
-    Liveness now comes only from markup and JS: a literal token, or a
-    constructed prefix. Kept as a function because the removal step still needs
-    to know which rules pair a dead class with a live one -- those are left
-    alone rather than half-rewritten.
-    """
-    out: set[str] = set()
-    for m in RULE.finditer(mask_comments(css)):
-        sel = m.group("sel")
-        if "@" in sel:
-            continue
-        for part in sel.split(","):
-            names = CLASS_IN_SELECTOR.findall(part)
-            if len(names) > 1:
-                out.update(names)          # compound or descendant: all needed
-    return out
-
-
 def analyse(sheet: str, live_tokens: set[str], prefixes: set[str],
             page_css: str = ""):
     path = sheet_path(sheet)
     css = path.read_text(encoding="utf-8", errors="replace")
     # A class is live if this sheet leans on it, OR any page's own <style>
     # block does, OR any OTHER shared sheet does.
-    # Deliberately NOT seeded from other rules -- see css_internal_refs.
+    # A CSS declaration alone does not prove a class reaches any element.
     # A page's own <style> block is a reference source like any other: it can
     # scope a shared class the sheet defines. This was collected by
     # page_style_blocks() and handed in, then never read -- the parameter was
@@ -501,10 +473,7 @@ def strip_rules(css: str, dead: set[str], strict: bool = False) -> tuple[str, in
         # The captured "selector" span starts after the previous rule's `}`, so
         # it carries leading whitespace and any comment. Those are not part of
         # the selector and must survive verbatim: slice them from the ORIGINAL.
-        sel_start = m.start("sel") + (len(sel_masked) - len(sel_masked.lstrip()))
         lead_end = m.start("sel")
-        # Everything before the real selector text (comments, blank lines).
-        real_sel_offset = len(sel_masked.rstrip()) and sel_masked.rfind("\n") + 1
         parts = [p.strip() for p in sel_masked.split(",") if p.strip()]
         if not parts:
             continue
