@@ -60,7 +60,7 @@ def test_every_glass_rule_is_gated_on_dark_mode_and_the_switch():
 def test_every_token_backed_sticky_header_is_frosted():
     frosted = GLASS[GLASS.index("Sticky headers"):]
     frosted = frosted[:frosted.index("}")]
-    missing = []
+    missing, seen = [], set()
     # Page rules are compiled into ion.css from frontend/, nested under a
     # body[data-page] scope, so the scan has to read those and descend.
     sheets = [s for s in sorted(CSS.glob("*.css")) if s.name not in {"ion.css", "ion-glass.css"}]
@@ -70,17 +70,22 @@ def test_every_token_backed_sticky_header_is_frosted():
             if not re.search(r"position\s*:\s*sticky", body) or not TOKEN_BG.search(body):
                 continue
             for part in selector.split(","):
+                seen.add(" ".join(part.split()))
                 tokens = part.split()
                 # A bare element (`th`) is named by its parent (`table.aq th`).
                 key = tokens[-1] if any(c in tokens[-1] for c in ".#") else " ".join(tokens[-2:])
                 if not re.search(r"(^|[\s,(])" + re.escape(key) + r"(?=[\s,)])", frosted):
                     missing.append(f"{sheet.name}: {part.strip()}")
+    # A scan that finds nothing passes vacuously; these live in ion-pages.css.
+    assert {"table.aq th", ".data-table th"} <= seen, sorted(seen)
     assert not missing, "add these sticky headers to ion-glass.css: " + "; ".join(missing)
 
 
 def test_the_page_loads_the_glass_sheet_after_every_page_sheet():
     base = (WEB / "templates" / "base.html").read_text(encoding="utf-8")
     assert base.index("ion-glass.css") > base.index("ion-shell.css") > base.index("{% block head_css %}")
+    # The page sheets now ship inside ion.css.
+    assert base.index("ion-glass.css") > base.index("/static/css/ion.css")
 
 
 def test_glass_is_on_unless_switched_off():
