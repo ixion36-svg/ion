@@ -27,13 +27,10 @@ import re
 from pathlib import Path
 
 import pytest
-from page_css import hoisted_keyframes, page_css
 
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = ROOT / "src/ion/web/templates/documents.html"
-#: The page sheet was retired into the one build; this is the
-#: body[data-page="documents"] block, and only that block.
-SHEET_TEXT = page_css("documents")
+SHEET = ROOT / "src/ion/web/static/css/documents-page.css"
 
 
 def page() -> str:
@@ -199,15 +196,13 @@ def test_the_export_button_has_a_label_element_to_change():
 def test_the_busy_spinner_is_in_the_stylesheet():
     """It was `<i class="icon-loader"></i>` in a JavaScript string, so the
     spinner was markup the page owned and a stylesheet could not reach."""
-    sheet = SHEET_TEXT
+    sheet = SHEET.read_text(encoding="utf-8")
     assert ".is-busy" in sheet
-    # @keyframes is not a style rule and a keyframe name is global, so it
-    # was hoisted out of this page's scope when the sheet was retired.
-    assert "@keyframes doc-busy-spin" in hoisted_keyframes()
+    assert "@keyframes doc-busy-spin" in sheet
 
 
 def test_the_spinner_respects_reduced_motion():
-    sheet = SHEET_TEXT
+    sheet = SHEET.read_text(encoding="utf-8")
     assert "prefers-reduced-motion" in sheet
 
 
@@ -246,7 +241,7 @@ def test_the_sheet_still_beats_what_the_block_beat_that_matters():
     while none of the block's selectors appears in those sheets. Measured
     as zero before the move; asserted here so adding one is a failing test
     rather than a silent restyle."""
-    sheet = SHEET_TEXT
+    sheet = SHEET.read_text(encoding="utf-8")
     selectors = set()
     for match in re.finditer(r"(^|\})\s*([^{}@][^{}]*?)\s*\{", sheet, re.M):
         for part in match.group(2).split(","):
@@ -264,10 +259,8 @@ def test_the_sheet_still_beats_what_the_block_beat_that_matters():
     assert not clashes, clashes
 
 
-def test_the_page_declares_the_scope_that_reaches_its_rules():
-    """The sheet is retired. What joins this page to its rules is the
-    page_id block: they are written against body[data-page="documents"],
-    and without it the body carries data-page="" and none of them match."""
-    page = PAGE.read_text(encoding="utf-8")
-    assert "documents-page.css" not in page, "the retired sheet is linked again"
-    assert "{% block page_id %}documents{% endblock %}" in page
+def test_the_page_links_the_sheet_from_head_css():
+    head = re.search(r"\{%\s*block head_css\s*%\}(.*?)\{%\s*endblock\s*%\}",
+                     PAGE.read_text(encoding="utf-8"), re.S)
+    assert head, "linked from head_css"
+    assert "documents-page.css" in head.group(1)

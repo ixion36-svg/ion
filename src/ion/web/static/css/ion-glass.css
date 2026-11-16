@@ -101,7 +101,7 @@ html[data-glass="on"][data-mode="dark"] :is(.saved-filters-modal, .case-create-o
 
 /* Sticky headers: rows scroll underneath them, so a see-through fill shows
    the text behind. Frosted and nearly opaque instead. */
-html[data-glass="on"][data-mode="dark"] :is(table.aq th, .data-table th, .iad-jump, .mitre-heatmap-header, .playbook-library-group-header, .cpanel-playbook-browser-search, .cpanel-pb-group-header, .hm-header, .hm-skill-name, .sg-header, .sg-name, .sg-summary, .sc-cap-name, .km-doc-table th, .cr-domain-header, .ion-dense thead th) {
+html[data-glass="on"][data-mode="dark"] :is(table.aq th, .data-table th, .iad-jump, .mitre-heatmap-header, .playbook-library-group-header, .cpanel-playbook-browser-search, .cpanel-pb-group-header, .hm-header, .hm-skill-name, .sg-header, .sg-name, .sg-summary, .sc-cap-name, .km-doc-table th, .cr-domain-header) {
     background: rgba(13, 19, 42, 0.92) !important;
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);

@@ -1,0 +1,39 @@
+/* The Arkime PCAP commit page's own stylesheet.
+ *
+ * These rules were the inline <style> block at the end of
+ * alert_arkime.html until 2026-10-13. They are page-scoped:
+ * alert_arkime.html is the only template that links this file, and it is
+ * linked from {% block head_css %}.
+ *
+ * Cascade note. The inline block sat in {% block scripts %}, at the end of
+ * <body>, so it loaded after every linked sheet and after base.html's own
+ * two inline blocks. From head_css it now loads before ion-workspace.css
+ * and those two. Measured before the move: of the 7 (at-rule, selector)
+ * pairs here, zero appear in ion-workspace.css or either base.html block,
+ * so no rule changes winner at equal specificity. Everything these rules
+ * actually override -- daisyUI's label and fieldset styling -- is in
+ * ion.css, which still loads first.
+ */
+/* The new/existing switch is a pair of radios so it submits with the form
+   and needs no script. :checked picks the label and which fieldset shows. */
+.arkime-commit .mode-new,
+.arkime-commit .mode-existing {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.arkime-commit .mode-bar label {
+  color: rgb(148 163 184);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.arkime-commit .mode-new:checked ~ .mode-bar label[for="arkime-mode-new"],
+.arkime-commit .mode-existing:checked ~ .mode-bar label[for="arkime-mode-existing"] {
+  background: var(--color-ion-cyan);
+  color: var(--color-ink-950, #0b1220);
+}
+.arkime-commit .mode-new:checked ~ .commit-fields .commit-existing,
+.arkime-commit .mode-existing:checked ~ .commit-fields .commit-new {
+  display: none;
+}

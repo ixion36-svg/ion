@@ -320,14 +320,10 @@ def test_csp_no_inline_styles_or_handlers(name):
     assert '<style' not in markup
 
 
-def test_the_page_styles_come_from_the_build():
+def test_page_links_its_own_stylesheet():
     source = (ROOT / 'src/ion/web/templates/detection_engineering.html').read_text(encoding='utf-8')
-    assert '/static/css/' not in source
-    assert not (ROOT / 'src/ion/web/static/css/detection-engineering.css').exists()
-    build = (ROOT / 'frontend/ion-detection-engineering.css').read_text(encoding='utf-8')
-    assert 'body[data-page="detection-engineering"] .dx-page' in build
-    entry = (ROOT / 'frontend/tailwind-daisy.input.css').read_text(encoding='utf-8')
-    assert '@import "./ion-detection-engineering.css";' in entry
+    assert '/static/css/detection-engineering.css' in source
+    assert (ROOT / 'src/ion/web/static/css/detection-engineering.css').is_file()
 
 
 @pytest.mark.parametrize('value,total,expected', [(3, 706, 0.4), (0, 3, 0), (1, 2, 50), (3, 3, 100), (None, 3, None), (3, 0, None), (3, None, None)])

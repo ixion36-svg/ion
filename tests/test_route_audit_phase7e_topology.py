@@ -121,9 +121,8 @@ def test_topology_css_came_across(integrations):
     integrations-page.css, which is what the redesign's `styled` column
     asked for and what brought them under the dead-rule scanner.
     """
-    # integrations-page.css was retired into the one build; the rules are
-    # nested under body[data-page="integrations"] in frontend/ion-pages.css.
-    sheet = Path("frontend/ion-pages.css").read_text(encoding="utf-8")
+    sheet = (Path("src/ion/web/static/css/integrations-page.css")
+             .read_text(encoding="utf-8"))
     assert ".topo-node" in sheet
     assert ".topo-hub" in sheet
     assert "<style" not in integrations, \

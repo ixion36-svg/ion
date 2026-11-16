@@ -41,14 +41,11 @@ from pathlib import Path
 import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
-from page_css import page_css
 
 from ion.web.ui.cases import PERMISSION, router
 
 ROOT = Path(__file__).resolve().parents[2]
-#: The page sheet was retired into the one build; this is the
-#: body[data-page="cases"] block, and only that block.
-SHEET_TEXT = page_css("cases")
+SHEET = ROOT / "src/ion/web/static/css/cases-page.css"
 PAGE = ROOT / "src/ion/web/templates/cases.html"
 
 URL = "/ui/cases/7/timeline"
@@ -417,7 +414,7 @@ def test_the_panel_has_no_inline_style_attribute(answers):
 
 
 def test_the_stylesheet_paints_every_class_the_panel_can_emit():
-    sheet = SHEET_TEXT
+    sheet = SHEET.read_text(encoding="utf-8")
     for kind in ("bob", "analyst", "system", "unknown"):
         assert f".case-tl-{kind}" in sheet, kind
     for verdict in ("true_positive", "false_positive",

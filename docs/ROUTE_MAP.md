@@ -226,8 +226,8 @@ Server-rendered fragments. `render_view` routes also answer the view model as JS
 | GET | `/ui/scheduler/jobs/{job_id}/executions` | `system:settings` | [scheduler.py:426](src/ion/web/ui/scheduler.py#L426) |  | `scheduler.html` |
 | GET | `/ui/scheduler/params` | `system:settings` | [scheduler.py:315](src/ion/web/ui/scheduler.py#L315) |  | `scheduler.html` |
 | GET | `/ui/scheduler/preview` | `system:settings` | [scheduler.py:367](src/ion/web/ui/scheduler.py#L367) |  | `scheduler.html` |
-| GET | `/ui/security-dashboard` | `security:read` | [security_dashboard.py:529](src/ion/web/ui/security_dashboard.py#L529) |  | `security_dashboard.html` |
-| GET | `/ui/security-dashboard/events/{event_id}` | `security:read` | [security_dashboard.py:585](src/ion/web/ui/security_dashboard.py#L585) |  | `security_dashboard.html` |
+| GET | `/ui/security-dashboard` | `security:read` | [security_dashboard.py:539](src/ion/web/ui/security_dashboard.py#L539) |  | `security_dashboard.html` |
+| GET | `/ui/security-dashboard/events/{event_id}` | `security:read` | [security_dashboard.py:595](src/ion/web/ui/security_dashboard.py#L595) |  | `security_dashboard.html` |
 | GET | `/ui/service-accounts` | `alert:read` | [service_accounts.py:43](src/ion/web/ui/service_accounts.py#L43) | `_fragments/service_accounts.html` | `service_accounts.html` |
 | GET | `/ui/settings/backups` | `admin + system:settings` | [settings.py:146](src/ion/web/ui/settings.py#L146) | `_fragments/settings_backups.html` | `settings.html` |
 | GET | `/ui/settings/configuration` | `system:settings` | [settings.py:475](src/ion/web/ui/settings.py#L475) | `_fragments/settings_configuration.html` | `settings.html` |
@@ -257,8 +257,8 @@ Server-rendered fragments. `render_view` routes also answer the view model as JS
 | POST | `/ui/template-render/output` | `template:read` | [template_render.py:470](src/ion/web/ui/template_render.py#L470) | `_fragments/template_render_output.html` | `template_render_variables.html`, `template_render.html` |
 | POST | `/ui/template-render/sections` | `template:read` | [template_render.py:446](src/ion/web/ui/template_render.py#L446) | `_fragments/template_render_sections.html` | `template_render.html` |
 | GET | `/ui/template-render/variables` | `template:read` | [template_render.py:344](src/ion/web/ui/template_render.py#L344) | `_fragments/template_render_variables.html` | `template_render.html` |
-| GET | `/ui/template-view/{template_id}` | `template:read` | [template_view.py:548](src/ion/web/ui/template_view.py#L548) | `_fragments/template_view.html` | `template_view.html`, `template_view.html` |
-| GET | `/ui/template-view/{template_id}/versions/{version_number}` | `template:read` | [template_view.py:633](src/ion/web/ui/template_view.py#L633) | `_fragments/template_view.html` | `template_view.html`, `template_view.html` |
+| GET | `/ui/template-view/{template_id}` | `template:read` | [template_view.py:544](src/ion/web/ui/template_view.py#L544) | `_fragments/template_view.html` | `template_view.html`, `template_view.html` |
+| GET | `/ui/template-view/{template_id}/versions/{version_number}` | `template:read` | [template_view.py:629](src/ion/web/ui/template_view.py#L629) | `_fragments/template_view.html` | `template_view.html`, `template_view.html` |
 | GET | `/ui/templates-page/controls` | `template:read` | [templates_page.py:78](src/ion/web/ui/templates_page.py#L78) | `_fragments/daily_work_controls.html`<br>`_fragments/shift_handover_controls.html`<br>`_fragments/templates_page_controls.html` | `templates.html` |
 | GET | `/ui/templates-page/folders` | `template:read` | [templates_page.py:95](src/ion/web/ui/templates_page.py#L95) | `_fragments/templates_page_folders.html` | `templates.html` |
 | GET | `/ui/templates-page/list` | `template:read` | [templates_page.py:131](src/ion/web/ui/templates_page.py#L131) | `_fragments/templates_page_list.html` | `templates.html` |

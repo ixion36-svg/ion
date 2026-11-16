@@ -54,9 +54,7 @@ from fastapi.testclient import TestClient
 from ion.web.ui.documents import DELETE_ANY, PERMISSION, router
 
 ROOT = Path(__file__).resolve().parents[2]
-#: The page sheet was retired; these rules live in the one build now,
-#: scoped by body[data-page="documents"].
-SHEET = ROOT / "frontend/ion-pages.css"
+SHEET = ROOT / "src/ion/web/static/css/documents-page.css"
 PAGE = ROOT / "src/ion/web/templates/documents.html"
 
 URL = "/ui/documents/list"
@@ -172,7 +170,7 @@ def test_a_row_renders_its_name_folder_and_type(answers):
     body = flat(html)
     assert "Incident SOP" in body
     assert "Runbooks" in body, "collection_name comes with the payload"
-    assert 'data-doctype="SOP"' in html, "the type chip reads the scale"
+    assert "doc-type-SOP" in html
     assert "v4" in body
     assert "pdf" in body
 
@@ -331,16 +329,13 @@ def test_the_fragment_has_no_inline_style_or_javascript_url(answers):
 def test_the_fragment_ships_no_colour_of_its_own(answers):
     answers(docs=[_Doc()])
     html = _get(_reader()).text
-    assert 'data-doctype="SOP"' in html
+    assert "doc-type-SOP" in html
     assert not re.search(r"#[0-9a-fA-F]{3,8}\b", html)
     assert "rgba(" not in html
     assert "var(--" not in html
 
 
 def test_the_stylesheet_paints_the_classes_the_fragment_emits():
-    """The fragment emits these and only the server does, so nothing else
-    would notice them losing their rule. tests/test_retired_page_sheets.py
-    asserts they are inside this page's scope block."""
     sheet = SHEET.read_text(encoding="utf-8")
     for cls in (".doc-row", ".doc-row-archived", ".doc-unmeasured"):
         assert cls in sheet, cls
@@ -542,26 +537,23 @@ def test_a_folder_that_is_not_a_number_is_a_failed_filter_not_an_empty_list(
 # ---------------------------------------------------------------------------
 
 
-def test_the_page_declares_the_scope_that_reaches_its_rules():
+def test_the_page_links_its_stylesheet():
     """I wrote this sheet and did not link it, which is the same mistake
     that left the forensics playbook preview unstyled: the classes were in
     the markup, the rules were in a file, and nothing joined them. No route
-    test can see it, because the fragment is correct either way.
-
-    The sheet is retired and the rules are in the one build, so the join is
-    no longer a <link>. It is the page_id block: the rules are written
-    against body[data-page="documents"], and without that block the body
-    carries data-page="" and every one of them matches nothing."""
+    test can see it, because the fragment is correct either way."""
     page = PAGE.read_text(encoding="utf-8")
-    assert "{% block page_id %}documents{% endblock %}" in page
-    assert "documents-page.css" not in page, "the retired sheet is referenced again"
+    assert "documents-page.css" in page
+    head = re.search(r"\{%\s*block head_css\s*%\}(.*?)\{%\s*endblock\s*%\}",
+                     page, re.S)
+    assert head, "linked from head_css, not from the body"
+    assert "documents-page.css" in head.group(1)
 
 
 def test_nothing_that_outranks_the_sheet_claims_its_selectors():
-    """ion-workspace.css and ion-shell.css are separate links that load
-    after ion.css, so they still outrank these rules at equal specificity
-    exactly as head_css did. An overlap would mean a rule that is present
-    and never wins -- unchanged by the sheet moving into the build."""
+    """head_css loses to ion-workspace.css and to ion-shell.css (the two
+    blocks that used to sit in base.html's body) at equal specificity, so
+    an overlap would mean a rule that is present and never wins."""
     workspace = (ROOT / "src/ion/web/static/css/ion-workspace.css").read_text(
         encoding="utf-8")
     shell = (ROOT / "src/ion/web/static/css/ion-shell.css").read_text(
