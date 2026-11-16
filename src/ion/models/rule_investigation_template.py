@@ -42,6 +42,13 @@ class RuleInvestigationTemplate(Base, TimestampMixin):
         Integer, ForeignKey("users.id"), nullable=True
     )
     reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    # Set when a person rewrites Bob's text, cleared when Bob regenerates it.
+    # The guide is labelled AI-derived on screen, and that label has to stop
+    # being true the moment somebody has changed the words.
+    edited_by_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )
+    edited_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     def to_dict(self) -> dict:
         return {
@@ -54,6 +61,8 @@ class RuleInvestigationTemplate(Base, TimestampMixin):
             "model": self.model,
             "reviewed_by_id": self.reviewed_by_id,
             "reviewed_at": self.reviewed_at.isoformat() if self.reviewed_at else None,
+            "edited_by_id": self.edited_by_id,
+            "edited_at": self.edited_at.isoformat() if self.edited_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

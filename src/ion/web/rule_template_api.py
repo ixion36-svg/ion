@@ -13,16 +13,18 @@ import logging
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_permission
 from ion.core.config import get_config
 from ion.models.rule_investigation_template import STATUS_APPROVED, STATUS_REJECTED
-from ion.models.user import User
+from ion.models.user import AuditLog, User
 from ion.services.auto_investigation_service import AutoInvestigationService
 from ion.services.rule_template_service import (
     build_generation_prompt,
     compute_source_hash,
+    edit_text,
     get_template,
     list_pending,
     rule_fields_from_raw,
@@ -118,6 +120,49 @@ async def generate_rule_template(
         source_hash=compute_source_hash(rf["rule_description"], rf["authored_guide"], evidence_ids),
         evidence_ids=evidence_ids,
     )
+    return {"template": row.to_dict()}
+
+
+#: Far above any checklist an analyst would write, and well below a body
+#: that is a mistake or an attempt to fill the table.
+MAX_GUIDE_CHARS = 20_000
+
+
+class GuideEdit(BaseModel):
+    checklist_text: str = Field(..., max_length=MAX_GUIDE_CHARS)
+
+    @field_validator("checklist_text")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("The guide cannot be empty. Reject it instead.")
+        return value
+
+
+@router.put("/alerts/investigation-template/{template_id}")
+def edit_rule_template(
+    template_id: int,
+    payload: GuideEdit,
+    user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
+) -> Dict[str, Any]:
+    """Correct Bob's custom guide by hand. It returns to pending review.
+
+    Gated like approve and reject beside it: whoever may make a generated
+    guide the default may also fix one. The text is only ever displayed,
+    through the sanitising markdown renderer; it is not fed back to Bob.
+    """
+    row = edit_text(session, template_id, payload.checklist_text, user.id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Template not found")
+    session.add(AuditLog(
+        user_id=user.id, action="rule_guide_edited",
+        resource_type="rule_investigation_template", resource_id=row.id,
+        details=f"{user.username} edited the custom investigation guide for "
+                f"{row.rule_name or row.rule_id}",
+    ))
+    session.commit()
     return {"template": row.to_dict()}
 
 

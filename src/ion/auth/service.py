@@ -643,9 +643,16 @@ class AuthService:
         from ion.services.workforce_service import (
             enrol_on_baseline,
             enrol_on_role,
+            follow_held_roles,
         )
 
         enrol_on_baseline(self.db_session, user)
+
+        # Before the chosen profile below: a role ticked on the form is
+        # held from now, and its journey has to be the one that says so.
+        assigner = self.user_repo.get_by_id(admin_user_id) if admin_user_id else None
+        if assigner is not None:
+            follow_held_roles(self.db_session, user, assigner=assigner)
 
         # The role the account is being onboarded into, chosen now so the
         # person can see their role training from day one and work it while

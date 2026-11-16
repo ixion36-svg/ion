@@ -1858,8 +1858,14 @@
 /* observables row */
 
 
-.awx-obsrow { display: flex; flex-wrap: wrap; gap: 6px; }
+.awx-obsrow { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+/* The value is the only part of a chip allowed to give way. A URL or hash
+   has no break points, so left to itself it runs out through the chip's
+   border in a narrow column; the full value stays in the chip's title. */
+.awx-ov { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.awx-obschip > .awx-ot, .awx-obschip > .awx-tl { flex: none; }
 .awx-obschip {
+    min-width: 0;
     display: inline-flex; align-items: center; gap: 6px; font-size: 11px;
     font-family: var(--font-mono, ui-monospace, monospace); color: var(--text-primary);
     background: rgba(255,255,255,.05); border: 1px solid var(--ion-border); padding: 3px 8px; border-radius: 6px; max-width: 100%;
@@ -1976,6 +1982,10 @@
     position: relative; z-index: 1;
     display: flex; gap: 34px; align-items: flex-start;
     min-height: 60px; width: max-content;
+    /* Centred while it fits. auto margins collapse to zero once the lanes
+       are wider than the graph, so a long path still scrolls from its
+       first lane, which justify-content: center would cut off. */
+    margin-inline: auto;
 }
 .apg-lane { display: flex; flex-direction: column; min-width: 150px; max-width: 190px; }
 .apg-lane-head {

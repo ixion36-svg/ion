@@ -361,8 +361,47 @@ class OIDCUserSync:
 
         # Sync roles from Keycloak
         self._sync_roles(user, token_data.roles)
+        self._follow_held_roles(user)
 
         return user
+
+    def _follow_held_roles(self, user: User) -> None:
+        """Put the person on the Workforce profile of each role they hold.
+
+        Roles reach an account from a Keycloak claim or from an
+        administrator, and either way this sign-in is the first moment the
+        person is certain to be looking at ION. Like the baseline, it is a
+        record and not a gate: these journeys are marked as roles already
+        held and withhold nothing.
+
+        The sign-in is committed first because the workforce call rolls the
+        session back when it fails, and that must not undo the login. That
+        commit is outside the guard below on purpose: it is the login's own
+        write, so if it fails the login has failed and the caller has to see
+        the real error. Swallowing it would log "the login continues" over a
+        session that raises on its next statement.
+        """
+        if not user.roles:
+            return
+        self.session.commit()
+        try:
+            from ion.services.workforce_service import (
+                a_workforce_manager,
+                follow_held_roles,
+            )
+
+            assigner = a_workforce_manager(self.session)
+            if assigner is not None:
+                follow_held_roles(self.session, user, assigner=assigner)
+        except Exception:
+            logger.exception(
+                "Could not follow the roles of OIDC user %s into Workforce; "
+                "the login continues", user.username,
+            )
+            # Nothing of the login's is pending after the commit above, and
+            # a failed statement leaves PostgreSQL refusing every later one
+            # until the transaction is rolled back.
+            self.session.rollback()
 
     def _guard_rebind(
         self, candidate: Optional[User], token_data: OIDCTokenData

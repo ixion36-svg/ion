@@ -156,7 +156,7 @@
         The threat level reaches a class, so it comes from the level the
         chip resolved rather than straight off the payload. -#}
     <span class="awx-obschip" title="{{ o.value }}">
-      <span class="awx-ot t-{{ o.kind }}">{{ o.kind }}</span>{{ o.short }}
+      <span class="awx-ot t-{{ o.kind }}">{{ o.kind }}</span><span class="awx-ov">{{ o.short }}</span>
       {%- if o.label is not none %}
       <span class="awx-tl tl-{{ o.level }}" title="{{ o.tip }}">
         <span class="awx-td"></span>{{ o.label }}</span>

@@ -826,6 +826,22 @@ async def _startup_event():
             session.close()
     run_locked(engine, LOCK_SEED_TENANTS, "seed_default_tenant", _seed_default_tenant)
 
+    from ion.storage.database import LOCK_SEED_WORKFORCE
+    def _seed_workforce():
+        if not config.workforce_enabled:
+            return
+        from ion.services.workforce_seed import (
+            map_existing_accounts,
+            seed_workforce_defaults,
+        )
+        session = factory()
+        try:
+            seed_workforce_defaults(session)
+            map_existing_accounts(session)
+        finally:
+            session.close()
+    run_locked(engine, LOCK_SEED_WORKFORCE, "seed_workforce_defaults", _seed_workforce)
+
     # ---------------------------------------------------------------
     # Seed default pattern-based playbooks
     # ---------------------------------------------------------------
@@ -1164,6 +1180,16 @@ async def _startup_event():
         logger.info("Arkime retention-awareness background loop started")
     run_locked(engine, LOCK_ARKIME_RETENTION_BG, "arkime_retention_bg_loop", _start_arkime_retention,
                hold_until_close=True)
+
+    from ion.storage.database import LOCK_RULE_NAME_BACKFILL_BG
+    def _start_rule_name_backfill():
+        from ion.services.rule_name_backfill_service import (
+            start_background_loop as _rnb_bg,
+        )
+        _rnb_bg(engine)
+        logger.info("Rule-name backfill background loop started")
+    run_locked(engine, LOCK_RULE_NAME_BACKFILL_BG, "rule_name_backfill_bg_loop",
+               _start_rule_name_backfill, hold_until_close=True)
 
     # ---------------------------------------------------------------
     # Case-embedding background producer — embeds cases via Ollama for
