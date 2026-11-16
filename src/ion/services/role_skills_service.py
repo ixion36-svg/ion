@@ -834,6 +834,72 @@ ROLE_DEFINITIONS: List[Dict[str, Any]] = [
 # Public questionnaire API
 # =========================================================================
 
+#: The self-assessment scale, and what each value takes to demonstrate.
+#:
+#: The labels on their own were the whole scale, and a label is not a
+#: criterion: "Can do it supervised" and "Confident & independent" are the
+#: same claim at different volumes, so where somebody lands depends on how
+#: boldly they read themselves rather than on what they have done. Two
+#: people with identical experience rate themselves differently, which is
+#: the failure mode that makes a skills matrix an opinion survey.
+#:
+#: Each level therefore names something a reader could point at. That is
+#: also what makes the number checkable later: a lead recording an
+#: equivalence, or asking why cover is thin, has something to ask for.
+#:
+#: 1 is deliberately given an encouraging line. The honest 1s are what
+#: make a gap visible, and a scale that feels like a judgement collects
+#: 3s instead.
+#:
+#: Scored 1-5, matching SkillAssessment.rating and the buttons the
+#: questionnaire renders. No 0: "never heard of it" is already the floor,
+#: and a 0 would only mean "did not answer", which an absent row says.
+RATING_SCALE: List[Dict[str, Any]] = [
+    {
+        "value": 1,
+        "label": "Never heard of it",
+        "demonstrates": (
+            "You would not recognise the term in a handover. Nothing to "
+            "show, and that is a useful answer: honest 1s are what make "
+            "the gaps real."
+        ),
+    },
+    {
+        "value": 2,
+        "label": "Aware of it",
+        "demonstrates": (
+            "You can say what it is and when it matters, but you have not "
+            "done it. You would need somebody alongside you the first time."
+        ),
+    },
+    {
+        "value": 3,
+        "label": "Can do it supervised",
+        "demonstrates": (
+            "You have done it and somebody checked the result. Point to a "
+            "case, ticket or exercise where you did, and who reviewed it."
+        ),
+    },
+    {
+        "value": 4,
+        "label": "Confident and independent",
+        "demonstrates": (
+            "You do it unsupervised and your work is not routinely "
+            "corrected. Point to recent work you owned end to end."
+        ),
+    },
+    {
+        "value": 5,
+        "label": "Could teach it",
+        "demonstrates": (
+            "Others come to you when it goes wrong. Point to somebody you "
+            "taught, a runbook you wrote, or a call you made when the "
+            "documented method did not fit."
+        ),
+    },
+]
+
+
 def get_role_definitions() -> Dict[str, Any]:
     """Return all role definitions for the picker + questionnaire UI.
 
@@ -850,13 +916,145 @@ def get_role_definitions() -> Dict[str, Any]:
         })
     return {
         "roles": out_roles,
-        "rating_scale": [
-            {"value": 1, "label": "Never heard of it"},
-            {"value": 2, "label": "Aware of it"},
-            {"value": 3, "label": "Can do it supervised"},
-            {"value": 4, "label": "Confident & independent"},
-            {"value": 5, "label": "Could teach it"},
-        ],
+        "rating_scale": RATING_SCALE,
+    }
+
+
+# =========================================================================
+# Suggested certifications
+# =========================================================================
+#
+# Three vocabularies meet here and none of them was written for this.
+# UserCareerGoal stores matrix role ids ("l2-analyst"), the certificates
+# are listed on catalogue posts ("l2_soc_analyst"), and
+# skills_matrix.CATALOGUE_TO_SKILLS_ROLE is the bridge between them. The
+# join runs catalogue -> matrix in that table, so it is inverted here
+# through catalogue_roles_for, which is many to one: five posts map to
+# l3-analyst and all five lists count.
+
+
+def _normalise_cert(name: str) -> str:
+    """A certificate name with the issuing body's spelling flattened."""
+    return " ".join((name or "").upper().split())
+
+
+def _recorded_as(recorded: Dict[str, str], cert: str) -> Optional[str]:
+    """The status of a recorded certificate matching this one, or None.
+
+    Matched in both directions, because the same certificate is recorded
+    as "GCIA", "GIAC GCIA" and "SANS GCIA" depending on who typed it --
+    the same reason skills_matrix.pillars_for_cert matches on substrings.
+    """
+    want = _normalise_cert(cert)
+    if not want:
+        return None
+    for have, status in recorded.items():
+        if want in have or have in want:
+            return status
+    return None
+
+
+def certifications_for_role(skills_role_id: str) -> List[Dict[str, Any]]:
+    """The certificates the catalogue lists against one matrix role.
+
+    Deduplicated across the posts that map to the role, keeping the first
+    spelling seen and recording every post that listed it, because "three
+    of the posts behind this role ask for it" is a stronger signal than
+    the bare name.
+
+    `pillars` comes from skills_matrix and keeps its three-way answer:
+    a tuple of pillars, an empty tuple for a certificate that is real but
+    not pillar-specific, and None for one nothing has mapped yet. A
+    caller must not collapse the last two.
+    """
+    from ion.data import skills_matrix, soc_role_catalogue
+
+    out: Dict[str, Dict[str, Any]] = {}
+    for catalogue_id in skills_matrix.catalogue_roles_for(skills_role_id):
+        role = soc_role_catalogue.get_role(catalogue_id)
+        if not role:
+            continue
+        for cert in role.get("typical_certifications") or []:
+            key = _normalise_cert(cert)
+            entry = out.setdefault(key, {
+                "name": cert,
+                "pillars": skills_matrix.pillars_for_cert(cert),
+                "listed_by": [],
+            })
+            entry["listed_by"].append(role.get("name") or catalogue_id)
+
+    # Most-listed first: a certificate three of the role's posts ask for
+    # outranks one that a single specialist post mentions.
+    return sorted(
+        out.values(),
+        key=lambda c: (-len(c["listed_by"]), c["name"].upper()),
+    )
+
+
+def suggested_certifications(session: Session, user_id: int) -> Dict[str, Any]:
+    """Certificates for where somebody is now, and where they are heading.
+
+    Both halves are returned even when they are the same role, so the UI
+    can say so rather than silently showing one list twice.
+
+    Nothing here is a requirement. The catalogue is explicit that its
+    certificates are what adverts and vendor pathways usually list for a
+    role, which is a different thing from what somebody needs to do the
+    job, and any of them can be met by assessed proficiency instead. The
+    caveat travels with the payload so a screen cannot quietly promote a
+    suggestion into a bar to clear.
+    """
+    from ion.data import skills_matrix
+    from ion.models.skills import TeamCertification
+
+    goal = (
+        session.query(UserCareerGoal)
+        .filter(UserCareerGoal.user_id == user_id)
+        .one_or_none()
+    )
+
+    recorded = {
+        _normalise_cert(c.cert_name): (c.status or "active")
+        for c in session.query(TeamCertification)
+        .filter(TeamCertification.user_id == user_id)
+        .all()
+    }
+
+    def block(role_id: Optional[str]) -> Optional[Dict[str, Any]]:
+        if not role_id:
+            return None
+        certs = []
+        for cert in certifications_for_role(role_id):
+            status = _recorded_as(recorded, cert["name"])
+            certs.append({
+                **cert,
+                # "held" and "lapsed" are separate answers. Somebody whose
+                # GCIA expired is not in the same position as somebody who
+                # never sat it, and one line of advice does not fit both.
+                "held": status == "active",
+                "lapsed": status == "expired",
+            })
+        return {
+            "role_id": role_id,
+            # No certificates and no posts behind the role are different
+            # answers; the second is a gap in the bridge, not advice.
+            "mapped": bool(skills_matrix.catalogue_roles_for(role_id)),
+            "certifications": certs,
+        }
+
+    current = block(goal.current_role if goal else None)
+    target = block(goal.target_role if goal else None)
+    return {
+        "has_goal": goal is not None,
+        "current": current,
+        "target": target,
+        "same_role": bool(
+            goal and goal.current_role and goal.current_role == goal.target_role
+        ),
+        "caveat": (
+            "Typical for the role, not required. Any of these can be met "
+            "by assessed proficiency instead."
+        ),
     }
 
 

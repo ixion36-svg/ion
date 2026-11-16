@@ -1,0 +1,146 @@
+{# The structure editor: units, the posts in them, and who sits in each.
+
+   The Team tab's chart draws this tree; this is where it is built. It was
+   on the old /workforce/orbat page, and folding that page into Team left
+   it out, so for a while the only way to make a post was the catalogue's
+   one-shot establishment.
+
+   Drawn as an indented outline rather than as the chart: an editor needs a
+   form on every row, and a form inside a 260px chart box is unusable.
+
+   Expects `units`, `unit_paths`, `seatable`, `profile_names`, `profiles`,
+   `post_state` and `stage_label`. #}
+
+{% macro seat_controls(p) %}
+  {% if p.occupant %}
+    <form hx-post="/ui/workforce/org/posts/{{ p.id }}/fill"
+          hx-target="#wf-tab" hx-swap="innerHTML">
+      <input type="hidden" name="journey_id" value="">
+      <button type="submit" class="btn btn-xs btn-ghost">Unseat</button>
+    </form>
+  {% else %}
+    {# Only journeys this post can take: not already seated, and of the
+       post's own role when it has one. fill_post refuses anything else,
+       so listing it would offer a choice that always fails. #}
+    {% set options = seatable if not p.profile_id
+                     else seatable | selectattr('profile_id', 'equalto', p.profile_id) | list %}
+    {% if options %}
+      <form class="flex items-center gap-1"
+            hx-post="/ui/workforce/org/posts/{{ p.id }}/fill"
+            hx-target="#wf-tab" hx-swap="innerHTML" hx-trigger="change">
+        <label class="sr-only" for="seat-{{ p.id }}">Seat someone in {{ p.title }}</label>
+        <select id="seat-{{ p.id }}" name="journey_id" class="select select-xs select-bordered max-w-[220px]">
+          <option value="" selected>Seat someone…</option>
+          {% for s in options %}
+            <option value="{{ s.journey_id }}">{{ s.name }} · {{ s.role }}{% if s.is_cover %} (cover){% endif %}</option>
+          {% endfor %}
+        </select>
+      </form>
+    {% else %}
+      <span class="text-xs text-base-content/40">nobody free for this role</span>
+    {% endif %}
+  {% endif %}
+{% endmacro %}
+
+{% macro post_line(p) %}
+  {% set state = post_state.get(p.state, ('Unknown', 'badge-ghost', 'border-base-300')) %}
+  <li class="flex items-center gap-2 flex-wrap rounded-md border bg-base-100 px-2 py-1 {{ state[2] }}">
+    <span class="text-sm font-medium">{{ p.title }}</span>
+    {% if p.is_lead %}<span class="badge badge-xs badge-primary">Lead</span>{% endif %}
+    <span class="text-xs text-base-content/50">{{ profile_names.get(p.profile_id, 'any role') }}</span>
+    <span class="badge badge-xs {{ state[1] }}">{{ state[0] }}</span>
+    {% if p.occupant %}
+      <span class="text-xs">{{ p.occupant.name }}</span>
+      {% if p.occupant.is_cover %}<span class="badge badge-xs badge-secondary">Cover</span>{% endif %}
+      <span class="text-xs text-base-content/50">{{ stage_label.get(p.occupant.stage, p.occupant.stage) }}</span>
+    {% endif %}
+    <div class="grow"></div>
+    {{ seat_controls(p) }}
+    <form hx-post="/ui/workforce/org/posts/{{ p.id }}/delete"
+          hx-target="#wf-tab" hx-swap="innerHTML"
+          hx-confirm="Remove the post {{ p.title }}?{% if p.occupant %} {{ p.occupant.name }} keeps their journey; only the seat goes.{% endif %}">
+      <button type="submit" class="btn btn-xs btn-ghost text-error" aria-label="Remove post {{ p.title }}">✕</button>
+    </form>
+  </li>
+{% endmacro %}
+
+{% macro unit_block(u) %}
+  {% set all_posts = (u.leads or []) + (u.posts or []) %}
+  <li class="flex flex-col gap-2">
+    <div class="rounded-lg border border-base-300 bg-base-200 p-3">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="text-sm font-semibold">{{ u.name }}</span>
+        <span class="text-xs text-base-content/50">{{ all_posts | length }} {{ 'post' if all_posts | length == 1 else 'posts' }}</span>
+        <div class="grow"></div>
+        <form hx-post="/ui/workforce/org/units/{{ u.id }}/delete"
+              hx-target="#wf-tab" hx-swap="innerHTML"
+              hx-confirm="Remove {{ u.name }} and everything under it?">
+          <button type="submit" class="btn btn-xs btn-ghost text-error">Remove unit</button>
+        </form>
+      </div>
+
+      {% if all_posts %}
+        <ul class="flex flex-col gap-1 mt-2">
+          {% for p in all_posts %}{{ post_line(p) }}{% endfor %}
+        </ul>
+      {% endif %}
+
+      <form class="flex items-center gap-1 flex-wrap mt-2"
+            hx-post="/ui/workforce/org/posts" hx-target="#wf-tab" hx-swap="innerHTML">
+        <input type="hidden" name="unit_id" value="{{ u.id }}">
+        <label class="sr-only" for="np-title-{{ u.id }}">New post title in {{ u.name }}</label>
+        <input id="np-title-{{ u.id }}" name="title" type="text" maxlength="150"
+               placeholder="New post title" class="input input-xs input-bordered w-44">
+        <label class="sr-only" for="np-role-{{ u.id }}">Role for the new post</label>
+        <select id="np-role-{{ u.id }}" name="profile_id" class="select select-xs select-bordered w-44">
+          <option value="">any role</option>
+          {% for pr in profiles %}<option value="{{ pr.id }}">{{ pr.name }}</option>{% endfor %}
+        </select>
+        <button type="submit" class="btn btn-xs btn-ghost">+ Add post</button>
+      </form>
+    </div>
+
+    {% if u.children %}
+      <ul class="flex flex-col gap-2 pl-4 ml-2 border-l-2 border-base-300">
+        {% for c in u.children %}{{ unit_block(c) }}{% endfor %}
+      </ul>
+    {% endif %}
+  </li>
+{% endmacro %}
+
+<div id="structure" class="card bg-base-200 border border-base-300 mb-5">
+  <div class="card-body p-5">
+    <h2 class="card-title text-base">Structure</h2>
+    <p class="text-sm text-base-content/70">The units and posts the Team
+      chart draws, and who sits in each. An unfilled post shows there as a
+      gap; one held by somebody still in training shows as filling, not as
+      covered.</p>
+
+    {% if not units %}
+      <p class="text-sm text-base-content/60 mt-2">No structure yet. Add a
+        top-level unit below (e.g. SOC), then teams and posts under it. An
+        unfilled post shows as a gap.</p>
+    {% else %}
+      <ul class="flex flex-col gap-2 mt-2">
+        {% for u in units %}{{ unit_block(u) }}{% endfor %}
+      </ul>
+    {% endif %}
+
+    <form class="flex items-end gap-2 flex-wrap mt-4"
+          hx-post="/ui/workforce/org/units" hx-target="#wf-tab" hx-swap="innerHTML">
+      <div>
+        <label class="label text-xs py-0" for="nu-name">New unit</label>
+        <input id="nu-name" name="name" type="text" maxlength="150"
+               placeholder="SOC, Detection, Tier 2" class="input input-sm input-bordered">
+      </div>
+      <div>
+        <label class="label text-xs py-0" for="nu-parent">Under</label>
+        <select id="nu-parent" name="parent_id" class="select select-sm select-bordered min-w-[180px]">
+          <option value="">(top level)</option>
+          {% for up in unit_paths %}<option value="{{ up.id }}">{{ up.path }}</option>{% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="btn btn-sm btn-primary">Add unit</button>
+    </form>
+  </div>
+</div>

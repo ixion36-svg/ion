@@ -130,3 +130,29 @@ def test_disabled_without_a_configured_secret(db, monkeypatch):
     with pytest.raises(HTTPException) as caught:
         asyncio.run(receive_alert_webhook(_alert(), _request(), SECRET))
     assert caught.value.status_code == 503
+
+
+def _ingest_with_severity(factory, severity):
+    alert = _alert().model_copy(update={"severity": severity})
+    asyncio.run(receive_alert_webhook(alert, _request(), SECRET))
+    with factory() as s:
+        return s.query(AlertTriage).one().priority, s.query(IntegrationEvent).one().payload
+
+
+@pytest.mark.parametrize("sent, stored", [
+    ("critical", "critical"), ("HIGH", "high"), (" Warning ", "medium"),
+    ("crit", "critical"), ("1", "critical"), ("informational", "info"),
+])
+def test_a_senders_severity_is_stored_as_one_the_queue_renders(db, sent, stored):
+    priority, _ = _ingest_with_severity(db, sent)
+    assert priority == stored
+
+
+@pytest.mark.parametrize("sent", ["<img src=x>", "sev-0", ""])
+def test_an_unrecognised_severity_is_not_stored_as_the_priority(db, sent):
+    """Defect: the sender's string written straight into `priority`, which the
+    alert queue shows to every analyst as that alert's severity. The alert is
+    still ingested, and the evidence row keeps what was actually sent."""
+    priority, payload = _ingest_with_severity(db, sent)
+    assert priority == "medium"
+    assert payload["severity"] == sent

@@ -1,0 +1,107 @@
+{# Certificates typically listed for the role somebody holds and the one
+   they are heading for.
+
+   The caveat is on screen, not in a tooltip. The catalogue these come
+   from says plainly that its certificates are what adverts and vendor
+   pathways usually list rather than what somebody needs to do the job,
+   and that any of them can be met by assessed proficiency. A list headed
+   "suggested" with that unsaid reads as a set of hurdles.
+
+   `pillars` keeps its three-way answer. A tuple names what the
+   certificate is evidence for, an empty tuple means it is real but not
+   evidence for a particular pillar, and null means nothing has mapped it
+   yet -- which is "go and look", not "no". #}
+
+{% macro cert_list(block) %}
+  {% if not block.mapped %}
+    <p class="text-sm text-base-content/60">No post in the role catalogue
+      maps to this role yet, so there is nothing to suggest from. That is a
+      gap in the mapping rather than an answer.</p>
+  {% elif not block.certifications %}
+    <p class="text-sm text-base-content/60">No certificates are listed
+      against this role.</p>
+  {% else %}
+    <ul class="flex flex-col mt-1">
+      {% for c in block.certifications %}
+        <li class="flex items-center gap-2 py-2 flex-wrap border-t border-base-300/60 first:border-t-0">
+          <span class="text-sm {{ 'text-base-content/50 line-through' if c.held }}">{{ c.name }}</span>
+
+          {% if c.held %}
+            <span class="badge badge-xs badge-success">You hold this</span>
+          {% elif c.lapsed %}
+            <span class="badge badge-xs badge-warning">Lapsed</span>
+          {% endif %}
+
+          {% if c.listed_by | length > 1 %}
+            <span class="text-xs text-base-content/50">{{ c.listed_by | length }} posts list it</span>
+          {% endif %}
+
+          <div class="grow"></div>
+
+          {% if c.pillars is none %}
+            <span class="text-xs text-base-content/40">not yet mapped to a pillar</span>
+          {% elif not c.pillars %}
+            <span class="text-xs text-base-content/40">no single pillar</span>
+          {% else %}
+            {% for p in c.pillars %}
+              <span class="badge badge-xs badge-ghost">{{ p }}</span>
+            {% endfor %}
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endmacro %}
+
+{% if failed %}
+  <div role="alert" class="alert alert-error">
+    <span>Suggested certificates could not be read. This is not an empty
+      list: the lookup failed.</span>
+  </div>
+
+{% elif not has_goal %}
+  <div class="card bg-base-200 border border-base-300">
+    <div class="card-body p-5">
+      <h2 class="card-title text-base">Suggested certificates</h2>
+      <p class="text-sm text-base-content/70">Set the role you are in and the
+        one you are working towards, above, and the certificates usually
+        listed for each will appear here.</p>
+    </div>
+  </div>
+
+{% else %}
+<div class="card bg-base-200 border border-base-300">
+  <div class="card-body p-5">
+    <h2 class="card-title text-base">Suggested certificates</h2>
+    <p class="text-sm text-base-content/70">{{ caveat }}</p>
+
+    {% if same_role %}
+      <p class="text-sm text-base-content/60">You are in the role you are
+        working towards, so there is one list.</p>
+      <h3 class="text-sm font-semibold mt-3">{{ current.role_id }}</h3>
+      {{ cert_list(current) }}
+    {% else %}
+      <div class="grid gap-5 lg:grid-cols-2 mt-2">
+        <div>
+          <h3 class="text-sm font-semibold">Where you are now</h3>
+          {% if not current %}
+            <p class="text-sm text-base-content/60">No current role set.</p>
+          {% else %}
+            <p class="text-xs text-base-content/50 mb-1">{{ current.role_id }}</p>
+            {{ cert_list(current) }}
+          {% endif %}
+        </div>
+        <div>
+          <h3 class="text-sm font-semibold">Where you are heading</h3>
+          {% if not target %}
+            <p class="text-sm text-base-content/60">No target role set.</p>
+          {% else %}
+            <p class="text-xs text-base-content/50 mb-1">{{ target.role_id }}</p>
+            {{ cert_list(target) }}
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}

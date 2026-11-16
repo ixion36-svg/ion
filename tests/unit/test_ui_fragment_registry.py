@@ -216,11 +216,44 @@ def _fragment_routes() -> list:
 #                     is right for the fragment and makes the discrepancy no
 #                     worse, but the discrepancy is real and belongs to
 #                     /api/dashboard rather than to this conversion.
+#
+#   /ui/workforce/  A person's own onboarding, and the two writes they can
+#     me, and the    make against it. All three mirror API routes that take
+#     submit and     get_current_user and no named permission --
+#     withdraw       GET /api/workforce/journeys/me,
+#     writes         POST /api/workforce/requirements/{id}/submit and
+#                    .../withdraw -- so a named permission here would make
+#                    the fragments stricter than the API rather than equal
+#                    to it.
+#
+#                    The page is open for the same reason, and that reason
+#                    is the point rather than an oversight: ION withholds
+#                    permissions until mandatory training is verified, so a
+#                    page telling a joiner what to complete cannot itself
+#                    demand one. A joiner has nothing yet. Gating this would
+#                    hide the onboarding from exactly the people being
+#                    onboarded.
+#
+#                    The reads resolve the caller's own journeys and nobody
+#                    else's. The writes are not open, either: ownership is
+#                    enforced inside the service, where
+#                    submit_requirement refuses a requirement whose journey
+#                    belongs to somebody else unless the actor may verify
+#                    it. That check is one definition shared with the JSON
+#                    API rather than a second one here that could disagree.
+#
+#                    Everything else on /workforce IS named --
+#                    /ui/workforce/team on workforce:read, /ui/workforce/setup
+#                    and its writes on workforce:manage, verify and send-back
+#                    on workforce:verify.
 BARE_AUTH_FRAGMENTS = {
     "/ui/bug-reports",
     "/ui/dashboard-v2/overview",
     "/ui/profile",
     "/ui/profile/resolve-elastic",
+    "/ui/workforce/me",
+    "/ui/workforce/requirements/{requirement_id}/submit",
+    "/ui/workforce/requirements/{requirement_id}/withdraw",
 }
 
 

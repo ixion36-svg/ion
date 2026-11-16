@@ -2015,3 +2015,86 @@
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
+
+/* ============================================================
+ * ORBAT org chart — a top-down tree with drawn reporting lines.
+ *
+ * The indented-list version of this page conveyed depth but not command:
+ * a reader had to infer who reported to whom from how far right a block
+ * sat. Here the line is drawn, so the structure is read rather than
+ * deduced.
+ *
+ * Connectors are pseudo-elements, not markup. A line between two boxes is
+ * not content, and a <div> per connector would be walked and announced by
+ * a screen reader reading the list.
+ *
+ * The shape is the classic nested-list tree. Each level is a <ul> laid out
+ * as a row; each node is an <li> carrying two half-width rules across its
+ * top which together form the bus between siblings. The first child drops
+ * its left half and the last child its right, so the bus stops at the
+ * outermost siblings instead of overhanging into space; an only child
+ * drops both and is joined by the parent's stub alone.
+ *
+ * The root row is exempt from all of it: a bus above the topmost unit
+ * would be a reporting line drawn to nobody.
+ * ============================================================ */
+.ion-orbat ul {
+  display: flex;
+  justify-content: center;
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 22px 0 0;
+}
+
+.ion-orbat li {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  list-style: none;
+  padding: 22px 8px 0;
+}
+
+.ion-orbat li::before,
+.ion-orbat li::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 50%;
+  height: 22px;
+  border-top: 2px solid var(--color-base-300);
+}
+
+.ion-orbat li::before { right: 50%; }
+.ion-orbat li::after { left: 50%; border-left: 2px solid var(--color-base-300); }
+
+.ion-orbat li:only-child::before,
+.ion-orbat li:only-child::after { display: none; }
+
+.ion-orbat li:first-child::before,
+.ion-orbat li:last-child::after { border: 0 none; }
+
+.ion-orbat li:last-child::before {
+  border-right: 2px solid var(--color-base-300);
+  border-radius: 0 6px 0 0;
+}
+
+.ion-orbat li:first-child::after { border-radius: 6px 0 0 0; }
+
+/* The stub dropping out of a parent box into its row of children. */
+.ion-orbat ul ul::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 0;
+  height: 22px;
+  border-left: 2px solid var(--color-base-300);
+}
+
+/* The root unit answers to nothing on this page. */
+.ion-orbat > ul { padding-top: 0; }
+.ion-orbat > ul > li { padding-top: 0; }
+.ion-orbat > ul > li::before,
+.ion-orbat > ul > li::after { display: none; }
