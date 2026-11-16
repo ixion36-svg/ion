@@ -90,3 +90,12 @@ def test_a_named_alert_leaves_the_unmapped_bucket(session):
     after = {r["rule_name"] for r in get_detection_health(session, days=365)["rules"]}
     assert before == {"(unmapped)"}
     assert after == {"Brute Force"}
+
+
+def test_a_name_longer_than_the_column_is_cut_to_fit(session):
+    session.add(AlertTriage(es_alert_id="a1"))
+    session.commit()
+
+    asyncio.run(fill_missing_rule_names(session, FakeElasticsearch({"a1": "R" * 900})))
+
+    assert _names(session) == {"a1": "R" * 500}

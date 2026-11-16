@@ -541,6 +541,8 @@ def open_journeys_for_held_roles(session: Session, user: User, *,
 
     rank = {entry["id"]: n for n, entry in enumerate(SOC_ROLE_CATALOGUE)}
     opened: list[UserJourney] = []
+    if not assigner.has_permission("workforce:manage"):
+        return opened
     for role in list(user.roles):
         candidates = (
             session.query(RoleProfile)
@@ -1270,6 +1272,21 @@ def confers_role(journey: UserJourney, now: Optional[datetime] = None) -> bool:
     return gate_cleared(journey) and readiness_complete(journey)
 
 
+def _holds_role_meanwhile(journey: UserJourney) -> bool:
+    """Whether an unfinished journey leaves its role with the person.
+
+    True only for somebody who held the role before the journey opened,
+    and only while that journey is open and in good standing. The mark
+    says their training was not yet on record; it is not a way to keep a
+    role. Once the journey is closed or withdrawn (a leaver, a role taken
+    away) or suspended (a mandatory item they had has lapsed) it withholds
+    like any other, or offboarding would close the journey and leave the
+    access behind.
+    """
+    return journey.role_already_held and journey.stage not in (
+        STAGE_CLOSED, STAGE_WITHDRAWN, STAGE_SUSPENDED)
+
+
 def sync_granted_roles(session: Session, user: User,
                        now: Optional[datetime] = None) -> dict:
     """Reconcile the ION roles this person holds against their journeys.
@@ -1296,7 +1313,7 @@ def sync_granted_roles(session: Session, user: User,
             continue
         if confers_role(journey, now):
             earned.add(role_id)
-        elif not journey.role_already_held:
+        elif not _holds_role_meanwhile(journey):
             withheld.add(role_id)
 
     # One journey earning a role beats another withholding it.

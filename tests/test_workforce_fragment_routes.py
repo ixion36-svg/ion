@@ -385,6 +385,11 @@ class TestSetupSchema:
         assert "Profile created." in r.text
         assert db.query(RoleProfile).filter_by(name="Hunter").count() == 1
 
+    def test_closing_the_post_panel_swaps_in_nothing(self, as_lead):
+        r = as_lead.get("/ui/workforce/orbat/closed")
+        assert r.status_code == 200
+        assert r.text == ""
+
     def test_an_empty_setup_offers_the_catalogue_and_the_induction(self, as_lead):
         r = as_lead.get("/ui/workforce/setup")
         assert 'hx-post="/ui/workforce/catalogue/adopt"' in r.text

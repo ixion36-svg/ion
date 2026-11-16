@@ -1176,6 +1176,15 @@ def update_user_roles(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # Refused before anything is saved. Answering 200 and dropping the
+    # profile would tell the administrator the person had been onboarded.
+    if roles_update.role_profile_id and not current_user.has_permission(
+            "workforce:manage"):
+        raise HTTPException(
+            status_code=403,
+            detail="Opening a role's onboarding needs the workforce:manage permission.",
+        )
+
     auth_service = AuthService(session)
     auth_service.update_user_roles(
         user=user,

@@ -57,7 +57,8 @@ async def fill_missing_rule_names(session: Session, es, batch: int = _BATCH) -> 
         last_id = rows[-1].id
 
         alerts = await es.get_alerts_by_ids([r.es_alert_id for r in rows]) or []
-        names = {a.id: a.rule_name for a in alerts if a.rule_name}
+        limit = AlertTriage.rule_name.type.length
+        names = {a.id: a.rule_name[:limit] for a in alerts if a.rule_name}
         for row in rows:
             name = names.get(row.es_alert_id)
             if name:
@@ -88,6 +89,9 @@ async def _loop(engine: Engine) -> None:
                 filled = await fill_missing_rule_names(session, es)
                 if filled:
                     logger.info("Rule-name backfill: named %d triage rows", filled)
+            except Exception:
+                session.rollback()
+                raise
             finally:
                 session.close()
         except Exception as exc:

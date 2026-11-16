@@ -13,7 +13,7 @@ from sqlalchemy.orm import sessionmaker
 
 from ion.models.base import Base
 from ion.models.user import Permission, Role, User
-from ion.models.workforce import PHASE_GATE, STAGE_PRE_ACCESS, UserJourney
+from ion.models.workforce import PHASE_GATE, UserJourney
 from ion.services import workforce_service as wf
 from ion.web import api
 
@@ -142,15 +142,67 @@ def test_saving_the_same_profile_again_keeps_one_journey(db, admin):
 
 def test_the_role_change_stands_when_the_editor_cannot_manage_workforce(
         db, admin, analyst_role):
-    picked = _profile(db, admin, "Detection Engineer")
+    _profile(db, admin, "SOC Analyst (L1)", grants=analyst_role)
     editor = _user(db, "editor", [Role(name="user_admin")])
     joiner = _user(db, "joiner")
 
-    _save_roles(db, editor, joiner, ["analyst"], role_profile_id=picked.id)
+    _save_roles(db, editor, joiner, ["analyst"])
 
     db.expire_all()
     assert [r.name for r in joiner.roles] == ["analyst"]
     assert _open_profiles(db, joiner) == []
+
+
+def test_picking_a_profile_without_the_right_to_is_refused_before_anything_changes(
+        db, admin, analyst_role):
+    from fastapi import HTTPException
+
+    picked = _profile(db, admin, "Detection Engineer")
+    editor = _user(db, "editor", [Role(name="user_admin")])
+    joiner = _user(db, "joiner")
+
+    with pytest.raises(HTTPException) as refused:
+        _save_roles(db, editor, joiner, ["analyst"], role_profile_id=picked.id)
+
+    assert refused.value.status_code == 403
+    db.expire_all()
+    assert joiner.roles == []
+    assert _open_profiles(db, joiner) == []
+
+
+def test_offboarding_takes_back_a_role_that_was_already_held(db, admin, analyst_role):
+    from datetime import date
+
+    _profile(db, admin, "SOC Analyst (L1)", grants=analyst_role)
+    leaver = _user(db, "leaver")
+    _save_roles(db, admin, leaver, ["analyst"])
+    assert [r.name for r in leaver.roles] == ["analyst"]
+
+    record = wf.start_offboarding(db, user=leaver, raiser=admin,
+                                  last_working_day=date.today())
+    wf.revoke_now(db, record, actor=admin)
+
+    db.refresh(leaver)
+    assert leaver.roles == []
+
+
+def test_a_lapsed_mandatory_item_suspends_a_role_that_was_already_held(
+        db, admin, analyst_role):
+    from datetime import datetime, timedelta
+
+    from ion.models.workforce import STAGE_SUSPENDED
+
+    _profile(db, admin, "SOC Analyst (L1)", grants=analyst_role)
+    holder = _user(db, "holder")
+    _save_roles(db, admin, holder, ["analyst"])
+    journey = db.query(UserJourney).filter_by(user_id=holder.id).one()
+    journey.stage = STAGE_SUSPENDED
+    journey.grace_until = datetime.utcnow() - timedelta(days=1)
+    db.commit()
+
+    wf.sync_granted_roles(db, holder)
+
+    assert holder.roles == []
 
 
 def test_only_published_non_baseline_profiles_are_offered(db, admin, analyst_role):
@@ -228,3 +280,38 @@ def test_an_existing_database_gains_the_already_held_column(tmp_path):
     columns = {c["name"]: c for c in inspect(engine).get_columns("user_journeys")}
     assert "role_already_held" in columns
     assert columns["role_already_held"]["nullable"] is False
+
+
+def _picker(db, viewer, group="edit"):
+    from starlette.requests import Request
+
+    from ion.web.ui import users as users_ui
+
+    request = Request({
+        "type": "http", "method": "GET", "path": "/ui/users/profile-options",
+        "headers": [], "query_string": b"", "scheme": "http",
+        "server": ("testserver", 80), "root_path": "",
+    })
+    return users_ui.users_profile_options_fragment(
+        request=request, group=group, user=viewer, session=db).body.decode()
+
+
+def test_the_picker_offers_the_assignable_profiles_to_a_workforce_manager(
+        db, admin, analyst_role):
+    picked = _profile(db, admin, "Detection Engineer")
+
+    html = _picker(db, admin)
+
+    assert 'id="edit-user-profile"' in html
+    assert f'<option value="{picked.id}">Detection Engineer</option>' in html
+
+
+def test_the_picker_gives_no_control_to_somebody_who_could_not_use_it(
+        db, admin, analyst_role):
+    _profile(db, admin, "Detection Engineer")
+    editor = _user(db, "editor", [Role(name="user_admin")])
+
+    html = _picker(db, editor)
+
+    assert "<select" not in html
+    assert "Detection Engineer" not in html
