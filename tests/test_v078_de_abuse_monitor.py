@@ -21,20 +21,23 @@ from ion.models.system_quirk import SystemQuirk, SystemQuirkStatus
 from ion.models.user import AuditLog
 from ion.services import de_abuse_service as svc
 
-_NOW = datetime.now(timezone.utc).replace(tzinfo=None)
+
+def _now():
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def _quirk(session, raised_by, verified_by=None, *, rules=None, created=None,
            verified_at=None, status=None, review_days=30):
+    now = _now()
     q = SystemQuirk(
         title="q", annotation="a", justification="j",
         scope_rules=rules if rules is not None else ["Rule A"],
         scope_hosts=["h1"],
-        review_date=_NOW + timedelta(days=review_days),
+        review_date=now + timedelta(days=review_days),
         status=status or (SystemQuirkStatus.ACTIVE if verified_by else SystemQuirkStatus.PENDING),
         raised_by_id=raised_by, verified_by_id=verified_by,
-        verified_at=verified_at or (_NOW if verified_by else None),
-        created_at=created or _NOW,
+        verified_at=verified_at or (now if verified_by else None),
+        created_at=created or now,
     )
     session.add(q)
     session.flush()
@@ -45,7 +48,7 @@ def _bob(session, created_by, decided_by, *, decided_at=None, created=None):
     p = BobTuningProposal(
         title="t", proposed_text="text", status=BobTuningProposalStatus.APPROVED,
         created_by_id=created_by, decided_by_id=decided_by,
-        decided_at=decided_at or _NOW, created_at=created or _NOW,
+        decided_at=decided_at or _now(), created_at=created or _now(),
     )
     session.add(p)
     session.flush()
@@ -116,7 +119,7 @@ def test_detects_high_volume_actor(session):
 
 
 def test_window_excludes_old_activity(session):
-    old = _NOW - timedelta(days=200)
+    old = _now() - timedelta(days=200)
     for _ in range(4):
         _quirk(session, raised_by=1, verified_by=2, created=old, verified_at=old)
     session.commit()

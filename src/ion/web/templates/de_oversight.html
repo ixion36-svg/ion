@@ -15,13 +15,13 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">The detective control over the DE module. Separation-of-duties stops one person; this flags what a colluding <strong>pair</strong> could do — recurring raiser/verifier and drafter/approver pairs, high-volume actors, and over-broad "blanket" quirks. <strong>Read-only</strong>: it reports, it never changes anything.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <select id="ab-days" class="ion-select" data-change-action="abLoad">
+        <select id="ab-days" class="select select-sm w-auto" data-change-action="abLoad">
             <option value="30">Last 30 days</option>
             <option value="90" selected>Last 90 days</option>
             <option value="180">Last 180 days</option>
             <option value="365">Last 365 days</option>
         </select>
-        <button class="ion-btn ion-btn-primary" data-click-action="abLoad">Refresh</button>
+        <button class="btn btn-sm btn-primary" data-click-action="abLoad">Refresh</button>
     </div>
 </section>
 
