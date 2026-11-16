@@ -189,6 +189,73 @@ def _fixture_alert_dicts(
         for t in fixture_q.all()
     ]
 
+def _alert_dicts(session: Session, alerts: list) -> list[dict]:
+    """The alert dicts the queue and the single-alert read both return.
+
+    One definition, so an alert opened by URL carries the same system
+    attribution and observables as the same alert opened from the queue.
+    """
+    # Bulk-resolve every alert's namespace → CyAB + TIDE identity in one
+    # cache build instead of one lookup per alert.
+    from ion.services.system_resolver_service import bulk_resolve
+    ns_map = bulk_resolve(session, (a.source_system for a in alerts))
+    out_alerts = []
+    for a in alerts:
+        # Exclude raw_data from list view — saves ~65% of payload.
+        # Frontend fetches raw_data on demand via GET /alerts/{id}/raw.
+        d = a.to_dict(include_raw=False)
+        res = ns_map.get(a.source_system) if a.source_system else None
+        if res:
+            d["cyab_system_id"] = res.get("cyab_system_id")
+            d["cyab_system_name"] = res.get("cyab_system_name")
+            d["cyab_data_source_name"] = res.get("cyab_data_source_name")
+            d["tide_system_id"] = res.get("tide_system_id")
+            d["tide_system_name"] = res.get("tide_system_name")
+        # Cases redesign: extract observables on-the-fly from the
+        # raw _source BEFORE it's dropped, so every alert widget can render
+        # its extracted + auto-enriched observables. Extraction-on-render:
+        # cheap, in-memory, NOT persisted here. Per-alert try/except so a
+        # single malformed doc never breaks the whole list.
+        try:
+            d["observables"] = to_contract_observables(a.raw_data or {})
+        except Exception:
+            logger.debug("observable extraction skipped for alert %s", a.id, exc_info=True)
+            d["observables"] = []
+        out_alerts.append(d)
+
+    # Back-fill threat_level/score/source on the extracted observables from
+    # any already-persisted enrichment (one batch query). Never enriches
+    # synchronously in the list path; air-gap deployments keep "unknown".
+    try:
+        hydrate_persisted_enrichment(session, out_alerts)
+    except Exception:
+        logger.debug("observable enrichment hydration skipped", exc_info=True)
+    return out_alerts
+
+
+def _annotate_alert_dicts(session: Session, out_alerts: list[dict]) -> None:
+    """Advisory annotations, in place. Each is best-effort and additive."""
+    # DE Phase 2: advisory System-Quirk annotations (badge/note/nudge).
+    # Additive-only and best-effort — a quirk NEVER hides an alert, and a
+    # failure here must not break the alerts view.
+    try:
+        from ion.licensing.gating import de_module_available
+        if de_module_available():  # quirks are a DE-module feature
+            from ion.services.de_quirk_service import annotate_alerts
+            annotate_alerts(session, out_alerts)
+    except Exception:
+        logger.debug("quirk annotation skipped", exc_info=True)
+
+    # KEV status, same contract: additive, best-effort, one query for the
+    # page. Bob has had this as ground truth since v0.79.1 while the analyst
+    # reading the same alert had not — the model knew more than the human.
+    try:
+        from ion.services.kev_service import annotate_alerts as annotate_kev
+        annotate_kev(session, out_alerts)
+    except Exception:
+        logger.debug("kev annotation skipped", exc_info=True)
+
+
 @router.get("/elasticsearch/alerts")
 async def get_es_alerts(
     hours: int = 24,
@@ -251,63 +318,9 @@ async def get_es_alerts(
             time_to=time_to,
             system=system,
         )
-        # Bulk-resolve every alert's namespace → CyAB + TIDE identity in one
-        # cache build instead of one lookup per alert.
-        from ion.services.system_resolver_service import bulk_resolve
-        ns_map = bulk_resolve(session, (a.source_system for a in alerts))
-        out_alerts = []
-        for a in alerts:
-            # Exclude raw_data from list view — saves ~65% of payload.
-            # Frontend fetches raw_data on demand via GET /alerts/{id}/raw.
-            d = a.to_dict(include_raw=False)
-            res = ns_map.get(a.source_system) if a.source_system else None
-            if res:
-                d["cyab_system_id"] = res.get("cyab_system_id")
-                d["cyab_system_name"] = res.get("cyab_system_name")
-                d["cyab_data_source_name"] = res.get("cyab_data_source_name")
-                d["tide_system_id"] = res.get("tide_system_id")
-                d["tide_system_name"] = res.get("tide_system_name")
-            # Cases redesign: extract observables on-the-fly from the
-            # raw _source BEFORE it's dropped, so every alert widget can render
-            # its extracted + auto-enriched observables. Extraction-on-render:
-            # cheap, in-memory, NOT persisted here. Per-alert try/except so a
-            # single malformed doc never breaks the whole list.
-            try:
-                d["observables"] = to_contract_observables(a.raw_data or {})
-            except Exception:
-                logger.debug("observable extraction skipped for alert %s", a.id, exc_info=True)
-                d["observables"] = []
-            out_alerts.append(d)
-
-        # Back-fill threat_level/score/source on the extracted observables from
-        # any already-persisted enrichment (one batch query). Never enriches
-        # synchronously in the list path; air-gap deployments keep "unknown".
-        try:
-            hydrate_persisted_enrichment(session, out_alerts)
-        except Exception:
-            logger.debug("observable enrichment hydration skipped", exc_info=True)
-
+        out_alerts = _alert_dicts(session, alerts)
         out_alerts.extend(fixture_dicts)
-
-        # DE Phase 2: advisory System-Quirk annotations (badge/note/nudge).
-        # Additive-only and best-effort — a quirk NEVER hides an alert, and a
-        # failure here must not break the alerts view.
-        try:
-            from ion.licensing.gating import de_module_available
-            if de_module_available():  # quirks are a DE-module feature
-                from ion.services.de_quirk_service import annotate_alerts
-                annotate_alerts(session, out_alerts)
-        except Exception:
-            logger.debug("quirk annotation skipped", exc_info=True)
-
-        # KEV status, same contract: additive, best-effort, one query for the
-        # page. Bob has had this as ground truth since v0.79.1 while the analyst
-        # reading the same alert had not — the model knew more than the human.
-        try:
-            from ion.services.kev_service import annotate_alerts as annotate_kev
-            annotate_kev(session, out_alerts)
-        except Exception:
-            logger.debug("kev annotation skipped", exc_info=True)
+        _annotate_alert_dicts(session, out_alerts)
 
         return {
             "alerts": out_alerts,
@@ -328,6 +341,40 @@ async def get_es_alerts(
             "connection_error": True,
             "message": safe_error(e),
         }
+
+@router.get("/elasticsearch/alerts/{alert_id}/detail")
+async def get_alert_detail(
+    alert_id: str,
+    current_user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
+):
+    """One alert, shaped like a row of GET /elasticsearch/alerts.
+
+    /alerts/{id} opens an alert by URL, and that alert need not be inside
+    the time window the queue loaded. Lab fixtures have no Elasticsearch
+    document, so they are answered from their triage row whatever the
+    state of Elasticsearch.
+    """
+    if alert_id.startswith("lab-fixture-"):
+        for fixture in _fixture_alert_dicts(session, include_closed=True):
+            if fixture["id"] == alert_id:
+                return {"alert": fixture}
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    service = get_elasticsearch_service()
+    if not get_elasticsearch_config().get("enabled") or not service.is_configured:
+        raise HTTPException(status_code=503, detail="Elasticsearch is not configured")
+    try:
+        alerts = await service.get_alerts_by_ids([alert_id])
+    except ElasticsearchError as e:
+        logger.warning("Elasticsearch error fetching alert %s: %s", alert_id, e)
+        raise HTTPException(status_code=502, detail=safe_error(e)) from e
+    if not alerts:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    out_alerts = _alert_dicts(session, alerts[:1])
+    _annotate_alert_dicts(session, out_alerts)
+    return {"alert": out_alerts[0]}
+
 
 @router.get("/elasticsearch/alerts/{alert_id}/raw")
 async def get_alert_raw_data(

@@ -1114,7 +1114,8 @@ def test_the_create_form_templates_carry_every_field_the_handlers_read(opener, s
 
 def test_the_page_route_passes_the_create_permission_as_a_fact_about_the_viewer():
     server = SERVER.read_text(encoding="utf-8")
-    handler = server[server.index("async def alerts_page"):]
+    # The queue page and /alerts/{id} share one context, built here.
+    handler = server[server.index("def _alerts_page_context"):]
     handler = handler[:handler.index("@app.get", 10)]
     assert '"can_create_case"' in handler
     assert 'has_permission("case:create")' in handler

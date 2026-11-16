@@ -19,7 +19,7 @@
    /ui/alerts/playbooks fragment is gated on: loadPlaybooksForAlert says
    the section is withheld rather than requesting a 403 that htmx would
    not swap over "Loading playbooks...". #}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden" data-alert-detail-v2="{{ '1' if alert_detail_v2 else '0' }}" data-alert-field-pins="{{ '1' if alert_field_pins else '0' }}" data-bob-templates="{{ '1' if bob_custom_templates else '0' }}" data-can-create-case="{{ 'true' if can_create_case else 'false' }}" data-can-read-playbooks="{{ 'true' if can_read_playbooks else 'false' }}">
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden{% if initial_alert_id %} alerts-single{% endif %}" data-alert-detail-v2="{{ '1' if alert_detail_v2 else '0' }}" data-alert-field-pins="{{ '1' if alert_field_pins else '0' }}" data-bob-templates="{{ '1' if bob_custom_templates else '0' }}" data-can-create-case="{{ 'true' if can_create_case else 'false' }}" data-can-read-playbooks="{{ 'true' if can_read_playbooks else 'false' }}">
 <div class="relative z-10 w-full px-4 sm:px-6 lg:px-8 py-10 md:py-12">
 
   <!-- ── Header row ── -->
@@ -620,24 +620,34 @@
     </div>
 </div>
 
-<!-- Alert Detail Modal -->
-<div class="modal" id="alert-detail-modal">
-    <div class="modal-content max-w-[min(1180px,94vw)] w-full">
-        <div class="modal-header">
-            <h2 id="alert-detail-title">Alert Details</h2>
-            <div class="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-md font-mono text-[0.9rem] ml-auto mr-4" id="investigation-timer">
+{# The alert window. The same inset workspace chrome /cases and /documents
+   use (static/css/ion-workspace.css), opened over the queue so the filters
+   and the selection behind it survive. At /alerts/{id} it is rendered in
+   page mode instead and the queue chrome is not shown.
+   data-initial-alert-id rather than Jinja inside the <script> block, so
+   `node --check` stays usable on the script. #}
+<div class="ion-ws-overlay" id="alert-window-overlay" data-click-action="closeAlertModal"></div>
+<div class="ion-ws-panel{% if initial_alert_id %} page-mode open{% endif %}" id="alert-window"
+     role="dialog" aria-labelledby="alert-detail-title"
+     data-initial-alert-id="{{ initial_alert_id or '' }}">
+    <div class="ion-ws-header">
+        <div class="aw-heading">
+            <span class="ion-ws-eyebrow" id="alert-window-position">Alert</span>
+            <span class="ion-ws-title" id="alert-detail-title">Alert Details</span>
+        </div>
+        <div class="aw-tools">
+            <div class="investigation-timer" id="investigation-timer">
                 <span class="text-base">&#9201;</span>
                 <span class="timer-display" id="timer-display">00:00</span>
-            <button class="timer-btn" id="timer-toggle-btn" data-click-action="toggleInvestigationTimer" title="Pause/Resume timer"><span class="timer-icon-pause">&#10074;&#10074;</span></button>
+                <button class="timer-btn" id="timer-toggle-btn" data-click-action="toggleInvestigationTimer" title="Pause/Resume timer"><span class="timer-icon-pause">&#10074;&#10074;</span></button>
             </div>
-            <button class="modal-close" data-click-action="closeAlertModal">&times;</button>
+            <button type="button" class="pm-tool-btn" id="alert-window-prev" data-click-action="alertWindowStep" data-args="[-1]" title="Previous alert in the queue" aria-label="Previous alert" disabled>&larr;</button>
+            <button type="button" class="pm-tool-btn" id="alert-window-next" data-click-action="alertWindowStep" data-args="[1]" title="Next alert in the queue" aria-label="Next alert" disabled>&rarr;</button>
+            <button type="button" class="ion-ws-close" data-click-action="closeAlertModal" aria-label="Close">&times;</button>
         </div>
-        <div class="modal-body" id="alert-detail-body">
-            <!-- Populated by JS -->
-        </div>
-        <div class="modal-footer">
-            <button class="btn btn-secondary" data-click-action="closeAlertModal">Close</button>
-        </div>
+    </div>
+    <div class="ion-ws-body" id="alert-detail-body">
+        <!-- Populated by JS -->
     </div>
 </div>
 </div><!-- /ion-tw inner wrapper -->
@@ -1072,6 +1082,7 @@
 <!-- the triage queue. Takes every dependency through mount() rather than reading
      this page's globals, so it cannot repeat the v0.79.5 ambient-global failure. -->
 <script nonce="{{ csp_nonce }}" src="/static/js/alerts-queue.js?v={{ ion_version }}"></script>
+<script nonce="{{ csp_nonce }}" src="/static/js/alerts-window.js?v={{ ion_version }}"></script>
 
 <script nonce="{{ csp_nonce }}">
 {% raw %}
@@ -1123,6 +1134,15 @@ let entityFilter = null; // { type: 'host'|'user'|'rule', value: '...' }
 let autoRefreshEnabled = true;
 let autoRefreshTimer = null;
 let currentDetailAlert = null;
+// The alert the window was last opened on. It can be outside allAlerts: an
+// alert reached by URL or from a related-alert link need not be inside the
+// time window the queue loaded, and the actions in its window still have
+// to find it.
+let openedAlert = null;
+function findAlert(alertId) {
+    return allAlerts.find(a => a.id === alertId)
+        || (openedAlert && openedAlert.id === alertId ? openedAlert : undefined);
+}
 let arkimeEnabled = false;  // Set from API response — true when ION has Arkime configured
 let triageCache = {}; // { es_alert_id: { status, priority, case_id, ... } }
 let casesData = []; // cached list of cases
@@ -1293,6 +1313,8 @@ document.addEventListener('DOMContentLoaded', function() {
     loadCasesIndex();
     startAutoRefresh();
     checkAIAvailability();
+    const initialAlertId = document.getElementById('alert-window').dataset.initialAlertId;
+    if (initialAlertId) showAlertDetail(initialAlertId);
 });
 
 async function checkAIAvailability() {
@@ -1923,7 +1945,7 @@ function showAlertClosureModal(alertId, closureType) {
 function _prepopulateAlertKFPFields(alertId) {
     // Try to get data from triage cache
     const triage = triageCache[alertId];
-    const alertData = allAlerts.find(a => a.id === alertId);
+    const alertData = findAlert(alertId);
 
     let hosts = [], users = [], ips = [], rules = [];
 
@@ -2406,7 +2428,7 @@ function showCreateCaseForm(alertId) {
     if (!overlay) return;
 
     // Auto-populate from alert data
-    const alert = allAlerts.find(a => a.id === alertId);
+    const alert = findAlert(alertId);
     let prefillTitle = '';
     let prefillDesc = '';
     let prefillSeverity = '';
@@ -2459,7 +2481,7 @@ async function submitCreateCase(alertId) {
     }
 
     // Build structured context from alert data
-    const alertData = allAlerts.find(a => a.id === alertId);
+    const alertData = findAlert(alertId);
     const affectedHosts = alertData && alertData.host ? [alertData.host] : [];
     const affectedUsers = alertData && alertData.user ? [alertData.user] : [];
     const triggeredRules = alertData && alertData.rule_name ? [alertData.rule_name] : [];
@@ -2624,7 +2646,7 @@ async function saveObservables(alertId, observables) {
 // =========================================================================
 
 function getAlertPayload(alertId) {
-    const alert = allAlerts.find(a => a.id === alertId);
+    const alert = findAlert(alertId);
     if (!alert) return null;
     const triage = triageCache[alertId] || {};
     return {
@@ -3688,7 +3710,7 @@ function _aqMount() {
         // a modal owns the keyboard while it is open, or j/k would scroll the
         // queue behind an open alert
         isBlocked: () => !!document.querySelector(
-            '.modal.show, .acp-panel.open, #acp-closure-overlay.open'),
+            '.modal.show, #alert-window.open, .acp-panel.open, #acp-closure-overlay.open'),
         // updateBulkActionsUI() is the real function, and it already syncs the
         // header select-all checkbox itself. The two names previously called
         // here — updateBulkActionsBar and syncSelectAllCheckbox — never existed,
@@ -3700,6 +3722,7 @@ function _aqMount() {
         onRender: (n) => {
             const el = document.getElementById('aq-count');
             if (el) el.textContent = `${n} of ${allAlerts.length}`;
+            ionAlertWindow.refreshNav();
         },
         actions: {
             open:    (ids) => showAlertDetail(ids[0]),
@@ -5018,11 +5041,11 @@ async function showAlertDetail(alertId) {
     // /cases renders an alert exactly the same way. What stays here is the
     // page-specific part: finding the alert in this page's list, showing the
     // modal, and starting the investigation timer.
-    const alert = allAlerts.find(a => a.id === alertId);
+    const alert = findAlert(alertId) || await fetchAlertById(alertId);
     if (!alert) return;
 
+    openedAlert = alert;
     currentDetailAlert = alert;
-    document.getElementById('alert-detail-title').textContent = alert.title;
 
     ionAlertDetail.mount(document.getElementById('alert-detail-body'), alert, {
         layout: 'stacked',           // sections, not tabs — same layout /cases proved
@@ -5034,27 +5057,43 @@ async function showAlertDetail(alertId) {
         classPrefix: 'alert-parsed'
     });
 
-    document.getElementById('alert-detail-modal').classList.add('show');
+    ionAlertWindow.show(alert);
 
     startInvestigationTimer(alertId);
     loadRelatedAlerts(alert);
     loadTriage(alertId);
 }
 
+// An alert the queue did not load: read it on its own. A failed read is said
+// in the window, which is opened for it, rather than leaving a click or a
+// URL that did nothing.
+async function fetchAlertById(alertId) {
+    let reason;
+    try {
+        const resp = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/detail`);
+        if (resp.ok) return (await resp.json()).alert;
+        reason = resp.status === 404
+            ? 'This alert was not found. It may have aged out of Elasticsearch.'
+            : 'This alert could not be read (HTTP ' + resp.status + ').';
+    } catch (error) {
+        reason = 'This alert could not be read: the request did not complete.';
+    }
+    ionAlertWindow.fail(reason);
+    return null;
+}
+
 function closeAlertModal() {
-    document.getElementById('alert-detail-modal').classList.remove('show');
     currentDetailAlert = null;
 
     // Stop investigation timer
     stopInvestigationTimer();
+    ionAlertWindow.hide();
 }
 
-// Close modal on background click
-document.addEventListener('click', function(e) {
-    const modal = document.getElementById('alert-detail-modal');
-    if (e.target === modal) {
-        closeAlertModal();
-    }
+ionAlertWindow.mount({
+    getAlerts: () => filteredAlerts,
+    currentId: () => (currentDetailAlert ? currentDetailAlert.id : null),
+    open: (alertId) => showAlertDetail(alertId),
 });
 
 // Close modal on Escape — dismiss highest z-index first
@@ -6237,7 +6276,7 @@ async function confirmAddToCase() {
     const ids = Array.from(selectedAlertIds);
     const ruleNames = {};
     ids.forEach(id => {
-        const a = allAlerts.find(x => x.id === id);
+        const a = findAlert(id);
         if (a && a.rule_name) { ruleNames[id] = a.rule_name; }
     });
     const payload = {
@@ -6340,7 +6379,7 @@ function handleKeyboardShortcut(e) {
     }
 
     // Check for modal states
-    const detailModalOpen = document.getElementById('alert-detail-modal')?.classList.contains('show');
+    const detailModalOpen = ionAlertWindow.isOpen();
     const anyModalOpen = document.querySelector('.modal.show, .case-create-overlay, .saved-filters-modal, #add-to-case-modal');
 
     switch (e.key) {
