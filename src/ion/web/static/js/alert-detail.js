@@ -1184,49 +1184,55 @@
       }, 200);
   }
 
+  // The sequence events (EQL building blocks) for the current alert. The
+  // tabbed layout asks on the tab's first click; the stacked layout has no
+  // tab to click, so mount() asks.
+  function _loadSequence() {
+      if (!_current) return;
+      const seqEl = document.getElementById('sequence-content');
+      if (!seqEl || !seqEl.classList.contains('loading')) return;
+      seqEl.innerHTML = '<div class="loading">Loading sequence events...</div>';
+      fetch(`/api/elasticsearch/alerts/${encodeURIComponent(_current.id)}/sequence`)
+          .then(r => r.json())
+          .then(data => {
+              const events = data.events || [];
+              if (!events.length) {
+                  seqEl.innerHTML = '<div class="empty-state p-5 text-center text-[#64748b]">No sequence events — this is not an EQL/correlation alert, or building blocks are not available.</div>';
+                  seqEl.classList.remove('loading');
+                  return;
+              }
+              let html = '<div class="text-[11px] text-[#64748b] mb-3">' + events.length + ' events in this sequence</div>';
+              html += '<div class="sequence-timeline">';
+              events.forEach((ev, i) => {
+                  const ts = ev.timestamp ? new Date(ev.timestamp).toLocaleString() : '';
+                  html += '<div class="border-l-[2px] border-l-[#334155] pt-2 pr-0 pb-2 pl-4 ml-2 relative">';
+                  html += '<div class="absolute left-[-5px] top-[12px] w-[8px] h-[8px] rounded-[50%] bg-[#6de4ff]"></div>';
+                  html += '<div class="text-[10px] text-[#64748b] mb-1">Step ' + (i+1) + ' &middot; ' + escapeHtml(ts) + '</div>';
+                  if (ev.process_name) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">Process:</span> <span class="text-[#e2e8f0] font-mono text-[11px]">' + escapeHtml(ev.process_name) + '</span></div>';
+                  if (ev.command_line) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">Command:</span> <span class="text-[#f8b33a] font-mono text-[10px] break-all">' + escapeHtml(ev.command_line) + '</span></div>';
+                  if (ev.parent_process) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">Parent:</span> <span class="text-[#94a3b8] font-mono text-[11px]">' + escapeHtml(ev.parent_process) + '</span></div>';
+                  if (ev.file_name) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">File:</span> <span class="text-[#e2e8f0] font-mono text-[11px]">' + escapeHtml(ev.file_name) + '</span></div>';
+                  if (ev.file_hash) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">Hash:</span> <span class="text-[#64748b] font-mono text-[10px]">' + escapeHtml(ev.file_hash) + '</span></div>';
+                  if (ev.source_ip || ev.destination_ip) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">Network:</span> <span class="text-[#e2e8f0] font-mono text-[11px]">' + escapeHtml(ev.source_ip || '') + ' &rarr; ' + escapeHtml(ev.destination_ip || '') + '</span></div>';
+                  if (ev.host) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">Host:</span> <span class="text-[#e2e8f0] text-[11px]">' + escapeHtml(ev.host) + '</span></div>';
+                  if (ev.user) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">User:</span> <span class="text-[#e2e8f0] text-[11px]">' + escapeHtml(ev.user) + '</span></div>';
+                  if (ev.event_action) html += '<div><span class="text-[#94a3b8] text-[10px]">Action:</span> <span class="text-[#6de4ff] text-[11px]">' + escapeHtml(ev.event_action) + '</span></div>';
+                  html += '</div>';
+              });
+              html += '</div>';
+              seqEl.innerHTML = html;
+              seqEl.classList.remove('loading');
+          })
+          .catch(() => { seqEl.innerHTML = '<div class="error">Failed to load sequence</div>'; });
+  }
+
   function switchDetailTab(tabId, btn) {
       document.querySelectorAll('.detail-tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.detail-tab-content').forEach(c => c.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById(`detail-tab-${tabId}`).classList.add('active');
       // Lazy-load sequence events (EQL building blocks) on first click
-      if (tabId === 'sequence' && _current) {
-          const seqEl = document.getElementById('sequence-content');
-          if (seqEl && seqEl.classList.contains('loading')) {
-              seqEl.innerHTML = '<div class="loading">Loading sequence events...</div>';
-              fetch(`/api/elasticsearch/alerts/${encodeURIComponent(_current.id)}/sequence`)
-                  .then(r => r.json())
-                  .then(data => {
-                      const events = data.events || [];
-                      if (!events.length) {
-                          seqEl.innerHTML = '<div class="empty-state p-5 text-center text-[#64748b]">No sequence events — this is not an EQL/correlation alert, or building blocks are not available.</div>';
-                          return;
-                      }
-                      let html = '<div class="text-[11px] text-[#64748b] mb-3">' + events.length + ' events in this sequence</div>';
-                      html += '<div class="sequence-timeline">';
-                      events.forEach((ev, i) => {
-                          const ts = ev.timestamp ? new Date(ev.timestamp).toLocaleString() : '';
-                          html += '<div class="border-l-[2px] border-l-[#334155] pt-2 pr-0 pb-2 pl-4 ml-2 relative">';
-                          html += '<div class="absolute left-[-5px] top-[12px] w-[8px] h-[8px] rounded-[50%] bg-[#6de4ff]"></div>';
-                          html += '<div class="text-[10px] text-[#64748b] mb-1">Step ' + (i+1) + ' &middot; ' + escapeHtml(ts) + '</div>';
-                          if (ev.process_name) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">Process:</span> <span class="text-[#e2e8f0] font-mono text-[11px]">' + escapeHtml(ev.process_name) + '</span></div>';
-                          if (ev.command_line) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">Command:</span> <span class="text-[#f8b33a] font-mono text-[10px] break-all">' + escapeHtml(ev.command_line) + '</span></div>';
-                          if (ev.parent_process) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">Parent:</span> <span class="text-[#94a3b8] font-mono text-[11px]">' + escapeHtml(ev.parent_process) + '</span></div>';
-                          if (ev.file_name) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">File:</span> <span class="text-[#e2e8f0] font-mono text-[11px]">' + escapeHtml(ev.file_name) + '</span></div>';
-                          if (ev.file_hash) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">Hash:</span> <span class="text-[#64748b] font-mono text-[10px]">' + escapeHtml(ev.file_hash) + '</span></div>';
-                          if (ev.source_ip || ev.destination_ip) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">Network:</span> <span class="text-[#e2e8f0] font-mono text-[11px]">' + escapeHtml(ev.source_ip || '') + ' &rarr; ' + escapeHtml(ev.destination_ip || '') + '</span></div>';
-                          if (ev.host) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">Host:</span> <span class="text-[#e2e8f0] text-[11px]">' + escapeHtml(ev.host) + '</span></div>';
-                          if (ev.user) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">User:</span> <span class="text-[#e2e8f0] text-[11px]">' + escapeHtml(ev.user) + '</span></div>';
-                          if (ev.event_action) html += '<div><span class="text-[#94a3b8] text-[10px]">Action:</span> <span class="text-[#6de4ff] text-[11px]">' + escapeHtml(ev.event_action) + '</span></div>';
-                          html += '</div>';
-                      });
-                      html += '</div>';
-                      seqEl.innerHTML = html;
-                      seqEl.classList.remove('loading');
-                  })
-                  .catch(() => { seqEl.innerHTML = '<div class="error">Failed to load sequence</div>'; });
-          }
-      }
+      if (tabId === 'sequence') _loadSequence();
       // Render from cache when we already have the document, otherwise fetch.
       // Guarding on `!raw_data` would strand the tab on its placeholder once
       // hydration or the Fields tab had populated it.
@@ -1886,6 +1892,10 @@
       var f = document.getElementById('alert-fields-content');
       if (f) loadAlertParsedFields(alert.id, f);
       _loadRawInto(document.getElementById('raw-data-content'), alert);
+      // The guide and the sequence loaded on a tab click, and this layout has
+      // no tabs: both sat on their placeholder for the life of the window.
+      loadInvestigationGuide(alert);
+      _loadSequence();
       _observeSections();
       return;
     }

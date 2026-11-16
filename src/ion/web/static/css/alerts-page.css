@@ -2626,3 +2626,14 @@ kbd {
 /* /alerts/{id}: the window is the page, so the queue chrome around it is not
    shown. The queue still loads, because prev/next reads its order. */
 .alerts-single > :not(#alert-window) { display: none; }
+
+/* The rail of selected alerts. Hidden by the analyst, or with nothing
+   ticked, the alert takes the whole window. */
+#alert-window-grid.aw-no-rail { grid-template-columns: 1fr; }
+.aw-tools .pm-tool-btn[aria-pressed="true"] { color: var(--text-primary); border-color: var(--border-bright); }
+/* At /alerts/{id} the panel is in the page flow and would grow to its
+   content, so neither column would scroll on its own and the rail would run
+   as long as the queue. Bounded to the viewport it behaves as it does over
+   the queue. The panel starts 81px down, under the navigation and the
+   page's top padding; 104px leaves the same margin beneath it. */
+#alert-window.page-mode { height: calc(100vh - 104px); min-height: 480px; }

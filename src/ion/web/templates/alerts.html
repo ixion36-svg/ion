@@ -641,15 +641,27 @@
                 <span class="timer-display" id="timer-display">00:00</span>
                 <button class="timer-btn" id="timer-toggle-btn" data-click-action="toggleInvestigationTimer" title="Pause/Resume timer"><span class="timer-icon-pause">&#10074;&#10074;</span></button>
             </div>
+            <button type="button" class="pm-tool-btn" id="alert-window-rail-toggle" data-click-action="alertWindowToggleRail" title="Show or hide the selected alerts beside this one" aria-pressed="true" disabled>Selected</button>
             <button type="button" class="pm-tool-btn" id="alert-window-prev" data-click-action="alertWindowStep" data-args="[-1]" title="Previous alert in the queue" aria-label="Previous alert" disabled>&larr;</button>
             <button type="button" class="pm-tool-btn" id="alert-window-next" data-click-action="alertWindowStep" data-args="[1]" title="Next alert in the queue" aria-label="Next alert" disabled>&rarr;</button>
             <button type="button" class="ion-ws-close" data-click-action="closeAlertModal" aria-label="Close">&times;</button>
         </div>
     </div>
-    <div class="ion-ws-body" id="alert-detail-body">
-        <!-- Populated by JS -->
+    {# The alerts ticked in the queue, beside the open one, the way a case's
+       alerts sit beside the one being read. Each column scrolls on its own.
+       With nothing ticked there is no rail. #}
+    <div class="ion-ws-body workspace-mode">
+        <div class="ion-ws-grid" id="alert-window-grid">
+            <aside class="ion-ws-rail" id="alert-window-rail" aria-label="Selected alerts"></aside>
+            <div class="ion-ws-detail" id="alert-detail-body">
+                <!-- Populated by JS -->
+            </div>
+        </div>
     </div>
 </div>
+<template id="aw-rail-heading"><h4 class="ion-ws-section-title"></h4></template>
+<template id="aw-rail-item"><div class="ion-ws-rail-item" data-click-action="showAlertDetail"><span class="rail-sev"></span><div class="ion-ws-rail-item-head"><span class="ion-ws-rail-item-name"></span></div><div class="ion-ws-rail-item-sub"></div></div></template>
+<template id="aw-rail-more"><div class="ion-ws-rail-item-sub ion-ws-rail-overflow"></div></template>
 </div><!-- /ion-tw inner wrapper -->
 </div><!-- /ion-tw -->
 
@@ -5093,7 +5105,13 @@ function closeAlertModal() {
 }
 
 ionAlertWindow.mount({
-    getAlerts: () => filteredAlerts,
+    // The order the table shows, which is grouped and sorted; filteredAlerts
+    // is the same set in the order it was read. Until the queue module has
+    // mounted there is only the latter.
+    getAlerts: () => (_aqMounted ? window.ionAlertQueue.displayed() : filteredAlerts),
+    // The ticked alerts, in that same order. The rail lists these.
+    getSelected: () => (_aqMounted ? window.ionAlertQueue.displayed() : filteredAlerts)
+        .filter(a => selectedAlertIds.has(a.id)),
     currentId: () => (currentDetailAlert ? currentDetailAlert.id : null),
     open: (alertId) => showAlertDetail(alertId),
 });
@@ -6004,6 +6022,8 @@ function clearSelection() {
 }
 
 function updateBulkActionsUI() {
+    // An action taken in the open alert can clear or change the selection.
+    ionAlertWindow.refreshNav();
     const count = selectedAlertIds.size;
     const toolbar = document.getElementById('bulk-actions-toolbar');
     const countSpan = document.getElementById('selected-count');

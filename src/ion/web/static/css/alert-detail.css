@@ -761,3 +761,15 @@
 .iad-folded .iad-fold-chev { transform: rotate(-90deg); }
 .iad-folded .iad-sec-body { display: none; }
 .iad-sec-body { padding: 10px 12px; }
+
+/* A section with nothing to show is one line under its title, not a padded
+   card: on an alert with no related alerts, no sequence and no notes, three
+   empty cards took a third of the column. The same rule /cases has for
+   .cpanel-empty-hint. The second selector is for a section whose content
+   sits in a single wrapper, as the sequence events do. */
+.iad-sec-body:has(> .empty-state:only-child),
+.iad-sec-body:has(> :only-child > .empty-state:only-child) { padding: 6px 12px; }
+.iad-sec-body > .empty-state:only-child,
+.iad-sec-body > :only-child > .empty-state:only-child {
+    padding: 0; background: none; border: 0; text-align: left; font-size: 0.74rem;
+}

@@ -571,6 +571,10 @@
             if (sortKey === k) sortDir = -sortDir; else { sortKey = k; sortDir = 1; }
             cur = 0; render();
         },
+        // The alerts in the order the table shows them: grouped, sorted, and
+        // without the groups the analyst collapsed. The alert window steps
+        // through this, so its prev/next match the rows on screen.
+        displayed: () => visible(),
         state: () => ({ groupBy, density, tz, sortKey, sortDir, cursor: cur,
                         visible: visible().length }),
     };

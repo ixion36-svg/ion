@@ -251,7 +251,7 @@ def test_the_alert_opens_in_the_shared_workspace_chrome_not_a_modal():
         assert cls in markup, cls
     assert 'class="ion-ws-overlay" id="alert-window-overlay"' in PAGE
     # The component mounts into this id on /alerts; it did before too.
-    assert 'class="ion-ws-body" id="alert-detail-body"' in markup
+    assert 'class="ion-ws-detail" id="alert-detail-body"' in markup
 
 
 def test_the_window_has_prev_and_next_bound_to_the_step_action():
@@ -289,6 +289,117 @@ def test_an_alert_outside_the_loaded_queue_is_read_on_its_own():
     assert "/detail`" in fetcher and "encodeURIComponent(alertId)" in fetcher
     # A failed read is said in the window rather than doing nothing.
     assert "ionAlertWindow.fail(reason)" in fetcher
+
+
+# ---------------------------------------------------------------------------
+# The rail
+# ---------------------------------------------------------------------------
+
+def test_the_rail_sits_beside_the_alert_in_the_shared_workspace_grid():
+    markup = _window_markup()
+    grid = markup[markup.index('class="ion-ws-body workspace-mode"'):]
+    assert grid.index('class="ion-ws-rail" id="alert-window-rail"') < grid.index('class="ion-ws-detail" id="alert-detail-body"')
+    assert 'class="ion-ws-grid" id="alert-window-grid"' in grid
+
+
+def test_a_rail_item_is_a_template_that_opens_its_alert():
+    """Cloned and filled through textContent and dataset, so an alert title
+    is never parsed as markup."""
+    item = re.search(r'<template id="aw-rail-item">(.*?)</template>', PAGE, re.S).group(1)
+    assert 'class="ion-ws-rail-item" data-click-action="showAlertDetail"' in item
+    for cls in ("rail-sev", "ion-ws-rail-item-name", "ion-ws-rail-item-sub"):
+        assert cls in item, cls
+    build = WINDOW_JS[WINDOW_JS.index("function railItem("):]
+    build = build[:build.index("\n  }")]
+    assert "item.dataset.args = JSON.stringify([alert.id])" in build
+    assert "innerHTML" not in WINDOW_JS
+
+
+def test_the_rail_shows_the_alerts_around_the_open_one_and_counts_the_rest():
+    render = WINDOW_JS[WINDOW_JS.index("function renderRail(pos)"):]
+    render = render[:render.index("\n  }")]
+    assert "centre - RAIL_REACH" in render and "centre + RAIL_REACH + 1" in render
+    assert "railNote(from, 'earlier')" in render
+    assert "railNote(list.length - to, 'later')" in render
+    # Re-rendered with the position, so a re-read queue is reflected.
+    nav = WINDOW_JS[WINDOW_JS.index("function refreshNav()"):]
+    assert "renderRail(pos);" in nav[:nav.index("\n  }")]
+
+
+def test_the_rail_can_be_hidden_and_an_empty_queue_shows_none():
+    toggle = re.search(r'<button[^>]*id="alert-window-rail-toggle"[^>]*>', PAGE).group(0)
+    assert 'data-click-action="alertWindowToggleRail"' in toggle
+    assert "window.alertWindowToggleRail = toggleRail" in WINDOW_JS
+    assert "var shown = railWanted() && list.length > 0;" in WINDOW_JS
+    assert re.search(r"#alert-window-grid\.aw-no-rail\s*\{\s*grid-template-columns:\s*1fr", PAGE_CSS)
+
+
+def test_the_rail_lists_the_ticked_alerts_not_the_whole_queue():
+    """The owner's call: the rail is the set the analyst chose to work
+    through. Listing the queue beside every alert repeated the table."""
+    render = WINDOW_JS[WINDOW_JS.index("function renderRail(pos)"):]
+    render = render[:render.index("\n  }")]
+    assert "var list = pos.selected;" in render
+    assert "pos.list" not in render
+    mount = PAGE[PAGE.index("ionAlertWindow.mount({"):]
+    mount = mount[:mount.index("});")]
+    assert ".filter(a => selectedAlertIds.has(a.id))" in mount
+    # The selection can change under an open alert (a case made from it).
+    bulk = PAGE[PAGE.index("function updateBulkActionsUI() {"):]
+    assert "ionAlertWindow.refreshNav();" in bulk[:bulk.index("const count")]
+
+
+def test_prev_next_walk_the_selection_when_the_open_alert_is_in_it():
+    pos = WINDOW_JS[WINDOW_JS.index("function position()"):]
+    pos = pos[:pos.index("\n  }")]
+    assert "list: scoped ? selected : queue," in pos
+    assert "index: scoped ? selectedIndex : indexOfAlert(queue, id)," in pos
+    assert "(pos.scoped ? ' selected' : '')" in WINDOW_JS
+
+
+def test_prev_next_and_the_rail_follow_the_order_the_table_shows():
+    """filteredAlerts is the order the queue was read in. The table groups
+    and sorts, so stepping through filteredAlerts jumped around the rows."""
+    queue_js = (ROOT / "src/ion/web/static/js/alerts-queue.js").read_text(encoding="utf-8")
+    assert "displayed: () => visible()," in queue_js
+    mount = PAGE[PAGE.index("ionAlertWindow.mount({"):]
+    mount = mount[:mount.index("});")]
+    assert "getAlerts: () => (_aqMounted ? window.ionAlertQueue.displayed() : filteredAlerts)" in mount
+
+
+def test_page_mode_bounds_the_window_so_its_columns_scroll():
+    assert re.search(r"#alert-window\.page-mode\s*\{\s*height:\s*calc\(100vh - \d+px\)", PAGE_CSS)
+
+
+# ---------------------------------------------------------------------------
+# Sections with nothing to show
+# ---------------------------------------------------------------------------
+
+def test_the_stacked_layout_loads_the_guide_and_the_sequence():
+    """Both loaded on a tab click. The stacked layout has no tabs, so on
+    /alerts they sat on their placeholders for the life of the window."""
+    detail_js = (ROOT / "src/ion/web/static/js/alert-detail.js").read_text(encoding="utf-8")
+    mount = detail_js[detail_js.index("  function mount(container, alert, opts) {"):]
+    stacked = mount[mount.index("if (_opts.layout === 'stacked') {"):]
+    stacked = stacked[:stacked.index("return;")]
+    assert "loadInvestigationGuide(alert);" in stacked
+    assert "_loadSequence();" in stacked
+    # One loader, which the tab click uses too.
+    assert detail_js.count("/sequence`)") == 1
+    assert "if (tabId === 'sequence') _loadSequence();" in detail_js
+
+
+def test_an_empty_sequence_stops_counting_as_loading():
+    detail_js = (ROOT / "src/ion/web/static/js/alert-detail.js").read_text(encoding="utf-8")
+    loader = detail_js[detail_js.index("function _loadSequence()"):]
+    empty = loader[loader.index("if (!events.length) {"):]
+    assert "seqEl.classList.remove('loading');" in empty[:empty.index("return;")]
+
+
+def test_a_section_holding_only_its_empty_state_is_one_line():
+    css = (ROOT / "src/ion/web/static/css/alert-detail.css").read_text(encoding="utf-8")
+    assert ".iad-sec-body:has(> .empty-state:only-child)" in css
+    assert ".iad-sec-body > :only-child > .empty-state:only-child" in css
 
 
 def test_the_queue_keyboard_stands_down_while_the_window_is_open():

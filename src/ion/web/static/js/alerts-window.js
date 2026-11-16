@@ -75,6 +75,85 @@
     if (fixed) fixed.remove();
   }
 
+  // ── the rail ──────────────────────────────────────────────────────────
+  // The alerts the analyst ticked in the queue, beside the open one: the
+  // set they chose to work through, not the whole queue. With nothing ticked
+  // there is no rail and the alert has the window. A selection can be the
+  // whole queue (500), so the rail shows the ones around the open alert and
+  // says how many it left out on each side.
+  var RAIL_REACH = 40;
+  var RAIL_KEY = 'ion-alert-window-rail';
+  var SEVERITIES = { critical: 1, high: 1, medium: 1, low: 1, info: 1 };
+
+  function clone(id) {
+    return el(id).content.firstElementChild.cloneNode(true);
+  }
+
+  function railWanted() {
+    try { return localStorage.getItem(RAIL_KEY) !== '0'; } catch (_) { return true; }
+  }
+
+  function railNote(count, where) {
+    var note = clone('aw-rail-more');
+    note.textContent = count + ' ' + where + ' selected';
+    return note;
+  }
+
+  function railItem(alert, selected) {
+    var item = clone('aw-rail-item');
+    item.dataset.args = JSON.stringify([alert.id]);
+    var severity = String(alert.severity || '').toLowerCase();
+    item.querySelector('.rail-sev').classList.add('rail-sev-' + (SEVERITIES[severity] ? severity : 'info'));
+    item.querySelector('.ion-ws-rail-item-name').textContent = alert.title || alert.rule_name || alert.id;
+    var when = alert.timestamp ? new Date(alert.timestamp) : null;
+    var parts = [alert.host, alert.user,
+      when && !isNaN(when) ? when.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : null];
+    item.querySelector('.ion-ws-rail-item-sub').textContent = parts.filter(Boolean).join(' \u00b7 ');
+    if (selected) {
+      item.classList.add('selected');
+      item.setAttribute('aria-current', 'true');
+    }
+    return item;
+  }
+
+  function renderRail(pos) {
+    var rail = el('alert-window-rail');
+    var list = pos.selected;
+    var shown = railWanted() && list.length > 0;
+    el('alert-window-grid').classList.toggle('aw-no-rail', !shown);
+    rail.hidden = !shown;
+    var toggle = el('alert-window-rail-toggle');
+    toggle.setAttribute('aria-pressed', railWanted() ? 'true' : 'false');
+    toggle.disabled = list.length === 0;
+    toggle.title = list.length === 0
+      ? 'Tick alerts in the queue to list them beside the one you open'
+      : 'Show or hide the selected alerts beside this one';
+    if (!shown) { rail.replaceChildren(); return; }
+
+    var centre = pos.selectedIndex === -1 ? 0 : pos.selectedIndex;
+    var from = Math.max(0, centre - RAIL_REACH);
+    var to = Math.min(list.length, centre + RAIL_REACH + 1);
+    var nodes = [];
+    var heading = clone('aw-rail-heading');
+    heading.textContent = 'Selected \u00b7 ' + list.length;
+    nodes.push(heading);
+    if (from > 0) nodes.push(railNote(from, 'earlier'));
+    var current = null;
+    for (var i = from; i < to; i++) {
+      var item = railItem(list[i], i === pos.selectedIndex);
+      if (i === pos.selectedIndex) current = item;
+      nodes.push(item);
+    }
+    if (to < list.length) nodes.push(railNote(list.length - to, 'later'));
+    rail.replaceChildren.apply(rail, nodes);
+    if (current) current.scrollIntoView({ block: 'nearest' });
+  }
+
+  function toggleRail() {
+    try { localStorage.setItem(RAIL_KEY, railWanted() ? '0' : '1'); } catch (_) { /* blocked */ }
+    renderRail(position());
+  }
+
   function el(id) { return document.getElementById(id); }
   function panel() { return el('alert-window'); }
 
@@ -94,14 +173,29 @@
     }
   }
 
-  function position() {
-    var list = host ? host.getAlerts() : [];
-    var id = host ? host.currentId() : null;
-    var index = -1;
+  function indexOfAlert(list, id) {
     for (var i = 0; i < list.length; i++) {
-      if (list[i].id === id) { index = i; break; }
+      if (list[i].id === id) return i;
     }
-    return { list: list, index: index };
+    return -1;
+  }
+
+  // Where the open alert sits. Prev/next step through the selection when the
+  // open alert is one of the ticked ones, so the rail and the arrows walk the
+  // same list; otherwise through the queue as the table shows it.
+  function position() {
+    var queue = host ? host.getAlerts() : [];
+    var selected = host ? host.getSelected() : [];
+    var id = host ? host.currentId() : null;
+    var selectedIndex = indexOfAlert(selected, id);
+    var scoped = selectedIndex !== -1;
+    return {
+      list: scoped ? selected : queue,
+      index: scoped ? selectedIndex : indexOfAlert(queue, id),
+      scoped: scoped,
+      selected: selected,
+      selectedIndex: selectedIndex
+    };
   }
 
   // The queue can be re-read or re-filtered under an open alert, so the
@@ -115,11 +209,12 @@
     var inQueue = pos.index !== -1;
     if (label) {
       label.textContent = inQueue
-        ? 'Alert ' + (pos.index + 1) + ' of ' + pos.list.length
+        ? 'Alert ' + (pos.index + 1) + ' of ' + pos.list.length + (pos.scoped ? ' selected' : '')
         : 'Alert · not in the queue as filtered';
     }
     if (prev) prev.disabled = !inQueue || pos.index === 0;
     if (next) next.disabled = !inQueue || pos.index === pos.list.length - 1;
+    renderRail(pos);
   }
 
   function open() {
@@ -149,6 +244,7 @@
     el('alert-window-position').textContent = 'Alert';
     el('alert-window-prev').disabled = true;
     el('alert-window-next').disabled = true;
+    renderRail({ selected: [], selectedIndex: -1 });
   }
 
   function hide() {
@@ -176,4 +272,5 @@
     isOpen: isOpen, refreshNav: refreshNav, step: step
   };
   window.alertWindowStep = step;
+  window.alertWindowToggleRail = toggleRail;
 })();
