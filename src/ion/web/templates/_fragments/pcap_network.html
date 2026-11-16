@@ -1,0 +1,88 @@
+{# The pcap top-talker tables, from ui/pcap.py's network_view.
+
+   All four shared one defect:
+
+       const max = Math.max(...top.map(i => i.count), 1);
+       const pct = (i.count / max * 100).toFixed(1);
+
+   One count that is not a number makes `max` NaN, every percentage after
+   it NaN, and every bar `width:NaN%`, so the whole column went blank.
+   Seen first on the analytics index breakdown.
+#}
+{%- if state != 'data' %}
+<div class="pcap-empty">
+  {%- if error %}{{ error }}
+  {%- else %}This analysis could not be read.{% endif %}
+</div>
+{%- else %}
+<div class="grid grid-cols-2 gap-5">
+  {%- for t in tables[:2] %}
+  <div>
+    <h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">{{ t.heading }}</h3>
+    {%- if t.rows is none %}
+    <p class="text-[var(--text-secondary)] text-[.85rem]">This list is not
+      in a shape this page can read.</p>
+    {%- elif not t.rows %}
+    <p class="text-[var(--text-secondary)] text-[.85rem]">No data</p>
+    {%- else %}
+    <table class="pcap-table">
+      <thead><tr><th>{{ t.column }}</th>
+        <th class="text-right">Packets</th></tr></thead>
+      <tbody>
+        {%- for r in t.rows %}
+        <tr>
+          <td class="font-mono">{{ r.name }}</td>
+          <td class="text-right bar-cell">
+            {%- if r.pct is not none %}
+            <span class="mini-bar" data-ion-style="width:{{ r.pct }}%"></span>
+            {%- endif %}
+            <span class="mini-val">
+              {%- if r.count is not none %}{{ r.count }}
+              {%- else %}<span class="an-absent"
+                  title="This row carried no packet count"></span>{% endif %}
+            </span>
+          </td>
+        </tr>
+        {%- endfor %}
+      </tbody>
+    </table>
+    {%- endif %}
+  </div>
+  {%- endfor %}
+</div>
+<div class="grid grid-cols-2 gap-5 mt-5">
+  {%- for t in tables[2:] %}
+  <div>
+    <h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">{{ t.heading }}</h3>
+    {%- if t.rows is none %}
+    <p class="text-[var(--text-secondary)] text-[.85rem]">This list is not
+      in a shape this page can read.</p>
+    {%- elif not t.rows %}
+    <p class="text-[var(--text-secondary)] text-[.85rem]">No data</p>
+    {%- else %}
+    <table class="pcap-table">
+      <thead><tr><th>{{ t.column }}</th>
+        <th class="text-right">Packets</th></tr></thead>
+      <tbody>
+        {%- for r in t.rows %}
+        <tr>
+          <td>{{ r.name }}</td>
+          <td class="text-right bar-cell">
+            {%- if r.pct is not none %}
+            <span class="mini-bar" data-ion-style="width:{{ r.pct }}%"></span>
+            {%- endif %}
+            <span class="mini-val">
+              {%- if r.count is not none %}{{ r.count }}
+              {%- else %}<span class="an-absent"
+                  title="This row carried no packet count"></span>{% endif %}
+            </span>
+          </td>
+        </tr>
+        {%- endfor %}
+      </tbody>
+    </table>
+    {%- endif %}
+  </div>
+  {%- endfor %}
+</div>
+{%- endif %}

@@ -1,0 +1,87 @@
+{# The change-request (CAB) table: rows, workflow buttons and both empty
+   states.
+
+   Replaces three innerHTML writes in change_requests.html (the rows, the
+   "No change requests." row and the "Failed to load" row) plus the
+   NEXT_ACTIONS map, which was a second copy of the transition table in
+   service_desk_service. The buttons are now derived from that table, so a
+   workflow change cannot leave the page offering a transition the server
+   rejects with a 409.
+
+   The table and its headings are inside the fragment, so a restyle of the
+   CAB table reaches it from the stylesheet. The card chrome and the status
+   filter stay in the page: the filter is what re-requests this fragment, and
+   an error swap must not be able to take the way out with it. #}
+<div class="overflow-x-auto">
+  <table class="table table-sm" id="crs-table">
+    <thead>
+      <tr>
+        <th>Ref</th><th>Title</th><th>Type</th><th>Risk</th><th>Status</th>
+        <th>Requested by</th><th>GitLab</th><th>Created</th><th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="crs-body">
+      {% if failed %}
+        {# "Nothing to approve" and "we could not look" lead to opposite
+           actions, so a failed read never renders as an empty queue. #}
+        <tr>
+          <td colspan="9">
+            <div role="alert" class="alert alert-error">
+              Change requests could not be read. This is not an empty list:
+              the query failed, so what is waiting for approval is unknown.
+            </div>
+          </td>
+        </tr>
+      {% elif not rows %}
+        <tr>
+          <td colspan="9" class="text-center p-6 text-base-content/60">
+            No change requests.
+          </td>
+        </tr>
+      {% else %}
+        {% for c in rows %}
+          <tr>
+            <td><span class="ion-mono">{{ c.get('reference') }}</span></td>
+            <td>{{ c.get('title') }}</td>
+            <td>
+              <small>{{ c.get('change_type') or '—' }}
+                {%- if c.get('target_version') %}
+                  <br>{{ c.get('current_version') or '?' }} → {{ c.get('target_version') }}
+                {%- endif %}
+              </small>
+            </td>
+            <td><span class="ion-pill {{ c.get('risk_css') }}">{{ c.get('risk_level') }}</span></td>
+            <td><span class="ion-pill {{ c.get('status_css') }}">{{ c.get('status') }}</span></td>
+            <td>{{ c.get('requested_by_username') or '—' }}</td>
+            <td>
+              {% if c.get('gitlab_issue_url') %}
+                {# `is not none`: issue 0 is a number, and a truthiness test
+                   would print the fallback for it. #}
+                <a class="ion-link" href="{{ c.get('gitlab_issue_url')|safe_url }}"
+                   target="_blank" rel="noopener">#{{ c.get('gitlab_issue_iid') if c.get('gitlab_issue_iid') is not none else '?' }}</a>
+              {% else %}
+                <small class="ion-muted">{{ c.get('gitlab_error') or '—' }}</small>
+              {% endif %}
+            </td>
+            <td><small class="ion-muted">{{ c.get('created_display') }}</small></td>
+            <td>
+              <div class="cr-act">
+                {# The transition itself is still a JS fetch: it prompts for
+                   decision notes and the API takes JSON. What changed is
+                   what happens after it succeeds: it re-requests this
+                   fragment instead of rebuilding the row. #}
+                {% for a in c.get('actions') %}
+                  <button class="ion-btn {{ a.css }}"
+                          data-click-action="transition"
+                          data-args='[{{ c.get('id') }}, "{{ a.action }}"]'>{{ a.label }}</button>
+                {% endfor %}
+                <a class="ion-btn ion-btn-ghost"
+                   href="/api/change-requests/{{ c.get('id') }}/export">Export</a>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      {% endif %}
+    </tbody>
+  </table>
+</div>

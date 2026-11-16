@@ -1,0 +1,12 @@
+{% if cluster.state == 'failed' %}<p class="error">Cluster metrics unavailable</p>
+{% elif cluster.state == 'empty' %}<p>Not configured</p>
+{% else %}
+<div class="metric-row"><span class="metric-label">Status</span><span class="cluster-status{% if cluster.status %} {{ cluster.status }}{% endif %}">{{ cluster.status if cluster.status is not none else 'Unknown' }}</span></div>
+<div class="metric-row"><span class="metric-label">Cluster</span><span class="metric-value">{{ cluster.name if cluster.name is not none else 'Unknown' }}</span></div>
+{% with metrics=cluster.metrics %}{% include '_fragments/integrations_metrics_rows.html' %}{% endwith %}
+{% endif %}
+<div id="es-ingest-metrics-content" class="metrics-content text-sm" hx-swap-oob="innerHTML">
+{% if indices.state == 'failed' %}<p class="error">Ingestion metrics unavailable</p>
+{% elif indices.state == 'empty' %}<p>Not configured</p>
+{% else %}{% with metrics=indices.metrics %}{% include '_fragments/integrations_metrics_rows.html' %}{% endwith %}{% endif %}
+</div>

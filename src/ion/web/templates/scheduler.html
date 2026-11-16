@@ -2,6 +2,10 @@
 
 {% block title %}Job Scheduler - ION{% endblock %}
 
+{% block head_css %}
+<link rel="stylesheet" href="/static/css/scheduler-page.css?v={{ ion_version }}">
+{% endblock %}
+
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
@@ -16,12 +20,33 @@
     <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Run arbitrary handlers on a cron schedule. Every dispatch is recorded with duration, status and output.</p>
   </div>
   <div class="flex items-center gap-2 flex-wrap">
-    <button class="btn btn-ghost" data-click-action="schRefresh">Refresh</button>
-    <button class="btn btn-primary" data-click-action="schOpenForm">+ New Job</button>
+    {# Refresh and New Job are the request's controls, so they stay out
+       here. A failed render of the card grid replaces #sch-content and
+       must not be able to remove the button that retries it. There is no
+       filter, so Refresh sends no hx-include: the list has one definition
+       and it is GET /ui/scheduler. #}
+    <button class="btn btn-ghost" id="sch-refresh"
+            hx-get="/ui/scheduler"
+            hx-target="#sch-content"
+            hx-swap="innerHTML">Refresh</button>
+    <button type="button" class="btn btn-primary" data-click-action="schOpenForm">+ New Job</button>
   </div>
 </section>
 
-<div id="sch-content">
+{# The cards are rendered whole by ion.web.ui.scheduler: the grid, the
+   empty state and the failure state. They used to be a string concatenated
+   in schRender() and written into this element.
+
+   hx-trigger="load" keeps the shell's first paint immediate and the cards
+   arriving in their own request, which is what the fetch it replaces did.
+   No hx-include: nothing on this page filters the list, and a History
+   button rendered inside this region inherits one. The button's address
+   is the job id in the path and carries no query, so there is no parameter
+   for an include to duplicate. #}
+<div id="sch-content"
+     hx-get="/ui/scheduler"
+     hx-trigger="load"
+     hx-swap="innerHTML">
   <div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading jobs...</div>
 </div>
 
@@ -41,8 +66,17 @@
         </fieldset>
         <fieldset class="fieldset p-0">
           <legend class="fieldset-legend">Job type *</legend>
+          {# Options come from /ui/scheduler/handlers. The select is the
+             control and stays in the shell; only its options are swapped,
+             so a catalogue that cannot be read replaces the options with
+             one that says so and leaves the rest of the form in place. #}
           <select id="sch-handler" class="select w-full" required
-                  data-change-action="schOnHandlerChange"></select>
+                  hx-get="/ui/scheduler/handlers"
+                  hx-trigger="load"
+                  hx-swap="innerHTML"
+                  data-change-action="schOnHandlerChange">
+            <option value="" disabled selected>Loading handlers...</option>
+          </select>
           <p class="text-xs opacity-50" id="sch-handler-desc"></p>
         </fieldset>
       </div>
@@ -50,11 +84,19 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <fieldset class="fieldset p-0">
           <legend class="fieldset-legend">Cron expression *</legend>
-          <input id="sch-cron" class="input w-full font-mono" type="text" required maxlength="120" placeholder="*/5 * * * *" data-input-action="schPreviewCron">
+          {# The field is the control. The preview line is the swap target,
+             so a preview that fails cannot remove the expression the user
+             is editing. count=3 is in the URL and cron_expr is the field's
+             own name: putting the expression in the URL as well would send
+             it twice, and FastAPI would keep the last copy. `changed` and
+             `delay` are trigger modifiers, not an event filter, so nothing
+             here is compiled into a function. #}
+          <input id="sch-cron" name="cron_expr" class="input w-full font-mono" type="text" required maxlength="120" placeholder="*/5 * * * *"
+                 hx-get="/ui/scheduler/preview?count=3"
+                 hx-trigger="input changed delay:300ms"
+                 hx-target="#sch-cron-preview"
+                 hx-swap="innerHTML">
           <p class="text-xs opacity-50">5-field crontab (min hour dom mon dow). Example: <code class="bg-base-300 px-1 rounded font-mono">0 3 * * *</code> = 3am daily.</p>
-          <!-- Reads the expression back in plain English with its next few
-               firing times, so a wrong schedule is caught here rather than
-               by an unexpected run. -->
           <div id="sch-cron-preview" class="text-xs mt-1"></div>
         </fieldset>
         <fieldset class="fieldset p-0">
@@ -74,7 +116,10 @@
       <!-- Typed inputs built from the handler catalogue. An ordinary SOC
            job should not need an internal handler key and hand-written
            JSON; the raw field stays available for a handler that declares
-           no parameters of its own. -->
+           no parameters of its own. Which of the two is showing is decided
+           by the params fragment, swapped into #sch-params-typed. Both
+           fieldsets stay in the shell so a failed render cannot remove the
+           raw textarea. -->
       <fieldset class="fieldset p-0" id="sch-params-typed-wrap">
         <legend class="fieldset-legend">Settings</legend>
         <div id="sch-params-typed" class="flex flex-col gap-3"></div>
@@ -98,6 +143,9 @@
   <div class="modal-box max-w-3xl">
     <div class="flex items-center justify-between gap-4">
       <h2 class="text-lg font-semibold" id="sch-exec-title">Recent executions</h2>
+      {# Close stays outside #sch-exec-body. The history fragment is what
+         gets replaced, including when the read fails, and the way out of
+         the panel has to survive that. #}
       <button class="btn btn-ghost btn-sm btn-circle" data-click-action="schCloseExec" aria-label="Close">&times;</button>
     </div>
     <div class="pt-4" id="sch-exec-body">
@@ -111,118 +159,116 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* JS toggles .show, not daisyUI .modal-open. Bridge the two. */
-#sch-modal-bg.show,
-#sch-exec-bg.show {
-  pointer-events: auto;
-  visibility: visible;
-  opacity: 1;
-  background-color: oklch(0% 0 0 / 0.4);
-}
-#sch-modal-bg.show > .modal-box,
-#sch-exec-bg.show > .modal-box {
-  opacity: 1;
-  scale: 1;
-  translate: 0;
-  max-width: 720px;
-  max-height: 90vh;
-}
-
-/* Job-card / exec-row left stripe has no daisyUI equivalent. */
-.sch-card,
-.sch-exec-row {
-  border-left-width: 4px;
-  border-left-style: solid;
-  border-left-color: var(--color-base-300);
-}
-.sch-card.ok, .sch-exec-row.ok { border-left-color: var(--color-success); }
-.sch-card.err, .sch-exec-row.err { border-left-color: var(--color-error); }
-.sch-card.run, .sch-exec-row.run { border-left-color: var(--color-warning); }
-.sch-card.off {
-  border-left-color: color-mix(in oklab, var(--color-base-content) 40%, transparent);
-  opacity: 0.7;
-}
-
-/* auto-fit card grid: minmax(340px) is not a daisyUI token. */
-.sch-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-  gap: 0.75rem;
-}
-
-@media (max-width: 768px) {
-  .sch-grid { grid-template-columns: 1fr; }
-  #sch-modal-bg.show > .modal-box,
-  #sch-exec-bg.show > .modal-box { max-height: 95vh; }
-}
-</style>
 <script nonce="{{ csp_nonce }}">
 const SCH_API = '/api/scheduler';
-let schCache = [];
-let schHandlers = [];
-// Handler metadata: label, description and typed parameters, so the form
-// can be a form rather than a handler key and a JSON textarea.
-let schCatalogue = [];
-let schCronPreviewTimer = null;
+// Set while the edit dialog is open, so a late catalogue response can
+// re-select the job's handler without re-requesting settings and dropping
+// the stored values. Null means the dialog is creating, not editing.
+let schEditingHandler = null;
 
-function schMeta(key) {
-  return schCatalogue.find(h => h.key === key) || null;
+function sch$(id) { return document.getElementById(id); }
+
+function schParamsUrl(handlerKey, stored) {
+  let url = '/ui/scheduler/params?handler_key=' + encodeURIComponent(handlerKey || '');
+  if (stored) url += '&params=' + encodeURIComponent(stored);
+  return url;
 }
 
-// ---- typed parameter form ------------------------------------------------
+// The params fragment says which fieldset is live. Only mode "raw" may
+// reveal the JSON textarea. A failure, and a form that has not loaded,
+// keep it hidden: a catalogue we could not read is not a handler that
+// takes free-form JSON.
+function schApplyParamsMode(slot) {
+  const marker = slot.querySelector('[data-sch-params]');
+  const mode = marker ? marker.getAttribute('data-sch-params') : '';
+  const raw = mode === 'raw';
+  const typedWrap = sch$('sch-params-typed-wrap');
+  const rawWrap = sch$('sch-params-raw-wrap');
+  if (typedWrap) typedWrap.style.display = raw ? 'none' : '';
+  if (rawWrap) rawWrap.style.display = raw ? '' : 'none';
+}
 
-function schRenderParams(handlerKey, existing) {
-  const meta = schMeta(handlerKey);
-  const typedWrap = document.getElementById('sch-params-typed-wrap');
-  const rawWrap = document.getElementById('sch-params-raw-wrap');
-  const typed = document.getElementById('sch-params-typed');
-  const params = (meta && meta.parameters) || [];
+function schHandlerDescription() {
+  const sel = sch$('sch-handler');
+  const opt = sel.options[sel.selectedIndex];
+  const descEl = sch$('sch-handler-desc');
+  if (descEl) descEl.textContent = (opt && opt.dataset.description) || '';
+}
 
-  // No declared parameters means there is nothing to render a form from,
-  // so fall back to the raw field rather than show an empty section.
-  if (!params.length) {
-    typedWrap.style.display = 'none';
-    rawWrap.style.display = '';
-    typed.innerHTML = '';
-    return;
+function schOnHandlerChange() {
+  const sel = sch$('sch-handler');
+  schHandlerDescription();
+  return htmx.ajax('GET', schParamsUrl(sel.value, ''),
+                   {target: '#sch-params-typed', swap: 'innerHTML'});
+}
+
+// Opening the dialog sets the expression without an input event, so the
+// field's own trigger does not fire. Typing goes through that trigger,
+// which is debounced; this one request is not.
+function schPreviewCron() {
+  const expr = sch$('sch-cron').value.trim();
+  return htmx.ajax(
+    'GET',
+    '/ui/scheduler/preview?count=3&cron_expr=' + encodeURIComponent(expr),
+    {target: '#sch-cron-preview', swap: 'innerHTML'}
+  );
+}
+
+// Re-request the cards. Create, edit, delete and run call this instead of
+// rebuilding them, so a card has one definition and it is the fragment.
+function schLoad() {
+  return htmx.ajax('GET', '/ui/scheduler', {target: '#sch-content', swap: 'innerHTML'});
+}
+
+function schOpenForm(ev, dataset) {
+  let job = null;
+  if (dataset && dataset.job) {
+    try { job = JSON.parse(dataset.job); }
+    catch (e) { job = null; }
   }
-
-  typedWrap.style.display = '';
-  rawWrap.style.display = 'none';
-
-  const current = existing || {};
-  typed.innerHTML = params.map(p => {
-    const val = (current[p.name] !== undefined) ? current[p.name] : p.default;
-    const help = p.help
-      ? `<p class="text-xs opacity-50">${schEsc(p.help)}</p>` : '';
-    if (p.type === 'boolean') {
-      return `<label class="flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" class="checkbox checkbox-sm" data-sch-param="${schEsc(p.name)}"
-               data-sch-type="boolean" ${val ? 'checked' : ''}>
-        <span class="text-sm">${schEsc(p.label)}</span>
-      </label>${help}`;
-    }
-    const bounds = (p.type === 'integer')
-      ? `${p.minimum !== undefined ? ' min="' + schEsc(p.minimum) + '"' : ''}`
-        + `${p.maximum !== undefined ? ' max="' + schEsc(p.maximum) + '"' : ''}`
-      : '';
-    return `<div>
-      <label class="text-sm block mb-1">${schEsc(p.label)}</label>
-      <input class="input w-full" data-sch-param="${schEsc(p.name)}"
-             data-sch-type="${schEsc(p.type || 'string')}"
-             type="${p.type === 'integer' ? 'number' : 'text'}"${bounds}
-             value="${schEsc(val === undefined || val === null ? '' : val)}">
-      ${help}
-    </div>`;
-  }).join('');
+  const sel = sch$('sch-handler');
+  if (job && job.id !== undefined && job.id !== null) {
+    schEditingHandler = job.handler_key || '';
+    sch$('sch-modal-title').textContent = 'Edit Job';
+    sch$('sch-id').value = job.id;
+    sch$('sch-name').value = job.name || '';
+    sch$('sch-cron').value = job.cron_expr || '';
+    if (schEditingHandler) sel.value = schEditingHandler;
+    sch$('sch-desc').value = job.description || '';
+    sch$('sch-params').value = job.params_json || '';
+    const en = sch$('sch-enabled');
+    if (job.enabled === true) en.value = 'true';
+    else if (job.enabled === false) en.value = 'false';
+    schHandlerDescription();
+    htmx.ajax('GET', schParamsUrl(schEditingHandler, job.params_json || ''),
+              {target: '#sch-params-typed', swap: 'innerHTML'});
+  } else {
+    schEditingHandler = null;
+    sch$('sch-modal-title').textContent = 'New Job';
+    sch$('sch-id').value = '';
+    sch$('sch-form').reset();
+    sch$('sch-cron').value = '*/15 * * * *';
+    schOnHandlerChange();
+  }
+  schPreviewCron();
+  sch$('sch-modal-bg').classList.add('show');
 }
 
-function schCollectParams(handlerKey) {
-  const meta = schMeta(handlerKey);
-  if (!meta || !meta.parameters.length) return undefined;  // raw field wins
+function schCloseForm() {
+  schEditingHandler = null;
+  sch$('sch-modal-bg').classList.remove('show');
+}
+
+function schCollectParams() {
+  const slot = sch$('sch-params-typed');
+  const marker = slot ? slot.querySelector('[data-sch-params]') : null;
+  const mode = marker ? marker.getAttribute('data-sch-params') : '';
+  // Not loaded, or loaded and unreadable. undefined is reserved for "the
+  // handler declares no settings, read the JSON textarea".
+  if (mode !== 'raw' && mode !== 'typed') return null;
+  if (mode === 'raw') return undefined;
   const out = {};
-  document.querySelectorAll('#sch-params-typed [data-sch-param]').forEach(el => {
+  slot.querySelectorAll('[data-sch-param]').forEach(function (el) {
     const name = el.getAttribute('data-sch-param');
     const type = el.getAttribute('data-sch-type');
     if (type === 'boolean') {
@@ -237,199 +283,40 @@ function schCollectParams(handlerKey) {
   return out;
 }
 
-function schOnHandlerChange() {
-  const key = document.getElementById('sch-handler').value;
-  const meta = schMeta(key);
-  const descEl = document.getElementById('sch-handler-desc');
-  if (descEl) descEl.textContent = (meta && meta.description) || '';
-  schRenderParams(key, null);
-}
-
-// ---- schedule preview ----------------------------------------------------
-
-async function schPreviewCron() {
-  const expr = document.getElementById('sch-cron').value.trim();
-  const out = document.getElementById('sch-cron-preview');
-  if (!out) return;
-  if (!expr) { out.innerHTML = ''; return; }
-
-  // Debounced: this fires on every keystroke.
-  clearTimeout(schCronPreviewTimer);
-  schCronPreviewTimer = setTimeout(async () => {
-    try {
-      const r = await fetch(SCH_API + '/preview-schedule?cron_expr='
-                            + encodeURIComponent(expr) + '&count=3');
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      const p = await r.json();
-      if (!p.valid) {
-        out.innerHTML = `<span class="text-error">${schEsc(p.error || 'Invalid cron expression')}</span>`;
-        return;
-      }
-      // Render in UTC, because that is the clock the cron expression is
-      // evaluated against. toLocaleString() without a timeZone formats in
-      // the viewer's local zone, which showed 08:00 beside a "(UTC)" label
-      // for an 07:00 UTC schedule on a UTC+1 machine.
-      const runs = (p.next_runs || [])
-        .map(t => schEsc(new Date(t).toLocaleString(undefined, {
-          timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short',
-        }))).join(' · ');
-      out.innerHTML = `<span class="text-success">${schEsc(p.description)}</span>`
-        + `<span class="opacity-60"> — next: ${runs} (${schEsc(p.timezone)})</span>`;
-    } catch (e) {
-      out.innerHTML = '';
-    }
-  }, 300);
-}
-
-function schEsc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
-function schFmtTime(iso){if(!iso)return'never';try{const d=new Date(iso);const diff=(Date.now()-d.getTime())/1000;if(diff<0){const a=-diff;if(a<60)return'in '+Math.round(a)+'s';if(a<3600)return'in '+Math.round(a/60)+'m';if(a<86400)return'in '+Math.round(a/3600)+'h';return'in '+Math.round(a/86400)+'d';}if(diff<60)return Math.round(diff)+'s ago';if(diff<3600)return Math.round(diff/60)+'m ago';if(diff<86400)return Math.round(diff/3600)+'h ago';return Math.round(diff/86400)+'d ago';}catch(e){return iso}}
-
-async function schBootstrap() {
-  try {
-    const r = await fetch(SCH_API + '/handlers');
-    if (r.ok) {
-      const data = await r.json();
-      schHandlers = data.handlers || [];
-      schCatalogue = data.catalogue || [];
-    }
-  } catch (e) {}
-  await schLoad();
-}
-
-async function schLoad() {
-  const c = document.getElementById('sch-content');
-  c.innerHTML = '<div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading jobs...</div>';
-  try {
-    const r = await fetch(SCH_API + '/jobs');
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const data = await r.json();
-    schCache = data.jobs || [];
-    schRender();
-  } catch (e) {
-    c.innerHTML = `<div class="alert alert-error text-[var(--sev-critical,#f85149)]">${schEsc(e.message || 'Failed to load')}</div>`;
-  }
-}
-
-function schRender() {
-  const c = document.getElementById('sch-content');
-  if (!schCache.length) {
-    c.innerHTML = `<div class="card bg-base-200 shadow">
-      <div class="card-body items-center text-center py-14">
-      <h3 class="card-title">No scheduled jobs yet</h3>
-      <p>Create a job to run a registered handler on a cron schedule.</p>
-      <button class="btn btn-primary mt-3.5" data-click-action="schOpenForm">+ New Job</button>
-    </div></div>`;
-    return;
-  }
-  const cards = schCache.map(j => {
-    let cls = j.enabled ? (j.last_status === 'error' ? 'err' : (j.last_status === 'running' ? 'run' : 'ok')) : 'off';
-    let statusTxt = !j.enabled ? 'disabled' : (j.last_status || 'pending');
-    const badge = cls === 'ok' ? 'badge-success' : cls === 'err' ? 'badge-error' : cls === 'run' ? 'badge-warning' : 'badge-ghost';
-    return `
-      <div class="card bg-base-200 shadow sch-card ${cls}">
-        <div class="card-body p-4">
-          <div class="flex justify-between items-start gap-3">
-            <div>
-              <div class="font-semibold">${schEsc(j.name)}</div>
-              <div class="font-mono text-xs uppercase tracking-wide opacity-50">${schEsc(j.handler_key)}</div>
-            </div>
-            <span class="badge ${badge} shrink-0">${schEsc(statusTxt)}</span>
-          </div>
-          ${j.description ? `<div class="text-[var(--text-secondary)] text-[.78rem] mt-1">${schEsc(j.description)}</div>` : ''}
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 mt-2 text-xs opacity-70">
-            <span class="col-span-full font-mono bg-base-300 px-2 py-1 rounded w-fit">${schEsc(j.cron_expr)}</span>
-            <span>next: <strong class="font-mono text-base-content">${schFmtTime(j.next_run_at)}</strong></span>
-            <span>last: <strong class="font-mono text-base-content">${schFmtTime(j.last_run_at)}</strong></span>
-          </div>
-          <div class="card-actions justify-end mt-2 flex-wrap">
-            <button class="btn btn-ghost btn-sm" data-click-action="schRun" data-args='[${j.id}]'>Run now</button>
-            <button class="btn btn-ghost btn-sm" data-click-action="schShowExec" data-args='[${j.id}, "${schEsc(j.name)}"]'>History</button>
-            <button class="btn btn-ghost btn-sm" data-click-action="schOpenForm" data-args='[${j.id}]'>Edit</button>
-            <button class="btn btn-ghost btn-sm btn-error" data-click-action="schDelete" data-args='[${j.id}]'>Delete</button>
-          </div>
-        </div>
-      </div>`;
-  }).join('');
-  c.innerHTML = `<div class="sch-grid">${cards}</div>`;
-}
-
-async function schRefresh() { await schLoad(); }
-
-function schOpenForm(jobId) {
-  const sel = document.getElementById('sch-handler');
-  // Show the human label; the internal key stays as the option value.
-  sel.innerHTML = (schCatalogue.length
-    ? schCatalogue.map(h => `<option value="${schEsc(h.key)}">${schEsc(h.label)}</option>`)
-    : schHandlers.map(h => `<option value="${schEsc(h)}">${schEsc(h)}</option>`)
-  ).join('') || '<option value="noop">No-op (smoke test)</option>';
-
-  if (jobId) {
-    const j = schCache.find(x => x.id === jobId);
-    if (!j) return;
-    document.getElementById('sch-modal-title').textContent = 'Edit Job';
-    document.getElementById('sch-id').value = j.id;
-    document.getElementById('sch-name').value = j.name;
-    document.getElementById('sch-cron').value = j.cron_expr;
-    document.getElementById('sch-handler').value = j.handler_key;
-    document.getElementById('sch-desc').value = j.description || '';
-    document.getElementById('sch-params').value = j.params_json || '';
-    document.getElementById('sch-enabled').value = j.enabled ? 'true' : 'false';
-
-    let existing = null;
-    try { existing = j.params_json ? JSON.parse(j.params_json) : null; }
-    catch (e) { existing = null; }
-    const meta = schMeta(j.handler_key);
-    const descEl = document.getElementById('sch-handler-desc');
-    if (descEl) descEl.textContent = (meta && meta.description) || '';
-    schRenderParams(j.handler_key, existing);
-  } else {
-    document.getElementById('sch-modal-title').textContent = 'New Job';
-    document.getElementById('sch-id').value = '';
-    document.getElementById('sch-form').reset();
-    document.getElementById('sch-cron').value = '*/15 * * * *';
-    schOnHandlerChange();
-  }
-  schPreviewCron();
-  document.getElementById('sch-modal-bg').classList.add('show');
-}
-
-function schCloseForm() {
-  document.getElementById('sch-modal-bg').classList.remove('show');
-}
-
 async function schSubmit(ev) {
   ev.preventDefault();
-  const id = document.getElementById('sch-id').value;
-  const handlerKey = document.getElementById('sch-handler').value;
-
-  // Typed inputs win when the handler declares parameters; the raw JSON
-  // field is only read for handlers that declare none.
-  let params = schCollectParams(handlerKey);
+  const id = sch$('sch-id').value;
+  const handlerKey = sch$('sch-handler').value;
+  let params = schCollectParams();
+  if (params === null) {
+    alert('Settings are not loaded, so the job was not saved.');
+    return false;
+  }
   if (params === undefined) {
     params = null;
-    const paramsRaw = document.getElementById('sch-params').value.trim();
+    const paramsRaw = sch$('sch-params').value.trim();
     if (paramsRaw) {
       try { params = JSON.parse(paramsRaw); }
-      catch(e) { alert('Params must be valid JSON: ' + e.message); return false; }
+      catch (e) { alert('Params must be valid JSON: ' + e.message); return false; }
     }
   }
   const payload = {
-    name: document.getElementById('sch-name').value.trim(),
-    cron_expr: document.getElementById('sch-cron').value.trim(),
+    name: sch$('sch-name').value.trim(),
+    cron_expr: sch$('sch-cron').value.trim(),
     handler_key: handlerKey,
-    description: document.getElementById('sch-desc').value.trim() || null,
+    description: sch$('sch-desc').value.trim() || null,
     params: params,
-    enabled: document.getElementById('sch-enabled').value === 'true',
+    enabled: sch$('sch-enabled').value === 'true',
   };
   try {
-    const url = id ? `${SCH_API}/jobs/${id}` : `${SCH_API}/jobs`;
+    const url = id ? (SCH_API + '/jobs/' + id) : (SCH_API + '/jobs');
     const r = await fetch(url, {
       method: id ? 'PUT' : 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(payload),
     });
     if (!r.ok) {
-      const body = await r.json().catch(() => ({}));
+      const body = await r.json().catch(function () { return {}; });
       throw new Error(body.detail || ('HTTP ' + r.status));
     }
     schCloseForm();
@@ -443,7 +330,7 @@ async function schSubmit(ev) {
 async function schDelete(id) {
   if (!confirm('Delete this job and its execution history?')) return;
   try {
-    const r = await fetch(`${SCH_API}/jobs/${id}`, { method: 'DELETE' });
+    const r = await fetch(SCH_API + '/jobs/' + id, {method: 'DELETE'});
     if (!r.ok) throw new Error('HTTP ' + r.status);
     await schLoad();
   } catch (e) {
@@ -453,9 +340,9 @@ async function schDelete(id) {
 
 async function schRun(id) {
   try {
-    const r = await fetch(`${SCH_API}/jobs/${id}/run`, { method: 'POST' });
+    const r = await fetch(SCH_API + '/jobs/' + id + '/run', {method: 'POST'});
     if (!r.ok) {
-      const body = await r.json().catch(() => ({}));
+      const body = await r.json().catch(function () { return {}; });
       throw new Error(body.detail || ('HTTP ' + r.status));
     }
     await schLoad();
@@ -464,47 +351,32 @@ async function schRun(id) {
   }
 }
 
-async function schShowExec(id, name) {
-  document.getElementById('sch-exec-title').textContent = 'Executions — ' + name;
-  const body = document.getElementById('sch-exec-body');
-  body.innerHTML = '<div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading...</div>';
-  document.getElementById('sch-exec-bg').classList.add('show');
-  try {
-    const r = await fetch(`${SCH_API}/jobs/${id}/executions?limit=50`);
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const data = await r.json();
-    const execs = data.executions || [];
-    if (!execs.length) {
-      body.innerHTML = `<div class="card bg-base-200 shadow">
-        <div class="card-body items-center text-center py-10">
-        <h3 class="card-title">No executions yet</h3>
-        <p>Trigger the job manually or wait for the next scheduled run.</p>
-      </div></div>`;
-      return;
-    }
-    body.innerHTML = execs.map(e => {
-      const cls = e.status === 'success' ? 'ok' : (e.status === 'error' ? 'err' : 'run');
-      const badge = cls === 'ok' ? 'badge-success' : cls === 'err' ? 'badge-error' : 'badge-warning';
-      return `<div class="card bg-base-200 shadow sch-exec-row ${cls} mb-2">
-        <div class="card-body p-3 text-sm">
-          <div class="flex justify-between gap-2">
-            <span class="badge ${badge}">${schEsc(e.status)}</span>
-            <span class="font-mono text-xs opacity-60">${schFmtTime(e.started_at)}${e.duration_ms != null ? ' · ' + e.duration_ms + 'ms' : ''}</span>
-          </div>
-          <div class="font-mono text-xs opacity-60">started: ${schEsc(e.started_at || '')} · completed: ${schEsc(e.completed_at || '—')}</div>
-          ${e.error_text ? `<div class="text-error font-mono text-xs whitespace-pre-wrap break-words mt-1.5">${schEsc(e.error_text)}</div>` : ''}
-        </div>
-      </div>`;
-    }).join('');
-  } catch (e) {
-    body.innerHTML = `<div class="alert alert-error text-[var(--sev-critical,#f85149)]">${schEsc(e.message || 'Failed to load')}</div>`;
-  }
+function schOpenExec() {
+  sch$('sch-exec-bg').classList.add('show');
 }
 
 function schCloseExec() {
-  document.getElementById('sch-exec-bg').classList.remove('show');
+  sch$('sch-exec-bg').classList.remove('show');
 }
 
-document.addEventListener('DOMContentLoaded', schBootstrap);
+document.body.addEventListener('htmx:afterSwap', function (ev) {
+  const target = ev.detail && ev.detail.target;
+  if (!target) return;
+  if (target.id === 'sch-params-typed') {
+    schApplyParamsMode(target);
+    return;
+  }
+  // The catalogue can arrive after the dialog opened. Restoring an edit's
+  // handler must not re-request settings: that request would carry no
+  // stored JSON and the defaults would replace what was saved.
+  if (target.id === 'sch-handler') {
+    if (schEditingHandler) {
+      target.value = schEditingHandler;
+      schHandlerDescription();
+    } else if (sch$('sch-modal-bg').classList.contains('show')) {
+      schOnHandlerChange();
+    }
+  }
+});
 </script>
 {% endblock %}

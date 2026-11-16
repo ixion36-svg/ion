@@ -1,0 +1,30 @@
+{% from "_fragments/_time.html" import ts %}
+{% macro entry(i) %}
+<div class="dw-cal-item{% if i.editable %} dw-editable{% endif %}"{% if i.editable %} data-entry-id="{{ i.id }}" data-type="{{ i.type }}" data-time="{{ i.time }}" data-text="{{ i.text }}"{% endif %}>
+  <span class="dw-cal-time">{{ ts(i.get('timestamp'), 'time', fallback='Time unknown') }}</span>
+  <span class="ion-badge ion-c-{{ i.color }}">{{ i.label }}</span>
+  <span class="dw-cal-text">{{ i.text }}</span>
+  {% if i.editable %}<span class="dw-cal-edit">edit</span>{% else %}<span class="dw-cal-auto">{{ i.source }}</span>{% endif %}
+</div>
+{% endmacro %}
+{% if payload is none %}
+<div role="alert" class="alert alert-error">The worklog could not be read. This does not mean the day was quiet. Refresh to retry.</div>
+{% else %}
+<p class="text-sm opacity-60 mb-3">{{ payload.user.name }} &middot; {{ payload.date }}</p>
+<div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow my-4" id="dw-metrics">
+{% for key, label in [('active_span', 'Active span'), ('triaged', 'Triaged'), ('cases_touched', 'Cases touched'), ('closed', 'Closed'), ('logged', 'Logged')] %}
+  {% set value = payload.summary.get(key) %}
+  <div class="stat"><div class="stat-title">{{ label }}</div><div class="stat-value">{{ value if value is not none else 'Unknown' }}</div></div>
+{% endfor %}
+</div>
+<div id="dw-mode-calendar">
+  <p class="text-xs opacity-60">Click an hour to add, or a manual entry to edit.</p>
+  {% if not payload['items'] %}<p class="dw-empty">No activity logged for this day.</p>{% endif %}
+  <div class="dw-calendar" id="dw-calendar">
+  {% for hour, items in payload.hours.items() %}<div class="dw-hour"><div class="dw-hour-label">{{ '%02d'|format(hour) }}:00</div><div class="dw-hour-slot" data-hour="{{ hour }}">{% for i in items %}{{ entry(i) }}{% endfor %}</div></div>{% endfor %}
+  </div>
+</div>
+<div id="dw-mode-timeline" class="dw-hidden"><div class="ion-timeline" id="dw-timeline"><div class="ion-timeline-rail"></div>
+  {% for i in payload['items'] %}<div class="ion-ev"><div class="ion-ev-time">{{ ts(i.get('timestamp'), 'time', fallback='Time unknown') }}</div><div class="ion-ev-dot dw-dot-{{ i.color }}"></div><div><span class="ion-badge ion-c-{{ i.color }}">{{ i.label }}</span> {{ i.text }} <span class="dw-src">{{ i.source }}</span></div></div>{% else %}<div class="dw-empty">No activity logged for this day.</div>{% endfor %}
+</div></div>
+{% endif %}

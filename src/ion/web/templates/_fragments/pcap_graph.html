@@ -1,0 +1,40 @@
+{% macro fig(value, why) %}
+{%- if value is not none %}{{ value }}
+{%- else %}<span class="an-absent" title="{{ why }}"></span>{% endif %}
+{% endmacro %}
+{# The network graph's chrome, from ui/pcap.py's graph_view.
+
+   The counts were `stats.total_nodes||0` and four more like it, so a
+   graph whose stats were not recorded reported zero hosts and zero
+   connections directly above a drawing of them.
+
+   #pcap-graph-canvas has to be in the DOM before renderNetworkGraph runs,
+   which is why the page chains the vis-network call onto this swap.
+#}
+{%- if state == 'failed' %}
+<p class="text-[var(--text-secondary)] p-5 text-center">
+  {%- if error %}{{ error }}
+  {%- else %}This analysis could not be read.{% endif %}</p>
+{%- elif state == 'unreadable' %}
+<p class="text-[var(--text-secondary)] p-5 text-center">The graph is not
+  in a shape this page can draw.</p>
+{%- elif state == 'empty' %}
+<p class="text-[var(--text-secondary)] p-5 text-center">No graph data
+  available.</p>
+{%- else %}
+<div class="flex justify-between items-center mb-2.5 flex-wrap gap-2">
+  <h3 class="m-0">Network Graph</h3>
+  <div class="text-xs text-[var(--text-secondary)]">
+    {{ fig(total_nodes, 'No host count recorded') }} hosts &middot;
+    {{ fig(total_edges, 'No connection count recorded') }} connections &middot;
+    <span class="text-[var(--primary)]">
+      {{- fig(internal_nodes, 'Not recorded') }} internal</span> &middot;
+    <span class="text-[var(--mitre-covered,#3fb950)]">
+      {{- fig(external_nodes, 'Not recorded') }} external</span>
+    {%- if suspicious_nodes %} &middot; <span class="text-[var(--sev-critical)]">
+      {{- suspicious_nodes }} suspicious</span>{% endif %}
+  </div>
+</div>
+<div class="h-[500px] bg-[var(--bg-tertiary)] border border-[var(--ion-border)] rounded-[var(--ion-radius-lg)]"
+     id="pcap-graph-canvas"></div>
+{%- endif %}

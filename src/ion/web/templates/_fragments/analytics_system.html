@@ -1,0 +1,299 @@
+{% macro sev_pills(items, prefix, alert_count) %}
+{#- None means no readable severity breakdown; an empty list means one was
+    recorded and every band is zero. `if (sev.critical)` drew nothing for
+    both, and the fallback sentence turned on `alert_count > 0`, which is
+    false for a missing count as well as for a real zero. -#}
+{%- if items is none %}
+<span class="{{ prefix }}-pill an-absent-text">no severity breakdown</span>
+{%- elif items %}
+{#- p.short, not p.key: the rules are `.sev-pill.crit` and
+    `.sev-pill.med`, so the payload key left those two uncoloured. -#}
+{%- for p in items %}<span class="{{ prefix }}-pill {{ p.short }}">{{ p.letter }} {{ p.count }}</span>{% endfor %}
+{%- elif alert_count is not none and alert_count > 0 %}
+<span class="{{ prefix }}-pill an-absent-text">no severity data</span>
+{%- elif alert_count == 0 %}
+<span class="an-absent-text">no alerts in time range</span>
+{%- endif %}
+{% endmacro %}
+{% macro figure(value, why) %}
+{%- if value is not none %}{{ "{:,}".format(value) }}
+{%- else %}<span class="an-absent" title="{{ why }}"></span>{% endif %}
+{% endmacro %}
+{# System analytics: the stats bar and the index breakdown, from
+   ui/analytics.py's system_view.
+
+   THE PAGE NEVER READ es_failed
+
+   This endpoint merges two halves: the Elasticsearch alert figures and the
+   CyAB namespace mappings out of ION's own database. Its own comment says
+   the first half's figures "are placeholders when this is true, not
+   measurements of a quiet estate". The page rendered them as measurements,
+   with `(data.total_alerts || 0).toLocaleString()` and three more like it,
+   so a deployment whose Elasticsearch was unreachable saw zero alerts,
+   zero logs and no severity anywhere: a clean estate. The flag was added
+   to the endpoint to make that visible and nothing was taught to read it.
+
+   The stat values are swapped out of band into the spans the page already
+   has, so there is one source of truth for them rather than a fragment and
+   a setText pass disagreeing.
+
+   The card grid and the alert-volume timeline are below, also out of
+   band. They were deferred on the first pass because buildSysCard is a
+   hundred lines of structure and a simplified card would have dropped
+   most of it, which is the regression this project keeps catching. All of
+   it is in the view model now.
+
+   Every count on a card was `|| 0` over this same payload, so a namespace
+   reported zero alerts and zero logs when the Elasticsearch half had not
+   happened. Two percentages drove a threshold colour from a `|| 0`, so a
+   system whose TIDE coverage or CyAB readiness was never recorded was
+   drawn in the red band at 0%, which on a coverage bar states that
+   nothing is covered. And both sparkline builders repeated the NaN
+   defect the index bars had: one unreadable count made every coordinate
+   NaN and the chart silently vanished.
+#}
+<span id="sys-s-total" hx-swap-oob="innerHTML:#sys-s-total">
+  {{- figure(total_alerts, 'Not read from Elasticsearch') -}}
+</span>
+<span id="sys-s-logs" hx-swap-oob="innerHTML:#sys-s-logs">
+  {{- figure(total_logs, 'Not read from Elasticsearch') -}}
+</span>
+<span id="sys-s-critical" hx-swap-oob="innerHTML:#sys-s-critical">
+  {%- if es_failed %}<span class="an-absent" title="Not read from Elasticsearch"></span>
+  {%- elif total_pills is none %}<span class="an-absent" title="No severity breakdown was recorded"></span>
+  {%- else %}{{ (total_pills | selectattr('key', 'equalto', 'critical') | map(attribute='count') | sum) }}{% endif %}
+</span>
+{#- These two come from ION's own records, so they are figures even when
+    the Elasticsearch half failed. That is what the endpoint means by
+    being able to answer with one half down. -#}
+<span id="sys-s-systems" hx-swap-oob="innerHTML:#sys-s-systems">
+  {{- figure(total_systems, 'Not recorded') -}}
+</span>
+<span id="sys-s-mapped" hx-swap-oob="innerHTML:#sys-s-mapped">
+  {{- figure(mapped_systems, 'Not recorded') -}}
+</span>
+<span id="sys-s-coverage" hx-swap-oob="innerHTML:#sys-s-coverage"
+      class="{% if avg_coverage is not none %}an-cov-{{ 'good' if avg_coverage >= 70 else 'fair' if avg_coverage >= 40 else 'poor' }}{% endif %}">
+  {%- if avg_coverage is not none %}{{ avg_coverage }}%
+  {%- else %}<span class="an-absent" title="Not recorded"></span>{% endif %}
+</span>
+{% if es_failed %}
+<div class="an-es-notice">
+  The alert figures in this tab could not be read from Elasticsearch, so
+  they are not shown. This is not a quiet estate.
+  {%- if error %} Elasticsearch reported: {{ error }}{% endif %}
+  The system and coverage figures come from ION's own records and are
+  unaffected.
+</div>
+{% elif indices is none %}
+<div class="empty-state">The index breakdown is not in a shape this page
+  can read.</div>
+{% elif not indices %}
+<div class="empty-state">No indices found</div>
+{% else %}
+<h3 class="an-breakdown-title">Index Breakdown</h3>
+<table class="analytics-table">
+  <thead><tr><th>Index</th><th>Alerts</th><th></th><th>Severity</th></tr></thead>
+  <tbody>
+    {%- for i in indices %}
+    <tr>
+      <td><span class="idx-name">{{ i.name or 'unnamed index' }}</span></td>
+      {#- `idx.count.toLocaleString()` throws on undefined, which took the
+          whole tab down through the caller's catch and put the exception
+          message where the panel should be. -#}
+      <td><span class="idx-count">
+        {{- figure(i.count, 'This index carried no count') -}}
+      </span></td>
+      <td>
+        <div class="idx-bar-container">
+          {%- if i.width is not none %}
+          <div class="idx-bar" data-ion-style="width: {{ i.width }}%"></div>
+          {%- endif %}
+        </div>
+      </td>
+      <td>{{ sev_pills(i.pills, 'sev', i.count) }}</td>
+    </tr>
+    {%- endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{#- The seventh stat card. The page set it from
+    `sysOverviewData.total_systems || 0` inside the tab loader, so it
+    read "-" until the Systems tab was opened and 0 when the read failed.
+    It comes from ION's own records, so it is a figure either way. -#}
+<span id="astat-systems" hx-swap-oob="innerHTML:#astat-systems">
+  {{- figure(total_systems, 'Not recorded') -}}
+</span>
+{#- `${data.total_systems} systems` printed "undefined systems" when the
+    figure was missing, and the unmapped count was
+    `(total || 0) - (mapped || 0)`, which is a confident number built from
+    two absences. -#}
+<span id="sys-summary-text" hx-swap-oob="innerHTML:#sys-summary-text">
+  {%- if total_systems is none %}The system count is not recorded.
+  {%- else %}{{ total_systems }} systems,
+  {%- if mapped_systems is none %} an unrecorded number TIDE-mapped
+  {%- else %} {{ mapped_systems }} TIDE-mapped
+  {%- if total_systems - mapped_systems > 0 %},
+    {{ total_systems - mapped_systems }} unmapped{% endif %}
+  {%- endif %}
+  {%- endif %}
+</span>
+<div id="sys-timeline-chart" hx-swap-oob="innerHTML:#sys-timeline-chart">
+  {%- if es_failed %}
+  <div class="text-center text-[var(--text-muted)] text-[0.8125rem] p-4">
+    Not read from Elasticsearch, so this is not a quiet estate.</div>
+  {%- elif not timeline_readable %}
+  <div class="text-center text-[var(--text-muted)] text-[0.8125rem] p-4">
+    The timeline is not in a shape this page can draw.</div>
+  {%- elif timeline is none %}
+  <div class="text-center text-[var(--text-muted)] text-[0.8125rem] p-4">
+    No timeline data</div>
+  {%- else %}
+  <div class="text-[0.65rem] text-[var(--text-muted)] mb-1">Alert volume
+    (interval: {{ interval }})</div>
+  <svg class="w-full h-[55px]" viewBox="0 0 {{ timeline.width }} {{ timeline.height }}"
+       preserveAspectRatio="none">
+    <defs><linearGradient id="sys-tl-grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#00d4ff" stop-opacity="0"/>
+    </linearGradient></defs>
+    <path d="{{ timeline.area }}" fill="url(#sys-tl-grad)" opacity="0.3"/>
+    <path d="{{ timeline.line }}" fill="none" stroke="var(--neon-cyan)"
+          stroke-width="2" class="sys-tl-line"/>
+    <text x="2" y="18" fill="var(--text-muted)" font-size="9"
+          font-family="JetBrains Mono">{{ timeline.top }}</text>
+    <text x="2" y="{{ timeline.height - 10 }}" fill="var(--text-muted)"
+          font-size="9" font-family="JetBrains Mono">0</text>
+  </svg>
+  {%- endif %}
+</div>
+<div id="sys-cards-grid" hx-swap-oob="innerHTML:#sys-cards-grid">
+  {%- if systems is none %}
+  <div class="empty-state col-span-full">The system list is not in a shape
+    this page can read.</div>
+  {%- elif not systems %}
+  <div class="empty-state col-span-full">No systems found. Configure
+    Elasticsearch and CyAB data source namespaces to see system
+    analytics.</div>
+  {%- else %}
+  {%- for s in systems %}
+  <div class="sys-card {{ s.kind }}{% if s.mapped %} mapped{% endif %}">
+    <div class="sys-card-header">
+      <div class="sys-card-name">
+        <span class="sys-icon">{{ s.letter }}</span>
+        {{ s.display_name }}
+      </div>
+      <div class="sys-card-alerts">
+        {{- figure(s.alert_count, 'Not read from Elasticsearch') -}}
+      </div>
+    </div>
+    <div class="sys-card-body">
+      <div class="sys-sev-row">{{ sev_pills(s.pills, 'sys-sev', s.alert_count) }}</div>
+      <div class="sys-sparkline">
+        {%- if s.spark is not none %}
+        <svg viewBox="0 0 {{ s.spark.width }} {{ s.spark.height }}"
+             preserveAspectRatio="none">
+          {#- The namespace colour reaches both paths through the card's
+              kind class, so nothing composes a colour here. -#}
+          <path class="sys-spark-area" d="{{ s.spark.area }}" opacity="0.5"/>
+          <path class="sys-spark-line" d="{{ s.spark.line }}" fill="none"
+                stroke-width="1.5"/>
+        </svg>
+        {%- endif %}
+      </div>
+      <div class="sys-meta">
+        <span title="Logs ingested in window from this namespace's data streams">&#x1F4DC;
+          {{ figure(s.logs_ingested, 'Not read from Elasticsearch') }} logs</span>
+        {#- `unique_hosts || logs_unique_hosts || 0` sent a recorded zero
+            through to the fallback chain and then to the literal. -#}
+        <span title="Unique hosts">&#x1F4BB;
+          {{ figure(s.unique_hosts, 'Neither host field was recorded') }} hosts</span>
+        <span title="Unique users">&#x1F464;
+          {{ figure(s.unique_users, 'Neither user field was recorded') }} users</span>
+        <span title="Alert status">{{ s.status or '-' }}</span>
+      </div>
+      {%- if s.cyab is not none %}
+      <div class="sys-meta mt-1">
+        <span title="CyAB System">{{ s.cyab.name or 'unnamed' }}</span>
+        <span title="Readiness" class="{{ s.cyab.band or '' }}">
+          {%- if s.cyab.readiness is not none %}{{ s.cyab.readiness }}% ready
+          {%- else %}<span class="an-absent"
+              title="No readiness score is recorded"></span> ready{% endif %}
+        </span>
+        <span title="Use Case Status">{{ s.cyab.use_case_status }}</span>
+      </div>
+      {%- endif %}
+      {%- if s.tide is not none %}
+      <div class="sys-tide-bar">
+        <div class="sys-tide-label">
+          <span class="tide-label-left">TIDE: {{ s.tide.name or '' }}</span>
+          <span class="tide-label-right {{ s.tide.band or '' }}">
+            {%- if s.tide.coverage is not none %}{{ s.tide.coverage }}%
+            {%- else %}<span class="an-absent"
+                title="No coverage figure is recorded for this link"></span>
+            {%- endif %}
+          </span>
+        </div>
+        <div class="sys-tide-progress">
+          {%- if s.tide.coverage is not none %}
+          <div class="sys-tide-progress-fill {{ s.tide.band }}"
+               data-ion-style="width:{{ s.tide.coverage }}%"></div>
+          {%- endif %}
+        </div>
+        <div class="sys-tide-stats">
+          <span>
+            {%- if s.tide.applied is not none and s.tide.total is not none %}
+            {{ s.tide.applied }}/{{ s.tide.total }} rules
+            {%- else %}<span class="an-absent"
+                title="This link records no rule counts"></span> rules{% endif %}
+          </span>
+          <span>
+            {%- if s.tide.enabled is not none %}{{ s.tide.enabled }} enabled
+            {%- else %}<span class="an-absent"
+                title="No enabled count is recorded"></span> enabled{% endif %}
+          </span>
+          {%- if s.tide.disabled %}
+          <span class="text-[var(--neon-orange)]">{{ s.tide.disabled }} disabled</span>
+          {%- endif %}
+          {%- if s.tide.critical %}
+          <span class="text-[var(--danger)]">{{ s.tide.critical }} crit</span>
+          {%- endif %}
+          {%- if s.tide.high %}
+          <span class="text-[var(--neon-orange)]">{{ s.tide.high }} high</span>
+          {%- endif %}
+        </div>
+      </div>
+      {%- elif s.mapped and s.cyab is not none %}
+      <div class="sys-tide-bar">
+        <div class="text-[0.7rem] text-[var(--text-muted)]">CyAB mapped
+          ({{ s.cyab.source_name or 'unnamed source' }}), no TIDE system
+          linked</div>
+      </div>
+      {%- endif %}
+      {%- if s.rules is none %}
+      <div class="sys-rules-section">
+        <div class="sys-rules-title">Top Rules</div>
+        <div class="an-absent-text">not in a shape this page can read</div>
+      </div>
+      {%- elif s.rules %}
+      <div class="sys-rules-section">
+        <div class="sys-rules-title">Top Rules</div>
+        {%- for r in s.rules %}
+        <div class="sys-rule-row">
+          <span class="sys-rule-name" title="{{ r.name or '' }}">{{ r.name or 'unnamed rule' }}</span>
+          <span class="sys-rule-count">
+            {{- figure(r.count, 'This rule carried no count') -}}
+          </span>
+        </div>
+        {%- endfor %}
+      </div>
+      {%- endif %}
+      {%- if not s.mapped %}
+      <div class="sys-unmapped-badge">No system mapping for this namespace</div>
+      {%- endif %}
+    </div>
+  </div>
+  {%- endfor %}
+  {%- endif %}
+</div>

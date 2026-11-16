@@ -18,6 +18,8 @@ Public API:
 import logging
 from typing import Optional
 
+from ion.services.attack_revocation_service import resolve, resolve_all
+
 logger = logging.getLogger(__name__)
 
 
@@ -264,7 +266,17 @@ def get_framework(framework_id: str) -> Optional[dict]:
 
 
 def _covered_techniques(tide_service) -> set[str]:
-    """Pull the set of MITRE technique IDs that have at least one TIDE rule."""
+    """MITRE technique IDs with at least one *enabled* TIDE rule.
+
+    _MEASURES below has always said "at least one enabled detection rule",
+    while this function tested ``rule_count > 0``, which counts a rule that is
+    switched off. The scorecard promised one thing and measured another, on a
+    compliance surface, which is the worst place for that gap to sit.
+
+    Measured on the live tenant 2026-10-12: 164 techniques had a rule and 94
+    had an enabled one, so every framework percentage was computed against a
+    covered set 70 techniques too large.
+    """
     if not tide_service or not tide_service.enabled:
         return set()
     try:
@@ -275,10 +287,14 @@ def _covered_techniques(tide_service) -> set[str]:
     if not coverage:
         return set()
     techniques_data = coverage.get("techniques", {})
-    return {
+    # Resolved forward: TIDE rules carry whatever ATT&CK generation they were
+    # written against, and the control maps below are resolved the same way.
+    # Comparing the two unresolved makes a retired id miss and reads as "no
+    # detection" rather than "ids from two ATT&CK versions".
+    return resolve_all(
         tid for tid, info in techniques_data.items()
-        if (info or {}).get("rule_count", 0) > 0
-    }
+        if (info or {}).get("enabled_rules", 0) > 0
+    )
 
 
 #: What this scorecard measures, and — just as important — what it does
@@ -323,8 +339,12 @@ def _score_framework(framework: dict, covered: set[str]) -> dict:
         covered_techs: list[str] = []
         gap_techs: list[str] = []
         for tid in required:
-            parent = tid.split(".")[0]
-            if tid in covered or parent in covered:
+            # Parent is taken from the resolved id: a retired sub-technique can
+            # land under a different parent (T1562.002 -> T1685.001), so
+            # splitting the original would test the wrong one.
+            resolved = resolve(tid)
+            parent = resolved.split(".")[0]
+            if resolved in covered or parent in covered:
                 covered_techs.append(tid)
             else:
                 gap_techs.append(tid)

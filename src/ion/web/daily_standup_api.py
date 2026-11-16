@@ -872,11 +872,8 @@ async def standup_duty(
     return _duty_today()
 
 
-@router.get("/checks")
-async def get_daily_checks(
-    current_user: User = Depends(require_permission("alert:read")),
-):
-    """Aggregate all daily SOC duty checks in a single call."""
+async def daily_checks_payload():
+    """The shared check results for the JSON API and presentation fragment."""
     (
         cluster, alerts, cases,
         dc_health, wef_health, rule_failures,
@@ -921,6 +918,15 @@ async def get_daily_checks(
         # on the page rather than in somebody's memory of the rota.
         "duty":               _duty_today(),
     }
+    return payload
+
+
+@router.get("/checks")
+async def get_daily_checks(
+    current_user: User = Depends(require_permission("alert:read")),
+):
+    """Aggregate all daily SOC duty checks in a single call."""
+    payload = await daily_checks_payload()
     # standup is a real-time operator panel — never let a
     # browser or proxy show stale numbers. The "critical alerts from
     # days ago" symptom the user reported was at least partly a cache

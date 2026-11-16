@@ -1,0 +1,109 @@
+{# Threat Intel: attack stories for the selected window.
+
+   Replaces three innerHTML sites in threat_intel.html (the loading
+   placeholder, the story list, and the catch) plus `escapeHtml`.
+
+   The defect this fragment exists for, measured live on this deployment:
+   GET /api/attack-stories answers 200 with {"enabled": false, "error":
+   "ElasticsearchError"} when the correlation read fails, because the
+   disabled state is a payload and not a status. The page checked
+   `if (!r.ok) throw` and then did `d.stories || []`, so that 200 fell
+   through to the empty state and rendered "No attack stories: alerts did
+   not correlate into multi-step patterns over the selected window."
+
+   A switched-off correlation engine was therefore reported to the analyst
+   as a clean result, with the service's own explanation of why it was off
+   discarded. Those two findings lead to opposite actions. One says the
+   estate is quiet. The other says nobody looked.
+
+   Four outcomes here. Correlation unavailable with the reason named,
+   this fragment itself failing, correlation having run and found nothing,
+   and the stories. #}
+
+{% if not enabled %}
+  <div class="ti-empty text-[var(--danger)]" role="alert">
+    <strong>Attack story correlation is unavailable.</strong>
+    No alerts were correlated for the last {{ hours }}h, so this is not a
+    finding that the estate saw no multi-step activity. Nothing was looked
+    at.
+    {% if error %}
+      <div class="mt-1 font-mono text-[.72rem] opacity-80">Reason: {{ error }}</div>
+    {% else %}
+      <div class="mt-1 text-[.72rem] opacity-80">The service did not say why.</div>
+    {% endif %}
+  </div>
+{% elif failed %}
+  <div class="ti-empty text-[var(--danger)]" role="alert">
+    <strong>Attack stories could not be built.</strong>
+    The correlation over the last {{ hours }}h did not complete, so no
+    conclusion about multi-step activity can be drawn from this panel. Use
+    the window control to try again.
+  </div>
+{% elif stories is none %}
+  {# Correlation reported itself enabled and returned a payload with no
+     `stories` list. Not an empty result: the shape is not the one this
+     panel knows how to read, and saying "no attack stories" for it would
+     be the same lie in a new place. #}
+  <div class="ti-empty text-[var(--danger)]" role="alert">
+    <strong>Attack stories could not be read.</strong>
+    Correlation reported that it ran over the last {{ hours }}h but did not
+    return a story list, so this panel cannot say whether anything
+    correlated.
+  </div>
+{% elif not stories %}
+  <div class="ti-empty">
+    No attack stories. Alerts did not correlate into multi-step patterns
+    over the last {{ hours }}h.
+  </div>
+{% else %}
+  {% for s in stories %}
+    <div class="bg-[var(--bg-secondary)] border border-[var(--ion-border)] rounded-[var(--ion-radius-lg)] py-3.5 px-4 mb-3">
+      <div class="flex items-center gap-3 mb-2">
+        {# `is not none`. A story scored zero correlated but earned no
+           risk; a story with no score was not scored. The JavaScript
+           printed `s.score` straight in, so an absent score rendered the
+           string "undefined" inside the risk circle. #}
+        <div class="w-[42px] h-[42px] rounded-[50%] flex items-center justify-center font-bold font-mono text-[.85rem] bg-[rgba(220,38,38,0.15)] text-[#fecaca] border-[2px] border-[rgba(220,38,38,0.4)] shrink-0">
+          {%- if s.score is not none -%}{{ s.score }}{%- else -%}<span class="text-[.6rem] font-normal">n/a</span>{%- endif -%}
+        </div>
+        <div class="flex-1">
+          <div class="text-[.95rem] font-bold text-[var(--text-primary)]">
+            {{ s.entity }}
+            {%- if s.entity_type %} <small class="text-[.72rem] text-[var(--text-secondary)] font-normal">({{ s.entity_type }})</small>{% endif -%}
+          </div>
+          <div class="text-xs text-[var(--text-secondary)] mt-0.5">
+            {{ s.alert_count if s.alert_count is not none else '?' }} alerts
+            &middot; {{ (s.unique_techniques or [])|length }} techniques
+            &middot; {{ s.time_span_hours if s.time_span_hours is not none else '?' }}h span
+            {%- if s.severity %} &middot; <span class="sev-badge sev-{{ s.severity }}">{{ s.severity }}</span>{% endif -%}
+          </div>
+        </div>
+      </div>
+      {% if s.narrative %}
+        <div class="py-2.5 px-3 bg-[var(--bg-primary)] border border-[var(--ion-border)] rounded-[var(--radius)] text-[.82rem] leading-[1.55] text-[var(--text-primary)]">{{ s.narrative }}</div>
+      {% else %}
+        <div class="py-2.5 px-3 text-[.82rem] text-[var(--text-muted)]">No narrative was generated for this story.</div>
+      {% endif %}
+      {% if kill_chain_order %}
+        {# The kill-chain ribbon. `ti-chain-stage` and its `.active` are
+           namespaced and have rules in threat-intel.css.
+
+           The JavaScript appended a bare `active` class here, and no rule
+           for a bare `.active` exists in this page's stylesheet or in
+           ion.css, measured by grep over both. So a stage the attacker
+           actually reached rendered identically to one they never got to,
+           which is the only thing this ribbon is for. Changed rather than
+           reproduced, because there is no unbroken appearance to preserve:
+           every stage looked unreached. #}
+        {% set reached = s.tactics_progression or [] %}
+        <div class="flex gap-0 items-center overflow-x-auto my-2 mx-0">
+          {%- for stage in kill_chain_order -%}
+            {%- if not loop.first %}<span class="py-0 px-1 text-[var(--text-muted)] text-[.8rem]">&rarr;</span>{% endif -%}
+            <span class="ti-chain-stage{% if stage in reached %} active{% endif %}"
+                  {% if stage in reached %}title="Reached in this attack"{% else %}title="Not observed in this attack"{% endif %}>{{ stage }}</span>
+          {%- endfor -%}
+        </div>
+      {% endif %}
+    </div>
+  {% endfor %}
+{% endif %}

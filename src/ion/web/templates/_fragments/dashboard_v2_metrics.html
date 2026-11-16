@@ -1,0 +1,87 @@
+{# The mean-time-to-resolve and closure-rate tiles.
+
+   Replaces the `$('kpi-mttr').textContent`, `$('kpi-sla').textContent` and
+   `$('kpi-sla-bar').style.width` assignments. Not an innerHTML site, but the
+   inline `style.width` was, and an inline style attribute is refused by
+   ION's `style-src-attr 'none'`, so the width is emitted as
+   `data-ion-style` and static/js/ion-dynamic-styles.js applies it after the
+   swap.
+
+   Both tiles are in one swapped container because both come from one read.
+   Four states each, where the JavaScript had two:
+
+     read failed       say so. `if (metrics)` skipped silently, leaving the
+                       page's own em-dash placeholders, which read as
+                       measured-and-absent.
+     no closures 30d   mttr_hours is None because nothing closed. A finding
+                       about a quiet month, printed as an em-dash before.
+     nothing opened 7d closure_rate_7d is None because created_7d is zero
+                       and there is nothing to divide by. The progress bar
+                       stayed at w-[0%], which draws a graphic zero for a
+                       measurement nobody took.
+     a figure          the measurement. #}
+
+<div class="flex flex-col gap-5 lg:gap-6">
+
+  <div class="card bg-base-200 shadow rise d-5">
+    <div class="stats w-full bg-transparent">
+      <div class="stat">
+        <div class="stat-title">Mean time to resolve</div>
+        {# Gated on the raw number and printing the text. `_mttr_text(0)` is
+           the string "0m", and a non-empty string is truthy, so a gate
+           written on the text would survive being weakened to truthiness and
+           the `is not none` would be decorative. #}
+        {% if not failed and view.mttr_hours is not none %}
+          <div class="stat-value">{{ view.mttr_text }}</div>
+          <div class="stat-desc flex items-center gap-1">
+            <svg class="w-3 h-3"><use href="#i-clock"/></svg>
+            30d rolling
+          </div>
+        {% else %}
+          <div class="stat-value text-base-content/40">—</div>
+          <div class="stat-desc">
+            {% if failed %}read failed, not measured{% else %}{{ view.mttr_text }}{% endif %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card bg-base-200 shadow rise d-6">
+    <div class="stats w-full bg-transparent">
+      <div class="stat">
+        <div class="stat-title">Closure rate · 7d</div>
+        {% if not failed and view.closure_pct is not none %}
+          <div class="stat-value">{{ view.closure_text }}<span class="text-primary text-3xl font-medium">%</span></div>
+          <div class="stat-desc flex items-center gap-1">
+            <svg class="w-3 h-3"><use href="#i-check-circle"/></svg>
+            team-wide
+          </div>
+        {% else %}
+          <div class="stat-value text-base-content/40">—</div>
+          <div class="stat-desc">
+            {% if failed %}
+              read failed, not measured
+            {% elif view.created_7d is not none and view.created_7d == 0 %}
+              no cases opened in 7d, nothing to divide by
+            {% else %}
+              rate not reported by this read
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+    {# No bar at all unless there is a rate to draw. An empty track is the
+       honest shape for an unmeasured rate; a zero-width fill inside it is a
+       drawn zero. #}
+    {% if not failed and view.bar_pct is not none %}
+      <div class="px-8 pb-6">
+        <div class="h-1 w-full rounded-full bg-base-300 overflow-hidden">
+          <div class="h-full rounded-full bg-gradient-to-r from-primary to-success transition-[width] duration-700"
+               data-ion-style="width:{{ view.bar_pct }}%"></div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+</div>

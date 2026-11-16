@@ -1,0 +1,77 @@
+{# The panels that follow a completed AI answer, from ui/chat.py.
+
+   The grounding advisory had two states on this page, a box or nothing,
+   and "nothing" meant both "checked, and every specific is in the cited
+   sources" and "never checked". The check is off unless
+   ION_CHAT_GROUNDING_CHECK is set and skips whenever RAG returned nothing
+   to check against, so the second was the common case. For an advisory
+   whose only job is to say whether to trust the specifics in an answer,
+   those two readings are opposites.
+#}
+{%- if show_citations %}
+{%- if citations is none %}
+<div class="ai-citations-bar">
+  <span class="ai-citations-label">Sources:</span>
+  <span class="ai-citation-chip ai-cite-unreadable">not in a shape this
+    page can read</span>
+</div>
+{%- elif citations %}
+<div class="ai-citations-bar">
+  <span class="ai-citations-label">Sources:</span>
+  {%- for c in citations %}
+  {#- The kind reaches the class only when it is one the styling knows.
+      `ai-citation-chip ${c.type}` put a server value in there. -#}
+  <span class="ai-citation-chip{% if c.kind %} cite-{{ c.kind }}{% endif %}">
+    {{- c.glyph }} {{ c.label }}: {{ c.title -}}
+  </span>
+  {%- endfor %}
+</div>
+{%- endif %}
+{%- endif %}
+{%- set g = grounding %}
+{%- if g.state == 'grounded' %}
+<div class="ai-grounding ok">&#x2713; Every specific here appears in the
+  cited sources.</div>
+{%- elif g.state == 'claims' %}
+<div class="ai-grounding warn">
+  <span class="ai-grounding-head">&#x26A0; Not found in the cited sources</span>
+  <ul>
+    {%- for claim in g.claims %}<li>{{ claim }}</li>{% endfor %}
+  </ul>
+  {%- if g.notes %}
+  {#- The service collects and caps this and nothing rendered it. -#}
+  <span class="ai-grounding-notes">{{ g.notes }}</span>
+  {%- endif %}
+  <span class="ai-grounding-foot">Advisory only. Verify before acting.</span>
+</div>
+{%- elif g.state == 'unlisted' %}
+<div class="ai-grounding warn">
+  <span class="ai-grounding-head">&#x26A0; The check did not list what it
+    could not support</span>
+  {%- if g.notes %}<span class="ai-grounding-notes">{{ g.notes }}</span>
+  {%- endif %}
+  <span class="ai-grounding-foot">Advisory only. Verify before acting.</span>
+</div>
+{%- elif g.state == 'unreadable' %}
+<div class="ai-grounding warn">
+  <span class="ai-grounding-head">&#x26A0; The grounding result is not in a
+    shape this page can read</span>
+  {%- if g.notes %}<span class="ai-grounding-notes">{{ g.notes }}</span>
+  {%- endif %}
+  <span class="ai-grounding-foot">Treat this answer as unchecked. Advisory
+    only. Verify before acting.</span>
+</div>
+{%- else %}
+<div class="ai-grounding none">
+  <span class="ai-grounding-head">Not checked against sources</span>
+  {%- if g.reason %}<span class="ai-grounding-notes">{{ g.reason }}</span>
+  {%- endif %}
+  <span class="ai-grounding-foot">Advisory only. Verify before acting.</span>
+</div>
+{%- endif %}
+<div class="ai-feedback-row" data-msg-id="{{ msg_id }}">
+  <button class="ai-fb-btn" data-click-action="submitFeedback"
+          data-args='{{ ["$target", "up"]|tojson }}' title="Good">&#x1F44D;</button>
+  <button class="ai-fb-btn" data-click-action="submitFeedback"
+          data-args='{{ ["$target", "down"]|tojson }}' title="Poor">&#x1F44E;</button>
+</div>

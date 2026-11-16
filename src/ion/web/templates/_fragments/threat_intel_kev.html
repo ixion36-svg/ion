@@ -1,0 +1,209 @@
+{# Threat Intel: one page of the CISA KEV catalog, its pager, and its
+   status bar.
+
+   Replaces five innerHTML sites across kevRenderStatus, kevSearch, kevRow,
+   kevRansomware and kevDetail.
+
+   Most of this region is carried over unchanged, because it was the
+   best-written part of this page. Three judgements in it are deliberate and
+   are kept word for word:
+
+     * The empty state names which catalog version found nothing. A bare
+       "no results" invites the reader to conclude the CVE is safe, when
+       what they have learned is only that one snapshot does not list it.
+     * "ransomware: unknown" is worded as CISA not having established use,
+       not as having ruled it out.
+     * References are selectable text rather than links, because ION ships
+       to air-gapped sites where an external anchor is a dead end that looks
+       broken.
+
+   The one defect: kevSearch's catch rendered into the ti-empty class, which
+   is the no-results styling, so a failed lookup read as an empty catalog.
+   That is the worst possible confusion for this panel in particular, since
+   its whole purpose is to answer "is this being exploited right now".
+
+   Since the condensed page the table pages, 50 rows at a time, says how
+   many rows it was cut from, and filters by date added as well as by term
+   and ransomware use. It used to render the newest 50 and stop, so the
+   other 1,600 entries were reachable only by guessing a search term.
+
+   The pager buttons send the filter form with them (hx-include), so a
+   page turn keeps the filter it was paging through.
+
+   The status bar swaps out of band. One read answers both regions. #}
+
+{# ---- the status bar, out of band ---- #}
+<div id="kev-status-bar" class="mb-4" hx-swap-oob="innerHTML">
+  {%- if failed -%}
+    <div class="rounded-lg border border-ion-coral/30 bg-ion-coral/[0.06] px-4 py-3 text-xs text-ion-coral" role="alert">
+      The KEV catalog could not be read, so nothing below should be taken as
+      the catalog's answer about any CVE.
+    </div>
+  {%- elif not status or not status.get('loaded') -%}
+    <div class="rounded-lg border border-ion-amber/30 bg-ion-amber/[0.06] px-4 py-3 text-xs text-ion-amber">
+      No KEV catalog loaded. An operator can import one from Settings.
+    </div>
+  {%- else -%}
+    {# Bands, not a hard cutoff: CISA publishes irregularly, so 30 days is a
+       prompt to check rather than a failure. `age is none` keeps its own
+       state, because an age nobody measured is not a fresh catalog. #}
+    {%- set age = status.get('age_days') -%}
+    {%- if age is none -%}{% set tone = 'slate-400' %}
+    {%- elif age <= 30 -%}{% set tone = 'ion-lime' %}
+    {%- elif age <= 90 -%}{% set tone = 'ion-amber' %}
+    {%- else -%}{% set tone = 'ion-coral' %}
+    {%- endif -%}
+    <div class="ti-statusbar">
+      <span class="text-slate-400">Catalog <b class="text-white">{{ status.get('catalog_version') or '&mdash;'|safe }}</b>
+        {%- if status.get('ahead_of_bundle') %} <span class="text-slate-500">(operator import, newer than this build)</span>{% endif -%}
+      </span>
+      {# `is not none`. A catalog of zero entries is a finding; a count
+         nobody recorded is not, and the page printed `${st.count}` straight
+         in, so an absent count read "undefined known-exploited CVEs". #}
+      <span class="text-slate-400">
+        {%- if status.get('count') is not none -%}
+          <b class="text-white">{{ status.get('count') }}</b> known-exploited CVEs
+        {%- else -%}
+          <b class="text-white">unknown</b> number of known-exploited CVEs
+        {%- endif -%}
+      </span>
+      <span class="text-{{ tone }}">{{ (age ~ ' days old') if age is not none else 'age unknown' }}</span>
+      <span class="text-slate-500">snapshot, ION does not fetch this at runtime</span>
+    </div>
+  {%- endif -%}
+</div>
+
+{# ---- the results ---- #}
+{% set total = total if total is defined else none %}
+{% set page = page if page is defined and page else 1 %}
+{% set pages = pages if pages is defined else none %}
+{% set per_page = per_page if per_page is defined and per_page else 50 %}
+{% set tracked = tracked if tracked is defined else none %}
+{% set bad_dates = bad_dates if bad_dates is defined else [] %}
+{% set added_from = added_from if added_from is defined else none %}
+{% set added_to = added_to if added_to is defined else none %}
+{% set filtered = q or ransomware_only or added_from or added_to %}
+
+{% if bad_dates %}
+  <p class="ti-note is-warn" role="status">An unreadable {{ bad_dates|join(' and ') }}
+    date was ignored, so the results below are not limited by it.</p>
+{% endif %}
+
+{% if failed %}
+  <div class="ti-empty text-[var(--danger)]" role="alert">
+    The KEV lookup did not complete. This is a fault rather than an empty
+    catalog, so it is not an answer about whether any CVE is known to be
+    exploited. Searching again may succeed.
+  </div>
+{% elif results is none %}
+  <div class="ti-empty text-[var(--danger)]" role="alert">
+    The KEV lookup answered with something this table cannot read, so it
+    cannot say what the catalog holds.
+  </div>
+{% elif not results %}
+  {# Which catalog found nothing, not a bare "no results". A reader who
+     searched a CVE and saw nothing has learned only that this snapshot does
+     not list it. #}
+  <div class="ti-empty">
+    No entries in catalog {{ (status or {}).get('catalog_version') or 'unknown' }}
+    {%- if q %} for {{ q }}{% endif -%}
+    {%- if ransomware_only %}, with the ransomware-linked filter applied{% endif -%}
+    {%- if added_from or added_to %}, added{% if added_from %} from {{ added_from }}{% endif %}{% if added_to %} to {{ added_to }}{% endif %}{% endif -%}.
+  </div>
+{% else %}
+{% set first = (page - 1) * per_page + 1 %}
+{% set last = first + results|length - 1 %}
+{% macro pager(where) -%}
+<div class="ti-pager" role="navigation" aria-label="KEV pages, {{ where }}">
+  <span class="ti-pager-sum">
+    {%- if total is not none -%}
+      <b>{{ '{:,}'.format(first) }}&ndash;{{ '{:,}'.format(last) }}</b> of <b>{{ '{:,}'.format(total) }}</b>{% if filtered %} matching{% endif %}
+    {%- else -%}
+      rows {{ first }}&ndash;{{ last }}; the total was not reported
+    {%- endif -%}
+  </span>
+  {%- if pages and pages > 1 %}
+  <span class="ti-pager-btns">
+    {%- for label, target, enabled in [('First', 1, page > 1), ('Prev', page - 1, page > 1), ('Next', page + 1, page < pages), ('Last', pages, page < pages)] %}
+      <button type="button" class="ti-pbtn"{% if not enabled %} disabled{% endif %}
+              hx-get="/ui/threat-intel/kev?page={{ target }}"
+              hx-include="#kev-form"
+              hx-target="#kev-results"
+              hx-swap="innerHTML">{{ label }}</button>
+      {%- if label == 'Prev' %}<span class="ti-pager-pos">page {{ page }} of {{ pages }}</span>{% endif -%}
+    {%- endfor %}
+  </span>
+  {%- endif %}
+</div>
+{%- endmacro %}
+{{ pager('top') }}
+<table class="ti-table ti-table-tight">
+  <thead>
+    <tr><th>CVE</th><th>Vendor / product</th><th>Vulnerability</th><th>Added</th><th>Remediate by</th></tr>
+  </thead>
+  <tbody>
+    {% for e in results %}
+      {% set i = loop.index0 %}
+      {% set cve = (e.get('cve_id') or '')|upper %}
+      <tr class="ti-kev-row" data-click-action="kevToggle" data-args='[{{ i }}]'
+          title="Click for the description, required action and CWEs">
+        <td class="ti-name-cell ti-nowrap"><span class="ti-kev-caret" id="kev-caret-{{ i }}">&#9656;</span> {{ e.get('cve_id') or '' }}</td>
+        <td>{{ e.get('vendor_project') or '' }} {{ e.get('product') or '' }}</td>
+        <td>
+          {{ e.get('vulnerability_name') or '' }}
+          {%- if e.get('known_ransomware') -%}
+            <span class="ti-badge ti-badge-ransomware" title="CISA records use by known ransomware campaigns">ransomware: known</span>
+          {%- else -%}
+            {# "unknown" means CISA has not established use. Not the same as
+               having ruled it out, and the title says so. #}
+            {%- set raw = e.get('known_ransomware_raw') or 'Unknown' -%}
+            <span class="ti-badge ti-badge-unknown" title="CISA has not established ransomware use. This is not the same as ruling it out.">ransomware: {{ raw|lower }}</span>
+          {%- endif -%}
+          {%- if tracked is not none and cve in tracked -%}
+            <span class="ti-flag is-warn" title="Open work on ION's vulnerability register">tracked</span>
+          {%- endif -%}
+        </td>
+        <td class="ti-mono ti-nowrap">{{ e.get('date_added') or '' }}</td>
+        <td class="ti-mono ti-nowrap">{{ e.get('due_date') or '' }}</td>
+      </tr>
+      <tr class="ti-kev-detail" id="kev-detail-{{ i }}">
+        <td colspan="5">
+          <div class="ti-kev-body">
+            {% if e.get('short_description') %}
+              <div class="ti-kev-f"><div class="ti-kev-k">Description</div>
+                <div>{{ e.get('short_description') }}</div></div>
+            {% endif %}
+            {% if e.get('required_action') %}
+              {# The actionable field: what CISA mandates, with the due date
+                 already in the row above it. #}
+              <div class="ti-kev-f ti-kev-action"><div class="ti-kev-k">Required action</div>
+                <div>{{ e.get('required_action') }}</div></div>
+            {% endif %}
+            {% set cwes = e.get('cwes') if e.get('cwes') is iterable and e.get('cwes') is not string else [] %}
+            {% if cwes %}
+              <div class="ti-kev-f"><div class="ti-kev-k">Weaknesses</div><div>
+                {% for c in cwes %}<span class="ti-badge ti-badge-cwe">{{ c }}</span> {% endfor %}
+              </div></div>
+            {% endif %}
+            {% if e.get('notes') %}
+              {# Selectable text, not links. ION ships to air-gapped sites
+                 where an external anchor is a dead end that looks broken;
+                 the reference is still worth having to hand. #}
+              <div class="ti-kev-f"><div class="ti-kev-k">References</div>
+                <div class="ti-kev-notes">{{ e.get('notes') }}</div></div>
+            {% endif %}
+            <div class="ti-kev-prov">Catalog {{ e.get('catalog_version') or 'unknown' }}
+              &#183; {{ 'operator import' if e.get('source') == 'imported' else 'shipped in the image' }}</div>
+          </div>
+        </td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% if pages and pages > 1 %}{{ pager('bottom') }}{% endif %}
+{% if tracked is none %}
+  <p class="ti-note ti-small">ION's vulnerability register was not read for this
+    page, so no row is marked as tracked. That is not the same as none being in
+    your estate.</p>
+{% endif %}
+{% endif %}

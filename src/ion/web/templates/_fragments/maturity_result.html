@@ -1,0 +1,140 @@
+{# One stored assessment's scored result: the ring and the domain cards.
+
+   Replaces two innerHTML writes in maturity.html. The JavaScript rendered
+   this from the POST response it had just received; this renders it from
+   what maturity_service actually stored, so the panel cannot show a figure
+   the database does not hold.
+
+   The two collapses this fragment exists to undo:
+
+     * `const pct = a.overall_score * 20` is 0 for None, so an unassessed
+       overall drew exactly the 0% arc a stored 0 draws. Here the ring is
+       hatched when `ring_pct` is None, and a hatch is the one picture no
+       measurement can produce.
+     * `width:${score.pct}%` with pct None emitted invalid CSS, so the bar
+       sat at width 0, which is what a domain measured at 0% looks like.
+       Here an unassessed bar is a full-width hatch and a 0% bar is a real
+       bar of width 0.
+
+   `score` and `pct` are tested separately, because a stored row holding one
+   and not the other is a real shape and substituting either from the other
+   would be inventing a measurement.
+
+   The controls that leave this view live in the page header, outside
+   #mat-content, so no swap of this fragment can remove the reader's way
+   out. The two buttons at the foot are a convenience inside the swap
+   target, not the escape hatch. #}
+
+{% from "_fragments/_time.html" import ts %}
+{% from "_fragments/maturity_failed.html" import read_failed %}
+
+{% if failed %}
+  {{ read_failed('This assessment') }}
+{% else %}
+  {% set a = assessment %}
+
+  <div class="card bg-base-200 shadow mb-6">
+    <div class="card-body flex-col sm:flex-row items-center gap-8">
+      {# The class and the background are chosen before the tag is opened so
+         neither branch owns half a `<div>`. #}
+      {% if a.measured %}
+        {% set ring_style = 'background:conic-gradient(' ~ a.colour ~ ' ' ~ a.ring_pct
+                            ~ '%, rgba(99,110,123,.2) ' ~ a.ring_pct ~ '%)' %}
+      {% else %}
+        {% set ring_style = 'background:' ~ hatch %}
+      {% endif %}
+      <div class="mat-result-ring" data-ion-style="{{ ring_style }}">
+        <div class="mat-result-inner">
+          <div class="font-mono text-4xl font-extrabold"
+               data-ion-style="color:{{ a.colour }}">{{ a.score if a.measured else 'n/a' }}</div>
+          <div class="text-[0.62rem] uppercase tracking-widest font-bold opacity-50 mt-1">
+            {{- 'of ' ~ max_level if a.measured else 'not assessed' -}}
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3 class="text-2xl font-semibold m-0 mb-1.5">
+          {% if a.level is not none %}
+            {{ a.level }} Maturity
+          {% else %}
+            Maturity level not assessed
+          {% endif %}
+        </h3>
+        <p class="m-0 opacity-70">{{ a.title }}, {{ ts(a.created_at, 'date') }}</p>
+        {% if a.created_by %}
+          <p class="m-0 text-xs opacity-60 mt-1">Recorded by {{ a.created_by }}</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# Permanent furniture, not a tooltip. A reader must not have to hover to
+     learn that a hatch means nobody scored this, nor to learn that this
+     page draws a real zero differently. #}
+  <div class="flex flex-wrap items-center gap-4 text-xs opacity-70 mb-4">
+    <span class="flex items-center gap-2">
+      <span class="inline-block w-6 h-2 rounded" data-ion-style="background:{{ measured_swatch }}"></span>assessed
+    </span>
+    <span class="flex items-center gap-2">
+      <span class="inline-block w-6 h-2 rounded" data-ion-style="background:{{ hatch }}"></span>not assessed, which is not the same as a score of 0
+    </span>
+  </div>
+
+  <div class="grid gap-4 mb-6 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+    {% for dom in a.domains + a.retired %}
+      <div class="card bg-base-200 shadow">
+        <div class="card-body p-5">
+          <div class="flex justify-between items-center mb-2.5 gap-2">
+            <span class="text-xs font-extrabold uppercase tracking-widest opacity-70">{{ dom.name }}</span>
+            <span class="font-mono font-extrabold text-xl whitespace-nowrap"
+                  data-ion-style="color:{{ dom.colour }}">{{ (dom.score ~ '/' ~ max_level) if dom.measured else 'n/a' }}</span>
+          </div>
+          <div class="h-1.5 bg-base-300 rounded overflow-hidden mb-1.5">
+            {% if dom.pct_measured %}
+              <div class="mat-bar-fill" data-ion-style="width:{{ dom.pct }}%; background:{{ dom.colour }}"></div>
+            {% else %}
+              {# Full-width hatch, not a bar at width 0. A bar at 0 is the
+                 same picture as a domain measured at 0%. #}
+              <div class="mat-bar-fill" data-ion-style="width:100%; background:{{ hatch }}"></div>
+            {% endif %}
+          </div>
+          <div class="text-[0.65rem] uppercase tracking-wide opacity-50 font-semibold">
+            {{- (dom.pct ~ '%') if dom.pct_measured else 'not assessed' -}}
+          </div>
+          {% if not dom.known %}
+            {# A figure that was measured and stored must not vanish because
+               the questionnaire moved on. The history table's columns are
+               the current questionnaire, so this is the only place it shows. #}
+            <div class="text-[0.65rem] opacity-60 mt-1.5">
+              Scored against a domain the questionnaire no longer has.
+            </div>
+          {% elif not dom.present %}
+            <div class="text-[0.65rem] opacity-60 mt-1.5">
+              This assessment's stored scores do not carry this domain.
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  {% if a.notes %}
+    <div class="card bg-base-200 shadow mb-6">
+      <div class="card-body p-5">
+        <h4 class="text-xs font-extrabold uppercase tracking-widest opacity-70 m-0 mb-2">Notes</h4>
+        <p class="m-0 whitespace-pre-line">{{ a.notes }}</p>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="flex gap-2 justify-end">
+    <button type="button" class="btn btn-ghost"
+            hx-get="/ui/maturity/history"
+            hx-target="#mat-content"
+            hx-swap="innerHTML">View History</button>
+    <button type="button" class="btn btn-primary"
+            hx-get="/ui/maturity/questionnaire"
+            hx-target="#mat-content"
+            hx-swap="innerHTML">New Assessment</button>
+  </div>
+{% endif %}

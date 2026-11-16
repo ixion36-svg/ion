@@ -1,0 +1,68 @@
+{# The Elastic UID lookup result for /profile.
+
+   Replaces the other two innerHTML sites in profile.html, the success alert
+   and the no-match alert, plus the hand-rolled `escapeHtml()` calls they
+   needed over every interpolated name. Jinja autoescapes.
+
+   Three states, where the JavaScript had two. A lookup that matched; a
+   lookup that ran and found no exact match, which says the user has no
+   Elastic identity under the names tried; and a lookup that could not run,
+   which says nothing at all about whether they have one. The JavaScript
+   collapsed the third into a toast and left the result box empty, so a
+   Kibana outage read as "no such user". Those lead to opposite actions:
+   one is "set your Elastic username", the other is "tell whoever runs
+   Kibana".
+
+   Nothing here is a credential. The payload carries a profile UID, matched
+   and candidate usernames, and the directory entries the suggest API
+   returned. All of it is identity, and the UID is already on screen in the
+   readonly input this result sits under.
+
+   The Resolve button is on the page, not in here, so a failed render cannot
+   remove the control that retries. #}
+
+{% if lookup_error %}
+  <div role="alert" class="alert alert-error text-[0.8125rem]">
+    <div>
+      <p>{{ lookup_error }}</p>
+      <p class="mt-2">
+        This is not a result. Whether you have an Elastic identity is
+        unknown rather than no, so do not change your Elastic username on
+        the strength of it. Try Resolve again once the lookup is working.
+      </p>
+    </div>
+  </div>
+{% elif result.resolved %}
+  <div role="status" class="alert alert-success text-[0.8125rem]">
+    <div>
+      Matched as <strong>{{ result.matched_username }}</strong>, UID
+      <code>{{ result.elastic_uid }}</code>
+    </div>
+  </div>
+{% else %}
+  <div role="status" class="alert alert-warning text-[0.8125rem]">
+    <div>
+      <p>
+        No exact match found. Tried:
+        {% for c in result.candidates_tried %}"{{ c }}"{% if not loop.last %}, {% endif %}{% endfor %}
+      </p>
+      {% if result.profiles_found %}
+        <p class="mt-2">Available profiles found:</p>
+        <ul class="mt-1 mr-0 mb-0 ml-4">
+          {% for p in result.profiles_found %}
+            <li><strong>{{ p.username }}</strong> ({{ p.full_name or p.email or '' }})</li>
+          {% endfor %}
+        </ul>
+        <p class="mt-2">
+          Set your <em>Elastic Username</em> to one of these and try again.
+        </p>
+      {% else %}
+        <p class="mt-2">
+          Kibana returned no profiles for any of those names, so there is
+          nothing to pick from. Check the username you use to sign in to
+          Kibana and set it above.
+        </p>
+      {% endif %}
+    </div>
+  </div>
+{% endif %}

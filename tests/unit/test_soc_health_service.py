@@ -100,16 +100,29 @@ class TestWeightsAndGrading:
 # --- detection coverage ----------------------------------------------------
 
 class TestDetectionCoverage:
-    def test_no_posture_stats_scores_zero(self, tide):
-        """Unknown coverage is scored as none, not as neutral."""
+    def test_no_posture_stats_is_unmeasured(self, tide):
+        """Unknown coverage is scored as none, not as neutral.
+
+        That first line is the original docstring and it was right. The
+        assertion under it was `score == 0`, which is a number, so the
+        aggregate counted the dimension as measured and graded the SOC on
+        it. On an instance with no TIDE that produced 30/100 Grade F and
+        the claim "All five dimensions measured". None is what the
+        docstring meant all along.
+        """
         tide(posture=None)
         out = svc._detection_coverage()
-        assert out["score"] == 0
+        assert out["score"] is None
+        assert out["label"] == "Unavailable"
         assert out["details"]["tide_available"] is False
+        assert out["details"]["reason"]
 
-    def test_a_tide_failure_scores_zero_without_raising(self, tide):
+    def test_a_tide_failure_is_unmeasured_without_raising(self, tide):
+        """A failed read is the same state as no data: ION could not look."""
         tide(raises=True)
-        assert svc._detection_coverage()["score"] == 0
+        out = svc._detection_coverage()
+        assert out["score"] is None
+        assert out["label"] == "Unavailable"
 
     def test_full_coverage_and_quality_scores_one_hundred(self, tide):
         tide(posture={"total_techniques": 100, "covered_techniques": 100,
@@ -125,17 +138,39 @@ class TestDetectionCoverage:
                       "quality": {"avg_quality": 40}})
         assert svc._detection_coverage()["score"] == 70
 
-    def test_zero_techniques_does_not_divide_by_zero(self, tide):
+    def test_zero_techniques_is_unavailable_rather_than_a_zero_score(self, tide):
+        """Still no ZeroDivisionError, which is what this test was for, but a
+        missing denominator is now reported as unmeasured instead of scored 0.
+        TIDE 6 does not serve the ATT&CK catalogue to the external query API,
+        so this is the ordinary case against a current TIDE."""
         tide(posture={"total_techniques": 0, "covered_techniques": 0,
                       "quality": {"avg_quality": 0}})
-        assert svc._detection_coverage()["score"] == 0
+        out = svc._detection_coverage()
+        assert out["score"] is None
+        assert out["label"] == "Unavailable"
+        assert "denominator" in (out["details"]["reason"] or "").lower()
 
-    def test_a_null_quality_is_treated_as_zero(self, tide):
+    def test_a_null_quality_is_not_treated_as_zero(self, tide):
+        """Was test_a_null_quality_is_treated_as_zero, which pinned the
+        defect: `avg_quality.get(..., 0) or 0` made "TIDE returned no quality
+        figure" identical to "the rules average zero", and the dimension was
+        graded as though the second had been measured. Coverage is known here,
+        so the dimension still scores, on coverage alone, and says so."""
         tide(posture={"total_techniques": 10, "covered_techniques": 10,
                       "quality": {"avg_quality": None}})
         out = svc._detection_coverage()
+        assert out["details"]["rule_quality_pct"] is None
+        assert out["details"]["score_basis"] == "technique coverage only"
+        assert out["score"] == 100  # 10 of 10 covered, not 60 after a 0.4 of nothing
+
+    def test_a_measured_zero_quality_is_still_scored(self, tide):
+        """The distinction cuts both ways, or it is just special-casing."""
+        tide(posture={"total_techniques": 10, "covered_techniques": 10,
+                      "quality": {"avg_quality": 0}})
+        out = svc._detection_coverage()
         assert out["details"]["rule_quality_pct"] == 0
-        assert out["score"] == 60
+        assert out["details"]["score_basis"] == "technique coverage and rule quality"
+        assert out["score"] == 60  # 100*0.6 + 0*0.4
 
 
 # --- operational efficiency ------------------------------------------------

@@ -1,0 +1,389 @@
+
+/* ── Modal Overlay / Dialog ─────────────────────────────── */
+body[data-page="forensics"] .modal-overlay{
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+body[data-page="forensics"] .modal-dialog{
+    background: var(--bg-secondary);
+    border: 1px solid var(--ion-border);
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow: auto;
+    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+body[data-page="forensics"] .modal-header{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--ion-border);
+    background: var(--bg-primary);
+    border-radius: 12px 12px 0 0;
+}
+body[data-page="forensics"] .modal-header h2{ font-size: 1.1rem; margin: 0; }
+body[data-page="forensics"] .editable-title{ cursor: pointer; border-bottom: 1px dashed transparent; transition: border-color .2s; }
+body[data-page="forensics"] .editable-title:hover{ border-bottom-color: var(--accent, var(--primary)); }
+body[data-page="forensics"] .editable-desc{ border: 1px dashed transparent; padding: 4px; border-radius: 4px; transition: border-color .2s; }
+body[data-page="forensics"] .editable-desc:hover{ border-color: var(--ion-border); }
+body[data-page="forensics"] .editable-desc:empty::after{ content: "Click to add description..."; color: var(--text-secondary); opacity: .5; font-style: italic; }
+body[data-page="forensics"] .modal-close{
+    background: none; border: none; font-size: 1.5rem;
+    cursor: pointer; color: var(--text-secondary); transition: color .2s;
+}
+body[data-page="forensics"] .modal-close:hover{ color: var(--danger); }
+body[data-page="forensics"] .modal-body{ padding: 1.25rem; }
+body[data-page="forensics"] .modal-body label{
+    display: block; margin: 10px 0 4px;
+    font-weight: 600; font-size: .85rem; color: var(--text-secondary);
+}
+body[data-page="forensics"] .modal-footer{
+    display: flex; gap: 0.75rem; padding: 1rem 1.25rem;
+    border-top: 1px solid var(--ion-border);
+    justify-content: flex-end;
+    background: var(--bg-primary);
+    border-radius: 0 0 12px 12px;
+}
+
+/* ── Filter Bar (matches cases.html) ────────────────────── */
+body[data-page="forensics"] .cases-filters-bar{
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    width: 100%;
+}
+/* layout-only: visual styling now comes from ion-input / ion-select */
+body[data-page="forensics"] .cases-filter-input{ flex: 1; }
+body[data-page="forensics"] .cases-filter-select{ min-width: 150px; width: auto; }
+
+/* ── Tabs ───────────────────────────────────────────────── */
+body[data-page="forensics"] .fr-tabs{
+    display: flex;
+    border-bottom: 1px solid var(--ion-border);
+    margin-bottom: 16px;
+    overflow-x: auto;
+    width: 100%;
+}
+body[data-page="forensics"] .fr-tab{
+    padding: 8px 18px; background: transparent; border: none;
+    color: var(--text-secondary); cursor: pointer; font-size: .85rem;
+    font-weight: 600; border-bottom: 2px solid transparent;
+    transition: color .15s, border-color .15s; white-space: nowrap;
+}
+body[data-page="forensics"] .fr-tab.active{ color: var(--accent, var(--primary)); border-bottom-color: var(--accent, var(--primary)); }
+body[data-page="forensics"] .fr-tab:hover{ color: var(--text-primary); }
+body[data-page="forensics"] .fr-panel{ margin-top: 4px; width: 100%; }
+
+/* ── Metric Tiles ───────────────────────────────────────── */
+body[data-page="forensics"] .fr-tiles{
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+    width: 100%;
+}
+body[data-page="forensics"] .fr-tile{
+    background: var(--bg-secondary);
+    border: 1px solid var(--ion-border);
+    border-radius: 12px; padding: 18px 16px;
+    text-align: center; position: relative; overflow: hidden;
+}
+body[data-page="forensics"] .fr-tile::before{ content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+body[data-page="forensics"] .fr-tile-blue::before{ background: var(--info); }
+body[data-page="forensics"] .fr-tile-cyan::before{ background: var(--accent, var(--primary)); }
+body[data-page="forensics"] .fr-tile-red::before{ background: var(--danger); }
+body[data-page="forensics"] .fr-tile-green::before{ background: var(--success); }
+body[data-page="forensics"] .fr-tile-purple::before{ background: #bc8cff; }
+body[data-page="forensics"] .fr-tile-amber::before{ background: var(--warning); }
+body[data-page="forensics"] .fr-tile-value{ font-size: 1.8rem; font-weight: 700; color: var(--text-primary); line-height: 1.2; }
+body[data-page="forensics"] .fr-tile-label{ font-size: .75rem; color: var(--text-secondary); margin-top: 4px; text-transform: uppercase; letter-spacing: .5px; }
+
+/* ── Pipeline / Stage Kanban ────────────────────────────── */
+body[data-page="forensics"] .fr-pipeline{
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+    overflow-x: auto;
+    min-height: 300px;
+    width: 100%;
+}
+body[data-page="forensics"] .fr-stage{
+    background: var(--bg-secondary);
+    border: 1px solid var(--ion-border);
+    border-radius: 10px; display: flex; flex-direction: column;
+    min-width: 0;
+}
+body[data-page="forensics"] .fr-stage-header{
+    padding: 10px 12px; display: flex; justify-content: space-between;
+    align-items: center; font-weight: 700; font-size: .8rem;
+    text-transform: uppercase; letter-spacing: .5px; border-radius: 10px 10px 0 0;
+}
+body[data-page="forensics"] .fr-stage-intake{ background: rgba(88,166,255,.12); color: var(--info); }
+body[data-page="forensics"] .fr-stage-evidence{ background: rgba(63,185,80,.12); color: var(--success); }
+body[data-page="forensics"] .fr-stage-analysis{ background: rgba(240,192,0,.12); color: var(--warning); }
+body[data-page="forensics"] .fr-stage-reporting{ background: rgba(188,140,255,.12); color: var(--sev-info); }
+body[data-page="forensics"] .fr-stage-review{ background: rgba(240,136,62,.12); color: var(--neon-orange); }
+body[data-page="forensics"] .fr-stage-closed{ background: rgba(110,118,129,.12); color: var(--text-muted); }
+body[data-page="forensics"] .fr-stage-count{ background: rgba(255,255,255,.15); padding: 2px 8px; border-radius: 10px; font-size: .75rem; }
+body[data-page="forensics"] .fr-stage-cards{ padding: 8px; flex: 1; overflow-y: auto; max-height: 500px; }
+
+/* ── Pipeline Cards ─────────────────────────────────────── */
+body[data-page="forensics"] .fr-card{
+    background: var(--bg-primary);
+    border: 1px solid var(--ion-border);
+    border-radius: var(--ion-radius-lg); padding: 10px; margin-bottom: 8px;
+    cursor: pointer; transition: border-color .15s;
+}
+body[data-page="forensics"] .fr-card:hover{ border-color: var(--accent, var(--primary)); }
+body[data-page="forensics"] .fr-card-num{ font-size: .7rem; color: var(--text-secondary); font-weight: 600; }
+body[data-page="forensics"] .fr-card-title{ font-size: .85rem; font-weight: 600; margin: 3px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body[data-page="forensics"] .fr-card-meta{ display: flex; gap: 6px; align-items: center; font-size: .7rem; color: var(--text-secondary); flex-wrap: wrap; }
+body[data-page="forensics"] .fr-card-lock{ color: var(--warning); }
+
+/* ── Table ──────────────────────────────────────────────── */
+body[data-page="forensics"] .table-container{ overflow-x: auto; width: 100%; }
+body[data-page="forensics"] .data-table{ width: 100%; border-collapse: collapse; font-size: .85rem; }
+body[data-page="forensics"] .data-table th, body[data-page="forensics"] .data-table td{ padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--ion-border); }
+body[data-page="forensics"] .data-table th{ color: var(--text-secondary); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .5px; }
+body[data-page="forensics"] .data-table tr{ cursor: pointer; transition: background .15s; }
+body[data-page="forensics"] .data-table tr:hover{ background: var(--primary-dim); }
+body[data-page="forensics"] .empty-state{ text-align: center; padding: 40px; color: var(--text-secondary); }
+
+/* ── Form inputs ────────────────────────────────────────── */
+body[data-page="forensics"] .form-input{
+    width: 100%; padding: 8px 12px;
+    border: 1px solid var(--ion-border);
+    border-radius: var(--radius); background: var(--bg-primary);
+    color: var(--text-primary); font-size: .9rem; box-sizing: border-box;
+}
+body[data-page="forensics"] .form-input:focus{ outline: none; border-color: var(--accent); }
+body[data-page="forensics"] textarea.form-input{ resize: vertical; }
+
+/* ── Badges ─────────────────────────────────────────────── */
+body[data-page="forensics"] .badge{ display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: .75rem; font-weight: 600; text-transform: uppercase; }
+body[data-page="forensics"] .badge-intake{ background: rgba(88,166,255,.12); color: var(--info); }
+body[data-page="forensics"] .badge-evidence_collection{ background: rgba(63,185,80,.12); color: var(--success); }
+body[data-page="forensics"] .badge-analysis{ background: rgba(240,192,0,.12); color: var(--warning); }
+body[data-page="forensics"] .badge-reporting{ background: rgba(188,140,255,.12); color: var(--sev-info); }
+body[data-page="forensics"] .badge-review{ background: rgba(240,136,62,.12); color: var(--neon-orange); }
+body[data-page="forensics"] .badge-closed{ background: rgba(110,118,129,.12); color: var(--text-muted); }
+body[data-page="forensics"] .badge-critical{ background: rgba(248,81,73,.12); color: var(--danger); }
+body[data-page="forensics"] .badge-high{ background: rgba(240,136,62,.12); color: var(--neon-orange); }
+body[data-page="forensics"] .badge-medium{ background: rgba(240,192,0,.12); color: var(--warning); }
+body[data-page="forensics"] .badge-low{ background: rgba(139,148,158,.12); color: #8b949e; }
+
+/* ── SLA ────────────────────────────────────────────────── */
+body[data-page="forensics"] .sla-badge{ display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: .7rem; font-weight: 600; }
+body[data-page="forensics"] .sla-met{ background: rgba(63,185,80,.12); color: var(--success); }
+body[data-page="forensics"] .sla-on-track{ background: rgba(63,185,80,.12); color: var(--success); }
+body[data-page="forensics"] .sla-at-risk{ background: rgba(240,192,0,.12); color: var(--warning); }
+body[data-page="forensics"] .sla-breached{ background: rgba(248,81,73,.12); color: var(--danger); }
+body[data-page="forensics"] .sla-breached-met{ background: rgba(240,136,62,.12); color: var(--neon-orange); }
+
+/* ── Timeline ───────────────────────────────────────────── */
+body[data-page="forensics"] .tl-entry{ padding: 10px 12px; margin-bottom: 8px; background: var(--bg-secondary); border-radius: var(--radius); border: 1px solid var(--ion-border); }
+body[data-page="forensics"] .tl-entry.status_change{ }
+body[data-page="forensics"] .tl-entry.evidence_added{ }
+body[data-page="forensics"] .tl-entry.custody_change{ }
+body[data-page="forensics"] .tl-meta{ font-size: .75rem; color: var(--text-secondary); margin-bottom: 4px; }
+body[data-page="forensics"] .tl-content{ font-size: .85rem; }
+
+/* ── Evidence card ──────────────────────────────────────── */
+body[data-page="forensics"] .ev-card{ background: var(--bg-secondary); border: 1px solid var(--ion-border); border-radius: var(--ion-radius-lg); padding: 12px; margin-bottom: 8px; }
+body[data-page="forensics"] .ev-card-header{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+body[data-page="forensics"] .ev-card-hash{ font-family: monospace; font-size: .75rem; color: var(--text-secondary); word-break: break-all; }
+
+/* ── Playbook step builder ──────────────────────────────── */
+body[data-page="forensics"] .pb-step-row{ display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; padding: 8px; background: var(--bg-secondary); border-radius: var(--radius); }
+body[data-page="forensics"] .pb-step-row input, body[data-page="forensics"] .pb-step-row textarea{ flex: 1; }
+body[data-page="forensics"] .pb-step-num{ min-width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: var(--accent, var(--primary)); color: #000; border-radius: 50%; font-weight: 700; font-size: .8rem; flex-shrink: 0; }
+
+/* ── Section Cards (fillable investigation steps) ────────── */
+body[data-page="forensics"] .section-card{
+    background: var(--bg-secondary);
+    border: 1px solid var(--ion-border);
+    border-radius: 10px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    transition: border-color .15s;
+}
+body[data-page="forensics"] .section-card.completed{ border-color: var(--success); }
+body[data-page="forensics"] .section-card-header{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    cursor: pointer;
+    user-select: none;
+}
+body[data-page="forensics"] .section-card-header:hover{ background: var(--primary-dim); }
+body[data-page="forensics"] .section-num{
+    min-width: 30px; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; font-weight: 700; font-size: .8rem; flex-shrink: 0;
+    background: var(--ion-border); color: var(--text-primary);
+}
+body[data-page="forensics"] .section-card.completed .section-num{ background: var(--success); color: #000; }
+body[data-page="forensics"] .section-card-title{ flex: 1; font-weight: 600; font-size: .9rem; }
+body[data-page="forensics"] .section-card-title small{ font-weight: 400; color: var(--text-secondary); font-size: .8rem; display: block; margin-top: 2px; }
+body[data-page="forensics"] .section-card-status{ font-size: .75rem; font-weight: 600; padding: 2px 10px; border-radius: 10px; }
+body[data-page="forensics"] .section-card-status.done{ background: rgba(63,185,80,.12); color: var(--success); }
+body[data-page="forensics"] .section-card-status.pending{ background: rgba(139,148,158,.12); color: #8b949e; }
+body[data-page="forensics"] .section-card-status.required{ background: rgba(240,192,0,.12); color: var(--warning); }
+body[data-page="forensics"] .section-card-body{
+    display: none;
+    padding: 0 16px 16px;
+}
+body[data-page="forensics"] .section-card.open .section-card-body{ display: block; }
+body[data-page="forensics"] .section-guidance{
+    background: var(--bg-secondary);
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    font-size: .8rem;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+    line-height: 1.5;
+}
+body[data-page="forensics"] .section-card-actions{
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    align-items: center;
+}
+
+/* ── Structured Fields ───────────────────────────────── */
+body[data-page="forensics"] .sf-fields{ display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px 16px; }
+body[data-page="forensics"] .sf-group{ display: flex; flex-direction: column; gap: 4px; }
+body[data-page="forensics"] .sf-label{ font-size: .78rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .3px; }
+body[data-page="forensics"] .sf-input{ font-size: .85rem !important; padding: 6px 10px !important; }
+body[data-page="forensics"] .sf-check-row{ flex-direction: row; align-items: center; gap: 6px; }
+body[data-page="forensics"] .sf-check-row input[type="checkbox"]{ width: 16px; height: 16px; }
+body[data-page="forensics"] .sf-list{ display: flex; flex-direction: column; gap: 4px; }
+body[data-page="forensics"] .sf-list-row{ display: flex; gap: 6px; align-items: center; }
+body[data-page="forensics"] .sf-list-row input{ flex: 1; }
+body[data-page="forensics"] .sf-list-remove{ background: none; border: none; color: var(--danger); cursor: pointer; font-size: 18px; padding: 0 4px; line-height: 1; }
+body[data-page="forensics"] .sf-list-remove:hover{ color: var(--danger); }
+body[data-page="forensics"] .sf-table-wrap{ width: 100%; }
+body[data-page="forensics"] .sf-table{ width: 100%; border-collapse: collapse; font-size: .82rem; }
+body[data-page="forensics"] .sf-table th{ text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--ion-border); font-weight: 600; color: var(--text-secondary); font-size: .75rem; text-transform: uppercase; }
+body[data-page="forensics"] .sf-table td{ padding: 3px 4px; }
+body[data-page="forensics"] .sf-table td input{ width: 100%; font-size: .82rem; }
+body[data-page="forensics"] .sf-notes-group{ grid-column: 1 / -1; }
+
+/* ── IOC Extraction ──────────────────────────────── */
+body[data-page="forensics"] .ioc-upload-area{ border: 2px dashed var(--ion-border); border-radius: 10px; padding: 24px; text-align: center; cursor: pointer; transition: border-color .2s, background .2s; }
+body[data-page="forensics"] .ioc-upload-area:hover, body[data-page="forensics"] .ioc-upload-area.dragover{ border-color: var(--accent, var(--primary)); background: rgba(0,229,255,.05); }
+body[data-page="forensics"] .ioc-category{ margin-bottom: 12px; }
+body[data-page="forensics"] .ioc-category-header{ display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--ion-border); margin-bottom: 6px; cursor: pointer; }
+body[data-page="forensics"] .ioc-category-title{ font-weight: 700; font-size: .85rem; text-transform: uppercase; letter-spacing: .3px; }
+body[data-page="forensics"] .ioc-category-count{ font-size: .75rem; color: var(--text-secondary); }
+body[data-page="forensics"] .ioc-items{ display: flex; flex-wrap: wrap; gap: 6px; }
+body[data-page="forensics"] .ioc-chip{ display: inline-flex; align-items: center; gap: 4px; background: var(--bg-secondary); border: 1px solid var(--ion-border); border-radius: var(--radius); padding: 3px 10px; font-size: .82rem; font-family: monospace; cursor: pointer; transition: border-color .15s; }
+body[data-page="forensics"] .ioc-chip:hover{ border-color: var(--accent, var(--primary)); }
+body[data-page="forensics"] .ioc-chip.selected{ border-color: var(--success); background: rgba(63,185,80,.12); }
+body[data-page="forensics"] .ioc-chip input[type="checkbox"]{ width: 14px; height: 14px; margin: 0; }
+body[data-page="forensics"] .btn-extract-ioc{ padding: 4px 10px; font-size: .75rem; background: var(--bg-secondary); border: 1px solid var(--ion-border); color: var(--text-secondary); border-radius: var(--radius); cursor: pointer; white-space: nowrap; }
+body[data-page="forensics"] .btn-extract-ioc:hover{ border-color: var(--accent, var(--primary)); color: var(--accent, var(--primary)); }
+
+/* ── Reference Docs Grid ───────────────────────────────── */
+body[data-page="forensics"] .fr-ref-grid{ display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; width: 100%; }
+body[data-page="forensics"] .fr-ref-card{ background: var(--bg-secondary); border: 1px solid var(--ion-border); border-radius: 10px; padding: 20px; cursor: pointer; transition: border-color .15s, transform .15s; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+body[data-page="forensics"] .fr-ref-card:hover{ border-color: var(--accent, var(--primary)); transform: translateY(-2px); }
+body[data-page="forensics"] .fr-ref-category{ font-size: .7rem; text-transform: uppercase; letter-spacing: .5px; color: var(--accent, var(--primary)); font-weight: 700; margin-bottom: 6px; }
+body[data-page="forensics"] .fr-ref-title{ font-size: 1rem; font-weight: 700; margin-bottom: 8px; }
+body[data-page="forensics"] .fr-ref-preview{ font-size: .8rem; color: var(--text-secondary); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+body[data-page="forensics"] .ref-doc-body{ line-height: 1.7; font-size: .9rem; }
+body[data-page="forensics"] .ref-doc-body h2{ margin-top: 20px; margin-bottom: 8px; color: var(--accent, var(--primary)); }
+body[data-page="forensics"] .ref-doc-body h3{ margin-top: 16px; margin-bottom: 6px; }
+body[data-page="forensics"] .ref-doc-body code{ background: var(--bg-secondary); padding: 2px 6px; border-radius: 4px; font-size: .85rem; }
+body[data-page="forensics"] .ref-doc-body pre{ background: var(--bg-secondary); padding: 12px; border-radius: var(--ion-radius-lg); overflow-x: auto; margin: 8px 0; }
+body[data-page="forensics"] .ref-doc-body pre code{ padding: 0; background: none; }
+body[data-page="forensics"] .ref-doc-body table{ width: 100%; border-collapse: collapse; margin: 8px 0; }
+body[data-page="forensics"] .ref-doc-body th, body[data-page="forensics"] .ref-doc-body td{ padding: 6px 10px; border: 1px solid var(--ion-border); font-size: .85rem; }
+body[data-page="forensics"] .ref-doc-body th{ background: var(--bg-secondary); }
+body[data-page="forensics"] .ref-doc-body ul, body[data-page="forensics"] .ref-doc-body ol{ padding-left: 20px; }
+body[data-page="forensics"] .ref-doc-body li{ margin-bottom: 4px; }
+
+/* ── Responsive ─────────────────────────────────────────── */
+@media (max-width: 1200px) {
+    body[data-page="forensics"] .fr-tiles{ grid-template-columns: repeat(3, 1fr); }
+    body[data-page="forensics"] .fr-pipeline{ grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 768px) {
+    body[data-page="forensics"] .fr-tiles{ grid-template-columns: repeat(2, 1fr); }
+    body[data-page="forensics"] .fr-pipeline{ grid-template-columns: 1fr; }
+    body[data-page="forensics"] .cases-filters-bar{ flex-direction: column; }
+    body[data-page="forensics"] .modal-dialog{ width: 95%; }
+}
+
+body[data-page="forensics"] .ion-fragment-loading, body[data-page="forensics"] .ion-fragment-message{text-align:center;padding:2rem;color:var(--text-secondary);}
+body[data-page="forensics"] .forensic-toast { position: fixed; bottom: 1.5rem; right: 1.5rem; padding: .75rem 1rem; border-radius: .5rem; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--ion-border); z-index: 10000; }
+body[data-page="forensics"] .forensic-toast-error { color: var(--danger); }
+body[data-page="forensics"] .forensic-annotation { white-space: pre-wrap; overflow-wrap: anywhere; }
+body[data-page="forensics"] .forensic-reference-content { white-space: pre-wrap; overflow-wrap: anywhere; }
+body[data-page="forensics"] .sla-unknown { color: var(--text-secondary); }
+body[data-page="forensics"] .forensic-progress { display: block; width: 100%; height: 6px; margin-top: 6px; border: 0; border-radius: 3px; overflow: hidden; appearance: none; background: var(--bg-secondary); color: var(--primary); }
+body[data-page="forensics"] .forensic-progress::-webkit-progress-bar { background: var(--bg-secondary); }
+body[data-page="forensics"] .forensic-progress::-webkit-progress-value { background: var(--primary); }
+body[data-page="forensics"] .forensic-progress::-moz-progress-bar { background: var(--primary); }
+
+/* ── Playbook step preview ──────────────────────────────────
+ *
+ * These rules are _ion-s-5eaab7cb30, which the conversion dropped. The
+ * preview rows had no rule in any sheet afterwards, so they rendered as
+ * bare text with no container: the hashed class carried the padding, the
+ * tinted background and the rounded corners that separated one step from
+ * the next.
+ *
+ * tools/hashed_class_map.json marks that entry `manual` because its
+ * generator could not express `background:var(--bg-secondary,#0d1117)` as
+ * a utility. The declarations are here instead, which is where a page's
+ * own colours belong.
+ *
+ * The original was a flex ROW, with a number badge beside a column of
+ * title and description. The template clone puts the title and the
+ * description in sequence, so this is a column: same container, arranged
+ * for the markup that now fills it.
+ */
+body[data-page="forensics"] .pb-preview-step {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 6px;
+    padding: 8px;
+    background: var(--bg-secondary);
+    border-radius: 6px;
+}
+
+body[data-page="forensics"] .pb-preview-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
+}
+
+/* Was text-[#f0c000] inside a JS template string. */
+body[data-page="forensics"] .pb-preview-req {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #f0c000;
+}
+
+body[data-page="forensics"] .pb-preview-fields {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+body[data-page="forensics"] .pb-preview-desc {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}

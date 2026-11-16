@@ -168,7 +168,8 @@ class CyabDataSource(Base):
     field_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Use case coverage
-    use_case_status: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    # A JSON object keyed by use case id. Text, because String(64) held two.
+    use_case_status: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     use_case_review_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     use_case_gaps: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     use_case_remediation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -179,14 +180,11 @@ class CyabDataSource(Base):
     # ES alert mapping (data_stream.namespace value for this system)
     data_namespace: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
 
-    # Onboarding Studio sub-profile tag, retained as a plain label. The
-    # cyab_subprofiles catalogue it referenced was archived with the CyAB
-    # workbench, so the foreign key is gone; the column keeps whatever
-    # values existing rows hold. The migration in storage/database.py only
-    # ever added it as a bare VARCHAR(64) anyway, so dropping the constraint
-    # makes the model match the schema that is actually deployed.
+    # Onboarding Studio sub-profile tag. Nullable so legacy
+    # rows stay valid until backfilled. The catalogue lives in
+    # cyab_subprofiles (see ion.models.cyab_subprofile).
     subprofile_id: Mapped[Optional[str]] = mapped_column(
-        String(64), nullable=True
+        String(64), ForeignKey("cyab_subprofiles.id"), nullable=True
     )
 
     created_at: Mapped[datetime] = mapped_column(

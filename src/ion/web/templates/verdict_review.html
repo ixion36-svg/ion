@@ -11,12 +11,36 @@
       <span class="h-1.5 w-1.5 rounded-full bg-primary pulse-cyan"></span>
       <span class="label-tiny text-primary">Human-in-the-loop</span>
     </div>
-    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Verdict Review</h1>
-    <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Review Bob's suggested verdicts and record your decision. Your call stamps the AI-feedback ledger.</p>
+    <div class="flex flex-wrap items-end justify-between gap-6">
+      <div class="basis-full md:basis-auto md:flex-1">
+        <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Verdict Review</h1>
+        <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Review Bob's suggested verdicts and record your decision. Your call stamps the AI-feedback ledger.</p>
+      </div>
+      {# Outside #vr-content deliberately. Inside it, a render that says the
+         read failed would take the Refresh button away with it and leave a
+         page reload as the only way to retry. It is the same hx-get the
+         container fires on load, so "what refresh does" has one
+         definition. #}
+      <button class="btn btn-ghost btn-sm"
+              hx-get="/ui/verdict-review"
+              hx-target="#vr-content"
+              hx-swap="innerHTML">Refresh</button>
+    </div>
   </section>
 
-  <div id="vr-metrics" class="mb-6"></div>
-  <div id="vr-list">
+  {# The metrics strip and the queue are rendered whole by
+     ion.web.ui.verdict_review.verdict_review_fragment. They used to be two
+     fetches building five innerHTML sites, including the containment
+     proposals and a hand-rolled esc(), none of which a stylesheet sweep
+     could reach.
+
+     hx-trigger="load" keeps this shell's first paint immediate and the data
+     arriving in its own request, which is what the fetches it replaces
+     already did. #}
+  <div id="vr-content"
+       hx-get="/ui/verdict-review"
+       hx-trigger="load"
+       hx-swap="innerHTML">
     <div class="flex justify-center items-center gap-2 py-14 text-center text-base-content/50">
       <span class="loading loading-spinner loading-sm text-primary"></span> Loading…
     </div>
@@ -26,176 +50,67 @@
 </div>
 
 <script nonce="{{ csp_nonce }}">
-(function () {
-  const VALID = ["true_positive", "false_positive", "benign_true_positive", "inconclusive"];
-  const VERDICT_BADGE = {
-    true_positive: "badge-error",
-    false_positive: "badge-info",
-    benign_true_positive: "badge-success",
-    inconclusive: "badge-warning"
-  };
-  const PRI_BADGE = {
-    critical: "badge-error",
-    high: "badge-warning",
-    medium: "badge-info",
-    low: "badge-success"
-  };
-  function esc(s) { const d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
-  function card(label, val, valueCls) {
-    return '<div class="stat">'
-      + '<div class="stat-title">' + esc(label) + '</div>'
-      + '<div class="stat-value' + (valueCls ? ' ' + valueCls : '') + '">' + esc(val) + '</div></div>';
-  }
+// esc(), card(), containmentHtml(), loadMetrics(), loadQueue() and the
+// VERDICT_BADGE / PRI_BADGE / APPLIES / VALID tables are gone with the
+// markup they served. Jinja autoescapes, and the server decides which
+// verdicts exist and which response actions apply to an observable, so the
+// page no longer carries a second copy of either.
+//
+// Both buttons are server-rendered, so they are wired through the delegated
+// listener in static/js/event-delegation.js rather than re-bound after
+// every render. There is no error handler here either:
+// static/js/htmx-errors.js owns what a failed fragment request means.
 
-  // ── Phase 3 connect: propose containment from a verdict card ──
-  // Observable type → applicable response action_types (mirrors DEFAULT_ACTIONS).
-  const APPLIES = {
-    ip: ['block_ip'], ipv4: ['block_ip'], ipv6: ['block_ip'],
-    domain: ['block_domain'], url: ['block_domain'],
-    user: ['disable_account', 'reset_password'], username: ['disable_account', 'reset_password'],
-    host: ['quarantine_host'], hostname: ['quarantine_host'], email: ['block_sender']
-  };
-  // Server-rendered: response actions are opt-in and /api/response/actions
-  // deliberately 404s when off. Gate the probe so a disabled deploy makes no
-  // failing request (no console 404) rather than fetching and swallowing it.
-  const RESPONSE_ACTIONS_ENABLED = {{ response_actions_enabled|tojson }};
-  let responseByType = null;  // null = not yet fetched; {} = disabled/empty
-  async function loadCatalog() {
-    if (responseByType !== null) return;
-    responseByType = {};
-    if (!RESPONSE_ACTIONS_ENABLED) return;  // feature off → no probe
-    try {
-      const r = await fetch('/api/response/actions');
-      if (!r.ok) return;  // safety net if it flips off between render and fetch
-      const acts = (await r.json()).actions || [];
-      const m = {}; acts.forEach(function (a) { m[a.action_type] = a; });
-      responseByType = m;
-    } catch (e) { /* stays {} */ }
-  }
-  function containmentHtml(v) {
-    if (!responseByType || !Object.keys(responseByType).length) return '';
-    const seen = {}; let rows = '';
-    (v.observables || []).forEach(function (o) {
-      const t = (o && o.type || '').toLowerCase(); const val = o && o.value;
-      if (!t || !val) return;
-      const key = t + '|' + val; if (seen[key]) return; seen[key] = 1;
-      const acts = (APPLIES[t] || []).map(function (x) { return responseByType[x]; }).filter(Boolean);
-      if (!acts.length) return;
-      rows += '<div class="flex flex-wrap gap-2 items-center mt-1">'
-        + '<code class="text-xs text-base-content/50">' + esc(o.type) + '</code> '
-        + '<span class="text-xs font-mono">' + esc(val) + '</span> ';
-      acts.forEach(function (a) {
-        rows += '<button data-act="' + a.id + '" data-target="' + esc(String(val)) + '" '
-          + 'class="vr-propose btn btn-xs btn-warning btn-outline">'
-          + esc(a.name) + (a.requires_approval ? ' ⚠' : '') + '</button>';
-      });
-      rows += '</div>';
-    });
-    if (!rows) return '';
-    return '<div class="mt-4 pt-4 border-t border-base-300">'
-      + '<div class="text-xs uppercase tracking-wide text-base-content/50 mb-2">Propose containment</div>' + rows + '</div>';
-  }
-  async function proposeAction(btn) {
-    btn.disabled = true;
-    try {
-      const r = await fetch('/api/response/actions/request', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action_id: parseInt(btn.dataset.act, 10), target: btn.dataset.target })
-      });
-      if (!r.ok) {
-        const d = await r.json().catch(function () { return {}; });
-        window.alert('Propose failed: ' + (d.detail || r.status)); btn.disabled = false; return;
-      }
-      btn.textContent = '✓ proposed';
-      btn.classList.remove('btn-warning');
-      btn.classList.add('btn-success');
-    } catch (e) { window.alert('Propose failed: ' + e.message); btn.disabled = false; }
-  }
+// Re-request metrics and queue together. Resolving a verdict changes both
+// the card list and the agreement rate, so one definition of "what the page
+// shows now" is cheaper than two patches that can disagree.
+function refreshVerdictReview() {
+  return htmx.ajax('GET', '/ui/verdict-review',
+                   { target: '#vr-content', swap: 'innerHTML' });
+}
 
-  async function loadMetrics() {
-    try {
-      const r = await fetch('/api/verdict-review/metrics');
-      if (!r.ok) return;
-      const m = await r.json();
-      document.getElementById('vr-metrics').innerHTML =
-        '<div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow">'
-        + card('Pending', m.pending, 'text-warning')
-        + card('Reviewed', m.reviewed, 'text-primary')
-        + card('Agreement', m.agreement_rate == null ? '—' : (Math.round(m.agreement_rate * 100) + '%'), 'text-success')
-        + '</div>';
-    } catch (e) { /* metrics are best-effort */ }
-  }
-  function emptyState() {
-    document.getElementById('vr-list').innerHTML =
-      '<div role="alert" class="alert alert-info">No verdicts awaiting review.</div>';
-  }
-  async function loadQueue() {
-    await loadCatalog();
-    const el = document.getElementById('vr-list');
-    let rows;
-    try {
-      const r = await fetch('/api/verdict-review/pending');
-      if (!r.ok) { el.innerHTML = '<div role="alert" class="alert alert-warning">Could not load the queue (' + r.status + ').</div>'; return; }
-      rows = (await r.json()).pending || [];
-    } catch (e) { el.innerHTML = '<div role="alert" class="alert alert-warning">Could not load the queue.</div>'; return; }
-    if (!rows.length) { emptyState(); return; }
-    el.innerHTML = rows.map(function (v) {
-      const bobRaw = v.bob_verdict ? v.bob_verdict.replace(/_/g, ' ') : 'escalated (low confidence)';
-      const bob = esc(bobRaw);
-      const bobKind = VERDICT_BADGE[v.bob_verdict] || 'badge-warning';
-      const conf = v.bob_confidence ? ' <span class="badge badge-ghost badge-sm">' + esc(v.bob_confidence) + '</span>' : '';
-      const pri = (v.priority || '').toLowerCase();
-      const priHtml = v.priority
-        ? ' <span class="badge badge-sm ' + (PRI_BADGE[pri] || 'badge-ghost') + '">' + esc(v.priority) + '</span>'
-        : '';
-      const btns = VALID.map(function (hv) {
-        const agree = v.bob_verdict === hv;
-        return '<button data-fb="' + v.id + '" data-hv="' + hv + '" class="vr-resolve btn btn-sm '
-          + (agree ? 'btn-success' : 'btn-ghost')
-          + '">' + esc(hv.replace(/_/g, ' ')) + '</button>';
-      }).join(' ');
-      return '<div class="vr-card card bg-base-200 shadow mb-3" data-card="' + v.id + '">'
-        + '<div class="card-body">'
-        + '<div class="flex flex-wrap items-start justify-between gap-3">'
-        +   '<div class="basis-full md:basis-auto md:flex-1">'
-        +     '<div class="font-semibold">' + esc(v.rule_name || '(unnamed rule)') + '</div>'
-        +     '<div class="text-xs text-base-content/50 font-mono mt-1">alert ' + esc(v.alert_id || '?')
-        +        priHtml + '</div></div>'
-        +   '<div class="text-sm flex flex-wrap items-center gap-2">'
-        +      '<span class="text-base-content/50">Bob:</span> '
-        +      '<span class="badge ' + bobKind + '">' + bob + '</span>' + conf + '</div>'
-        + '</div>'
-        + '<div class="flex flex-wrap gap-2 items-center mt-3"><span class="text-xs text-base-content/50 mr-1">Your verdict:</span>'
-        + btns + '</div>'
-        + containmentHtml(v)
-        + '</div></div>';
-    }).join('');
-    document.querySelectorAll('.vr-resolve').forEach(function (b) {
-      b.addEventListener('click', function () { resolveVerdict(b.dataset.fb, b.dataset.hv); });
+// Still a mutation, and still a fetch. What changed is the aftermath: it
+// used to remove the card, call loadMetrics() and re-run the empty-state
+// check by counting .vr-card nodes, which was a third place that decided
+// what an empty queue looks like.
+async function resolveVerdict(fbId, hv) {
+  try {
+    const r = await fetch('/api/verdict-review/' + fbId + '/resolve', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ human_verdict: hv })
     });
-    document.querySelectorAll('.vr-propose').forEach(function (b) {
-      b.addEventListener('click', function () { proposeAction(b); });
+    if (!r.ok) {
+      const d = await r.json().catch(function () { return {}; });
+      window.alert('Failed: ' + (d.detail || r.status));
+      return;
+    }
+    refreshVerdictReview();
+  } catch (e) { window.alert('Failed: ' + e.message); }
+}
+
+// Unchanged in substance: propose containment for one observable. The
+// button it reports into is the one that was clicked, so this sets
+// textContent and classes rather than rebuilding anything.
+async function proposeAction(event, dataset) {
+  const btn = this;
+  btn.disabled = true;
+  try {
+    const r = await fetch('/api/response/actions/request', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action_id: parseInt(dataset.act, 10), target: dataset.target })
     });
-  }
-  async function resolveVerdict(fbId, hv) {
-    try {
-      const r = await fetch('/api/verdict-review/' + fbId + '/resolve', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ human_verdict: hv })
-      });
-      if (!r.ok) {
-        const d = await r.json().catch(function () { return {}; });
-        window.alert('Failed: ' + (d.detail || r.status));
-        return;
-      }
-      const card = document.querySelector('[data-card="' + fbId + '"]');
-      if (card) card.remove();
-      loadMetrics();
-      if (!document.querySelector('.vr-card')) emptyState();
-    } catch (e) { window.alert('Failed: ' + e.message); }
-  }
-  loadMetrics();
-  loadQueue();
-})();
+    if (!r.ok) {
+      const d = await r.json().catch(function () { return {}; });
+      window.alert('Propose failed: ' + (d.detail || r.status));
+      btn.disabled = false;
+      return;
+    }
+    btn.textContent = '✓ proposed';
+    btn.classList.remove('btn-warning');
+    btn.classList.add('btn-success');
+  } catch (e) { window.alert('Propose failed: ' + e.message); btn.disabled = false; }
+}
 </script>
 {% endblock %}

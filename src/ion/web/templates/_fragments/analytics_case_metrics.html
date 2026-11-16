@@ -1,0 +1,72 @@
+{% import '_fragments/analytics_state.html' as st %}
+{% import '_fragments/analytics_spark.html' as sp %}
+{# Case metrics, from ui/analytics.py's case_metrics_view.
+
+   The four cards at the top were `r.total_cases || 0`, `r.open_cases || 0`
+   and `r.closed_cases || 0`: three confident zeros for figures the job did
+   not record, on the numbers an analyst reads first. Only mttr_hours was
+   guarded, with `!= null`.
+
+   The two chart colours were text-[#eab308] and text-[#22c55e], arbitrary
+   Tailwind values inside a JavaScript template string.
+#}
+{% if job.state != 'ok' %}
+{{ st.job_notice(job) }}
+{% else %}
+<div class="metrics-grid">
+  <div class="metric-card">
+    <div class="metric-value">
+      {{- mttr_hours if mttr_hours is not none else '-' -}}
+    </div>
+    <div class="metric-label">MTTR (hours)</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-value">
+      {%- if total_cases is not none %}{{ total_cases }}
+      {%- else %}<span class="an-absent" title="This job recorded no total"></span>{% endif %}
+    </div>
+    <div class="metric-label">Total Cases (30d)</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-value an-open-cases">
+      {%- if open_cases is not none %}{{ open_cases }}
+      {%- else %}<span class="an-absent" title="This job recorded no open count"></span>{% endif %}
+    </div>
+    <div class="metric-label">Open</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-value an-closed-cases">
+      {%- if closed_cases is not none %}{{ closed_cases }}
+      {%- else %}<span class="an-absent" title="This job recorded no closed count"></span>{% endif %}
+    </div>
+    <div class="metric-label">Closed</div>
+  </div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+  {{ sp.sparkline(trend, 'Cases Created / Day') }}
+  {{ sp.share_bars(closure_reasons, 'Closure Reasons', 'cl-') }}
+</div>
+{#- Cases by Severity. `data.open || 0` printed a zero for each figure the
+    job did not record, and the sort used indexOf on a fixed list, so a
+    severity outside it came back -1 and sorted above critical. -#}
+{% if by_severity is none %}
+{{ st.unreadable_list('severity figures') }}
+{% elif by_severity %}
+<div class="mt-4">
+  <h3 class="an-breakdown-title">Cases by Severity</h3>
+  <table class="analytics-table">
+    <thead><tr><th>Severity</th><th>Open</th><th>Closed</th><th>Total</th></tr></thead>
+    <tbody>
+      {%- for s in by_severity %}
+      <tr>
+        <td><span class="severity-badge severity-{{ s.key }}">{{ s.label }}</span></td>
+        <td>{% if s.open is not none %}{{ s.open }}{% else %}<span class="an-absent" title="Not recorded"></span>{% endif %}</td>
+        <td>{% if s.closed is not none %}{{ s.closed }}{% else %}<span class="an-absent" title="Not recorded"></span>{% endif %}</td>
+        <td class="font-semibold">{% if s.total is not none %}{{ s.total }}{% else %}<span class="an-absent" title="Not recorded"></span>{% endif %}</td>
+      </tr>
+      {%- endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endif %}

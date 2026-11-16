@@ -1,0 +1,9 @@
+{% macro folders(tree, selected='', depth=0, manage=false, can={}) %}
+{% for f in tree %}<div{% if depth > 0 %} class="{{ 'folder-manage-children' if manage else 'folder-children' }}"{% endif %} data-folder-depth="{{ depth }}">
+{% if manage %}<div class="folder-manage-item"><div class="folder-manage-info"><span>{{ f.name }}</span><span class="folder-manage-counts">{{ f.template_count if f.get('template_count') is not none else 'Unknown' }} templates, {{ f.document_count if f.get('document_count') is not none else 'Unknown' }} docs</span></div><div>
+{% if can.rename_collection %}<button class="btn btn-sm" data-click-action="renameFolder" data-args="{{ [f.id, f.name]|tojson|forceescape }}">Rename</button>{% endif %}
+{% if can.delete_collection %}<button class="btn btn-sm btn-error" data-click-action="deleteFolder" data-args="{{ [f.id, f.name, f.get('template_count')]|tojson|forceescape }}">Delete</button>{% endif %}</div></div>
+{% else %}<button class="folder-item w-full{% if selected|string == f.id|string %} active{% endif %}" data-folder="{{ f.id }}"><span class="folder-icon"><i class="icon-folder"></i></span><span class="folder-name">{{ f.name }}</span><span class="folder-manage-counts">({{ f.template_count if f.get('template_count') is not none else 'Unknown' }})</span></button>{% endif %}
+{% if f.children %}{{ folders(f.children, selected, depth+1, manage, can) }}{% endif %}</div>{% endfor %}
+{% endmacro %}
+{% macro options(tree, selected='', prefix='') %}{% for f in tree %}<option value="{{ f.id }}"{% if selected|string == f.id|string %} selected{% endif %}>{{ prefix }}{{ f.name }}</option>{% if f.children %}{{ options(f.children, selected, prefix ~ '› ') }}{% endif %}{% endfor %}{% endmacro %}

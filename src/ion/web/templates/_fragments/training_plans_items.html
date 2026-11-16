@@ -1,0 +1,17 @@
+{% if state == 'failed' %}
+<div class="tp-empty" role="alert">Failed to load training plan items.</div>
+{% elif state == 'empty' %}
+<div class="tp-empty">No certifications added yet. Browse Career Pathways and add certifications to this plan.</div>
+{% else %}
+{% for item in items %}
+<div class="tp-item{% if item.get('status') in ['completed', 'skipped'] %} completed{% endif %}" data-item-id="{{ item.get('id', '') }}">
+    {% if item.get('id') is not none %}<div class="tp-item-check{% if item.get('status') == 'completed' %} checked{% endif %}" data-click-action="tpToggleComplete" data-args='{{ [plan_id, item.get("id"), item.get("status")] | tojson }}' title="Toggle complete"></div>{% endif %}
+    <div class="tp-item-info"><div class="tp-item-name">{{ item.get('cert_name') or 'Unknown' }}</div><div class="tp-item-provider">{{ item.get('provider') or 'Unknown' }}</div></div>
+    <span class="tp-item-price">{% if item.get('price') is not none %}~£{{ '{:,.0f}'.format(item.price) }}{% else %}Unknown{% endif %}</span>
+    <span class="tp-item-difficulty {{ item.get('difficulty') or '' }}">{{ item.get('difficulty') or 'Unknown' }}</span>
+    <span class="tp-item-funding {{ item.get('funding_type') or '' }}" {% if item.get('id') is not none %}data-click-action="tpCycleFunding" data-args='{{ ["$event", plan_id, item.get("id"), item.get("funding_type")] | tojson }}'{% endif %} title="Click to change">{{ {'company':'Company','self':'Self','split':'Split','tbd':'TBD'}.get(item.get('funding_type'), item.get('funding_type') or 'Unknown') }}</span>
+    <span class="tp-item-status {{ item.get('status') or '' }}" {% if item.get('id') is not none %}data-click-action="tpCycleStatus" data-args='{{ ["$event", plan_id, item.get("id"), item.get("status")] | tojson }}'{% endif %} title="Click to change">{{ {'planned':'Planned','in_progress':'In Progress','completed':'Completed','skipped':'Skipped'}.get(item.get('status'), item.get('status') or 'Unknown') }}</span>
+    {% if item.get('id') is not none %}<div class="tp-item-actions"><button data-click-action="tpRemoveItem" data-args='{{ [plan_id, item.id] | tojson }}' title="Remove"><i class="icon-x"></i></button></div>{% endif %}
+</div>
+{% endfor %}
+{% endif %}

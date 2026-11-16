@@ -1,0 +1,39 @@
+{# The discover time histogram, from ui/discover.py's histogram_view.
+
+   The bar titles are the reason this moved. The page interpolated an
+   Elasticsearch timestamp into `title="${b.timestamp}: ..."` with no
+   escaping, which is the kind of place that stops being safe quietly: the
+   same pattern one field along is a broken attribute.
+
+   The height stays a data-ion-style attribute, because it genuinely varies
+   per bar and that is what the hook is for.
+
+   The total is swapped out of band: it lives in the panel header, not in
+   the chart.
+#}
+<span id="histogram-total" hx-swap-oob="innerHTML:#histogram-total">
+  {%- if total is not none %}{{ total }} total events
+  {%- elif state == 'data' or state == 'empty' %}total unknown
+  {%- endif %}
+</span>
+{% if state == 'unconfigured' %}
+<div class="empty-state">{{ detail or 'Elasticsearch is not configured.' }}</div>
+{% elif state == 'refused' %}
+<div class="empty-state">That index pattern is not one this deployment allows.</div>
+{% elif state == 'failed' %}
+<div class="empty-state">The histogram could not be drawn{% if detail %}. {{ detail }}{% endif %}</div>
+{% elif state == 'empty' %}
+<div class="empty-state">No data for histogram</div>
+{% else %}
+{%- for bar in bars %}
+{%- if bar.height is not none %}
+<div class="histogram-bar" data-ion-style="height: {{ bar.height }}%"
+     title="{{ bar.when or 'undated' }}: {{ bar.count }} events"></div>
+{%- else %}
+{#- A bucket whose count we could not read. Drawn as unmeasured rather
+    than as a zero-height bar, which looks like a quiet hour. -#}
+<div class="histogram-bar dsc-bar-unmeasured"
+     title="{{ bar.when or 'undated' }}: this bucket arrived without a readable count"></div>
+{%- endif %}
+{%- endfor %}
+{% endif %}

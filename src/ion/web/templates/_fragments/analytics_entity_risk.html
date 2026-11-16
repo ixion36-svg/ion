@@ -1,0 +1,52 @@
+{% import '_fragments/analytics_state.html' as st %}
+{# Entity risk, from ui/analytics.py's risk_view.
+
+   `e.risk_score >= 100 ? 'critical' : ... : 'low'` falls through every
+   comparison for a missing score, so an entity the job scored no risk for
+   was drawn as low risk. It has its own band here.
+
+   The scale was `entities[0]?.risk_score || 1`, taken from the first row,
+   so a first row without a score rescaled every bar on the chart. It is
+   the largest readable score now.
+#}
+{% if job.state != 'ok' %}
+{{ st.job_notice(job) }}
+{% elif entities is none %}
+{{ st.unreadable_list('entities') }}
+{% elif not entities %}
+<div class="empty-state">No entities with risk scores in the last 30 days</div>
+{% else %}
+<table class="analytics-table">
+  <thead><tr>
+    <th>Entity</th><th>Type</th><th>Risk Score</th><th></th>
+    <th>Alerts</th><th>Open Cases</th><th>Top Rules</th>
+  </tr></thead>
+  <tbody>
+    {%- for e in entities %}
+    <tr>
+      <td><strong>{{ e.entity or '' }}</strong></td>
+      <td><span class="entity-type-badge {{ e.kind_key }}">{{ e.kind or 'unknown' }}</span></td>
+      <td class="font-bold">
+        {%- if e.score is not none %}{{ e.score }}
+        {%- else %}<span class="an-absent" title="This entity carried no risk score"></span>{% endif %}
+      </td>
+      <td class="w-[120px]">
+        <div class="risk-bar-container">
+          {%- if e.width is not none %}
+          <div class="risk-bar {{ e.band or 'risk-unmeasured' }}"
+               data-ion-style="width: {{ e.width }}%"></div>
+          {%- endif %}
+        </div>
+      </td>
+      <td>{% if e.alerts is not none %}{{ e.alerts }}{% else %}<span class="an-absent" title="No alert count"></span>{% endif %}</td>
+      <td>{% if e.open_cases is not none %}{{ e.open_cases }}{% else %}<span class="an-absent" title="No open case count"></span>{% endif %}</td>
+      <td class="text-xs max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap"
+          {%- if e.rules %} title="{{ e.rules|join(', ') }}"{% endif %}>
+        {%- if e.rules is none %}<span class="an-absent" title="This row carried no rule list"></span>
+        {%- else %}{{ e.rules[:2]|join(', ') }}{% endif %}
+      </td>
+    </tr>
+    {%- endfor %}
+  </tbody>
+</table>
+{% endif %}

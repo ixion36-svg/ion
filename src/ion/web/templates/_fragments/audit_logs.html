@@ -1,0 +1,101 @@
+{# One page of the audit trail: the table and its pager.
+
+   Replaces five innerHTML sites in audit_logs.html, one of which was the
+   row builder and one the in-browser secret filter. The filter now runs in
+   ion.web.ui.audit_logs.visible_details, where the data is assembled,
+   rather than at render time in a browser that already holds the values.
+
+   The filter selects stay in the page rather than moving here, so a swap
+   cannot reset the viewer's filter choice, and hx-include sends their
+   current values with every request. Paging therefore keeps the filters,
+   and changing a filter resets to the first page because the select sends
+   no offset and the route defaults it to 0. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+<div class="overflow-x-auto">
+  <table class="table table-sm">
+    <thead>
+      <tr>
+        <th>Timestamp</th><th>User</th><th>Action</th>
+        <th>Resource</th><th>Details</th><th>IP Address</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if failed %}
+        <tr><td colspan="6">
+          <div role="alert" class="alert alert-error m-4">
+            The audit log could not be read. This is not an empty journal:
+            nothing can be concluded from this view about what has or has
+            not happened.
+          </div>
+        </td></tr>
+      {% elif not logs %}
+        <tr><td colspan="6" class="text-center opacity-60 py-8">
+          No audit entries match these filters.
+        </td></tr>
+      {% else %}
+        {% for log in logs %}
+          <tr>
+            <td class="font-mono text-xs">{{ ts(log.timestamp) }}</td>
+            <td>
+              {# A null username is a system action, not a missing name.
+                 Blank would read as "we lost the actor", which on an audit
+                 row is the opposite of what it means. #}
+              {% if log.username %}{{ log.username }}
+              {% else %}<em class="opacity-60">System</em>{% endif %}
+            </td>
+            <td><span class="badge badge-sm {{ log.badge }}">{{ log.action_label }}</span></td>
+            <td>
+              {% if log.resource_type %}{{ log.resource_type }}{% if log.resource_id is not none %} #{{ log.resource_id }}{% endif %}
+              {% else %}-{% endif %}
+            </td>
+            <td class="max-w-xs">
+              <div class="flex flex-wrap gap-1">
+                {# Three states, because they are three different facts. A
+                   dict renders its surviving pairs, a legacy bare string
+                   renders as itself, and nothing renders a dash. A row
+                   whose details were entirely redacted shows the dash from
+                   the empty-list branch, which is the one case this cannot
+                   distinguish from genuinely absent details. #}
+                {% if log.details is string %}
+                  <span class="badge badge-ghost badge-sm font-normal h-auto py-1 whitespace-normal">{{ log.details }}</span>
+                {% elif log.details %}
+                  {% for label, value in log.details %}
+                    <span class="badge badge-ghost badge-sm font-normal h-auto py-1 whitespace-normal"><strong>{{ label }}:</strong> {{ value }}</span>
+                  {% endfor %}
+                {% else %}-{% endif %}
+              </div>
+            </td>
+            <td class="font-mono text-xs">{{ log.ip_address or '-' }}</td>
+          </tr>
+        {% endfor %}
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+{% if not failed %}
+{# The pager is measured, not guessed. The page inferred "there is more"
+   from a full page of results, which enables Next on the last page
+   whenever the total is an exact multiple of the page size and then shows
+   the follower an empty table. The route asks for one row more than it
+   renders instead. #}
+<div class="flex flex-wrap items-center justify-center gap-3 px-4 py-3 border-t border-base-300">
+  <button class="btn btn-ghost btn-sm"
+          hx-get="/ui/audit-logs"
+          hx-vals='{"offset": {{ [offset - page_size, 0]|max }}, "page_size": {{ page_size }}}'
+          hx-include="#filter-action, #filter-resource"
+          hx-target="#logs-panel"
+          hx-swap="innerHTML"
+          {% if offset <= 0 %}disabled{% endif %}>Previous</button>
+  <span class="text-sm opacity-70">Page {{ (offset // page_size) + 1 }}</span>
+  <button class="btn btn-ghost btn-sm"
+          hx-get="/ui/audit-logs"
+          hx-vals='{"offset": {{ offset + page_size }}, "page_size": {{ page_size }}}'
+          hx-include="#filter-action, #filter-resource"
+          hx-target="#logs-panel"
+          hx-swap="innerHTML"
+          {% if not has_next %}disabled{% endif %}>Next</button>
+</div>
+{% endif %}

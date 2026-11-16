@@ -1,6 +1,29 @@
 {% extends "base.html" %}
 {% block title %}Daily Standup · ION{% endblock %}
+
+{% block head_css %}
+{# The page's own rules, lifted out of this template's inline style block.
+   See the header of ds-standup.css for the cascade check. #}
+<link rel="stylesheet" href="/static/css/ds-standup.css?v={{ ion_version }}">
+{% endblock %}
+
 {% block content %}
+{#
+  The duty check report. The shell holds no data and builds no markup: the
+  seven data-driven regions are pulled from /ui/daily-standup/* with hx-get
+  and rendered by Jinja on the server. See ion.web.ui.daily_standup for the
+  gate per region and for what the old JavaScript got wrong.
+
+  Every control that reloads a region sits outside that region's swap
+  target, so a render saying the read failed cannot also remove the button
+  that retries it. Run Checks is in the header; the regions it reloads are
+  below it and listen for its click.
+
+  Nothing auto-loads except the duty line, which is how the page already
+  behaved: the sweep is eleven Elasticsearch and database queries and is
+  operator-triggered, while the rota is one local row and is most worth
+  knowing on the mornings when Elasticsearch is the thing that broke.
+#}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
   <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 {% set tabs = [
@@ -10,6 +33,16 @@
 ] %}
 {% set active_label = "Daily Standup" %}
 {% include "_nav_tabs.html" %}
+
+    {# ── Client-state templates ──
+       These three reflect whether this browser has unsaved edits, which no
+       server knows, so they are cloned and filled with textContent rather
+       than fetched. They sit here, outside the <script> block: a <template>
+       placed inside a script is inert text, cloneTemplate returns null and
+       every control built from it vanishes with no error. #}
+    <template id="ds-save-dirty-template"><span class="ds-save-pending">Unsaved changes</span></template>
+    <template id="ds-save-ok-template"><span class="ds-saved">Saved</span></template>
+    <template id="ds-save-failed-template"><span class="ds-save-failed">Save failed</span></template>
 
     <!-- ── Header ── -->
     <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
@@ -26,8 +59,15 @@
         </div>
       </div>
       <div class="flex items-center gap-2 flex-wrap shrink-0">
-        <button data-click-action="runChecks" id="btn-run-checks" class="btn btn-primary btn-sm gap-2">
-          <svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg> Run Checks
+        {# The sweep. The other three regions below trigger on this button's
+           click, so one press reloads all four from four reads rather than
+           one route running the eleven-query sweep four times. #}
+        <button id="btn-run-checks" class="btn btn-primary btn-sm gap-2"
+                hx-get="/ui/daily-standup/checks"
+                hx-target="#ds-checks" hx-swap="innerHTML"
+                hx-disabled-elt="this">
+          <span class="ds-idle inline-flex items-center gap-2"><svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg> Run Checks</span>
+          <span class="ds-busy items-center gap-2"><span class="ds-spinner"></span> Running&hellip;</span>
         </button>
         {# presentation-mode + pptx download — same data the
            live page shows, but stripped down for a meeting screen. #}
@@ -50,297 +90,126 @@
       </div>
     </section>
 
-    <!-- S1: ES Cluster Health -->
-    <div class="mb-6"><div class="text-xs uppercase tracking-wider text-base-content/50 mb-3">Section 1</div>
-      <div class="card bg-base-200 shadow">
-        <div class="card-body">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <h2 class="card-title text-base">
-              <svg class="w-4 h-4 text-primary"><use href="#i-database"/></svg> ES Cluster Health
-            </h2>
-            <span id="es-status-badge" class="badge badge-ghost badge-sm uppercase">--</span>
-          </div>
-          <div id="es-cluster-body" class="stats stats-vertical sm:stats-horizontal w-full bg-transparent shadow-none">
-            <div class="stat p-2">
-              <div class="stat-title">Nodes</div>
-              <div id="es-nodes" class="stat-value text-2xl">--</div>
-            </div>
-            <div class="stat p-2">
-              <div class="stat-title">Shards</div>
-              <div id="es-shards" class="stat-value text-2xl">--</div>
-            </div>
-            <div class="stat p-2">
-              <div class="stat-title">Indices</div>
-              <div id="es-indices" class="stat-value text-2xl">--</div>
-            </div>
-            <div class="stat p-2">
-              <div class="stat-title">Store</div>
-              <div id="es-store" class="stat-value text-2xl">--</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- S2: Critical Alerts (Last 24h) -->
-    <div class="mb-6"><div class="text-xs uppercase tracking-wider text-base-content/50 mb-3">Section 2</div>
-      <div class="card bg-base-200 shadow">
-        <div class="card-body">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <h2 class="card-title text-base">
-              <svg class="w-4 h-4 text-error"><use href="#i-shield-alert"/></svg> Critical Alerts (Last 24h)
-            </h2>
-            <span class="badge badge-error badge-sm">Critical: <span id="kpi-critical">--</span></span>
-          </div>
-          <!-- shown only when the API falls back to ION-local data -->
-          <div id="alerts-fallback-banner" role="alert" class="alert alert-warning hidden"></div>
-          <div id="alerts-table-wrap" class="overflow-x-auto">
-            <table class="table table-sm">
-              <thead><tr><th>Time</th><th>Severity</th><th>Rule Name</th><th>Host</th><th>Status</th></tr></thead>
-              <tbody id="alerts-tbody"><tr><td colspan="5" class="py-8 text-center opacity-50">Waiting for checks...</td></tr></tbody>
-            </table>
-          </div>
-          <div class="card-actions justify-end">
-            <a href="/alerts" class="link link-primary text-sm inline-flex items-center gap-1">
-              View all in Alerts <svg class="w-3 h-3"><use href="#i-arrow-up-right"/></svg>
-            </a>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- S2b: KPI strip — Open alerts 30d / case status / triage MTTA -->
-    <div class="mb-6">
-      <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 2b · KPIs</div>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-        <!-- Alerts in the last 24h — replaces the v0.17.1 30d
-             backlog card. Severity row (Critical / High / Medium / Low)
-             + status row (Open / Ack / Closed). Source = ES via
-             _check_alerts_24h; falls back to ION-local AlertTriage
-             counts when ES is down (severity drops to "unknown" in
-             that mode — banner shown below if so). -->
-        <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-          <div class="flex items-baseline justify-between mb-3">
-            <span class="text-[11px] uppercase tracking-wider text-slate-500">Alerts · 24h</span>
-            <span id="ds-a24-source" class="text-[11px] text-slate-500 tabular-nums">—</span>
-          </div>
-          <div class="flex items-end gap-3 mb-3">
-            <div id="ds-a24-total" class="font-sans font-semibold tabular-nums tracking-tight text-[36px] leading-none text-white">—</div>
-            <div class="text-[11px] text-slate-500 leading-tight pb-1">total alerts<br><span class="text-slate-600">last 24h</span></div>
-          </div>
-          <div class="grid grid-cols-4 gap-2 pt-3 border-t border-white/5 text-center">
-            <div><div id="ds-a24-critical" class="text-[16px] font-semibold tabular-nums text-ion-coral leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">critical</div></div>
-            <div><div id="ds-a24-high"     class="text-[16px] font-semibold tabular-nums text-ion-amber leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">high</div></div>
-            <div><div id="ds-a24-medium"   class="text-[16px] font-semibold tabular-nums text-slate-300 leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">medium</div></div>
-            <div><div id="ds-a24-low"      class="text-[16px] font-semibold tabular-nums text-slate-400 leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">low</div></div>
-          </div>
-          <div class="grid grid-cols-3 gap-2 pt-2 mt-2 border-t border-white/5 text-center">
-            <div><div id="ds-a24-open"     class="text-[14px] font-semibold tabular-nums text-ion-coral leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">open</div></div>
-            <div><div id="ds-a24-ack"      class="text-[14px] font-semibold tabular-nums text-ion-amber leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">ack</div></div>
-            <div><div id="ds-a24-closed"   class="text-[14px] font-semibold tabular-nums text-ion-lime leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">closed</div></div>
-          </div>
-        </div>
-
-        <!-- Cases card — expanded with a severity breakdown row.
-             Top row remains status (Open / In Progress / Closed). -->
-        <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-          <div class="flex items-baseline justify-between mb-3">
-            <span class="text-[11px] uppercase tracking-wider text-slate-500">Cases · 24h</span>
-            <span id="ds-cs-flow" class="text-[11px] text-slate-500 tabular-nums">— closed/24h</span>
-          </div>
-          <div class="flex items-end gap-3 mb-3">
-            <div id="ds-cs-total" class="font-sans font-semibold tabular-nums tracking-tight text-[36px] leading-none text-white">—</div>
-            <div class="text-[11px] text-slate-500 leading-tight pb-1">intake<br><span class="text-slate-600">last 24h</span></div>
-          </div>
-          <div class="grid grid-cols-3 gap-2 pt-3 border-t border-white/5 text-center">
-            <div><div id="ds-cs-open" class="text-[16px] font-semibold tabular-nums text-ion-coral leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">open</div></div>
-            <div><div id="ds-cs-ack"  class="text-[16px] font-semibold tabular-nums text-ion-amber leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">in&nbsp;progress</div></div>
-            <div><div id="ds-cs-closed" class="text-[16px] font-semibold tabular-nums text-ion-lime leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">closed</div></div>
-          </div>
-          <div class="grid grid-cols-4 gap-2 pt-2 mt-2 border-t border-white/5 text-center">
-            <div><div id="ds-cs-sev-critical" class="text-[14px] font-semibold tabular-nums text-ion-coral leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">critical</div></div>
-            <div><div id="ds-cs-sev-high"     class="text-[14px] font-semibold tabular-nums text-ion-amber leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">high</div></div>
-            <div><div id="ds-cs-sev-medium"   class="text-[14px] font-semibold tabular-nums text-slate-300 leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">medium</div></div>
-            <div><div id="ds-cs-sev-low"      class="text-[14px] font-semibold tabular-nums text-slate-400 leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">low</div></div>
-          </div>
-        </div>
-
-        <!-- Triage throughput (last 24h) -->
-        <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-          <div class="flex items-baseline justify-between mb-3">
-            <span class="text-[11px] uppercase tracking-wider text-slate-500">Triage · 24h</span>
-            <span class="text-[11px] text-slate-500">avg MTTA</span>
-          </div>
-          <div class="flex items-end gap-3 mb-3">
-            <div id="ds-tt-count" class="font-sans font-semibold tabular-nums tracking-tight text-[36px] leading-none text-ion-cyan">—</div>
-            <div class="text-[11px] text-slate-500 leading-tight pb-1">alerts triaged<br><span class="text-slate-600">last 24h</span></div>
-          </div>
-          <div class="grid grid-cols-3 gap-2 pt-3 border-t border-white/5 text-center">
-            <div><div id="ds-tt-avg"  class="text-[18px] font-semibold tabular-nums text-white leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">avg&nbsp;min</div></div>
-            <div><div id="ds-tt-p50"  class="text-[18px] font-semibold tabular-nums text-slate-300 leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">p50</div></div>
-            <div><div id="ds-tt-p90"  class="text-[18px] font-semibold tabular-nums text-slate-300 leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">p90</div></div>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- S3: Stale Cases -->
-    <div class="mb-6"><div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 3</div>
-      <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2">
-            <svg class="w-4 h-4 text-ion-amber"><use href="#i-clock"/></svg> Stale Cases (Open &gt; 24h)
-          </h2>
-          <span class="text-[12px] text-ion-amber font-semibold">Count: <span id="kpi-stale">--</span></span>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="w-full text-[12px]">
-            <thead><tr><th class="dth">Case #</th><th class="dth">Title</th><th class="dth">Triggered Rules</th><th class="dth">Severity</th><th class="dth">Assigned To</th><th class="dth">Hours Open</th></tr></thead>
-            <tbody id="stale-tbody"><tr><td colspan="6" class="px-3 py-8 text-center text-slate-500">Waiting for checks...</td></tr></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- S4: DC + WEF Log Health -->
-    <div class="mb-6"><div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 4</div>
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <!-- DC Log Health -->
-        <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-          <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2 mb-3">
-            <svg class="w-4 h-4 text-ion-iris"><use href="#i-server"/></svg> DC Log Health
-            <span id="dc-overall-light" class="ds-rag-light ds-rag-grey"></span>
-          </h2>
-          <div class="grid grid-cols-3 gap-3 mb-3 text-[12px]">
-            <div class="text-slate-400">Events 24h: <span id="dc-total" class="text-white font-semibold">--</span></div>
-            <div class="text-slate-400">Hosts w/ gaps: <span id="dc-gaps" class="text-white font-semibold">--</span></div>
-            <div class="text-slate-400">Below avg: <span id="dc-below" class="text-white font-semibold">--</span></div>
-          </div>
-          <div id="dc-hosts-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-            <div class="text-slate-500 text-[11px] col-span-full text-center py-4 animate-pulse">Loading...</div>
-          </div>
-        </div>
-        <!-- WEF Log Health -->
-        <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-          <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2 mb-3">
-            <svg class="w-4 h-4 text-ion-iris"><use href="#i-server"/></svg> WEF Log Health
-            <span id="wef-overall-light" class="ds-rag-light ds-rag-grey"></span>
-          </h2>
-          <div class="grid grid-cols-3 gap-3 mb-3 text-[12px]">
-            <div class="text-slate-400">Events 24h: <span id="wef-total" class="text-white font-semibold">--</span></div>
-            <div class="text-slate-400">Hosts w/ gaps: <span id="wef-gaps" class="text-white font-semibold">--</span></div>
-            <div class="text-slate-400">Below avg: <span id="wef-below" class="text-white font-semibold">--</span></div>
-          </div>
-          <div id="wef-hosts-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-            <div class="text-slate-500 text-[11px] col-span-full text-center py-4 animate-pulse">Loading...</div>
-          </div>
-        </div>
-      </div>
+    {# Sections 1 to 4, in one swap, from one sweep. Section 6 is on the far
+       side of the Arkime panels and arrives in the same response as an
+       out-of-band swap, so a figure and the table under it come from one
+       read and cannot disagree. #}
+    <div id="ds-checks">
+      <p class="ds-empty">Waiting for checks&hellip; press Run Checks to sweep Elasticsearch and the case database.</p>
     </div>
 
     <!-- S5: Arkime High-Risk Country Traffic -->
     <div class="mb-6">
-      <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 5</div>
-      <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-        <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2 mb-4">
-          <svg class="w-4 h-4 text-ion-coral"><use href="#i-globe"/></svg> Arkime High-Risk Country Traffic
+      <div class="ds-section-label">Section 5</div>
+      <div class="ds-panel">
+        <h2 class="ds-panel-title">
+          <svg class="w-4 h-4 text-error"><use href="#i-globe"/></svg> Arkime High-Risk Country Traffic
         </h2>
-        <div id="arkime-countries" class="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          <div class="ds-country-card" data-country="RU"><span class="text-[18px]">&#x1F1F7;&#x1F1FA;</span><div class="text-[12px] text-slate-300 font-semibold">Russia</div><div class="text-[11px] text-slate-500">Sessions: <span class="ds-country-count" id="ark-ru">--</span></div></div>
-          <div class="ds-country-card" data-country="CN"><span class="text-[18px]">&#x1F1E8;&#x1F1F3;</span><div class="text-[12px] text-slate-300 font-semibold">China</div><div class="text-[11px] text-slate-500">Sessions: <span class="ds-country-count" id="ark-cn">--</span></div></div>
-          <div class="ds-country-card" data-country="IR"><span class="text-[18px]">&#x1F1EE;&#x1F1F7;</span><div class="text-[12px] text-slate-300 font-semibold">Iran</div><div class="text-[11px] text-slate-500">Sessions: <span class="ds-country-count" id="ark-ir">--</span></div></div>
-          <div class="ds-country-card" data-country="KP"><span class="text-[18px]">&#x1F1F0;&#x1F1F5;</span><div class="text-[12px] text-slate-300 font-semibold">North Korea</div><div class="text-[11px] text-slate-500">Sessions: <span class="ds-country-count" id="ark-kp">--</span></div></div>
-          <div class="ds-country-card" data-country="SY"><span class="text-[18px]">&#x1F1F8;&#x1F1FE;</span><div class="text-[12px] text-slate-300 font-semibold">Syria</div><div class="text-[11px] text-slate-500">Sessions: <span class="ds-country-count" id="ark-sy">--</span></div></div>
+        <div id="ds-arkime-countries"
+             hx-get="/ui/daily-standup/arkime/countries"
+             hx-trigger="click from:#btn-run-checks"
+             hx-swap="innerHTML">
+          <p class="ds-empty">Waiting for checks&hellip;</p>
         </div>
       </div>
     </div>
 
     <!-- S5b: Arkime Node Stats -->
     <div class="mb-6">
-      <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-        <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2 mb-4">
-          <svg class="w-4 h-4 text-ion-cyan"><use href="#i-server"/></svg> Arkime Capture Nodes
+      <div class="ds-panel">
+        <h2 class="ds-panel-title">
+          <svg class="w-4 h-4 text-primary"><use href="#i-server"/></svg> Arkime Capture Nodes
         </h2>
-        <div id="arkime-nodes" class="text-slate-500 text-[12px] animate-pulse">Loading node stats...</div>
+        <div id="ds-arkime-nodes"
+             hx-get="/ui/daily-standup/arkime/nodes"
+             hx-trigger="click from:#btn-run-checks"
+             hx-swap="innerHTML">
+          <p class="ds-empty">Waiting for checks&hellip;</p>
+        </div>
       </div>
     </div>
 
     <!-- S6: Rule Failures -->
     <div class="mb-6">
-      <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 6</div>
-      <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-        <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2 mb-4">
-          <svg class="w-4 h-4 text-ion-amber"><use href="#i-alert-triangle"/></svg> Rule Failures
+      <div class="ds-section-label">Section 6</div>
+      <div class="ds-panel">
+        <h2 class="ds-panel-title">
+          <svg class="w-4 h-4 text-warning"><use href="#i-alert-triangle"/></svg> Rule Failures
         </h2>
-        <div class="overflow-x-auto">
-          <table class="w-full text-[12px]">
-            <thead><tr><th class="dth">Rule Name</th><th class="dth">Failure Count</th><th class="dth">Last Failure</th></tr></thead>
-            <tbody id="rules-tbody"><tr><td colspan="3" class="px-3 py-8 text-center text-slate-500">Waiting for checks...</td></tr></tbody>
-          </table>
+        {# Filled by the out-of-band half of /ui/daily-standup/checks. #}
+        <div id="ds-rules">
+          <p class="ds-empty">Waiting for checks&hellip;</p>
         </div>
       </div>
     </div>
 
     <!-- S7: ServiceNow Incidents -->
     <div class="mb-6">
-      <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 7</div>
-      <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-        <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2 mb-4">
-          <svg class="w-4 h-4 text-ion-cyan"><use href="#i-file-text"/></svg> ServiceNow Incidents
+      <div class="ds-section-label">Section 7</div>
+      <div class="ds-panel">
+        <h2 class="ds-panel-title">
+          <svg class="w-4 h-4 text-primary"><use href="#i-file-text"/></svg> ServiceNow Incidents
         </h2>
         <textarea id="snow-incidents" rows="4" placeholder="Paste or type ongoing ServiceNow incidents..."
-          class="w-full rounded-md bg-white/5 border border-white/10 text-[13px] text-white placeholder:text-slate-500 px-4 py-3 focus:border-ion-cyan/50 focus:bg-white/8 transition resize-y"></textarea>
+          class="textarea w-full text-[13px] resize-y"></textarea>
       </div>
     </div>
 
     <!-- S8: Threat Landscape AI Summary -->
     <div class="mb-6">
-      <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 8</div>
-      <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
+      <div class="ds-section-label">Section 8</div>
+      <div class="ds-panel">
         <div class="flex items-center justify-between mb-4">
-          <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2">
-            <svg class="w-4 h-4 text-ion-iris"><use href="#i-sparkles"/></svg> Threat Landscape AI Summary
+          <h2 class="ds-panel-title mb-0">
+            <svg class="w-4 h-4 text-secondary"><use href="#i-sparkles"/></svg> Threat Landscape AI Summary
           </h2>
-          <button data-click-action="generateThreatSummary" class="inline-flex items-center gap-2 h-8 px-3 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[11px] font-semibold transition">
-            <svg class="w-3 h-3"><use href="#i-sparkles"/></svg> Generate Summary
+          {# Outside #threat-summary, so a render saying the AI service
+             refused cannot remove the button that asks it again. #}
+          <button id="btn-threat-summary" class="btn btn-ghost btn-sm gap-2"
+                  hx-post="/ui/daily-standup/threat-summary"
+                  hx-target="#threat-summary" hx-swap="innerHTML"
+                  hx-disabled-elt="this">
+            <span class="ds-idle inline-flex items-center gap-2"><svg class="w-3 h-3"><use href="#i-sparkles"/></svg> Generate Summary</span>
+            <span class="ds-busy items-center gap-2"><span class="ds-spinner"></span> Generating&hellip;</span>
           </button>
         </div>
-        <div id="threat-summary" class="text-[13px] text-slate-400 leading-relaxed mb-5 min-h-[60px]">Click "Generate Summary" to produce an AI briefing.</div>
-        <div class="border-t border-white/5 pt-4">
-          <h3 class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Reports of Interest</h3>
-          <div id="threat-reports" class="space-y-2 text-[12px] text-slate-400">No reports loaded.</div>
+        <div id="threat-summary" class="text-[13px] text-base-content/70 leading-relaxed mb-5 min-h-[60px]">
+          Click "Generate Summary" to produce an AI briefing.
+        </div>
+        <div class="border-t border-base-300 pt-4">
+          <div class="ds-section-label">Reports of Interest</div>
+          <div id="threat-reports" class="space-y-2 text-[12px] text-base-content/70"
+               hx-get="/ui/daily-standup/reports"
+               hx-trigger="click from:#btn-run-checks"
+               hx-swap="innerHTML">
+            <p class="ds-empty">No reports loaded. Press Run Checks.</p>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- S9: Daily Meetings -->
     <div class="mb-6">
-      <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 9</div>
-      <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-        <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2 mb-4">
-          <svg class="w-4 h-4 text-ion-lime"><use href="#i-check-circle"/></svg> Daily Meetings
+      <div class="ds-section-label">Section 9</div>
+      <div class="ds-panel">
+        <h2 class="ds-panel-title">
+          <svg class="w-4 h-4 text-success"><use href="#i-check-circle"/></svg> Daily Meetings
         </h2>
         <div class="space-y-2" id="meetings-checklist">
-          <label class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-white/5 transition cursor-pointer text-[13px] text-slate-300">
-            <input type="checkbox" class="ds-meeting-cb accent-ion-cyan" data-item="standup"> Morning standup attended
+          {% for value, label in [
+              ('standup', 'Morning standup attended'),
+              ('handover', 'Shift handover reviewed'),
+              ('case_review', 'Case review completed'),
+              ('threat_intel', 'Threat intel briefing reviewed'),
+              ('action_items', 'Action items from previous day checked')
+          ] %}
+          <label class="ds-check-row">
+            <input type="checkbox" class="ds-meeting-cb checkbox checkbox-sm checkbox-primary" data-item="{{ value }}"> {{ label }}
           </label>
-          <label class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-white/5 transition cursor-pointer text-[13px] text-slate-300">
-            <input type="checkbox" class="ds-meeting-cb accent-ion-cyan" data-item="handover"> Shift handover reviewed
-          </label>
-          <label class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-white/5 transition cursor-pointer text-[13px] text-slate-300">
-            <input type="checkbox" class="ds-meeting-cb accent-ion-cyan" data-item="case_review"> Case review completed
-          </label>
-          <label class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-white/5 transition cursor-pointer text-[13px] text-slate-300">
-            <input type="checkbox" class="ds-meeting-cb accent-ion-cyan" data-item="threat_intel"> Threat intel briefing reviewed
-          </label>
-          <label class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-white/5 transition cursor-pointer text-[13px] text-slate-300">
-            <input type="checkbox" class="ds-meeting-cb accent-ion-cyan" data-item="action_items"> Action items from previous day checked
-          </label>
+          {% endfor %}
           <div class="flex items-center gap-3 px-3 py-2">
-            <input type="checkbox" class="ds-meeting-cb accent-ion-cyan" data-item="custom" id="cb-custom">
-            <input type="text" id="custom-meeting-item" placeholder="Custom item..." class="flex-1 h-8 px-3 rounded-md bg-white/5 border border-white/10 text-[13px] text-white placeholder:text-slate-500 focus:border-ion-cyan/50 transition">
+            <input type="checkbox" class="ds-meeting-cb checkbox checkbox-sm checkbox-primary" data-item="custom" id="cb-custom">
+            <input type="text" id="custom-meeting-item" placeholder="Custom item..." class="input input-sm flex-1 text-[13px]">
           </div>
         </div>
       </div>
@@ -348,44 +217,46 @@
 
     <!-- S10: Additional Notes -->
     <div class="mb-6">
-      <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 10</div>
-      <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-        <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2 mb-4">
-          <svg class="w-4 h-4 text-slate-400"><use href="#i-edit"/></svg> Additional Notes
+      <div class="ds-section-label">Section 10</div>
+      <div class="ds-panel">
+        <h2 class="ds-panel-title">
+          <svg class="w-4 h-4 text-base-content/60"><use href="#i-edit"/></svg> Additional Notes
         </h2>
         <textarea id="additional-notes" rows="5" placeholder="Free-form notes for today's report..."
-          class="w-full rounded-md bg-white/5 border border-white/10 text-[13px] text-white placeholder:text-slate-500 px-4 py-3 focus:border-ion-cyan/50 focus:bg-white/8 transition resize-y"></textarea>
+          class="textarea w-full text-[13px] resize-y"></textarea>
       </div>
     </div>
 
     <!-- S11: Sign-Off -->
     <div class="mb-24">
-      <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 11</div>
-      <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-        <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2 mb-4">
-          <svg class="w-4 h-4 text-ion-lime"><use href="#i-lock"/></svg> Sign-Off
+      <div class="ds-section-label">Section 11</div>
+      <div class="ds-panel">
+        <h2 class="ds-panel-title">
+          <svg class="w-4 h-4 text-success"><use href="#i-lock"/></svg> Sign-Off
         </h2>
         <!-- Who the rota says runs this standup. Above the signature
              box on purpose: the question "should I be doing this?" is
-             answered before somebody types their name, not after. -->
-        <div id="duty-line" class="mb-4 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[13px] text-slate-300">
-          <span class="text-slate-500">Checking the duty rota&hellip;</span>
+             answered before somebody types their name, not after.
+             Loads on its own, and /checks refreshes it out of band. -->
+        <div id="duty-line" class="ds-duty-line mb-4"
+             hx-get="/ui/daily-standup/duty" hx-trigger="load" hx-swap="innerHTML">
+          <span class="text-base-content/50">Checking the duty rota&hellip;</span>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <div class="flex flex-col gap-1.5">
             <!-- "Signed off by", not "Duty Analyst". This box is free
                  text; it records who signed, which is not the same fact
                  as who the rota had on duty. -->
-            <label class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold" for="signoff-analyst">Signed off by</label>
-            <input id="signoff-analyst" type="text" placeholder="Your name" class="h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[13px] text-white placeholder:text-slate-500 focus:border-ion-cyan/50 transition">
+            <label class="ds-section-label mb-0" for="signoff-analyst">Signed off by</label>
+            <input id="signoff-analyst" type="text" placeholder="Your name" class="input input-sm text-[13px]">
           </div>
           <div class="flex flex-col gap-1.5">
-            <label class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Sign-Off Timestamp</label>
-            <div id="signoff-time" class="h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[13px] text-slate-400 flex items-center">Not signed off</div>
+            <label class="ds-section-label mb-0">Sign-Off Timestamp</label>
+            <div id="signoff-time" class="input input-sm flex items-center text-[13px] text-base-content/60">Not signed off</div>
           </div>
         </div>
-        <label class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-white/5 transition cursor-pointer text-[13px] text-slate-300">
-          <input type="checkbox" id="signoff-confirm" class="accent-ion-cyan"> I confirm all daily checks have been completed
+        <label class="ds-check-row">
+          <input type="checkbox" id="signoff-confirm" class="checkbox checkbox-sm checkbox-primary"> I confirm all daily checks have been completed
         </label>
       </div>
     </div>
@@ -393,30 +264,33 @@
   </div><!-- /inner container -->
 </div><!-- /ion-tw -->
 
-<!-- Report detail slide-over -->
-<div id="ds-report-panel" class="ion-tw fixed top-0 right-0 bottom-0 w-[480px] max-w-[92vw] z-50 bg-ink-900 border-l border-white/10 shadow-[-8px_0_24px_rgba(0,0,0,0.5)] overflow-y-auto p-5">
+<!-- Report detail slide-over. The body is swapped by whichever report row
+     was clicked; the title arrives with it as an out-of-band swap, so a
+     refusal cannot leave the previous report's name standing above it. -->
+<div id="ds-report-panel" class="ion-tw hidden fixed top-0 right-0 bottom-0 w-[480px] max-w-[92vw] z-50 bg-base-200 border-l border-base-300 shadow-xl overflow-y-auto p-5">
   <div class="flex items-start justify-between mb-4">
-    <h3 id="ds-report-title" class="text-[13px] font-semibold text-ion-cyan font-mono leading-tight pr-2">—</h3>
-    <button data-click-action="dsCloseReport" class="text-slate-400 hover:text-white text-xl leading-none shrink-0">&times;</button>
+    <h3 id="ds-report-title" class="text-[13px] font-semibold text-primary font-mono leading-tight pr-2">&mdash;</h3>
+    <button data-click-action="dsCloseReport" class="btn btn-ghost btn-xs" aria-label="Close report">&times;</button>
   </div>
+  <div id="ds-report-busy" class="ds-busy justify-center py-10"><span class="ds-spinner"></span></div>
   <div id="ds-report-body">
-    <div class="flex justify-center py-10"><span class="ds-spinner"></span></div>
+    <p class="ds-empty">Pick a report from Reports of Interest.</p>
   </div>
 </div>
-<div id="ds-report-backdrop" class="ion-tw fixed inset-0 z-40 bg-black/50"
+<div id="ds-report-backdrop" class="ion-tw hidden fixed inset-0 z-40 bg-black/50"
 data-click-action="dsCloseReport"></div>
 
 <!-- ── Sticky Action Bar ── -->
-<div class="ion-tw fixed bottom-0 left-0 right-0 z-30 border-t border-white/10 bg-ink-950/90 backdrop-blur-md">
+<div class="ion-tw ds-action-bar fixed bottom-0 left-0 right-0 z-30">
   <div class="mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 h-14 flex items-center justify-between">
     <div class="flex items-center gap-2 text-[12px]">
-      <span id="save-status" class="text-slate-500">Unsaved changes</span>
+      <span id="save-status" class="text-base-content/50"></span>
     </div>
     <div class="flex items-center gap-2">
-      <button data-click-action="exportPDF" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
+      <button data-click-action="exportPDF" class="btn btn-ghost btn-sm gap-2">
         <svg class="w-3.5 h-3.5"><use href="#i-download"/></svg> Export PDF
       </button>
-      <button data-click-action="saveStandup" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+      <button data-click-action="saveStandup" class="btn btn-primary btn-sm gap-2">
         <svg class="w-3.5 h-3.5"><use href="#i-check-circle"/></svg> Save &amp; Sign Off
       </button>
     </div>
@@ -425,754 +299,125 @@ data-click-action="dsCloseReport"></div>
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-.dth{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);font-weight:600;padding:8px 12px;border-bottom:1px solid var(--ion-border)}
-.ds-country-card{display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 8px;border-radius:10px;border:1px solid var(--ion-border);background:rgba(255,255,255,.02);transition:border-color .2s,background .2s}
-.ds-country-card.highlighted{border-color:rgba(255,108,108,.4);background:rgba(255,108,108,.08)}
-.ds-country-count.active{color:var(--danger);font-weight:700}
-.ds-spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--ion-border);border-top-color:var(--primary);border-radius:50%;animation:ds-spin .7s linear infinite}
-@keyframes ds-spin{to{transform:rotate(360deg)}}
-.ds-status-pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em}
-.ds-pill-ok{background:rgba(163,230,53,.1);color:var(--success);border:1px solid rgba(163,230,53,.2)}
-.ds-pill-warning{background:rgba(245,158,11,.1);color:var(--warning);border:1px solid rgba(245,158,11,.2)}
-.ds-pill-critical{background:rgba(255,108,108,.1);color:var(--danger);border:1px solid rgba(255,108,108,.2)}
-.ds-sev-pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em}
-.ds-sev-critical{background:rgba(255,108,108,.12);color:var(--danger);border:1px solid rgba(255,108,108,.25)}
-.ds-sev-high{background:rgba(245,158,11,.12);color:var(--warning);border:1px solid rgba(245,158,11,.25)}
-.ds-sev-medium{background:rgba(139,92,246,.12);color:var(--neon-purple);border:1px solid rgba(139,92,246,.25)}
-.ds-sev-low{background:rgba(148,163,184,.1);color:var(--text-secondary);border:1px solid rgba(148,163,184,.2)}
-.ds-hours-red{color:var(--danger);font-weight:700}
-.ds-hours-amber{color:var(--warning);font-weight:700}
-.ds-hours-yellow{color:var(--warning);font-weight:600}
-.ds-gap-row{background:rgba(255,108,108,.04)}
-/* RAG traffic lights */
-.ds-rag-light{display:inline-block;width:12px;height:12px;border-radius:50%;border:1px solid var(--ion-border)}
-.ds-rag-green{background:var(--success);box-shadow:0 0 8px rgba(34,197,94,.6)}
-.ds-rag-amber{background:var(--warning);box-shadow:0 0 8px rgba(245,158,11,.6);animation:ds-rag-pulse 1.5s ease-in-out infinite}
-.ds-rag-red{background:var(--danger);box-shadow:0 0 10px rgba(239,68,68,.7);animation:ds-rag-pulse 0.8s ease-in-out infinite}
-.ds-rag-grey{background:var(--text-muted)}
-@keyframes ds-rag-pulse{0%,100%{opacity:1}50%{opacity:.4}}
-/* Host widget card */
-.ds-host-widget{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;border:1px solid var(--ion-border);background:rgba(255,255,255,.02);transition:border-color .2s}
-.ds-host-widget.ds-hw-ok{border-color:rgba(34,197,94,.15)}
-.ds-host-widget.ds-hw-warning{border-color:rgba(245,158,11,.25);background:rgba(245,158,11,.04)}
-.ds-host-widget.ds-hw-critical{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.06)}
-.ds-host-widget .ds-hw-light{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-.ds-host-widget .ds-hw-name{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-primary);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ds-host-widget .ds-hw-meta{font-size:9px;color:var(--text-muted);text-align:right;white-space:nowrap}
-/* Report detail slide-over */
-#ds-report-panel,#ds-report-backdrop{display:none}
-.ds-report-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;transition:background .15s}
-.ds-report-item:hover{background:rgba(255,255,255,.05)}
-.ds-rpt-sec-hdr{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-muted);font-weight:600;margin-bottom:4px;padding-top:12px}
-.ds-rpt-tag{display:inline-flex;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;background:rgba(109,228,255,.1);color:var(--primary)}
-.ds-rpt-ttp{display:inline-flex;padding:2px 7px;border-radius:4px;font-size:10px;background:rgba(245,158,11,.12);color:var(--warning);border:1px solid rgba(245,158,11,.25)}
-</style>
 <script nonce="{{ csp_nonce }}">
-/* ── Daily Standup JS ─────────────────────────────── */
-const DS = {checksData: null, threatSummary: null, dirty: true};
+/* ── Daily Standup ────────────────────────────────────────────────────────
+ *
+ * What is left here is what only the browser knows: the viewer's clock,
+ * whether this page has unsaved edits, which panel is open, the free-text
+ * boxes, and the localStorage cache the slide deck reads. Everything that
+ * came from a server now arrives as markup from /ui/daily-standup/*.
+ *
+ * No markup is assembled. The three save-status variants are <template>
+ * elements in the page, cloned by cloneTemplate; the busy spinners are
+ * markup inside their buttons, revealed by htmx's .htmx-request class.
+ */
 
-function esc(s) { if (s == null) return ''; const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
-function fmtTime(iso) { if (!iso) return '--'; try { return new Date(iso).toLocaleString(); } catch { return iso; } }
-function fmtShort(iso) { if (!iso) return '--'; try { const d = new Date(iso); return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); } catch { return iso; } }
-
-/* ── Live clock ── */
+/* ── Live clock. The viewer's clock, so it stays in the browser. ── */
 function tickClock() {
   const now = new Date();
-  document.getElementById('ds-date').textContent = now.toLocaleDateString('en-GB', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
-  document.getElementById('ds-clock').textContent = now.toUTCString().slice(-12, -4) + ' UTC';
+  const date = document.getElementById('ds-date');
+  const clock = document.getElementById('ds-clock');
+  if (date) {
+    date.textContent = now.toLocaleDateString('en-GB',
+      {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'});
+  }
+  if (clock) clock.textContent = now.toUTCString().slice(-12, -4) + ' UTC';
 }
 setInterval(tickClock, 1000);
 tickClock();
 
-/* ── Severity pill helper ── */
-function sevPill(sev) {
-  const s = (sev || '').toLowerCase();
-  const cls = {critical:'ds-sev-critical',high:'ds-sev-high',medium:'ds-sev-medium',low:'ds-sev-low'}[s] || 'ds-sev-low';
-  return `<span class="ds-sev-pill ${cls}">${esc(sev)}</span>`;
+/* A copy of a <template>'s first element. The markup is Jinja's; nothing
+   here assembles it. Null when the template is not on the page, which is
+   also what happens if one is ever moved inside a <script>. */
+function cloneTemplate(id) {
+  const tpl = document.getElementById(id);
+  if (!tpl || !tpl.content || !tpl.content.firstElementChild) return null;
+  return tpl.content.firstElementChild.cloneNode(true);
 }
 
-/* ── Status pill ── */
-function statusPill(status) {
-  const s = (status || '').toUpperCase();
-  if (s === 'CRITICAL') return '<span class="ds-status-pill ds-pill-critical">CRITICAL</span>';
-  if (s === 'WARNING')  return '<span class="ds-status-pill ds-pill-warning">WARNING</span>';
-  return '<span class="ds-status-pill ds-pill-ok">OK</span>';
+function setSaveStatus(templateId) {
+  const slot = document.getElementById('save-status');
+  const node = cloneTemplate(templateId);
+  if (!slot || !node) return;
+  slot.replaceChildren(node);
 }
 
-/* ── Hours-open colour ── */
-function hoursClass(h) {
-  if (h > 72) return 'ds-hours-red';
-  if (h > 48) return 'ds-hours-amber';
-  return 'ds-hours-yellow';
+/* ── Report slide-over. The rows carry their own hx-get; this only
+      reveals the panel, so the report markup has one definition. ── */
+function dsOpenReport() {
+  document.getElementById('ds-report-panel').classList.remove('hidden');
+  document.getElementById('ds-report-backdrop').classList.remove('hidden');
 }
 
-/* ── Spinner for tables ── */
-function spinner(cols) { return `<tr><td colspan="${cols}" class="px-3 py-8 text-center text-slate-500"><span class="ds-spinner"></span> Loading...</td></tr>`; }
-
-/* ── S1: ES Cluster ── */
-// Who the rota has on duty this week.
-//
-// Three states, kept apart because each sends somebody somewhere
-// different: a name (get on with it), nobody rostered (the rota has a
-// hole this week), and unavailable (the lookup failed, which must not
-// read as "nobody").
-function renderDuty(duty) {
-  const el = document.getElementById('duty-line');
-  if (!el) { return; }
-  if (!duty) {
-    el.innerHTML = '<span class="text-slate-500">Duty rota unavailable.</span>';
-    return;
-  }
-  if (!duty.assigned) {
-    el.innerHTML = '<span class="text-amber-400 font-semibold">Nobody is on duty this week.</span>' +
-      ' <span class="text-slate-500">The standup still needs running — put your name below.</span>';
-    return;
-  }
-  // An unacknowledged entry is a plan rather than a fact, and the
-  // Monday somebody is off sick is exactly when that matters.
-  const ack = duty.acknowledged
-    ? '<span class="text-ion-lime">acknowledged</span>'
-    : '<span class="text-amber-400">not acknowledged</span>';
-  el.innerHTML = '<span class="text-slate-500">On duty this week:</span> ' +
-    '<span class="text-white font-semibold" id="duty-who"></span> · ' + ack;
-  // textContent, not interpolation: the name comes from the database.
-  el.querySelector('#duty-who').textContent =
-    (duty.user && duty.user.name) ? duty.user.name : 'someone';
+function dsCloseReport() {
+  document.getElementById('ds-report-panel').classList.add('hidden');
+  document.getElementById('ds-report-backdrop').classList.add('hidden');
 }
 
-function renderCluster(es) {
-  if (!es) return;
-  const badge = document.getElementById('es-status-badge');
-  const status = (es.status || 'unknown').toLowerCase();
-  badge.textContent = status;
-  badge.className = 'px-2.5 py-1 rounded-md text-[10px] font-semibold uppercase tracking-[0.12em] border ';
-  if (status === 'green')       badge.className += 'bg-ion-lime/10 text-ion-lime border-ion-lime/20';
-  else if (status === 'yellow') badge.className += 'bg-ion-amber/10 text-ion-amber border-ion-amber/20';
-  else                          badge.className += 'bg-ion-coral/10 text-ion-coral border-ion-coral/20';
-  document.getElementById('es-nodes').textContent   = es.number_of_nodes ?? '--';
-  document.getElementById('es-shards').textContent  = es.active_shards ?? '--';
-  document.getElementById('es-indices').textContent = es.indices_count ?? '--';
-  document.getElementById('es-store').textContent   = es.store_size ?? '--';
-}
-
-/* ── S2: Critical Alerts ──
-   v0.19.5: data is {critical_count, total, alerts: [...]} — high
-   dropped from the standup; analysts see High via /alerts.
-   v0.19.15: data may include source='ion_fallback' + fallback_reason
-   when ES returned no matches — surface a small banner so analysts
-   know the source is degraded. */
-function renderAlerts(data) {
-  const alertData = data || {};
-  const alerts = alertData.alerts || [];
-  document.getElementById('kpi-critical').textContent = alertData.critical_count ?? 0;
-  // Toggle fallback banner if present.
-  const banner = document.getElementById('alerts-fallback-banner');
-  if (banner) {
-    if (alertData.source === 'ion_fallback') {
-      banner.textContent = 'ION-local fallback · ' + (alertData.fallback_reason || 'ES returned no critical-severity matches');
-      banner.style.display = 'block';
-    } else {
-      banner.style.display = 'none';
-    }
-  }
-  const tbody = document.getElementById('alerts-tbody');
-  if (!alerts.length) { tbody.innerHTML = '<tr><td colspan="5" class="px-3 py-8 text-center text-slate-500">No critical alerts in last 24h</td></tr>'; return; }
-  const rows = alerts.slice(0, 15);
-  // fall back through rule_name → title → id so the cell is
-  // never blank — analysts complained the panel was hard to decipher
-  // when ES alerts had no rule.name (older Sigma exports, custom feeds).
-  tbody.innerHTML = rows.map(a => {
-    // rule-name column. Drop the previous `a.id` fallback —
-    // the raw ES document id (a UUID like `abcd-1234…`) was leaking
-    // into the column whenever rule_name/title were missing, which
-    // analysts read as "ID instead of rule name". Prefer rule_name,
-    // fall back to title, terminate at "(rule unknown)" — never to
-    // the document id.
-    const ruleLabel = a.rule_name || a.title || '(rule unknown)';
-    return `<tr class="border-b border-white/5 hover:bg-white/[.02]">
-    <td class="px-3 py-2 text-slate-400 font-mono">${fmtShort(a.timestamp)}</td>
-    <td class="px-3 py-2">${sevPill(a.severity)}</td>
-    <td class="px-3 py-2 text-white truncate max-w-[320px]" title="${esc(ruleLabel)}">${esc(ruleLabel)}</td>
-    <td class="px-3 py-2 text-slate-300">${esc(a.host)}</td>
-    <td class="px-3 py-2 text-slate-400">${esc(a.status)}</td>
-  </tr>`;
-  }).join('');
-}
-
-/* ── S3: Stale Cases ── */
-function renderStaleCases(data) {
-  // API now returns ALL stale cases (no .limit(20)) and
-  // each row carries a triggered_rules JSON list. New column added.
-  const caseData = data || {};
-  const cases = caseData.cases || [];
-  document.getElementById('kpi-stale').textContent = caseData.count ?? cases.length;
-  const tbody = document.getElementById('stale-tbody');
-  if (!cases.length) { tbody.innerHTML = '<tr><td colspan="6" class="px-3 py-8 text-center text-slate-500">No stale cases</td></tr>'; return; }
-  const fmtRules = (rules) => {
-    if (!rules || !rules.length) return '<span class="text-slate-600">—</span>';
-    const head = rules.slice(0, 2).map(esc).join(', ');
-    return head + (rules.length > 2 ? ` <span class="text-slate-500">+${rules.length - 2}</span>` : '');
-  };
-  tbody.innerHTML = cases.map(c => {
-    const h = c.hours_open ?? 0;
-    return `<tr class="border-b border-white/5 hover:bg-white/[.02]">
-      <td class="px-3 py-2 text-white font-mono">${esc(c.case_number)}</td>
-      <td class="px-3 py-2 text-slate-300 truncate max-w-[220px]">${esc(c.title)}</td>
-      <td class="px-3 py-2 text-slate-300 truncate max-w-[220px]">${fmtRules(c.triggered_rules)}</td>
-      <td class="px-3 py-2">${sevPill(c.severity)}</td>
-      <td class="px-3 py-2 text-slate-400">${esc(c.assigned_to)}</td>
-      <td class="px-3 py-2 font-mono ${hoursClass(h)}">${h.toFixed(1)}</td>
-    </tr>`;
-  }).join('');
-}
-
-/* ── S4: Log Health (DC + WEF) — RAG widget cards ──
-   v0.10.18: distinguish error / not_configured / empty so silent ES
-   misconfig (wrong field, wrong index, auth fail) doesn't masquerade as
-   "no hosts matched". The diag block from the API tells the operator
-   exactly what was queried so they can adjust ION_STANDUP_* env vars. */
-function renderLogHealth(prefix, data) {
-  document.getElementById(prefix + '-total').textContent = (data.total_events_24h ?? data.total_events ?? '--').toLocaleString();
-  document.getElementById(prefix + '-gaps').textContent  = data.hosts_with_gaps ?? '--';
-  document.getElementById(prefix + '-below').textContent = data.hosts_below_average ?? data.hosts_below_avg ?? '--';
-
-  const grid = document.getElementById(prefix + '-hosts-grid');
-  if (!grid) return;
-  const overallLight = document.getElementById(prefix + '-overall-light');
-
-  function diagFooter(d) {
-    if (!d) return '';
-    var pats = (d.patterns || []).map(function(p) { return '<code class="text-slate-400">' + esc(p) + '</code>'; }).join(', ') || '<em>none</em>';
-    return '<div class="text-[10px] text-slate-600 col-span-full mt-2 text-center">' +
-           'Queried <code class="text-slate-400">' + esc(d.index || '—') + '</code>' +
-           ' for <code class="text-slate-400">' + esc(d.host_field || '—') + '</code>' +
-           ' matching ' + pats +
-           ' &middot; ' + (d.total_hits || 0).toLocaleString() + ' hits / ' +
-           (d.host_count || 0) + ' hosts' +
-           '</div>';
-  }
-
-  // Error states — paint the overall light red and surface the cause.
-  if (data && data.status === 'error') {
-    if (overallLight) overallLight.className = 'ds-rag-light ds-rag-red';
-    grid.innerHTML =
-      '<div class="col-span-full py-3 px-3 rounded border border-red-500/30 bg-red-500/10 text-[12px] text-red-300">' +
-        '<strong>Elasticsearch query failed.</strong> ' + esc(data.error || 'unknown error') +
-      '</div>' + diagFooter(data.diag);
-    return;
-  }
-  if (data && data.status === 'not_configured') {
-    if (overallLight) overallLight.className = 'ds-rag-light ds-rag-amber';
-    grid.innerHTML =
-      '<div class="col-span-full py-3 px-3 rounded border border-amber-500/30 bg-amber-500/10 text-[12px] text-amber-200">' +
-        '<strong>Not configured.</strong> ' + esc(data.error || 'Set ION_ELASTICSEARCH_URL and ION_STANDUP_* env vars.') +
-      '</div>' + diagFooter(data.diag);
-    return;
-  }
-
-  const hosts = data.hosts || [];
-
-  if (!hosts.length) {
-    if (overallLight) overallLight.className = 'ds-rag-light ds-rag-amber';
-    grid.innerHTML =
-      '<div class="text-slate-500 text-[11px] col-span-full text-center py-3">' +
-        'No host data — patterns matched zero hosts in the last 24 h.' +
-      '</div>' + diagFooter(data.diag);
-    return;
-  }
-
-  // Determine overall RAG status for the section header light.
-  // `overallLight` is already in scope from line 440 — re-declaring here is a
-  // SyntaxError that abort the script parse and breaks every other handler in
-  // the file (including runChecks → uncaught ReferenceError on the Run-checks
-  // button onclick).
-  const hasCritical = hosts.some(h => h.status === 'critical');
-  const hasWarning = hosts.some(h => h.status === 'warning');
-  if (overallLight) {
-    overallLight.className = 'ds-rag-light ' + (hasCritical ? 'ds-rag-red' : hasWarning ? 'ds-rag-amber' : 'ds-rag-green');
-  }
-
-  // Render host widget cards
-  grid.innerHTML = hosts.map(h => {
-    const name = h.hostname || h.display_hostname || '?';
-    const events = (h.count_24h ?? h.events_24h ?? 0).toLocaleString();
-    const avg = (h.avg_7d ?? 0).toLocaleString();
-    const gaps = h.gap_hours ?? 0;
-    const status = h.status || 'ok';
-    const belowAvg = h.below_average || h.below_avg;
-
-    // RAG light colour
-    const lightClass = status === 'critical' ? 'ds-rag-red' : status === 'warning' ? 'ds-rag-amber' : 'ds-rag-green';
-    const widgetClass = status === 'critical' ? 'ds-hw-critical' : status === 'warning' ? 'ds-hw-warning' : 'ds-hw-ok';
-
-    // Build tooltip
-    const tooltip = name + '\\nEvents 24h: ' + events + '\\n7d avg: ' + avg + '\\nGap hours: ' + gaps + (belowAvg ? '\\n⚠ Below average' : '');
-
-    return '<div class="ds-host-widget ' + widgetClass + '" title="' + tooltip + '">'
-      + '<div class="ds-hw-light ' + lightClass + '"></div>'
-      + '<div class="ds-hw-name">' + esc(name) + '</div>'
-      + '<div class="ds-hw-meta">' + events + (gaps > 0 ? '<br><span class="text-[#ef4444]">' + gaps + 'h gap</span>' : '') + '</div>'
-      + '</div>';
-  }).join('');
-}
-
-/* ── S5: Arkime ── */
-function renderArkime(countries) {
-  const list = countries || [];
-  const map = {};
-  list.forEach(c => { map[c.country_code] = c; });
-
-  ['RU','CN','IR','KP','SY'].forEach(code => {
-    const c = map[code] || {};
-    const count = c.session_count || 0;
-    const el = document.getElementById('ark-' + code.toLowerCase());
-    if (el) { el.textContent = count; if (count > 0) el.classList.add('active'); else el.classList.remove('active'); }
-    const card = document.querySelector(`.ds-country-card[data-country="${code}"]`);
-    if (card) {
-      if (count > 0) card.classList.add('highlighted'); else card.classList.remove('highlighted');
-      // Add per-node breakdown below the count
-      let detailEl = card.querySelector('.ds-node-detail');
-      if (!detailEl) { detailEl = document.createElement('div'); detailEl.className = 'ds-node-detail'; card.appendChild(detailEl); }
-      if (count > 0 && c.nodes && c.nodes.length) {
-        let html = '';
-        c.nodes.forEach(n => {
-          html += '<div class="text-[9px] text-[#94a3b8] mt-1 text-left w-full">';
-          html += '<span class="text-[#6de4ff]">' + esc(n.node) + '</span>: ' + n.session_count + ' session' + (n.session_count !== 1 ? 's' : '');
-          if (n.sessions && n.sessions.length) {
-            n.sessions.forEach(s => {
-              const proto = s.protocol || '?';
-              const bytes = s.bytes ? (s.bytes > 1048576 ? (s.bytes/1048576).toFixed(1)+'MB' : s.bytes > 1024 ? (s.bytes/1024).toFixed(0)+'KB' : s.bytes+'B') : '0B';
-              html += '<div class="pl-2 text-[#64748b]">' + esc(s.src_ip||'?') + ' &rarr; ' + esc(s.dst_ip||'?') + ' [' + esc(proto) + '] ' + bytes + '</div>';
-            });
-          }
-          html += '</div>';
-        });
-        detailEl.innerHTML = html;
-      } else {
-        detailEl.innerHTML = '';
-      }
-    }
-  });
-}
-
-/* ── S5b: Arkime Node Stats ── */
-function renderArkimeNodes(data) {
-  const el = document.getElementById('arkime-nodes');
-  if (!data || data.error) {
-    el.innerHTML = '<span class="text-ion-coral text-xs">' + esc(data?.error || 'Failed to load') + '</span>';
-    return;
-  }
-  if (!data.configured) { el.innerHTML = '<span class="text-slate-500">Arkime not configured</span>'; return; }
-  const nodes = data.nodes || [];
-  if (!nodes.length) { el.innerHTML = '<span class="text-slate-500">No capture nodes found</span>'; return; }
-
-  function fmtBytes(b) {
-    if (!b || b === 0) return '0 B';
-    const u = ['B','KB','MB','GB','TB'];
-    const i = Math.min(Math.floor(Math.log(b) / Math.log(1024)), u.length - 1);
-    return (b / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0) + ' ' + u[i];
-  }
-
-  let html = '<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">';
-  for (const n of nodes) {
-    const hasDrops = (n.dropped || 0) + (n.es_dropped || 0) + (n.overload_dropped || 0) > 0;
-    const dropClass = hasDrops ? 'border-ion-coral/30' : 'border-white/5';
-    html += `<div class="rounded-lg border ${dropClass} bg-white/[0.02] p-4">`;
-    html += `<div class="flex items-center justify-between mb-3">`;
-    html += `<span class="text-sm font-semibold text-white font-mono">${esc(n.name)}</span>`;
-    html += `<span class="text-[10px] text-slate-500">CPU: ${n.cpu}%</span>`;
-    html += `</div>`;
-    html += `<div class="grid grid-cols-3 gap-2 text-[11px]">`;
-    html += `<div><div class="text-slate-500">Packets</div><div class="text-white font-mono">${(n.packets_24h || 0).toLocaleString()}</div></div>`;
-    html += `<div><div class="text-slate-500">Data</div><div class="text-white font-mono">${fmtBytes(n.bytes_24h)}</div></div>`;
-    html += `<div><div class="text-slate-500">Sessions</div><div class="text-white font-mono">${(n.sessions_24h || 0).toLocaleString()}</div></div>`;
-    html += `<div><div class="text-slate-500">Pkt/s</div><div class="text-ion-cyan font-mono">${n.packets_per_sec || 0}</div></div>`;
-    html += `<div><div class="text-slate-500">Bytes/s</div><div class="text-ion-cyan font-mono">${fmtBytes(n.bytes_per_sec)}</div></div>`;
-    html += `<div><div class="text-slate-500">Sess/s</div><div class="text-ion-cyan font-mono">${n.sessions_per_sec || 0}</div></div>`;
-    if (hasDrops) {
-      html += `<div><div class="text-slate-500">Dropped</div><div class="text-ion-coral font-mono font-semibold">${(n.dropped || 0).toLocaleString()}</div></div>`;
-      html += `<div><div class="text-slate-500">ES Drop</div><div class="text-ion-coral font-mono">${(n.es_dropped || 0).toLocaleString()}</div></div>`;
-      html += `<div><div class="text-slate-500">Overload</div><div class="text-ion-coral font-mono">${(n.overload_dropped || 0).toLocaleString()}</div></div>`;
-    }
-    html += `</div></div>`;
-  }
-  html += '</div>';
-  el.innerHTML = html;
-}
-
-/* ── S6: Rule Failures ──
-   v0.19.14: API renamed rule_name→name, failure_count→failures.
-   Reading both shapes for backwards compat (cached payloads, older
-   API images during a rolling deploy). */
-function renderRuleFailures(data) {
-  const failData = data || {};
-  const failures = failData.rules || (Array.isArray(data) ? data : []);
-  const tbody = document.getElementById('rules-tbody');
-  if (!failures.length) { tbody.innerHTML = '<tr><td colspan="3" class="px-3 py-8 text-center text-slate-500">No rule failures detected</td></tr>'; return; }
-  tbody.innerHTML = failures.map(f => `<tr class="border-b border-white/5 hover:bg-white/[.02]">
-    <td class="px-3 py-2 text-white">${esc(f.name || f.rule_name || '(unnamed)')}</td>
-    <td class="px-3 py-2 text-ion-amber font-mono">${f.failures ?? f.failure_count ?? 0}</td>
-    <td class="px-3 py-2 text-slate-400 font-mono">${fmtTime(f.last_failure)}</td>
-  </tr>`).join('');
-}
-
-/* ── v0.17.1 KPI renderers ── */
-function fmtN(n) {
-  if (n == null || isNaN(n)) return '—';
-  if (n >= 10000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
-  return Number(n).toLocaleString();
-}
-// 24h alerts breakdown (replaces renderOpenAlerts30d on the
-// page — the 30d data is still computed server-side for pptx export
-// but no longer rendered as a KPI card).
-function renderAlerts24h(d) {
-  d = d || {};
-  const sev = d.by_severity || {};
-  const st  = d.by_status || {};
-  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = fmtN(v); };
-  set('ds-a24-total',    d.total);
-  set('ds-a24-critical', sev.critical);
-  set('ds-a24-high',     sev.high);
-  set('ds-a24-medium',   sev.medium);
-  set('ds-a24-low',      sev.low);
-  set('ds-a24-open',     st.open);
-  set('ds-a24-ack',      st.acknowledged);
-  set('ds-a24-closed',   st.closed);
-  const srcEl = document.getElementById('ds-a24-source');
-  if (srcEl) {
-    if (d.source === 'ion_fallback') {
-      srcEl.textContent = 'ION fallback (ES down) — severity n/a';
-    } else {
-      srcEl.textContent = 'ES';
-    }
-  }
-}
-function renderCaseStatusCounts(d) {
-  // API switched to a 24h-scoped view (intake_24h /
-  // closed_24h / open / in_progress).
-  // added by_severity_24h breakdown on the same window.
-  d = d || {};
-  const setIf = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = fmtN(val); };
-  setIf('ds-cs-total',  d.intake_24h);
-  setIf('ds-cs-open',   d.open);
-  setIf('ds-cs-ack',    d.in_progress);
-  setIf('ds-cs-closed', d.closed_24h);
-  const sev = d.by_severity_24h || {};
-  setIf('ds-cs-sev-critical', sev.critical);
-  setIf('ds-cs-sev-high',     sev.high);
-  setIf('ds-cs-sev-medium',   sev.medium);
-  setIf('ds-cs-sev-low',      sev.low);
-  const flow = document.getElementById('ds-cs-flow');
-  if (flow) flow.textContent = `${fmtN(d.intake_24h)} new · ${fmtN(d.closed_24h)} closed`;
-}
-function renderTriageThroughput(d) {
-  d = d || {};
-  document.getElementById('ds-tt-count').textContent = fmtN(d.triaged_24h);
-  const fmtMin = v => (v == null ? '—' : Number(v).toFixed(1));
-  document.getElementById('ds-tt-avg').textContent = fmtMin(d.avg_mtta_minutes);
-  document.getElementById('ds-tt-p50').textContent = fmtMin(d.p50_mtta_minutes);
-  document.getElementById('ds-tt-p90').textContent = fmtMin(d.p90_mtta_minutes);
-}
-
-/* ── Load all checks ── */
-async function loadChecks() {
-  // Show spinners. dc-tbody / wef-tbody were replaced with RAG traffic-light
-  // widgets in v0.9.35 — guard lookups so missing elements don't throw.
-  ['alerts-tbody','stale-tbody','rules-tbody'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.innerHTML = spinner(id === 'rules-tbody' ? 3 : 5);
-  });
-  try {
-    // bypass browser cache. Backend also sends
-    // Cache-Control: no-store; this is belt-and-braces so analysts
-    // don't see "critical alerts from days ago" when ES has nothing
-    // fresh and the previous response is sitting in disk cache.
-    const r = await fetch('/api/daily-standup/checks', { cache: 'no-store' });
-    if (!r.ok) throw new Error('Failed to load checks');
-    const data = await r.json();
-    DS.checksData = data;
-    renderDuty(data.duty);
-    renderCluster(data.cluster_health);
-    renderAlerts(data.critical_alerts);
-    renderStaleCases(data.stale_cases);
-    if (data.dc_log_health) renderLogHealth('dc', data.dc_log_health);
-    if (data.wef_log_health) renderLogHealth('wef', data.wef_log_health);
-    renderRuleFailures(data.rule_failures);
-    // / v0.31.1 KPI cards
-    renderAlerts24h(data.alerts_24h);
-    renderCaseStatusCounts(data.case_status_counts);
-    renderTriageThroughput(data.triage_throughput);
-  } catch (e) {
-    console.error('loadChecks error:', e);
-  }
-}
-
-/* ── Arkime traffic ── */
-async function loadArkimeTraffic() {
-  try {
-    const [trafficResp, nodesResp] = await Promise.all([
-      fetch('/api/daily-standup/arkime/high-risk-traffic'),
-      fetch('/api/daily-standup/arkime/node-stats'),
-    ]);
-    if (trafficResp.ok) {
-      const data = await trafficResp.json();
-      renderArkime(data.countries || []);
-    }
-    if (nodesResp.ok) {
-      const data = await nodesResp.json();
-      renderArkimeNodes(data);
-    }
-  } catch (e) {
-    console.warn('Arkime data not available:', e.message);
-  }
-}
-
-/* ── Threat summary ──
-   v0.19.11: persist generated summary + AOB notes into localStorage so
-   /daily-standup/slides (a separate page) can include them in the
-   slide deck and the .pptx download. Stale-after 12 h. */
+/* ── localStorage, so /daily-standup/slides and the .pptx download can
+      pick up the AI summary and the AOB notes without a full save.
+      Stale after 12 h. ── */
 const _DS_LS_KEY_AI = 'ion.standup.ai_summary';
 const _DS_LS_KEY_AOB = 'ion.standup.aob';
+const _DS_LS_MAX_AGE = 12 * 60 * 60 * 1000;
+
 function _dsSaveLS(key, text) {
   try {
     if (text && text.trim()) {
-      localStorage.setItem(key, JSON.stringify({text, ts: Date.now()}));
+      localStorage.setItem(key, JSON.stringify({text: text, ts: Date.now()}));
     } else {
       localStorage.removeItem(key);
     }
   } catch (_) { /* private mode / quota */ }
 }
-async function generateThreatSummary() {
-  const el = document.getElementById('threat-summary');
-  el.innerHTML = '<span class="ds-spinner"></span> Generating AI summary...';
-  try {
-    const r = await fetch('/api/threat-landscape/ai-summary', {method: 'POST'});
-    if (!r.ok) throw new Error('AI summary request failed');
-    const data = await r.json();
-    DS.threatSummary = data.summary || data.content || '';
-    el.innerHTML = `<div class="whitespace-pre-wrap">${esc(DS.threatSummary)}</div>`;
-    _dsSaveLS(_DS_LS_KEY_AI, DS.threatSummary);
-  } catch (e) {
-    el.innerHTML = `<span class="text-ion-amber">${esc(e.message)}</span>`;
-  }
-}
 
-/* AOB notes — debounce-save to localStorage as the analyst types so the
-   slides page and pptx download can pick them up without a full save. */
-(function () {
-  let aobDebounce;
-  document.addEventListener('DOMContentLoaded', () => {
-    const ta = document.getElementById('additional-notes');
-    if (!ta) return;
-    // Restore if a recent value exists.
-    try {
-      const raw = localStorage.getItem(_DS_LS_KEY_AOB);
-      if (raw) {
-        const {text, ts} = JSON.parse(raw);
-        if (text && Date.now() - (ts || 0) < 12 * 60 * 60 * 1000) {
-          ta.value = text;
-        }
-      }
-    } catch (_) {}
-    ta.addEventListener('input', () => {
-      clearTimeout(aobDebounce);
-      aobDebounce = setTimeout(() => _dsSaveLS(_DS_LS_KEY_AOB, ta.value), 400);
-    });
-  });
-})();
-
-/* .pptx download — POST localStorage AI summary + AOB so the deck
-   includes them. v0.19.11. */
 function _dsReadLS(key) {
   try {
     const raw = localStorage.getItem(key);
     if (!raw) return '';
-    const {text, ts} = JSON.parse(raw);
-    if (!text) return '';
-    if (Date.now() - (ts || 0) > 12 * 60 * 60 * 1000) return '';
-    return text;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.text) return '';
+    if (Date.now() - (parsed.ts || 0) > _DS_LS_MAX_AGE) return '';
+    return parsed.text;
   } catch (_) { return ''; }
 }
-async function dsDownloadPptx(ev) {
-  if (ev) ev.preventDefault();
-  // Prefer the live textarea contents over what's been debounced into
-  // localStorage — operator may have just typed it without yet pausing.
-  const ta = document.getElementById('additional-notes');
-  const aob = (ta && ta.value && ta.value.trim()) || _dsReadLS(_DS_LS_KEY_AOB);
-  const ai = (DS && DS.threatSummary) || _dsReadLS(_DS_LS_KEY_AI);
+
+/* The summary as the fragment rendered it. One copy, read back rather than
+   kept in a second variable that could drift from what is on screen. */
+function dsSummaryText() {
+  const el = document.getElementById('threat-summary-text');
+  return el ? el.textContent : '';
+}
+
+/* ── The sweep and the report list, as the save endpoints already accept
+      them. Both arrive in a data attribute through |tojson and are parsed
+      with JSON.parse: on a throw this returns null and undefined rather
+      than {} and [], because posting an empty sweep would record a
+      sign-off against checks that were never read. ── */
+function _dsJson(id, attribute) {
+  const el = document.getElementById(id);
+  if (!el) return null;
+  const raw = el.getAttribute(attribute);
+  if (!raw) return null;
   try {
-    const r = await fetch('/api/daily-standup/pptx', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      credentials: 'same-origin',
-      body: JSON.stringify({ai_summary: ai || '', aob: aob || ''}),
-    });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const blob = await r.blob();
-    const cd = r.headers.get('Content-Disposition') || '';
-    const m = cd.match(/filename="([^"]+)"/);
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = m ? m[1] : 'Daily-Standup.pptx';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(a.href);
+    return JSON.parse(raw);
   } catch (e) {
-    alert('Download failed: ' + e.message);
+    console.error('standup: ' + attribute + ' could not be parsed', e);
+    return null;
   }
 }
 
-/* ── Reports of interest ── */
-async function loadReports() {
-  const el = document.getElementById('threat-reports');
-  try {
-    const r = await fetch('/api/threat-landscape/reports?limit=5');
-    if (!r.ok) throw new Error('Reports fetch failed');
-    const data = await r.json();
-    const reports = data.reports || data || [];
-    DS.reports = reports;  // v0.15.2: cached so collectState() can ship them to /save + /pdf
-    if (!reports.length) { el.textContent = 'No reports available.'; return; }
-    el.innerHTML = reports.map(rpt => `<div class="ds-report-item" data-click-action="dsOpenReport" data-args='[${JSON.stringify(rpt.id)}]'>
-      <svg class="w-3 h-3 text-ion-cyan shrink-0"><use href="#i-file-text"/></svg>
-      <span class="text-slate-300 truncate flex-1">${esc(rpt.title || rpt.name || 'Untitled')}</span>
-      <span class="text-slate-600 text-[11px] shrink-0">${fmtShort(rpt.published || rpt.created_at)}</span>
-    </div>`).join('');
-  } catch (e) {
-    el.innerHTML = `<span class="text-slate-500">${esc(e.message)}</span>`;
-  }
-}
-
-/* ── Report detail slide-over ── */
-window.dsOpenReport = async function(reportId) {
-  const panel    = document.getElementById('ds-report-panel');
-  const backdrop = document.getElementById('ds-report-backdrop');
-  const title    = document.getElementById('ds-report-title');
-  const body     = document.getElementById('ds-report-body');
-  title.textContent = '—';
-  body.innerHTML = '<div class="flex justify-center py-10"><span class="ds-spinner"></span></div>';
-  panel.style.display = 'block';
-  backdrop.style.display = 'block';
-  try {
-    const r = await fetch('/api/threat-landscape/reports/' + encodeURIComponent(reportId));
-    if (!r.ok) {
-      const err = await r.json().catch(() => ({}));
-      throw new Error(err.detail || 'HTTP ' + r.status);
-    }
-    const d = await r.json();
-    title.textContent = d.name || 'Report';
-    const secs = [];
-
-    // Meta
-    const meta = [];
-    if (d.published) meta.push(new Date(d.published).toLocaleDateString());
-    if (d.types && d.types.length) meta.push(d.types.join(', '));
-    if (d.source) meta.push(esc(d.source));
-    if (d.confidence != null) meta.push('Confidence ' + d.confidence + '%');
-    if (meta.length) secs.push('<p class="text-[10px] text-slate-500 font-mono mb-3">' + meta.join(' · ') + '</p>');
-
-    // Labels
-    if (d.labels && d.labels.length) {
-      secs.push('<div class="flex flex-wrap gap-1 mb-3">' +
-        d.labels.map(l => `<span class="ds-rpt-tag">${esc(l.value)}</span>`).join('') +
-      '</div>');
-    }
-
-    // Body
-    if (d.body) {
-      secs.push('<div class="ds-rpt-sec-hdr">Report Content</div>' +
-        '<p class="text-[12px] text-slate-300 leading-relaxed whitespace-pre-wrap mb-2">' + esc(d.body) + '</p>');
-    }
-
-    // Threat actors
-    if (d.related_actors && d.related_actors.length) {
-      secs.push('<div class="ds-rpt-sec-hdr">Threat Actors</div>' +
-        d.related_actors.map(a =>
-          '<div class="text-[12px] text-slate-200 py-0.5">' + esc(a.name) +
-          (a.aliases && a.aliases.length ? ' <span class="text-slate-500 text-[11px]">(' + esc(a.aliases.join(', ')) + ')</span>' : '') +
-          '</div>'
-        ).join(''));
-    }
-
-    // MITRE ATT&CK
-    if (d.related_ttps && d.related_ttps.length) {
-      secs.push('<div class="ds-rpt-sec-hdr">MITRE ATT&amp;CK</div>' +
-        '<div class="flex flex-wrap gap-1">' +
-        d.related_ttps.map(t =>
-          '<span class="ds-rpt-ttp">' + (t.mitre_id ? esc(t.mitre_id) + ' — ' : '') + esc(t.name) + '</span>'
-        ).join('') + '</div>');
-    }
-
-    // Malware
-    if (d.related_malware && d.related_malware.length) {
-      secs.push('<div class="ds-rpt-sec-hdr">Malware</div>' +
-        '<div class="flex flex-wrap gap-1">' +
-        d.related_malware.map(m => `<span class="ds-rpt-tag">${esc(m.name)}</span>`).join('') +
-        '</div>');
-    }
-
-    // Vulnerabilities
-    if (d.related_vulns && d.related_vulns.length) {
-      secs.push('<div class="ds-rpt-sec-hdr">Vulnerabilities</div>' +
-        '<div class="flex flex-wrap gap-1">' +
-        d.related_vulns.map(v => `<span class="ds-rpt-ttp">${esc(v.name)}</span>`).join('') +
-        '</div>');
-    }
-
-    // Countries / sectors
-    if (d.related_countries && d.related_countries.length) {
-      secs.push('<div class="ds-rpt-sec-hdr">Target Countries</div>' +
-        '<p class="text-[12px] text-slate-300">' + esc(d.related_countries.join(', ')) + '</p>');
-    }
-    if (d.related_sectors && d.related_sectors.length) {
-      secs.push('<div class="ds-rpt-sec-hdr">Target Sectors</div>' +
-        '<p class="text-[12px] text-slate-300">' + esc(d.related_sectors.join(', ')) + '</p>');
-    }
-
-    // Indicators
-    if (d.related_indicators && d.related_indicators.length) {
-      const shown = d.related_indicators.slice(0, 10);
-      secs.push('<div class="ds-rpt-sec-hdr">Indicators (' + shown.length + (d.related_indicators.length > 10 ? '+' : '') + ')</div>' +
-        '<ul class="space-y-1">' +
-        shown.map(i => '<li class="text-[11px] font-mono text-slate-400 break-all">' + esc(i.pattern) + '</li>').join('') +
-        '</ul>');
-    }
-
-    body.innerHTML = secs.join('') || '<p class="text-[12px] text-slate-500">No details available.</p>';
-  } catch(e) {
-    body.innerHTML = '<p class="text-[12px] text-red-400">' + esc(String(e.message || e)) + '</p>';
-  }
-};
-
-window.dsCloseReport = function() {
-  document.getElementById('ds-report-panel').style.display = 'none';
-  document.getElementById('ds-report-backdrop').style.display = 'none';
-};
-
-/* ── Run all checks in parallel ── */
-async function runChecks() {
-  const btn = document.getElementById('btn-run-checks');
-  btn.disabled = true; btn.innerHTML = '<span class="ds-spinner"></span> Running...';
-  await Promise.all([loadChecks(), loadArkimeTraffic(), loadReports()]);
-  btn.disabled = false; btn.innerHTML = '<svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg> Run Checks';
-  markDirty();
-}
-
-/* ── Collect form state ──
- *
- * field names match StandupSaveRequest in daily_standup_api.py
- * exactly. The earlier shape (threat_summary / servicenow_incidents /
- * signoff_analyst / signoff_confirmed) was silently dropped by pydantic
- * so the AI summary, ServiceNow notes, sign-off and meetings checklist
- * never made it into the saved doc or the PDF export. */
 function collectState() {
   const meetings = {};
-  document.querySelectorAll('.ds-meeting-cb').forEach(cb => { meetings[cb.dataset.item] = cb.checked; });
+  document.querySelectorAll('.ds-meeting-cb').forEach(function (cb) {
+    meetings[cb.dataset.item] = cb.checked;
+  });
+  const checks = _dsJson('ds-checks-data', 'data-ds-checks');
+  const reports = _dsJson('ds-reports-data', 'data-ds-reports');
   return {
-    checks_data: DS.checksData,
-    ai_summary: DS.threatSummary || '',
-    reports_of_interest: DS.reports || [],
+    checks_data: checks || {},
+    ai_summary: dsSummaryText(),
+    reports_of_interest: reports || [],
     servicenow_notes: document.getElementById('snow-incidents').value,
     additional_notes: document.getElementById('additional-notes').value,
     meetings: meetings,
@@ -1184,78 +429,137 @@ function collectState() {
 
 /* ── Save ── */
 async function saveStandup() {
-  // Set sign-off timestamp if confirmed
   if (document.getElementById('signoff-confirm').checked) {
-    document.getElementById('signoff-time').textContent = new Date().toLocaleString() + ' UTC';
+    document.getElementById('signoff-time').textContent =
+      new Date().toLocaleString();
   }
-  const state = collectState();
   try {
-    const r = await fetch('/api/daily-standup/save', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(state)});
+    const r = await fetch('/api/daily-standup/save', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(collectState())
+    });
     if (!r.ok) throw new Error('Save failed');
-    document.getElementById('save-status').innerHTML = '<span class="text-ion-lime">Saved</span>';
-    DS.dirty = false;
+    setSaveStatus('ds-save-ok-template');
     if (typeof showToast === 'function') showToast('Standup saved', 'success');
   } catch (e) {
-    document.getElementById('save-status').innerHTML = '<span class="text-ion-coral">Save failed</span>';
+    setSaveStatus('ds-save-failed-template');
     if (typeof showToast === 'function') showToast(e.message, 'error');
   }
 }
 
 /* ── Export PDF ── */
 async function exportPDF() {
-  const state = collectState();
   try {
-    const r = await fetch('/api/daily-standup/pdf', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(state)});
+    const r = await fetch('/api/daily-standup/pdf', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(collectState())
+    });
     if (!r.ok) throw new Error('PDF export failed');
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `daily-standup-${new Date().toISOString().slice(0,10)}.pdf`;
-    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    a.href = url;
+    a.download = 'daily-standup-' + new Date().toISOString().slice(0, 10) + '.pdf';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   } catch (e) {
     if (typeof showToast === 'function') showToast(e.message, 'error');
   }
 }
 
-/* ── Dirty tracking ── */
-function markDirty() {
-  DS.dirty = true;
-  document.getElementById('save-status').innerHTML = '<span class="text-slate-500">Unsaved changes</span>';
+/* ── .pptx download. Prefers the live textarea over what has been
+      debounced into localStorage: the operator may have just typed it. ── */
+async function dsDownloadPptx(ev) {
+  if (ev) ev.preventDefault();
+  const ta = document.getElementById('additional-notes');
+  const aob = (ta && ta.value && ta.value.trim()) || _dsReadLS(_DS_LS_KEY_AOB);
+  const ai = dsSummaryText() || _dsReadLS(_DS_LS_KEY_AI);
+  try {
+    const r = await fetch('/api/daily-standup/pptx', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      credentials: 'same-origin',
+      body: JSON.stringify({ai_summary: ai || '', aob: aob || ''})
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const blob = await r.blob();
+    const disposition = r.headers.get('Content-Disposition') || '';
+    const match = disposition.match(/filename="([^"]+)"/);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = match ? match[1] : 'Daily-Standup.pptx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+  } catch (e) {
+    if (typeof showToast === 'function') {
+      showToast('Download failed: ' + e.message, 'error');
+    }
+  }
 }
+
+/* ── Dirty tracking ── */
+function markDirty() { setSaveStatus('ds-save-dirty-template'); }
 document.addEventListener('input', markDirty);
 document.addEventListener('change', markDirty);
 
-/* ── Init: populate analyst name from session ── */
-// The rota loads on its own, not via runChecks.
-//
-// runChecks sweeps Elasticsearch and only runs when an operator presses
-// the button. Who is on duty is one local row, and it is most worth
-// knowing on the mornings when Elasticsearch is the thing that broke.
-async function loadDuty() {
-  try {
-    const r = await fetch('/api/daily-standup/duty', { cache: 'no-store' });
-    if (!r.ok) { renderDuty(null); return; }
-    renderDuty(await r.json());
-  } catch (e) {
-    // null renders "unavailable", which is not the same as "nobody".
-    renderDuty(null);
-  }
-}
-document.addEventListener('DOMContentLoaded', loadDuty);
+/* A fresh swap of any region is a change to what a save would record. */
+document.addEventListener('htmx:afterSwap', function (evt) {
+  const id = evt.detail && evt.detail.target ? evt.detail.target.id : '';
+  if (id === 'threat-summary') _dsSaveLS(_DS_LS_KEY_AI, dsSummaryText());
+  if (id === 'duty-line') return;
+  markDirty();
+});
 
-document.addEventListener('DOMContentLoaded', () => {
-  const nameEl = document.getElementById('user-name');
-  if (nameEl && nameEl.textContent && nameEl.textContent !== 'Loading\u2026') {
-    document.getElementById('signoff-analyst').value = nameEl.textContent;
-  } else {
-    // Fallback: wait for app.js user load
-    const obs = new MutationObserver(() => {
-      if (nameEl && nameEl.textContent && nameEl.textContent !== 'Loading\u2026') {
-        document.getElementById('signoff-analyst').value = nameEl.textContent;
-        obs.disconnect();
-      }
+/* ── AOB notes: restore a recent value, then debounce-save as the analyst
+      types so the slides page and the pptx download can pick them up. ── */
+document.addEventListener('DOMContentLoaded', function () {
+  markDirty();
+
+  const ta = document.getElementById('additional-notes');
+  if (ta) {
+    const cached = _dsReadLS(_DS_LS_KEY_AOB);
+    if (cached) ta.value = cached;
+    let debounce;
+    ta.addEventListener('input', function () {
+      clearTimeout(debounce);
+      debounce = setTimeout(function () {
+        _dsSaveLS(_DS_LS_KEY_AOB, ta.value);
+      }, 400);
     });
-    if (nameEl) obs.observe(nameEl, {childList: true, characterData: true, subtree: true});
+  }
+
+  const summary = _dsReadLS(_DS_LS_KEY_AI);
+  if (summary) {
+    const slot = document.getElementById('threat-summary');
+    if (slot && !document.getElementById('threat-summary-text')) {
+      const cached = document.createElement('div');
+      cached.id = 'threat-summary-text';
+      cached.className = 'whitespace-pre-wrap';
+      cached.textContent = summary;
+      slot.replaceChildren(cached);
+    }
+  }
+
+  /* The signed-off name defaults to the session's user, which app.js
+     writes into #user-name some time after this fires. */
+  const nameEl = document.getElementById('user-name');
+  const signoff = document.getElementById('signoff-analyst');
+  function adoptName() {
+    if (!nameEl || !signoff) return false;
+    const text = nameEl.textContent;
+    if (!text || text === 'Loading…') return false;
+    signoff.value = text;
+    return true;
+  }
+  if (!adoptName() && nameEl) {
+    const observer = new MutationObserver(function () {
+      if (adoptName()) observer.disconnect();
+    });
+    observer.observe(nameEl, {childList: true, characterData: true, subtree: true});
   }
 });
 </script>

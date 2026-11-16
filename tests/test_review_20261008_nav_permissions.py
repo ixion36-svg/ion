@@ -46,14 +46,17 @@ from ion.web.nav_permissions import (
     visible_nav_paths,
 )
 
-_BASE = _SRC / "ion" / "web" / "templates" / "base.html"
-
 
 def _nav_hrefs() -> list[str]:
-    """Every internal nav href in the header, Jinja conditionals and all."""
-    html = _BASE.read_text(encoding="utf-8")
+    """Every internal nav href in the header, every licence gate open.
+
+    Rendered rather than read: base.html builds the nav from the registry in
+    nav.py, so the template source holds no hrefs to scrape.
+    """
+    from tests.nav_render import render
+
     hrefs = re.findall(r'<a href="(/[^"#?]*)"[^>]*class="tw-(?:nav-link|drop-item)',
-                       html)
+                       render())
     return sorted(set(hrefs))
 
 

@@ -1,0 +1,213 @@
+{# Job Scheduler fragments for /scheduler.
+
+   One template, five views, because each of them replaced an innerHTML
+   write and they share this file:
+
+     jobs        the card grid, its empty state and its failure state
+     executions  one job's history, in the same three shapes
+     handlers    <option> elements swapped into #sch-handler
+     params      the typed settings inputs, or the raw-JSON marker
+     preview     the plain-English cron line under the expression
+
+   The card chrome is here and the controls are not. Refresh, New Job, the
+   handler select, the cron field and the history panel's Close button live
+   in the page shell, outside whichever region this response replaces, so a
+   failed render cannot take away the control that retries.
+
+   The cron preview deliberately does not use the ts macro. next_runs are
+   instants on the clock the expression is evaluated against, and the line
+   is labelled with that timezone. ts() would mark an aware value
+   data-ts-local="yes", and local-time.js would move the digits onto the
+   viewer's clock while the label still said UTC. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% if view == "handlers" %}
+  {% if failed %}
+    <option value="" disabled selected>Handler catalogue could not be read.</option>
+  {% elif not handlers %}
+    <option value="" disabled selected>No handlers are registered.</option>
+  {% else %}
+    {% for h in handlers %}
+      <option value="{{ h.key }}"{% if h.description %} data-description="{{ h.description }}"{% endif %}>{{ h.label }}</option>
+    {% endfor %}
+  {% endif %}
+
+{% elif view == "params" %}
+  {% if mode == "failed" %}
+    <div data-sch-params="failed" role="alert" class="alert alert-error text-sm">
+      This handler's settings could not be read. That is not an empty form,
+      and it is not a handler that takes raw JSON: what it declares is
+      unknown. Close the dialog and open it again to retry.
+    </div>
+  {% elif mode == "unselected" %}
+    {# Same attribute as the failure above, on purpose. The submit handler
+       refuses both, so a catalogue that has not loaded yet cannot be saved
+       as a job with no settings. #}
+    <div data-sch-params="failed" role="alert" class="alert alert-warning text-sm">
+      No job type is selected, so there are no settings to show. This is not
+      a handler that takes raw JSON.
+    </div>
+  {% elif mode == "raw" %}
+    <div data-sch-params="raw" hidden></div>
+  {% elif mode == "typed" %}
+    <div data-sch-params="typed" class="flex flex-col gap-3">
+      {% if stored_unreadable %}
+        <div role="alert" class="alert alert-warning text-sm">
+          Stored settings could not be parsed, so these fields are the
+          handler's defaults, not what was saved. Saving now replaces the
+          stored value with whatever is shown here.
+        </div>
+      {% endif %}
+      {% for p in parameters %}
+        {% if p.type == "boolean" %}
+          <div>
+            <label class="flex items-center gap-2 cursor-pointer">
+              {# `is true`, not truthiness. The string "false" is truthy and
+                 would arrive checked, which records the opposite of what was
+                 stored. Only a real boolean true ticks the box. #}
+              <input type="checkbox" class="checkbox checkbox-sm"
+                     data-sch-param="{{ p.name }}" data-sch-type="boolean"
+                     {% if p.value is true %}checked{% endif %}>
+              <span class="text-sm">{{ p.label }}</span>
+            </label>
+            {% if p.help %}<p class="text-xs opacity-50">{{ p.help }}</p>{% endif %}
+          </div>
+        {% else %}
+          <div>
+            <label class="text-sm block mb-1">{{ p.label }}</label>
+            {# `is not none` on the value and on both bounds. A minimum of 0
+               and a stored 0 are measurements; a missing bound is not a
+               minimum of zero and must not be rendered as min="0". #}
+            <input class="input w-full" data-sch-param="{{ p.name }}"
+                   data-sch-type="{{ p.type }}"
+                   type="{{ 'number' if p.type == 'integer' else 'text' }}"
+                   {% if p.minimum is not none %}min="{{ p.minimum }}"{% endif %}
+                   {% if p.maximum is not none %}max="{{ p.maximum }}"{% endif %}
+                   {% if p.value is not none %}value="{{ p.value }}"{% else %}value=""{% endif %}>
+            {% if p.help %}<p class="text-xs opacity-50">{{ p.help }}</p>{% endif %}
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  {% endif %}
+
+{% elif view == "preview" %}
+  {% if failed %}
+    <span class="text-error">The schedule preview could not be read. That is not an invalid expression: the check did not run.</span>
+  {% elif preview and preview.valid is false %}
+    <span class="text-error">{{ preview.error or "Invalid cron expression" }}</span>
+  {% elif preview and preview.valid is true %}
+    {% if preview.description %}<span class="text-success">{{ preview.description }}</span>{% endif %}
+    {% if next_labels %}
+      <span class="opacity-60"> — next: {{ next_labels | join(' · ') }}{% if preview.timezone %} ({{ preview.timezone }}){% endif %}</span>
+    {% endif %}
+  {% endif %}
+
+{% elif view == "executions" %}
+  <div class="card bg-base-200 shadow">
+  {% if failed %}
+    <div class="card-body">
+      <div role="alert" class="alert alert-error">
+        Executions{% if job_name %} for {{ job_name }}{% endif %} could not be
+        read. This is not an empty history: the query failed, so whether this
+        job has run is unknown rather than "it has not". Close this panel and
+        open History again to retry.
+      </div>
+    </div>
+  {% elif not executions %}
+    <div class="card-body items-center text-center py-10">
+      <h3 class="card-title">No executions yet{% if job_name %} for {{ job_name }}{% endif %}</h3>
+      <p>Trigger the job manually or wait for the next scheduled run.</p>
+    </div>
+  {% else %}
+    <div class="card-body p-3">
+      {% if job_name %}<h3 class="font-semibold mb-2">Executions — {{ job_name }}</h3>{% endif %}
+      {% for e in executions %}
+        <div class="card bg-base-200 shadow sch-exec-row {{ e.card_cls }} mb-2">
+          <div class="card-body p-3 text-sm">
+            <div class="flex justify-between gap-2">
+              <span class="badge {{ e.badge_css }}">{{ e.status_label }}</span>
+              <span class="font-mono text-xs opacity-60">{{ ts(e.started_at, fallback='—') }}{% if e.duration_ms is not none %} · {{ e.duration_ms }}ms{% endif %}</span>
+            </div>
+            <div class="font-mono text-xs opacity-60">completed: {{ ts(e.completed_at, fallback='—') }}</div>
+            {% if e.error_text %}
+              <div class="text-error font-mono text-xs whitespace-pre-wrap break-words mt-1.5">{{ e.error_text }}</div>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+  </div>
+
+{% elif view == "jobs" %}
+  {% if failed %}
+    <div class="card bg-base-200 shadow">
+      <div class="card-body">
+        <div role="alert" class="alert alert-error">
+          Scheduled jobs could not be read. This is not an empty list: the
+          query failed, so which jobs will run is unknown rather than none.
+          Refresh to try again.
+        </div>
+      </div>
+    </div>
+  {% elif not jobs %}
+    <div class="card bg-base-200 shadow">
+      <div class="card-body items-center text-center py-14">
+        <h3 class="card-title">No scheduled jobs yet</h3>
+        <p>Create a job to run a registered handler on a cron schedule.</p>
+        {# The one control inside the swap target, and a second copy of the
+           shell's New Job button rather than the only one. A render that
+           omits it, including the failure branch above, still leaves
+           Refresh and New Job in the header, so nothing a user needs to
+           retry or recover with can be swapped away. #}
+        <button type="button" class="btn btn-primary mt-3.5" data-click-action="schOpenForm">+ New Job</button>
+      </div>
+    </div>
+  {% else %}
+    <div class="sch-grid">
+      {% for j in jobs %}
+        <div class="card bg-base-200 shadow sch-card {{ j.card_cls }}">
+          <div class="card-body p-4">
+            <div class="flex justify-between items-start gap-3">
+              <div>
+                <div class="font-semibold">{{ j.name }}</div>
+                <div class="font-mono text-xs uppercase tracking-wide opacity-50">{{ j.handler_key }}</div>
+              </div>
+              <span class="badge {{ j.badge_css }} shrink-0">{{ j.status_label }}</span>
+            </div>
+            {% if j.description %}
+              <div class="text-[var(--text-secondary)] text-[.78rem] mt-1">{{ j.description }}</div>
+            {% endif %}
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 mt-2 text-xs opacity-70">
+              <span class="col-span-full font-mono bg-base-300 px-2 py-1 rounded w-fit">{{ j.cron_expr }}</span>
+              <span>next: <strong class="font-mono text-base-content">{{ ts(j.next_run_at, fallback='never') }}</strong></span>
+              <span>last: <strong class="font-mono text-base-content">{{ ts(j.last_run_at, fallback='never') }}</strong></span>
+            </div>
+            {% if j.show_actions %}
+              <div class="card-actions justify-end mt-2 flex-wrap">
+                <button type="button" class="btn btn-ghost btn-sm" data-click-action="schRun" data-args='{{ [j.id] | tojson }}'>Run now</button>
+                {# The job id is the path, not a query parameter. This button
+                   is swapped into #sch-content, which is where an hx-include
+                   would be inherited, and a parameter baked here as well as
+                   inherited would be sent twice. There is no query string,
+                   so there is nothing to send twice. hx-trigger is set
+                   rather than left to default so a load trigger on the
+                   container cannot be what fires it. #}
+                <button type="button" class="btn btn-ghost btn-sm"
+                        hx-get="/ui/scheduler/jobs/{{ j.id }}/executions"
+                        hx-trigger="click"
+                        hx-target="#sch-exec-body"
+                        hx-swap="innerHTML"
+                        data-click-action="schOpenExec">History</button>
+                <button type="button" class="btn btn-ghost btn-sm" data-click-action="schOpenForm" data-job='{{ j.edit | tojson }}'>Edit</button>
+                <button type="button" class="btn btn-ghost btn-sm btn-error" data-click-action="schDelete" data-args='{{ [j.id] | tojson }}'>Delete</button>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endif %}

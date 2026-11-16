@@ -1,5 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Flow Topology · ION{% endblock %}
+{% block head_css %}
+<link rel="stylesheet" href="/static/css/network-topology-page.css?v={{ ion_version }}">
+{% endblock %}
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
@@ -55,9 +58,9 @@
   <div class="card bg-base-200 shadow">
     <div class="card-body">
       <h2 class="card-title text-xs uppercase tracking-widest opacity-70">NSE metrics</h2>
-      <div id="nt-metrics" class="nt-kv">—</div>
+      <div id="nt-metrics" class="nt-kv">Loading…</div>
       <h2 class="card-title text-xs uppercase tracking-widest opacity-70 mt-3.5">Top ports by volume</h2>
-      <div id="nt-ports">—</div>
+      <div id="nt-ports">Loading…</div>
       <a class="link link-primary text-sm mt-2.5 inline-block" href="/arkime-traffic">Traffic Analytics →</a>
     </div>
   </div>
@@ -70,200 +73,31 @@
   </div>
 </div>
 
+<template id="nt-canvas-loading">
+  <div class="nt-loading"><span class="nt-spinner"></span><span class="nt-loading-text">Building graph…</span></div>
+</template>
+<template id="nt-canvas-message">
+  <div class="nt-loading"><span class="nt-loading-text"></span></div>
+</template>
+
 </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}" id="__________cytoscape_stylesheet">
-/* Cytoscape injects this exact rule as a nonce-less <style> unless an element
-   with that id already exists, which would violate our strict style-src. Owning
-   the id suppresses the injection — keep both the id and the rule. */
-.__________cytoscape_container { position: relative; }
-/* JS toggles .active on .nt-seg-btn, not daisyUI .btn-active. Bridge the two. */
-#nt-range-tabs .nt-seg-btn.active {
-  background-color: var(--color-primary);
-  color: var(--color-primary-content);
-  font-weight: 600;
-  border-color: var(--color-primary);
-}
-
-/* JS classList toggles .hidden on the warning. ID+class so daisyUI .alert
-   { display: grid } cannot win. */
-#nt-unconfigured.hidden { display: none; }
-
-/* JS innerHTML: #nt-meta hosts / conversations / method / legend. */
-#nt-meta strong {
-  color: var(--color-base-content);
-  font-family: var(--font-mono, ui-monospace, monospace);
-}
-/* Ops-console backdrop: dark base + a faint blue glow + a subtle grid, so the
-   graph reads as a surface rather than floating on flat grey. Cytoscape draws on
-   a transparent canvas, so this shows through behind the nodes. */
-#nt-canvas {
-  background-color: #0b0f14;
-  background-image:
-    radial-gradient(1000px circle at 50% 28%, rgba(88, 166, 255, 0.12), transparent 55%),
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size: 100% 100%, 28px 28px, 28px 28px;
-  border: 1px solid var(--color-base-300);
-}
-.nt-legend {
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
-  margin-left: auto;
-  flex-wrap: wrap;
-}
-.nt-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: .7rem;
-}
-.nt-legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  display: inline-block;
-  border: 1px solid var(--color-base-300);
-}
-.nt-method {
-  font-size: .66rem;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  border: 1px solid var(--color-base-300);
-  border-radius: 999px;
-  padding: 2px 8px;
-}
-
-/* JS innerHTML: canvas loading / error / empty states. */
-.nt-loading {
-  text-align: center;
-  padding: 60px;
-  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
-}
-.nt-spinner {
-  display: inline-block;
-  width: 20px;
-  height: 20px;
-  border: 3px solid var(--color-base-300);
-  border-top-color: var(--color-primary);
-  border-radius: 50%;
-  animation: nt-spin .8s linear infinite;
-  margin-right: 8px;
-  vertical-align: middle;
-}
-@keyframes nt-spin { to { transform: rotate(360deg); } }
-
-/* JS classList toggles .empty; JS innerHTML injects h3 / .nt-detail-meta / .nt-link. */
-.nt-detail h3 {
-  font-size: 1rem;
-  color: var(--color-base-content);
-  margin: 0 0 6px 0;
-  font-family: var(--font-mono, ui-monospace, monospace);
-}
-.nt-detail.empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-style: italic;
-  font-size: .82rem;
-}
-.nt-detail-meta {
-  font-size: .76rem;
-  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
-  line-height: 1.7;
-}
-.nt-detail-meta b {
-  color: var(--color-base-content);
-  font-weight: 600;
-}
-.nt-mt { margin-top: 14px; }
-.nt-link {
-  display: inline-block;
-  margin-top: 10px;
-  color: var(--color-primary);
-  font-size: .78rem;
-  text-decoration: none;
-}
-.nt-link:hover { text-decoration: underline; }
-
-/* JS innerHTML: #nt-metrics kv list. */
-.nt-kv {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: .8rem;
-}
-.nt-kv strong {
-  color: var(--color-base-content);
-  font-family: var(--font-mono, ui-monospace, monospace);
-}
-
-/* JS innerHTML: port volume bars. Width is set via data-ion-style. */
-.nt-port-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: .76rem;
-  margin-bottom: 4px;
-}
-.nt-port-name {
-  width: 64px;
-  font-family: var(--font-mono, ui-monospace, monospace);
-  color: var(--color-base-content);
-}
-.nt-port-bar {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--color-primary);
-  opacity: .75;
-  min-width: 2px;
-}
-.nt-port-val {
-  font-size: .7rem;
-  opacity: .7;
-}
-
-/* JS innerHTML: unavailable metric rows. */
-.nt-unavail-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 5px 0;
-  border-bottom: 1px dashed var(--color-base-300);
-  font-size: .78rem;
-}
-.nt-unavail-row:last-of-type { border-bottom: none; }
-.nt-unavail-name { color: var(--color-base-content); }
-.nt-unavail-req {
-  font-size: .7rem;
-  white-space: nowrap;
-  opacity: .7;
-}
-.nt-tag {
-  display: inline-block;
-  font-size: .64rem;
-  border: 1px solid var(--color-base-300);
-  border-radius: 999px;
-  padding: 1px 7px;
-  margin-left: 6px;
-  text-transform: uppercase;
-  letter-spacing: .5px;
-}
-</style>
+<style nonce="{{ csp_nonce }}" id="__________cytoscape_stylesheet"></style>
 <script nonce="{{ csp_nonce }}" src="/static/js/cytoscape.min.js"></script>
 <script nonce="{{ csp_nonce }}">
 const NT_API = '/api/arkime/traffic/topology';
+const NT_MSG_LOADING = 'Building graph…';
+const NT_MSG_UNCONFIGURED = 'No capture source.';
+const NT_MSG_EMPTY = 'Nothing to graph — no Arkime sessions in this range.';
+const NT_MSG_UNREADABLE = 'could not be read';
 let ntCy = null;
 let ntData = null;
 let ntRange = '24h';
 const ntExpanded = new Set();
 
-// One palette per category: [inner, outer] radial-gradient stops. The legend
-// swatch uses the outer stop, so the key always names a colour the graph draws.
 const NT_CATS = {
   subnet:   ['#a5d6ff', '#388bfd'],
   internal: ['#79c0ff', '#1f6feb'],
@@ -271,18 +105,10 @@ const NT_CATS = {
   threat:   ['#ff9492', '#da3633'],
   asset:    ['#56d364', '#238636'],
 };
-const NT_COLORS = Object.fromEntries(
-  Object.entries(NT_CATS).map(([cat, stops]) => [cat, stops[1]])
-);
 
-// Log-scaled sizes so a byte range spanning orders of magnitude stays legible.
 function ntNodeSize(bytes){ const b = Math.max(Number(bytes) || 0, 1); return Math.max(22, Math.min(92, 16 + Math.log10(b) * 9)); }
 function ntEdgeWidth(bytes){ const b = Math.max(Number(bytes) || 0, 1); return Math.max(1.5, Math.min(12, Math.log10(b) * 1.6)); }
 
-// Cytoscape stylesheet — gradient spheres, category colours, a red glow on
-// threat-linked nodes, curved width-scaled edges. Node/edge label text comes
-// from packet capture; Cytoscape renders labels as plain text (not HTML), so
-// this is not an injection sink (the detail panel does its own escaping).
 const NT_CY_STYLE = [
   { selector: 'node', style: {
       'width': 'data(size)', 'height': 'data(size)',
@@ -296,7 +122,7 @@ const NT_CY_STYLE = [
   { selector: 'node[kind="subnet"]', style: { 'shape': 'round-hexagon' } },
   { selector: 'node[kind="host"]',   style: { 'shape': 'ellipse' } },
   ...Object.entries(NT_CATS).map(([cat, stops]) => ({
-    selector: `node[cat="${cat}"]`,
+    selector: 'node[cat="' + cat + '"]',
     style: { 'background-gradient-stop-colors': stops.join(' ') },
   })),
   { selector: 'node[cat="threat"]', style: {
@@ -315,19 +141,23 @@ const NT_CY_STYLE = [
   { selector: 'edge:selected', style: { 'width': 4, 'line-color': '#58a6ff', 'target-arrow-color': '#58a6ff', 'opacity': 1 } },
 ];
 
-function ntEsc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
-
-function ntFmtBytes(b){
-  b = Number(b) || 0;
-  const units = ['B','KB','MB','GB','TB'];
-  let i = 0;
-  while (b >= 1024 && i < units.length - 1) { b /= 1024; i++; }
-  return (i === 0 ? b : b.toFixed(1)) + ' ' + units[i];
+function cloneTemplate(id) {
+  const tpl = document.getElementById(id);
+  if (!tpl || !tpl.content || !tpl.content.firstElementChild) return null;
+  return tpl.content.firstElementChild.cloneNode(true);
 }
 
-function ntFmtRate(bps){
-  if (bps == null) return null;
-  return ntFmtBytes(bps) + '/s';
+function ntSetCanvas(message, loading) {
+  if (ntCy) { ntCy.destroy(); ntCy = null; }
+  const canvas = document.getElementById('nt-canvas');
+  const node = cloneTemplate(loading ? 'nt-canvas-loading' : 'nt-canvas-message');
+  if (!node) {
+    canvas.replaceChildren();
+    return;
+  }
+  const text = node.querySelector('.nt-loading-text');
+  if (text) text.textContent = message;
+  canvas.replaceChildren(node);
 }
 
 function ntSetRange(r){
@@ -338,28 +168,43 @@ function ntSetRange(r){
   ntLoad();
 }
 
+function ntBoardUrl() {
+  const params = new URLSearchParams();
+  params.set('range', ntRange);
+  if (document.getElementById('nt-ext').checked) params.set('exclude_private', 'true');
+  return '/ui/network-topology/board?' + params.toString();
+}
+
+function ntLoadBoard(url) {
+  return htmx.ajax('GET', url, { target: '#nt-meta', swap: 'innerHTML' });
+}
+
 async function ntLoad(){
   ntExpanded.clear();
-  const ext = document.getElementById('nt-ext').checked ? '&exclude_private=true' : '';
-  document.getElementById('nt-meta').textContent = 'Loading graph…';
-  document.getElementById('nt-canvas').innerHTML = '<div class="nt-loading"><span class="nt-spinner"></span> Building graph…</div>';
+  const boardUrl = ntBoardUrl();
+  const banner = document.getElementById('nt-unconfigured');
+  ntSetCanvas(NT_MSG_LOADING, true);
   try {
-    const r = await fetch(`${NT_API}?range=${ntRange}${ext}`);
-    if (r.status === 503) {
-      document.getElementById('nt-unconfigured').classList.remove('hidden');
-      document.getElementById('nt-meta').textContent = 'Arkime not configured.';
-      document.getElementById('nt-canvas').innerHTML = '<div class="nt-loading">No capture source.</div>';
-      return;
+    const response = await fetch(NT_API + '?' + boardUrl.split('?')[1]);
+    if (response.status === 503) {
+      banner.classList.remove('hidden');
+      ntSetCanvas(NT_MSG_UNCONFIGURED, false);
+    } else if (!response.ok) {
+      banner.classList.add('hidden');
+      ntSetCanvas(NT_MSG_UNREADABLE, false);
+    } else {
+      banner.classList.add('hidden');
+      ntData = await response.json();
+      ntRender();
     }
-    if (!r.ok) throw new Error('Topology request failed (HTTP ' + r.status + ')');
-    document.getElementById('nt-unconfigured').classList.add('hidden');
-    ntData = await r.json();
-    ntRender();
-    ntRenderMetrics();
-    ntRenderUnavailable();
-  } catch (e) {
-    document.getElementById('nt-meta').textContent = 'Error loading topology.';
-    document.getElementById('nt-canvas').innerHTML = `<div class="nt-loading">${ntEsc(e.message)}</div>`;
+  } catch (err) {
+    banner.classList.add('hidden');
+    ntSetCanvas(NT_MSG_UNREADABLE, false);
+  }
+  try {
+    await ntLoadBoard(boardUrl);
+  } catch (err) {
+    /* the fragment route was unreachable; the cards stay on Loading */
   }
 }
 
@@ -371,8 +216,8 @@ function ntNodeCategory(n){
 
 function ntBuildGraph(){
   const grouped = document.getElementById('nt-group').checked;
-  const hosts = ntData.nodes || [];
-  const rawEdges = ntData.edges || [];
+  const hosts = Array.isArray(ntData.nodes) ? ntData.nodes : [];
+  const rawEdges = Array.isArray(ntData.edges) ? ntData.edges : [];
   const subnetOf = {};
   hosts.forEach(n => { subnetOf[n.ip] = n.subnet || ''; });
 
@@ -399,14 +244,13 @@ function ntBuildGraph(){
   const edgeMap = new Map();
   rawEdges.forEach(e => {
     const a = keyFor(e.src), b = keyFor(e.dst);
-    if (a === b) return; // intra-subnet chatter collapses away when grouped
+    if (a === b) return;
     const k = a + '|' + b;
     let agg = edgeMap.get(k);
     if (!agg) { agg = { from: a, to: b, bytes: 0, sessions: 0, protos: {}, sample: e }; edgeMap.set(k, agg); }
     agg.bytes += e.bytes; agg.sessions += e.sessions;
     if (e.protocol) agg.protos[e.protocol] = (agg.protos[e.protocol] || 0) + e.bytes;
     if (e.bytes > agg.sample.bytes) agg.sample = e;
-    // Aggregate the worst endpoint-threat seen on any flow in this pair.
     if (e.threat && (!agg.threat || e.threat.rank > agg.threat.rank)) agg.threat = e.threat;
   });
 
@@ -414,14 +258,14 @@ function ntBuildGraph(){
   nodes.forEach((v, k) => {
     if (v.kind === 'host') {
       const n = v.host;
-      const label = n.asset && n.asset.hostname ? `${n.asset.hostname}\n${n.ip}` : n.ip;
+      const label = n.asset && n.asset.hostname ? n.asset.hostname + '\n' + n.ip : n.ip;
       elements.push({ group: 'nodes', data: {
         id: k, label, kind: 'host', cat: ntNodeCategory(n), size: ntNodeSize(n.bytes),
       }});
     } else {
       elements.push({ group: 'nodes', data: {
         id: k, kind: 'subnet', cat: v.threat ? 'threat' : 'subnet', size: ntNodeSize(v.bytes),
-        label: `${v.subnet}\n${v.hosts} host${v.hosts === 1 ? '' : 's'}`,
+        label: v.subnet + '\n' + v.hosts + ' host' + (v.hosts === 1 ? '' : 's'),
       }});
     }
   });
@@ -431,7 +275,7 @@ function ntBuildGraph(){
     const protos = Object.keys(agg.protos);
     const dominant = protos.length ? protos.reduce((a, b) => agg.protos[a] >= agg.protos[b] ? a : b) : '';
     const port = agg.sample.port;
-    const label = dominant ? (port != null ? `${dominant}:${port}` : dominant) : '';
+    const label = dominant ? (port != null ? dominant + ':' + port : dominant) : '';
     elements.push({ group: 'edges', data: {
       id: 'e' + (ei++), source: agg.from, target: agg.to, label,
       width: ntEdgeWidth(agg.bytes),
@@ -443,30 +287,19 @@ function ntBuildGraph(){
 }
 
 function ntRender(){
-  const meta = document.getElementById('nt-meta');
-  const m = (ntData && ntData.metrics) || {};
-  if (!ntData || !(ntData.nodes || []).length) {
-    meta.textContent = 'No conversations captured in this window.';
-    document.getElementById('nt-canvas').innerHTML = '<div class="nt-loading">Nothing to graph — no Arkime sessions in this range.</div>';
+  const nodes = ntData && ntData.nodes;
+  if (!Array.isArray(nodes)) {
+    ntSetCanvas(NT_MSG_UNREADABLE, false);
     return;
   }
-  const legend = Object.entries({
-    subnet: 'subnet', internal: 'internal host', external: 'external host',
-    asset: 'known asset', threat: 'threat-linked',
-  }).map(([k, lbl]) =>
-    `<span class="nt-legend-item"><span class="nt-legend-dot" data-ion-style="background:${NT_COLORS[k]}"></span>${lbl}</span>`
-  ).join('');
-  meta.innerHTML = `
-    <span><strong>${m.hosts || 0}</strong> hosts</span>
-    <span><strong>${m.active_conversations || 0}</strong> conversations</span>
-    <span class="nt-method">${ntEsc(m.method || '')}</span>
-    <span class="nt-legend">${legend}</span>
-  `;
-
+  if (!nodes.length) {
+    ntSetCanvas(NT_MSG_EMPTY, false);
+    return;
+  }
   const elements = ntBuildGraph();
   const container = document.getElementById('nt-canvas');
   if (ntCy) { ntCy.destroy(); ntCy = null; }
-  container.innerHTML = '';
+  container.replaceChildren();
   ntCy = cytoscape({
     container,
     elements,
@@ -478,59 +311,42 @@ function ntRender(){
       gravity: 0.3, componentSpacing: 120, numIter: 1200,
     },
   });
-  // Tap a node/edge for details; tap the empty canvas to clear.
   ntCy.on('tap', 'node', evt => ntShowNode(evt.target.id()));
   ntCy.on('tap', 'edge', evt => ntShowEdge(evt.target.data('agg')));
   ntCy.on('tap', evt => { if (evt.target === ntCy) ntClearDetail(); });
 }
 
+function ntDetailQuery() {
+  const params = new URLSearchParams();
+  params.set('range', ntRange);
+  if (document.getElementById('nt-ext').checked) params.set('exclude_private', 'true');
+  params.set('grouped', document.getElementById('nt-group').checked ? 'true' : 'false');
+  if (ntExpanded.size) params.set('expanded', Array.from(ntExpanded).join(','));
+  return params;
+}
+
 function ntShowNode(id){
   const det = document.getElementById('nt-detail');
-  det.classList.remove('empty');
-  if (id.startsWith('s:')) {
-    const subnet = id.slice(2);
-    const members = (ntData.nodes || []).filter(n => n.subnet === subnet);
-    const bytes = members.reduce((a, n) => a + n.bytes, 0);
-    det.innerHTML = `<h3>${ntEsc(subnet)}</h3>
-      <div class="nt-detail-meta"><b>${members.length}</b> host${members.length === 1 ? '' : 's'} · <b>${ntEsc(ntFmtBytes(bytes))}</b> observed</div>
-      <button class="btn btn-secondary nt-mt" data-click-action="ntDrill" data-args='["${ntEsc(subnet)}"]'>Drill into subnet</button>`;
-    return;
-  }
-  const ip = id.slice(2);
-  const n = (ntData.nodes || []).find(x => x.ip === ip);
-  if (!n) return;
-  const rows = [
-    `<b>${ntEsc(ntFmtBytes(n.bytes))}</b> · <b>${n.sessions}</b> sessions`,
-    n.subnet ? `Subnet: <b>${ntEsc(n.subnet)}</b> · ${n.private ? 'internal (RFC-1918)' : 'external'}` : null,
-    n.asset ? `Asset: <b>${ntEsc(n.asset.hostname)}</b> · criticality <b>${ntEsc(n.asset.criticality)}</b> · ${ntEsc(n.asset.environment)}` : 'Not in CMDB',
-    n.threat ? `Threat: <b>${ntEsc(n.threat.level)}</b>${n.threat.is_ioc ? ' · IOC' : ''} · linked to <b>${n.threat.case_count}</b> case(s)` : 'No observable-ledger hits',
-  ].filter(Boolean).map(r => `<div>${r}</div>`).join('');
-  let links = `<a class="nt-link" href="/observables?search=${encodeURIComponent(ip)}">Observables →</a>`;
-  if (n.asset) links += ` <a class="nt-link" href="/network-map?search=${encodeURIComponent(ip)}">Network Map →</a>`;
-  det.innerHTML = `<h3>${ntEsc(ip)}</h3><div class="nt-detail-meta">${rows}</div>${links}`;
+  if (det) det.classList.remove('empty');
+  const params = ntDetailQuery();
+  params.set('node', id);
+  return htmx.ajax('GET', '/ui/network-topology/node?' + params.toString(), {
+    target: '#nt-detail',
+    swap: 'outerHTML'
+  });
 }
 
 function ntShowEdge(agg){
+  if (!agg) return;
   const det = document.getElementById('nt-detail');
-  det.classList.remove('empty');
-  const s = agg.sample;
-  const rows = [
-    `<b>${ntEsc(ntFmtBytes(agg.bytes))}</b> · <b>${agg.sessions}</b> sessions`,
-    s.protocol ? `Dominant: <b>${ntEsc(s.protocol)}${s.port != null ? ':' + s.port : ''}</b>` : 'Protocol detail needs the session sample',
-    s.throughput_bps != null ? `Busiest pair throughput: <b>${ntEsc(ntFmtRate(s.throughput_bps))}</b>` : null,
-    s.packets ? `<b>${s.packets}</b> packets (sampled)` : null,
-    agg.threat ? `Threat: <b>${ntEsc(agg.threat.level)}</b>${agg.threat.malicious ? ' · <b>malicious endpoint</b>' : ''}${agg.threat.is_ioc ? ' · IOC' : ''}` : null,
-  ].filter(Boolean).map(r => `<div>${r}</div>`).join('');
-  let link = '';
-  if (s.arkime_url && /^https?:\/\//.test(s.arkime_url)) {
-    link = `<a class="nt-link" href="${ntEsc(s.arkime_url)}" target="_blank" rel="noopener noreferrer">Open in Arkime →</a>`;
-  }
-  // Per-edge PCAP: deep-link to the representative flow (its community_id), where
-  // the analyst can pull the capture. href gated ^https?:// and escaped.
-  if (s.arkime_pcap_url && /^https?:\/\//.test(s.arkime_pcap_url)) {
-    link += ` <a class="nt-link" href="${ntEsc(s.arkime_pcap_url)}" target="_blank" rel="noopener noreferrer">Flow PCAP →</a>`;
-  }
-  det.innerHTML = `<h3>${ntEsc(agg.from.slice(2))} → ${ntEsc(agg.to.slice(2))}</h3><div class="nt-detail-meta">${rows}</div>${link}`;
+  if (det) det.classList.remove('empty');
+  const params = ntDetailQuery();
+  params.set('src', agg.from);
+  params.set('dst', agg.to);
+  return htmx.ajax('GET', '/ui/network-topology/edge?' + params.toString(), {
+    target: '#nt-detail',
+    swap: 'outerHTML'
+  });
 }
 
 function ntDrill(subnet){
@@ -542,34 +358,6 @@ function ntClearDetail(){
   const det = document.getElementById('nt-detail');
   det.classList.add('empty');
   det.textContent = 'Select a node or edge for details. Drag to pan, scroll to zoom.';
-}
-
-function ntRenderMetrics(){
-  const m = (ntData && ntData.metrics) || {};
-  document.getElementById('nt-metrics').innerHTML = `
-    <span>Active conversations: <strong>${m.active_conversations || 0}</strong></span>
-    <span>Hosts observed: <strong>${m.hosts || 0}</strong></span>
-    <span>Edge weights: <strong>${ntEsc(m.method === 'connections' ? 'whole-window (connections API)' : 'top-volume sample')}</strong></span>
-  `;
-  const ports = m.port_distribution || [];
-  const el = document.getElementById('nt-ports');
-  if (!ports.length) { el.textContent = 'No port data in this window.'; return; }
-  const max = ports[0].bytes || 1;
-  el.innerHTML = ports.map(p => `
-    <div class="nt-port-row">
-      <span class="nt-port-name">${Number(p.port)}</span>
-      <span class="nt-port-bar" data-ion-style="width:${Math.max(2, Math.round(p.bytes / max * 140))}px"></span>
-      <span class="nt-port-val">${ntEsc(ntFmtBytes(p.bytes))}</span>
-    </div>`).join('');
-}
-
-function ntRenderUnavailable(){
-  const rows = (ntData && ntData.unavailable) || [];
-  document.getElementById('nt-unavailable').innerHTML = rows.map(u => `
-    <div class="nt-unavail-row">
-      <span class="nt-unavail-name">${ntEsc(u.metric)}<span class="nt-tag">unavailable</span></span>
-      <span class="nt-unavail-req">${ntEsc(u.requires)}</span>
-    </div>`).join('');
 }
 
 document.getElementById('nt-group').addEventListener('change', () => { if (ntData) ntRender(); });

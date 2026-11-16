@@ -1,0 +1,42 @@
+{# The four summary tiles of /network-map.
+
+   Replaces four textContent writes and the `Object.keys(d.os_breakdown ||
+   {}).length` behind the fourth. Three of the four were already guarded
+   with `?? '—'` and read correctly; the OS families tile was not, so a
+   stats payload with no breakdown in it reported a measured zero OS
+   families across the whole estate.
+
+   A figure that did not read renders an em dash and says so underneath.
+   The em dash alone is ambiguous, and on a tile labelled "Total Assets"
+   the ambiguity is between an unreachable database and an estate ION has
+   never seen a host in. #}
+
+{% macro tile(label, value, tone='') -%}
+<div class="stat">
+  <div class="stat-title">{{ label }}</div>
+  <div class="stat-value text-2xl{% if tone %} {{ tone }}{% endif %}">
+    {%- if value is not none %}{{ value }}{% else %}&#8212;{% endif -%}
+  </div>
+  {%- if value is none %}
+  <div class="stat-desc">Not measured</div>
+  {%- endif %}
+</div>
+{%- endmacro %}
+
+{% if failed %}
+  {# One tile, not four em dashes. Four of them read as four separate
+     unmeasured figures, when what happened is that the one read behind
+     all four did not complete. #}
+  <div class="stat">
+    <div class="stat-title">Asset summary</div>
+    <div class="stat-value text-2xl">&#8212;</div>
+    <div class="stat-desc">
+      The summary could not be read. These figures are unknown, not zero.
+    </div>
+  </div>
+{% else %}
+  {{ tile('Total Assets', total) }}
+  {{ tile('Seen 24h', seen_24h, 'text-primary') }}
+  {{ tile('Unique IPs', total_ips, 'text-success') }}
+  {{ tile('OS Families', os_families, 'text-secondary') }}
+{% endif %}

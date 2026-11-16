@@ -1,0 +1,123 @@
+{# One IOC lookup result on /tools.
+
+   Replaces three innerHTML writes: the "Looking up..." placeholder, the
+   catch's "Lookup failed", and `displayLookupResult`.
+
+   The render it replaces had never shown a hit. The request carried no
+   `type`, so the endpoint rejected it; and even with a type, the branch
+   `data.found === false || !data.data || data.data.length === 0` tested a
+   `data` key the service does not return, so every response fell into "No
+   threat intelligence found for this IOC". That is a negative finding
+   stated with confidence about an indicator OpenCTI may well know.
+
+   Five outcomes, each its own render:
+
+     failed     the lookup did not run. Not a miss.
+     error      OpenCTI said why it could not answer: disabled, not
+                configured, or an unsupported type. Also not a miss.
+     unknown    the response carried no `found` key, so it did not say.
+     not found  OpenCTI was asked and has no record.
+     found      what it holds.
+
+   The row carries its own values on data attributes so Export Results can
+   build a CSV from what is on screen. The page kept a parallel JavaScript
+   array for that and wrote it into CSV with no quote escaping, so one
+   label containing a double quote broke the row. #}
+
+<div data-ioc-export
+     data-value="{{ value }}"
+     data-type="{{ label }}"
+     data-score="{% if score is not none %}{{ score }}{% endif %}"
+     data-found="{% if found is not none %}{{ 'yes' if found else 'no' }}{% endif %}">
+
+  <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60 mb-2">
+    Results for <code class="font-mono text-[12px]">{{ value }}</code>
+    <span class="badge badge-sm badge-ghost uppercase">{{ label }}</span>
+  </h4>
+
+  {% if failed %}
+  <p class="text-sm text-error">
+    The lookup did not run, so nothing is known about this indicator either
+    way. This is not a result from OpenCTI.
+  </p>
+
+  {% elif error %}
+  <p class="text-sm text-error">{{ error }}</p>
+  <p class="text-sm opacity-60">
+    OpenCTI refused the query, so this indicator has not been checked.
+  </p>
+
+  {% elif found is none %}
+  <p class="text-sm opacity-60">
+    OpenCTI answered without saying whether it holds this indicator, so
+    neither a hit nor a miss can be reported.
+  </p>
+
+  {% elif not found %}
+  <p class="text-sm opacity-60">
+    OpenCTI has no record of this indicator.
+  </p>
+
+  {% else %}
+  <div class="overflow-x-auto">
+    <table class="data-table">
+      <tr>
+        <td><strong>Type</strong></td>
+        <td>{{ label }} <code class="font-mono text-[12px]">{{ ioc_type }}</code></td>
+      </tr>
+      <tr>
+        <td><strong>Risk Score</strong></td>
+        <td>
+          {#- A measured zero is OpenCTI's "known and assessed as benign",
+              which is a finding. `data.score || '-'` printed a dash for
+              it, indistinguishable from an indicator with no score. -#}
+          {% if score is not none %}
+          <span class="badge badge-sm {% if score > 70 %}badge-error{% elif score > 40 %}badge-warning{% else %}badge-ghost{% endif %}">{{ score }}</span>
+          {%- else %}
+          <span class="opacity-60">no score recorded</span>
+          {%- endif %}
+        </td>
+      </tr>
+      {% if labels %}
+      <tr>
+        <td><strong>Labels</strong></td>
+        <td>
+          {%- for name in labels %}
+          <span class="tag">{{ name }}</span>
+          {%- endfor %}
+        </td>
+      </tr>
+      {% endif %}
+      {% if description %}
+      <tr>
+        <td><strong>Description</strong></td>
+        <td>{{ description }}</td>
+      </tr>
+      {% endif %}
+    </table>
+  </div>
+
+  {# The three lists the response actually carries. The page rendered
+     `data.relationships`, which the service never returns, so this whole
+     region was dead code while real indicators went unshown. #}
+  {% for title, group in [('Indicators', indicators),
+                          ('Threat Actors', threat_actors),
+                          ('Reports', reports)] %}
+  {% if group %}
+  <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60 mt-4 mb-2">{{ title }}</h4>
+  <ul class="list-disc pl-5 text-sm">
+    {%- for row in group %}
+    <li>
+      {{ row.name }}
+      {%- if row.score is not none %} <span class="opacity-60">(score {{ row.score }})</span>{% endif %}
+    </li>
+    {%- endfor %}
+  </ul>
+  {% endif %}
+  {% endfor %}
+
+  <p class="text-sm mt-4">
+    <a class="link" href="{{ observables_url | safe_url('/observables') }}">Open in Observables</a>
+  </p>
+  {% endif %}
+</div>

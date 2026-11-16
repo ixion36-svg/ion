@@ -2,6 +2,14 @@
 
 {% block title %}Discover - ION{% endblock %}
 
+{% block head_css %}
+{# The page's own rules, for the classes the server-rendered fragments
+   emit. head_css loads at base.html line 50, so this beats ion.css and
+   ion-migrated-styles.css and loses to ion-workspace.css; neither of the
+   selectors here appears in that sheet. #}
+<link rel="stylesheet" href="/static/css/discover-page.css?v={{ ion_version }}">
+{% endblock %}
+
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
@@ -203,6 +211,10 @@
                     <tr><td colspan="3" class="empty-state">Enter a query and click Search</td></tr>
                 </tbody>
             </table>
+            {# POST /ui/discover/search swaps the three figures the
+               pin-to-case capture needs onto this, so running a search
+               does not cost a second round trip to collect them. #}
+            <span id="dsc-search-meta" class="hidden"></span>
         </div>
     </div>
 </div>
@@ -393,343 +405,51 @@
 </div>
 
 
-<style nonce="{{ csp_nonce }}">
-/* Discover page specific styles.
-   RESTORED: the daisyUI restyle removed this wholesale, which is safe for the
-   static markup it converted but not for the classes below, which JS builds at
-   runtime inside script template literals and so cannot be converted --
-   .modal-overlay/.modal-dialog (shared with the JS-built #nl-query-modal),
-   .saved-search-*, .histogram-bar, .health-*, .found-badge/.not-found-badge,
-   .index-badge, .clickable, .empty-searches, .stat/.stat-label/.stat-value.
-   No verification tool caught the loss: the audit checks hashed classes and
-   inline styles, and the spot check only reads JS->CSS contracts it can see a
-   rule for somewhere. Rules for markup that no longer exists are inert. */
-/* Discover page specific styles */
-.page-subtitle {
-    color: var(--text-secondary);
-    margin-top: 0.5rem;
-}
-
-.discover-search-form,
-.ioc-hunt-form,
-.bulk-ioc-form {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.form-row {
-    display: flex;
-    gap: 1rem;
-}
-
-.form-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
-
-.form-group label {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-}
-
-.form-actions {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-}
-
-.search-results-container,
-.indices-container,
-.mappings-container,
-.field-stats-container {
-    max-height: 500px;
-    overflow-y: auto;
-}
-
-.data-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.9rem;
-}
-
-.data-table th,
-.data-table td {
-    padding: 0.5rem;
-    text-align: left;
-    border-bottom: 1px solid var(--ion-border);
-}
-
-.data-table th {
-    background: var(--bg-secondary);
-    position: sticky;
-    top: 0;
-}
-
-.data-table tr:hover {
-    background: var(--bg-hover);
-}
-
-.empty-state {
-    text-align: center;
-    color: var(--text-secondary);
-    padding: 2rem;
-}
-
-.health-green { color: var(--success); }
-.health-yellow { color: var(--warning); }
-.health-red { color: var(--danger); }
-
-.checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.85rem;
-}
-
-.ioc-hunt-summary {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 1rem;
-    padding: 1rem;
-    background: var(--bg-secondary);
-    border-radius: 4px;
-}
-
-.ioc-hunt-summary .stat {
-    display: flex;
-    flex-direction: column;
-}
-
-.ioc-hunt-summary .stat-label {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-}
-
-.ioc-hunt-summary .stat-value {
-    font-size: 1.25rem;
-    font-weight: bold;
-}
-
-.ioc-indices-found {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    margin-bottom: 1rem;
-}
-
-.ioc-indices-found .index-badge {
-    background: var(--bg-tertiary);
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.8rem;
-}
-
-.bulk-summary {
-    display: flex;
-    gap: 2rem;
-    margin-bottom: 1rem;
-    padding: 1rem;
-    background: var(--bg-secondary);
-    border-radius: 4px;
-}
-
-.found-badge { color: var(--success); }
-.not-found-badge { color: var(--text-secondary); }
-
-.histogram-container {
-    height: 150px;
-    display: flex;
-    align-items: flex-end;
-    gap: 2px;
-    padding: 1rem;
-}
-
-.histogram-bar {
-    flex: 1;
-    background: var(--accent-color);
-    min-width: 8px;
-    transition: height 0.3s ease;
-}
-
-.histogram-bar:hover {
-    opacity: 0.8;
-}
-
-.stats-summary {
-    display: flex;
-    gap: 2rem;
-    margin-bottom: 1rem;
-    padding: 1rem;
-    background: var(--bg-secondary);
-    border-radius: 4px;
-}
-
-.clickable {
-    cursor: pointer;
-    color: var(--accent-color);
-}
-
-.clickable:hover {
-    text-decoration: underline;
-}
-
-/* Saved Searches styles */
-.saved-searches-actions {
-    display: flex;
-    gap: 0.5rem;
-    margin-left: auto;
-}
-
-.saved-searches-panel {
-    max-height: 400px;
-    overflow-y: auto;
-}
-
-.saved-searches-container {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.saved-searches-section h4 {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    margin-bottom: 0.5rem;
-    text-transform: uppercase;
-}
-
-.saved-searches-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.saved-search-item {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem;
-    background: var(--bg-secondary);
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background 0.2s;
-}
-
-.saved-search-item:hover {
-    background: var(--bg-hover);
-}
-
-.saved-search-favorite {
-    color: var(--text-secondary);
-    cursor: pointer;
-}
-
-.saved-search-favorite.active {
-    color: var(--warning);
-}
-
-.saved-search-info {
-    flex: 1;
-}
-
-.saved-search-name {
-    font-weight: 500;
-}
-
-.saved-search-meta {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-}
-
-.saved-search-actions {
-    display: flex;
-    gap: 0.25rem;
-}
-
-.saved-search-actions .btn {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
-}
-
-/* Modal styles */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-}
-/* `display` is conditional: this element is also written with Tailwind's `hidden`, and an unconditional display here beats it. */
-.modal-overlay:not(.hidden) { display: flex; }
-
-.modal-dialog {
-    background: var(--bg-primary);
-    border-radius: var(--ion-radius-lg);
-    width: 100%;
-    max-width: 500px;
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: 0 2px 8px rgba(0,0,0,.15);
-}
-
-.modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1rem 1.5rem;
-    border-bottom: 1px solid var(--ion-border);
-}
-
-.modal-header h3 {
-    margin: 0;
-}
-
-.modal-close {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    cursor: pointer;
-    color: var(--text-secondary);
-}
-
-.modal-close:hover {
-    color: var(--text-primary);
-}
-
-.modal-body {
-    padding: 1.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.5rem;
-    padding: 1rem 1.5rem;
-    border-top: 1px solid var(--ion-border);
-}
-
-.empty-searches {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-    padding: 0.5rem;
-}
-</style>
-
 </div><!-- /ion-tw inner -->
 </div><!-- /ion-tw -->
+{# The AI query builder. Static markup, so it is here rather than
+   built from a string in JavaScript at first open: three of its
+   colours were arbitrary Tailwind values the page owned, and are
+   classes in discover-page.css now. #}
+<div id="nl-query-modal" class="modal-overlay hidden">
+  <div class="modal-dialog max-w-[560px]">
+    <div class="modal-header">
+      <h3>AI Query Builder</h3>
+      <button class="modal-close" data-click-action="closeNlQueryModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-slate-400 mb-3 text-[13px]">Describe what you are
+        looking for in plain English and AI will generate an
+        Elasticsearch query.</p>
+      <div class="form-group">
+        <label for="nl-question">Ask in plain English</label>
+        <input type="text" id="nl-question" class="form-control"
+               placeholder="e.g., show me lateral movement in the last 24h">
+      </div>
+      <div class="hidden dsc-nl-error mb-2" id="nl-query-error"></div>
+      <div id="nl-query-result" class="mt-3 hidden">
+        <label class="text-slate-400 text-xs">Generated Query</label>
+        <pre class="dsc-nl-output p-2.5 rounded-[6px] text-xs max-h-[240px] overflow-auto whitespace-pre-wrap"
+             id="nl-query-output"></pre>
+        <p id="nl-query-explanation" class="text-slate-400 mt-1 text-xs"></p>
+        <p id="nl-query-index" class="text-slate-500 mt-1 text-[11px]"></p>
+      </div>
+    </div>
+    <div class="modal-footer flex gap-2 justify-end">
+      <button class="btn" data-click-action="closeNlQueryModal">Cancel</button>
+      <button class="btn btn-primary" id="nl-query-generate-btn"
+              data-click-action="generateNlQuery">Generate</button>
+      <button class="btn btn-primary hidden" id="nl-query-apply-btn"
+              data-click-action="applyNlQuery">Apply to Search</button>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
+htmx.config.useTemplateFragments = true;
+
 // Tab switching
 function switchDiscoverTab(tabName) {
     document.querySelectorAll('.tool-tab').forEach(t => t.classList.remove('active'));
@@ -758,84 +478,65 @@ async function executeDiscoverSearch() {
     const timeFrom = document.getElementById('search-time-from').value;
     const size = parseInt(document.getElementById('search-size').value);
 
-    try {
-        const response = await fetch('/api/elasticsearch/discover/search', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                index_pattern: indexPattern,
-                query: query,
-                time_field: timeField,
-                time_from: timeFrom,
-                time_to: 'now',
-                size: size
-            })
-        });
-
-        if (!response.ok) throw new Error('Search failed');
-
-        const data = await response.json();
-        _lastDiscoverSearch = {
-            executed_at: new Date().toISOString(),
-            index_pattern: indexPattern,
-            query: query,
-            time_field: timeField,
-            time_from: timeFrom,
-            time_to: 'now',
-            requested_size: size,
-            total_hits: data.total,
-            returned_hits: (data.hits || []).length,
-            took_ms: data.took_ms,
-            hits: data.hits || []
-        };
-        displaySearchResults(data);
-    } catch (error) {
-        _lastDiscoverSearch = null;
-        showToast('Search failed: ' + error.message, 'error');
-    }
-}
-
-function displaySearchResults(data) {
-    const tbody = document.getElementById('search-results-body');
-    const countBadge = document.getElementById('search-result-count');
-
-    countBadge.textContent = `${data.total} hits (${data.took_ms}ms)`;
-
-    if (!data.hits || data.hits.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No results found</td></tr>';
-        return;
-    }
-
-    // Get all unique keys from results
-    const allKeys = new Set();
-    data.hits.forEach(hit => {
-        Object.keys(hit).forEach(k => {
-            if (!k.startsWith('_')) allKeys.add(k);
-        });
+    // One search, rendered by the server. POST /ui/discover/search returns
+    // the table, swaps the count badge and the header row out of band, and
+    // carries the three figures the pin-to-case capture needs on
+    // #dsc-search-meta, so there is no second round trip for them.
+    //
+    // The page used to store the hits in _lastDiscoverSearch as well, and
+    // neither consumer ever read them: dscQueryCaptureFields takes the
+    // query, the window, the duration and the two counts. That was 100
+    // documents of dead state per search.
+    const executedAt = new Date().toISOString();
+    await displaySearchResults({
+        index_pattern: indexPattern,
+        query: query,
+        time_field: timeField,
+        time_from: timeFrom,
+        time_to: 'now',
+        size: size,
     });
 
-    // Build table
-    const priorityFields = ['@timestamp', '_index', 'message', 'host.name', 'source.ip', 'user.name', 'event.action'];
-    const displayFields = priorityFields.filter(f => allKeys.has(f));
-    if (displayFields.length < 5) {
-        [...allKeys].filter(k => !displayFields.includes(k)).slice(0, 5 - displayFields.length).forEach(k => displayFields.push(k));
+    const meta = document.getElementById('dsc-search-meta');
+    let figures = null;
+    if (meta) {
+        // JSON.parse on a throw leaves this null rather than {}: a capture
+        // with no figures behind it should read as unknown, not as zero.
+        try { figures = JSON.parse(meta.dataset.dscMeta); } catch (e) { figures = null; }
     }
+    if (!figures || figures.state === 'failed' || figures.state === 'unconfigured'
+            || figures.state === 'refused') {
+        _lastDiscoverSearch = null;
+        return;
+    }
+    _lastDiscoverSearch = {
+        executed_at: executedAt,
+        index_pattern: indexPattern,
+        query: query,
+        time_field: timeField,
+        time_from: timeFrom,
+        time_to: 'now',
+        requested_size: size,
+        total_hits: figures.total,
+        returned_hits: figures.returned,
+        took_ms: figures.took_ms,
+    };
+}
 
-    // Update header
-    const header = document.getElementById('search-results-header');
-    header.innerHTML = displayFields.map(f => `<th>${f}</th>`).join('');
-
-    // Update body
-    tbody.innerHTML = data.hits.map(hit => {
-        const cells = displayFields.map(f => {
-            let val = hit[f];
-            if (val === undefined || val === null) val = '-';
-            if (typeof val === 'object') val = JSON.stringify(val);
-            if (typeof val === 'string' && val.length > 100) val = val.substring(0, 100) + '...';
-            return `<td>${escapeHtml(String(val))}</td>`;
-        }).join('');
-        return `<tr>${cells}</tr>`;
-    }).join('');
+// POST /ui/discover/search renders the table and swaps the count badge
+// and the header row out of band. The header cells were the reason to
+// move it: field names are Elasticsearch document keys, so in a log
+// ingest system they are whatever the logs carried, and they went into
+// <th> unescaped while the cells below them were escaped.
+//
+// The column choice moved with it, because which columns to show is a
+// presentation decision and the server renders the presentation.
+function displaySearchResults(params) {
+    const tbody = document.getElementById('search-results-body');
+    if (!tbody) return Promise.resolve();
+    return htmx.ajax('POST', '/ui/discover/search', {
+        source: tbody, target: tbody, swap: 'innerHTML', values: params,
+    });
 }
 
 async function getHistogram() {
@@ -844,47 +545,37 @@ async function getHistogram() {
     const timeField = document.getElementById('search-time-field').value;
     const timeFrom = document.getElementById('search-time-from').value;
 
-    try {
-        const response = await fetch('/api/elasticsearch/discover/histogram', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                index_pattern: indexPattern,
-                query: query,
-                time_field: timeField,
-                time_from: timeFrom,
-                time_to: 'now',
-                interval: '1h'
-            })
-        });
-
-        if (!response.ok) throw new Error('Histogram failed');
-
-        const data = await response.json();
-        displayHistogram(data);
-    } catch (error) {
-        showToast('Histogram failed: ' + error.message, 'error');
-    }
+    // One read, rendered by the server. The toast went with the second
+    // fetch: a histogram that fails now says so in the panel, where the
+    // chart would have been, instead of in a notification that disappears
+    // and leaves the previous chart on screen looking current.
+    return displayHistogram({
+        index_pattern: indexPattern,
+        query: query,
+        time_field: timeField,
+        time_from: timeFrom,
+        time_to: 'now',
+        interval: '1h',
+    });
 }
 
-function displayHistogram(data) {
+// POST /ui/discover/histogram draws the bars and swaps the total out of
+// band. The bar titles were the reason: the page interpolated an
+// Elasticsearch timestamp into title="..." with no escaping.
+//
+// Also moved: a body whose buckets were not a list read as "No data for
+// histogram"; a missing total printed "undefined total events"; and
+// `Math.max(...buckets.map(b => b.count))` made every height NaN if any
+// one count was not a number, so the whole chart rendered as nothing.
+function displayHistogram(params) {
     const panel = document.getElementById('histogram-panel');
     const container = document.getElementById('histogram-container');
-    const total = document.getElementById('histogram-total');
-
-    panel.style.display = 'block';
-    total.textContent = `${data.total} total events`;
-
-    if (!data.buckets || data.buckets.length === 0) {
-        container.innerHTML = '<div class="empty-state">No data for histogram</div>';
-        return;
-    }
-
-    const maxCount = Math.max(...data.buckets.map(b => b.count));
-    container.innerHTML = data.buckets.map(b => {
-        const height = maxCount > 0 ? (b.count / maxCount * 100) : 0;
-        return `<div class="histogram-bar" data-ion-style="height: ${height}%" title="${b.timestamp}: ${b.count} events"></div>`;
-    }).join('');
+    if (!container) return Promise.resolve();
+    if (panel) panel.classList.remove('hidden');
+    return htmx.ajax('POST', '/ui/discover/histogram', {
+        source: container, target: container, swap: 'innerHTML',
+        values: params,
+    });
 }
 
 // RFC 4180 quoting, no formula guard. Used for the column names, which
@@ -1049,9 +740,25 @@ function dscRenderProvenance(fields) {
         ['total hits', unknownTotal ? 'not reported' : String(fields.total_hits)],
         ['truncated', truncated],
     ];
-    el.innerHTML = rows
-        .map(([k, v]) => escapeHtml(k.padEnd(16, ' ')) + escapeHtml(String(v == null ? '—' : v)))
+    // This block is text, and its container carries whitespace-pre-wrap, so
+    // the newlines render. The page escaped each half and then wrote the
+    // result as innerHTML, which is escaping done by hand for a string that
+    // was never going to be parsed as markup. textContent is the same
+    // output with nothing to get wrong.
+    el.textContent = rows
+        .map(([k, v]) => k.padEnd(16, ' ') + String(v == null ? '—' : v))
         .join('\n');
+}
+
+// An <option> is not markup a stylesheet sweep has to reach, so the three
+// writes in dscLoadCaseOptions needed the DOM call that does the same job
+// without parsing a string, not a fragment and a round trip.
+function dscOnlyOption(select, label) {
+    if (!select) return;
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = label;
+    select.replaceChildren(opt);
 }
 
 async function dscLoadCaseOptions() {
@@ -1061,17 +768,30 @@ async function dscLoadCaseOptions() {
         const r = await fetch('/api/elasticsearch/alerts/cases?status=OPEN&limit=500&sort=case_number&order=desc');
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const data = await r.json();
-        const cases = data.cases || data || [];
-        if (!cases.length) {
-            select.innerHTML = '<option value="">No open cases</option>';
+        // `data.cases || data || []` sent a payload that was neither shape
+        // to `.length` of undefined, which is falsey, so a body we could
+        // not read said "No open cases": we looked and there are none.
+        const cases = Array.isArray(data) ? data
+            : (data && Array.isArray(data.cases) ? data.cases : null);
+        if (cases === null) {
+            dscOnlyOption(select, 'Could not read the case list');
             return;
         }
-        select.innerHTML = '<option value="">Select a case...</option>' +
-            cases.map(c => '<option value="' + escapeHtml(String(c.id)) + '">' +
-                escapeHtml((c.case_number ? c.case_number + ' — ' : '') + (c.title || ('Case ' + c.id))) +
-                '</option>').join('');
+        if (!cases.length) {
+            dscOnlyOption(select, 'No open cases');
+            return;
+        }
+        dscOnlyOption(select, 'Select a case...');
+        cases.forEach(c => {
+            if (!c || c.id === undefined || c.id === null) return;
+            const opt = document.createElement('option');
+            opt.value = String(c.id);
+            const prefix = c.case_number ? c.case_number + ' — ' : '';
+            opt.textContent = prefix + (c.title || ('Case ' + c.id));
+            select.appendChild(opt);
+        });
     } catch (e) {
-        select.innerHTML = '<option value="">Could not load cases</option>';
+        dscOnlyOption(select, 'Could not load cases');
     }
 }
 
@@ -1127,122 +847,77 @@ async function pinQueryEvidence() {
 
 // ==================== INDEX BROWSER ====================
 
-async function loadIndices() {
-    const includeSystem = document.getElementById('include-system-indices').checked;
-
-    try {
-        const response = await fetch(`/api/elasticsearch/indices?include_system=${includeSystem}&include_stats=true`);
-        if (!response.ok) throw new Error('Failed to load indices');
-
-        const data = await response.json();
-        displayIndices(data);
-    } catch (error) {
-        showToast('Failed to load indices: ' + error.message, 'error');
-    }
+// One read, rendered by the server. The toast went with the second
+// fetch: a failed load showed a notification that disappears and left
+// the previous index list on screen looking current.
+function loadIndices() {
+    const box = document.getElementById('include-system-indices');
+    return displayIndices({
+        include_system: box ? box.checked : false,
+    });
 }
 
-function displayIndices(data) {
+// GET /ui/discover/indices renders the table. Index names reached
+// three data-args attributes by raw interpolation, and an index name
+// is whatever Elasticsearch holds: a quote in one produced JSON that
+// event-delegation.js throws on, so all three controls on that row
+// looked live and did nothing. A missing document count also printed
+// as 0, and an index with no count is not an empty index.
+function displayIndices(params) {
     const tbody = document.getElementById('indices-body');
-
-    if (!data.indices || data.indices.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No indices found</td></tr>';
-        return;
-    }
-
-    tbody.innerHTML = data.indices.map(idx => `
-        <tr>
-            <td class="clickable" data-click-action="loadMappings" data-args='["${idx.name}"]'>${idx.name}</td>
-            <td><span class="health-${idx.health || 'unknown'}">${idx.health || '-'}</span></td>
-            <td>${(idx.doc_count != null ? idx.doc_count : 0).toLocaleString()}</td>
-            <td>${idx.size || '-'}</td>
-            <td>
-                <button class="btn btn-sm" data-click-action="loadMappings" data-args='["${idx.name}"]'>Fields</button>
-                <button class="btn btn-sm" data-click-action="searchIndex" data-args='["${idx.name}"]'>Search</button>
-            </td>
-        </tr>
-    `).join('');
+    if (!tbody) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/discover/indices', {
+        source: tbody, target: tbody, swap: 'innerHTML',
+        values: params || {},
+    });
 }
 
-async function loadMappings(indexName) {
-    try {
-        const response = await fetch(`/api/elasticsearch/indices/${encodeURIComponent(indexName)}/mappings`);
-        if (!response.ok) throw new Error('Failed to load mappings');
-
-        const data = await response.json();
-        displayMappings(indexName, data);
-    } catch (error) {
-        showToast('Failed to load mappings: ' + error.message, 'error');
-    }
+function loadMappings(indexName) {
+    return displayMappings(indexName);
 }
 
-function displayMappings(indexName, data) {
+// GET /ui/discover/mappings renders the table and swaps the index name
+// and the field count out of band. Field names went into cells
+// unescaped and into two data-args raw, alongside the index name, and
+// `f.searchable ? 'Yes' : 'No'` turned a mapping that did not say into
+// a mapping that said no.
+function displayMappings(indexName) {
     const panel = document.getElementById('mappings-panel');
-    const indexNameSpan = document.getElementById('mappings-index-name');
-    const countBadge = document.getElementById('mappings-field-count');
     const tbody = document.getElementById('mappings-body');
-
-    panel.style.display = 'block';
-    indexNameSpan.textContent = indexName;
-    countBadge.textContent = `${data.total} fields`;
-
-    tbody.innerHTML = data.fields.map(f => `
-        <tr>
-            <td>${f.name}</td>
-            <td>${f.type}</td>
-            <td>${f.searchable ? 'Yes' : 'No'}</td>
-            <td>${f.aggregatable ? 'Yes' : 'No'}</td>
-            <td>
-                ${f.aggregatable ? `<button class="btn btn-sm" data-click-action="loadFieldStats" data-args='["${indexName}", "${f.name}"]'>Stats</button>` : ''}
-                <button class="btn btn-sm" data-click-action="searchField" data-args='["${indexName}", "${f.name}"]'>Search</button>
-            </td>
-        </tr>
-    `).join('');
+    if (!tbody) return Promise.resolve();
+    if (panel) panel.classList.remove('hidden');
+    return htmx.ajax('GET', '/ui/discover/mappings', {
+        source: tbody, target: tbody, swap: 'innerHTML',
+        values: { index_pattern: indexName },
+    });
 }
 
-async function loadFieldStats(indexName, fieldName) {
-    try {
-        const response = await fetch('/api/elasticsearch/indices/field-stats', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                index_pattern: indexName,
-                field: fieldName,
-                size: 20,
-                time_from: null
-            })
-        });
-
-        if (!response.ok) throw new Error('Failed to load field stats');
-
-        const data = await response.json();
-        displayFieldStats(fieldName, data);
-    } catch (error) {
-        showToast('Failed to load field stats: ' + error.message, 'error');
-    }
+// The page sent `time_from: null`, which the request model reads as no
+// lower bound; the route's default window is kept instead, so the
+// figures describe a stated period rather than all of history.
+function loadFieldStats(indexName, fieldName) {
+    return displayFieldStats(indexName, fieldName);
 }
 
-function displayFieldStats(fieldName, data) {
+// POST /ui/discover/field-stats renders the table and swaps the field
+// name and the three summary figures out of band.
+//
+// Two reasons beyond the markup. `data.unique_count.toLocaleString()`
+// and the same for total_count, doc_count and each row's count throw
+// on undefined, so a payload missing any one figure took the whole
+// panel down through the caller's catch. And the Hunt button's
+// argument was escapeHtml(String(v.value)) inside a JSON string, over
+// a field value: log content, so Hunt searched for something other
+// than the value beside it.
+function displayFieldStats(indexName, fieldName) {
     const panel = document.getElementById('field-stats-panel');
-    const nameSpan = document.getElementById('field-stats-name');
-    const summary = document.getElementById('field-stats-summary');
     const tbody = document.getElementById('field-stats-body');
-
-    panel.style.display = 'block';
-    nameSpan.textContent = fieldName;
-
-    summary.innerHTML = `
-        <div class="stat"><span class="stat-label">Unique Values</span><span class="stat-value">${data.unique_count.toLocaleString()}</span></div>
-        <div class="stat"><span class="stat-label">Total Count</span><span class="stat-value">${data.total_count.toLocaleString()}</span></div>
-        <div class="stat"><span class="stat-label">Documents</span><span class="stat-value">${data.doc_count.toLocaleString()}</span></div>
-    `;
-
-    tbody.innerHTML = data.top_values.map(v => `
-        <tr>
-            <td>${v.value !== null ? escapeHtml(String(v.value)) : '<em>null</em>'}</td>
-            <td>${v.count.toLocaleString()}</td>
-            <td><button class="btn btn-sm" data-click-action="huntIOC" data-args='["${escapeHtml(String(v.value))}"]'>Hunt</button></td>
-        </tr>
-    `).join('');
+    if (!tbody) return Promise.resolve();
+    if (panel) panel.classList.remove('hidden');
+    return htmx.ajax('POST', '/ui/discover/field-stats', {
+        source: tbody, target: tbody, swap: 'innerHTML',
+        values: { index_pattern: indexName, field: fieldName },
+    });
 }
 
 function searchIndex(indexName) {
@@ -1271,71 +946,48 @@ async function executeIOCHunt() {
     const timeFrom = document.getElementById('ioc-time-from').value || null;
     const indexPattern = document.getElementById('ioc-index').value;
 
-    try {
-        const response = await fetch('/api/elasticsearch/ioc-hunt', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                ioc_value: iocValue,
-                ioc_type: iocType,
-                index_pattern: indexPattern,
-                time_from: timeFrom,
-                time_to: 'now',
-                size: 100
-            })
-        });
-
-        if (!response.ok) throw new Error('IOC hunt failed');
-
-        const data = await response.json();
-        displayIOCHuntResults(data);
-    } catch (error) {
-        showToast('IOC hunt failed: ' + error.message, 'error');
-    }
+    // One read, rendered by the server. The toast went with the second
+    // fetch: a hunt that failed showed a notification that disappears and
+    // left the previous indicator's hits on screen, which on this panel is
+    // a result attributed to the wrong IOC.
+    return displayIOCHuntResults({
+        ioc_value: iocValue,
+        ioc_type: iocType || '',
+        index_pattern: indexPattern,
+        time_from: timeFrom || 'now-30d',
+        time_to: 'now',
+        size: 100,
+    });
 }
 
-function displayIOCHuntResults(data) {
-    document.getElementById('ioc-empty-state').style.display = 'none';
-    document.getElementById('ioc-bulk-results').style.display = 'none';
-    document.getElementById('ioc-single-results').style.display = 'block';
-
-    const countBadge = document.getElementById('ioc-hunt-result-count');
-    const summary = document.getElementById('ioc-hunt-summary');
-    const indices = document.getElementById('ioc-indices-found');
+// The three IOC panels were shown and hidden with style.display while
+// two of them carry class="hidden" in the markup, so an inline style
+// and a class were both deciding the same thing. One mechanism now.
+function dscShowIOCPanel(which) {
+    const panels = { empty: 'ioc-empty-state', single: 'ioc-single-results',
+                     bulk: 'ioc-bulk-results' };
+    Object.keys(panels).forEach(name => {
+        const el = document.getElementById(panels[name]);
+        if (!el) return;
+        el.classList.toggle('hidden', name !== which);
+    });
+}
+// POST /ui/discover/ioc-hunt renders the rows and swaps the count, the
+// summary and the index badges out of band.
+//
+// The details column was the reason. The page built
+// `<strong>' + k + ':</strong> ' + v` and then wrote
+// escapeHtml(details.substring(0, 200)), so escapeHtml ran over the
+// finished markup and escaped its own tags: the cell showed the literal
+// text <strong>host.name:</strong> web-01 to the analyst. Four more
+// values went in unescaped beside it, the index names among them.
+function displayIOCHuntResults(params) {
+    dscShowIOCPanel('single');
     const tbody = document.getElementById('ioc-hunt-body');
-
-    countBadge.textContent = `${data.total} hits`;
-
-    summary.innerHTML = `
-        <div class="stat"><span class="stat-label">IOC Value</span><span class="stat-value">${escapeHtml(data.ioc_value)}</span></div>
-        <div class="stat"><span class="stat-label">Type</span><span class="stat-value">${data.ioc_type}</span></div>
-        <div class="stat"><span class="stat-label">Hits</span><span class="stat-value">${data.total}</span></div>
-        <div class="stat"><span class="stat-label">Time</span><span class="stat-value">${data.took_ms}ms</span></div>
-    `;
-
-    indices.innerHTML = data.indices_found.map(i =>
-        `<span class="index-badge">${i.index}: ${i.count}</span>`
-    ).join('');
-
-    if (data.hits.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="3" class="empty-state">No hits found for this IOC</td></tr>';
-        return;
-    }
-
-    tbody.innerHTML = data.hits.map(hit => {
-        const details = Object.entries(hit)
-            .filter(([k]) => !k.startsWith('_') && k !== '@timestamp')
-            .slice(0, 5)
-            .map(([k, v]) => `<strong>${k}:</strong> ${typeof v === 'object' ? JSON.stringify(v) : v}`)
-            .join(' | ');
-        return `
-            <tr>
-                <td>${hit['@timestamp'] || '-'}</td>
-                <td>${hit._index}</td>
-                <td>${escapeHtml(details.substring(0, 200))}</td>
-            </tr>
-        `;
-    }).join('');
+    if (!tbody) return Promise.resolve();
+    return htmx.ajax('POST', '/ui/discover/ioc-hunt', {
+        source: tbody, target: tbody, swap: 'innerHTML', values: params,
+    });
 }
 
 async function executeBulkIOCHunt() {
@@ -1348,54 +1000,30 @@ async function executeBulkIOCHunt() {
     const timeFrom = document.getElementById('ioc-time-from').value || null;
     const indexPattern = document.getElementById('ioc-index').value;
 
-    try {
-        const response = await fetch('/api/elasticsearch/ioc-hunt/bulk', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                ioc_values: iocs,
-                index_pattern: indexPattern,
-                time_from: timeFrom,
-                time_to: 'now'
-            })
-        });
-
-        if (!response.ok) throw new Error('Bulk IOC hunt failed');
-
-        const data = await response.json();
-        displayBulkIOCResults(data);
-    } catch (error) {
-        showToast('Bulk IOC hunt failed: ' + error.message, 'error');
-    }
+    // One read, rendered by the server. The textarea's lines go over as
+    // one field and the route splits them, so the page is not also
+    // deciding what counts as an indicator.
+    return displayBulkIOCResults({
+        ioc_values: iocs.join('\n'),
+        index_pattern: indexPattern,
+        time_from: timeFrom || 'now-30d',
+        time_to: 'now',
+    });
 }
 
-function displayBulkIOCResults(data) {
-    document.getElementById('ioc-empty-state').style.display = 'none';
-    document.getElementById('ioc-single-results').style.display = 'none';
-    document.getElementById('ioc-bulk-results').style.display = 'block';
-
-    const countBadge = document.getElementById('ioc-hunt-result-count');
-    const summary = document.getElementById('bulk-summary');
+// POST /ui/discover/ioc-hunt/bulk renders the rows and swaps the count
+// and the summary out of band. The Details button was the reason: its
+// argument was data-args='["' + escapeHtml(r.ioc_value) + '"]', and
+// escapeHtml turns a quote into &quot;, which inside a JSON string is
+// six literal characters, so JSON.parse handed the dispatcher a
+// different indicator than the one on screen.
+function displayBulkIOCResults(params) {
+    dscShowIOCPanel('bulk');
     const tbody = document.getElementById('bulk-results-body');
-
-    countBadge.textContent = `${data.found_count}/${data.total_searched} found`;
-
-    summary.innerHTML = `
-        <div class="stat"><span class="stat-label">Total Searched</span><span class="stat-value">${data.total_searched}</span></div>
-        <div class="stat"><span class="stat-label">Found</span><span class="stat-value found-badge">${data.found_count}</span></div>
-        <div class="stat"><span class="stat-label">Not Found</span><span class="stat-value not-found-badge">${data.not_found_count}</span></div>
-    `;
-
-    tbody.innerHTML = data.results.map(r => `
-        <tr>
-            <td>${escapeHtml(r.ioc_value)}</td>
-            <td>${r.ioc_type}</td>
-            <td><span class="${r.found ? 'found-badge' : 'not-found-badge'}">${r.found ? 'Found' : 'Not Found'}</span></td>
-            <td>${r.hit_count}</td>
-            <td>${r.indices.slice(0, 3).join(', ')}${r.indices.length > 3 ? '...' : ''}</td>
-            <td>${r.found ? `<button class="btn btn-sm" data-click-action="huntIOC" data-args='["${escapeHtml(r.ioc_value)}"]'>Details</button>` : ''}</td>
-        </tr>
-    `).join('');
+    if (!tbody) return Promise.resolve();
+    return htmx.ajax('POST', '/ui/discover/ioc-hunt/bulk', {
+        source: tbody, target: tbody, swap: 'innerHTML', values: params,
+    });
 }
 
 function huntIOC(value) {
@@ -1407,9 +1035,7 @@ function huntIOC(value) {
 
 function clearIOCHunt() {
     document.getElementById('ioc-value').value = '';
-    document.getElementById('ioc-empty-state').style.display = 'block';
-    document.getElementById('ioc-single-results').style.display = 'none';
-    document.getElementById('ioc-bulk-results').style.display = 'none';
+    dscShowIOCPanel('empty');
 }
 
 // Utility functions
@@ -1451,70 +1077,26 @@ async function loadSavedSearches() {
     }
 }
 
+// GET /ui/discover/saved-searches renders all three lists from one
+// response, where the page made three writes after a /api/auth/me round
+// trip to learn whose searches were whose.
+//
+// Its split was wrong as well as client-side: `mine` was
+// `s => !s.is_shared || s.created_by_id === me`, so an unshared search
+// belonging to somebody else landed in My searches. The repository is
+// not expected to return one, which is what let it survive.
 function displaySavedSearches() {
-    const favoritesList = document.getElementById('favorites-list');
-    const myList = document.getElementById('my-searches-list');
-    const sharedList = document.getElementById('shared-searches-list');
-
-    // Get current user ID from somewhere (we'll approximate by checking created_by)
-    const favorites = savedSearchesData.filter(s => s.is_favorite);
-    const mine = savedSearchesData.filter(s => !s.is_shared || s.created_by_id === getCurrentUserId());
-    const shared = savedSearchesData.filter(s => s.is_shared && s.created_by_id !== getCurrentUserId());
-
-    favoritesList.innerHTML = favorites.length > 0
-        ? favorites.map(s => renderSavedSearchItem(s)).join('')
-        : '<div class="empty-searches">No favorites yet</div>';
-
-    myList.innerHTML = mine.length > 0
-        ? mine.map(s => renderSavedSearchItem(s)).join('')
-        : '<div class="empty-searches">No saved searches</div>';
-
-    sharedList.innerHTML = shared.length > 0
-        ? shared.map(s => renderSavedSearchItem(s)).join('')
-        : '<div class="empty-searches">No shared searches</div>';
+    const host = document.getElementById('my-searches-list');
+    if (!host) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/discover/saved-searches', {
+        source: host, target: host, swap: 'innerHTML',
+    });
 }
 
-function renderSavedSearchItem(search) {
-    const isOwner = search.created_by_id === getCurrentUserId();
-    const lastRun = search.last_executed_at ? new Date(search.last_executed_at).toLocaleDateString() : 'Never';
-
-    return `
-        <div class="saved-search-item" data-id="${search.id}">
-            <span class="saved-search-favorite ${search.is_favorite ? 'active' : ''}"
-                  data-click-action="toggleFavorite" data-stop-propagation data-args='[${search.id}]'
-                  title="${search.is_favorite ? 'Remove from favorites' : 'Add to favorites'}">
-                ${search.is_favorite ? '★' : '☆'}
-            </span>
-            <div class="saved-search-info" data-click-action="loadSavedSearch" data-args='[${search.id}]'>
-                <div class="saved-search-name">${escapeHtml(search.name)}</div>
-                <div class="saved-search-meta">
-                    ${search.is_shared ? '🔗 Shared' : ''}
-                    ${search.execution_count} runs | Last: ${lastRun}
-                    ${!isOwner ? ` | By: ${search.created_by_username || 'Unknown'}` : ''}
-                </div>
-            </div>
-            <div class="saved-search-actions">
-                <button class="btn btn-sm btn-primary" data-click-action="executeSavedSearch" data-stop-propagation data-args='[${search.id}]'>Run</button>
-                ${isOwner ? `
-                    <button class="btn btn-sm" data-click-action="editSavedSearch" data-stop-propagation data-args='[${search.id}]'>Edit</button>
-                    <button class="btn btn-sm" data-click-action="deleteSavedSearch" data-stop-propagation data-args='[${search.id}]'>Delete</button>
-                ` : ''}
-            </div>
-        </div>
-    `;
-}
-
-function getCurrentUserId() {
-    // Get from session or global - for now check if window has currentUser
-    if (window.currentUser && window.currentUser.id) {
-        return window.currentUser.id;
-    }
-    return null;
-}
 
 function toggleSavedSearchesPanel() {
     const panel = document.getElementById('saved-searches-panel');
-    if (panel.style.display === 'none') {
+    if (getComputedStyle(panel).display === 'none') {
         panel.style.display = 'block';
         loadSavedSearches();
     } else {
@@ -1621,8 +1203,15 @@ async function executeSavedSearch(searchId) {
         if (params.time_from) document.getElementById('search-time-from').value = params.time_from;
         if (params.size) document.getElementById('search-size').value = params.size;
 
-        // Display results
-        displaySearchResults(data.results);
+        // Run it through the normal path now the form holds its parameters.
+        // The page rendered data.results straight and left
+        // _lastDiscoverSearch untouched, so a pin-to-case straight after
+        // running a saved search captured whatever had been searched
+        // manually before it, or nothing at all. Going through
+        // executeDiscoverSearch means the capture describes what is on
+        // screen. It costs one more Elasticsearch query, which is the
+        // right price for a provenance record that is not wrong.
+        await executeDiscoverSearch();
 
         showToast(`Executed: ${data.saved_search.name}`, 'success');
     } catch (error) {
@@ -1689,57 +1278,28 @@ async function toggleFavorite(searchId) {
 }
 
 // ==================== NL-to-ES Query (AI) ====================
+// The modal is static markup, so it lives in the page rather than being
+// built from a string at first open. That also took three hard-coded
+// hex colours out of JavaScript and into discover-page.css.
 function openNlQueryModal() {
-    let modal = document.getElementById('nl-query-modal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'nl-query-modal';
-        modal.className = 'modal-overlay';
-        modal.innerHTML = `
-            <div class="modal-dialog max-w-[560px]">
-                <div class="modal-header">
-                    <h3>AI Query Builder</h3>
-                    <button class="modal-close" data-click-action="closeNlQueryModal">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <p class="text-slate-400 mb-3 text-[13px]">Describe what you're looking for in plain English and AI will generate an Elasticsearch query.</p>
-                    <div class="form-group">
-                        <label for="nl-question">Ask in plain English</label>
-                        <input type="text" id="nl-question" class="form-control" placeholder="e.g., show me lateral movement in the last 24h">
-                    </div>
-                    <div class="hidden text-[#f87171] text-[13px] mb-2" id="nl-query-error"></div>
-                    <div id="nl-query-result" class="mt-3 hidden">
-                        <label class="text-slate-400 text-xs">Generated Query</label>
-                        <pre class="bg-[#1e293b] p-2.5 rounded-[6px] text-xs max-h-[240px] overflow-auto text-[#e2e8f0] whitespace-pre-wrap" id="nl-query-output"></pre>
-                        <p id="nl-query-explanation" class="text-slate-400 mt-1 text-xs"></p>
-                        <p id="nl-query-index" class="text-slate-500 mt-1 text-[11px]"></p>
-                    </div>
-                </div>
-                <div class="modal-footer flex gap-2 justify-end">
-                    <button class="btn" data-click-action="closeNlQueryModal">Cancel</button>
-                    <button class="btn btn-primary" id="nl-query-generate-btn" data-click-action="generateNlQuery">Generate</button>
-                    <button class="btn btn-primary hidden" id="nl-query-apply-btn" data-click-action="applyNlQuery">Apply to Search</button>
-                </div>
-            </div>`;
-        document.body.appendChild(modal);
-        // Submit on Enter
-        modal.querySelector('#nl-question').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') { e.preventDefault(); generateNlQuery(); }
-        });
-    }
-    modal.style.display = 'flex';
+    const modal = document.getElementById('nl-query-modal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
     const input = modal.querySelector('#nl-question');
-    input.value = '';
-    modal.querySelector('#nl-query-result').style.display = 'none';
-    modal.querySelector('#nl-query-error').style.display = 'none';
-    modal.querySelector('#nl-query-apply-btn').style.display = 'none';
-    modal.querySelector('#nl-query-generate-btn').style.display = '';
-    setTimeout(() => input.focus(), 100);
+    if (input) input.value = '';
+    ['#nl-query-result', '#nl-query-error', '#nl-query-apply-btn']
+        .forEach(sel => {
+            const el = modal.querySelector(sel);
+            if (el) el.classList.add('hidden');
+        });
+    const generate = modal.querySelector('#nl-query-generate-btn');
+    if (generate) generate.classList.remove('hidden');
+    if (input) setTimeout(() => input.focus(), 100);
 }
 
 function closeNlQueryModal() {
     const modal = document.getElementById('nl-query-modal');
-    if (modal) modal.style.display = 'none';
+    if (modal) modal.classList.add('hidden');
 }
 
 async function generateNlQuery() {
@@ -1798,14 +1358,25 @@ function applyNlQuery() {
     showToast('AI query applied — click Search to execute', 'success');
 }
 
-// Initialize
-document.addEventListener('DOMContentLoaded', function() {
-    // Tab is already on search by default
-    // Load current user info
-    fetch('/api/auth/me')
-        .then(r => r.json())
-        .then(data => { window.currentUser = data; })
-        .catch(() => {});
+// The /api/auth/me read that used to run here fed getCurrentUserId, and
+// only the saved-search split used it. The server does that split now, so
+// the round trip is gone and with it a race: the fetch resolved after
+// DOMContentLoaded and its .catch swallowed a failure, so a split running
+// before it, or at all after a failed read, put your own shared searches
+// under Shared and labelled every item "By: you".
+//
+// Nothing else needed DOMContentLoaded, so the listener went too. The tab
+// starts on search by default.
+
+// Enter submits the AI query. Bound at load, because the modal is in
+// the page: the listener used to be attached inside the builder, so it
+// existed only after the first open and only on that one element.
+document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    if (e.target && e.target.id === 'nl-question') {
+        e.preventDefault();
+        generateNlQuery();
+    }
 });
 </script>
 {% endblock %}

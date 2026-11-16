@@ -1,0 +1,5 @@
+{% from "_fragments/_time.html" import ts %}
+{% from "_fragments/investigation_memory_macros.html" import number, pill, duration %}
+{% if data is none %}<tr><td colspan="10" class="text-error">Could not read FP signatures. Suppression state is unknown. Retry the read.</td></tr>
+{% else %}{% for r in data.fps %}<tr><td>{{ pill('on' if r.enabled is true else ('off' if r.enabled is false else 'unknown')) }}</td><td>{{ r.rule_name or r.rule_id or '-' }}</td><td>{{ r.alert_signature or '-' }}</td><td>{{ r.host_pattern or '-' }}</td><td>{{ r.user_pattern or '-' }}</td><td>{{ number(r.confidence) }}{% if r.confidence is not none %}%{% endif %}</td><td>{{ number(r.hit_count) }}</td><td>{{ ts(r.last_matched_at) }}</td><td title="{{ r.reason }}">{{ r.reason }}</td><td><button class="btn btn-ghost btn-xs" data-click-action="imToggleFp" data-args='[{{ r.id }}]'>{{ 'Disable' if r.enabled is true else 'Enable' }}</button><button class="btn btn-ghost btn-xs" data-click-action="imDeleteFp" data-args='[{{ r.id }}]'>Delete</button></td></tr>
+{% else %}<tr><td colspan="10">No FP signatures yet. Create one with the New FP signature button.</td></tr>{% endfor %}{% endif %}

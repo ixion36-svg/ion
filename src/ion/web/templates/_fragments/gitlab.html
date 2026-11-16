@@ -1,0 +1,278 @@
+{# GitLab issue browser. Replaces the innerHTML writes in gitlab.html:
+   the connection banner, the issue cards, the label / assignee / milestone
+   selects, the issue detail and the comment thread. escapeHtml() is gone;
+   Jinja autoescapes. Timestamps go through the ts macro, stored URLs
+   through safe_url, and markdown stays in a hidden textarea for
+   safeMarkdown to paint after the swap. Nothing here is marked safe.
+
+   The list filters, Refresh, the status Retry, the catalog Reload and the
+   detail modal's Close live in the page shell, outside these swap targets.
+   The selects are the exception, and only because the options are known
+   here: they are sent back with hx-swap-oob, including when a catalogue
+   read failed, so the failure cannot delete the control. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% macro ext_link(url, label, css='') -%}
+{%- set href = url | safe_url -%}
+{%- if href -%}
+<a href="{{ href }}" target="_blank" rel="noopener noreferrer"{% if css %} class="{{ css }}"{% endif %}>{{ label }}</a>
+{%- else -%}
+{{ label if label is not none else '—' }}
+{%- endif -%}
+{%- endmacro %}
+
+{% if view == 'status' %}
+<div role="alert" class="connection-status alert mb-4{% if phase == 'connected' %} connected{% elif phase == 'refused' or phase == 'failed' or phase == 'unknown' %} error{% endif %}">
+  {% if phase == 'connected' %}
+    <strong>Connected to GitLab</strong><br>
+    Project: {{ ext_link(web_url, project_path if project_path is not none else '—') }}
+  {% elif phase == 'unconfigured' %}
+    <strong>GitLab Not Configured</strong>
+  {% elif phase == 'refused' %}
+    <strong>Connection Failed</strong>
+    {% if error is string %}<br>{{ error }}{% endif %}
+  {% elif phase == 'failed' %}
+    <strong>GitLab could not be read.</strong>
+    This is not a connection refusal and not an unconfigured install: the query failed.
+  {% else %}
+    <strong>The connection state is unknown.</strong>
+    The values returned were not booleans, so this is neither a refused connection nor an install known to be unconfigured.
+  {% endif %}
+</div>
+
+{% elif view == 'issues' %}
+{# `issues is none` is a failed read. `[]` is GitLab having no issues.
+   A truthiness test treats those as the same sentence. #}
+{% if failed or issues is none %}
+  <p class="error-message" role="alert">Issues could not be read. This is not an empty list: the query failed, so how many issues are open is unknown rather than zero.</p>
+{% elif not issues %}
+  <p class="empty-message">No issues found.</p>
+{% else %}
+  {% for issue in issues %}
+    {% if issue.iid is not none %}
+    <div class="issue-card" data-issue-iid="{{ issue.iid }}"
+         hx-get="/ui/gitlab/issues/{{ issue.iid }}"
+         hx-target="#issue-detail-body" hx-swap="innerHTML">
+    {% else %}
+    <div class="issue-card">
+    {% endif %}
+      <div class="issue-header">
+        <span class="issue-id">{% if issue.iid is not none %}#{{ issue.iid }}{% else %}—{% endif %}</span>
+        <span class="issue-title-text"><strong>{% if issue.title is not none %}{{ issue.title }}{% endif %}</strong></span>
+        <span class="issue-state{% if issue.state == 'opened' %} opened{% elif issue.state == 'closed' %} closed{% endif %}">{% if issue.state is not none %}{{ issue.state }}{% endif %}</span>
+      </div>
+      {% if issue.labels %}
+        <div class="issue-labels">
+          {% for label in issue.labels %}
+            <span class="issue-label" data-ion-style="background: {{ label.color }}">{{ label.name }}</span>
+          {% endfor %}
+        </div>
+      {% endif %}
+      <div class="issue-footer">
+        <span>Created by {{ issue.author if issue.author is not none else '—' }} on {{ ts(issue.created_at) }}</span>
+        {% if issue.assignees %}
+          <span>Assigned to: {% for name in issue.assignees %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+        {% endif %}
+      </div>
+    </div>
+  {% endfor %}
+{% endif %}
+
+{% elif view == 'detail' %}
+{# The title lives outside this swap, in the modal chrome next to Close.
+   It is replaced out of band on purpose: a failed read of a second issue
+   must not keep showing the previous issue's title, and Close itself is
+   not in this response, so the error cannot take away the way out. #}
+<h2 id="issue-detail-title" class="text-lg font-semibold" hx-swap-oob="outerHTML">Issue{% if iid is not none %} #{{ iid }}{% endif %}{% if issue and issue.title is not none and issue.title != '' %}: {{ issue.title }}{% endif %}</h2>
+{% if not_found %}
+  <div data-issue-iid="{{ iid }}" role="alert" class="alert alert-warning">
+    <div>
+      <p>Issue #{{ iid }} was not found. This is not a failed read: GitLab answered, and it has no such issue.</p>
+      <button type="button" class="btn btn-ghost btn-sm mt-2"
+              hx-get="/ui/gitlab/issues/{{ iid }}"
+              hx-target="#issue-detail-body" hx-swap="innerHTML">Retry</button>
+    </div>
+  </div>
+{% elif failed or issue is none %}
+  <div data-issue-iid="{{ iid }}" role="alert" class="alert alert-error">
+    <div>
+      <p>Issue #{{ iid }} could not be read. This is not an empty issue and not a missing one: the query failed.</p>
+      <button type="button" class="btn btn-ghost btn-sm mt-2"
+              hx-get="/ui/gitlab/issues/{{ iid }}"
+              hx-target="#issue-detail-body" hx-swap="innerHTML">Retry</button>
+    </div>
+  </div>
+{% else %}
+  <div data-issue-iid="{{ issue.iid if issue.iid is not none else iid }}" data-issue-state="{{ issue.state if issue.state is not none else '' }}">
+    <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_16rem] gap-8">
+      <div class="min-w-0">
+        <div class="flex flex-wrap gap-4 text-sm opacity-70 mb-6 pb-4 border-b border-base-300">
+          <span>Created by <strong>{{ issue.author if issue.author is not none else '—' }}</strong></span>
+          <span>on {{ ts(issue.created_at) }}</span>
+          <span>Updated {{ ts(issue.updated_at) }}</span>
+        </div>
+        <div class="p-4 bg-base-200 rounded-box min-h-[100px]" id="issue-detail-description">
+          {% if issue.description is not none and issue.description != '' %}
+            {# Markdown is not rendered here. There is no HTML sanitiser on
+               this path, so the source stays in a textarea (autoescaped,
+               so a closing textarea tag in the text cannot break out) and
+               the page paints it with safeMarkdown after the swap. #}
+            <textarea class="hidden" data-md-source readonly>{{ issue.description }}</textarea>
+            <div class="gl-md"></div>
+          {% else %}
+            <em>No description</em>
+          {% endif %}
+        </div>
+
+        <div class="mt-8">
+          <h3 class="text-base font-semibold mb-4">Comments</h3>
+          {% set comments_url = '/ui/gitlab/issues/' ~ iid ~ '/comments' %}
+          <div id="issue-comments-list" class="mb-4"
+               hx-get="{{ comments_url }}" hx-trigger="load" hx-swap="innerHTML">
+            <p class="loading">Loading comments...</p>
+          </div>
+          {# Retry and the draft sit outside the comments swap, so refreshing
+             the thread cannot wipe a comment the analyst has not sent. #}
+          <button type="button" class="btn btn-ghost btn-sm mb-4"
+                  hx-get="{{ comments_url }}"
+                  hx-target="#issue-comments-list" hx-swap="innerHTML">Retry comments</button>
+          <div class="flex flex-col gap-2">
+            <textarea id="new-comment" class="textarea w-full" rows="3" placeholder="Add a comment..."></textarea>
+            <button type="button" class="btn btn-primary self-end" data-click-action="addComment">Add Comment</button>
+          </div>
+        </div>
+      </div>
+      <div class="lg:border-l lg:border-base-300 lg:pl-6">
+        <div class="mb-6">
+          <h4 class="text-xs uppercase tracking-wide opacity-60 mb-2">Status</h4>
+          <span class="issue-state{% if issue.state == 'opened' %} opened{% elif issue.state == 'closed' %} closed{% endif %}">{% if issue.state is not none %}{{ issue.state }}{% endif %}</span>
+          {% if issue.state == 'opened' %}
+            <button type="button" class="btn btn-sm mt-2" data-click-action="toggleIssueState">Close Issue</button>
+          {% elif issue.state == 'closed' %}
+            <button type="button" class="btn btn-sm mt-2" data-click-action="toggleIssueState">Reopen Issue</button>
+          {% else %}
+            <p class="text-sm opacity-60 mt-2">This state is neither opened nor closed, so it was not given a toggle.</p>
+          {% endif %}
+        </div>
+        <div class="mb-6">
+          <h4 class="text-xs uppercase tracking-wide opacity-60 mb-2">Labels</h4>
+          <div class="flex flex-wrap gap-1">
+            {% if issue.labels %}
+              {% for label in issue.labels %}
+                <span class="issue-label" data-ion-style="background: {{ label.color }}">{{ label.name }}</span>
+              {% endfor %}
+            {% else %}
+              <em>No labels</em>
+            {% endif %}
+          </div>
+        </div>
+        <div class="mb-6">
+          <h4 class="text-xs uppercase tracking-wide opacity-60 mb-2">Assignees</h4>
+          <div>
+            {% if issue.assignees %}
+              {% for name in issue.assignees %}{{ name }}{% if not loop.last %}, {% endif %}{% endfor %}
+            {% else %}
+              <em>Unassigned</em>
+            {% endif %}
+          </div>
+        </div>
+        <div class="mb-6">
+          <h4 class="text-xs uppercase tracking-wide opacity-60 mb-2">Milestone</h4>
+          <div>{% if issue.milestone is not none %}{{ issue.milestone }}{% else %}<em>No milestone</em>{% endif %}</div>
+        </div>
+        <div class="mb-6">
+          <h4 class="text-xs uppercase tracking-wide opacity-60 mb-2">Due Date</h4>
+          <div>{{ ts(issue.due_date, 'date', fallback='No due date') }}</div>
+        </div>
+        <div class="mb-6">
+          {{ ext_link(issue.web_url, 'View in GitLab', 'btn btn-ghost') }}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+{% elif view == 'comments' %}
+{% if not_found %}
+  <p class="error-message" role="alert">Issue #{{ iid }} was not found, so its comments are unknown rather than empty.</p>
+{% elif failed or comments is none %}
+  <p class="error-message" role="alert">Comments could not be read. This is not an empty thread.</p>
+{% elif not comments %}
+  <p class="empty-message">No comments yet.</p>
+{% else %}
+  {% for comment in comments %}
+    <div class="comment-item">
+      <div class="comment-header">
+        <span class="comment-author">{{ comment.author if comment.author is not none else '—' }}</span>
+        <span class="comment-date">{{ ts(comment.created_at) }}</span>
+      </div>
+      {% if comment.body is not none and comment.body != '' %}
+        <textarea class="hidden" data-md-source readonly>{{ comment.body }}</textarea>
+        <div class="comment-body gl-md"></div>
+      {% else %}
+        <div class="comment-body"><em>No comment text</em></div>
+      {% endif %}
+    </div>
+  {% endfor %}
+{% endif %}
+
+{% elif view == 'catalog' %}
+{# These four selects are the controls. They are replaced out of band, on
+   success and on failure, because a response that only said "could not be
+   read" would otherwise delete the select the analyst uses to retry.
+   A selection of "0" is kept by comparing ids as strings: integer 0 and
+   the query value "0" are the same member, and a truthiness check drops it. #}
+<select id="label-filter" name="labels" class="select select-sm min-w-[9rem]" hx-swap-oob="outerHTML">
+  <option value="">All Labels</option>
+  {% if labels is none %}
+    {% if selected_label is not none %}<option value="{{ selected_label }}" selected>{{ selected_label }}</option>{% endif %}
+  {% else %}
+    {% for label in labels %}
+      <option value="{{ label.name }}"{% if label.filter_selected %} selected{% endif %}>{{ label.name }}</option>
+    {% endfor %}
+  {% endif %}
+</select>
+<select id="issue-labels" name="issue_labels" class="select w-full h-auto" multiple size="4" hx-swap-oob="outerHTML">
+  {% if labels is none %}
+    {% for name in selected_issue_labels %}
+      <option value="{{ name }}" selected>{{ name }}</option>
+    {% endfor %}
+  {% else %}
+    {% for label in labels %}
+      <option value="{{ label.name }}"{% if label.multi_selected %} selected{% endif %}>{{ label.name }}</option>
+    {% endfor %}
+  {% endif %}
+</select>
+<select id="issue-assignee" name="assignee_id" class="select w-full" hx-swap-oob="outerHTML">
+  <option value="">Unassigned</option>
+  {% if members is none %}
+    {% if selected_assignee is not none %}<option value="{{ selected_assignee }}" selected>{{ selected_assignee }}</option>{% endif %}
+  {% else %}
+    {% for member in members %}
+      <option value="{{ member.id }}"{% if member.selected %} selected{% endif %}>{{ member.name if member.name is not none else '' }} (@{{ member.username if member.username is not none else '' }})</option>
+    {% endfor %}
+  {% endif %}
+</select>
+<select id="issue-milestone" name="milestone_id" class="select w-full" hx-swap-oob="outerHTML">
+  <option value="">No Milestone</option>
+  {% if milestones is none %}
+    {% if selected_milestone is not none %}<option value="{{ selected_milestone }}" selected>{{ selected_milestone }}</option>{% endif %}
+  {% else %}
+    {% for milestone in milestones %}
+      <option value="{{ milestone.id }}"{% if milestone.selected %} selected{% endif %}>{% if milestone.title is not none %}{{ milestone.title }}{% endif %}</option>
+    {% endfor %}
+  {% endif %}
+</select>
+<div class="text-sm">
+  {% if labels is none %}
+    <p class="error-message" role="alert">Labels could not be read. This is not an empty label list.</p>
+  {% endif %}
+  {% if members is none %}
+    <p class="error-message" role="alert">Members could not be read. This is not an empty member list.</p>
+  {% endif %}
+  {% if milestones is none %}
+    <p class="error-message" role="alert">Milestones could not be read. This is not an empty milestone list.</p>
+  {% endif %}
+</div>
+{% endif %}

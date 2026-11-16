@@ -2,6 +2,13 @@
 
 {% block title %}Analytics Engine - ION{% endblock %}
 
+{% block head_css %}
+{# The page's own rules, for the classes the server-rendered panels emit.
+   head_css loses to ion-workspace.css and base.html's two in-body blocks,
+   and neither of the selectors here appears in those. #}
+<link rel="stylesheet" href="/static/css/analytics-page.css?v={{ ion_version }}">
+{% endblock %}
+
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
@@ -169,726 +176,6 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* =========================================================================
-   Analytics Stats Bar — matches stat-card pattern from style.css
-   ========================================================================= */
-.analytics-stats-bar {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 1rem;
-    margin-bottom: 2rem;
-}
-.astat-card {
-    background: var(--bg-secondary);
-    border: 1px solid var(--ion-border);
-    border-radius: var(--ion-radius-lg);
-    padding: 1.25rem 1rem;
-    text-align: center;
-    cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0,0,0,.15);
-    position: relative;
-    overflow: hidden;
-    transition: border-color 0.3s, box-shadow 0.3s, transform 0.2s;
-}
-.astat-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--primary), var(--neon-purple));
-}
-.astat-card:hover {
-    border-color: var(--border-bright);
-    box-shadow: 0 2px 8px rgba(0,0,0,.15), var(--glow-sm);
-    transform: translateY(-2px);
-}
-.astat-value {
-    font-size: 1.75rem;
-    font-weight: 700;
-    color: var(--primary);
-    text-shadow: var(--glow-sm);
-    font-family: 'JetBrains Mono', monospace;
-    line-height: 1.2;
-}
-.astat-label {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-top: 0.375rem;
-}
-
-/* =========================================================================
-   Tabs
-   ========================================================================= */
-.analytics-tabs {
-    display: flex;
-    gap: 0;
-    border-bottom: 1px solid var(--ion-border);
-    margin-bottom: 1.5rem;
-    overflow-x: auto;
-}
-.analytics-tab {
-    padding: 0.75rem 1.125rem;
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    color: var(--text-muted);
-    font-size: 0.8125rem;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: color 0.2s, border-color 0.2s;
-}
-.analytics-tab:hover { color: var(--text-primary); }
-.analytics-tab.active {
-    color: var(--primary);
-    border-bottom-color: var(--primary);
-    font-weight: 600;
-    text-shadow: 0 0 8px var(--primary-glow);
-}
-
-/* Tab Content */
-.analytics-tab-content { display: none; }
-.analytics-tab-content.active { display: block; }
-
-/* Section Headers */
-.analytics-section .section-header {
-    display: flex;
-    align-items: baseline;
-    gap: 0.75rem;
-    margin-bottom: 1.25rem;
-}
-.analytics-section .section-header h2 {
-    margin: 0;
-    font-size: 1.125rem;
-    color: var(--text-bright);
-}
-.section-sub { color: var(--text-muted); font-size: 0.8125rem; }
-
-/* =========================================================================
-   Overview Grid
-   ========================================================================= */
-.analytics-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-}
-.overview-card {
-    background: var(--bg-secondary);
-    border: 1px solid var(--ion-border);
-    border-radius: var(--ion-radius-lg);
-    padding: 1.25rem;
-    cursor: pointer;
-    box-shadow: 0 2px 8px rgba(0,0,0,.15);
-    transition: border-color 0.3s, box-shadow 0.3s;
-}
-.overview-card:hover {
-    border-color: var(--border-bright);
-    box-shadow: 0 2px 8px rgba(0,0,0,.15), 0 0 20px rgba(0, 212, 255, 0.08);
-}
-.overview-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.75rem;
-}
-.overview-card-title { font-weight: 600; font-size: 0.9375rem; color: var(--text-primary); }
-.overview-card-status {
-    font-size: 0.6875rem;
-    padding: 0.2rem 0.6rem;
-    border-radius: 99px;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-}
-.overview-card-status.ok { background: rgba(16,185,129,0.15); color: var(--neon-green); }
-.overview-card-status.stale { background: rgba(251,191,36,0.15); color: var(--neon-yellow); }
-.overview-card-status.error { background: rgba(239,68,68,0.15); color: var(--neon-red); }
-.overview-card-status.pending { background: rgba(139,148,158,0.15); color: var(--text-muted); }
-.overview-card-body { color: var(--text-secondary); }
-.overview-card-metric {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--text-bright);
-    font-family: 'JetBrains Mono', monospace;
-    margin-bottom: 0.25rem;
-}
-.overview-card-detail { font-size: 0.75rem; color: var(--text-muted); }
-.overview-card-footer { margin-top: 0.75rem; font-size: 0.6875rem; color: var(--text-muted); border-top: 1px solid var(--ion-border); padding-top: 0.625rem; }
-
-/* =========================================================================
-   Data Tables
-   ========================================================================= */
-.analytics-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.8125rem;
-    color: var(--text-primary);
-}
-.analytics-table th {
-    text-align: left;
-    padding: 0.625rem 0.75rem;
-    border-bottom: 2px solid var(--ion-border);
-    font-weight: 600;
-    font-size: 0.6875rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-muted);
-}
-.analytics-table td {
-    padding: 0.625rem 0.75rem;
-    border-bottom: 1px solid var(--ion-border);
-    vertical-align: middle;
-    color: var(--text-secondary);
-}
-.analytics-table tr:hover td { background: var(--primary-dim); }
-.analytics-table a { color: var(--primary); text-decoration: none; }
-.analytics-table a:hover { text-decoration: underline; }
-
-/* =========================================================================
-   Risk Bars
-   ========================================================================= */
-.risk-bar-container {
-    width: 100%;
-    background: var(--bg-elevated);
-    border-radius: 3px;
-    height: 6px;
-}
-.risk-bar { height: 6px; border-radius: 3px; transition: width 0.4s ease; }
-.risk-bar.critical { background: var(--neon-red); box-shadow: 0 0 6px rgba(239,68,68,0.4); }
-.risk-bar.high { background: var(--neon-orange); box-shadow: 0 0 6px rgba(249,115,22,0.3); }
-.risk-bar.medium { background: var(--neon-yellow); }
-.risk-bar.low { background: var(--neon-green); }
-
-/* =========================================================================
-   Rule Noise Bar Chart
-   ========================================================================= */
-.noise-bar-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-}
-.noise-bar-label {
-    width: 280px;
-    font-size: 0.8125rem;
-    color: var(--text-primary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.noise-bar-track {
-    flex: 1;
-    height: 20px;
-    background: var(--bg-elevated);
-    border-radius: 4px;
-    overflow: hidden;
-}
-.noise-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
-.noise-bar-count { width: 50px; text-align: right; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; }
-.fp-low { background: linear-gradient(90deg, var(--neon-green), #059669); }
-.fp-med { background: linear-gradient(90deg, var(--neon-yellow), var(--neon-orange)); }
-.fp-high { background: linear-gradient(90deg, var(--neon-red), #dc2626); }
-
-/* =========================================================================
-   Sparkline (pure CSS bars)
-   ========================================================================= */
-.sparkline {
-    display: flex;
-    align-items: flex-end;
-    gap: 2px;
-    height: 60px;
-    padding: 0 2px;
-}
-.sparkline-bar {
-    flex: 1;
-    background: var(--primary);
-    border-radius: 2px 2px 0 0;
-    min-width: 3px;
-    opacity: 0.6;
-    transition: opacity 0.2s, box-shadow 0.2s;
-}
-.sparkline-bar:hover {
-    opacity: 1;
-    box-shadow: 0 0 6px var(--primary-glow);
-}
-
-/* =========================================================================
-   Chart Containers
-   ========================================================================= */
-.velocity-chart-container {
-    background: var(--bg-secondary);
-    border: 1px solid var(--ion-border);
-    border-radius: var(--ion-radius-lg);
-    padding: 1.25rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,.15);
-}
-.velocity-chart-title {
-    font-weight: 600;
-    font-size: 0.875rem;
-    color: var(--text-primary);
-    margin-bottom: 0.75rem;
-}
-
-/* =========================================================================
-   Threat Level Distribution
-   ========================================================================= */
-.threat-dist-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
-.threat-dist-label { width: 80px; font-size: 0.8125rem; font-weight: 500; color: var(--text-secondary); text-transform: capitalize; }
-.threat-dist-count { width: 40px; text-align: right; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; }
-.tl-critical { background: var(--neon-red); box-shadow: 0 0 4px rgba(239,68,68,0.3); }
-.tl-high { background: var(--neon-orange); }
-.tl-medium { background: var(--neon-yellow); }
-.tl-low { background: var(--neon-green); }
-.tl-benign { background: var(--text-muted); }
-.tl-unknown { background: var(--bg-elevated); }
-
-/* =========================================================================
-   Case Metrics Cards
-   ========================================================================= */
-.metrics-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
-.metric-card {
-    background: var(--bg-secondary);
-    border: 1px solid var(--ion-border);
-    border-radius: var(--ion-radius-lg);
-    padding: 1.25rem;
-    text-align: center;
-    box-shadow: 0 2px 8px rgba(0,0,0,.15);
-    position: relative;
-    overflow: hidden;
-}
-.metric-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, var(--primary), var(--neon-purple));
-}
-.metric-value {
-    font-size: 2rem;
-    font-weight: 700;
-    color: var(--text-bright);
-    font-family: 'JetBrains Mono', monospace;
-    line-height: 1.2;
-}
-.metric-label {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    margin-top: 0.375rem;
-}
-
-/* =========================================================================
-   Closure Reason Bars
-   ========================================================================= */
-.closure-bars { margin-top: 1rem; }
-.closure-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
-.closure-label { width: 160px; font-size: 0.8125rem; color: var(--text-secondary); }
-.closure-bar-track { flex: 1; height: 18px; background: var(--bg-elevated); border-radius: 4px; overflow: hidden; }
-.closure-bar-fill { height: 100%; border-radius: 4px; }
-.closure-count { width: 35px; text-align: right; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); font-family: 'JetBrains Mono', monospace; }
-.cl-true_positive { background: var(--neon-green); }
-.cl-false_positive { background: var(--neon-red); }
-.cl-benign_true_positive { background: var(--neon-yellow); }
-.cl-duplicate { background: var(--text-muted); }
-.cl-insufficient_data { background: var(--neon-purple); }
-.cl-not_applicable { background: var(--bg-elevated); }
-.cl-unspecified { background: var(--bg-elevated); }
-
-/* =========================================================================
-   Severity Badges (local — matches alerts.html pattern)
-   ========================================================================= */
-.severity-badge {
-    padding: 0.2rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.6875rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-}
-.severity-critical, .severity-badge.severity-critical { background: rgba(239,68,68,0.2); color: var(--neon-red); }
-.severity-high, .severity-badge.severity-high { background: rgba(249,115,22,0.2); color: var(--neon-orange); }
-.severity-medium, .severity-badge.severity-medium { background: rgba(251,191,36,0.2); color: var(--neon-yellow); }
-.severity-low, .severity-badge.severity-low { background: rgba(16,185,129,0.2); color: var(--neon-green); }
-.severity-info, .severity-badge.severity-info { background: rgba(14,165,233,0.2); color: var(--neon-blue); }
-.severity-unknown, .severity-badge.severity-unknown { background: rgba(139,148,158,0.15); color: var(--text-muted); }
-
-/* =========================================================================
-   Stale Items
-   ========================================================================= */
-.stale-section { margin-bottom: 1.5rem; }
-.stale-section h3 {
-    font-size: 0.9375rem;
-    margin-bottom: 0.75rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: var(--text-primary);
-}
-.stale-badge {
-    font-size: 0.6875rem;
-    background: rgba(239,68,68,0.15);
-    color: var(--neon-red);
-    padding: 0.15rem 0.5rem;
-    border-radius: 99px;
-    font-weight: 600;
-}
-.days-stale { font-weight: 700; font-family: 'JetBrains Mono', monospace; }
-.days-stale.warn { color: var(--neon-yellow); }
-.days-stale.danger { color: var(--neon-red); text-shadow: 0 0 6px rgba(239,68,68,0.3); }
-
-/* =========================================================================
-   Entity Type Badges
-   ========================================================================= */
-.entity-type-badge {
-    font-size: 0.6875rem;
-    padding: 0.15rem 0.5rem;
-    border-radius: 4px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-}
-.entity-type-badge.host { background: rgba(14,165,233,0.15); color: var(--neon-blue); }
-.entity-type-badge.user { background: rgba(168,85,247,0.15); color: var(--neon-purple); }
-
-/* =========================================================================
-   Config Table
-   ========================================================================= */
-.config-table { width: 100%; border-collapse: collapse; }
-.config-table th {
-    text-align: left;
-    padding: 0.75rem;
-    border-bottom: 2px solid var(--ion-border);
-    font-size: 0.6875rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-muted);
-}
-.config-table td {
-    padding: 0.75rem;
-    border-bottom: 1px solid var(--ion-border);
-    vertical-align: middle;
-    color: var(--text-secondary);
-}
-.config-table tr:hover td { background: var(--primary-dim); }
-.config-toggle {
-    cursor: pointer;
-    width: 40px;
-    height: 22px;
-    border-radius: 11px;
-    border: none;
-    position: relative;
-    transition: background 0.2s;
-}
-.config-toggle.on { background: var(--neon-green); box-shadow: 0 0 8px rgba(16,185,129,0.3); }
-.config-toggle.off { background: var(--bg-elevated); }
-.config-toggle::after {
-    content: '';
-    position: absolute;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: white;
-    top: 2px;
-    transition: left 0.2s;
-}
-.config-toggle.on::after { left: 20px; }
-.config-toggle.off::after { left: 2px; }
-.schedule-input {
-    width: 64px;
-    padding: 0.375rem 0.5rem;
-    border: 1px solid var(--ion-border);
-    border-radius: var(--radius);
-    font-size: 0.8125rem;
-    text-align: center;
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    font-family: 'JetBrains Mono', monospace;
-}
-.schedule-input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 2px var(--primary-dim); }
-.run-time { font-size: 0.75rem; color: var(--text-muted); }
-
-/* =========================================================================
-   Loading / Empty States
-   ========================================================================= */
-.loading-state, .empty-state {
-    text-align: center;
-    padding: 3rem 2rem;
-    color: var(--text-muted);
-    font-size: 0.875rem;
-}
-
-/* =========================================================================
-   Responsive
-   ========================================================================= */
-@media (max-width: 1100px) {
-    .analytics-stats-bar { grid-template-columns: repeat(4, 1fr); }
-    .analytics-grid { grid-template-columns: repeat(2, 1fr); }
-}
-@media (max-width: 768px) {
-    .analytics-stats-bar { grid-template-columns: repeat(2, 1fr); }
-    .analytics-grid { grid-template-columns: 1fr; }
-    .metrics-grid { grid-template-columns: repeat(2, 1fr); }
-    .noise-bar-label { width: 150px; }
-}
-
-/* =========================================================================
-   System Analytics Tab
-   ========================================================================= */
-.sys-stat-card {
-    background: var(--bg-secondary);
-    border: 1px solid var(--ion-border);
-    border-radius: var(--ion-radius-lg);
-    padding: 1rem 0.75rem;
-    text-align: center;
-    box-shadow: 0 2px 8px rgba(0,0,0,.15);
-    position: relative;
-    overflow: hidden;
-}
-.sys-stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
-}
-.sys-stat-val {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--primary);
-    font-family: 'JetBrains Mono', monospace;
-    line-height: 1.2;
-    text-shadow: var(--glow-sm);
-}
-.sys-stat-label {
-    font-size: 0.7rem;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-top: 0.25rem;
-}
-
-/* System card */
-.sys-card {
-    background: var(--bg-secondary);
-    border: 1px solid var(--ion-border);
-    border-radius: var(--ion-radius-lg);
-    box-shadow: 0 2px 8px rgba(0,0,0,.15);
-    overflow: hidden;
-    transition: border-color 0.3s, box-shadow 0.3s, transform 0.2s;
-}
-.sys-card:hover {
-    border-color: var(--border-bright);
-    box-shadow: 0 2px 8px rgba(0,0,0,.15), 0 0 20px rgba(0, 212, 255, 0.08);
-    transform: translateY(-2px);
-}
-.sys-card-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.875rem 1.125rem;
-    border-bottom: 1px solid var(--ion-border);
-    position: relative;
-}
-.sys-card-header::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 3px;
-}
-.sys-card.mapped .sys-card-header::before {
-    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-green));
-}
-.sys-card:not(.mapped) .sys-card-header::before {
-    background: linear-gradient(90deg, var(--neon-orange), var(--neon-red));
-}
-.sys-card-name {
-    font-size: 0.9375rem;
-    font-weight: 600;
-    color: var(--text-bright);
-    font-family: 'JetBrains Mono', monospace;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-.sys-card-name .sys-icon {
-    width: 22px;
-    height: 22px;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.7rem;
-    font-weight: 700;
-    color: var(--bg-primary);
-    flex-shrink: 0;
-}
-.sys-card-alerts {
-    font-size: 1.375rem;
-    font-weight: 700;
-    color: var(--primary);
-    font-family: 'JetBrains Mono', monospace;
-    text-shadow: var(--glow-sm);
-}
-.sys-card-body { padding: 0.875rem 1.125rem; }
-.sys-sev-row { display: flex; gap: 0.375rem; margin-bottom: 0.625rem; flex-wrap: wrap; }
-.sys-sev-pill {
-    display: flex;
-    align-items: center;
-    gap: 0.2rem;
-    padding: 0.15rem 0.4rem;
-    border-radius: 4px;
-    font-size: 0.65rem;
-    font-weight: 600;
-    font-family: 'JetBrains Mono', monospace;
-}
-.sys-sev-pill.crit { background: rgba(255,69,58,0.15); color: var(--danger); border: 1px solid rgba(255,69,58,0.3); }
-.sys-sev-pill.high { background: rgba(255,149,0,0.15); color: var(--neon-orange); border: 1px solid rgba(255,149,0,0.3); }
-.sys-sev-pill.med { background: rgba(255,214,10,0.15); color: var(--warning); border: 1px solid rgba(255,214,10,0.3); }
-.sys-sev-pill.low { background: rgba(48,209,88,0.15); color: var(--success); border: 1px solid rgba(48,209,88,0.3); }
-.sys-sparkline { margin: 0.375rem 0; height: 36px; }
-.sys-sparkline svg { width: 100%; height: 36px; display: block; }
-.sys-meta {
-    display: flex;
-    gap: 0.75rem;
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    margin-top: 0.375rem;
-}
-.sys-meta span { display: flex; align-items: center; gap: 0.2rem; }
-.sys-rules-section {
-    margin-top: 0.625rem;
-    border-top: 1px solid var(--ion-border);
-    padding-top: 0.625rem;
-}
-.sys-rules-title {
-    font-size: 0.65rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.25rem;
-}
-.sys-rule-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.2rem 0;
-    font-size: 0.7rem;
-}
-.sys-rule-name {
-    color: var(--text-secondary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 260px;
-}
-.sys-rule-count {
-    color: var(--primary);
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 600;
-    font-size: 0.65rem;
-}
-
-/* TIDE coverage overlay on system card */
-.sys-tide-bar {
-    margin-top: 0.625rem;
-    padding-top: 0.625rem;
-    border-top: 1px solid var(--ion-border);
-}
-.sys-tide-label {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.7rem;
-    margin-bottom: 0.375rem;
-}
-.sys-tide-label .tide-label-left { color: var(--text-muted); font-weight: 500; }
-.sys-tide-label .tide-label-right { font-weight: 700; font-family: 'JetBrains Mono', monospace; }
-.sys-tide-progress {
-    height: 6px;
-    background: var(--bg-elevated);
-    border-radius: 3px;
-    overflow: hidden;
-    margin-bottom: 0.375rem;
-}
-.sys-tide-progress-fill {
-    height: 100%;
-    border-radius: 3px;
-    transition: width 0.4s ease;
-}
-.sys-tide-stats {
-    display: flex;
-    gap: 0.75rem;
-    font-size: 0.65rem;
-    color: var(--text-muted);
-}
-.sys-tide-stats span { display: flex; align-items: center; gap: 0.2rem; }
-
-/* Unmapped badge */
-.sys-unmapped-badge {
-    margin-top: 0.5rem;
-    padding: 0.375rem 0.625rem;
-    background: rgba(255,149,0,0.08);
-    border: 1px solid rgba(255,149,0,0.2);
-    border-radius: var(--radius);
-    font-size: 0.7rem;
-    color: var(--neon-orange);
-    text-align: center;
-}
-.sys-unmapped-badge a { color: var(--primary); text-decoration: none; }
-.sys-unmapped-badge a:hover { text-decoration: underline; }
-
-/* Index Breakdown (ported from /engineering-analytics, phase 7) */
-.sev-pill {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.2rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.7rem;
-    font-weight: 600;
-    font-family: 'JetBrains Mono', monospace;
-}
-.sev-pill.crit { background: rgba(255, 69, 58, 0.15); color: var(--danger); border: 1px solid rgba(255, 69, 58, 0.3); }
-.sev-pill.high { background: rgba(255, 149, 0, 0.15); color: var(--neon-orange); border: 1px solid rgba(255, 149, 0, 0.3); }
-.sev-pill.med  { background: rgba(255, 214, 10, 0.15); color: var(--warning); border: 1px solid rgba(255, 214, 10, 0.3); }
-.sev-pill.low  { background: rgba(48, 209, 88, 0.15); color: var(--success); border: 1px solid rgba(48, 209, 88, 0.3); }
-.idx-name {
-    font-family: 'JetBrains Mono', monospace;
-    color: var(--neon-cyan);
-    font-size: 0.75rem;
-}
-.idx-bar-container {
-    flex: 1;
-    height: 8px;
-    background: var(--bg-elevated);
-    border-radius: 4px;
-    overflow: hidden;
-}
-.idx-bar {
-    height: 100%;
-    border-radius: 4px;
-    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
-    transition: width 0.4s ease;
-}
-.idx-count {
-    font-family: 'JetBrains Mono', monospace;
-    font-weight: 600;
-    color: var(--primary);
-    font-size: 0.8125rem;
-}
-.idx-sev-pills {
-    display: flex;
-    gap: 0.375rem;
-}
-</style>
 <script nonce="{{ csp_nonce }}">
 let dashboardData = null;
 let jobsList = [];
@@ -908,363 +195,124 @@ document.querySelectorAll('.astat-card[data-tab]').forEach(card => {
 // =========================================================================
 // Data Loading
 // =========================================================================
+// GET /ui/analytics/dashboard renders the overview grid and pushes the
+// six summary spans out of band beside it, the way the system tab's
+// stats bar already works.
+//
+// Each of those six was `|| 0` over an endpoint that had already
+// defaulted the figure to 0, on a bar where zero reads as good news. A
+// job that has never run, a job whose stored result holds no such figure
+// and a job type that is not registered at all all reported the same
+// confident zero as a real measurement of none. `astat-stale` was worse
+// still: `(s.stale_cases || 0) + (s.stale_alerts || 0)` reports a
+// total that silently omits whichever half was unreadable.
+//
+// The overview cards' staleness badge was decided with
+// `Date.now() - new Date(job.last_run_at)`, which reads a naive UTC
+// value in the viewer's zone. Against a two-hour threshold a viewer's
+// offset flipped the badge outright.
 async function loadDashboard() {
     try {
-        const [dashResp, jobsResp] = await Promise.all([
-            fetch('/api/analytics/dashboard'),
-            fetch('/api/analytics/jobs'),
-        ]);
-        if (dashResp.status === 401 || jobsResp.status === 401) { window.location.href = '/login?redirect=/analytics'; return; }
-        dashboardData = await dashResp.json();
+        const jobsResp = await fetch('/api/analytics/jobs');
+        if (jobsResp.status === 401) { window.location.href = '/login?redirect=/analytics'; return; }
         const jobsData = await jobsResp.json();
         jobsList = jobsData.jobs || [];
-        renderDashboard();
+        dashboardData = true;
     } catch (e) {
-        console.error('Failed to load analytics:', e);
-        document.getElementById('overview-grid').innerHTML = '<div class="empty-state">Failed to load analytics data</div>';
+        console.error('Failed to load the job list:', e);
+        jobsList = [];
     }
-}
-
-// =========================================================================
-// Rendering
-// =========================================================================
-function renderDashboard() {
-    if (!dashboardData) return;
-    const s = dashboardData.summary || {};
-    const jobs = dashboardData.jobs || {};
-
-    // Summary stats
-    setText('astat-entities', s.entities_at_risk || 0);
-    setText('astat-offenders', s.repeat_offenders || 0);
-    setText('astat-noisy', s.noisy_rules || 0);
-    setText('astat-mttr', s.mttr_hours != null ? s.mttr_hours : '-');
-    setText('astat-velocity', s.observable_velocity || 0);
-    setText('astat-stale', (s.stale_cases || 0) + (s.stale_alerts || 0));
-
-    renderOverview(jobs);
-    renderEntityRisk(jobs.entity_risk_score);
-    renderRepeatOffenders(jobs.repeat_offenders);
-    renderRuleNoise(jobs.rule_noise);
-    renderObservableVelocity(jobs.observable_velocity);
-    renderCaseMetrics(jobs.case_metrics);
-    renderStaleInvestigations(jobs.stale_investigations);
+    htmx.ajax('GET', '/ui/analytics/dashboard', {
+        source: document.getElementById('overview-grid'),
+        target: '#overview-grid', swap: 'innerHTML',
+    });
+    renderEntityRisk();
+    renderRepeatOffenders();
+    renderRuleNoise();
+    renderObservableVelocity();
+    renderCaseMetrics();
+    renderStaleInvestigations();
     renderConfig();
 }
 
-function renderOverview(jobs) {
-    const grid = document.getElementById('overview-grid');
-    const cards = Object.entries(jobs).map(([type, job]) => {
-        const result = job.result || {};
-        const status = getJobStatus(job);
-        const metric = getOverviewMetric(type, result);
-
-        return `<div class="overview-card" data-click-action="switchTab" data-args='["${type === 'entity_risk_score' ? 'entity_risk' : type === 'repeat_offenders' ? 'repeat_offenders' : type}"]'>
-            <div class="overview-card-header">
-                <span class="overview-card-title">${esc(job.display_name)}</span>
-                <span class="overview-card-status ${status.cls}">${status.label}</span>
-            </div>
-            <div class="overview-card-body">
-                <div class="overview-card-metric">${metric.value}</div>
-                <div class="overview-card-detail">${metric.detail}</div>
-            </div>
-            <div class="overview-card-footer">${job.last_run_at ? 'Last run: ' + timeAgo(job.last_run_at) : 'Never run'} ${job.last_duration_ms ? '(' + job.last_duration_ms + 'ms)' : ''}</div>
-        </div>`;
-    });
-    grid.innerHTML = cards.join('');
-}
-
-function getJobStatus(job) {
-    if (job.last_error) return { cls: 'error', label: 'Error' };
-    if (!job.last_run_at) return { cls: 'pending', label: 'Pending' };
-    const age = Date.now() - new Date(job.last_run_at).getTime();
-    if (age > 2 * 3600000) return { cls: 'stale', label: 'Stale' };
-    return { cls: 'ok', label: 'OK' };
-}
-
-function getOverviewMetric(type, result) {
-    switch (type) {
-        case 'entity_risk_score': {
-            const top = (result.entities || [])[0];
-            return { value: result.total_scored || 0, detail: top ? `Top: ${top.entity} (${top.risk_score})` : 'No entities scored' };
-        }
-        case 'repeat_offenders':
-            return { value: result.total_flagged || 0, detail: `Threshold: ${result.threshold || 3}+ alerts in 30d` };
-        case 'rule_noise': {
-            const noisy = (result.rules || []).filter(r => r.fp_ratio > 0.5).length;
-            return { value: noisy, detail: `${result.total_rules || 0} rules analyzed` };
-        }
-        case 'observable_velocity':
-            return { value: result.velocity_7d || 0, detail: `Change: ${result.velocity_change > 0 ? '+' : ''}${result.velocity_change || 0} vs prev week` };
-        case 'case_metrics':
-            return { value: result.mttr_hours != null ? result.mttr_hours + 'h' : '-', detail: `${result.open_cases || 0} open / ${result.closed_cases || 0} closed` };
-        case 'stale_investigations':
-            return { value: (result.total_stale_cases || 0) + (result.total_stale_alerts || 0), detail: `${result.total_stale_cases || 0} cases, ${result.total_stale_alerts || 0} alerts` };
-        default:
-            return { value: '-', detail: '' };
-    }
-}
-
-function renderEntityRisk(job) {
+// GET /ui/analytics/entity-risk renders the panel. The fragment reads its own job, so
+// a job that is missing, has never run, or stored an unreadable
+// result each say which, where this page said "No data yet. Click
+// Run All Jobs" for all three.
+function renderEntityRisk() {
     const container = document.getElementById('entity-risk-content');
-    if (!job || !job.result) { container.innerHTML = '<div class="empty-state">No data yet. Click "Run All Jobs" to generate.</div>'; return; }
-    const entities = job.result.entities || [];
-    if (!entities.length) { container.innerHTML = '<div class="empty-state">No entities with risk scores in the last 30 days</div>'; return; }
-
-    const maxScore = entities[0]?.risk_score || 1;
-
-    container.innerHTML = `<table class="analytics-table">
-        <thead><tr><th>Entity</th><th>Type</th><th>Risk Score</th><th></th><th>Alerts</th><th>Open Cases</th><th>Top Rules</th></tr></thead>
-        <tbody>${entities.map(e => {
-            const pct = Math.min(100, Math.round((e.risk_score / maxScore) * 100));
-            const cls = e.risk_score >= 100 ? 'critical' : e.risk_score >= 50 ? 'high' : e.risk_score >= 20 ? 'medium' : 'low';
-            return `<tr>
-                <td><strong>${esc(e.entity)}</strong></td>
-                <td><span class="entity-type-badge ${e.type}">${e.type}</span></td>
-                <td class="font-bold text-[var(--text)]">${e.risk_score}</td>
-                <td class="w-[120px]"><div class="risk-bar-container"><div class="risk-bar ${cls}" data-pct="${pct}"></div></div></td>
-                <td>${e.alert_count}</td>
-                <td>${e.open_cases}</td>
-                <td class="text-xs max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap" title="${esc((e.rules || []).join(', '))}">${esc((e.rules || []).slice(0, 2).join(', '))}</td>
-            </tr>`;
-        }).join('')}</tbody>
-    </table>`;
-    applyBarWidths();
+    if (!container) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/analytics/entity-risk', {
+        source: container, target: container, swap: 'innerHTML',
+    });
 }
 
-function renderRepeatOffenders(job) {
+// GET /ui/analytics/repeat-offenders renders the panel. The fragment reads its own job, so
+// a job that is missing, has never run, or stored an unreadable
+// result each say which, where this page said "No data yet. Click
+// Run All Jobs" for all three.
+function renderRepeatOffenders() {
     const container = document.getElementById('repeat-offenders-content');
-    if (!job || !job.result) { container.innerHTML = '<div class="empty-state">No data yet. Click "Run All Jobs" to generate.</div>'; return; }
-    const offenders = job.result.offenders || [];
-    if (!offenders.length) { container.innerHTML = '<div class="empty-state">No repeat offenders detected in the last 30 days</div>'; return; }
-
-    container.innerHTML = `<table class="analytics-table">
-        <thead><tr><th>Entity</th><th>Type</th><th>Alerts (7d)</th><th>Alerts (30d)</th><th>Worst Severity</th><th>Distinct Rules</th></tr></thead>
-        <tbody>${offenders.map(o => `<tr>
-            <td><strong>${esc(o.entity)}</strong></td>
-            <td><span class="entity-type-badge ${o.type}">${o.type}</span></td>
-            <td class="font-semibold">${o.count_7d}</td>
-            <td class="font-semibold">${o.count_30d}</td>
-            <td><span class="severity-badge severity-${o.top_severity || 'unknown'}">${o.top_severity || '-'}</span></td>
-            <td class="text-xs" title="${esc((o.rules || []).join(', '))}">${(o.rules || []).length} rules</td>
-        </tr>`).join('')}</tbody>
-    </table>`;
+    if (!container) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/analytics/repeat-offenders', {
+        source: container, target: container, swap: 'innerHTML',
+    });
 }
 
-function renderRuleNoise(job) {
+// GET /ui/analytics/rule-noise renders the panel. The fragment reads its own job, so
+// a job that is missing, has never run, or stored an unreadable
+// result each say which, where this page said "No data yet. Click
+// Run All Jobs" for all three.
+function renderRuleNoise() {
     const container = document.getElementById('rule-noise-content');
-    if (!job || !job.result) { container.innerHTML = '<div class="empty-state">No data yet. Click "Run All Jobs" to generate.</div>'; return; }
-    const rules = job.result.rules || [];
-    if (!rules.length) { container.innerHTML = '<div class="empty-state">No rule data available</div>'; return; }
-
-    const maxCount = Math.max(...rules.map(r => r.alert_count), 1);
-
-    container.innerHTML = `
-        <div class="mb-3 text-xs text-[var(--text-muted)]">
-            Bar color: <span class="text-[#22c55e]">low FP</span> | <span class="text-[#eab308]">medium FP</span> | <span class="text-[#ef4444]">high FP (&gt;50%)</span>
-        </div>
-        ${rules.map(r => {
-            const pct = Math.round((r.alert_count / maxCount) * 100);
-            const fpClass = r.fp_ratio > 0.5 ? 'fp-high' : r.fp_ratio > 0.2 ? 'fp-med' : 'fp-low';
-            return `<div class="noise-bar-row">
-                <span class="noise-bar-label" title="${esc(r.rule_name)}">${esc(r.rule_name)}</span>
-                <div class="noise-bar-track"><div class="noise-bar-fill ${fpClass}" data-pct="${pct}"></div></div>
-                <span class="noise-bar-count">${r.alert_count}</span>
-                <span class="noise-bar-count w-[65px]" title="FP ratio">${Math.round(r.fp_ratio * 100)}% FP</span>
-            </div>`;
-        }).join('')}
-    `;
-    applyBarWidths();
+    if (!container) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/analytics/rule-noise', {
+        source: container, target: container, swap: 'innerHTML',
+    });
 }
 
-function renderObservableVelocity(job) {
+// GET /ui/analytics/observable-velocity renders the panel.
+function renderObservableVelocity() {
     const container = document.getElementById('observable-velocity-content');
-    if (!job || !job.result) { container.innerHTML = '<div class="empty-state">No data yet. Click "Run All Jobs" to generate.</div>'; return; }
-    const r = job.result;
-
-    // Sparkline
-    const dailyCounts = r.daily_counts || [];
-    const maxDay = Math.max(...dailyCounts.map(d => d.count), 1);
-
-    // Threat distribution
-    const dist = r.threat_distribution || {};
-    const totalObs = Object.values(dist).reduce((a, b) => a + b, 0) || 1;
-
-    const staleList = (r.stale_iocs || []).map(s => `<tr>
-        <td>${esc(s.value)}</td>
-        <td><span class="entity-type-badge host">${s.type}</span></td>
-        <td><span class="severity-badge severity-${s.threat_level}">${s.threat_level}</span></td>
-        <td class="days-stale ${s.days_stale > 21 ? 'danger' : 'warn'}">${s.days_stale}d</td>
-    </tr>`).join('');
-
-    container.innerHTML = `
-        <div class="grid grid-cols-2 gap-4 mb-4">
-            <div class="velocity-chart-container">
-                <div class="velocity-chart-title">New Observables / Day (30d)</div>
-                <div class="sparkline">${dailyCounts.map(d => {
-                    const h = Math.max(2, Math.round((d.count / maxDay) * 56));
-                    return `<div class="sparkline-bar" data-ion-style="height:${h}px" title="${d.date}: ${d.count}"></div>`;
-                }).join('')}</div>
-                <div class="flex justify-between text-[0.6875rem] text-[var(--text-muted)] mt-1.5">
-                    <span>${dailyCounts[0]?.date || ''}</span><span>${dailyCounts[dailyCounts.length - 1]?.date || ''}</span>
-                </div>
-            </div>
-            <div class="velocity-chart-container">
-                <div class="velocity-chart-title">Threat Level Distribution</div>
-                ${['critical','high','medium','low','benign','unknown'].map(level => {
-                    const count = dist[level] || 0;
-                    const pct = Math.round((count / totalObs) * 100);
-                    return `<div class="threat-dist-row">
-                        <span class="threat-dist-label">${level}</span>
-                        <div class="_ion-s-8bc7ebe99c">
-                            <div class="threat-dist-bar tl-${level} h-full" data-ion-style="width:${pct}%"></div>
-                        </div>
-                        <span class="threat-dist-count">${count}</span>
-                    </div>`;
-                }).join('')}
-                <div class="mt-2 text-xs text-[var(--text-muted)]">Total: ${r.total_observables || 0} | Watched: ${r.total_watched || 0}</div>
-            </div>
-        </div>
-        <div class="flex gap-4 mb-4">
-            <div class="metric-card flex-1"><div class="metric-value">${r.velocity_7d || 0}</div><div class="metric-label">New IOCs (7d)</div></div>
-            <div class="metric-card flex-1"><div class="metric-value">${r.velocity_prev_7d || 0}</div><div class="metric-label">Previous 7d</div></div>
-            <div class="metric-card flex-1"><div class="metric-value" data-ion-style="color:${(r.velocity_change || 0) > 0 ? '#ef4444' : '#22c55e'}">${(r.velocity_change || 0) > 0 ? '+' : ''}${r.velocity_change || 0}</div><div class="metric-label">Change</div></div>
-        </div>
-        ${staleList ? `<h3 class="text-[0.9375rem] mb-2">Stale Watched IOCs</h3>
-        <table class="analytics-table"><thead><tr><th>Value</th><th>Type</th><th>Threat Level</th><th>Days Stale</th></tr></thead>
-        <tbody>${staleList}</tbody></table>` : ''}
-    `;
+    if (!container) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/analytics/observable-velocity', {
+        source: container, target: container, swap: 'innerHTML',
+    });
 }
 
-function renderCaseMetrics(job) {
+// GET /ui/analytics/case-metrics renders the panel.
+function renderCaseMetrics() {
     const container = document.getElementById('case-metrics-content');
-    if (!job || !job.result) { container.innerHTML = '<div class="empty-state">No data yet. Click "Run All Jobs" to generate.</div>'; return; }
-    const r = job.result;
-
-    // Closure reasons
-    const reasons = r.closure_reasons || {};
-    const totalClosed = Object.values(reasons).reduce((a, b) => a + b, 0) || 1;
-
-    // Daily trend sparkline
-    const trend = r.daily_trend || [];
-    const maxTrend = Math.max(...trend.map(d => d.count), 1);
-
-    container.innerHTML = `
-        <div class="metrics-grid">
-            <div class="metric-card"><div class="metric-value">${r.mttr_hours != null ? r.mttr_hours : '-'}</div><div class="metric-label">MTTR (hours)</div></div>
-            <div class="metric-card"><div class="metric-value">${r.total_cases || 0}</div><div class="metric-label">Total Cases (30d)</div></div>
-            <div class="metric-card"><div class="metric-value text-[#eab308]">${r.open_cases || 0}</div><div class="metric-label">Open</div></div>
-            <div class="metric-card"><div class="metric-value text-[#22c55e]">${r.closed_cases || 0}</div><div class="metric-label">Closed</div></div>
-        </div>
-        <div class="grid grid-cols-2 gap-4">
-            <div class="velocity-chart-container">
-                <div class="velocity-chart-title">Cases Created / Day</div>
-                <div class="sparkline">${trend.map(d => {
-                    const h = Math.max(2, Math.round((d.count / maxTrend) * 56));
-                    return `<div class="sparkline-bar bg-[#8b5cf6]" data-ion-style="height:${h}px" title="${d.date}: ${d.count}"></div>`;
-                }).join('')}</div>
-                <div class="flex justify-between text-[0.6875rem] text-[var(--text-muted)] mt-1.5">
-                    <span>${trend[0]?.date || ''}</span><span>${trend[trend.length - 1]?.date || ''}</span>
-                </div>
-            </div>
-            <div class="velocity-chart-container">
-                <div class="velocity-chart-title">Closure Reasons</div>
-                <div class="closure-bars">${Object.entries(reasons).sort((a, b) => b[1] - a[1]).map(([reason, count]) => {
-                    const pct = Math.round((count / totalClosed) * 100);
-                    return `<div class="closure-row">
-                        <span class="closure-label">${formatReason(reason)}</span>
-                        <div class="closure-bar-track"><div class="closure-bar-fill cl-${reason}" data-pct="${pct}"></div></div>
-                        <span class="closure-count">${count}</span>
-                    </div>`;
-                }).join('')}</div>
-            </div>
-        </div>
-        ${renderSeverityBreakdown(r.by_severity || {})}
-    `;
-    applyBarWidths();
+    if (!container) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/analytics/case-metrics', {
+        source: container, target: container, swap: 'innerHTML',
+    });
 }
 
-function renderSeverityBreakdown(bySev) {
-    const entries = Object.entries(bySev);
-    if (!entries.length) return '';
-    return `<div class="mt-4">
-        <h3 class="text-[0.9375rem] mb-2">Cases by Severity</h3>
-        <table class="analytics-table"><thead><tr><th>Severity</th><th>Open</th><th>Closed</th><th>Total</th></tr></thead>
-        <tbody>${entries.sort((a, b) => {
-            const order = ['critical','high','medium','low','info'];
-            return order.indexOf(a[0]) - order.indexOf(b[0]);
-        }).map(([sev, data]) => `<tr>
-            <td><span class="severity-badge severity-${sev}">${sev}</span></td>
-            <td>${data.open || 0}</td>
-            <td>${data.closed || 0}</td>
-            <td class="font-semibold">${data.total || 0}</td>
-        </tr>`).join('')}</tbody></table>
-    </div>`;
-}
 
-function renderStaleInvestigations(job) {
+// GET /ui/analytics/stale renders the panel. The argument is ignored:
+// the fragment reads its own job, so a panel whose job is missing or
+// whose stored result is unreadable says which, where every panel on
+// this page said "No data yet. Click Run All Jobs" for all three.
+function renderStaleInvestigations() {
     const container = document.getElementById('stale-content');
-    if (!job || !job.result) { container.innerHTML = '<div class="empty-state">No data yet. Click "Run All Jobs" to generate.</div>'; return; }
-    const r = job.result;
-    const staleCases = r.stale_cases || [];
-    const staleAlerts = r.stale_alerts || [];
-
-    if (!staleCases.length && !staleAlerts.length) {
-        container.innerHTML = '<div class="empty-state">No stale investigations found. All items have recent activity.</div>';
-        return;
-    }
-
-    let html = '';
-
-    if (staleCases.length) {
-        html += `<div class="stale-section">
-            <h3>Stale Cases <span class="stale-badge">${staleCases.length}</span></h3>
-            <table class="analytics-table"><thead><tr><th>Case</th><th>Title</th><th>Severity</th><th>Assigned To</th><th>Last Activity</th><th>Days Stale</th></tr></thead>
-            <tbody>${staleCases.map(c => `<tr>
-                <td><a href="/cases">${esc(c.case_number)}</a></td>
-                <td>${esc(c.title)}</td>
-                <td><span class="severity-badge severity-${c.severity || 'medium'}">${c.severity || '-'}</span></td>
-                <td>${esc(c.assigned_to || 'Unassigned')}</td>
-                <td class="run-time">${timeAgo(c.last_activity)}</td>
-                <td class="days-stale ${c.days_stale > 7 ? 'danger' : 'warn'}">${c.days_stale}d</td>
-            </tr>`).join('')}</tbody></table>
-        </div>`;
-    }
-
-    if (staleAlerts.length) {
-        html += `<div class="stale-section">
-            <h3>Stale Alerts (uncased) <span class="stale-badge">${staleAlerts.length}</span></h3>
-            <table class="analytics-table"><thead><tr><th>Alert ID</th><th>Status</th><th>Assigned To</th><th>Last Activity</th><th>Days Stale</th></tr></thead>
-            <tbody>${staleAlerts.map(a => `<tr>
-                <td class="text-xs max-w-[200px] overflow-hidden text-ellipsis" title="${esc(a.es_alert_id)}">${esc(a.es_alert_id.substring(0, 20))}...</td>
-                <td>${a.status}</td>
-                <td>${esc(a.assigned_to || 'Unassigned')}</td>
-                <td class="run-time">${timeAgo(a.last_activity)}</td>
-                <td class="days-stale ${a.days_stale > 10 ? 'danger' : 'warn'}">${a.days_stale}d</td>
-            </tr>`).join('')}</tbody></table>
-        </div>`;
-    }
-
-    container.innerHTML = html;
+    if (!container) return Promise.resolve();
+    return htmx.ajax('GET', '/ui/analytics/stale', {
+        source: container, target: container, swap: 'innerHTML',
+    });
 }
 
+// GET /ui/analytics/config renders the table. `${j.run_count}` and
+// `${j.schedule_minutes}` printed "undefined" for a job whose columns
+// were null, and the second of those went into a number input's value
+// attribute, so the field was unusable until retyped. The two status
+// colours were text-[#ef4444] and text-[#22c55e] written into the row,
+// so they ignored the theme; they are classes in analytics-page.css now.
 function renderConfig() {
-    const container = document.getElementById('config-content');
-    if (!jobsList.length) { container.innerHTML = '<div class="empty-state">No jobs configured</div>'; return; }
-
-    container.innerHTML = `<table class="config-table">
-        <thead><tr><th>Job</th><th>Enabled</th><th>Schedule (min)</th><th>Last Run</th><th>Next Run</th><th>Runs</th><th>Duration</th><th>Status</th><th></th></tr></thead>
-        <tbody>${jobsList.map(j => `<tr>
-            <td><strong>${esc(j.display_name)}</strong><div class="text-[0.6875rem] text-[var(--text-muted)]">${j.job_type}</div></td>
-            <td><button class="config-toggle ${j.enabled ? 'on' : 'off'}" data-click-action="toggleJob" data-args='["${j.job_type}", ${!j.enabled}]'></button></td>
-            <td><input type="number" class="schedule-input" value="${j.schedule_minutes}" min="5" data-change-action="updateSchedule" data-args='["${j.job_type}", "$value"]'></td>
-            <td class="run-time">${j.last_run_at ? timeAgo(j.last_run_at) : 'Never'}</td>
-            <td class="run-time">${j.next_run_at ? timeAgo(j.next_run_at) : '-'}</td>
-            <td>${j.run_count}</td>
-            <td class="run-time">${j.last_duration_ms != null ? j.last_duration_ms + 'ms' : '-'}</td>
-            <td>${j.last_error ? '<span class="text-[#ef4444]" title="' + esc(j.last_error) + '">Error</span>' : (j.has_results ? '<span class="text-[#22c55e]">OK</span>' : '<span class="text-[var(--text-muted)]">Pending</span>')}</td>
-            <td><button class="btn btn-sm btn-secondary" data-click-action="runJob" data-args='["${j.job_type}"]'>Run Now</button></td>
-        </tr>`).join('')}</tbody>
-    </table>`;
+    htmx.ajax('GET', '/ui/analytics/config', {
+        source: document.getElementById('config-content'),
+        target: '#config-content', swap: 'innerHTML',
+    });
 }
 
 // =========================================================================
@@ -1341,16 +389,16 @@ function switchTab(tab) {
 function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
 
 
-// the v0.31.21 inline-style migration hashed `width:${pct}%` into the
-// STATIC class ._ion-s-95aea49e0e, leaving a literal `${pct}` in the CSS. That
-// rule is invalid so browsers drop it — every bar on this page has rendered at
-// zero width since. Apply the width from data-pct instead (CSP-safe: no inline
-// style attribute, set via the style property).
-function applyBarWidths(root) {
-    (root || document).querySelectorAll('[data-pct]').forEach(function (el) {
-        el.style.width = el.getAttribute('data-pct') + '%';
-    });
-}
+// The v0.31.21 inline-style migration hashed a width into the STATIC class
+// ._ion-s-95aea49e0e, leaving a literal ${pct} in the CSS. That rule is
+// invalid, browsers drop it, and every bar on this page rendered at zero
+// width until applyBarWidths() set each one from a data-pct attribute.
+//
+// Both are gone. The bars are server-rendered with data-ion-style, which
+// ion-dynamic-styles.js applies on a MutationObserver, so a width lands
+// after an htmx swap without the fragment asking for it. No data-pct
+// attribute is left in the tree, so applyBarWidths had no element to find
+// and no caller.
 
 function esc(str) {
     if (!str) return '';
@@ -1392,316 +440,88 @@ function showToast(msg, isError) {
 }
 
 // =========================================================================
-function renderIndexTable(indices, total) {
-    const container = document.getElementById('index-table-container');
-    if (!indices.length) {
-        container.innerHTML = '<div class="empty-state">No indices found</div>';
-        return;
-    }
-
-    const maxCount = Math.max(...indices.map(i => i.count), 1);
-
-    let rows = indices.map(idx => {
-        const sev = idx.severity || {};
-        const pct = Math.round((idx.count / maxCount) * 100);
-        let sevPills = '';
-        if (sev.critical) sevPills += `<span class="sev-pill crit">C ${sev.critical}</span>`;
-        if (sev.high) sevPills += `<span class="sev-pill high">H ${sev.high}</span>`;
-        if (sev.medium) sevPills += `<span class="sev-pill med">M ${sev.medium}</span>`;
-        if (sev.low) sevPills += `<span class="sev-pill low">L ${sev.low}</span>`;
-
-        return `<tr>
-            <td><span class="idx-name">${esc(idx.index)}</span></td>
-            <td><span class="idx-count">${idx.count.toLocaleString()}</span></td>
-            <td>
-                <div class="idx-bar-container">
-                    <div class="idx-bar" data-pct="${pct}"></div>
-                </div>
-            </td>
-            <td><div class="idx-sev-pills">${sevPills || '-'}</div></td>
-        </tr>`;
-    }).join('');
-
-    container.innerHTML = `
-        <table class="eng-index-table">
-            <thead>
-                <tr>
-                    <th>Index</th>
-                    <th>Count</th>
-                    <th>Volume</th>
-                    <th>Severity</th>
-                </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-        </table>`;
-
-    // The volume bars were dead on the old page: the v0.31.21 inline-style
-    // migration hashed `width:${pct}%` into the STATIC class
-    // ._ion-s-95aea49e0e, leaving the literal `${pct}` in the CSS — an invalid
-    // rule the browser drops, so every bar rendered at zero width. Set it here
-    // instead (CSP-safe, no inline style attribute).
-    container.querySelectorAll('.idx-bar[data-pct]').forEach(function (el) {
-        el.style.width = el.getAttribute('data-pct') + '%';
-    });
-}
 
 // System Analytics Tab
 // =========================================================================
-let sysOverviewData = null;
 let sysTabLoaded = false;
 
-async function loadSystemAnalyticsTab() {
-    const hours = document.getElementById('sys-time-range').value;
-    const grid = document.getElementById('sys-cards-grid');
-    grid.innerHTML = '<div class="loading-state">Loading system analytics...</div>';
+// One message into the card grid, built rather than parsed. Both the
+// loading line and the failure line were innerHTML with a class in a
+// string, and neither is markup a stylesheet needs to reach.
+function ionSysMessage(host, message) {
+    if (!host) return;
+    const box = document.createElement('div');
+    box.className = 'empty-state col-span-full';
+    box.textContent = message;
+    host.replaceChildren(box);
+}
 
+// GET /ui/analytics/system renders the index breakdown and swaps the
+// six stat figures out of band.
+function loadSystemFragment() {
+    const host = document.getElementById('index-table-container');
+    if (!host) return Promise.resolve();
+    const hours = (document.getElementById('sys-time-range') || {}).value || 24;
+    return htmx.ajax('GET', '/ui/analytics/system', {
+        source: host, target: host, swap: 'innerHTML',
+        values: { hours: hours },
+    });
+}
+// GET /ui/analytics/system renders the whole tab: the six stat figures,
+// the index breakdown, the summary line, the alert-volume timeline and
+// the per-namespace card grid. Everything but the index table is swapped
+// out of band into the containers this page already has.
+//
+// The grid was the last piece because buildSysCard was a hundred lines of
+// structure and a simplified fragment would have dropped most of it. What
+// it was also doing:
+//
+//   * Every count was `|| 0` over a payload whose Elasticsearch half may
+//     not have happened, so a namespace reported zero alerts and zero
+//     logs when nothing had been measured. es_failed says which.
+//   * `sys.unique_hosts || sys.logs_unique_hosts || 0` sent a recorded
+//     zero through to the next field and then to the literal, so one
+//     namespace with no unique hosts and one with neither field recorded
+//     read alike.
+//   * `t.coverage_pct || 0` and `c.readiness_score || 0` each drove three
+//     threshold colours, so a system whose coverage or readiness was
+//     never recorded was drawn in the red band at 0%, which on a coverage
+//     bar states that nothing is covered.
+//   * applied_rules, total_rules and enabled_rules went in raw, so a
+//     link missing those columns rendered "undefined/undefined rules".
+//   * Both sparkline builders repeated the NaN defect the index bars had:
+//     `Math.max(...timeline.map(t => t.count), 1)` is NaN the moment one
+//     count is not a number, every coordinate derived from it is NaN, and
+//     the chart silently vanished.
+//   * getSysColor composed an `hsl()` literal from a JS string hash for
+//     any namespace its ladder missed. That is a table on the server now,
+//     hashed with hashlib rather than hash(), which Python salts per
+//     process and would have recoloured every namespace on restart.
+async function loadSystemAnalyticsTab() {
+    sysTabLoaded = true;
+    const grid = document.getElementById('sys-cards-grid');
+    ionSysMessage(grid, 'Loading system analytics...');
     try {
-        const resp = await fetch(`/api/analytics/system-overview?hours=${hours}`, { credentials: 'include' });
-        if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).detail || resp.statusText);
-        sysOverviewData = await resp.json();
-        sysTabLoaded = true;
-        renderSystemAnalytics(sysOverviewData);
-        setText('astat-systems', sysOverviewData.total_systems || 0);
+        await loadSystemFragment();
     } catch (e) {
         console.error('System analytics error:', e);
-        grid.innerHTML = `<div class="empty-state">${esc(e.message || 'Failed to load')}</div>`;
+        ionSysMessage(grid, e.message || 'Failed to load');
     }
 }
 
-function renderSystemAnalytics(data) {
-    // Stats bar
-    const sev = data.total_severity || {};
-    setText('sys-s-total', (data.total_alerts || 0).toLocaleString());
-    setText('sys-s-logs', (data.total_logs_ingested || 0).toLocaleString());
-    setText('sys-s-systems', data.total_systems || 0);
-    setText('sys-s-mapped', data.mapped_systems || 0);
-    const covEl = document.getElementById('sys-s-coverage');
-    if (covEl) {
-        covEl.textContent = (data.avg_tide_coverage || 0) + '%';
-        covEl.style.color = data.avg_tide_coverage >= 70 ? 'var(--neon-green)' : data.avg_tide_coverage >= 40 ? 'var(--neon-yellow)' : 'var(--neon-red)';
+
+function systemReadFailed() {
+    for (const id of ['astat-systems','sys-s-total','sys-s-logs','sys-s-critical','sys-s-systems','sys-s-mapped','sys-s-coverage']) {
+        document.getElementById(id).textContent = '—';
     }
-    setText('sys-s-critical', (sev.critical || 0).toLocaleString());
-
-    // Index Breakdown (ported from /engineering-analytics, phase 7)
-    renderIndexTable(data.indices || [], data.total_alerts || 1);
-
-    // Summary text
-    const sumEl = document.getElementById('sys-summary-text');
-    if (sumEl) {
-        const unmapped = (data.total_systems || 0) - (data.mapped_systems || 0);
-        sumEl.textContent = `${data.total_systems} systems, ${data.mapped_systems} TIDE-mapped${unmapped ? ', ' + unmapped + ' unmapped' : ''}`;
-    }
-
-    // Timeline
-    renderSysTimeline(data.total_timeline || [], data.interval);
-
-    // System cards
-    renderSysCards(data.systems || []);
+    document.getElementById('sys-summary-text').textContent = 'System analytics could not be read. These figures are unknown.';
+    document.getElementById('sys-timeline-chart').textContent = 'The timeline could not be read.';
+    ionSysMessage(document.getElementById('sys-cards-grid'), 'System analytics could not be read. Retry Refresh.');
 }
-
-function renderSysTimeline(timeline, interval) {
-    const container = document.getElementById('sys-timeline-chart');
-    if (!timeline.length) {
-        container.innerHTML = '<div class="text-center text-[var(--text-muted)] text-[0.8125rem] p-4">No timeline data</div>';
-        return;
-    }
-    const W = container.clientWidth - 40 || 800;
-    const H = 70;
-    const maxVal = Math.max(...timeline.map(t => t.count), 1);
-    const points = timeline.map((t, i) => ({
-        x: 20 + (i / Math.max(timeline.length - 1, 1)) * (W - 40),
-        y: H - 10 - ((t.count / maxVal) * (H - 25)),
-        count: t.count
-    }));
-    const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-    const areaPath = linePath + ` L${points[points.length-1].x.toFixed(1)},${H-10} L${points[0].x.toFixed(1)},${H-10} Z`;
-
-    container.innerHTML = `<div class="text-[0.65rem] text-[var(--text-muted)] mb-1">Alert volume (interval: ${interval || 'auto'})</div>
-        <svg class="w-full h-[55px]" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-            <defs><linearGradient id="sys-tl-grad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.4"/>
-                <stop offset="100%" stop-color="#00d4ff" stop-opacity="0"/>
-            </linearGradient></defs>
-            <path d="${areaPath}" fill="url(#sys-tl-grad)" opacity="0.3"/>
-            <path d="${linePath}" fill="none" stroke="var(--neon-cyan)" stroke-width="2" filter="drop-shadow(0 0 4px rgba(0,212,255,0.5))"/>
-            <text x="2" y="18" fill="var(--text-muted)" font-size="9" font-family="JetBrains Mono">${maxVal}</text>
-            <text x="2" y="${H-10}" fill="var(--text-muted)" font-size="9" font-family="JetBrains Mono">0</text>
-        </svg>`;
-}
-
-function renderSysCards(systems) {
-    const grid = document.getElementById('sys-cards-grid');
-    if (!systems.length) {
-        grid.innerHTML = '<div class="empty-state col-span-full">No systems found. Configure Elasticsearch and CyAB data source namespaces to see system analytics.</div>';
-        return;
-    }
-    grid.innerHTML = systems.map(sys => buildSysCard(sys)).join('');
-}
-
-function buildSysCard(sys) {
-    const sev = sys.severity || {};
-    const ns = sys.system || 'unknown';
-    const isMapped = sys.mapped;
-    const icon = getSysIcon(ns);
-    const iconColor = getSysColor(ns);
-
-    // Severity pills
-    let sevHtml = '';
-    if (sev.critical) sevHtml += `<span class="sys-sev-pill crit">C ${sev.critical}</span>`;
-    if (sev.high) sevHtml += `<span class="sys-sev-pill high">H ${sev.high}</span>`;
-    if (sev.medium) sevHtml += `<span class="sys-sev-pill med">M ${sev.medium}</span>`;
-    if (sev.low) sevHtml += `<span class="sys-sev-pill low">L ${sev.low}</span>`;
-    if (!sevHtml && sys.alert_count > 0) sevHtml = '<span class="sys-sev-pill text-[var(--text-muted)]">No severity data</span>';
-    if (!sevHtml && sys.alert_count === 0) sevHtml = '<span class="text-[0.7rem] text-[var(--text-muted)]">No alerts in time range</span>';
-
-    // Mini sparkline
-    const sparkHtml = buildSysSparkline(sys.timeline || [], iconColor);
-
-    // Top rules (max 4)
-    const rules = (sys.top_rules || []).slice(0, 4);
-    let rulesHtml = '';
-    if (rules.length) {
-        rulesHtml = `<div class="sys-rules-section">
-            <div class="sys-rules-title">Top Rules</div>
-            ${rules.map(r => `<div class="sys-rule-row">
-                <span class="sys-rule-name" title="${esc(r.rule)}">${esc(r.rule)}</span>
-                <span class="sys-rule-count">${r.count}</span>
-            </div>`).join('')}
-        </div>`;
-    }
-
-    // TIDE coverage overlay (if mapped)
-    let tideHtml = '';
-    if (isMapped && sys.tide) {
-        const t = sys.tide;
-        const covPct = t.coverage_pct || 0;
-        const covColor = covPct >= 70 ? 'var(--neon-green)' : covPct >= 40 ? 'var(--neon-yellow)' : 'var(--neon-red)';
-        tideHtml = `<div class="sys-tide-bar">
-            <div class="sys-tide-label">
-                <span class="tide-label-left">TIDE: ${esc(t.name || '')}</span>
-                <span class="tide-label-right" data-ion-style="color:${covColor}">${covPct}%</span>
-            </div>
-            <div class="sys-tide-progress">
-                <div class="sys-tide-progress-fill" data-ion-style="width:${covPct}%; background:${covColor}"></div>
-            </div>
-            <div class="sys-tide-stats">
-                <span>${t.applied_rules}/${t.total_rules} rules</span>
-                <span>${t.enabled_rules} enabled</span>
-                ${t.disabled_rules ? `<span class="text-[var(--neon-orange)]">${t.disabled_rules} disabled</span>` : ''}
-                ${t.severity_breakdown?.critical ? `<span class="text-[var(--danger)]">${t.severity_breakdown.critical} crit</span>` : ''}
-                ${t.severity_breakdown?.high ? `<span class="text-[var(--neon-orange)]">${t.severity_breakdown.high} high</span>` : ''}
-            </div>
-        </div>`;
-    } else if (isMapped && sys.cyab && !sys.tide) {
-        tideHtml = `<div class="sys-tide-bar">
-            <div class="text-[0.7rem] text-[var(--text-muted)]">CyAB mapped (${esc(sys.cyab.cyab_source_name || '')}), no TIDE system linked</div>
-        </div>`;
-    }
-
-    // CyAB info line
-    let cyabHtml = '';
-    if (isMapped && sys.cyab) {
-        const c = sys.cyab;
-        const readColor = (c.readiness_score || 0) >= 70 ? 'var(--neon-green)' : (c.readiness_score || 0) >= 40 ? 'var(--neon-yellow)' : 'var(--neon-red)';
-        cyabHtml = `<div class="sys-meta mt-1">
-            <span title="CyAB System">${esc(c.cyab_system_name || c.cyab_source_name || '')}</span>
-            <span data-ion-style="color:${readColor}" title="Readiness">${c.readiness_score || 0}% ready</span>
-            <span title="Use Case Status">${esc(c.use_case_status || 'Not reviewed')}</span>
-        </div>`;
-    }
-
-    // Unmapped badge
-    let unmappedHtml = '';
-    if (!isMapped) {
-        unmappedHtml = `<div class="sys-unmapped-badge">No system mapping for this namespace</div>`;
-    }
-
-    return `<div class="sys-card ${isMapped ? 'mapped' : ''}">
-        <div class="sys-card-header">
-            <div class="sys-card-name">
-                <span class="sys-icon" data-ion-style="background:${iconColor}">${icon}</span>
-                ${esc(ns)}
-            </div>
-            <div class="sys-card-alerts">${(sys.alert_count || 0).toLocaleString()}</div>
-        </div>
-        <div class="sys-card-body">
-            <div class="sys-sev-row">${sevHtml}</div>
-            <div class="sys-sparkline">${sparkHtml}</div>
-            <div class="sys-meta">
-                <span title="Logs ingested in window from this namespace's data streams">&#x1F4DC; ${(sys.logs_ingested || 0).toLocaleString()} logs</span>
-                <span title="Unique hosts">&#x1F4BB; ${sys.unique_hosts || sys.logs_unique_hosts || 0} hosts</span>
-                <span title="Unique users">&#x1F464; ${sys.unique_users || sys.logs_unique_users || 0} users</span>
-                <span title="Alert status">${formatSysStatus(sys.status)}</span>
-            </div>
-            ${cyabHtml}
-            ${tideHtml}
-            ${rulesHtml}
-            ${unmappedHtml}
-        </div>
-    </div>`;
-}
-
-function buildSysSparkline(timeline, color) {
-    if (!timeline.length) return '';
-    const W = 360, H = 36;
-    const maxVal = Math.max(...timeline.map(t => t.count), 1);
-    const points = timeline.map((t, i) => ({
-        x: (i / Math.max(timeline.length - 1, 1)) * W,
-        y: H - 4 - ((t.count / maxVal) * (H - 8))
-    }));
-    const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-    const areaPath = linePath + ` L${W},${H-4} L0,${H-4} Z`;
-    const gId = 'sys-sg-' + color.replace(/[^a-zA-Z0-9]/g, '');
-    return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-        <defs><linearGradient id="${gId}" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="${color}" stop-opacity="0.3"/>
-            <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
-        </linearGradient></defs>
-        <path d="${areaPath}" fill="url(#${gId})" opacity="0.5"/>
-        <path d="${linePath}" fill="none" stroke="${color}" stroke-width="1.5" filter="drop-shadow(0 0 2px ${color})"/>
-    </svg>`;
-}
-
-function formatSysStatus(status) {
-    if (!status || !Object.keys(status).length) return '-';
-    const parts = [];
-    if (status.open) parts.push(`${status.open} open`);
-    if (status.acknowledged) parts.push(`${status.acknowledged} ack`);
-    if (status.closed) parts.push(`${status.closed} closed`);
-    return parts.join(', ') || '-';
-}
-
-function getSysIcon(name) {
-    const n = (name || '').toLowerCase();
-    if (n.includes('windows') || n === 'default') return 'W';
-    if (n.includes('linux')) return 'L';
-    if (n.includes('network') || n.includes('firewall') || n.includes('fw')) return 'N';
-    if (n.includes('cloud') || n.includes('aws') || n.includes('azure') || n.includes('gcp')) return 'C';
-    if (n.includes('endpoint') || n.includes('edr')) return 'E';
-    if (n.includes('mail') || n.includes('email') || n.includes('exchange')) return 'M';
-    if (n.includes('dns')) return 'D';
-    if (n.includes('web') || n.includes('http') || n.includes('proxy')) return 'P';
-    if (n.includes('auth') || n.includes('identity') || n.includes('ad')) return 'A';
-    if (n.includes('db') || n.includes('sql') || n.includes('database')) return 'B';
-    return name ? name.charAt(0).toUpperCase() : '?';
-}
-
-function getSysColor(name) {
-    const n = (name || '').toLowerCase();
-    if (n.includes('windows') || n === 'default') return '#00a4ef';
-    if (n.includes('linux')) return '#fcc624';
-    if (n.includes('network') || n.includes('firewall')) return '#00d4ff';
-    if (n.includes('cloud') || n.includes('aws')) return '#ff9900';
-    if (n.includes('azure')) return '#0078d4';
-    if (n.includes('gcp')) return '#4285f4';
-    if (n.includes('endpoint') || n.includes('edr')) return '#9b59b6';
-    if (n.includes('mail') || n.includes('email')) return '#e74c3c';
-    if (n.includes('dns')) return '#2ecc71';
-    if (n.includes('web') || n.includes('proxy')) return '#f39c12';
-    if (n.includes('auth') || n.includes('identity')) return '#e91e63';
-    let hash = 0;
-    for (let i = 0; i < n.length; i++) hash = n.charCodeAt(i) + ((hash << 5) - hash);
-    return `hsl(${Math.abs(hash % 360)}, 70%, 55%)`;
+for (const eventName of ['htmx:responseError','htmx:sendError','htmx:timeout']) {
+    document.addEventListener(eventName, event => {
+        if (event.detail.target === document.getElementById('index-table-container')) systemReadFailed();
+    });
 }
 
 // Lazy-load systems tab when first opened

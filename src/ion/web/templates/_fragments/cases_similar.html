@@ -1,0 +1,49 @@
+{# The Similar Closed Cases panel, from ui/cases.py's similar_view.
+
+   Three outcomes, and the middle one is the reason this fragment exists:
+   `cases is none` means the read failed or answered a shape we could not
+   read, so we cannot say there are none; an empty list means we read it
+   and there are none, which is what the endpoint says of a case nobody has
+   embedded yet; a list renders cards.
+
+   The card's colours are in static/css/cases-page.css, keyed by
+   `closure_key`. They were an rgba()/var() map in the page's JavaScript,
+   which put ION's palette in the markup and out of a theme's reach.
+
+   The case number used to be an <a href="javascript:openCaseDetail(id)">,
+   which this CSP blocks; the link only worked because the click bubbled to
+   the card's own data-click-action. The card carries that action and the
+   number is no longer a link, so what happens on click is what the DOM
+   says happens.
+#}
+{% if cases is none %}
+<div class="cpanel-empty-hint">Similarity unavailable</div>
+{% elif not cases %}
+<div class="cpanel-empty-hint">No similar closed cases yet{% if reason %} ({{ reason }}){% endif %}</div>
+{% else %}
+{%- for c in cases %}
+<div class="cpanel-alert-card cursor-pointer" data-click-action="openCaseDetail"
+     data-args='{{ [c.case_id]|tojson }}'>
+  <div class="cpanel-alert-card-header">
+    <span class="cpanel-alert-id">{{ c.label }}</span>
+    <div class="cpanel-alert-badges">
+      {%- if c.similarity_pct is not none %}
+      <span class="cpanel-alert-badge case-sim-badge"
+            title="Cosine similarity">{{ c.similarity_pct }}%</span>
+      {%- else %}
+      {# Not 0%. `(s.similarity || 0) * 100` printed the one number that
+         means the opposite of a score nobody sent. #}
+      <span class="cpanel-alert-badge case-sim-badge"
+            title="This row carried no similarity score">score unknown</span>
+      {%- endif %}
+      <span class="cpanel-alert-badge case-closure-{{ c.closure_key }}">
+        {{- c.closure_label or 'no verdict recorded' -}}
+      </span>
+    </div>
+  </div>
+  {%- if c.title %}
+  <div class="cpanel-alert-card-meta">{{ c.title }}</div>
+  {%- endif %}
+</div>
+{%- endfor %}
+{% endif %}

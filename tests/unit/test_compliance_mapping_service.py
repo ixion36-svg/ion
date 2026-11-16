@@ -39,11 +39,22 @@ class FakeTide:
         return self._coverage
 
 
-def _tide(*technique_ids, counts=None):
-    """A TIDE whose coverage reports one rule for each named technique."""
+def _tide(*technique_ids, counts=None, enabled=None):
+    """A TIDE whose coverage reports rules for each named technique.
+
+    `enabled` defaults to `counts`, since the ordinary case is a rule that is
+    switched on. Pass it explicitly to model a technique whose rules all exist
+    and are all disabled: the case the scorecard counted as covered while
+    _MEASURES claimed it required an enabled rule.
+    """
     counts = counts or {}
+    enabled = enabled or {}
     return FakeTide({"techniques": {
-        tid: {"rule_count": counts.get(tid, 1)} for tid in technique_ids
+        tid: {
+            "rule_count": counts.get(tid, 1),
+            "enabled_rules": enabled.get(tid, counts.get(tid, 1)),
+        }
+        for tid in technique_ids
     }})
 
 
@@ -89,7 +100,7 @@ class TestGetFramework:
 
 
 class TestCoveredTechniques:
-    def test_techniques_with_a_rule_are_covered(self):
+    def test_techniques_with_an_enabled_rule_are_covered(self):
         assert svc._covered_techniques(_tide("T1071", "T1078")) == {
             "T1071", "T1078"}
 
@@ -97,6 +108,25 @@ class TestCoveredTechniques:
         """A mapping row with zero rules is an intention, not a detection."""
         tide = _tide("T1071", "T1078", counts={"T1078": 0})
         assert svc._covered_techniques(tide) == {"T1071"}
+
+    def test_a_technique_whose_rules_are_all_disabled_is_not_covered(self):
+        """_MEASURES has always promised "at least one enabled detection
+        rule", and this tested rule_count, so a rule nobody had switched on
+        credited the control. Measured on the live TIDE tenant: 164
+        techniques had a rule, 94 had an enabled one.
+        """
+        tide = _tide("T1071", "T1078", counts={"T1078": 4},
+                     enabled={"T1078": 0})
+        assert svc._covered_techniques(tide) == {"T1071"}
+
+    def test_a_disabled_only_technique_is_not_the_same_as_an_unwritten_one(self):
+        """Both are uncovered here, but the distinction has to survive: the
+        service deliberately reports neither as covered while
+        tide_service keeps them in separate buckets."""
+        written_off = _tide("T1078", counts={"T1078": 9}, enabled={"T1078": 0})
+        never_written = _tide("T1078", counts={"T1078": 0})
+        assert svc._covered_techniques(written_off) == set()
+        assert svc._covered_techniques(never_written) == set()
 
     def test_no_tide_service_means_no_coverage(self):
         assert svc._covered_techniques(None) == set()
@@ -114,8 +144,17 @@ class TestCoveredTechniques:
 
     def test_a_null_technique_entry_does_not_crash(self):
         """TIDE has shipped null bodies for techniques before now."""
-        tide = FakeTide({"techniques": {"T1071": None, "T1078": {"rule_count": 2}}})
+        tide = FakeTide({"techniques": {
+            "T1071": None,
+            "T1078": {"rule_count": 2, "enabled_rules": 2},
+        }})
         assert svc._covered_techniques(tide) == {"T1078"}
+
+    def test_a_technique_body_with_no_enabled_count_is_not_covered(self):
+        """An older TIDE, or a shape change, must not read as coverage.
+        Absent evidence of a running rule is not evidence of one."""
+        tide = FakeTide({"techniques": {"T1078": {"rule_count": 7}}})
+        assert svc._covered_techniques(tide) == set()
 
 
 class TestScoring:

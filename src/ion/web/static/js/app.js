@@ -39,6 +39,53 @@ function safeMarkdown(content) {
     return safeHtml(marked.parse(content));
 }
 
+/**
+ * Render markdown to a sanitized DOM fragment rather than a string, under
+ * the same ION_SANITIZE_CONFIG as everything else.
+ *
+ * cases.html needed a fragment, because a sanitized STRING has to be
+ * assigned somewhere and the redesign counts that as a runtime write, so
+ * it called DOMPurify.sanitize itself with RETURN_DOM_FRAGMENT. That call
+ * did pass ION_SANITIZE_CONFIG, so it was not a policy bypass, but it was
+ * a second place where the policy is assembled, and
+ * tests/test_ithc_hardening.py holds the invariant that there is exactly
+ * one: a bare sanitize() loses FORBID_ATTR, and an attacker-set id is a
+ * DOM-clobbering primitive on stored cross-user content like a case note.
+ *
+ * Returns null when it cannot sanitize, rather than something that looks
+ * sanitized. The caller falls back to textContent.
+ */
+function safeMarkdownFragment(content) {
+    if (typeof marked === 'undefined' || typeof DOMPurify === 'undefined') {
+        return null;
+    }
+    try {
+        return DOMPurify.sanitize(
+            marked.parse(content == null ? '' : String(content)),
+            Object.assign({}, ION_SANITIZE_CONFIG,
+                          { RETURN_DOM_FRAGMENT: true }));
+    } catch (error) {
+        return null;
+    }
+}
+
+/**
+ * Replace an element's children with markup that is ALREADY safe, meaning
+ * it came from safeHtml, safeMarkdown, or escapeHtml. This does not
+ * sanitize. Passing it raw user content is the same hole as innerHTML.
+ *
+ * It exists so a sanitized string never has to be assigned to a live
+ * element. DOMParser's document is inert: its scripts do not run and its
+ * img and iframe do not fetch, so markup that got past DOMPurify has
+ * nothing to act on while it is being read. replaceChildren then adopts
+ * the parsed nodes.
+ */
+function ionSetSafeHtml(target, html) {
+    if (!target) return;
+    const parsed = new DOMParser().parseFromString(String(html ?? ''), 'text/html');
+    target.replaceChildren(...parsed.body.childNodes);
+}
+
 // API helper
 const api = {
     async request(method, url, data = null) {
@@ -450,30 +497,19 @@ function syncIonModeLabel() {
     label.textContent = mode === 'dark' ? 'Dark' : 'Light';
 }
 
-// Mobile nav hamburger toggle
-function toggleNavMenu() {
-    const hamburger = document.getElementById('nav-hamburger');
-    const navLinks = document.getElementById('nav-links');
-    if (hamburger && navLinks) {
-        hamburger.classList.toggle('open');
-        navLinks.classList.toggle('mobile-open');
-    }
-}
+// The mobile nav hamburger is gone. toggleNavMenu toggled .open on
+// #nav-hamburger and .mobile-open on #nav-links; no template defines either
+// id, nothing called the function, and neither class has a rule in any
+// stylesheet, the Tailwind build included. It is removed rather than left
+// as three dead references that read like a working mobile menu.
 
-// Close dropdown and mobile nav when clicking outside
+// Close the user dropdown when clicking outside
 document.addEventListener('click', function(event) {
     const userMenu = document.getElementById('user-menu');
     const dropdown = document.getElementById('user-dropdown');
     if (userMenu && dropdown && !userMenu.contains(event.target)) {
         dropdown.style.display = 'none';
         dropdown.classList.remove('show');
-    }
-    // Close mobile nav when clicking outside
-    const hamburger = document.getElementById('nav-hamburger');
-    const navLinks = document.getElementById('nav-links');
-    if (hamburger && navLinks && !hamburger.contains(event.target) && !navLinks.contains(event.target)) {
-        hamburger.classList.remove('open');
-        navLinks.classList.remove('mobile-open');
     }
 });
 

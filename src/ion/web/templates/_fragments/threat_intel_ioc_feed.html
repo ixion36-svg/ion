@@ -1,0 +1,86 @@
+{# Threat Intel: the IOC Feed table.
+
+   Replaces five innerHTML sites in tiLoadIOCFeed.
+
+   Each row's sparkline cell fetches itself from
+   /ui/threat-intel/ioc-spark, which is what the page did too: it rendered
+   the table, then lazily filled the cells in batches of six so the first
+   paint was not blocked by N parallel requests. hx-trigger="load" on each
+   cell keeps that shape, and the browser's own connection limit does the
+   throttling the hand-rolled batching did.
+
+   `i.score || 0` sent an unscored indicator through the colour bands as a
+   zero and painted it the resting grey, which is the same treatment as a
+   genuinely low score. An indicator OpenCTI has not scored says so. #}
+
+{% if not configured %}
+  <tr><td colspan="7" class="ti-empty">
+    OpenCTI is not configured, so there is no indicator feed. This is a
+    deployment setting rather than a fault.
+  </td></tr>
+{% elif failed %}
+  <tr><td colspan="7" class="ti-empty text-[var(--danger)]" role="alert">
+    The indicator feed could not be read. OpenCTI is configured, so this is
+    a fault rather than an empty feed, and no conclusion about current
+    indicators follows from it.
+    {% if error %}<span class="font-mono text-[10px] opacity-80 ml-1">({{ error }})</span>{% endif %}
+  </td></tr>
+{% elif indicators is none %}
+  <tr><td colspan="7" class="ti-empty text-[var(--danger)]" role="alert">
+    The indicator feed answered with something this table cannot read, so it
+    cannot say what the feed holds.
+  </td></tr>
+{% elif not indicators %}
+  <tr><td colspan="7" class="ti-empty">
+    No indicators at or above a score of {{ min_score }}.
+  </td></tr>
+{% else %}
+  {% for i in indicators %}
+    {% set score = i.get('score') %}
+    {% set scored = score is number %}
+    <tr>
+      <td>
+        {%- if not scored -%}
+          <strong class="text-[var(--text-muted)]" title="OpenCTI records no score for this indicator">?</strong>
+        {%- else -%}
+          {# data-ion-style, because style-src-attr is 'none' and the colour
+             is chosen from the score rather than from a fixed set of
+             classes. static/js/ion-dynamic-styles.js applies it. #}
+          <strong data-ion-style="color:{{ 'var(--danger)' if score >= 90 else 'var(--neon-orange)' if score >= 70 else 'var(--text-secondary)' }}">{{ score }}</strong>
+        {%- endif -%}
+      </td>
+      <td><code class="text-xs text-[var(--text-muted)]">{{ i.get('ioc_type') or '' }}</code></td>
+      <td><code class="text-[var(--text-primary)]">{{ i.get('ioc_value') or '' }}</code></td>
+      <td>
+        {%- set labels = i.get('labels') or [] -%}
+        {%- if not labels -%}
+          <span class="text-[var(--text-muted)]">&mdash;</span>
+        {%- else -%}
+          {%- for l in labels[:label_limit] -%}
+            {# A label is either a mapping with a value or a bare string,
+               which is what `l.value || l` handled. Both shapes come out of
+               OpenCTI depending on the query. #}
+            <span class="inline-block py-[1px] px-1.5 rounded-[3px] text-[.7rem] bg-[rgba(255,255,255,0.04)] border border-[var(--ion-border)] mr-0.5">{{ l.get('value') if l is mapping else l }}</span>
+          {%- endfor -%}
+        {%- endif -%}
+      </td>
+      <td>{{ i.get('source') or '&mdash;'|safe }}</td>
+      <td>
+        {# The sightings cell loads itself. One request per row, as before,
+           and a row whose cell fails says so rather than showing the same
+           em-dash a row with no sightings shows. #}
+        <span class="ti-spark"
+              hx-get="/ui/threat-intel/ioc-spark?value={{ (i.get('ioc_value') or '')|urlencode }}"
+              hx-trigger="load"
+              hx-swap="innerHTML">
+          <span class="text-[.7rem] text-[var(--text-muted)]">&hellip;</span>
+        </span>
+      </td>
+      <td>
+        <button class="ti-btn-outline ti-btn-sm"
+                data-click-action="tiCopyIOC"
+                data-args='["$event", {{ (i.get('ioc_value') or '')|tojson }}]'>Copy</button>
+      </td>
+    </tr>
+  {% endfor %}
+{% endif %}

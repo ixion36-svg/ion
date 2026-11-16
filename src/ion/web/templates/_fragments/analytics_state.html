@@ -1,0 +1,36 @@
+{# The three sentences every analytics panel needs before its own content,
+   shared because all eleven opened with the same line and it covered
+   three situations at once:
+
+       if (!job || !job.result) { ... 'No data yet. Click "Run All Jobs"
+       to generate.' ... }
+
+   Only `never_run` is answered by clicking Run All Jobs. A job type that
+   is not registered is a deployment question, and a job that ran and
+   stored something unreadable is a bug worth seeing rather than an
+   invitation to run it again.
+#}
+{% macro job_notice(job) %}
+{%- if job.state == 'missing' %}
+<div class="empty-state">This analytics job is not registered on this
+  deployment, so there is nothing to run.</div>
+{%- elif job.state == 'never_run' %}
+<div class="empty-state">No data yet. Click "Run All Jobs" to generate.
+  {%- if job.last_error %} The last attempt reported: {{ job.last_error }}{% endif %}
+</div>
+{%- elif job.state == 'unreadable' %}
+<div class="empty-state">This job has run, and stored a result this page
+  cannot read{% if job.last_run %}, last at {{ job.last_run }}{% endif %}.
+  {%- if job.last_error %} It reported: {{ job.last_error }}{% endif %}
+</div>
+{%- endif %}
+{% endmacro %}
+{# A list the job stored that we could not read, as against a list that is
+   genuinely empty. The page rendered its reassurance for both, and
+   "No stale investigations found. All items have recent activity" is a
+   sentence an analyst stops reading on. #}
+{% macro unreadable_list(what) %}
+<div class="empty-state">The {{ what }} in this result are not in a shape
+  this page can read, so none are shown. This is not the same as there
+  being none.</div>
+{% endmacro %}

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Log Source Health - ION{% endblock %}
+{% block page_id %}log_sources{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
@@ -21,12 +22,33 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Index lag, source volume and configured pipelines.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="btn btn-ghost" data-click-action="lsRefresh">Run Health Check</button>
-        <button class="btn btn-primary" data-click-action="lsOpenForm">+ New Source</button>
+        <button class="btn btn-ghost" id="ls-refresh" type="button">Run Health Check</button>
+        <button class="btn btn-primary" data-click-action="lsNewSource">+ New Source</button>
     </div>
 </section>
 
-<div id="ls-content"><div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading...</div></div>
+{# The body is rendered whole by ion.web.ui.log_sources_fragment: the
+   Elasticsearch banner, the six summary tiles and the per-source cards. It
+   used to be six innerHTML writes assembled by 191 lines of inline
+   JavaScript with a hand-rolled lsEsc(). The markup now has one definition,
+   in Jinja, which escapes it, and a restyle of the cards reaches them from
+   the stylesheet.
+
+   hx-trigger="load" keeps the shell's first paint immediate and the data
+   arriving in its own request, which is what the two sequential fetches it
+   replaces already did. The health check queries Elasticsearch once per
+   source, so that separation is what stops the page waiting on it.
+
+   Run Health Check and + New Source stay out here, outside the swap target,
+   so a failed read cannot take away the control that retries it. Refresh
+   and `log-sources:changed` (fired after a save, a delete or a seed) are
+   triggers on the same hx-get, so "reload the body" has one definition. #}
+<div id="ls-content"
+     hx-get="/ui/log-sources"
+     hx-trigger="load, click from:#ls-refresh, log-sources:changed from:body"
+     hx-swap="innerHTML">
+    <div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading sources...</div>
+</div>
 
 <div class="modal" id="ls-modal-bg">
     <div class="modal-box">
@@ -99,164 +121,81 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* JS toggles .show, not daisyUI .modal-open. Bridge the two. */
-#ls-modal-bg.show {
-    pointer-events: auto;
-    visibility: visible;
-    opacity: 1;
-    background-color: oklch(0% 0 0 / 0.4);
-}
-#ls-modal-bg.show > .modal-box {
-    opacity: 1;
-    scale: 1;
-    translate: 0;
-    max-width: 640px;
-    max-height: 90vh;
-}
-
-/* JS adds status classes — five-colour left stripe has no daisyUI equivalent. */
-#ls-content .ls-card {
-    border-left-width: 4px;
-    border-left-style: solid;
-    border-left-color: var(--color-base-300);
-}
-#ls-content .ls-card.healthy { border-left-color: var(--color-success); }
-#ls-content .ls-card.stale { border-left-color: var(--color-warning); }
-#ls-content .ls-card.silent { border-left-color: var(--color-error); }
-#ls-content .ls-card.never { border-left-color: color-mix(in oklab, var(--color-base-content) 40%, transparent); }
-#ls-content .ls-card.error { border-left-color: var(--sev-high); }
-
-@media (max-width: 768px) {
-    #ls-modal-bg.show > .modal-box { max-height: 95vh; }
-}
-</style>
 <script nonce="{{ csp_nonce }}">
+// lsEsc() and lsFmtTime() are gone with the markup they served: Jinja
+// autoescapes, and the fragment emits <time> for static/js/local-time.js to
+// put on the viewer's clock. lsFmtTime also returned the literal word
+// "never" for any source with no timestamp, which covered both a source
+// that has never reported and one whose health query failed. Those are a
+// misconfiguration and a monitoring gap, and the fragment names them apart.
+// What is left here changes state: the modal and the writes.
 const LS_API = '/api/log-sources';
-let lsCache = [];
 let lsCats = [];
 
-function lsEsc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
-function lsFmtTime(iso){if(!iso)return'never';try{const d=new Date(iso);const diff=(Date.now()-d.getTime())/1000;if(diff<60)return Math.round(diff)+'s ago';if(diff<3600)return Math.round(diff/60)+'m ago';if(diff<86400)return Math.round(diff/3600)+'h ago';return Math.round(diff/86400)+'d ago';}catch(e){return iso}}
+// The body has one definition of "reload", the hx-get on #ls-content, so a
+// save, a delete and a seed all say the same thing instead of each
+// re-fetching and re-rendering.
+function lsReload() {
+    document.body.dispatchEvent(new CustomEvent('log-sources:changed'));
+}
 
 async function lsBootstrap() {
+    // Only the category list, for the modal's select. The body itself
+    // arrives from /ui/log-sources on load.
     try {
         const cats = await fetch(LS_API + '/categories').then(r => r.json());
         lsCats = cats.categories || [];
     } catch (e) {}
-    await lsLoad();
 }
 
-async function lsLoad() {
-    const c = document.getElementById('ls-content');
-    c.innerHTML = '<div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading sources...</div>';
-    try {
-        const list = await fetch(LS_API).then(r => r.json());
-        lsCache = list.sources || [];
-        if (lsCache.length === 0) {
-            c.innerHTML = `<div class="card bg-base-200 shadow">
-                <div class="card-body items-center text-center py-14">
-                <h3 class="card-title">No log sources yet</h3>
-                <p>Define the ingestion sources you expect ION to see, and we'll continuously check whether they're alive in Elasticsearch.</p>
-                <div class="flex flex-wrap gap-2 justify-center">
-                <button class="btn btn-ghost" data-click-action="lsSeedDefaults">Seed 8 Common Sources</button>
-                <button class="btn btn-primary ml-2" data-click-action="lsOpenForm">+ Add Manually</button>
-                </div>
-            </div></div>`;
-            return;
-        }
-        await lsRefresh();
-    } catch (e) {
-        c.innerHTML = `<div class="alert alert-error text-[var(--sev-critical,#f85149)]">${lsEsc(e.message || 'Failed to load')}</div>`;
-    }
-}
-
-async function lsRefresh() {
-    const c = document.getElementById('ls-content');
-    c.innerHTML = '<div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Querying Elasticsearch for each source...</div>';
-    try {
-        const r = await fetch(LS_API + '/health').then(r => r.json());
-        lsRender(r);
-    } catch (e) {
-        c.innerHTML = `<div class="alert alert-error text-[var(--sev-critical,#f85149)]">${lsEsc(e.message)}</div>`;
-    }
-}
+// lsLoad, lsRefresh and lsRender are gone. The two fetches they made are
+// the two reads ion.web.ui.log_sources now does in one request, and the
+// three states they rendered by hand (loading, the empty registry and a
+// failed read) are branches of the fragment. The failure branches in
+// particular each printed one red line carrying `e.message`, which said
+// nothing about whether the registry or the health check was the thing
+// that failed.
+//
+// There is no htmx error handler here on purpose. static/js/htmx-errors.js
+// is the one definition of what a failed fragment request means, and the
+// route itself answers 200 with wording for the cases it can catch.
 
 async function lsSeedDefaults() {
     const r = await fetch(LS_API + '/seed-defaults', { method: 'POST' });
-    const j = await r.json();
-    if (j.added) lsLoad();
+    // Reload whatever the answer was. The old `if (j.added)` was truthiness
+    // on a count, so a seed that added nothing because the table was not
+    // empty left the stale body on screen with no sign anything happened.
+    if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        alert('Seed failed: ' + (j.detail || r.status));
+        return;
+    }
+    lsReload();
 }
 
-function lsRender(data) {
-    const sources = data.sources || [];
-    const summary = data.summary || {};
-    const c = document.getElementById('ls-content');
-
-    let banner = '';
-    if (data.es_configured === false) {
-        banner = '<div class="alert alert-warning mb-4"><strong>Elasticsearch not configured.</strong> Health column shows the last cached check (if any). Configure ES in <a class="link text-[inherit] underline" href="/settings#elasticsearch">Settings</a> for live data.</div>';
-    }
-
-    let html = banner + `<div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow mb-6">
-        <div class="stat"><div class="stat-title">Healthy %</div><div class="stat-value text-primary">${summary.healthy_pct||0}%</div></div>
-        <div class="stat"><div class="stat-title">Healthy</div><div class="stat-value text-success">${summary.healthy_count||0}</div></div>
-        <div class="stat"><div class="stat-title">Stale</div><div class="stat-value text-warning">${summary.stale_count||0}</div></div>
-        <div class="stat"><div class="stat-title">Silent</div><div class="stat-value text-error">${summary.silent_count||0}</div></div>
-        <div class="stat"><div class="stat-title">Never Seen</div><div class="stat-value text-base-content/50">${summary.never_count||0}</div></div>
-        <div class="stat"><div class="stat-title">Errors</div><div class="stat-value text-base-content/50">${summary.error_count||0}</div></div>
-    </div>`;
-
-    // Sort: silent + never first, then stale, then healthy
-    const order = { silent: 0, never: 1, stale: 2, error: 3, healthy: 4 };
-    sources.sort((a, b) => (order[a.status] ?? 5) - (order[b.status] ?? 5));
-
-    html += '<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">';
-    for (const s of sources) {
-        const status = s.status || 'never';
-        const badgeKind = status === 'healthy' ? 'badge-success'
-            : status === 'stale' ? 'badge-warning'
-            : (status === 'silent' || status === 'error') ? 'badge-error'
-            : 'badge-ghost';
-        html += `<div class="card bg-base-200 shadow ls-card ${lsEsc(status)}">
-            <div class="card-body p-4">
-            <div class="flex flex-wrap justify-between items-start gap-3">
-                <div>
-                    <div class="font-semibold leading-tight">${lsEsc(s.name)}</div>
-                    <div class="text-xs uppercase tracking-wide opacity-50 mt-0.5">${lsEsc(s.category)} &middot; ${lsEsc(s.criticality)}</div>
-                </div>
-                <span class="badge ${badgeKind} shrink-0">${lsEsc(status)}</span>
-            </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 mt-2 text-xs opacity-70">
-                <div>Last event: <strong class="font-mono text-base-content">${lsEsc(lsFmtTime(s.last_event_at))}</strong></div>
-                <div>Window: <strong class="font-mono text-base-content">${s.expected_interval_minutes||0}m</strong></div>
-                <div>Events 24h: <strong class="font-mono text-base-content">${s.event_count_24h ?? '-'}</strong></div>
-                <div>Owner: <strong class="font-mono text-base-content">${lsEsc(s.owner || '-')}</strong></div>
-            </div>
-            <div class="flex gap-2 justify-end mt-2">
-                <button class="btn btn-ghost btn-sm" data-click-action="lsEdit" data-args='[${s.id}]'>Edit</button>
-                <button class="btn btn-ghost btn-sm btn-error" data-click-action="lsDelete" data-args='[${s.id}]'>Delete</button>
-            </div>
-            </div>
-        </div>`;
-    }
-    html += '</div>';
-
-    c.innerHTML = html;
+// The delegated dispatcher in static/js/event-delegation.js calls an action
+// with (event, dataset) when the element carries no data-args, so a button
+// bound straight to lsOpenForm handed it a MouseEvent. A MouseEvent is
+// truthy, so "+ New Source" opened the form titled "Edit Log Source" with
+// the string "undefined" in every field and in the hidden id, and saving
+// sent PATCH /api/log-sources/undefined. The two entry points are separate
+// now, and lsOpenForm is only ever called from code.
+function lsNewSource() {
+    lsOpenForm(null);
 }
 
 function lsOpenForm(source) {
     const m = document.getElementById('ls-modal-bg');
     document.getElementById('ls-modal-title').textContent = source ? 'Edit Log Source' : 'New Log Source';
     const cat = document.getElementById('ls-category');
-    cat.innerHTML = '';
+    cat.replaceChildren();
     for (const c of lsCats) {
         const o = document.createElement('option');
         o.value = c.id; o.textContent = c.label;
         cat.appendChild(o);
     }
     const crit = document.getElementById('ls-crit');
-    crit.innerHTML = '';
+    crit.replaceChildren();
     for (const c of ['critical', 'high', 'medium', 'low']) {
         const o = document.createElement('option');
         o.value = c; o.textContent = c.charAt(0).toUpperCase() + c.slice(1);
@@ -288,7 +227,8 @@ async function lsEdit(id) {
 async function lsDelete(id) {
     if (!confirm('Delete this log source?')) return;
     const r = await fetch(LS_API + '/' + id, { method: 'DELETE' });
-    if (r.ok) lsLoad();
+    if (r.ok) lsReload();
+    else alert('Delete failed: ' + r.status);
 }
 
 async function lsSubmit(ev) {
@@ -312,7 +252,7 @@ async function lsSubmit(ev) {
     const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (r.ok) {
         lsCloseForm();
-        lsLoad();
+        lsReload();
     } else {
         const j = await r.json().catch(() => ({}));
         alert('Save failed: ' + (j.detail || 'unknown'));

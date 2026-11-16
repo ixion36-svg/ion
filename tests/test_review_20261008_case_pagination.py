@@ -426,38 +426,94 @@ class TestWiring:
         return (_SRC / "ion" / "web" / "templates" / "cases.html"
                 ).read_text(encoding="utf-8")
 
-    def test_the_page_requests_a_window(self):
-        """The bare /api/cases fetch is gone.
+    # The window, has_more and the ceiling were asserted against the page's
+    # own JavaScript, because the page did its own paging:
+    #
+    #     "'/api/cases?limit=' + CASES_PAGE_SIZE"   in the page
+    #     "data.has_more"                           in the page
+    #     "CASES_LOAD_CEILING"                      in the page
+    #
+    # The board is /ui/cases/board now, so none of that is the page's job.
+    # The contract did not move with it unchanged, it got stricter: the
+    # server owns limit and offset, has_more drives an explicit button
+    # rather than a loop, and the counts are rendered rather than derived
+    # from however much the browser happened to hold. A ceiling is no
+    # longer the right shape, because nothing auto-loads up to a cap.
+    #
+    # Each test below asserts the behaviour where it now lives, and the
+    # page is checked for the absence of its old machinery so a client-side
+    # loop cannot quietly come back.
 
-        Asserted on the fetch itself, not on the strings "limit=" and
-        "offset=" anywhere in the file -- they appear in unrelated calls, so
-        that version of this test passed before the page was changed at all.
-        """
+    @staticmethod
+    def _board_module():
+        return (_SRC / "ion" / "web" / "ui" / "_cases_board.py"
+                ).read_text(encoding="utf-8")
+
+    @staticmethod
+    def _board_fragment():
+        return (_SRC / "ion" / "web" / "templates" / "_fragments"
+                / "cases_board.html").read_text(encoding="utf-8")
+
+    def test_the_page_requests_a_window(self):
         page = self._page()
         assert "fetch('/api/cases')" not in page
-        assert "'/api/cases?limit=' + CASES_PAGE_SIZE" in page
+        assert "'/ui/cases/board'" in page
+        assert "CASES_PAGE_SIZE" not in page
 
-    def test_the_page_follows_has_more(self):
+    def test_the_route_bounds_the_window_itself(self):
+        """A limit the caller can raise without bound is not a limit."""
+        module = self._board_module()
+        assert "limit: int = Query(24, ge=1, le=500)" in module
+        assert "offset: int = Query(0, ge=0)" in module
+
+    def test_the_board_follows_has_more(self):
         """A single page would show the first N and call it the board."""
-        assert "data.has_more" in self._page()
+        module = self._board_module()
+        assert "has_more" in module
+        assert "next_offset" in module
+        fragment = self._board_fragment()
+        assert "cases-loadmore" in fragment
+        assert "loadMoreCases" in fragment
 
-    def test_the_page_stops_at_a_ceiling(self):
-        """Following has_more without a bound just restores the old
-        unbounded load, one request at a time."""
+    def test_more_pages_are_offered_only_when_there_are_more(self):
+        """`has_more` of None means the payload did not say. Treating that
+        as true offers a page that may not exist, and as false hides the
+        rest of the backlog, so the button is shown only on an explicit
+        true."""
+        assert "{% if has_more is not sameas true %} hidden{% endif %}" in \
+            self._board_fragment()
+
+    def test_the_page_no_longer_loops_to_a_ceiling(self):
+        """Following has_more from the browser without a bound restored the
+        old unbounded load one request at a time, which is what the ceiling
+        was for. The analyst asks for each page now, so there is no loop to
+        bound."""
         page = self._page()
-        assert "CASES_LOAD_CEILING" in page
-        assert "casesTruncated = true" in page
+        assert "CASES_LOAD_CEILING" not in page
+        assert "casesTruncated" not in page
 
     def test_a_capped_load_is_visible_to_the_analyst(self):
         """A board silently showing a third of the cases is worse than one
-        that admits it."""
-        page = self._page()
-        assert "cases-load-notice" in page
-        assert "renderCaseLoadNotice" in page
+        that admits it.
 
-    def test_the_page_reads_the_servers_counts(self):
-        """Client-side counts over a capped array understate the backlog."""
+        This asserted "renderCaseLoadNotice" was in the page, and kept
+        passing after that function was deleted, because the words survived
+        in the comment above the div it used to fill. Asserted against the
+        fragment that fills it now, which cannot pass on prose.
+        """
+        assert "cases-load-notice" in self._page()
+        fragment = self._board_fragment()
+        assert 'hx-swap-oob="innerHTML:#cases-load-notice"' in fragment
+        assert "function renderCaseLoadNotice" not in self._page()
+
+    def test_the_counts_come_from_the_server_and_say_when_unknown(self):
+        """Client-side counts over a capped array understate the backlog,
+        and a count the payload did not carry must not render as 0."""
         assert "/api/cases/facets" in self._page()
+        fragment = self._board_fragment()
+        assert 'hx-swap-oob="innerHTML:#cases-total"' in fragment
+        assert "{{ total if total is not none else" in fragment
+        assert "{{ shown if shown is not none else" in fragment
 
 
 # ── No page relies on the old unbounded default ──────────────────────────
@@ -499,7 +555,18 @@ class TestNoUnboundedCallers:
         )
 
     def test_the_alerts_summary_counts_from_the_server(self):
+        """The Cases card is a server-rendered fragment now
+        (ion/web/ui/alerts.py), so the aggregate comes from case_facets in
+        the fragment route rather than from a facets fetch in the page. The
+        page must pull that fragment and the fragment must read the facets;
+        a count taken from the capped page is the defect either way."""
         page = (_SRC / "ion" / "web" / "templates" / "alerts.html"
                 ).read_text(encoding="utf-8")
-        assert "/api/cases/facets" in page
-        assert "casesActiveTotal" in page
+        assert 'hx-get="/ui/alerts/cases-summary"' in page
+        assert "/api/cases/facets" not in page, "the page no longer counts for itself"
+
+        fragment = (_SRC / "ion" / "web" / "ui" / "alerts.py").read_text(encoding="utf-8")
+        route = fragment[fragment.index("def alerts_cases_summary_fragment"):]
+        route = route[:route.index("\n@router.")]
+        assert "cq.case_facets(session)" in route
+        assert "active_total(" in route

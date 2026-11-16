@@ -1,0 +1,12 @@
+{% from "_fragments/_time.html" import ts %}
+{% if team is none %}<div role="alert" class="alert alert-error">The team worklog could not be read. Team activity is unknown. Refresh to retry.</div>
+{% else %}
+<div class="dw-board-head"><div>Analyst</div><div>Working now</div><div>Today</div><div>Active</div></div>
+{% for p in team %}
+<div class="dw-row"><div class="dw-who"><span class="ion-avatar ion-c-purple">{{ p.initials or '?' }}</span><div class="dw-who-name">{{ p.name }}</div></div>
+  <div class="dw-now">{{ p.now or 'No active case' }}</div>
+  <div class="dw-cnt">{% for key, label in [('total', 'items'), ('triaged', 'triaged'), ('closed', 'closed')] %}{% set value = p.counts.get(key) %}<span>{{ value if value is not none else 'Unknown' }}</span> {{ label }} {% endfor %}</div>
+  <div class="dw-last">{{ ts(p.get('last_active_at'), 'time', fallback='Time unknown') }}</div>
+</div>
+{% else %}<p class="dw-empty">No analyst activity recorded for this day.</p>{% endfor %}
+{% endif %}

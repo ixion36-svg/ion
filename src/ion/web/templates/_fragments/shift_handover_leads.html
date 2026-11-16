@@ -1,0 +1,4 @@
+{% if can_write %}
+{% if users is none %}<div class="alert alert-error">Incoming leads could not be read. Retry before raising a draft.</div>
+{% else %}<label>Incoming lead<select id="sh-raise-incoming" class="select select-bordered"><option value="">Decide later</option>{% for u in users %}<option value="{{ u.id }}">{{ u.display_name or u.username }}</option>{% endfor %}</select></label>{% endif %}
+{% endif %}

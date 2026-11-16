@@ -1,0 +1,10 @@
+<template data-response-actions-state="{{ state }}"></template>
+{% if state == 'disabled' %}
+<div class="cpanel-empty-hint">Response actions are disabled.</div>
+{% elif state == 'failed' %}
+<div class="cpanel-empty-hint">Could not load response actions.</div>
+{% else %}
+{% if state == 'empty' %}<div class="cpanel-empty-hint"><i class="icon-search"></i> No actionable observables on this case</div>{% endif %}
+{% for item in items %}<div class="awx-obsrow"><code>{{ item.type }}</code> {{ item.value }} {% for action in item.actions %}{% if can_execute %}<button type="button" class="btn" data-click-action="requestResponseAction" data-args='{{ [action.id, item.value, case_id]|tojson }}'>{{ action.name if action.name is not none else 'Unnamed action' }}{{ ' ⚠' if action.approval else '' }}</button> {% else %}<span>{{ action.name if action.name is not none else 'Unnamed action' }} (execution permission required)</span>{% endif %}{% endfor %}</div>{% endfor %}
+<div class="cpanel-section-title">Action log</div><div id="response-actions-log">…</div>
+{% endif %}

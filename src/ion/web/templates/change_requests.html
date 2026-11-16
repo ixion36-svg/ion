@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Change Requests (CAB) - ION{% endblock %}
+{% block page_id %}change_requests{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
@@ -135,7 +136,15 @@
       <h2 class="card-title text-base">Change requests</h2>
       <label class="flex items-center gap-2 text-sm">
         <span class="text-base-content/60">Status:</span>
-        <select id="filter-status" class="select select-sm w-auto" data-change-action="loadCRs">
+        {# The filter is the request. htmx sends the select's own value with
+           the GET, so there is no handler that reads the value and no second
+           definition of what the filtered table looks like. It lives outside
+           the swapped region deliberately: an error render must not be able
+           to remove the control that retries. #}
+        <select id="filter-status" name="status" class="select select-sm w-auto"
+                hx-get="/ui/change-requests"
+                hx-target="#crs-table-wrap"
+                hx-swap="innerHTML">
           <option value="all" selected>All</option>
           <option value="draft">Draft</option>
           <option value="submitted">Submitted</option>
@@ -148,43 +157,41 @@
         </select>
       </label>
     </div>
-    <div class="overflow-x-auto">
-      <table class="table table-sm" id="crs-table">
-        <thead>
-          <tr><th>Ref</th><th>Title</th><th>Type</th><th>Risk</th><th>Status</th><th>Requested by</th><th>GitLab</th><th>Created</th><th>Actions</th></tr>
-        </thead>
-        <tbody id="crs-body"><tr><td colspan="9" class="loading">Loading…</td></tr></tbody>
-      </table>
+    {# The table is rendered whole by ion.web.ui.change_requests_fragment:
+       rows, risk and status pills, the GitLab cell and the workflow buttons.
+       It used to be a template literal written into #crs-body with
+       innerHTML, which no stylesheet sweep could reach.
+
+       hx-trigger="load" keeps this shell's first paint immediate and the
+       rows arriving in their own request, which is what the fetch it
+       replaces already did. #}
+    <div id="crs-table-wrap"
+         hx-get="/ui/change-requests"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+      <div class="text-center p-10 text-base-content/60">
+        <span class="loading loading-spinner loading-sm text-primary"></span>
+        Loading change requests...
+      </div>
     </div>
   </div>
 </section>
 
-<style nonce="{{ csp_nonce }}">
-/* JS innerHTML uses class="loading" as a text placeholder, not daisyUI's spinner. */
-#crs-table td.loading {
-    display: table-cell;
-    aspect-ratio: auto;
-    width: auto;
-    height: auto;
-    background: none;
-    mask-image: none;
-    -webkit-mask-image: none;
-    text-align: center;
-    padding: 2rem;
-    opacity: 0.6;
-}
-
-/* JS toggles .dw-hidden on .cr-upgrade-only (not Tailwind .hidden). */
-.dw-hidden,
-.cr-upgrade-only.dw-hidden { display: none; }
-
-/* JS innerHTML wraps row actions in .cr-act; no daisyUI equivalent on a JS-emitted class. */
-.cr-act { display: flex; gap: 0.35rem; flex-wrap: wrap; }
-</style>
 
 <script nonce="{{ csp_nonce }}">
-function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function fmtDate(iso){ if(!iso) return ''; try { return new Date(iso).toISOString().replace('T',' ').slice(0,16);} catch(e){ return iso; } }
+// esc() and fmtDate() are gone with the markup they served. Jinja
+// autoescapes the table, and the Created column is formatted on the server
+// from the stored naive-UTC stamp. fmtDate read that as local time and then
+// converted it, so the column was off by the browser's offset.
+
+// Re-request the table. The transitions and the create form call this
+// instead of rebuilding rows, so there is one definition of a row and it is
+// the fragment. The status filter does the same thing declaratively.
+function refreshCRs(){
+  const status = document.getElementById('filter-status').value;
+  return htmx.ajax('GET', '/ui/change-requests?status=' + encodeURIComponent(status),
+                   { target: '#crs-table-wrap', swap: 'innerHTML' });
+}
 
 async function loadChangelog(){
   const target = document.getElementById('cf-target').value.trim();
@@ -232,46 +239,9 @@ async function submitCR(){
   });
   if(!resp.ok){ msg.textContent = 'Failed: ' + resp.status; return; }
   const cr = await resp.json();
-  msg.textContent = `Created ${cr.reference}` + (cr.gitlab_issue_iid ? ` — GitLab #${cr.gitlab_issue_iid}` : ` (GitLab: ${esc(cr.gitlab_error || 'n/a')})`);
+  msg.textContent = `Created ${cr.reference}` + (cr.gitlab_issue_iid !== null && cr.gitlab_issue_iid !== undefined ? ` — GitLab #${cr.gitlab_issue_iid}` : ` (GitLab: ${cr.gitlab_error || 'n/a'})`);
   ['cf-target','cf-title','cf-just','cf-changes','cf-impact','cf-affected','cf-impl','cf-backout','cf-test','cf-start','cf-end','cf-planned'].forEach(id => document.getElementById(id).value = '');
-  loadCRs();
-}
-
-const NEXT_ACTIONS = {
-  draft: [['submit','Submit','ion-btn-primary'], ['cancel','Cancel','ion-btn-ghost']],
-  submitted: [['approve','Approve','ion-btn-primary'], ['reject','Reject','ion-btn-danger'], ['cancel','Cancel','ion-btn-ghost']],
-  approved: [['schedule','Schedule','ion-btn-primary'], ['implement','Implement','ion-btn-primary'], ['cancel','Cancel','ion-btn-ghost']],
-  scheduled: [['implement','Implement','ion-btn-primary'], ['cancel','Cancel','ion-btn-ghost']],
-  implemented: [['close','Close','ion-btn-primary']],
-};
-
-async function loadCRs(){
-  const status = document.getElementById('filter-status').value;
-  const body = document.getElementById('crs-body');
-  const resp = await fetch(`/api/change-requests?status=${encodeURIComponent(status)}`, { credentials:'same-origin' });
-  if(!resp.ok){ body.innerHTML = `<tr><td colspan="9" class="loading">Failed to load: ${resp.status}</td></tr>`; return; }
-  const items = (await resp.json()).change_requests || [];
-  if(!items.length){ body.innerHTML = `<tr><td colspan="9" class="loading">No change requests.</td></tr>`; return; }
-  const riskColor = { low:'ion-c-green', medium:'ion-c-amber', high:'ion-c-red' };
-  const stColor = { draft:'ion-c-muted', submitted:'ion-c-cyan', approved:'ion-c-green', scheduled:'ion-c-cyan', implemented:'ion-c-green', closed:'ion-c-muted', rejected:'ion-c-red', cancelled:'ion-c-muted' };
-  body.innerHTML = items.map(c => {
-    const acts = (NEXT_ACTIONS[c.status] || []).map(a =>
-      `<button class="ion-btn ${a[2]}" data-click-action="transition" data-args='[${c.id}, "${a[0]}"]'>${a[1]}</button>`).join('');
-    const gl = c.gitlab_issue_url
-      ? `<a class="ion-link" href="${esc(c.gitlab_issue_url)}" target="_blank" rel="noopener">#${c.gitlab_issue_iid}</a>`
-      : `<small class="ion-muted">${esc(c.gitlab_error || '—')}</small>`;
-    return `<tr>
-      <td><span class="ion-mono">${esc(c.reference)}</span></td>
-      <td>${esc(c.title)}</td>
-      <td><small>${esc(c.change_type || '—')}${c.target_version ? '<br>' + esc(c.current_version || '?') + ' → ' + esc(c.target_version) : ''}</small></td>
-      <td><span class="ion-pill ${riskColor[c.risk_level]||'ion-c-muted'}">${esc(c.risk_level)}</span></td>
-      <td><span class="ion-pill ${stColor[c.status]||'ion-c-muted'}">${esc(c.status)}</span></td>
-      <td>${esc(c.requested_by_username || '—')}</td>
-      <td>${gl}</td>
-      <td><small class="ion-muted">${fmtDate(c.created_at)}</small></td>
-      <td><div class="cr-act">${acts}<a class="ion-btn ion-btn-ghost" href="/api/change-requests/${c.id}/export">Export</a></div></td>
-    </tr>`;
-  }).join('');
+  refreshCRs();
 }
 
 async function transition(id, action){
@@ -282,7 +252,7 @@ async function transition(id, action){
     body: JSON.stringify({ action, notes })
   });
   if(!resp.ok){ const d = await resp.json().catch(()=>({})); alert(`Failed (${resp.status}): ${d.detail || ''}`); return; }
-  loadCRs();
+  refreshCRs();
 }
 
 async function initCRForm(){
@@ -294,7 +264,9 @@ async function initCRForm(){
     }
   } catch(e) {}
 }
-document.addEventListener('DOMContentLoaded', () => { initCRForm(); onCRTypeChange(); loadCRs(); });
+// The table's first paint is hx-trigger="load" on #crs-table-wrap, not a
+// call from here.
+document.addEventListener('DOMContentLoaded', () => { initCRForm(); onCRTypeChange(); });
 </script>
 
 </div>

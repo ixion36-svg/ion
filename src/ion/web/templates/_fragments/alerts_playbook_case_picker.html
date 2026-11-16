@@ -1,0 +1,60 @@
+{# Alerts: the Start Playbook picker for a case, overlay included.
+
+   Rendered into #case-playbook-picker-host by showCasePlaybookPicker.
+   Replaces the one innerHTML site in that function and its
+   `picker.onclick` self-click dismiss, which is the delegated
+   data-remove-self-on-self-click here.
+
+   The rows are what GET /api/playbooks?active_only=true returns. Start
+   POSTs /api/cases/{id}/playbook/{pid}/start, which carries
+   playbook:execute, so it is offered only with it; the page offered it to
+   every reader who could open the dialog.
+
+   Three outcomes. The function showed a toast and no dialog for an empty
+   list, and a toast for a failed read. Both are a dialog here, because a
+   click on Start Playbook that produces nothing on screen reads as a
+   broken button. #}
+
+<div class="case-mgmt-overlay" id="case-playbook-picker" data-remove-self-on-self-click>
+  <div class="case-mgmt-modal max-w-[500px]">
+    <h3>
+      <span>Start Playbook for Case</span>
+      <button class="close-btn" data-remove-target="case-playbook-picker" title="Close">&times;</button>
+    </h3>
+    <div class="p-4">
+      {% if failed %}
+        <div class="text-[var(--danger)]" role="alert">
+          The playbook list could not be read, so nothing can be started from
+          here. Whether any active playbooks exist is not known. Close this and
+          open it again to try again.
+        </div>
+      {% elif not playbooks %}
+        <div class="text-[var(--text-muted)]">
+          No active playbooks. A playbook has to be created and marked active
+          on the Playbooks page before it can be started for a case.
+        </div>
+      {% else %}
+        {% if not can_start %}
+          <div class="text-xs text-[var(--text-muted)] mb-2" title="Requires the playbook:execute permission">
+            Starting a playbook requires the playbook:execute permission; this
+            is the list only.
+          </div>
+        {% endif %}
+        {% for p in playbooks %}
+          <div class="flex items-center gap-2 p-2.5 bg-[var(--bg-secondary)] rounded-[4px] mb-2">
+            <div class="flex-1">
+              <div class="font-semibold text-sm">{{ p.name }}</div>
+              <div class="text-xs text-[var(--text-muted)]">
+                {% if p.step_count is not none %}{{ p.step_count }} steps{% else %}steps not counted{% endif %}
+                | Priority: {% if p.priority is not none %}{{ p.priority }}{% else %}not set{% endif %}
+              </div>
+            </div>
+            {% if can_start %}
+              <button class="btn btn-sm btn-primary" data-click-action="startCasePlaybook" data-args='[{{ case_id }}, {{ p.id }}]'>Start</button>
+            {% endif %}
+          </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+</div>

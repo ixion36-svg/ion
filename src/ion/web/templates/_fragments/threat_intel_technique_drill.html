@@ -1,0 +1,105 @@
+{# Threat Intel: the ATT&CK technique drill-down panel.
+
+   Replaces three innerHTML sites in tiDrillTechnique, and swaps the
+   panel's heading out of band so a failed read replaces the previous
+   technique's title rather than leaving it above a message about a
+   different one.
+
+   Most of this is a faithful move. One judgement in the old code was
+   right and is kept: an OpenCTI lookup that errored is worded differently
+   from one that matched no actors, and the second says explicitly that the
+   lookup may not be supported by this OpenCTI build. Collapsing those two
+   would tell a reader no actor uses a technique when the truth is that
+   nobody asked successfully.
+
+   What it got wrong: `d.local_cases.length` and `d.actors.length` were
+   read without a guard, so a payload omitting either key raised a
+   TypeError into the catch and the whole panel became "Failed:
+   TypeError...". Each section now answers for itself. #}
+
+{# The heading, out of band. #}
+<h3 class="text-base m-0 text-[var(--ion-cyan,#6de4ff)] font-mono" id="ti-drill-title" hx-swap-oob="innerHTML">
+  {%- if failed or detail is none -%}
+    {{ technique_id }} &middot; could not be read
+  {%- else -%}
+    {{ detail.get('technique_id') or technique_id }}
+    {%- if detail.get('name') %} &mdash; {{ detail.get('name') }}{% endif -%}
+  {%- endif -%}
+</h3>
+
+{% if failed or detail is none %}
+  <div class="ti-empty text-[var(--danger)]" role="alert">
+    {{ technique_id }} could not be read. Nothing here is known about it:
+    not which tactics it belongs to, not which of your cases triggered it,
+    not which actors use it. Open it again to try.
+    {% if error %}<div class="mt-1 font-mono text-[.72rem] opacity-80">Reason: {{ error }}</div>{% endif %}
+  </div>
+{% else %}
+  {% set tactics = detail.get('tactic_ids') or [] %}
+  {% if tactics %}
+    <div class="mb-3.5">
+      <div class="text-[.72rem] text-[var(--text-secondary)] uppercase tracking-[.05em] mb-1.5">Tactics</div>
+      {% for t in tactics %}<span class="inline-block py-0.5 px-2 bg-[rgba(109,228,255,0.1)] border border-[rgba(109,228,255,0.3)] rounded-[4px] text-[.72rem] text-[var(--ion-cyan,#6de4ff)] mr-1 font-mono">{{ t }}</span>{% endfor %}
+    </div>
+  {% endif %}
+
+  {% if detail.get('is_subtechnique') and detail.get('parent_id') %}
+    <div class="text-[.78rem] text-[var(--text-secondary)] mb-3.5">
+      {# A button, not <a href="javascript:void(0)">, which is a dead link
+         in the accessibility tree and a navigation the CSP has no reason to
+         permit. #}
+      Sub-technique of
+      <button type="button"
+              class="text-[var(--ion-cyan,#6de4ff)] no-underline font-mono bg-transparent border-0 p-0 cursor-pointer"
+              data-click-action="tiCloseAndDrillTechnique"
+              data-args='[{{ detail.get('parent_id')|tojson }}]'>{{ detail.get('parent_id') }}</button>
+    </div>
+  {% endif %}
+
+  <div class="mb-3.5">
+    <h4 class="text-[.85rem] mt-0 mr-0 mb-2 ml-0 text-[var(--text-primary)]">
+      Local Cases <span class="text-[var(--text-secondary)] font-normal text-xs">(last {{ local_days }} days)</span>
+    </h4>
+    {%- if local_cases is none -%}
+      {# The payload did not carry the key. Not the same as no case having
+         triggered this technique, which is what an unguarded `.length`
+         turned it into by raising into the catch. #}
+      <em class="text-[.78rem] text-[var(--danger)]" role="alert">The local case lookup did not answer, so this panel cannot say whether any of your cases triggered this technique.</em>
+    {%- elif not local_cases -%}
+      <em class="text-[.78rem] text-[var(--text-secondary)]">No cases triggered this technique in the last {{ local_days }} days.</em>
+    {%- else -%}
+      <ul class="list-none p-0 m-0">
+        {% for c in local_cases %}
+          <li class="py-1.5 px-0 border-b-[1px] border-b-[var(--ion-border)] text-[.8rem]">
+            <a class="text-[var(--ion-cyan,#6de4ff)] no-underline font-mono" href="/cases?selected={{ c.get('id')|urlencode }}">{{ c.get('case_number') or '' }}</a>
+            <span class="ml-1.5 text-[var(--text-primary)]">{{ c.get('title') or '' }}</span>
+            {%- if c.get('severity') %}<span class="sev-badge sev-{{ c.get('severity') }} ml-1.5 text-[.7rem]">{{ c.get('severity') }}</span>{% endif -%}
+          </li>
+        {% endfor %}
+      </ul>
+    {%- endif -%}
+  </div>
+
+  <div class="mb-3.5">
+    <h4 class="text-[.85rem] mt-0 mr-0 mb-2 ml-0 text-[var(--text-primary)]">
+      Actors Using This Technique <span class="text-[var(--text-secondary)] font-normal text-xs">(OpenCTI)</span>
+    </h4>
+    {%- if detail.get('actors_error') -%}
+      {# The endpoint reports its own OpenCTI failure in the payload. Kept
+         distinct from an empty result, which the page had right. #}
+      <em class="text-[.78rem] text-[var(--text-secondary)]">OpenCTI lookup unavailable: {{ detail.get('actors_error') }}</em>
+    {%- elif actors is none -%}
+      <em class="text-[.78rem] text-[var(--danger)]" role="alert">The actor lookup did not answer, so this panel cannot say which actors use this technique.</em>
+    {%- elif not actors -%}
+      <em class="text-[.78rem] text-[var(--text-secondary)]">No actors mapped to this technique in OpenCTI, or actor-by-technique lookup is not supported by this OpenCTI service build.</em>
+    {%- else -%}
+      <ul class="list-none p-0 m-0">
+        {% for a in actors %}
+          <li class="py-1 px-0 text-[.8rem]">
+            <span class="text-[var(--ion-cyan,#6de4ff)]">{{ a.get('name') or a.get('id') or '' }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    {%- endif -%}
+  </div>
+{% endif %}

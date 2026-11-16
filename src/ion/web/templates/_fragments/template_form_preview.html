@@ -1,0 +1,24 @@
+{# The assembled Jinja2 the save will store, for the Preview modal.
+
+   The modal, its heading and both Close buttons are in the page shell, so
+   an error rendered here cannot strand an open overlay with no way out.
+
+   The content is rendered as text, not markup. The modal's own heading
+   calls it "Template Preview (Generated Jinja2)", and it is Jinja2 source:
+   `{% raw %}{% for row in rows %}{% endraw %}` has to arrive on screen as
+   those characters rather than be interpreted or stripped. Jinja autoescape
+   does that, which is also why the page's escapeHtml() call has no
+   replacement here. #}
+
+{% if failed %}
+  <span class="text-error">The sections could not be assembled, so there is
+  nothing to preview. This says nothing about whether they would save.</span>
+{% elif content %}
+{{ content }}
+{% else %}
+  {# "" and None are different answers and the route keeps them apart. An
+     empty string is the real assembled content of a template whose sections
+     all render to nothing, which is worth knowing before saving it. #}
+  <span class="opacity-60">(No sections defined, so this template would save
+  with no content at all.)</span>
+{% endif %}

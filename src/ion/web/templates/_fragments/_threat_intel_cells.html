@@ -1,0 +1,120 @@
+{# Cells the actor and campaign result tables share.
+
+   The two tables are not the same shape: actors have nine columns and
+   campaigns seven, because actors carry an origin and a type list that
+   campaigns do not. Only the cells that are genuinely identical live here,
+   so the macros do not grow a parameter for every difference between the
+   two and become harder to read than the duplication would have been.
+
+   Everything here replaces a fragment of the string concatenation in
+   searchActors and searchCampaigns, which built the same cells twice and
+   had already drifted: the actor table rendered aliases with a "+N" more
+   indicator and the campaign table silently truncated at three. #}
+
+{% macro origin(flag, name) -%}
+{# The flag and the country name travel together, keyed on the flag, which
+   is right: both are derived from the same country code by
+   country_mapper, so there is no state where one is known and the other is
+   not. #}
+{%- if flag -%}
+  <span class="country-flag" title="{{ name }}">{{ flag }}</span> {{ name }}
+{%- else -%}
+  <span class="text-[var(--text-muted)]">-</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro aliases(values, shown=3) -%}
+{# `.slice(0, 3)` and a "+N" for the rest, which is what the actor table
+   did. The campaign table dropped the "+N" and so told a reader that an
+   entity with twelve aliases had three. Same macro now, so they cannot
+   disagree again. #}
+{%- set all = values or [] -%}
+{%- if not all -%}
+  <span class="text-[var(--text-muted)]">-</span>
+{%- else -%}
+  {{ all[:shown]|join(', ') }}
+  {%- if all|length > shown -%}
+    <span class="text-[var(--text-secondary)]" title="{{ all[shown:]|join(', ') }}"> +{{ all|length - shown }}</span>
+  {%- endif -%}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro confidence(value) -%}
+{# Four states, not three. The page did `conf = a.confidence != null ?
+   a.confidence : '-'` and then banded `conf >= 70 ? 'high' : conf >= 40 ?
+   'medium' : 'low'`, so an entity with no confidence rendered a dash
+   painted in the `low` colour: it looked like OpenCTI had assessed the
+   entity and found it unreliable, when in fact nothing had been
+   assessed. #}
+{%- if value is not none and value is number -%}
+  {%- if value >= 70 -%}{% set band = 'high' %}
+  {%- elif value >= 40 -%}{% set band = 'medium' %}
+  {%- else -%}{% set band = 'low' %}
+  {%- endif -%}
+  <span class="ti-confidence {{ band }}">{{ value }}</span>
+{%- else -%}
+  <span class="text-[var(--text-muted)]" title="OpenCTI records no confidence for this entity">not assessed</span>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro labels(values) -%}
+{# data-ion-style rather than a style attribute: the CSP sets
+   style-src-attr 'none', so an inline style is blocked, and
+   static/js/ion-dynamic-styles.js applies this attribute instead. The
+   colour is OpenCTI's own per-label colour, so it cannot be a class. #}
+{%- set all = values or [] -%}
+{%- if not all -%}
+  <span class="text-[var(--text-muted)]">-</span>
+{%- else -%}
+  {%- for l in all -%}
+    {%- set colour = l.color or '#30363d' -%}
+    <span class="ti-label" data-ion-style="background:{{ colour }}22; color:{{ l.color or '#8b949e' }}">{{ l.value }}</span>
+  {%- endfor -%}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro watch_cell(kind, entity, can_manage, watched_ids) -%}
+{# Withheld entirely without observable:enrich, which is what POST
+   /api/threat-intel/watches requires. The page is gated on observable:read
+   and never checked, so a read-only analyst was offered a Watch button
+   that answers 403 on click, and the handler did not read r.ok either, so
+   the refusal was reported as "Added to watchlist".
+
+   The payload travels on the button as data-args rather than being looked
+   up by index in a JavaScript array the server does not have.
+   event-delegation.js JSON-parses data-args and applies it as arguments,
+   so a one-element array hands the whole payload to watchActor as its
+   first argument. #}
+{%- if not can_manage -%}
+  <span class="text-[var(--text-muted)] text-xs" title="Requires the observable:enrich permission">Read only</span>
+{%- elif entity.get('id') in watched_ids -%}
+  <button class="ti-btn-outline ti-btn-sm ti-btn-watched" disabled>Watched</button>
+{%- else -%}
+  {# `.get`, not attribute access. OpenCTI omits keys it has no value for,
+     and `entity.description` on a dict without that key is Jinja's
+     Undefined, which `|tojson` raises on rather than rendering: the whole
+     fragment would 500 for one actor with no description. The JavaScript
+     this replaces read `a.description` as undefined and JSON.stringify
+     dropped it, so the port was briefly less robust than the code it
+     replaced. Caught by a test that stubbed OpenCTI with minimal rows. #}
+  {%- set payload = {
+        'entity_type': kind,
+        'opencti_id': entity.get('id'),
+        'name': entity.get('name'),
+        'description': entity.get('description'),
+        'aliases': entity.get('aliases') or [],
+        'labels': (entity.get('labels') or [])|map(attribute='value')|list,
+      } -%}
+  <button class="ti-btn ti-btn-sm ti-btn-watch"
+          data-click-action="watchActor"
+          data-args='[{{ payload|tojson }}]'>Watch</button>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro detail_row_state(message, columns, tone='empty') -%}
+{# A detail row's own three outcomes, as the one cell a detail row is. #}
+<td colspan="{{ columns }}">
+  <div class="ti-empty p-2.5{% if tone == 'error' %} text-[var(--danger)]{% endif %}"
+       {% if tone == 'error' %}role="alert"{% endif %}>{{ message }}</div>
+</td>
+{%- endmacro %}

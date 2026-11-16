@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Bug Reports - ION{% endblock %}
+{% block page_id %}bug_reports{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
@@ -73,57 +74,41 @@
   </div>
 </section>
 
-<section class="card bg-base-200 shadow">
-  <div class="card-body p-0">
-    <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-base-300">
-      <h2 class="card-title text-base">Submitted reports</h2>
-      <div class="flex flex-wrap items-center gap-4">
-        <label class="label cursor-pointer justify-start gap-2 py-0 w-fit">
-          <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" id="filter-mine" data-change-action="loadBugs">
-          <span class="label-text">Only mine</span>
-        </label>
-        <label class="flex items-center gap-2 text-sm">
-          <span class="text-base-content/60">Status:</span>
-          <select id="filter-status" class="select select-sm w-auto" data-change-action="loadBugs">
-            <option value="all" selected>All</option>
-            <option value="open">Open</option>
-            <option value="in_progress">In progress</option>
-            <option value="resolved">Resolved</option>
-            <option value="closed">Closed</option>
-          </select>
-        </label>
-      </div>
-    </div>
-    <div class="overflow-x-auto">
-      <table class="table table-sm" id="bugs-table">
-        <thead>
-          <tr><th>#</th><th>Title</th><th>Severity</th><th>Component</th><th>Status</th><th>GitLab</th><th>Reported by</th><th>Created</th><th>Actions</th></tr>
-        </thead>
-        <tbody id="bugs-body"><tr><td colspan="9" class="loading">Loading…</td></tr></tbody>
-      </table>
-    </div>
-  </div>
-</section>
+{# The submitted-reports card is rendered whole by
+   ion.web.ui.bug_reports_fragment, filters and all, so this is just the slot
+   it lands in. It used to be three innerHTML writes: the loaded table, the
+   empty state and the load-failure message, assembled by 64 lines of inline
+   JavaScript with a hand-rolled esc(). The markup now has one definition, in
+   Jinja, which escapes it, and a restyle of the table reaches it from the
+   stylesheet.
 
-<style nonce="{{ csp_nonce }}">
-/* JS innerHTML uses class="loading" as a text placeholder, not daisyUI's spinner. */
-#bugs-table td.loading {
-    display: table-cell;
-    aspect-ratio: auto;
-    width: auto;
-    height: auto;
-    background: none;
-    mask-image: none;
-    -webkit-mask-image: none;
-    text-align: center;
-    padding: 2rem;
-    opacity: 0.6;
-}
-</style>
+   hx-trigger="load" keeps the shell's first paint immediate and the rows
+   arriving in their own request, which is what the fetch it replaces already
+   did. This slot handles only that first paint, with the route's default
+   filters. Every later request comes from the fragment's own filter bar,
+   which is the only thing that knows which filters are on screen; it also
+   listens for `bugs:changed`, the event submitting or syncing a report
+   fires. An hx-include="#bug-filters" here instead logged
+   `returned no matches!` to the console on every first paint, since the
+   fragment that owns that id has not arrived yet. #}
+<div id="bugs-content"
+     hx-get="/ui/bug-reports"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+  <div class="text-center p-10 text-base-content/60">
+    <span class="loading loading-spinner loading-sm text-primary"></span>
+    Loading bug reports...
+  </div>
+</div>
+
 
 <script nonce="{{ csp_nonce }}">
-function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function fmtDate(iso){ if(!iso) return ''; try { return new Date(iso).toISOString().replace('T',' ').slice(0,16);} catch(e){ return iso; } }
+// esc() and fmtDate() are gone with the table they served: Jinja autoescapes
+// and the fragment formats the timestamp. What is left here submits and
+// syncs, which are state changes, not markup construction.
+function reloadBugs(){
+  document.body.dispatchEvent(new CustomEvent('bugs:changed'));
+}
 
 async function submitBug(){
   const title = document.getElementById('bf-title').value.trim();
@@ -143,48 +128,17 @@ async function submitBug(){
   });
   if(!resp.ok){ msg.textContent = 'Failed: ' + resp.status; return; }
   const br = await resp.json();
-  msg.textContent = br.gitlab_issue_iid ? `Filed — GitLab issue #${br.gitlab_issue_iid} created.`
-                                        : `Filed (GitLab issue not created: ${esc(br.gitlab_error || 'n/a')}).`;
+  msg.textContent = br.gitlab_issue_iid != null ? `Filed — GitLab issue #${br.gitlab_issue_iid} created.`
+                                                : `Filed (GitLab issue not created: ${br.gitlab_error || 'n/a'}).`;
   ['bf-title','bf-desc','bf-steps','bf-component','bf-page'].forEach(id => document.getElementById(id).value = '');
-  loadBugs();
-}
-
-async function loadBugs(){
-  const status = document.getElementById('filter-status').value;
-  const mine = document.getElementById('filter-mine').checked ? '&mine=true' : '';
-  const body = document.getElementById('bugs-body');
-  const resp = await fetch(`/api/bug-reports?status=${encodeURIComponent(status)}${mine}`, { credentials:'same-origin' });
-  if(!resp.ok){ body.innerHTML = `<tr><td colspan="9" class="loading">Failed to load: ${resp.status}</td></tr>`; return; }
-  const items = (await resp.json()).bug_reports || [];
-  if(!items.length){ body.innerHTML = `<tr><td colspan="9" class="loading">No bug reports.</td></tr>`; return; }
-  const sevColor = { low:'ion-c-muted', medium:'ion-c-cyan', high:'ion-c-amber', critical:'ion-c-red' };
-  const stColor = { open:'ion-c-amber', in_progress:'ion-c-cyan', resolved:'ion-c-green', closed:'ion-c-muted' };
-  body.innerHTML = items.map(b => {
-    const gl = b.gitlab_issue_url
-      ? `<a class="ion-link" href="${esc(b.gitlab_issue_url)}" target="_blank" rel="noopener">#${b.gitlab_issue_iid}</a> <small class="ion-muted">${esc(b.gitlab_state || '')}</small>`
-      : `<small class="ion-muted">${esc(b.gitlab_error || '—')}</small>`;
-    const sync = b.gitlab_issue_iid ? `<button class="ion-btn ion-btn-ghost" data-click-action="syncBug" data-args='[${b.id}]'>Sync</button>` : '';
-    return `<tr>
-      <td>${b.id}</td>
-      <td>${esc(b.title)}</td>
-      <td><span class="ion-pill ${sevColor[b.severity]||'ion-c-muted'}">${esc(b.severity)}</span></td>
-      <td>${esc(b.component || '—')}</td>
-      <td><span class="ion-pill ${stColor[b.status]||'ion-c-muted'}">${esc(b.status)}</span></td>
-      <td>${gl}</td>
-      <td>${esc(b.reported_by_username || '—')}</td>
-      <td><small class="ion-muted">${fmtDate(b.created_at)}</small></td>
-      <td>${sync}</td>
-    </tr>`;
-  }).join('');
+  reloadBugs();
 }
 
 async function syncBug(id){
   const resp = await fetch(`/api/bug-reports/${id}/sync`, { method:'POST', credentials:'same-origin' });
   if(!resp.ok){ alert('Sync failed: ' + resp.status); return; }
-  loadBugs();
+  reloadBugs();
 }
-
-document.addEventListener('DOMContentLoaded', loadBugs);
 </script>
 
 </div>

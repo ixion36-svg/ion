@@ -1,0 +1,54 @@
+{# The story rail.
+
+   Replaces three innerHTML sites in stories.html: the row map, the
+   "No stories yet" line and the "Failed to load: ..." line, plus the
+   hand-rolled esc() that ran over every story name. Jinja autoescapes.
+
+   A row records which story is selected and nothing else. It used to carry
+   an hx-get for the detail pane as well, which made one click fire two
+   requests at the same target: the row's own, and the pair that
+   `stories:changed` sets off. Two in-flight responses racing onto one
+   element, with "what opening a story does" written in two places. The
+   page's hidden selection state is the single definition now, and both
+   panels re-read it.
+
+   The rail's Refresh control is NOT in here. It sits in the page shell,
+   outside this swap target, because a read that fails replaces this
+   element's contents: a Refresh button rendered here would be taken away
+   by exactly the render that makes someone want it. #}
+
+{% if failed %}
+  <li role="alert" class="px-4 py-3 text-error text-sm">
+    The story list could not be read. This is not an empty automation
+    estate: nothing here says how many stories exist, so do not create one
+    on the strength of this panel.
+  </li>
+{% elif not stories %}
+  <li class="px-4 py-3 opacity-50">No stories yet</li>
+{% else %}
+  {% for s in stories %}
+    {# `is not none` on both sides. Without it a row with no id would come
+       back highlighted whenever nothing is selected, because None equals
+       None, and story 0 would never highlight at all. #}
+    <li class="px-4 py-2 cursor-pointer hover:bg-base-300
+               {% if s.id is not none and s.id == active_id %}bg-base-300{% endif %}"
+        data-click-action="storiesSelect"
+        data-story-id="{{ s.id }}">
+      <div class="font-semibold">{{ s.name }}</div>
+      <div class="text-xs opacity-60 mt-0.5 flex items-center gap-1.5 flex-wrap">
+        {# Three states, not two. `enabled` is a non-nullable column today,
+           so None should not reach here, but the badge is the only thing on
+           the row that says whether this story can run at all, and folding
+           an absent value into "disabled" would claim it cannot. #}
+        {% if s.enabled is true %}
+          <span class="badge badge-success badge-xs">enabled</span>
+        {% elif s.enabled is false %}
+          <span class="badge badge-ghost badge-xs">disabled</span>
+        {% else %}
+          <span class="badge badge-warning badge-xs">state unknown</span>
+        {% endif %}
+        <span>&middot; #{{ s.id if s.id is not none else '?' }}</span>
+      </div>
+    </li>
+  {% endfor %}
+{% endif %}

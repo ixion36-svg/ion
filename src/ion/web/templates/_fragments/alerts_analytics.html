@@ -1,0 +1,158 @@
+{# Alerts: the analytics drawer's trend chart, two donuts and three bar lists.
+
+   Replaces the writes in renderTrendChart, renderDonut, renderTopCountries
+   and renderHBarChart. The fragment lands in #chart-trend and swaps the
+   other five charts out of band, so the drawer's own layout and its tabs
+   stay in the page shell where a failed render cannot take them away.
+
+   ONE SENTENCE WHERE THERE WERE FIVE WRONG ONES. Every renderer answered an
+   empty set with "No data", and `allAlerts` stays empty after a failed read,
+   so a window nobody could read showed "No data" in all five charts at
+   once: the whole drawer agreeing on an answer none of them had measured.
+   A failed read now says so once, and the other charts say the same thing
+   rather than claiming a measurement.
+
+   THE AXIS IS UTC AND SAYS SO. The page computed the buckets as absolute
+   instants and then labelled them with toLocaleTimeString, the reader's
+   clock, so two analysts in different zones read different hours off the
+   same bars. These labels are UTC. That is a visible change, and the
+   alternative is an axis that moves with the reader while the data does
+   not.
+
+   A bucket with nothing in it is a measured zero and renders as a zero-height
+   bar, which is the point of a trend chart. #}
+
+{#- `kind` is "host", "rule" or none, not a colour. The bar's colour is
+    alerts-page.css's answer now; the width is genuinely per row and stays
+    an attribute. The country list passes none and keeps its generated
+    hue, which is a spread across rows rather than a theme decision. -#}
+{%- macro bars(rows, kind, empty_text, failed) -%}
+  {%- if failed -%}
+    <div class="empty-state text-[var(--danger)]" role="alert">Not counted: the alerts could not be read.</div>
+  {%- elif rows is none -%}
+    <div class="empty-state text-[var(--danger)]" role="alert">Not counted.</div>
+  {%- elif not rows -%}
+    <div class="empty-state">{{ empty_text }}</div>
+  {%- else -%}
+    {%- for r in rows %}
+      <div class="hbar-row">
+        <span class="hbar-label" title="{{ r.name }}">{{ r.name }}</span>
+        <span class="hbar-track"><span class="hbar-fill{{ ' hbar-' ~ kind if kind }}" data-ion-style="width:{{ r.pct }}%{{ '; background:hsl(' ~ r.hue ~ ',65%,55%)' if not kind }}"></span></span>
+        <span class="hbar-count">{{ r.count }}</span>
+      </div>
+    {%- endfor -%}
+  {%- endif -%}
+{%- endmacro -%}
+
+{%- macro donut(d, empty_text, failed, unread_text='Not counted: the alerts could not be read.') -%}
+  {%- if failed or d is none -%}
+    {# `unread_text` per donut. The severity donut is None only when the
+       alert read failed; the triage donut is also None when the alert read
+       succeeded and the triage batch did not, and saying "the alerts could
+       not be read" for that blames the wrong read. Two causes, two
+       sentences. #}
+    <div class="empty-state text-[var(--danger)]" role="alert">{{ unread_text }}</div>
+  {%- elif d.total == 0 -%}
+    {# A measured zero. Every slice was counted and every count was zero,
+       which is not the same as the read failing, and the page could not
+       tell them apart. #}
+    <div class="empty-state">{{ empty_text }}</div>
+  {%- else -%}
+    <svg width="{{ d.w }}" height="{{ d.h }}" viewBox="0 0 {{ d.w }} {{ d.h }}" xmlns="http://www.w3.org/2000/svg">
+      {%- for a in d.arcs %}
+        <path d="{{ a.d }}" class="donut-segment donut-{{ a.key }}"><title>{{ a.label }}: {{ a.value }} ({{ a.pct }}%)</title></path>
+      {%- endfor %}
+      <text x="{{ d.cx }}" y="{{ d.cy - 4 }}" text-anchor="middle" class="chart-value text-base font-bold fill-[currentColor]">{{ d.total }}</text>
+      <text x="{{ d.cx }}" y="{{ d.cy + 10 }}" text-anchor="middle" class="chart-value">total</text>
+      {%- for l in d.legend %}
+        <rect x="{{ d.legend_x }}" y="{{ l.y - 8 }}" width="10" height="10" rx="2" class="donut-{{ l.key }}"/>
+        <text x="{{ d.legend_x + 16 }}" y="{{ l.y }}" class="donut-legend">{{ l.label }}</text>
+        <text x="{{ d.legend_x + 16 }}" y="{{ l.y + 12 }}" class="donut-legend-value">{{ l.value }} ({{ l.pct }}%)</text>
+      {%- endfor %}
+    </svg>
+  {%- endif -%}
+{%- endmacro -%}
+
+{# ---- the fragment's own target: the notices and the trend chart ---- #}
+
+{% if failed %}
+  <div class="empty-state text-[var(--danger)]" role="alert">
+    The alerts for this window could not be read, so none of these charts
+    has a measurement behind it.
+    {% if connection_error %}
+      Elasticsearch could not be reached.
+    {% elif reason %}
+      <span class="font-mono text-[10px] opacity-80">({{ reason }})</span>
+    {% endif %}
+  </div>
+{% else %}
+  {% if degraded and reason %}
+    <div class="text-xs text-[var(--warning,#f59e0b)] mb-2" role="status">{{ reason }}</div>
+  {% endif %}
+  {% if defaulted %}
+    <div class="text-xs text-[var(--text-muted)] mb-2">
+      The controls did not express a window these charts could use, so the
+      last {{ hours }} hours are shown.
+    </div>
+  {% endif %}
+  {% if truncated %}
+    <div class="text-xs text-[var(--text-muted)] mb-2">
+      Counted over the newest {{ limit }} alerts; the window holds more, so
+      these are not totals for the whole window.
+    </div>
+  {% endif %}
+
+  {% if trend is none or trend.total == 0 %}
+    <div class="empty-state">No alerts in the last {{ hours }} hours.</div>
+  {% else %}
+    <svg width="100%" height="{{ trend_h }}" viewBox="0 0 {{ trend_w }} {{ trend_h }}"
+         preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"
+         role="img" aria-label="Alert volume by time bucket, in UTC">
+      {%- set n = trend.buckets|length -%}
+      {%- set bw = (trend_w / n)|round(4) -%}
+      {%- for b in trend.buckets -%}
+        {%- set x = (loop.index0 * bw)|round(2) -%}
+        {%- set bh = ((trend_h - 24) * b.pct / 100)|round(2) -%}
+        <rect x="{{ x }}" y="{{ (trend_h - 24 - bh)|round(2) }}" width="{{ (bw * 0.8)|round(2) }}" height="{{ bh }}"
+              class="chart-bar{{ ' chart-bar-critical' if b.critical else (' chart-bar-high' if b.high else '') }}"
+              ><title>{{ b.iso }}: {{ b.count }} alert{{ '' if b.count == 1 else 's' }}{% if b.critical %}, {{ b.critical }} critical{% endif %}{% if b.high %}, {{ b.high }} high{% endif %}</title></rect>
+        {%- if b.label %}
+          <text x="{{ (x + bw / 2)|round(2) }}" y="{{ trend_h - 4 }}" class="chart-value" text-anchor="middle">{{ b.label }}</text>
+        {%- endif -%}
+      {%- endfor %}
+    </svg>
+    <div class="text-[0.6875rem] text-[var(--text-muted)] text-right">times in UTC</div>
+  {% endif %}
+{% endif %}
+
+{# ---- the other five charts, out of band ---- #}
+
+<div id="chart-severity" class="min-h-[200px] relative" hx-swap-oob="innerHTML">
+  {{ donut(severity_donut, 'No alerts in this window.', failed) }}
+</div>
+
+<div id="chart-triage-status" class="min-h-[200px] relative" hx-swap-oob="innerHTML">
+  {{ donut(triage_donut, 'No alerts in this window.', failed,
+             'Not counted: the triage records for these alerts could not be read, '
+             'so how many are open is not known.') }}
+</div>
+
+<div id="chart-top-countries" class="min-h-[200px] relative" hx-swap-oob="innerHTML">
+  {{ bars(countries.rows if countries else none, none, 'No country data.', failed) }}
+  {%- if countries and countries.unattributed %}
+    {# The page skipped these silently, so a window whose alerts all carried
+       a geo block with no country in it read as a window with no geo data. #}
+    <div class="text-[0.6875rem] text-[var(--text-muted)] mt-1">
+      {{ countries.unattributed }} alert{{ '' if countries.unattributed == 1 else 's' }}
+      carried location data with no country in it.
+    </div>
+  {%- endif %}
+</div>
+
+<div id="chart-top-hosts" class="min-h-[200px] relative" hx-swap-oob="innerHTML">
+  {{ bars(hosts, 'host', 'No host data.', failed) }}
+</div>
+
+<div id="chart-top-rules" class="min-h-[200px] relative" hx-swap-oob="innerHTML">
+  {{ bars(rules, 'rule', 'No rule data.', failed) }}
+</div>

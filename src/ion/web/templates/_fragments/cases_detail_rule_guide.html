@@ -1,0 +1,10 @@
+{% if state == 'failed' %}
+<div class="cpanel-alert-fields-empty">Failed to load rule guide: the raw document could not be read.</div>
+{% elif state == 'empty' %}
+<div class="cpanel-alert-fields-empty">{% if raw_missing %}No raw data available for this alert.{% else %}No rule description or investigation guide on this alert.{% endif %}</div>
+{% else %}
+{% if description %}<div class="cpanel-rule-desc">{{ description }}</div>{% endif %}
+{% if guide %}<div class="cpanel-rule-guide-label">Investigation guide</div><div class="cpanel-note-markdown cpanel-rule-guide" data-case-rule-guide></div><textarea hidden data-case-rule-markdown>{{ guide }}</textarea>{% endif %}
+{% endif %}
+
+<template data-case-rule-state="{{ state }}"></template>

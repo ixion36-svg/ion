@@ -1,0 +1,63 @@
+{# The quirks due for review on /de, plus the quirks-due tile.
+
+   Replaces the innerHTML write in loadQuirks(). The rows are de_quirks' own
+   quirk rows, so the register and this summary parse `review_date` the same
+   way.
+
+   Three outcomes. The module being licence-gated off never reaches this
+   template: the route answers 404 and static/js/htmx-errors.js words it.
+
+     read failed  the tile says nothing and the panel says why. The
+                  JavaScript's `r.ok ? r.json() : { quirks: [] }` painted
+                  "Nothing due within 7 days." and "of 0 active" for a read
+                  that did not happen, and a quirk nobody reviews keeps
+                  annotating alerts.
+     nothing due  the empty state, which is a real finding.
+     rows         the list, soonest first.
+
+   The distance to the review is a real distance now. `ageOf()` divided a
+   negative interval, failed its `>= 1` test and had `Math.max(1, ...)` floor
+   the result, so a review due in six days and one due in two hours both read
+   "review 1h", and the `.replace('d', 'd out')` meant to make it read "3d
+   out" could never fire.
+
+   Overdue is `SystemQuirk.is_expired()`, which is the clock
+   `de_quirk_service._active_quirks` compares against. The JavaScript parsed
+   a UTC-stored instant as local time, so for an analyst east of UTC a quirk
+   that had already lapsed still read as pending review while the matcher had
+   stopped using it. #}
+
+{% from "_fragments/_time.html" import ts %}
+{% from "_fragments/de_workbench_kpi.html" import kpi %}
+
+{% if failed %}
+{{ kpi('kpi-quirks', 'Quirks due review', 'text-warning', '—', 'read failed, count unknown') }}
+<div role="alert" class="alert alert-error">
+  The quirk register could not be read. This is not an empty review list: the
+  query failed, so how many quirks are due is unknown rather than zero.
+  Refresh to try again.
+</div>
+{% else %}
+{{ kpi(
+  'kpi-quirks', 'Quirks due review', 'text-warning',
+  view.due_count,
+  'of ' ~ view.active_count ~ ' active · 7d window'
+) }}
+{% if not view.rows %}
+<div class="text-[12px] opacity-60 py-2">Nothing due within 7 days.</div>
+{% else %}
+{% for q in view.rows %}
+  <div class="flex items-center justify-between gap-2 py-2 border-b border-white/5">
+    <span class="font-mono text-[11.5px] min-w-0 break-words">{{ q.title if q.title else '—' }}</span>
+    <span class="flex items-center gap-2 whitespace-nowrap">
+      <span class="text-[10px] opacity-50">{{ ts(q.review_date, 'date', fallback='no review date') }}</span>
+      {% if q.overdue %}
+        <span class="badge badge-sm badge-error">overdue</span>
+      {% else %}
+        <span class="badge badge-sm badge-warning">{{ q.due_text }}</span>
+      {% endif %}
+    </span>
+  </div>
+{% endfor %}
+{% endif %}
+{% endif %}

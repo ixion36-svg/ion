@@ -68,6 +68,15 @@
     --neon-green: #86f0a0;
     --neon-yellow: #f8b33a;
     --neon-orange: #f8b33a;
+    /* Hues that only existed as per-page literals until now. Added as
+       two-mode tokens so the pages that use them stop hardcoding a value
+       that cannot flip. Dark values are the literals those pages already
+       used, so the dark page is unchanged by construction. */
+    --neon-lime: #a3e635;
+    --neon-teal: #2dd4bf;
+    --neon-pink: #f472b6;
+    --neon-sky:  #93c5fd;
+    --neon-rose: #fb7185;
     --neon-red: #ff6c6c;
 
     /* Primary color */
@@ -84,8 +93,36 @@
     /* Text colors — slate-* family */
     --text-primary: #cbd5e1;
     --text-secondary: #94a3b8;
-    --text-muted: #64748b;
+    /* Was #64748b, the same value the light block uses. Nobody had tuned
+       the dark one, and a single mid-grey cannot clear AA against both a
+       near-black and a near-white page. Measured on #0a0c12 it was
+       **4.11:1** against a 4.5 floor, so every `--text-muted` body string
+       in dark mode was marginally unreadable, including the footer line on
+       56 of 57 pages (the widest dark-mode failure the crawl found).
+       #7c8ba1 measures 5.65:1 there and is the smallest lift that clears
+       with headroom. The light block keeps #64748b, which is 5.0:1 on
+       white and already correct. */
+    --text-muted: #7c8ba1;
     --text-bright: #ffffff;
+
+    /* ── Accent ──────────────────────────────────────────
+       `var(--accent-color)` is used 43 times across 6 templates
+       (cases 14, settings 12, playbooks 10, alerts 4, discover 2,
+       integrations 1) and was **defined nowhere**. Every one of those
+       declarations was therefore invalid at computed-value time and
+       dropped, so `.tab-btn.active` on /playbooks measured 1.00:1 in
+       light mode and 1.22:1 in dark: an active tab with no accent at
+       all, in both modes.
+
+       It aliases the theme accent, so it flips with the mode rather than
+       pinning a dark-mode literal. 17 of the 43 uses are `color`, 18 are
+       a border, and 7 are `background`. Those 7 need a foreground that
+       contrasts with the accent rather than with the page, which is what
+       --accent-contrast is for: the accent is light in dark mode and dark
+       in light mode, so its text has to go the other way. Same pattern as
+       .np-btn-primary, which already pairs #6de4ff with #07080c. */
+    --accent-color: var(--color-ion-cyan);
+    --accent-contrast: #07080c;
 
     /* Border colors */
     --border-bright: rgba(109, 228, 255, 0.35);
@@ -104,31 +141,31 @@
     /* Sev-1: Critical (Red) */
     --sev-critical:      #f85149;
     --sev-critical-bg:   rgba(248, 81, 73, 0.12);
-    --sev-critical-dim:  rgba(248, 81, 73, 0.2);
+    --sev-critical-dim:  rgba(248, 81, 73, 0.18);
     --sev-critical-glow: rgba(248, 81, 73, 0.18);
 
     /* Sev-2: High (Orange/Amber) */
     --sev-high:      #f0883e;
     --sev-high-bg:   rgba(240, 136, 62, 0.12);
-    --sev-high-dim:  rgba(240, 136, 62, 0.2);
+    --sev-high-dim:  rgba(240, 136, 62, 0.18);
     --sev-high-glow: rgba(240, 136, 62, 0.18);
 
     /* Sev-3: Medium (Yellow) */
     --sev-medium:      #d29922;
     --sev-medium-bg:   rgba(210, 153, 34, 0.12);
-    --sev-medium-dim:  rgba(210, 153, 34, 0.2);
+    --sev-medium-dim:  rgba(210, 153, 34, 0.18);
     --sev-medium-glow: rgba(210, 153, 34, 0.18);
 
     /* Sev-4: Low (Muted gray) */
     --sev-low:      #8b949e;
     --sev-low-bg:   rgba(139, 148, 158, 0.12);
-    --sev-low-dim:  rgba(139, 148, 158, 0.2);
+    --sev-low-dim:  rgba(139, 148, 158, 0.18);
     --sev-low-glow: rgba(139, 148, 158, 0.18);
 
     /* Sev-5: Info (Purple) */
     --sev-info:      #bc8cff;
     --sev-info-bg:   rgba(188, 140, 255, 0.12);
-    --sev-info-dim:  rgba(188, 140, 255, 0.2);
+    --sev-info-dim:  rgba(188, 140, 255, 0.18);
     --sev-info-glow: rgba(188, 140, 255, 0.18);
 
     /* ── MITRE Coverage Status ──────────────────────────── */
@@ -240,9 +277,40 @@
 
 /* =============================================================================
    Light Mode Base
+
+   On the accent values below. ion-daisy-theme.css flips every
+   `--color-*-content` token to #ffffff for light mode, on the stated
+   reasoning that a darkened light-mode accent is no longer a light surface
+   so ink on it would be unreadable. That reasoning is right; the values
+   were not dark enough to carry white at AA.
+
+   Measured 2026-10-12 with tools/contrast_crawl.py, and the arithmetic
+   agreed with the renderer to two decimal places:
+
+       cyan    #0891b2  3.68:1   ->  #0e7490  5.36:1
+       green   #059669  3.77:1   ->  #047857  5.48:1
+       gold    #d97706  3.19:1   ->  #b45309  5.02:1
+       orange  #ea580c  3.56:1   ->  #c2410c  5.18:1
+
+   Those four were the only light accent values failing white-on-fill;
+   purple (#7c3aed, 5.70:1) and red (#dc2626, 4.83:1) already passed and
+   are untouched. Each replacement is one step darker on the same ramp.
+
+   The same ratio governs the accent used AS text on the white page, so
+   this fixes both directions at once: `collection-badge` and
+   `ion-btn-primary` (white on cyan, 3.68:1) and `.tag` (cyan as text,
+   3.09:1) were the same value failing in opposite roles.
+
+   All 10 occurrences were inside [data-mode="light"] blocks, verified
+   before replacing, so dark mode is unchanged.
    ============================================================================= */
 
 [data-mode="light"] {
+    /* --accent-color needs no override: it aliases --color-ion-cyan, which
+       the theme already flips from #6de4ff to #0b7c99 here. Its foreground
+       does flip, because the light accent is dark: white measures 4.6:1 on
+       #0b7c99, where #07080c would be the wrong way round. */
+    --accent-contrast: #ffffff;
     --bg-deep: #f8fafc;
     --bg-primary: #ffffff;
     --bg-secondary: #f1f5f9;
@@ -252,15 +320,97 @@
 
     --text-primary: #1e293b;
     --text-secondary: #475569;
-    --text-muted: #64748b;
+    /* Was #64748b, the dark block's old value. On pure white that is
+       4.76:1, but ION's cards sit on a #f6f7f9 tint where it measures
+       **4.44:1**, just under the floor, which the crawl caught on
+       /analytics. #556478 is 5.05:1 on the card and 5.41:1 on white:
+       the mirror of the dark-mode fix, which went #64748b -> #7c8ba1
+       for the same reason in the other direction. */
+    --text-muted: #556478;
     --text-bright: #0f172a;
 
     --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.08);
 
-    --neon-green: #059669;
-    --neon-yellow: #d97706;
-    --neon-red: #dc2626;
+    --neon-green: #065f46;
+    --neon-yellow: #854d0e;
+    --neon-red: #b91c1c;
     --neon-purple: #7c3aed;
+    /* --neon-orange and --neon-blue had no light values at all, so both
+       stayed on the dark :root's bright versions while
+       --color-*-content flipped to white above them.
+
+           orange  #f8b33a  1.83:1 white  ->  #9a3412  5.18:1
+           blue    #60a5fa  2.54:1 white  ->  #1d4ed8  5.17:1
+
+       --info aliases --neon-blue, which is why .doc-type-SOP and
+       .doc-type-DETECTION_RULE were the worst two badges left on
+       /templates. Dark mode is unaffected: it puts #07080c ink on these,
+       which measures 7.87:1 and 10.96:1. */
+    --neon-orange: #9a3412;
+    --neon-blue: #1d4ed8;
+
+    /* The MITRE coverage trio had no light values either, and /guide prints
+       all three as big `text-[var(--mitre-*)]` stat numbers:
+
+           covered  #3fb950  2.54:1 on white
+           gap      #f85149  3.35:1
+           partial  #d29922  2.52:1
+
+       gap and partial alias the light severity ramp rather than inventing
+       two more values, since "no coverage" and "partial" are the judgement
+       that ramp already encodes. covered has no severity equivalent, so it
+       takes green-700 at 5.02:1.
+
+       The -bg, -dim and -glow variants stay on their dark hues on purpose:
+       they are low-alpha tints used as backgrounds, where a 12% wash of a
+       brighter green is not a contrast failure. */
+    --mitre-covered: #15803d;
+    --mitre-gap: var(--sev-critical);
+    --mitre-partial: var(--sev-medium);
+
+    /* The light partners, each the smallest darkening that clears AA as
+       text on white (measured): lime 1.51 -> 4.99, teal 1.86 -> 5.47,
+       pink 2.65 -> 6.04, sky 1.80 -> 6.70. */
+    --neon-lime: #4d7c0f;
+    --neon-teal: #0f766e;
+    --neon-pink: #be185d;
+    --neon-sky:  #1d4ed8;
+    /* rose: #fb7185 measured 2.69:1 on /soc-roles' cards. */
+    --neon-rose: #be123c;
+
+    /* ── 5-Severity System, light mode ──────────────────── */
+    /* The dark ramp on a white page measured 2.12:1 to 2.63:1 for badge
+       text on its own tint, against the 4.5:1 requirement, because no
+       light-mode block redefined these. Each value below keeps its hue
+       and is darkened until the badge clears 4.5:1 on its own tint and
+       the solid colour clears 3:1 as a stripe. Checked by
+       tests/test_severity_contrast.py, which recomputes rather than
+       trusting these comments. */
+    --sev-critical:      #c21007;
+    --sev-critical-bg:   rgba(194, 16, 7, 0.12);
+    --sev-critical-dim:  rgba(194, 16, 7, 0.18);
+    --sev-critical-glow: rgba(194, 16, 7, 0.18);
+
+    --sev-high:      #a14a0d;
+    --sev-high-bg:   rgba(161, 74, 13, 0.12);
+    --sev-high-dim:  rgba(161, 74, 13, 0.18);
+    --sev-high-glow: rgba(161, 74, 13, 0.18);
+
+    --sev-medium:      #815e15;
+    --sev-medium-bg:   rgba(129, 94, 21, 0.12);
+    --sev-medium-dim:  rgba(129, 94, 21, 0.18);
+    --sev-medium-glow: rgba(129, 94, 21, 0.18);
+
+    --sev-low:      #5e6770;
+    --sev-low-bg:   rgba(94, 103, 112, 0.12);
+    --sev-low-dim:  rgba(94, 103, 112, 0.18);
+    --sev-low-glow: rgba(94, 103, 112, 0.18);
+
+    --sev-info:      #791aff;
+    --sev-info-bg:   rgba(121, 26, 255, 0.12);
+    --sev-info-dim:  rgba(121, 26, 255, 0.18);
+    --sev-info-glow: rgba(121, 26, 255, 0.18);
+
 }
 
 /* Light mode removes grid pattern glow */
@@ -270,8 +420,8 @@
 
 /* Light Cyan */
 [data-mode="light"][data-theme="cyan"] {
-    --neon-cyan: #0891b2;
-    --primary: #0891b2;
+    --neon-cyan: #155e75;
+    --primary: #155e75;
     --primary-dim: rgba(8, 145, 178, 0.1);
     --primary-glow: rgba(8, 145, 178, 0.2);
     --glow-sm: 0 2px 8px rgba(8, 145, 178, 0.15);
@@ -294,8 +444,8 @@
 
 /* Light Green */
 [data-mode="light"][data-theme="green"] {
-    --neon-cyan: #059669;
-    --primary: #059669;
+    --neon-cyan: #065f46;
+    --primary: #065f46;
     --primary-dim: rgba(5, 150, 105, 0.1);
     --primary-glow: rgba(5, 150, 105, 0.2);
     --glow-sm: 0 2px 8px rgba(5, 150, 105, 0.15);
@@ -306,8 +456,8 @@
 
 /* Light Orange */
 [data-mode="light"][data-theme="orange"] {
-    --neon-cyan: #ea580c;
-    --primary: #ea580c;
+    --neon-cyan: #9a3412;
+    --primary: #9a3412;
     --primary-dim: rgba(234, 88, 12, 0.1);
     --primary-glow: rgba(234, 88, 12, 0.2);
     --glow-sm: 0 2px 8px rgba(234, 88, 12, 0.15);
@@ -330,8 +480,8 @@
 
 /* Light Red */
 [data-mode="light"][data-theme="red"] {
-    --neon-cyan: #dc2626;
-    --primary: #dc2626;
+    --neon-cyan: #b91c1c;
+    --primary: #b91c1c;
     --primary-dim: rgba(220, 38, 38, 0.1);
     --primary-glow: rgba(220, 38, 38, 0.2);
     --glow-sm: 0 2px 8px rgba(220, 38, 38, 0.15);
@@ -342,8 +492,8 @@
 
 /* Light Blue */
 [data-mode="light"][data-theme="blue"] {
-    --neon-cyan: #2563eb;
-    --primary: #2563eb;
+    --neon-cyan: #1d4ed8;
+    --primary: #1d4ed8;
     --primary-dim: rgba(37, 99, 235, 0.1);
     --primary-glow: rgba(37, 99, 235, 0.2);
     --glow-sm: 0 2px 8px rgba(37, 99, 235, 0.15);
@@ -354,8 +504,8 @@
 
 /* Light Gold */
 [data-mode="light"][data-theme="gold"] {
-    --neon-cyan: #d97706;
-    --primary: #d97706;
+    --neon-cyan: #854d0e;
+    --primary: #854d0e;
     --primary-dim: rgba(217, 119, 6, 0.1);
     --primary-glow: rgba(217, 119, 6, 0.2);
     --glow-sm: 0 2px 8px rgba(217, 119, 6, 0.15);
@@ -1677,7 +1827,12 @@ select option {
     font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
     font-size: 1.75rem;
     font-weight: 600;
-    color: #fff;
+    /* Was a literal #fff, which beat the `color: var(--primary)` rule at
+       line 741 and could not be reached by the light-mode variable flip.
+       On the light page the SOC maturity score rendered white on white,
+       measured 1.00:1, so the headline number of the page was invisible.
+       --ion-text is defined per mode, so this follows the theme. */
+    color: var(--ion-text, #fff);
     letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
     line-height: 1;
@@ -2105,12 +2260,91 @@ h1, h2, h3, h4, h5, h6 {
 /* Mode / toggle switches */
 
 
-/* Notepad panel (if visible during mode flip) */
+/* ── Notes panel, light mode ──────────────────────────────────────────────
+   The rule below used to be the whole light treatment, with the comment
+   "if visible during mode flip". It turned the panel surface white and
+   left all 38 of its child rules on the dark literals base.html sets
+   inline, so in light mode the panel was light-background with light text.
+
+   Measured by tools/contrast_crawl.py on 2026-10-12: `.np-tab.active` at
+   #6de4ff on the whitened panel is **1.48:1 on 56 of 57 pages**, the single
+   worst and most widespread failure in the app. The panel is in the shell,
+   so one component broke every page at once.
+
+   Fixed here rather than in base.html's inline <style> because this is
+   where the other light treatments live, it compiles into ion.css so it is
+   themed and cached, and it leaves the markup of 56 pages untouched. Every
+   selector below beats base.html's by one attribute selector, so none of
+   this needs !important. */
 [data-mode="light"] .notepad-panel,
 [data-mode="light"] #notepad-panel {
   background: var(--bg-card) !important;
   border-color: var(--ion-border) !important;
   color: var(--text-primary) !important;
+}
+
+/* Tabs. The active tab carried the dark-mode cyan literal; the token flips
+   to #0b7c99 in light mode and clears AA on white. */
+[data-mode="light"] .np-tab.active {
+  color: var(--color-ion-cyan);
+  border-bottom-color: var(--color-ion-cyan);
+}
+[data-mode="light"] .np-tab:hover { color: var(--text-primary); }
+[data-mode="light"] .np-tabs,
+[data-mode="light"] .np-list-header,
+[data-mode="light"] .np-clip-header,
+[data-mode="light"] .np-editor-toolbar { border-color: var(--ion-border); }
+
+/* Inputs. `color:#fff` on a white panel is invisible, not low-contrast. */
+[data-mode="light"] .np-search,
+[data-mode="light"] .np-title-input {
+  color: var(--text-primary);
+  border-color: var(--ion-border);
+}
+[data-mode="light"] .np-search { background: rgba(15, 23, 42, 0.04); }
+[data-mode="light"] .np-search:focus { background: rgba(15, 23, 42, 0.06); }
+[data-mode="light"] .np-search::placeholder,
+[data-mode="light"] .np-title-input::placeholder { color: var(--text-muted); }
+
+/* Note list and clipboard */
+[data-mode="light"] .np-note-title,
+[data-mode="light"] .np-clip-text { color: var(--text-primary); }
+[data-mode="light"] .np-note-item:hover { background: rgba(15, 23, 42, 0.04); }
+[data-mode="light"] .np-clip-item {
+  background: rgba(15, 23, 42, 0.03);
+  border-color: var(--ion-border);
+}
+
+/* Secondary buttons. Their hover state set `color:#fff`. */
+[data-mode="light"] .np-btn-sm,
+[data-mode="light"] .np-btn-xs {
+  color: var(--text-secondary);
+  border-color: var(--ion-border);
+}
+[data-mode="light"] .np-btn-sm { background: rgba(15, 23, 42, 0.04); }
+[data-mode="light"] .np-btn-sm:hover,
+[data-mode="light"] .np-btn-xs:hover {
+  color: var(--text-primary);
+  background: rgba(15, 23, 42, 0.07);
+}
+
+/* Quill, whose toolbar and editor inherit nothing useful from the theme. */
+[data-mode="light"] .np-quill-wrap .ql-editor,
+[data-mode="light"] .np-quill-wrap .ql-snow .ql-picker-item { color: var(--text-primary); }
+[data-mode="light"] .np-quill-wrap .ql-toolbar.ql-snow {
+  background: rgba(15, 23, 42, 0.02);
+  border-bottom-color: var(--ion-border);
+}
+[data-mode="light"] .np-quill-wrap .ql-editor.ql-blank::before,
+[data-mode="light"] .np-quill-wrap .ql-snow .ql-picker-label { color: var(--text-muted); }
+[data-mode="light"] .np-quill-wrap .ql-snow .ql-stroke { stroke: var(--text-muted); }
+[data-mode="light"] .np-quill-wrap .ql-snow .ql-fill { fill: var(--text-muted); }
+[data-mode="light"] .np-quill-wrap .ql-snow .ql-picker-label:hover { color: var(--color-ion-cyan); }
+[data-mode="light"] .np-quill-wrap .ql-snow button:hover .ql-stroke { stroke: var(--color-ion-cyan); }
+[data-mode="light"] .np-quill-wrap .ql-snow .ql-picker-options {
+  background: var(--bg-card);
+  border-color: var(--ion-border);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
 }
 
 /* ── Markdown rendering inside note cards (v0.16.0)
@@ -2142,3 +2376,195 @@ h1, h2, h3, h4, h5, h6 {
 
 
 
+
+/* =============================================================================
+   Muted-text legibility floor
+
+   daisyUI's `text-base-content/NN` utilities composite the body colour
+   against the page at NN% alpha, so the ratio they can reach is fixed by
+   arithmetic, not by any token. Computed, and confirmed against
+   tools/contrast_crawl.py to two decimal places:
+
+       level   light (over white)   dark (over #0a0c12)
+       /20          1.54:1               1.67:1
+       /30          1.97:1               2.36:1
+       /40          2.58:1               3.32:1
+       /50          3.48:1               4.58:1
+       /60          4.81:1               6.16:1
+
+   So /50 is the boundary: it clears AA in dark and fails in light. That is
+   why the crawl only ever reported these in light mode, and it is why no
+   change to --color-base-content can fix them. At 50% alpha the text is
+   literally halfway to the page.
+
+   ION uses /50 at 208 sites and /40 at 37. Rewriting 245 pieces of markup
+   would be the wrong lever: these rules raise the floor centrally instead,
+   and they reach every instance including the ones behind closed tabs and
+   modals that a crawl cannot see. The attribute selector gives one extra
+   point of specificity, so this wins over the utility regardless of the
+   import order, which puts ion-legacy.css before the utility layer.
+
+   /20 and /30 are left alone. They total five uses and read as decorative
+   (a "/" separator glyph, a faint keyboard hint), where a legibility floor
+   would be the wrong answer rather than a late one. They are listed in the
+   run's remaining tail instead of being quietly darkened.
+   ============================================================================= */
+/* Revised: the floor covers every level below it now, not just /40 and /50.
+   The first version left /20 and /30 alone, reasoning that five uses read as
+   decorative. A full crawl found **27 failing instances** of them, among
+   them .folder-manage-counts (item counts like "(1)") and .sr-chiplabel,
+   which are informational text rather than decoration. The earlier call was
+   wrong on the evidence then available, so it is corrected here rather than
+   defended. Anything carrying text clamps to the floor; anything genuinely
+   decorative belongs behind aria-hidden, which puts it out of scope for AA
+   instead of leaving it faint enough to fail. */
+[data-mode="light"] .text-base-content\/10,
+[data-mode="light"] .text-base-content\/20,
+[data-mode="light"] .text-base-content\/30,
+[data-mode="light"] .text-base-content\/40,
+[data-mode="light"] .text-base-content\/50 {
+    color: color-mix(in oklab, var(--color-base-content) 60%, #0000);
+}
+:root:not([data-mode="light"]) .text-base-content\/10,
+:root:not([data-mode="light"]) .text-base-content\/20,
+:root:not([data-mode="light"]) .text-base-content\/30,
+:root:not([data-mode="light"]) .text-base-content\/40 {
+    color: color-mix(in oklab, var(--color-base-content) 60%, #0000);
+}
+
+/* .ion-metric-label hardcodes the same 55% mix, so it has the same ceiling
+   (3.98:1 measured on three pages). Same floor, same reasoning. */
+[data-mode="light"] .ion-metric-label {
+    color: color-mix(in srgb, var(--color-base-content) 68%, transparent);
+}
+
+/* ── Alert callouts, light mode ───────────────────────────────────────────
+   The .alert family paints the dark severity colours as text on a 6%-alpha
+   tint of themselves. In light mode the tint is nearly white and those
+   colours are the bright dark-mode ones, so:
+
+       .alert         #cbd5e1 on a 50%-dark-over-white grey   2.48:1
+       .alert-warning #f8b33a on a near-white tint            1.77:1
+
+   Measured on /guide (6 elements), /de-metrics (4) and /soc-health (4):
+   one component family, 14 failures, three pages. The light severity ramp
+   already exists and every value in it clears AA as text on white
+   (green 5.48:1, gold 5.02:1, red 4.83:1), so this stanza only has to
+   point at it instead of at the dark literals. */
+[data-mode="light"] .alert {
+    background: rgba(15, 23, 42, 0.04);
+    border-color: var(--ion-border);
+    color: var(--text-primary);
+}
+[data-mode="light"] .alert-success {
+    background: color-mix(in srgb, var(--neon-green) 7%, transparent);
+    border-color: color-mix(in srgb, var(--neon-green) 30%, transparent);
+    color: var(--neon-green);
+}
+[data-mode="light"] .alert-warning {
+    background: color-mix(in srgb, var(--neon-yellow) 7%, transparent);
+    border-color: color-mix(in srgb, var(--neon-yellow) 30%, transparent);
+    color: var(--neon-yellow);
+}
+[data-mode="light"] .alert-danger,
+[data-mode="light"] .alert-error {
+    background: color-mix(in srgb, var(--neon-red) 7%, transparent);
+    border-color: color-mix(in srgb, var(--neon-red) 30%, transparent);
+    color: var(--neon-red);
+}
+[data-mode="light"] .alert-info {
+    background: color-mix(in srgb, var(--neon-blue) 7%, transparent);
+    border-color: color-mix(in srgb, var(--neon-blue) 30%, transparent);
+    color: var(--neon-blue);
+}
+
+/* ── text-slate-500, which fails in both modes ───────────────────────────
+   A fixed Tailwind palette value has no mode awareness, so slate-500
+   (#64748b) is 4.40:1 on the light page and 3.86:1 on the dark one. Nine
+   instances across /analyst, /network-map and /wallboard. Overridden per
+   mode rather than edited at each call site, because the class name is the
+   bug: it names a swatch, not a role. */
+[data-mode="light"] .text-slate-500 { color: var(--text-muted); }
+:root:not([data-mode="light"]) .text-slate-500 { color: var(--text-secondary); }
+
+/* Dark /50 came out at 4.45:1 on a tinted card, where the arithmetic on a
+   flat page said 4.58. 55% restores the margin. The light side already
+   clamps to 60%. */
+:root:not([data-mode="light"]) .text-base-content\/50 {
+    color: color-mix(in oklab, var(--color-base-content) 60%, #0000);
+}
+
+/* ── daisyUI's inactive tab, light mode ──────────────────────────────────
+   daisyui.trimmed.css paints an unselected tab at
+   `color-mix(in oklab, var(--color-base-content) 50%, transparent)`, which
+   measures **3.42:1** on the light page. Ten instances across /guide,
+   /investigation-memory and /executive-report, and it is vendored code, so
+   it is overridden here rather than edited.
+
+   The :not() list is daisyUI's own, copied exactly. Dropping any of it
+   would make this rule win over the ACTIVE tab too and repaint the accent
+   that marks which tab you are on. The [data-mode="light"] prefix supplies
+   the extra specificity. Dark mode already passes and is left alone. */
+[data-mode="light"] .tab:is(.tabs > .tab):not(:checked, label:has(:checked), :hover, .tab-active, [aria-selected="true"], [aria-current="true"], [aria-current="page"]) {
+    color: color-mix(in oklab, var(--color-base-content) 65%, transparent);
+}
+
+/* ── text-slate-600, the sibling of text-slate-500 ───────────────────────
+   45 uses, measured 4.41:1 on the light page. Same shape as slate-500: a
+   fixed palette value naming a swatch rather than a role, so it cannot
+   follow the mode. Dark already clears, so only light is overridden. */
+[data-mode="light"] .text-slate-600 { color: var(--text-muted); }
+
+/* htmx's loading affordance, defined here rather than injected.
+ *
+ * base.html sets includeIndicatorStyles:false, which stops htmx inserting
+ * its own stylesheet. That was correct when nothing used the class, but it
+ * also meant `hx-indicator` did nothing at all: the attribute is honoured,
+ * htmx adds .htmx-request, and no rule anywhere reacted to it. Every
+ * fragment conversion that wanted a spinner during a slow request found the
+ * affordance dead and fell back to hx-disabled-elt.
+ *
+ * Defining the pair in this sheet rather than re-enabling the injected one
+ * keeps it where a stylesheet sweep can see it, which is the whole premise
+ * of the redesign.
+ *
+ * Both forms: the indicator inside the requesting element, and the
+ * requesting element being the indicator. htmx supports both and a page
+ * using the second with only the first defined shows nothing.
+ */
+.htmx-indicator { display: none; }
+.htmx-request .htmx-indicator { display: inline-flex; }
+.htmx-request.htmx-indicator { display: inline-flex; }
+
+/* The in-flight state of a fragment swap, applied by static/js/htmx-busy.js
+ * to the element htmx is about to replace.
+ *
+ * htmx leaves the old content on screen until the response arrives, so on a
+ * slow query a filter change or a Refresh click looks like a click that did
+ * nothing, and the user clicks again. The JavaScript these fragments replace
+ * wrote a spinner into the container before every fetch, so the conversion
+ * lost a cue rather than never having had one.
+ *
+ * Dimmed rather than hidden or blanked, deliberately: the figures on screen
+ * are still the last ones that were actually read, and replacing them with a
+ * spinner throws away true information in order to show that newer
+ * information is coming. Fading says "this is being refreshed" while leaving
+ * it readable.
+ *
+ * pointer-events stays on. A control inside the region, including the one
+ * that retries, must not stop working because a request is in flight.
+ */
+.ion-busy {
+    opacity: 0.55;
+    transition: opacity 120ms ease-out;
+    cursor: progress;
+}
+
+/* The control the user actually touched, so a click registers visibly even
+ * when the region being replaced is elsewhere on the page. */
+button.htmx-request,
+select.htmx-request,
+input.htmx-request {
+    opacity: 0.6;
+    cursor: progress;
+}

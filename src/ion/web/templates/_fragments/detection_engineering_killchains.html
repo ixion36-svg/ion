@@ -1,0 +1,12 @@
+{% macro value(v) %}{{ v if v is not none else 'Unavailable' }}{% endmacro %}
+{% if state == 'failed' %}<div class="de-empty" role="alert">Failed to load use cases</div>
+{% elif state == 'empty' %}<div class="de-empty">No use cases found in TIDE</div>
+{% else %}{% for pb in playbooks %}<div class="de-kc"><div class="de-kc-title">{{ value(pb.get('name')) }}</div><div class="de-kc-desc">{{ value(pb.get('description')) }}</div>
+<div class="de-kc-chain">{% if pb.get('steps') is none %}<div class="de-empty">Steps unavailable</div>{% else %}{% for step in pb.steps %}
+{% if not loop.first %}<div class="de-kc-arrow">→</div>{% endif %}<div class="de-kc-node {{ step.coverage_state }}">
+<div class="de-kc-node-header">Step {{ value(step.get('order')) }}</div><div class="de-kc-node-name">{{ value(step.get('name')) }}</div>
+{% if step.get('tactic') %}<div>{{ step.tactic }}</div>{% endif %}
+<div class="mt-1">{% for tid in step.get('techniques') or [] %}<span class="de-mitre-chip">{{ tid }}</span> {% endfor %}</div>
+{% if step.get('required_rule') %}<div>Req: {{ step.required_rule }}</div>{% endif %}
+<div class="de-kc-node-rules">{% if step.get('techniques') is none %}Techniques unavailable{% elif not step.techniques %}No techniques linked{% elif step.rule_count is none %}Coverage unavailable{% elif step.enabled_rules > 0 %}<span class="ok">{{ step.enabled_rules }} enabled</span> / {{ step.rule_count }} rules{% elif step.rule_count > 0 %}<span class="warn">{{ step.rule_count }} rules (0 enabled)</span>{% else %}<span class="bad">No rules</span>{% endif %}</div>
+</div>{% endfor %}{% endif %}</div></div>{% endfor %}{% endif %}

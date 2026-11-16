@@ -13,8 +13,8 @@ Each timeline item is a plain dict:
     {"time": "14:32", "ts": <datetime>, "type": <slug>, "text": <str>,
      "source": "auto"|"logged", "ref": <optional id str>}
 
-Every source is wrapped in try/except so one failing source degrades that
-slice rather than breaking the page.
+Every source must be read successfully. A failed source raises so callers
+can distinguish an unreadable day from a quiet one.
 """
 
 from __future__ import annotations
@@ -90,8 +90,9 @@ def _manual_items(session: Session, user_id: int, start, end) -> List[Dict[str, 
                 # edit/delete (auto items are derived and not mutable here).
                 "id": r.id,
             })
-    except Exception as e:  # noqa: BLE001
-        logger.warning("worklog manual source failed: %s", e)
+    except Exception:  # noqa: BLE001
+        logger.exception("Worklog manual entries could not be read")
+        raise
     return out
 
 
@@ -121,8 +122,9 @@ def _case_items(session: Session, user_id: int, start, end) -> List[Dict[str, An
             suffix = f" as {str(reason).replace('_', ' ')}" if reason else ""
             out.append({"time": _hm(c.closed_at), "ts": c.closed_at, "type": "closed",
                         "text": f"Closed {label}{suffix}", "source": "auto", "ref": str(c.id)})
-    except Exception as e:  # noqa: BLE001
-        logger.warning("worklog case source failed: %s", e)
+    except Exception:  # noqa: BLE001
+        logger.exception("Worklog case activity could not be read")
+        raise
     return out
 
 
@@ -140,8 +142,9 @@ def _investigation_items(session: Session, user_id: int, start, end) -> List[Dic
             txt = "Ran an investigation" + (f" — verdict: {verdict}" if verdict else "")
             out.append({"time": _hm(inv.created_at), "ts": inv.created_at, "type": "playbook",
                         "text": txt, "source": "auto", "ref": str(getattr(inv, "id", "") or "")})
-    except Exception as e:  # noqa: BLE001
-        logger.warning("worklog investigation source failed: %s", e)
+    except Exception:  # noqa: BLE001
+        logger.exception("Worklog investigations could not be read")
+        raise
     return out
 
 
@@ -162,8 +165,9 @@ def _audit_items(session: Session, user_id: int, start, end) -> List[Dict[str, A
             typ, label = mapped
             out.append({"time": _hm(r.timestamp), "ts": r.timestamp, "type": typ,
                         "text": r.details or label, "source": "auto", "ref": None})
-    except Exception as e:  # noqa: BLE001
-        logger.warning("worklog audit source failed: %s", e)
+    except Exception:  # noqa: BLE001
+        logger.exception("Worklog audit activity could not be read")
+        raise
     return out
 
 
@@ -193,7 +197,7 @@ def get_day_activity(session: Session, user_id: int, day: date) -> Dict[str, Any
 
     return {
         "date": day.isoformat(),
-        "items": [{k: v for k, v in i.items() if k != "ts"} for i in items],
+        "items": [dict({k: v for k, v in i.items() if k != "ts"}, timestamp=i["ts"]) for i in items],
         "summary": {
             "active_span": span or "—",
             "triaged": triaged,
@@ -282,9 +286,9 @@ def get_team_today(session: Session, day: date) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
     try:
         users = session.query(User).filter(User.is_active.is_(True)).all()
-    except Exception as e:  # noqa: BLE001
-        logger.warning("worklog team users query failed: %s", e)
-        return out
+    except Exception:  # noqa: BLE001
+        logger.exception("Worklog team users could not be read")
+        raise
 
     for u in users:
         day_act = get_day_activity(session, u.id, day)
@@ -304,7 +308,8 @@ def get_team_today(session: Session, day: date) -> List[Dict[str, Any]]:
             if oc:
                 now_text = getattr(oc, "title", None) or f"case #{oc.id}"
         except Exception:  # noqa: BLE001
-            pass
+            logger.exception("Worklog current assignment could not be read")
+            raise
         last = items[0]["time"] if items else "—"
         out.append({
             "user_id": u.id,
@@ -313,6 +318,7 @@ def get_team_today(session: Session, day: date) -> List[Dict[str, Any]]:
             "now": now_text,
             "counts": day_act["summary"],
             "last_active": last,
+            "last_active_at": items[0].get("timestamp"),
         })
     out.sort(key=lambda r: r["counts"]["total"], reverse=True)
     return out

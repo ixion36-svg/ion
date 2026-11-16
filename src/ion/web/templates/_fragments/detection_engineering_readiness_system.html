@@ -1,0 +1,57 @@
+{% macro n(v) %}{{ v if v is not none else 'Unknown' }}{% endmacro %}
+{% if state == 'failed' %}
+<div class="de-empty" role="alert">{{ error }}</div>
+{% else %}
+{% set color='mitre-covered' if readiness_pct is not none and readiness_pct >= 75 else 'mitre-partial' if readiness_pct is not none and readiness_pct >= 50 else 'sev-critical' %}
+<div class="de-sys-readiness">
+<div class="flex justify-between items-center mb-2">
+<div>
+<div class="text-[.85rem] font-bold text-[var(--text-primary)]">{{ actor.get('name','Unknown') }} vs {{ system.name if system else 'Global (All TIDE Rules)' }}</div>
+<div class="text-[.72rem] text-[var(--text-secondary)] mt-0.5">{{ n(covered_count) }} covered, {{ n(gap_count) }} gaps, {{ n(total_ttps) }} total TTPs</div>
+</div>
+<button class="de-btn-pdf" data-click-action="deDownloadPdf" data-args='{{ [actor_id, actor_type]|tojson }}'>Download PDF</button>
+</div>
+<div class="de-readiness-gauge">
+<span class="text-[1.2rem] font-bold font-mono min-w-[50px]">{{ n(readiness_pct) }}{% if readiness_pct is not none %}%{% endif %}
+</span>
+<div class="de-readiness-bar">
+{% if readiness_pct is not none %}
+<div class="de-readiness-fill" data-ion-style="width:{{ readiness_pct }}%;background:var(--{{ color }})">
+</div>
+{% endif %}
+</div>
+</div>
+{% if ai_summary %}
+<div>{{ ai_summary }}</div>
+{% endif %}
+<table class="de-table mt-2">
+<thead>
+<tr>
+<th>Technique</th>
+<th>Status</th>
+<th>Rules</th>
+<th>Enabled</th>
+</tr>
+</thead>
+<tbody>
+{% for e in coverage_matrix %}
+<tr>
+<td>
+<span class="de-mitre-chip">{{ e.get('mitre_id','Unknown') }}</span> {{ e.get('name','') }}</td>
+<td>
+{% if e.get('covered') is none %}Unknown{% else %}
+<span class="{{ 'text-[var(--mitre-covered)]' if e.covered else 'text-[var(--mitre-gap)]' }} font-bold">{{ 'COVERED' if e.covered else 'GAP' }}</span>
+{% endif %}
+</td>
+<td class="mono">{{ n(e.get('rule_count')) }}</td>
+<td class="mono">{{ n(e.get('enabled_rules')) }}</td>
+</tr>
+{% else %}
+<tr>
+<td colspan="4">No techniques recorded</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% endif %}

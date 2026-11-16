@@ -1,0 +1,82 @@
+{# The bulk IOC lookup table on /tools.
+
+   Replaces two innerHTML writes: the "Looking up N IOCs..." placeholder
+   and the table.
+
+   The table it replaces reported every value as not found. Its hit test
+   was `data.found !== false && data.data && data.data.length > 0`, and
+   `data` is a key the enrichment response does not have, so the condition
+   was never true however much OpenCTI knew. `data.score || '-'` then
+   printed a dash for a measured score of zero.
+
+   One request now, not one per line: the page fetched /api/opencti/enrich
+   once per pasted line, sequentially and with no cap.
+
+   The header says what was asked and what was answered, because a bulk
+   lookup that stopped early is a page of indicators nobody checked and it
+   must not look like a page of indicators that came back clean. #}
+
+<div>
+  {% if failed %}
+  <p class="text-sm text-error">
+    The bulk lookup did not run. None of the {{ submitted }} indicator{{ '' if submitted == 1 else 's' }}
+    submitted has been checked; this is not a set of clean results.
+  </p>
+
+  {% else %}
+  {% if error %}
+  <p class="text-sm text-error">{{ error }}</p>
+  {% endif %}
+
+  <p class="text-sm opacity-60">
+    {{ submitted }} indicator{{ '' if submitted == 1 else 's' }} looked up.
+    {%- if found_count is not none %}
+    {{ found_count }} known to OpenCTI.
+    {%- else %}
+    How many are known was not reported.
+    {%- endif %}
+    {%- if dropped %}
+    <strong>{{ dropped }} not looked up:</strong> this runs at most
+    {{ limit }} at a time, so those are unchecked rather than clean.
+    {%- endif %}
+  </p>
+
+  {% if not rows %}
+  <p class="text-sm opacity-60">
+    The lookup returned no rows at all, which is not the same as every
+    indicator being unknown. Nothing here has been checked.
+  </p>
+  {% else %}
+  <div class="overflow-x-auto">
+    <table class="data-table">
+      <tr><th>IOC</th><th>Type</th><th>Score</th><th>Status</th></tr>
+      {% for row in rows %}
+      <tr data-ioc-export
+          data-value="{{ row.value }}"
+          data-type="{{ row.label }}"
+          data-score="{% if row.score is not none %}{{ row.score }}{% endif %}"
+          data-found="{% if row.found is not none %}{{ 'yes' if row.found else 'no' }}{% endif %}">
+        <td><code class="font-mono text-[12px]">{{ row.value }}</code></td>
+        <td>{{ row.label }}</td>
+        <td>
+          {%- if row.score is not none %}{{ row.score }}
+          {%- else %}<span class="opacity-60">&#8212;</span>{% endif -%}
+        </td>
+        <td>
+          {%- if row.error %}
+          <span class="badge badge-sm badge-error">not checked</span>
+          {%- elif row.found is none %}
+          <span class="opacity-60">no answer</span>
+          {%- elif row.found %}
+          <span class="badge badge-sm badge-success">Found</span>
+          {%- else %}
+          <span class="opacity-60">Not found</span>
+          {%- endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% endif %}
+  {% endif %}
+</div>

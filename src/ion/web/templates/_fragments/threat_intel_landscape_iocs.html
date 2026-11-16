@@ -1,0 +1,50 @@
+{# Threat Intel Overview: the high-score IOC card.
+
+   Replaces three innerHTML sites in loadOverviewIOCs. Same three outcomes
+   as the actors card, and the same defect: the catch rendered "IOCs
+   unavailable, OpenCTI not configured?" as a guess with a question mark,
+   while the 503 behind it says "OpenCTI integration is not configured".
+
+   The empty state wording keeps the threshold in it, because "no
+   high-score IOCs" is only meaningful alongside the score it was measured
+   against. #}
+
+{% if not configured %}
+  <div class="text-slate-500 text-sm">
+    OpenCTI is not configured, so there is no indicator feed to score. This
+    is a deployment setting rather than a fault.
+  </div>
+{% elif failed or rows is none %}
+  <div class="text-ion-coral text-sm" role="alert">
+    The indicator feed could not be read from OpenCTI. OpenCTI is
+    configured, so no conclusion about current indicators can be drawn from
+    this card.
+    {% if error %}<span class="font-mono text-[10px] opacity-80 ml-1">({{ error }})</span>{% endif %}
+  </div>
+{% elif not rows %}
+  <div class="text-slate-500 text-sm">No high-score IOCs at this threshold.</div>
+{% else %}
+  <div class="space-y-1.5">
+    {% for i in rows %}
+      {# The colour bands are the page's own: 90 and above red, 70 and above
+         amber, else slate. `i.score || 0` sent an unscored indicator
+         through those comparisons as a zero and painted it slate, which is
+         the same treatment as a genuinely low score. An unscored indicator
+         says so instead. #}
+      {% set scored = i.score is not none %}
+      {% if not scored %}{% set cls = 'text-slate-600' %}
+      {% elif i.score >= 90 %}{% set cls = 'text-red-400' %}
+      {% elif i.score >= 70 %}{% set cls = 'text-amber-400' %}
+      {% else %}{% set cls = 'text-slate-400' %}{% endif %}
+      <div class="flex items-center gap-3 py-1">
+        <span class="font-mono text-[11px] font-bold w-7 text-right {{ cls }}"
+              {% if not scored %}title="This indicator carries no score"{% endif %}>
+          {{- i.score if scored else '?' -}}
+        </span>
+        <span class="text-[10px] text-slate-500 font-mono w-20">{{ i.ioc_type }}</span>
+        <span class="text-xs text-slate-200 font-mono truncate flex-1">{{ i.ioc_value }}</span>
+        <span class="text-[10px] text-slate-500">{{ i.source or '' }}</span>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}

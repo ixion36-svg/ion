@@ -12,6 +12,7 @@ import httpx
 
 from ion.core.circuit_breaker import tide_breaker
 from ion.core.config import get_ssl_verify, get_tide_config
+from ion.services import attack_catalogue
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,63 @@ logger = logging.getLogger(__name__)
 # literal and, unlike the escaped string params, has no other guard. Rejecting
 # anything outside this set is what keeps `WHERE space = '{self.space}'` safe.
 _SPACE_RE = re.compile(r"^[A-Za-z0-9_.\- ]{1,64}$")
+
+#: TIDE refuses any statement longer than this. Documented in the upstream
+#: README (github.com/sigeauk/tide) alongside the SELECT/WITH-only rule and
+#: the keyword blocklist. Queries here are hand-built strings, so this is a
+#: real ceiling: anything that interpolates a list of unknown length can
+#: cross it, and the rejection comes back as a 4xx that _query turns into
+#: None, which every caller reads as "no rows".
+_MAX_SQL_CHARS = 4000
+
+
+def _strip_sql_comments(sql: str) -> str:
+    """Drop ``--`` comments, leaving quoted text alone.
+
+    TIDE refuses a statement if a word like LOAD, SET or UPDATE appears
+    anywhere in it, comments included, so an explanatory comment such as
+    "load-bearing" took down the whole posture query.
+    """
+    out, i, n, quoted = [], 0, len(sql), False
+    while i < n:
+        ch = sql[i]
+        if ch == "'":
+            quoted = not quoted
+        elif not quoted and sql.startswith("--", i):
+            end = sql.find("\n", i)
+            i = n if end == -1 else end
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def _quoted_id_batches(ids, budget: int):
+    """Split ids into quoted SQL list fragments, each at most `budget` chars.
+
+    Measured 2026-10-12 against the technique-coverage query, whose body is
+    439 characters: that leaves room for roughly 296 subtechnique ids or 445
+    parent ids in one statement. A baseline playbook can list more, and the
+    rejection used to surface as an empty coverage map, which the caller then
+    rendered as every technique having no rules. A query too long to send was
+    being drawn as a total absence of detection.
+
+    Also escapes each id. The previous inline f-string did not, so a quote
+    inside a technique id broke the statement.
+    """
+    batch: list[str] = []
+    size = 0
+    for raw in ids:
+        token = "'" + str(raw).replace("'", "''") + "'"
+        extra = len(token) + (1 if batch else 0)
+        if batch and size + extra > budget:
+            yield ",".join(batch)
+            batch, size = [token], len(token)
+        else:
+            batch.append(token)
+            size += extra
+    if batch:
+        yield ",".join(batch)
 
 
 # Per-process micro-cache for identical SQL within a short window. Detection
@@ -93,6 +151,12 @@ def _cache_put(sql: str, value: Optional[dict]) -> None:
 class TideService:
     """Client for TIDE's /api/external/query endpoint."""
 
+    # Learnt once from TIDE's schema; None until asked. Whether baselines are
+    # copied per system (TIDE 6), and whether rule scores are percentages
+    # (TIDE 5.1+).
+    _per_system_baselines: Optional[bool] = None
+    _percent_scores: Optional[bool] = None
+
     def __init__(self):
         cfg = get_tide_config()
         self.url = (cfg.get("url") or "").rstrip("/")
@@ -135,6 +199,21 @@ class TideService:
 
     def _query(self, sql: str, retries: int = 1) -> Optional[dict]:
         if not self.enabled:
+            return None
+
+        # 0. Length ceiling. TIDE refuses any statement over _MAX_SQL_CHARS,
+        #    and refuses it as a 4xx that this method turns into None. Every
+        #    caller reads None as "no rows", so an over-long query arrives as
+        #    an absence of data rather than as an error. Catching it here
+        #    names the offender in the log instead of leaving a page quietly
+        #    reporting zero coverage. See _quoted_id_batches.
+        sql = _strip_sql_comments(sql)
+        if len(sql) > _MAX_SQL_CHARS:
+            logger.error(
+                "TIDE query is %d chars, over the %d limit, so it was not sent. "
+                "Build it with _quoted_id_batches. sql=%s",
+                len(sql), _MAX_SQL_CHARS, sql[:200],
+            )
             return None
 
         # 1. Cache hit short-circuits everything (including 504 storms).
@@ -304,7 +383,11 @@ class TideService:
                     "TIDE query failed: HTTP %d: %s | sql=%s",
                     resp.status_code, detail, sql[:60],
                 )
-                tide_breaker.record_failure()
+                # A 400 is TIDE refusing this one statement, so TIDE is up.
+                # Counting it opened the breaker after three refusals and
+                # cut every other TIDE read off with them.
+                if resp.status_code != 400:
+                    tide_breaker.record_failure()
                 _cache_put(sql, None)
                 return None
 
@@ -423,20 +506,20 @@ class TideService:
         # system_id is user-controlled; escape the single-quote break-out.
         safe_id = system_id.replace("'", "''")
         # Techniques covered by this system's detections
+        # dr.enabled = 1: a rule applied to this system but switched off is
+        # not covering anything on it. Applied and running are different
+        # facts, and only the second one detects an intrusion.
         covered = self._query(f"""
             SELECT DISTINCT t.technique_id
             FROM applied_detections ad
             JOIN detection_rules dr ON dr.rule_id = ad.detection_id AND dr.space = '{self.space}',
             LATERAL unnest(dr.mitre_ids) AS t(technique_id)
-            WHERE ad.system_id = '{safe_id}'
+            WHERE ad.system_id = '{safe_id}' AND dr.enabled = 1
         """)
         covered_ids = {r["technique_id"] for r in (covered["rows"] if covered else [])}
 
-        # All techniques in the MITRE database
-        all_tech = self._query(
-            "SELECT id as technique_id, name, tactic FROM mitre_techniques ORDER BY id"
-        )
-        techniques = all_tech["rows"] if all_tech else []
+        # The catalogue is ION's own: TIDE 6 does not serve it (see attack_catalogue).
+        techniques = [dict(t) for t in attack_catalogue.techniques()]
 
         return {
             "covered": list(covered_ids),
@@ -449,13 +532,8 @@ class TideService:
         if not self.enabled:
             return None
 
-        # 1. All known MITRE techniques
-        all_tech = self._query(
-            "SELECT id as technique_id, name, tactic FROM mitre_techniques ORDER BY id"
-        )
-        if not all_tech:
-            return None
-        techniques = all_tech["rows"]
+        # 1. All known MITRE techniques, from ION's catalogue (see attack_catalogue).
+        techniques = [dict(t) for t in attack_catalogue.techniques()]
         tech_catalog = {t["technique_id"]: t for t in techniques}
 
         # 2. Per-technique rule stats (LATERAL unnest for DuckDB compatibility)
@@ -524,9 +602,23 @@ class TideService:
                 if entry not in sys_map[parent]:
                     sys_map[parent].append(entry)
 
-        # 4. Build result
+        # 4. Build result.
+        #
+        # Three states, not two. A technique whose rules are all switched off
+        # is neither covered nor untouched: someone wrote the detection and
+        # nothing is running it. That is a different problem from having no
+        # rule at all, and a cheaper one, because enabling beats authoring.
+        # Collapsing it into either bucket destroys the only fact that tells
+        # them apart.
+        #
+        # Measured on the live tenant 2026-10-12: 164 techniques had a rule
+        # and 94 had an enabled one. The previous test counted a technique as
+        # covered the moment any rule mentioned it, so 70 techniques were
+        # reported as covered by rules nothing was running, and none of them
+        # appeared as a gap anywhere.
         result_techs = {}
         covered_ids = set()
+        inactive_ids = []
         blind_spots = []
         for tid, info in tech_catalog.items():
             entry = {
@@ -540,10 +632,14 @@ class TideService:
             }
             if tid in stats_map:
                 entry.update(stats_map[tid])
-                covered_ids.add(tid)
             if tid in sys_map:
                 entry["systems"] = sys_map[tid]
-            if entry["rule_count"] == 0:
+
+            if (entry.get("enabled_rules") or 0) > 0:
+                covered_ids.add(tid)
+            elif (entry.get("rule_count") or 0) > 0:
+                inactive_ids.append(tid)
+            else:
                 blind_spots.append(tid)
             result_techs[tid] = entry
 
@@ -557,7 +653,13 @@ class TideService:
             "techniques": result_techs,
             "total_techniques": len(tech_catalog),
             "covered_techniques": len(covered_ids),
+            # Rules written, none switched on. Kept apart from blind_spots so
+            # a reader can tell "nobody built this" from "nobody turned it on".
+            "inactive_techniques": inactive_ids,
             "blind_spots": blind_spots,
+            # Stated rather than left to be inferred from the name. "Covered"
+            # here means something is actually running, not that a rule exists.
+            "coverage_basis": "at least one enabled rule",
             "total_rules": total_rules,
         }
 
@@ -574,6 +676,7 @@ class TideService:
         if not self.enabled:
             return None
 
+        excellent, good, fair = self._quality_bands()
         # Round-trip 1: everything from detection_rules + mitre coverage in ONE CTE query.
         result = self._query(f"""
             WITH
@@ -587,10 +690,10 @@ class TideService:
                     count(*) FILTER (WHERE enabled = 1) AS enabled_rules,
                     count(*) FILTER (WHERE enabled = 0) AS disabled_rules,
                     count(*) FILTER (WHERE mitre_ids IS NULL OR len(mitre_ids) = 0) AS unmapped_rules,
-                    count(*) FILTER (WHERE quality_score >= 30) AS q_excellent,
-                    count(*) FILTER (WHERE quality_score >= 20 AND quality_score < 30) AS q_good,
-                    count(*) FILTER (WHERE quality_score >= 10 AND quality_score < 20) AS q_fair,
-                    count(*) FILTER (WHERE quality_score < 10) AS q_poor,
+                    count(*) FILTER (WHERE quality_score >= {excellent}) AS q_excellent,
+                    count(*) FILTER (WHERE quality_score >= {good} AND quality_score < {excellent}) AS q_good,
+                    count(*) FILTER (WHERE quality_score >= {fair} AND quality_score < {good}) AS q_fair,
+                    count(*) FILTER (WHERE quality_score < {fair}) AS q_poor,
                     round(avg(quality_score), 1) AS avg_quality,
                     min(quality_score) AS min_quality,
                     max(quality_score) AS max_quality
@@ -605,9 +708,14 @@ class TideService:
                 GROUP BY severity
             ),
             coverage AS (
+                -- enabled = 1 is load-bearing. This figure reaches SOC
+                -- Health as technique_coverage_pct and then the detection
+                -- coverage grade; without it a technique counted as covered
+                -- because a disabled rule mentioned it. Measured on the live
+                -- tenant: 164 techniques had a rule, 94 had an enabled one.
                 SELECT count(DISTINCT t.technique_id) AS covered
                 FROM rules r, LATERAL unnest(r.mitre_ids) AS t(technique_id)
-                WHERE r.mitre_ids IS NOT NULL
+                WHERE r.mitre_ids IS NOT NULL AND r.enabled = 1
             )
             SELECT
                 t.*,
@@ -636,16 +744,17 @@ class TideService:
             except Exception:
                 pass
 
-        # Round-trip 2: counts from mitre_techniques + systems (small, fast tables).
+        # Round-trip 2: the systems count.
         counts = self._query(
-            "SELECT (SELECT count(*) FROM mitre_techniques) AS total_techniques, "
-            "(SELECT count(*) FROM systems) AS total_systems"
+            "SELECT (SELECT count(*) FROM systems) AS total_systems"
         )
-        total_techniques = 0
         total_systems = 0
         if counts and counts["rows"]:
-            total_techniques = counts["rows"][0].get("total_techniques", 0)
             total_systems = counts["rows"][0].get("total_systems", 0)
+
+        # TIDE 6 moved the ATT&CK catalogue into a reference database its query
+        # API refuses to read, so the total comes from ION's own catalogue.
+        total_techniques = len(attack_catalogue.techniques())
 
         return {
             "total_rules": r["total_rules"],
@@ -653,6 +762,7 @@ class TideService:
             "disabled_rules": r["disabled_rules"],
             "severity": severity,
             "quality": {
+                "scale": "percent" if self._scores_are_percentages() else "points",
                 "excellent": r["q_excellent"],
                 "good": r["q_good"],
                 "fair": r["q_fair"],
@@ -682,6 +792,41 @@ class TideService:
         """)
         return result["rows"] if result else []
 
+    # Lower bounds of the excellent, good and fair quality bands. TIDE 5.1
+    # moved rule scores from points (about 0-40) to a percentage; the
+    # percentage bands follow TIDE's own colouring (green from 80, amber from 50).
+    _POINT_BANDS = (30, 20, 10)
+    _PERCENT_BANDS = (80, 50, 25)
+
+    def _scores_are_percentages(self) -> bool:
+        """True from TIDE 5.1. Scoring v2 arrived with checkedRule.rule_id,
+        a tenant table every TIDE creates up front (rule_score_history, which
+        carries scoring_version, only exists once rules have been synced).
+        Assumed until TIDE can be asked, since current TIDE scores that way."""
+        if self._percent_scores is None:
+            if self._query("SELECT count(*) AS n FROM checkedRule") is None:
+                return True
+            self._percent_scores = (
+                self._query("SELECT rule_id FROM checkedRule LIMIT 0") is not None
+            )
+        return self._percent_scores
+
+    def _quality_bands(self) -> tuple[int, int, int]:
+        return self._PERCENT_BANDS if self._scores_are_percentages() else self._POINT_BANDS
+
+    def _baselines_are_per_system(self) -> Optional[bool]:
+        """True on TIDE 6, where playbooks carry a system_id; None if TIDE
+        could not be asked. The external query API refuses schema lookups,
+        so the column itself is the probe: when the table answers and the
+        column is refused, the column is absent."""
+        if self._per_system_baselines is None:
+            if self._query("SELECT count(*) AS n FROM playbooks") is None:
+                return None
+            self._per_system_baselines = (
+                self._query("SELECT system_id FROM playbooks LIMIT 0") is not None
+            )
+        return self._per_system_baselines
+
     def get_playbooks_with_kill_chains(self) -> list[dict]:
         """Return playbooks (baselines) with steps, techniques, detections, and system coverage.
 
@@ -693,7 +838,14 @@ class TideService:
         """
         if not self.enabled:
             return []
-        pb = self._query("SELECT id, name, description FROM playbooks ORDER BY name")
+        per_system = self._baselines_are_per_system()
+        if per_system is None:
+            return []
+        # TIDE 6 gives every system its own copy of each baseline it applies,
+        # in the same table. The catalogue is the templates, the rows with no
+        # system; listing every row showed each baseline once per system.
+        where = "WHERE system_id IS NULL " if per_system else ""
+        pb = self._query(f"SELECT id, name, description FROM playbooks {where}ORDER BY name")
         if not pb or not pb["rows"]:
             return []
         playbooks = pb["rows"]
@@ -746,36 +898,64 @@ class TideService:
             p["steps"] = step_list
 
             # Get systems that have this baseline applied
-            sys_result = self._query(f"""
-                SELECT sb.system_id, s.name as system_name
-                FROM system_baselines sb
-                JOIN systems s ON s.id = sb.system_id
-                WHERE sb.playbook_id = '{p["id"]}'
-                ORDER BY s.name
-            """)
+            if per_system:
+                # A system's link points at its own copy, and TIDE 6 cleared
+                # the copy's template_id, so the copy is found by name.
+                safe_name = str(p["name"]).replace("'", "''")
+                sys_result = self._query(f"""
+                    SELECT DISTINCT pc.system_id, s.name as system_name
+                    FROM playbooks pc
+                    JOIN systems s ON s.id = pc.system_id
+                    WHERE pc.system_id IS NOT NULL AND pc.name = '{safe_name}'
+                    ORDER BY s.name
+                """)
+            else:
+                sys_result = self._query(f"""
+                    SELECT sb.system_id, s.name as system_name
+                    FROM system_baselines sb
+                    JOIN systems s ON s.id = sb.system_id
+                    WHERE sb.playbook_id = '{safe_pid}'
+                    ORDER BY s.name
+                """)
             p["applied_systems"] = sys_result["rows"] if sys_result else []
 
             # For each technique in steps, get rule coverage
             if all_tids:
-                tid_list = ",".join(f"'{t}'" for t in all_tids)
-                cov = self._query(f"""
-                    SELECT t.technique_id,
-                           count(DISTINCT dr.rule_id) as rule_count,
-                           count(DISTINCT dr.rule_id) FILTER (WHERE dr.enabled = 1) as enabled_rules
-                    FROM detection_rules dr, LATERAL unnest(dr.mitre_ids) AS t(technique_id)
-                    WHERE dr.space = '{self.space}' AND t.technique_id IN ({tid_list})
-                    GROUP BY t.technique_id
-                """)
+                # Built as prefix + ids + suffix so the budget is exact by
+                # construction rather than a guessed headroom figure.
+                prefix = (
+                    "SELECT t.technique_id, "
+                    "count(DISTINCT dr.rule_id) as rule_count, "
+                    "count(DISTINCT dr.rule_id) FILTER (WHERE dr.enabled = 1) "
+                    "as enabled_rules "
+                    "FROM detection_rules dr, "
+                    "LATERAL unnest(dr.mitre_ids) AS t(technique_id) "
+                    f"WHERE dr.space = '{self.space}' AND t.technique_id IN ("
+                )
+                suffix = ") GROUP BY t.technique_id"
+                budget = _MAX_SQL_CHARS - len(prefix) - len(suffix)
+
                 cov_map = {}
-                if cov:
+                measured = True
+                for id_list in _quoted_id_batches(sorted(all_tids), budget):
+                    cov = self._query(prefix + id_list + suffix)
+                    if cov is None:
+                        # One failed batch means the map is incomplete, and an
+                        # incomplete map is indistinguishable from "these
+                        # techniques have no rules". Say it is unmeasured
+                        # rather than let a reader draw the wrong conclusion.
+                        measured = False
+                        continue
                     for r in cov["rows"]:
                         cov_map[r["technique_id"]] = {
                             "rule_count": r["rule_count"],
                             "enabled_rules": r["enabled_rules"],
                         }
                 p["technique_coverage"] = cov_map
+                p["technique_coverage_measured"] = measured
             else:
                 p["technique_coverage"] = {}
+                p["technique_coverage_measured"] = True
 
         return playbooks
 
@@ -828,19 +1008,21 @@ class TideService:
         if not self.enabled:
             return None
 
-        # 1. All techniques
-        all_tech = self._query(
-            "SELECT id AS technique_id, name, tactic FROM mitre_techniques ORDER BY tactic, id"
+        # 1. All techniques, from ION's catalogue (see attack_catalogue).
+        techniques = sorted(
+            (dict(t) for t in attack_catalogue.techniques()),
+            key=lambda t: (t["tactic"] is None, t["tactic"] or "", t["technique_id"]),
         )
-        if not all_tech:
-            return None
-        techniques = all_tech["rows"]
 
-        # 2. Covered techniques
+        # 2. Covered techniques. enabled = 1, so a gap analysis cannot clear a
+        # tactic on the strength of rules nobody switched on. This function
+        # reports total_blind_spots, which is exactly the number that must not
+        # be flattered.
         covered = self._query(f"""
             SELECT DISTINCT t.technique_id
             FROM detection_rules dr, LATERAL unnest(dr.mitre_ids) AS t(technique_id)
             WHERE dr.space = '{self.space}' AND dr.mitre_ids IS NOT NULL
+              AND dr.enabled = 1
         """)
         covered_set: set[str] = set()
         if covered:
@@ -868,11 +1050,12 @@ class TideService:
         """)
         unmapped_rules = unmapped["rows"] if unmapped else []
 
+        _, good, _ = self._quality_bands()
         quick = self._query(f"""
             SELECT DISTINCT rule_id, name, severity, quality_score, mitre_ids
             FROM detection_rules
             WHERE space = '{self.space}' AND enabled = 0
-              AND quality_score >= 20 AND severity IN ('critical', 'high')
+              AND quality_score >= {good} AND severity IN ('critical', 'high')
             ORDER BY quality_score DESC, severity
             LIMIT 20
         """)

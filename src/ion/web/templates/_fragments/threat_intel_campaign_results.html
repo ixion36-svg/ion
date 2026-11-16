@@ -1,0 +1,72 @@
+{# Threat Intel: campaign search results from OpenCTI.
+
+   The actor table's twin, seven columns rather than nine: campaigns carry
+   no origin and no type list. Replaces six innerHTML sites in
+   searchCampaigns.
+
+   Same four outcomes as the actor table, and the same defect behind them:
+   `fetch(...).then(r => r.json())` with no r.ok, so a 503 from an
+   unconfigured OpenCTI arrived as {"detail": ...} and rendered through the
+   data.detail branch into the ti-empty class, which is the no-results
+   styling. #}
+
+{% from "_fragments/_time.html" import ts %}
+{% from "_fragments/_threat_intel_cells.html" import aliases, confidence, labels, watch_cell %}
+
+{# The resting state, before anything has been searched for. It is a
+   branch rather than markup left in the page shell, because the shell's
+   copy would survive a search and sit above the results. #}
+{% if prompt %}
+  <div class="ti-empty">Enter a search term to query OpenCTI for campaigns.</div>
+{% elif not configured %}
+  <div class="ti-empty">
+    OpenCTI is not configured, so campaigns cannot be searched. This is a
+    deployment setting rather than a fault, and the search will work once
+    OpenCTI is wired up.
+  </div>
+{% elif failed %}
+  <div class="ti-empty text-[var(--danger)]" role="alert">
+    The search for {{ q }} did not complete. OpenCTI is configured, so this
+    is a fault rather than an absence of matches, and searching again may
+    succeed.
+    {% if error %}<span class="font-mono text-[10px] opacity-80 ml-1">({{ error }})</span>{% endif %}
+  </div>
+{% elif campaigns is none %}
+  <div class="ti-empty text-[var(--danger)]" role="alert">
+    OpenCTI answered the search for {{ q }} with something this table
+    cannot read, so it cannot say whether anything matched.
+  </div>
+{% elif not campaigns %}
+  <div class="ti-empty">No campaigns found for {{ q }}.</div>
+{% else %}
+<table class="ti-table">
+  <thead>
+    <tr>
+      <th>Name</th><th>Aliases</th><th>Confidence</th>
+      <th>First Seen</th><th>Last Seen</th><th>Labels</th><th>Watch</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for c in campaigns %}
+      <tr>
+        <td class="ti-name-cell"
+            hx-get="/ui/threat-intel/campaign-detail?entity_id={{ c.id|urlencode }}"
+            hx-target="#campaign-detail-{{ loop.index0 }}"
+            hx-swap="innerHTML"
+            data-click-action="tiToggleDetailRow"
+            data-args='["campaign-detail-{{ loop.index0 }}"]'
+            title="Show detail">{{ c.name }}</td>
+        <td>{{ aliases(c.aliases) }}</td>
+        <td>{{ confidence(c.confidence) }}</td>
+        <td>{{ ts(c.first_seen, 'date', fallback='-') }}</td>
+        <td>{{ ts(c.last_seen, 'date', fallback='-') }}</td>
+        <td>{{ labels(c.labels) }}</td>
+        <td>{{ watch_cell('campaign', c, can_manage, watched_ids) }}</td>
+      </tr>
+      <tr class="ti-detail-row" id="campaign-detail-{{ loop.index0 }}">
+        <td colspan="7"><div class="ti-loading"><span class="ti-spinner"></span> Loading detail...</div></td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}

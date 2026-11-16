@@ -1,0 +1,391 @@
+{# The security dashboard for /security, and the event-detail modal body.
+
+   Replaces the innerHTML writes in security_dashboard.html. The markup is
+   the same cards, badges and rows that script built, so the page's own
+   stylesheet still reaches them.
+
+   The card chrome is here. The severity select, the window select, Refresh
+   and Export are not: they live in the page shell, outside this swap
+   target, so a failed render cannot take away the control that retries.
+   The selects send their state with hx-include.
+
+   The Block IP button is the exception. It belongs to the blocked-IP card,
+   and that card is inside the one dashboard swap, so the page shell has
+   nowhere else to hang it. It is rendered on every branch of that card,
+   including the failed read, for that reason. It has no state of its own.
+
+   The status select is the other exception, on the event panel only. Only
+   the loaded event knows which option is current, so the select is
+   re-rendered with that option marked. The failure branch omits it: there
+   is no status to change. Close stays in the page shell.
+
+   Every control that writes is behind can_manage, which is security:manage
+   off the viewer. Block, quick-block, unblock and the status select are the
+   four, and the API gates all four on that permission while gating the five
+   reads on security:read. A viewer holding only the read sees the dashboard
+   and none of those controls, rather than a button whose only possible
+   answer is 403. The Actions column goes with its buttons: a column of
+   blanks is not information, so the header and the cells are gated
+   together and the empty and failed rows span the columns that exist.
+
+   A quick block of an address already on the block list is the one control
+   whose effect depends on the record. The repository upserts, so it would
+   replace a permanent block with sixty minutes. The server accepts that,
+   so the control is not withheld; its title says what it would do. Three
+   states: blocked_addresses is None when the block list could not be read,
+   and an unknown block state must not be rendered as "not blocked".
+
+   No stored URL is rendered as a link. Request paths, query strings and
+   payloads are evidence and are printed as text, which Jinja escapes. A
+   javascript: value in one of those columns is text, not an href, so
+   |safe_url has no site here. The export download is a same-origin URL
+   the page script builds from a whitelist, not a stored column.
+
+   Timestamps go through the ts macro. A server-formatted clock would show
+   an analyst in another timezone the wrong time, which is what
+   toLocaleString() was doing with a zoneless value and getting away with
+   only because the browser parsed it as local. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% if panel == 'event' %}
+  {% if failed or event is none %}
+    <div role="alert" class="alert alert-error">
+      This event could not be read. This is not an empty record: the query
+      failed, so its severity, source and payload are unknown. Close this
+      dialog and open the event again to retry.
+    </div>
+  {% else %}
+    {% if event.payload %}
+      <div role="alert" class="alert alert-error mb-4">
+        <div class="w-full">
+          <div class="font-semibold mb-3"><i class="icon-alert-triangle"></i> Detected Payload / Trigger Data</div>
+          <div class="flex flex-col gap-3">
+            {% for section in event.payload %}
+              <div class="bg-base-content/5 p-3 rounded">
+                <div class="text-xs uppercase opacity-70 mb-2">{{ section.label }}</div>
+                <pre class="{{ section.css }} p-3 rounded font-mono text-xs overflow-auto whitespace-pre-wrap break-all max-h-[200px] m-0">{{ section.text }}</pre>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    {% endif %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="p-2 bg-base-200 rounded">
+        <div class="text-xs uppercase opacity-70">Event Type</div>
+        <div class="font-medium break-all">{{ event.type_label if event.type_label is not none else '-' }}</div>
+      </div>
+      <div class="p-2 bg-base-200 rounded">
+        <div class="text-xs uppercase opacity-70">Severity</div>
+        <div class="font-medium break-all"><span class="{{ event.severity_class }}">{{ event.severity if event.severity is not none else '-' }}</span></div>
+      </div>
+      <div class="p-2 bg-base-200 rounded">
+        <div class="text-xs uppercase opacity-70">Source IP</div>
+        <div class="font-medium break-all font-mono">{{ event.source_ip if event.source_ip is not none else '-' }}</div>
+      </div>
+      <div class="p-2 bg-base-200 rounded">
+        <div class="text-xs uppercase opacity-70">Username</div>
+        <div class="font-medium break-all">{{ event.username if event.username is not none else '-' }}</div>
+      </div>
+      <div class="p-2 bg-base-200 rounded">
+        <div class="text-xs uppercase opacity-70">Request Path</div>
+        <div class="font-medium break-all">{{ event.request_path if event.request_path is not none else '-' }}</div>
+      </div>
+      <div class="p-2 bg-base-200 rounded">
+        <div class="text-xs uppercase opacity-70">Request Method</div>
+        <div class="font-medium break-all">{{ event.request_method if event.request_method is not none else '-' }}</div>
+      </div>
+      <div class="p-2 bg-base-200 rounded">
+        <div class="text-xs uppercase opacity-70">First Seen</div>
+        <div class="font-medium break-all">{{ ts(event.first_seen) }}</div>
+      </div>
+      <div class="p-2 bg-base-200 rounded">
+        <div class="text-xs uppercase opacity-70">Last Seen</div>
+        <div class="font-medium break-all">{{ ts(event.last_seen) }}</div>
+      </div>
+      <div class="p-2 bg-base-200 rounded">
+        <div class="text-xs uppercase opacity-70">Event Count</div>
+        <div class="font-medium break-all" id="detail-event-count">{% if event.event_count is not none %}{{ event.event_count }}{% else %}—{% endif %}</div>
+      </div>
+      <div class="p-2 bg-base-200 rounded">
+        <div class="text-xs uppercase opacity-70">Confidence Score</div>
+        <div class="font-medium break-all" id="detail-confidence">{% if event.confidence_score is not none %}{{ event.confidence_score }}%{% else %}—{% endif %}</div>
+      </div>
+      <div class="p-2 bg-base-200 rounded col-span-2">
+        <div class="text-xs uppercase opacity-70">User Agent</div>
+        <div class="font-medium break-all">{{ event.user_agent if event.user_agent is not none else '-' }}</div>
+      </div>
+      <div class="p-2 bg-base-200 rounded col-span-2">
+        <div class="text-xs uppercase opacity-70">Description</div>
+        <div class="font-medium break-all">{{ event.description if event.description is not none else '-' }}</div>
+      </div>
+    </div>
+    {% if event.patterns %}
+      <div class="mt-4 p-4 bg-base-200 rounded">
+        <div class="font-semibold mb-2">Matched Detection Patterns</div>
+        <ul class="font-mono text-sm list-none p-0">
+          {% for pattern in event.patterns %}
+            <li class="py-1 border-b border-base-content/10">{{ pattern }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+    {# Re-rendered with the event's status because the shell cannot know
+       which option is current. The Close button is not here: it stays in
+       the modal footer, outside the swap, so a failed read still has a way
+       out. This failure branch does not render the select at all.
+
+       PATCH /api/security/events/{id}/status is security:manage, so a
+       read-only viewer gets the record and not the select. The status it
+       already has is on the pill in the table row either way.
+
+       data-event-id is the event this select belongs to, and the handler
+       patches that id rather than one the opener stored. htmx leaves the
+       previous event's body on screen until this swap lands, so a change
+       inside that window would otherwise send the previous event's status
+       to the newly opened event's id. An id of None cannot be addressed by
+       PATCH /events/{id}/status, so there is no select for it. #}
+    {% if can_manage and event.id is not none %}
+      <div class="mt-4">
+        <select id="event-status-select" class="select select-sm w-auto"
+                data-event-id="{{ event.id }}" data-change-action="updateEventStatus">
+          {% for value, label in statuses %}
+            <option value="{{ value }}" {% if value == event.status %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    {% endif %}
+  {% endif %}
+{% else %}
+
+{% if summary_failed %}
+  <div role="alert" class="alert alert-error mb-6" id="threat-banner">
+    The threat summary could not be read. This is not an all-clear: the
+    threat level and the last-hour count are unknown rather than normal or
+    zero. Refresh to try again.
+  </div>
+{% else %}
+  <div class="alert alert-info mb-6 flex flex-wrap items-center justify-between gap-4" id="threat-banner" role="alert">
+    <div class="threat-level flex items-center gap-4 {{ summary.level_class }}">
+      <span class="threat-icon text-2xl"><i class="icon-shield-alert"></i></span>
+      <span class="threat-text text-xl font-semibold">Threat Level: {% if summary.threat_level is not none %}{{ summary.threat_level|upper }}{% else %}UNKNOWN{% endif %}</span>
+    </div>
+    <div class="stats stats-horizontal bg-transparent shadow-none" id="threat-stats">
+      <div class="stat py-0">
+        <div class="stat-value text-2xl" id="stat-last-hour">{% if summary.last_hour_total is not none %}{{ summary.last_hour_total }}{% else %}—{% endif %}</div>
+        <div class="stat-desc">Last Hour</div>
+      </div>
+      <div class="stat py-0">
+        <div class="stat-value text-2xl" id="stat-blocks">{% if summary.active_blocks is not none %}{{ summary.active_blocks }}{% else %}—{% endif %}</div>
+        <div class="stat-desc">Active Blocks</div>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+{% if stats_failed %}
+  <div role="alert" class="alert alert-error mb-6" id="stats-failed">
+    Security statistics could not be read. This is not a quiet period: the
+    24-hour counts are unknown rather than zero. Refresh to try again.
+  </div>
+{% else %}
+  <div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow mb-6">
+    <div class="stat">
+      <div class="stat-figure text-primary"><i class="icon-chart-bar"></i></div>
+      <div class="stat-title">Events (24h)</div>
+      <div class="stat-value" id="stat-total">{% if stats.total is not none %}{{ stats.total }}{% else %}—{% endif %}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-figure text-error"><i class="icon-alert-triangle"></i></div>
+      <div class="stat-title">Critical</div>
+      <div class="stat-value text-error" id="stat-critical">{% if stats.critical is not none %}{{ stats.critical }}{% else %}—{% endif %}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-figure text-warning"><i class="icon-alert-triangle"></i></div>
+      <div class="stat-title">High</div>
+      <div class="stat-value text-warning" id="stat-high">{% if stats.high is not none %}{{ stats.high }}{% else %}—{% endif %}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-figure text-secondary"><i class="icon-ban"></i></div>
+      <div class="stat-title">Blocked</div>
+      <div class="stat-value text-secondary" id="stat-blocked">{% if stats.blocked is not none %}{{ stats.blocked }}{% else %}—{% endif %}</div>
+    </div>
+  </div>
+{% endif %}
+
+<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_22rem] gap-6">
+  <div class="card bg-base-200 shadow min-w-0">
+    <div class="card-body p-0">
+      <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-base-300">
+        <h2 class="card-title text-base">Recent Security Events</h2>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="table table-sm table-zebra min-w-[1100px] whitespace-nowrap" id="events-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Severity</th>
+              <th>Type</th>
+              <th>Source IP</th>
+              <th class="max-w-[200px]">Title</th>
+              <th class="min-w-[150px] max-w-[300px]">Matched Content</th>
+              <th>Count</th>
+              <th>Status</th>
+              {% if can_manage %}<th>Actions</th>{% endif %}
+            </tr>
+          </thead>
+          {# Spans the columns that were rendered. A hard 9 would leave the
+             error and empty rows one cell wider than the head once the
+             Actions column is gated away, which pushes the table sideways. #}
+          {% set columns = 9 if can_manage else 8 %}
+          <tbody id="events-tbody">
+            {% if events_failed %}
+              <tr><td colspan="{{ columns }}"><div role="alert" class="alert alert-error m-4">Security events could not be read. This is not an empty list: the query failed, so how many events are in this window is unknown rather than zero. Refresh to try again.</div></td></tr>
+            {% elif not events %}
+              <tr><td colspan="{{ columns }}" class="text-center opacity-50 py-8" id="events-empty">
+                {% if severity %}
+                  No {{ severity }} events in this {{ hours }}-hour window. Other severities, or a wider window, may have some.
+                {% else %}
+                  No security events in this {{ hours }}-hour window.
+                {% endif %}
+              </td></tr>
+            {% else %}
+              {% for event in events %}
+                <tr class="cursor-pointer" data-click-action="showEventDetail" data-args='{{ [event.id]|tojson }}'>
+                  <td>{{ ts(event.created_at) }}</td>
+                  <td><span class="{{ event.severity_class }}">{{ event.severity if event.severity is not none else '—' }}</span></td>
+                  <td>{{ event.type_label if event.type_label is not none else '—' }}</td>
+                  <td class="font-mono">{{ event.source_ip if event.source_ip is not none else '—' }}</td>
+                  <td>{{ event.title if event.title is not none else '—' }}</td>
+                  <td class="matched-content" title="{{ event.matched.title }}"><code>{{ event.matched.text }}</code></td>
+                  <td class="event-count">{% if event.event_count is not none %}{{ event.event_count }}{% else %}—{% endif %}</td>
+                  <td><span class="{{ event.status_class }}">{{ event.status_label if event.status_label is not none else '—' }}</span></td>
+                  {% if can_manage %}
+                    <td>
+                      {% if event.source_ip is not none %}
+                        {% if blocked_addresses is not none and event.source_ip in blocked_addresses %}
+                          <button class="btn btn-sm" type="button" data-click-action="quickBlockIP" data-stop-propagation data-args='{{ [event.source_ip]|tojson }}' title="Already blocked. Blocking again replaces that block with 60 minutes."><i class="icon-ban"></i></button>
+                        {% else %}
+                          <button class="btn btn-sm" type="button" data-click-action="quickBlockIP" data-stop-propagation data-args='{{ [event.source_ip]|tojson }}' title="Block IP for 60 minutes"><i class="icon-ban"></i></button>
+                        {% endif %}
+                      {% else %}
+                        {# No address was recorded, so there is nothing for
+                           POST /blocked-ips to take. Not a permission case. #}
+                        <span class="opacity-50">—</span>
+                      {% endif %}
+                    </td>
+                  {% endif %}
+                </tr>
+              {% endfor %}
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex flex-col gap-4">
+    <div class="card bg-base-200 shadow">
+      <div class="card-body">
+        <h3 class="card-title text-base">Top Source IPs</h3>
+        <div id="top-ips-list" class="flex flex-col gap-2">
+          {% if summary_failed or summary is none %}
+            <div role="alert" class="alert alert-error">Top source IPs could not be read. This is not an empty list.</div>
+          {% elif summary.top_attackers is none %}
+            <div role="alert" class="alert alert-error">Top source IPs could not be read. This is not an empty list.</div>
+          {% elif not summary.top_attackers %}
+            <div class="text-sm opacity-50 py-2">No source IPs</div>
+          {% else %}
+            {% for ip in summary.top_attackers %}
+              <div class="flex items-center justify-between gap-2 py-2 border-b border-base-300 last:border-0">
+                <span class="font-mono">{{ ip.label if ip.label is not none else '—' }}</span>
+                <div class="flex items-center gap-2">
+                  <span class="badge badge-primary badge-sm">{% if ip.count is not none %}{{ ip.count }}{% else %}—{% endif %}</span>
+                  {% if can_manage and ip.label is not none %}
+                    {% if blocked_addresses is not none and ip.label in blocked_addresses %}
+                      <button class="btn btn-sm btn-error" type="button" data-click-action="quickBlockIP" data-args='{{ [ip.label]|tojson }}' title="Already blocked. Blocking again replaces that block with 60 minutes."><i class="icon-ban"></i></button>
+                    {% else %}
+                      <button class="btn btn-sm btn-error" type="button" data-click-action="quickBlockIP" data-args='{{ [ip.label]|tojson }}' title="Block IP for 60 minutes"><i class="icon-ban"></i></button>
+                    {% endif %}
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card bg-base-200 shadow">
+      <div class="card-body">
+        <h3 class="card-title text-base">Threat Types</h3>
+        <div id="threat-types-list" class="flex flex-col gap-2">
+          {% if summary_failed or summary is none %}
+            <div role="alert" class="alert alert-error">Threat types could not be read. This is not an empty list.</div>
+          {% elif summary.top_threats is none %}
+            <div role="alert" class="alert alert-error">Threat types could not be read. This is not an empty list.</div>
+          {% elif not summary.top_threats %}
+            <div class="text-sm opacity-50 py-2">No threats detected</div>
+          {% else %}
+            {% for threat in summary.top_threats %}
+              <div class="flex items-center justify-between gap-2 py-2 border-b border-base-300 last:border-0">
+                <span>{{ threat.text if threat.text is not none else '—' }}</span>
+                <span class="badge badge-primary badge-sm">{% if threat.count is not none %}{{ threat.count }}{% else %}—{% endif %}</span>
+              </div>
+            {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card bg-base-200 shadow">
+      <div class="card-body">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="card-title text-base basis-full md:basis-auto">Blocked IPs</h3>
+          {# Outside every branch below, so the failed read still has it.
+             See the note at the top of this template. Gated on the write
+             permission: the modal it opens only posts to /blocked-ips. #}
+          {% if can_manage %}
+            <button class="btn btn-sm btn-primary" type="button" data-click-action="showBlockIPModal">+ Block IP</button>
+          {% endif %}
+        </div>
+        <div id="blocked-ips-list" class="flex flex-col gap-2">
+          {% if blocked_failed %}
+            <div role="alert" class="alert alert-error">Blocked IPs could not be read. This is not an empty list: how many addresses are blocked is unknown rather than zero.</div>
+          {% elif not blocked %}
+            <div class="text-sm opacity-50 py-2">No blocked IPs</div>
+          {% else %}
+            {% for block in blocked %}
+              <div class="flex items-center justify-between gap-2 py-2 border-b border-base-300 last:border-0">
+                <div>
+                  <span class="font-mono">{{ block.ip_address if block.ip_address is not none else '—' }}</span>
+                  <small class="block text-[var(--text-muted)]">
+                    {% if block.permanent is true %}
+                      Permanent
+                    {% elif block.permanent is false %}
+                      {% if block.blocked_until is not none %}
+                        Until {{ ts(block.blocked_until) }}
+                      {% else %}
+                        Indefinite
+                      {% endif %}
+                    {% else %}
+                      Duration unknown
+                    {% endif %}
+                  </small>
+                </div>
+                {# DELETE /blocked-ips/{ip} is security:manage. It matches any
+                   row by address and this row is one, so there is no
+                   record state that would make it refuse. #}
+                {% if can_manage and block.ip_address is not none %}
+                  <button class="btn btn-sm btn-ghost" type="button" data-click-action="unblockIP" data-args='{{ [block.ip_address]|tojson }}' title="Unblock">&#10006;</button>
+                {% endif %}
+              </div>
+            {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}

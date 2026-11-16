@@ -1,0 +1,8 @@
+{% for metric in metrics %}
+{% set tone = {'normal': 'good', 'elevated': 'warning', 'high': 'error'}[metric.level] %}
+<div class="metric-row" data-metric="{{ metric.key }}">
+  <span class="metric-label">{{ metric.label }}</span>
+  <span class="metric-value{% if metric.value is not none and (metric.bar or metric.level != 'normal' or metric.key == 'success_rate') %} {{ tone }}{% endif %}">{% if metric.value is not none %}{% if metric.unit == '%' %}{{ '%.1f'|format(metric.value) }}{% else %}{{ metric.value }}{% endif %}{{ metric.unit }}{% else %}Unknown{% endif %}</span>
+</div>
+{% if metric.bar and metric.value is not none %}<div class="metric-bar"><div class="metric-bar-fill {{ tone }}" data-ion-style="width: {{ metric.value }}%"></div></div>{% endif %}
+{% endfor %}

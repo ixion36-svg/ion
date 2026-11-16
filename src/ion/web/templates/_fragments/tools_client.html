@@ -1,0 +1,71 @@
+{# Every piece of markup /tools builds from something only the browser
+   knows.
+
+   Most of this page is not a server page. Defanging pasted text,
+   identifying a hash, parsing a URL, testing a regex, reading email
+   headers, parsing a log line and the encoding grid all operate on text
+   the analyst typed into the browser; there is no server read behind any
+   of them and inventing a /ui route for one would send that text to ION
+   to be handed straight back. So the markup lives here, as <template>
+   elements, and the page's script clones one and sets textContent.
+
+   The three things that do read something ION holds — the two OpenCTI
+   lookups and the translator's language list — are fragments rendered by
+   ion/web/ui/tools.py instead.
+
+   These are included in the page shell OUTSIDE its <script> block, and
+   that placement is load-bearing: a <template> inside a <script> is inert
+   text, document.getElementById finds nothing, cloneTemplate returns null
+   and every control built from it vanishes with no error anywhere.
+
+   The generic kit first. Seven of this page's renders are a table of
+   label/value pairs, so one table template and four cell templates
+   replace seven hand-rolled `'<table class="data-table">' + …` strings
+   that had drifted apart: three emitted a <th> header row and four did
+   not, two escaped their keys and one did not. #}
+
+<template id="tools-table"><div class="overflow-x-auto"><table class="data-table"><thead><tr data-head></tr></thead><tbody data-body></tbody></table></div></template>
+<template id="tools-th"><th></th></template>
+<template id="tools-tr"><tr></tr></template>
+<template id="tools-td"><td></td></template>
+<template id="tools-td-strong"><td><strong></strong></td></template>
+<template id="tools-td-code"><td><code class="font-mono text-[12px]"></code></td></template>
+<template id="tools-heading"><h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60 mt-4 mb-2"></h4></template>
+<template id="tools-note"><p class="text-sm opacity-60"></p></template>
+<template id="tools-bad"><span class="text-error"></span></template>
+<template id="tools-line"><p class="text-sm"></p></template>
+<template id="tools-code"><code class="font-mono text-[12px]"></code></template>
+<template id="tools-code-block"><pre class="code-block"></pre></template>
+<template id="tools-mark"><mark></mark></template>
+<template id="tools-list"><ul class="list-disc pl-5 text-sm"></ul></template>
+<template id="tools-li-code"><li><code class="font-mono text-[12px]"></code></li></template>
+
+{# The received-header chain. `<ol class="received-chain">` was the class
+   the string version used and no stylesheet has ever painted it, so the
+   mail path rendered as an unstyled list while looking deliberate. #}
+<template id="tools-chain"><ol class="pl-5 text-sm space-y-1"></ol></template>
+<template id="tools-chain-item"><li><strong data-hop></strong> <span data-path></span><br><small class="opacity-60" data-when></small></li></template>
+
+{# Detected IOCs. `ioc-type-section` and `ioc-list` were two more classes
+   nothing painted. #}
+<template id="tools-ioc-empty"><p class="text-sm opacity-60">No IOCs detected</p></template>
+<template id="tools-ioc-section"><div class="mt-4"><h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60 mb-2" data-title></h4><ul class="space-y-1" data-list></ul></div></template>
+<template id="tools-ioc-item"><li class="flex flex-wrap items-center gap-2"><code class="font-mono text-[12px]" data-value></code><button type="button" class="btn btn-sm" data-click-action="lookupFromList">Lookup</button></li></template>
+
+{# Custom find/replace rules. `rule-item`, `rule-label` and `rule-input`
+   were unpainted too, so the whole row was unstyled inputs in a column.
+   Each control's data-args is set by the script through JSON.stringify:
+   the string version interpolated the index and the field name straight
+   into the attribute, and a rule whose text held a double quote made
+   every control on its row a dead one, because event-delegation.js logs
+   a JSON.parse failure and returns. #}
+<template id="tools-rules-empty"><p class="text-sm opacity-60 p-2">No custom rules yet. Use + Add to create one.</p></template>
+<template id="tools-rule-item"><div class="flex flex-wrap items-center gap-2"><input type="checkbox" class="checkbox checkbox-sm" data-change-action="toggleRule"><span class="text-xs text-base-content/60">Find:</span><input type="text" class="input input-sm flex-1" data-change-action="updateRule" data-find><span class="text-xs text-base-content/60">Replace:</span><input type="text" class="input input-sm flex-1" data-change-action="updateRule" data-replace><button type="button" class="btn btn-sm btn-error" data-click-action="deleteRule">Remove</button></div></template>
+
+{# The timestamp converter's relative reading. Built with <br> tags and
+   three interpolated values; the labels are markup now and only the three
+   figures are filled. #}
+<template id="tools-ts-info"><div class="text-sm space-y-1"><div><strong>Relative:</strong> <span data-relative></span></div><div><strong>Day:</strong> <span data-day></span></div><div><strong>ISO week:</strong> <span data-week></span></div></div></template>
+
+{# The translation pane's resting state. #}
+<template id="tools-translation-placeholder"><span class="text-slate-600 italic">Translation will appear here.</span></template>

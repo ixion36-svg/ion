@@ -1,0 +1,3 @@
+{% from '_fragments/forensics_macros.html' import label, text %}
+{% if state == 'failed' %}<div class="empty-state">Timeline unavailable</div>{% elif state == 'empty' %}<div class="empty-state">No timeline entries</div>{% else %}
+{% for e in items %}<div class="tl-entry {{ e.entry_type if e.entry_type in ['note','status_change','custody_change','evidence_added','case_created','case_closed','step_completed'] else 'note' }}"><div class="tl-meta">{{ text(e.username) }} · {{ text(e.timestamp) }} · <em>{{ label(e.entry_type) }}</em></div><div class="tl-content">{{ text(e.content) }}</div></div>{% endfor %}{% endif %}

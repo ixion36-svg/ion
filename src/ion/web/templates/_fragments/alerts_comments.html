@@ -1,0 +1,90 @@
+{# Alerts: the detail modal's comments tab.
+
+   Replaces the innerHTML write in renderCommentsTab.
+
+   Three outcomes, where the page had two. `loadTriage` wrote
+   `data.comments || []` and this renderer said "No comments yet" for it, so
+   a triage payload that carried no comment list at all, which is what a
+   refusal body looks like, read as an alert nobody had commented on.
+
+   COMMENT PROSE IS ESCAPED TEXT NOW, not markdown. The page ran
+   `safeHtml(marked.parse(raw))` on the client. ION has no server-side HTML
+   sanitiser and none is being added, which ui/template_render.py and the
+   cases conversion both record, so rendering author-supplied markdown here
+   would mean either shipping unsanitised HTML or adding a sanitiser. The
+   text keeps its line breaks through whitespace-pre-wrap. Markdown
+   formatting is lost; stored XSS is not reintroduced.
+
+   That also simplifies the translate toggle. The page stored both
+   `data-original-raw` and `data-rendered-html` and swapped innerHTML
+   between them; there is one text now, in `data-original-text`, and
+   translateComment swaps textContent.
+
+   The timestamp goes through the ts macro. `new Date(c.created_at)
+   .toLocaleString()` read a value whose zone the row does not state in the
+   viewer's zone, which is the one decision the macro exists to own. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+<div class="comments-list">
+  {% if comments_failed %}
+    <div class="empty-state text-[var(--danger)]" role="alert">
+      The comments could not be read. This is not an alert with no comments
+      on it: whether anyone has commented is not known.
+    </div>
+  {% elif not comments %}
+    <div class="empty-state">No comments yet</div>
+  {% else %}
+    {% for c in comments %}
+      {# A stable id per row. The page used the comment id when it had one
+         and Math.random() when it did not, which meant the translate button
+         pointed at a different element on every re-render. loop.index is
+         stable for a given render and unique within it. #}
+      {%- set cmt_id = 'cmt-' ~ (c.id if c.id is not none else 'row' ~ loop.index) -%}
+      <div class="comment-item" data-comment-id="{{ c.id if c.id is not none else '' }}">
+        <div class="comment-header">
+          {# `or` on the name, because a comment with no recorded author is
+             not an author called "null", which is what escapeHtml(undefined)
+             printed. #}
+          <span class="comment-user">{{ c.user or 'unknown analyst' }}</span>
+          <span class="comment-time">{{ ts(c.created_at, fallback='') }}</span>
+          <button class="cmt-translate-btn ml-[auto] text-[10px] bg-transparent border border-[rgba(255,255,255,0.1)] text-[#94a3b8] py-0.5 px-2 rounded-[3px] cursor-pointer"
+                  type="button"
+                  data-click-action="translateComment"
+                  data-args='[{{ cmt_id|tojson }}]'>Translate</button>
+        </div>
+        {# `|tojson` on the data-args above rather than building the array by
+           interpolation. event-delegation.js parses data-args with
+           JSON.parse and on a throw it logs and returns, so a value that
+           breaks the JSON makes the control look like it works and do
+           nothing. The Submit button below carried
+           data-args='["${escapeHtml(alertId)}"]', and an alert id holding a
+           double quote became &quot;, which the browser decodes to a bare
+           quote inside the JSON string: Submit was silently dead for such
+           an id. Every argument on this page goes through tojson now. #}
+        <div class="comment-body cpanel-note-markdown whitespace-pre-wrap"
+             id="{{ cmt_id }}"
+             data-original-text="{{ c.content }}">{{ c.content }}</div>
+      </div>
+    {% endfor %}
+  {% endif %}
+</div>
+
+{% if can_triage %}
+  <div class="comment-form">
+    <textarea id="comment-input" placeholder="Add a comment..."></textarea>
+    <button class="btn btn-primary"
+            data-click-action="addComment"
+            data-args='[{{ alert_id|tojson }}]'>Submit</button>
+  </div>
+{% else %}
+  {# POST /api/elasticsearch/alerts/{id}/comments carries alert:triage. The
+     page offered the box and the button to every reader, so a viewer with
+     alert:read could type a comment and have the submit answer 403 with the
+     text still in the box. #}
+  <div class="comment-form">
+    <p class="text-xs text-[var(--text-muted)] m-0">
+      Adding a comment needs the alert:triage permission.
+    </p>
+  </div>
+{% endif %}

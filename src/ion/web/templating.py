@@ -21,6 +21,7 @@ from jinja2 import FileSystemBytecodeCache
 import ion
 from ion.core.config import get_config
 from ion.licensing.gating import de_module_available
+from ion.web import nav
 from ion.web._csp_nonce import _CSPNonceProxy
 from ion.web._csrf_token import _CSRFTokenProxy
 
@@ -30,6 +31,149 @@ _BYTECODE_CACHE_DIR = Path("/tmp/ion-jinja2-cache")
 
 def _workforce_available() -> bool:
     return bool(getattr(get_config(), "workforce_enabled", False))
+
+
+def _nav_visible(item: nav.Item) -> bool:
+    """Whether a nav entry's licence gate is open, read per render."""
+    if item.gate == "de":
+        return de_module_available()
+    if item.gate == "workforce":
+        return _workforce_available()
+    return True
+
+
+def _ts_parts(value: object) -> dict | None:
+    """Split a timestamp into the instant, a fallback string, and whether it
+    can honestly be localised.
+
+    The `ts` macro in templates/_fragments/_time.html is the only caller.
+
+    A timezone-aware value carries its offset, so a browser can put it on
+    the viewer's clock and the fallback can name UTC. A naive value cannot:
+    ION stores audit and event timestamps in a naive `DateTime` column
+    defaulting to the database's `func.now()`, which is UTC on SQLite and
+    the session timezone on Postgres, and nothing in the row records which.
+
+    So a naive value is not localised. Emitting it without an offset and
+    localising anyway would be worse than leaving it alone, because
+    JavaScript parses a zoneless ISO date-time as LOCAL time, so the
+    browser would read the digits as the viewer's clock, convert from a
+    zone the value was never in, and display a time that is wrong by the
+    viewer's offset while looking authoritative.
+
+    The JavaScript this replaces had exactly that shape: it passed the
+    naive string to `new Date()` and called `toLocaleString()`, which
+    parsed as local and formatted as local, so it showed the stored digits
+    unchanged and unlabelled. Showing the same digits with a note saying
+    whose clock they are on is strictly more information, and is why this
+    returns `localise` rather than guessing a zone.
+
+    An unknown zone is not UTC, the same way unmeasured is not zero.
+    """
+    import re
+    from datetime import datetime, timezone
+
+    if value is None or value == "":
+        return None
+
+    if isinstance(value, datetime):
+        if value.tzinfo is not None:
+            as_utc = value.astimezone(timezone.utc)
+            return {
+                "iso": value.isoformat(),
+                "shown": as_utc.strftime("%Y-%m-%d %H:%M UTC"),
+                "localise": True,
+                "note": "",
+            }
+        return {
+            "iso": value.isoformat(),
+            "shown": value.strftime("%Y-%m-%d %H:%M"),
+            "localise": False,
+            "note": "Server time. This record stores no timezone.",
+        }
+
+    text = str(value)
+
+    # A string that parses is handed to the branch above, so the same
+    # instant renders the same way whichever type the repository returned.
+    # Without this a `datetime` showed "2026-10-12 14:51" while the ISO
+    # string of the same moment showed "2026-10-12T14:51:48.123456", and a
+    # fragment author cannot tell which they will get: some repositories
+    # hand back parsed objects and some call .isoformat() for their JSON
+    # consumer. Two conversions reported the raw microseconds as the
+    # ugliest thing on their page.
+    # A date with no time is left alone. Parsing it would render
+    # "2026-10-12 00:00", asserting a midnight the data never carried, and
+    # inventing a time of day on a date is the same defect as printing 0
+    # for a figure nobody measured.
+    date_only = re.fullmatch(r"\d{4}-\d{2}-\d{2}", text) is not None
+
+    parsed = None
+    if not date_only:
+        try:
+            # fromisoformat accepts "Z" only from 3.11 and ION targets 3.12,
+            # but normalising costs nothing and keeps this true on 3.10.
+            parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            parsed = None
+    if parsed is not None:
+        return _ts_parts(parsed)
+
+    # Not parseable. Keep it exactly as given rather than blanking it: an
+    # unreadable timestamp is still evidence, and the zone is unknown.
+    # Z, +00:00, +0000. A date-only string has no time to place in a zone.
+    if re.search(r"(Z|[+-]\d{2}:?\d{2})$", text):
+        return {"iso": text, "shown": text, "localise": True, "note": ""}
+    return {
+        "iso": text,
+        "shown": text,
+        "localise": False,
+        "note": "Server time. This record stores no timezone.",
+    }
+
+
+def _safe_url(value: object, fallback: str = "") -> str:
+    """A stored URL, or the fallback if its scheme is not one a link may use.
+
+    Jinja escapes characters, not schemes. `href="{{ row.url }}"` with
+    `javascript:alert(1)` in that column renders a link that executes on
+    click, and the hand-rolled `esc()` helpers the fragments replaced had
+    exactly the same hole, so it is not a regression but it is still a hole.
+    Two fragments render a GitLab issue URL straight out of the database.
+
+    Allowed: http, https, mailto, and a site-relative path. Everything else
+    returns the fallback, so the template renders plain text rather than a
+    link that does something other than navigate.
+
+    ASCII whitespace and control characters are stripped before the scheme
+    is read, because a browser strips them too: `java	script:alert(1)` and a
+    leading newline both navigate, so a naive `startswith` check passes
+    something the browser then executes.
+    """
+    if not value:
+        return fallback
+
+    text = str(value)
+    # The same characters a browser ignores when parsing the scheme.
+    stripped = "".join(c for c in text if ord(c) > 0x20)
+    lowered = stripped.lower()
+
+    if lowered.startswith(("http://", "https://", "mailto:")):
+        return text
+    # Protocol-relative. A valid URL, but it changes origin, which a stored
+    # link has no business doing. Rejected before the bare-path check below,
+    # which otherwise accepts it: "//evil.example/x".split("/")[0] is the
+    # empty string, which contains no colon and looks like a relative path.
+    if stripped.startswith("//"):
+        return fallback
+    # A site-relative path.
+    if stripped.startswith("/"):
+        return text
+    # No scheme and no leading slash: a bare path such as "docs/x". Safe,
+    # and rejecting it would break ordinary relative links.
+    if ":" not in lowered.split("/")[0]:
+        return text
+    return fallback
 
 
 def make_templates(directory: Path | None = None) -> Jinja2Templates:
@@ -49,14 +193,17 @@ def make_templates(directory: Path | None = None) -> Jinja2Templates:
         pass
     templates.env.auto_reload = bool(getattr(get_config(), "debug_mode", False))
     templates.env.globals["ion_version"] = ion.__version__
-    # base.html gates the DE nav on `{% if de_module_available() %}`, so every
-    # env needs it or any page extending base.html raises UndefinedError.
-    # Callable, not a value, so a runtime licence change is picked up without
-    # a template reload.
-    templates.env.globals["de_module_available"] = de_module_available
-    # Same contract for the workforce nav entry: callable, so the flag is
-    # read per render and the entry vanishes the moment the module is off.
-    templates.env.globals["workforce_available"] = _workforce_available
+    # base.html renders the whole navigation from this registry: the desktop
+    # dropdowns, the mobile panel and the `g` key table. Every env needs these
+    # or any page extending base.html raises UndefinedError. The helpers are
+    # callables, not values, so a licence change is read per render without a
+    # template reload.
+    templates.env.globals["ts_parts"] = _ts_parts
+    templates.env.filters["safe_url"] = _safe_url
+    templates.env.globals["nav_items"] = nav.NAV
+    templates.env.globals["nav_mobile_items"] = nav.mobile_items
+    templates.env.globals["nav_shortcuts"] = nav.shortcuts
+    templates.env.globals["nav_visible"] = _nav_visible
     templates.env.globals["csp_nonce"] = _CSPNonceProxy()
     templates.env.globals["csrf_token"] = _CSRFTokenProxy()
     return templates

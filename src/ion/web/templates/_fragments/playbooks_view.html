@@ -1,0 +1,65 @@
+{% from "_fragments/_time.html" import ts %}
+<h3 id="view-playbook-title" hx-swap-oob="true">{{ title }}</h3>
+{% if state == 'missing' %}
+<p>This playbook is no longer there.</p>
+{% elif state != 'data' %}
+<p>This playbook could not be read.</p>
+{% else %}
+<div class="view-section">
+    <h4>Description</h4>
+    {% if description is none %}<p>No description</p>{% else %}<p>{{ description }}</p>{% endif %}
+</div>
+<div class="view-section">
+    <h4>Status</h4>
+    <p>
+        {% if active_state == 'active' %}
+        <span class="status-badge status-active">Active</span>
+        {% elif active_state == 'inactive' %}
+        <span class="status-badge status-inactive">Inactive</span>
+        {% else %}
+        <span class="status-badge">unknown</span>
+        {% endif %}
+        {% if priority_label is not none %} | Priority: {{ priority_label }}{% else %} | Priority: unknown{% endif %}
+    </p>
+</div>
+<div class="view-section">
+    <h4>Trigger Conditions</h4>
+    {% if triggers.state == 'unreadable' %}
+    <p>Trigger conditions could not be read.</p>
+    {% else %}
+    <div class="trigger-tags gap-2">{% for label in triggers.labels %}<span class="trigger-tag">{{ label }}</span>{% endfor %}</div>
+    {% endif %}
+</div>
+<div class="view-section">
+    <h4>Steps ({{ steps|length }})</h4>
+    <div class="view-steps-list">
+        {% if steps_state == 'empty' %}
+        <p class="text-secondary">No steps defined</p>
+        {% elif steps_state != 'data' %}
+        <p>The steps could not be read.</p>
+        {% else %}
+        {% for step in steps %}
+        <div class="view-step">
+            <span class="view-step-number">{{ loop.index }}</span>
+            <div class="view-step-content">
+                <div class="view-step-title">{{ step.title }}</div>
+                <div class="view-step-meta">
+                    Type: {{ step.step_type }}
+                    {% if step.is_required %} | Required{% endif %}
+                    {% if step.description %} | {{ step.description }}{% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+</div>
+<div class="view-section">
+    <h4>Metadata</h4>
+    <p class="text-secondary">
+        Created by: {{ created_by or 'unknown' }}<br>
+        Created: {{ ts(created_at, fallback='unknown') }}<br>
+        Updated: {{ ts(updated_at, fallback='unknown') }}
+    </p>
+</div>
+{% endif %}

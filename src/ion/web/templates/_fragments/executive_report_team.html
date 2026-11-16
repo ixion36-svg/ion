@@ -1,0 +1,149 @@
+{# The Executive Report's Team tab: the 24-hour activity chart and the
+   nine-column per-analyst breakdown.
+
+   Replaces the other two `innerHTML` writes in executive_report.html,
+   including the `el.querySelectorAll('.ae-activity-bar[data-pct]')` loop
+   that set each bar's height from a data attribute after the write. The
+   heights now arrive as `data-ion-style`, which ion-dynamic-styles.js
+   applies on every render path including an htmx swap, so there is nothing
+   left to wire after the swap.
+
+   Two windows meet on this tab and only one of them used to be labelled.
+   `_hourly_activity` ignores the lookback entirely and always reads the
+   last 24 hours, while the table beside it covers the whole lookback, so
+   both now carry their own window and the lookback is the one the service
+   reported rather than the one the select asked for.
+
+   No control lives in here. The days select and the tab strip are in the
+   page shell outside #er-team, so no swap of this fragment can remove the
+   reader's way to retry. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% if failed %}
+  <div role="alert" class="alert alert-error">
+    <span>
+      The team metrics could not be computed. No figure is shown below
+      rather than zeros: the read failed, so every number is unknown, which
+      is not the same as a team that did nothing. Press Generate or reselect
+      the Team tab to try again.
+    </span>
+  </div>
+{% else %}
+
+{# The lookback the figures cover. Three states, same as the Summary tab's
+   period line: the service measured the window asked for, it measured a
+   different one, or it did not say. The third and second are reachable
+   here, because the days select reaches 90 days and
+   /api/analyst-efficiency/metrics accepts at most 720 hours. #}
+<div class="text-[.85rem] text-[var(--text-secondary)] mb-4">
+  {% if window.stated and window.matches %}
+    Per-analyst figures cover the last {{ window.hours }} hours.
+  {% elif window.stated %}
+    <span class="badge badge-sm badge-warning">window changed</span>
+    You asked for {{ window.requested_hours }} hours; the per-analyst
+    figures cover {{ window.hours }} hours, which is the longest window
+    this service measures.
+  {% else %}
+    <span class="badge badge-sm badge-ghost">window not stated</span>
+    The service did not state the window it measured, so the period these
+    per-analyst figures cover is unknown.
+  {% endif %}
+</div>
+
+<div class="card bg-base-200 shadow mb-4">
+  <div class="card-body">
+    <h3 class="card-title text-xs uppercase tracking-wider opacity-70">Activity Timeline</h3>
+    {% if not hourly.measured %}
+      <p class="text-[.78rem] text-[var(--text-secondary)]">
+        The service returned no hourly buckets, so no timeline could be
+        drawn. That is not 24 hours in which nothing happened.
+      </p>
+    {% else %}
+      {% if not hourly.any_activity %}
+        <p class="text-[.78rem] text-[var(--text-secondary)]">
+          No case closure or alert triage was recorded in any of these
+          hours. The bars below are drawn at zero, which is what was
+          measured.
+        </p>
+      {% endif %}
+      <div class="ae-activity-chart">
+        {% for row in hourly.rows %}
+          {% if row.measured %}
+            {# Height at its real value, including zero. The JavaScript's
+               `Math.max(val/maxVal*100, 2)` floored every bar, so a quiet
+               hour drew the same stub as a busy one and a dead day read as
+               a steady trickle. #}
+            <div class="ae-activity-bar" data-ion-style="height:{{ row.pct }}%"><div class="tip">{{ ts(row.hour, 'time', fallback='hour not recorded') }}: {{ row.total }} actions</div></div>
+          {% else %}
+            {# No bar at all, not a bar at zero. An hour whose counts were
+               not recorded is not an hour with none. #}
+            <div class="ae-activity-bar" data-ion-style="height:0px"><div class="tip">{{ ts(row.hour, 'time', fallback='hour not recorded') }}: counts not recorded</div></div>
+          {% endif %}
+        {% endfor %}
+      </div>
+      <p class="text-xs opacity-50 mt-2">
+        Always the last 24 hours, whatever lookback is selected above: this
+        is the only window the service computes hourly buckets for.
+      </p>
+    {% endif %}
+  </div>
+</div>
+
+{% if analysts %}
+  <div class="card bg-base-200 shadow mb-4">
+    <div class="card-body">
+      <h3 class="card-title text-xs uppercase tracking-wider opacity-70">Per-Analyst Breakdown</h3>
+      <div class="overflow-x-auto">
+        <table class="table table-sm">
+          <thead><tr><th>Analyst</th><th>Cases Closed</th><th>Cases Opened</th><th>Alerts Triaged</th><th>True Positives</th><th>False Positives</th><th>FP Rate</th><th>Avg MTTR</th><th>Total Actions</th></tr></thead>
+          <tbody>
+            {% for row in analysts %}
+              <tr>
+                <td>{{ row.username }}</td>
+                <td class="font-mono">{{ row.cases_closed if row.cases_closed is not none else 'not computed' }}</td>
+                <td class="font-mono">{{ row.cases_opened if row.cases_opened is not none else 'not computed' }}</td>
+                <td class="font-mono">{{ row.alerts_triaged if row.alerts_triaged is not none else 'not computed' }}</td>
+                <td class="font-mono">{{ row.true_positives if row.true_positives is not none else 'not computed' }}</td>
+                <td class="font-mono">{{ row.false_positives if row.false_positives is not none else 'not computed' }}</td>
+                {# `row.fp_measured`, not `row.fp_rate`. The service emits
+                   0.0 when the analyst made no threat/not-threat call at
+                   all, and the JavaScript printed that as "0%", so a
+                   flawless record and no record read identically. #}
+                <td class="font-mono">{% if row.fp_measured %}{{ row.fp_rate }}%{% else %}<span class="badge badge-sm badge-ghost">no disposition recorded</span>{% endif %}</td>
+                <td class="font-mono">{{ (row.avg_mttr ~ 'h') if row.avg_mttr is not none else 'not computed' }}</td>
+                <td class="font-mono">{{ row.total_actions if row.total_actions is not none else 'not computed' }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {# Which denominator this column used, always, not only when the
+         payload happens to say "of_dispositions". The JavaScript's
+         `if (basis === 'of_dispositions')` dropped the note silently for
+         any other value, leaving two different rates on two tabs under one
+         heading with nothing to tell them apart. #}
+      <p class="text-xs opacity-50 mt-2">
+        {% if fp_basis %}
+          {{ fp_basis }}
+        {% else %}
+          The service did not state which denominator this FP Rate column
+          was measured against, so it cannot be compared with the FP Rate
+          on the Summary tab.
+        {% endif %}
+        A row marked "no disposition recorded" closed no case as a true or
+        false positive, so no rate could be computed for it. That is not a
+        rate of zero.
+      </p>
+    </div>
+  </div>
+{% else %}
+  <div class="card bg-base-200 shadow">
+    <div class="card-body">
+      No analyst had any recorded activity in this window. The read
+      succeeded and returned nobody, which is a measurement.
+    </div>
+  </div>
+{% endif %}
+
+{% endif %}

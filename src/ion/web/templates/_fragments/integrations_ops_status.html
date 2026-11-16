@@ -1,0 +1,15 @@
+{% if state == 'failed' %}<p class="loading">Integration status unavailable</p>
+{% elif state == 'empty' %}<p class="loading">No integrations configured</p>
+{% else %}{% for item in items %}
+<div class="integration-card">
+  <div class="integration-card-header">
+    <div class="integration-icon {% if item.type in ['gitlab', 'opencti', 'elasticsearch'] %}{{ item.type }}{% else %}default{% endif %}" aria-hidden="true">{{ item.name[:1] }}</div>
+    <div class="integration-card-title">{{ item.name }}</div>
+    {% if item.version %}<span class="version-badge {% if item.compatible is sameas false %}incompatible{% elif item.compatible is sameas true %}compatible{% endif %}">v{{ item.version }}</span>{% endif %}
+  </div>
+  <div class="integration-card-status"><span class="status-indicator {% if item.status in ['healthy', 'degraded', 'error', 'disabled', 'not_configured'] %}{{ item.status }}{% endif %}"></span><span>{{ item.status }}</span></div>
+  <div class="integration-card-details">{% if item.enabled is sameas true %}Enabled{% elif item.enabled is sameas false %}Disabled{% else %}Enabled state unknown{% endif %}{% if item.response_time_ms is not none %} | {{ '%.0f'|format(item.response_time_ms) }}ms{% endif %}
+  {% if item.compatible is sameas false %}<div class="version-warning">Version outside supported range</div>{% elif item.version and item.compatible is none %}<div class="version-warning">Version compatibility unknown</div>{% endif %}</div>
+  {% if can_manage and item.type %}<div class="integration-card-actions"><button class="btn btn-sm" data-click-action="testConnection" data-args='{{ [item.type]|tojson }}'>Test</button></div>{% endif %}
+</div>
+{% endfor %}{% endif %}

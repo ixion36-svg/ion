@@ -1,0 +1,166 @@
+{% macro number(v) %}{{ v if v is not none else 'Unknown' }}{% endmacro %}
+{% macro rate(v) %}
+{% if v is not none %}
+<div class="de-rate-bar">
+<div class="de-rate-track">
+<div class="de-rate-fill" data-ion-style="width:{{ v }}%;background:var(--{{ 'sev-critical' if v >= 70 else 'sev-medium' if v >= 40 else 'mitre-covered' }})">
+</div>
+</div>
+<div class="de-rate-val">{{ v }}%</div>
+</div>
+{% else %}Unknown{% endif %}
+{% endmacro %}
+{% if state == 'failed' %}
+<div class="de-empty" role="alert">{{ error }}</div>
+{% else %}
+{% if state == 'empty' %}<div class="de-empty">No alerts in this time range</div>{% endif %}
+<div class="de-exec-time">
+<span>Time range:</span>
+{% for h,label in [(24,'24h'),(72,'3d'),(168,'7d'),(336,'14d'),(720,'30d')] %}
+<button class="{{ 'active' if hours == h else '' }}" data-click-action="deExecSetHours" data-args='{{ [h]|tojson }}'>{{ label }}</button>
+{% endfor %}
+</div>
+<div class="de-stats">
+{% for key,label,sub in [('total_alerts','Total Alerts','in last '~hours~'h'),('unique_rules_firing','Unique Rules Firing','matched to TIDE: '~number(summary.get('tide_matched'))),('avg_alerts_per_rule','Avg / Rule','alerts per firing rule'),('noisy_rules','High-volume Rules','>70% closed, >10 alerts'),('silent_enabled_rules','Non-firing Rules','enabled in TIDE, 0 alerts')] %}
+<div class="de-stat {{ 'warn' if key == 'noisy_rules' else 'crit' if key == 'silent_enabled_rules' else '' }}">
+<div class="de-stat-label">{{ label }}</div>
+<div class="de-stat-val">{{ number(summary.get(key)) }}</div>
+<div class="de-stat-sub">{{ sub }}</div>
+</div>
+{% endfor %}
+<div class="de-stat">
+<div class="de-stat-label">Open</div>
+<div class="de-stat-val">{{ number((summary.get('status') or {}).get('open')) }}</div>
+<div class="de-stat-sub">{{ number(open_pct) }}{% if open_pct is not none %}%{% endif %} of total</div>
+</div>
+</div>
+<div class="de-section">
+<div class="de-section-title">
+<i class="icon-activity">
+</i> Alert Volume</div>
+{% if timeline is none %}
+<div class="de-empty">Volume unavailable</div>
+{% elif not timeline %}
+<div class="de-empty">No data</div>
+{% else %}
+{% if volume_incomplete %}<div class="de-empty">Some volume measurements unavailable</div>{% endif %}
+<div class="de-vol-chart">
+<div class="de-vol-bars">
+{% for t in timeline %}
+{% set count=t.get('count') %}
+{% if count is not none %}
+<div class="de-vol-bar" data-ion-style="height:{{ [count / volume_max * 100,1]|max }}%;background:var(--{{ 'sev-critical' if count > volume_max*0.8 else 'sev-medium' if count > volume_max*0.5 else 'mitre-covered' }})">
+<div class="de-vol-tip">{{ t.get('timestamp','') }}: {{ count }}</div>
+</div>
+{% else %}<div class="de-vol-bar"><div class="de-vol-tip">{{ t.get('timestamp','') }}: Unknown</div></div>
+{% endif %}
+{% endfor %}
+</div>
+</div>
+{% endif %}
+</div>
+{% if severity_timeline is none %}<div class="de-empty">Severity measurements unavailable</div>{% elif severity_timeline %}
+<div class="de-section">
+<div class="de-section-title">Volume by Severity</div>
+{% if severity_incomplete %}<div class="de-empty">Some severity measurements unavailable</div>{% endif %}
+<div class="de-vol-chart">
+<div class="de-vol-bars">
+{% for t in severity_timeline %}
+<div class="de-vol-bar flex flex-col-reverse bg-transparent" data-ion-style="height:100%">
+<div class="de-vol-tip">{{ t.get('timestamp','') }}{% for sev in ['critical','high','medium','low'] %} {{ sev }}: {{ number(t.get(sev)) }}{% endfor %}</div>
+{% for sev in ['critical','high','medium','low'] %}
+{% set value=t.get(sev) %}
+{% if value is not none and value > 0 %}
+<div class="w-full rounded-[1px]" data-ion-style="height:{{ value / severity_max * 100 }}%;background:var(--sev-{{ sev }})" title="{{ sev }}: {{ value }}">
+</div>
+{% endif %}
+{% endfor %}
+</div>
+{% endfor %}
+</div>
+</div>
+<div class="flex gap-3 mt-2">
+{% for sev in ['critical','high','medium','low'] %}
+<div class="de-donut-legend-item">
+<div class="de-donut-legend-dot" data-ion-style="background:var(--sev-{{ sev }})">
+</div>{{ sev }}</div>
+{% endfor %}
+</div>
+</div>
+{% endif %}
+<div class="de-cols">
+{% for rules,title,empty,limit in [(top_firing,'Top Firing Rules','No firing rules',20),(noisy_rules,'High-volume Rules','No noisy rules detected',15)] %}
+<div class="de-section">
+<div class="de-section-title">{{ title }}{% if title == 'High-volume Rules' %} <span class="text-[.68rem] text-[var(--text-secondary)] font-normal">(&gt;10 alerts, &gt;70% closed — volume, not FP rate; see Detection Health for noise)</span>
+{% endif %}
+</div>
+{% if rules is none %}
+<div class="de-empty">Rules unavailable</div>
+{% elif not rules %}
+<div class="de-empty">{{ empty }}</div>
+{% else %}
+<table class="de-table">
+<thead>
+<tr>
+<th>Rule</th>
+<th>Alerts</th>
+<th>Close Rate</th>
+<th>{{ 'TIDE' if loop.first else 'Open' }}</th>
+</tr>
+</thead>
+<tbody>
+{% for r in rules[:limit] %}
+<tr>
+<td class="max-w-[220px] overflow-hidden text-ellipsis whitespace-nowrap" title="{{ r.get('rule_name','') }}">{{ r.get('rule_name','Unknown') }}</td>
+<td class="mono">{{ number(r.get('alert_count')) }}</td>
+<td>{{ rate(r.get('close_rate')) }}</td>
+<td>
+{% if title == 'Top Firing Rules' %}
+{% if r.get('in_tide') %}
+<span class="de-sev {{ r.get('tide_severity') if r.get('tide_severity') in ['critical','high','medium','low'] else 'low' }}">{{ r.get('tide_severity','Unknown') }}</span>
+{% else %}-{% endif %}
+{% else %}{{ number(r.get('open')) }}{% endif %}
+</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+{% endif %}
+</div>
+{% endfor %}
+</div>
+{% if silent_rules is none %}
+<div class="de-empty">Non-firing rules unavailable</div>
+{% elif silent_rules %}
+<div class="de-section">
+<div class="de-section-title">Non-firing Rules <span>(enabled in TIDE, 0 alerts in ES — differs from Detection Health's "silent")</span>
+</div>
+<table class="de-table">
+<thead>
+<tr>
+<th>Rule</th>
+<th>TIDE Severity</th>
+<th>Quality</th>
+<th>MITRE</th>
+</tr>
+</thead>
+<tbody>
+{% for r in silent_rules[:30] %}
+<tr>
+<td>{{ r.get('rule_name','Unknown') }}</td>
+<td>
+<span class="de-sev {{ r.get('tide_severity') if r.get('tide_severity') in ['critical','high','medium','low'] else 'low' }}">{{ r.get('tide_severity','Unknown') }}</span>
+</td>
+<td class="mono">{{ number(r.get('tide_quality')) }}</td>
+<td>
+{% for mid in (r.get('mitre_ids') or [])[:5] %}
+<span class="de-mitre-chip">{{ mid }}</span>
+{% else %}-{% endfor %}
+</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+{% endif %}
+{% endif %}

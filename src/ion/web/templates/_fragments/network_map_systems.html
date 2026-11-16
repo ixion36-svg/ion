@@ -1,0 +1,35 @@
+{# The source-system filter of /network-map.
+
+   Replaces `sysSel.innerHTML = '<option…>'` followed by `sysSel.innerHTML
+   += …` once per system, which is the `+=` form the status tool
+   under-counted for a while.
+
+   The whole <select> is rendered rather than its options swapped into the
+   shell's, so the element and its name have one definition. `selected`
+   travels in the model for the same reason: the JavaScript saved
+   `sysSel.value` into a local and put it back after rebuilding, and this
+   fragment is re-requested after a sync, so without it the reader's choice
+   would silently revert to All Systems while the table stayed filtered.
+
+   A failed read is not an estate nothing reports into. The select still
+   offers All Systems, because the table behind it is still readable, and
+   says the list of systems is the part that is missing. #}
+
+<select id="filter-system" name="source_system" class="select select-sm w-auto">
+  <option value=""{% if not selected %} selected{% endif %}>All Systems</option>
+  {%- if not failed %}
+  {%- for system in systems %}
+  <option value="{{ system }}"{% if system == selected %} selected{% endif %}>{{ system }}</option>
+  {%- endfor %}
+  {%- endif %}
+  {%- if selected and (failed or selected not in systems) %}
+  {# The reader is filtering on a system this read does not list. Dropping
+     the option would quietly widen their filter on the next submit. #}
+  <option value="{{ selected }}" selected>{{ selected }}</option>
+  {%- endif %}
+</select>
+{%- if failed %}
+<span class="text-xs text-base-content/50">Source systems unreadable</span>
+{%- elif not systems %}
+<span class="text-xs text-base-content/50">No source system recorded</span>
+{%- endif %}

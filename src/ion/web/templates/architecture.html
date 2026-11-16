@@ -1,185 +1,11 @@
 {% extends "base.html" %}
 
 {% block title %}System Architecture - ION{% endblock %}
+{% block page_id %}architecture{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 w-full">
-<style nonce="{{ csp_nonce }}">
-/* Full-viewport tool chrome. Not a daisyUI layout. */
-.arch-page-wrap {
-    width: 100%;
-    padding: 0.75rem 1rem 1rem;
-    box-sizing: border-box;
-    height: calc(100vh - 60px);
-    display: flex;
-    flex-direction: column;
-}
-.arch-main-content {
-    display: flex;
-    flex: 1;
-    gap: 1rem;
-    overflow: hidden;
-    min-height: 0;
-}
-.arch-sidebar {
-    width: 280px;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    flex-shrink: 0;
-    overflow-y: auto;
-    padding-right: 0.25rem;
-}
-
-/* JS toggles .active on .workflow-card, not a daisyUI selected state. */
-.workflow-card.active {
-    border-color: var(--color-primary);
-    background: color-mix(in oklab, var(--color-primary) 6%, var(--color-base-200));
-    box-shadow: inset 0 0 10px color-mix(in oklab, var(--color-primary) 5%, transparent);
-}
-.workflow-card.active .step-dot { background: var(--color-primary); }
-.step-dot {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: var(--color-base-300);
-}
-
-/* Diagram canvas — JS positions #main-hub / .arch-node via element.style. */
-.arch-diagram-viewport {
-    flex: 1;
-    position: relative;
-    overflow: auto;
-    min-height: 0;
-}
-.arch-diagram-container {
-    position: relative;
-    min-width: 950px;
-    min-height: 850px;
-    width: 100%;
-    height: 100%;
-    background-image: radial-gradient(color-mix(in oklab, var(--color-base-content) 12%, transparent) 1px, transparent 1px);
-    background-size: 40px 40px;
-}
-.arch-svg {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 1;
-    pointer-events: none;
-}
-.arch-hub {
-    position: absolute;
-    z-index: 10;
-    width: 120px;
-    height: 120px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.hub-inner {
-    width: 84px;
-    height: 84px;
-    background: var(--color-base-100);
-    border: 2px solid var(--color-primary);
-    border-radius: 50%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 0 20px color-mix(in oklab, var(--color-primary) 30%, transparent);
-    position: relative;
-}
-.hub-title {
-    font-weight: 900;
-    color: var(--color-primary);
-    font-size: 1rem;
-    letter-spacing: 2px;
-}
-.hub-pulse {
-    position: absolute;
-    inset: -8px;
-    border: 1.5px solid var(--color-primary);
-    border-radius: 50%;
-    opacity: 0;
-    animation: hub-ping 2.5s ease-out infinite;
-}
-.hub-pulse.p2 { animation-delay: 1.25s; }
-@keyframes hub-ping {
-    0%   { transform: scale(0.85); opacity: 0.6; }
-    100% { transform: scale(1.4);  opacity: 0; }
-}
-
-/* JS innerHTML: .arch-node / .node-card / .node-icon / .node-name */
-.arch-node {
-    position: absolute;
-    z-index: 5;
-    transition: transform 0.3s ease, left 0.6s cubic-bezier(0.4, 0, 0.2, 1), top 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s;
-    cursor: pointer;
-}
-.node-card {
-    width: 106px;
-    padding: 10px 8px;
-    background: var(--color-base-100);
-    border: 1px solid var(--color-base-300);
-    border-radius: var(--radius-field, 0.25rem);
-    text-align: center;
-    transition: all 0.3s;
-}
-.arch-node.highlight .node-card {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 15px color-mix(in oklab, var(--color-primary) 10%, transparent);
-    transform: translateY(-5px);
-}
-.arch-node.dimmed { opacity: 0.15; filter: grayscale(0.5); }
-.node-icon {
-    font-size: 1.05rem;
-    margin-bottom: 4px;
-    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.node-name {
-    font-size: 0.68rem;
-    font-weight: bold;
-    color: var(--color-base-content);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.arch-node.highlight .node-icon i { color: var(--color-primary); }
-.arch-node.highlight .node-name { color: var(--color-primary); }
-
-/* SVG connections and packets — JS sets stroke attrs and .active-line */
-.arch-conn { fill: none; stroke-linecap: round; transition: stroke 0.6s, stroke-opacity 0.6s, stroke-width 0.4s; }
-.arch-conn.active-line { stroke-dasharray: 6 4; animation: arch-dash 1.2s linear infinite; }
-@keyframes arch-dash { to { stroke-dashoffset: -20; } }
-.arch-packet { fill: var(--color-primary); filter: drop-shadow(0 0 4px var(--color-primary)); }
-
-/* JS innerHTML: .ring-label plus hashed top offsets */
-.ring-label {
-    position: absolute;
-    font-size: 0.52rem;
-    font-weight: bold;
-    color: var(--color-base-content);
-    text-transform: uppercase;
-    letter-spacing: 5px;
-    opacity: 0.12;
-    pointer-events: none;
-    width: 100%;
-    text-align: center;
-}
-
-@media (max-width: 900px) {
-    .arch-main-content { flex-direction: column; }
-    .arch-sidebar { width: 100%; flex-direction: row; overflow-x: auto; overflow-y: hidden; flex-shrink: 0; max-height: 120px; }
-    .workflow-card { min-width: 200px; flex-shrink: 0; }
-    .arch-sidebar-footer { display: none; }
-}
-</style>
 
 <div class="arch-page-wrap">
     <header class="flex flex-wrap items-center justify-between gap-3 mb-3 shrink-0">
@@ -257,7 +83,27 @@
                         <span class="hub-title">ION</span>
                     </div>
                 </div>
-                <div id="labels-container"></div>
+
+                {# The nodes, the ring labels and the workflow edges are one
+                   fragment, rendered by ion.web.ui.architecture. They used to
+                   be three JavaScript array constants and an innerHTML write
+                   per node, so every rule frontend/ion-pages.css has for
+                   .arch-node / .node-card / .ring-label was unreachable from
+                   the stylesheet.
+
+                   hx-trigger="load" keeps the shell's first paint immediate.
+                   This slot is deliberately not position:relative, so the
+                   absolutely positioned nodes inside it still resolve against
+                   .arch-diagram-container and the hub keeps its z-index. #}
+                <div id="arch-diagram-nodes"
+                     hx-get="/ui/architecture/diagram"
+                     hx-trigger="load"
+                     hx-swap="innerHTML">
+                  <div class="text-center p-10 text-base-content/60">
+                    <span class="loading loading-spinner loading-sm text-primary"></span>
+                    Loading topology...
+                  </div>
+                </div>
             </div>
         </div>
     </div>
@@ -270,185 +116,163 @@
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
 (function() {
-    // ── Icon mapping: Lucide icon names → ION icon-* CSS classes ──
-    const ICON_MAP = {
-        'route':            'icon-git-branch',
-        'bell':             'icon-bell',
-        'folder-open':      'icon-folder',
-        'eye':              'icon-eye',
-        'lock':             'icon-lock',
-        'database':         'icon-database',
-        'bot':              'icon-bot',
-        'file-scan':        'icon-file-text',
-        'search':           'icon-search',
-        'scroll-text':      'icon-scroll-text',
-        'shield':           'icon-shield',
-        'bell-ring':        'icon-bell-ring',
-        'book-open':        'icon-book-open',
-        'file-text':        'icon-file-text',
-        'message-circle':   'icon-message-circle',
-        'graduation-cap':   'icon-graduation-cap',
-        'layout-dashboard': 'icon-layout-dashboard',
-        'brain':            'icon-brain',
-        'git-merge':        'icon-git-merge',
-        'globe':            'icon-globe',
-        'shield-check':     'icon-shield-check',
-    };
+    'use strict';
 
-    const INTERNAL_MODULES = [
-        { id: 'api',           name: 'API Router',     icon: 'route',          layer: 1 },
-        { id: 'alerts',        name: 'Alerts Engine',  icon: 'bell',           layer: 1 },
-        { id: 'cases',         name: 'Case Manager',   icon: 'folder-open',    layer: 1 },
-        { id: 'observables',   name: 'Observables',    icon: 'eye',            layer: 1 },
-        { id: 'auth',          name: 'Auth Service',   icon: 'lock',           layer: 2 },
-        { id: 'database',      name: 'Storage',        icon: 'database',       layer: 2 },
-        { id: 'ai_chat',       name: 'AI Analytics',   icon: 'bot',            layer: 2 },
-        { id: 'pcap',          name: 'PCAP Engine',    icon: 'file-scan',      layer: 2 },
-        { id: 'forensics',     name: 'Forensics',      icon: 'search',         layer: 2 },
-        { id: 'logging',       name: 'Logging',        icon: 'scroll-text',    layer: 2 },
-        { id: 'security',      name: 'Shield',         icon: 'shield',         layer: 2 },
-        { id: 'notifications', name: 'Notify',         icon: 'bell-ring',      layer: 2 },
-        { id: 'knowledge_base',name: 'Knowledge',      icon: 'book-open',      layer: 2 },
-        { id: 'templates',     name: 'Templates',      icon: 'file-text',      layer: 2 },
-        { id: 'chat',          name: 'Team Chat',      icon: 'message-circle', layer: 2 },
-        { id: 'skills',        name: 'Training',       icon: 'graduation-cap', layer: 2 }
-    ];
+    var SVG_NS = 'http://www.w3.org/2000/svg';
+    var SLOT_ID = 'arch-diagram-nodes';
 
-    const EXTERNAL_SERVICES = [
-        { id: 'elasticsearch', name: 'Elasticsearch',  icon: 'database',         color: '#00bfb3' },
-        { id: 'kibana',        name: 'Kibana',         icon: 'layout-dashboard', color: '#00bfb3' },
-        { id: 'ollama',        name: 'Ollama LLM',     icon: 'brain',            color: '#a855f7' },
-        { id: 'gitlab',        name: 'GitLab',         icon: 'git-merge',        color: '#fc6d26' },
-        { id: 'opencti',       name: 'OpenCTI',        icon: 'globe',            color: '#6366f1' },
-        { id: 'dfir_iris',     name: 'DFIR-IRIS',      icon: 'shield-check',     color: '#3b82f6' }
-    ];
+    // The three looks a connection can have. As a boolean argument plus an
+    // override after the fact, the faint backdrop silently inherited the
+    // idle line's opacity whenever that one changed.
+    var BACKDROP = { stroke: 'var(--ion-border)', width: '1', opacity: '0.08', cls: 'arch-conn' };
+    var IDLE     = { stroke: 'var(--ion-border)', width: '1', opacity: '0.2',  cls: 'arch-conn' };
+    var ACTIVE   = { stroke: 'var(--primary)',    width: '2', opacity: '0.6',  cls: 'arch-conn active-line' };
 
-    const WORKFLOW_PATHS = {
-        default: [
-            { from: 'hub', to: 'api' }, { from: 'api', to: 'auth' }, { from: 'api', to: 'database' },
-            { from: 'api', to: 'alerts' }, { from: 'alerts', to: 'elasticsearch' },
-            { from: 'alerts', to: 'cases' }, { from: 'cases', to: 'kibana' },
-            { from: 'cases', to: 'dfir_iris' }, { from: 'observables', to: 'opencti' },
-            { from: 'ai_chat', to: 'ollama' }, { from: 'security', to: 'api' }
-        ],
-        auth: [
-            { from: 'api', to: 'security' },
-            { from: 'security', to: 'auth' },
-            { from: 'auth', to: 'database' },
-            { from: 'database', to: 'auth' },
-            { from: 'auth', to: 'api' }
-        ],
-        detection: [
-            { from: 'elasticsearch', to: 'alerts' },
-            { from: 'alerts', to: 'api' },
-            { from: 'api', to: 'cases' },
-            { from: 'cases', to: 'notifications' }
-        ],
-        incident: [
-            { from: 'cases', to: 'observables' },
-            { from: 'observables', to: 'opencti' },
-            { from: 'cases', to: 'dfir_iris' },
-            { from: 'cases', to: 'forensics' }
-        ],
-        ai: [
-            { from: 'cases', to: 'ai_chat' },
-            { from: 'ai_chat', to: 'ollama' },
-            { from: 'ollama', to: 'ai_chat' },
-            { from: 'ai_chat', to: 'api' }
-        ],
-        infra: [
-            { from: 'security', to: 'logging' },
-            { from: 'api', to: 'logging' },
-            { from: 'logging', to: 'elasticsearch' },
-            { from: 'database', to: 'logging' }
-        ]
-    };
+    var activeWorkflow = 'default';
+    var nodes = {};
 
-    let activeWorkflow = 'default';
-    const nodes = {};
+    function slot() {
+        return document.getElementById(SLOT_ID);
+    }
 
-    function getIconClass(lucideName) {
-        return ICON_MAP[lucideName] || 'icon-circle';
+    // An unknown scenario id yields no links rather than leaving the previous
+    // scenario's lines on screen, which is what the old constant lookup did.
+    function linksFor(workflow) {
+        var host = slot();
+        if (!host) return [];
+        return Array.prototype.slice.call(
+            host.querySelectorAll('.arch-path[data-workflow="' + workflow + '"]')
+        );
+    }
+
+    function endpoints(link) {
+        var a = nodes[link.getAttribute('data-from')];
+        var b = nodes[link.getAttribute('data-to')];
+        return (a && b) ? [a, b] : null;
+    }
+
+    // Each ring's radius depends on the container's measured size, so it
+    // cannot be rendered server-side. The constants it derives from are, and
+    // reading them back here keeps one definition of which rings exist.
+    function ringGeometry(cx, cy) {
+        var host = slot();
+        var out = [];
+        if (!host) return out;
+        host.querySelectorAll('.ring-label[data-ring]').forEach(function(el) {
+            var minRadius = parseFloat(el.getAttribute('data-ring-min-radius'));
+            var factor = parseFloat(el.getAttribute('data-ring-radius-factor'));
+            var offset = parseFloat(el.getAttribute('data-ring-angle-offset'));
+            // A ring missing any of the three is a server-side bug. Skipping it
+            // leaves its nodes visibly stacked at the origin, which is louder
+            // than substituting a plausible default radius.
+            if (isNaN(minRadius) || isNaN(factor) || isNaN(offset)) return;
+            out.push({
+                ring: el.getAttribute('data-ring'),
+                radius: Math.max(minRadius, Math.min(cx, cy) * factor),
+                offset: offset,
+                label: el
+            });
+        });
+        return out;
     }
 
     function positionNodes() {
-        const container = document.getElementById('diagram-container');
-        const rect = container.getBoundingClientRect();
-        const cx = rect.width / 2;
-        const cy = rect.height / 2;
+        var container = document.getElementById('diagram-container');
+        if (!container) return;
+        var rect = container.getBoundingClientRect();
+        var cx = rect.width / 2;
+        var cy = rect.height / 2;
 
-        const hub = document.getElementById('main-hub');
-        hub.style.left = (cx - 60) + 'px';
-        hub.style.top = (cy - 60) + 'px';
-        nodes['hub'] = { x: cx, y: cy };
+        var hub = document.getElementById('main-hub');
+        if (hub) {
+            hub.style.left = (cx - 60) + 'px';
+            hub.style.top = (cy - 60) + 'px';
+        }
+        nodes = { hub: { x: cx, y: cy } };
 
-        // Remove old nodes
-        container.querySelectorAll('.arch-node').forEach(function(n) { n.remove(); });
-
-        var r1 = Math.max(160, Math.min(cx, cy) * 0.38);
-        var r2 = Math.max(300, Math.min(cx, cy) * 0.68);
-        var r3 = Math.max(430, Math.min(cx, cy) * 0.92);
-
-        var layer1 = INTERNAL_MODULES.filter(function(m) { return m.layer === 1; });
-        layer1.forEach(function(node, i) {
-            var angle = (i / layer1.length) * Math.PI * 2 - (Math.PI / 2);
-            renderNode(node, cx + Math.cos(angle) * r1, cy + Math.sin(angle) * r1);
-        });
-
-        var layer2 = INTERNAL_MODULES.filter(function(m) { return m.layer === 2; });
-        layer2.forEach(function(node, i) {
-            var angle = (i / layer2.length) * Math.PI * 2 + 0.3 - (Math.PI / 2);
-            renderNode(node, cx + Math.cos(angle) * r2, cy + Math.sin(angle) * r2);
-        });
-
-        EXTERNAL_SERVICES.forEach(function(node, i) {
-            var angle = (i / EXTERNAL_SERVICES.length) * Math.PI * 2 - 0.5 - (Math.PI / 2);
-            renderNode(node, cx + Math.cos(angle) * r3, cy + Math.sin(angle) * r3);
+        ringGeometry(cx, cy).forEach(function(g) {
+            var members = container.querySelectorAll('.arch-node[data-ring="' + g.ring + '"]');
+            members.forEach(function(el, i) {
+                var angle = (i / members.length) * Math.PI * 2 + g.offset - (Math.PI / 2);
+                var x = cx + Math.cos(angle) * g.radius;
+                var y = cy + Math.sin(angle) * g.radius;
+                el.style.left = (x - 53) + 'px';
+                el.style.top = (y - 35) + 'px';
+                nodes[el.getAttribute('data-id')] = { x: x, y: y };
+            });
+            // Clamped because the outer ring's label lands at -60px on a
+            // 1600x1000 viewport, outside the canvas. The code this replaced
+            // discarded its label markup instead of inserting it, so these
+            // have no visible baseline, and a label placed off-canvas would
+            // ship the same invisibility this conversion exists to remove.
+            g.label.style.top = Math.max(4, cy - g.radius - 55) + 'px';
         });
 
         drawConnections();
-        updateLabels(cx, cy, r1, r2, r3);
     }
 
-    function renderNode(data, x, y) {
-        var container = document.getElementById('diagram-container');
-        var div = document.createElement('div');
-        div.className = 'arch-node';
-        div.dataset.id = data.id;
-        div.style.left = (x - 53) + 'px';
-        div.style.top = (y - 35) + 'px';
-        nodes[data.id] = { x: x, y: y };
+    function paintStatus(text, color) {
+        var el = document.getElementById('arch-sim-status');
+        if (!el) return;
+        el.textContent = text;
+        el.style.color = color;
+    }
 
-        div.innerHTML = '<div class="node-card">'
-            + '<div class="node-icon"><i class="' + getIconClass(data.icon) + '"></i></div>'
-            + '<div class="node-name">' + data.name + '</div>'
-            + '</div>';
-        container.appendChild(div);
+    function connection(p1, p2, look, id) {
+        var el = document.createElementNS(SVG_NS, 'path');
+        el.setAttribute('d', 'M ' + p1.x + ' ' + p1.y + ' L ' + p2.x + ' ' + p2.y);
+        el.setAttribute('stroke', look.stroke);
+        el.setAttribute('stroke-width', look.width);
+        el.setAttribute('stroke-opacity', look.opacity);
+        el.setAttribute('class', look.cls);
+        if (id) el.setAttribute('id', id);
+        return el;
+    }
+
+    function packet(pathId, idx) {
+        var circle = document.createElementNS(SVG_NS, 'circle');
+        circle.setAttribute('r', '3');
+        circle.setAttribute('class', 'arch-packet');
+
+        var anim = document.createElementNS(SVG_NS, 'animateMotion');
+        anim.setAttribute('dur', (1.5 + (idx * 0.4)) + 's');
+        anim.setAttribute('repeatCount', 'indefinite');
+        anim.setAttribute('begin', (idx * 0.3) + 's');
+
+        var mpath = document.createElementNS(SVG_NS, 'mpath');
+        mpath.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#' + pathId);
+        anim.appendChild(mpath);
+        circle.appendChild(anim);
+        return circle;
     }
 
     function drawConnections() {
         var svg = document.getElementById('connections-svg');
-        svg.innerHTML = '';
-        var paths = WORKFLOW_PATHS[activeWorkflow];
-        if (!paths) return;
+        if (!svg) return;
+        svg.replaceChildren();
 
+        var host = slot();
         var isScenario = activeWorkflow !== 'default';
-        var activeNodeIds = {};
-        paths.forEach(function(p) { activeNodeIds[p.from] = true; activeNodeIds[p.to] = true; });
+        if (host && host.querySelector('[data-arch-topology-failed]')) {
+            paintStatus('Unavailable', 'var(--color-error)');
+        } else if (isScenario) {
+            paintStatus('Simulating', 'var(--primary)');
+        } else {
+            paintStatus('Ready', 'var(--success)');
+        }
 
-        // Also draw faint default connections as background when in a scenario
+        var paths = linksFor(activeWorkflow);
+        var activeNodeIds = {};
+        paths.forEach(function(p) {
+            activeNodeIds[p.getAttribute('data-from')] = true;
+            activeNodeIds[p.getAttribute('data-to')] = true;
+        });
+
+        // The full topology stays as a faint backdrop while a scenario runs.
         if (isScenario) {
-            WORKFLOW_PATHS['default'].forEach(function(conn) {
-                var p1 = nodes[conn.from];
-                var p2 = nodes[conn.to];
-                if (!p1 || !p2) return;
-                var bg = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                bg.setAttribute('d', 'M ' + p1.x + ' ' + p1.y + ' L ' + p2.x + ' ' + p2.y);
-                bg.setAttribute('stroke', 'var(--ion-border)');
-                bg.setAttribute('stroke-width', '1');
-                bg.setAttribute('stroke-opacity', '0.08');
-                bg.setAttribute('class', 'arch-conn');
-                svg.appendChild(bg);
+            linksFor('default').forEach(function(link) {
+                var ends = endpoints(link);
+                if (ends) svg.appendChild(connection(ends[0], ends[1], BACKDROP, null));
             });
         }
 
@@ -456,98 +280,60 @@
             if (!isScenario) {
                 n.classList.remove('dimmed', 'highlight');
             } else {
-                var isActive = activeNodeIds[n.dataset.id];
-                n.classList.toggle('highlight', !!isActive);
+                var isActive = !!activeNodeIds[n.getAttribute('data-id')];
+                n.classList.toggle('highlight', isActive);
                 n.classList.toggle('dimmed', !isActive);
             }
         });
 
-        // Update status text
-        var statusEl = document.getElementById('arch-sim-status');
-        if (statusEl) {
-            if (isScenario) {
-                statusEl.textContent = 'Simulating';
-                statusEl.style.color = 'var(--primary)';
-            } else {
-                statusEl.textContent = 'Ready';
-                statusEl.style.color = 'var(--success)';
-            }
-        }
-
-        paths.forEach(function(conn, idx) {
-            var p1 = nodes[conn.from];
-            var p2 = nodes[conn.to];
-            if (!p1 || !p2) return;
-
+        paths.forEach(function(link, idx) {
+            var ends = endpoints(link);
+            if (!ends) return;
             var pathId = 'flow-path-' + idx;
-
-            // Connection line
-            var line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            line.setAttribute('d', 'M ' + p1.x + ' ' + p1.y + ' L ' + p2.x + ' ' + p2.y);
-            line.setAttribute('id', pathId);
-            line.setAttribute('stroke', isScenario ? 'var(--primary)' : 'var(--ion-border)');
-            line.setAttribute('stroke-width', isScenario ? '2' : '1');
-            line.setAttribute('stroke-opacity', isScenario ? '0.6' : '0.2');
-            line.setAttribute('class', 'arch-conn' + (isScenario ? ' active-line' : ''));
-            svg.appendChild(line);
-
-            // Animated packet on scenario workflows
-            if (isScenario) {
-                var speed = 1.5 + (idx * 0.4);
-                var circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                circle.setAttribute('r', '3');
-                circle.setAttribute('class', 'arch-packet');
-
-                var anim = document.createElementNS('http://www.w3.org/2000/svg', 'animateMotion');
-                anim.setAttribute('dur', speed + 's');
-                anim.setAttribute('repeatCount', 'indefinite');
-                anim.setAttribute('begin', (idx * 0.3) + 's');
-
-                var mpath = document.createElementNS('http://www.w3.org/2000/svg', 'mpath');
-                mpath.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#' + pathId);
-                anim.appendChild(mpath);
-                circle.appendChild(anim);
-                svg.appendChild(circle);
-            }
+            svg.appendChild(connection(ends[0], ends[1], isScenario ? ACTIVE : IDLE, pathId));
+            if (isScenario) svg.appendChild(packet(pathId, idx));
         });
     }
 
-    function setWorkflow(id) {
-        activeWorkflow = id;
-        document.querySelectorAll('.workflow-card').forEach(function(card) {
-            card.classList.toggle('active', card.dataset.workflow === id);
+    var sidebar = document.querySelector('.arch-sidebar');
+    if (sidebar) {
+        sidebar.addEventListener('click', function(e) {
+            var card = e.target.closest('.workflow-card');
+            if (!card || !card.dataset.workflow) return;
+            activeWorkflow = card.dataset.workflow;
+            document.querySelectorAll('.workflow-card').forEach(function(c) {
+                c.classList.toggle('active', c.dataset.workflow === activeWorkflow);
+            });
+            drawConnections();
         });
-        drawConnections();
     }
-
-    function updateLabels(cx, cy, r1, r2, r3) {
-        var container = document.getElementById('labels-container');
-        container.innerHTML = ''
-            + '<div class="ring-label" data-ion-style="top:' + (cy - r1 - 55) + 'px">Core Cluster</div>'
-            + '<div class="ring-label" data-ion-style="top:' + (cy - r2 - 55) + 'px">System Services</div>'
-            + '<div class="ring-label" data-ion-style="top:' + (cy - r3 - 55) + 'px">External Integrations</div>';
-    }
-
-    // Event delegation for sidebar clicks
-    document.querySelector('.arch-sidebar').addEventListener('click', function(e) {
-        var card = e.target.closest('.workflow-card');
-        if (card && card.dataset.workflow) {
-            setWorkflow(card.dataset.workflow);
-        }
-    });
 
     window.addEventListener('resize', positionNodes);
 
-    // Init on DOM ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() {
-            positionNodes();
-            setTimeout(positionNodes, 150);
-        });
-    } else {
-        positionNodes();
-        setTimeout(positionNodes, 150);
+    function isSlot(e) {
+        var target = (e.detail && e.detail.target) || e.target;
+        return !!target && target.id === SLOT_ID;
     }
+
+    document.body.addEventListener('htmx:afterSwap', function(e) {
+        if (!isSlot(e)) return;
+        positionNodes();
+        // The original's second pass: the diagram viewport scrolls, so its
+        // measured size changes once after the first layout settles.
+        setTimeout(positionNodes, 150);
+    });
+
+    // htmx does not swap on a non-2xx, so the placeholder stays put. Say so on
+    // the badge rather than leave it reading "Ready" over an empty diagram.
+    ['htmx:responseError', 'htmx:sendError', 'htmx:timeout'].forEach(function(evt) {
+        document.body.addEventListener(evt, function(e) {
+            if (isSlot(e)) paintStatus('Unavailable', 'var(--color-error)');
+        });
+    });
+
+    // Runs before the fragment arrives, so it centres the hub and finds no
+    // rings. That keeps the hub placed even if the fragment never lands.
+    positionNodes();
 })();
 </script>
 {% endblock %}

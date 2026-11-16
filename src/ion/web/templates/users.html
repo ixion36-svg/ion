@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}User Management - ION{% endblock %}
+{% block page_id %}users{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
@@ -14,40 +15,65 @@
     <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Users</h1>
     <p class="mt-3 max-w-2xl text-[15px] text-slate-400">User accounts, roles and sessions.</p>
   </div>
-  <button data-click-action="showCreateUserModal" class="btn btn-primary">
-    <svg class="w-3.5 h-3.5"><use href="#i-plus"/></svg>
-    New User
-  </button>
+  {# New User is filled by an out-of-band swap from /ui/users, because
+     POST /api/users needs user:create and this shell cannot know whether the
+     viewer holds it: /users renders from server.py's `_PAGES` table, which
+     passes no context. The slot is empty until the fragment answers, so a
+     viewer who cannot create an account is never shown the button. #}
+  <div id="users-create-slot"></div>
 </section>
 
 <div class="card bg-base-200 shadow">
     <div class="card-body p-0">
+        {# Both controls stay out here, above the swap target, so a render
+           that says the read failed cannot take away the control that
+           retries it. Their values reach the fragment through hx-include,
+           which is on the container too and not only on the two controls:
+           Firefox restores a checkbox's state across a reload, so the first
+           request has to send whatever the box is actually showing. #}
         <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-base-300">
             <h2 class="card-title text-base">Users</h2>
-            <label class="label cursor-pointer justify-start gap-2 py-0 w-fit">
-                <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" id="include-inactive" data-change-action="loadUsers">
-                <span class="label-text">Show inactive users</span>
-            </label>
+            <div class="flex items-center gap-3">
+                <label class="label cursor-pointer justify-start gap-2 py-0 w-fit">
+                    {# value="true" rather than the browser's default "on":
+                       the route parses this into a bool, and "true" is what
+                       that parse is unambiguous about. An unticked box sends
+                       nothing and the route's default applies. #}
+                    <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
+                           id="include-inactive" name="include_inactive" value="true"
+                           hx-get="/ui/users"
+                           hx-target="#users-content"
+                           hx-include="#include-inactive"
+                           hx-swap="innerHTML">
+                    <span class="label-text">Show inactive users</span>
+                </label>
+                <button type="button" class="btn btn-ghost btn-sm"
+                        hx-get="/ui/users"
+                        hx-target="#users-content"
+                        hx-include="#include-inactive"
+                        hx-swap="innerHTML">Refresh</button>
+            </div>
         </div>
-        <div class="overflow-x-auto">
-            <table class="table table-sm" id="users-table">
-                <thead>
-                    <tr>
-                        <th>Username</th>
-                        <th>Email</th>
-                        <th>Display Name</th>
-                        <th>Roles</th>
-                        <th>Elastic UID</th>
-                        <th>Keycloak Sub</th>
-                        <th>Status</th>
-                        <th>Last Login</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="users-tbody">
-                    <tr><td colspan="9"><div class="flex justify-center items-center gap-2 py-8 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading users...</div></td></tr>
-                </tbody>
-            </table>
+
+        {# The table, its empty state and its failure state are rendered
+           whole by ion.web.ui.users_fragment. They used to be five
+           innerHTML writes built from template literals, with the role
+           names going in unescaped and last_login formatted by
+           new Date(...).toLocaleString() over a zoneless stamp.
+
+           hx-trigger="load" keeps this shell's first paint immediate and
+           the data arriving in its own request, which is what the fetch it
+           replaces already did. `users:changed`, fired by the four
+           mutations below, is a trigger on the same hx-get, so "reload the
+           table" has one definition and carries the filter with it. #}
+        <div id="users-content"
+             hx-get="/ui/users"
+             hx-trigger="load, users:changed from:body"
+             hx-include="#include-inactive"
+             hx-swap="innerHTML">
+            <div class="flex justify-center items-center gap-2 py-8 text-center opacity-50">
+                <span class="loading loading-spinner loading-sm text-primary"></span> Loading users...
+            </div>
         </div>
     </div>
 </div>
@@ -82,7 +108,16 @@
             </div>
             <fieldset class="fieldset p-0">
                 <legend class="fieldset-legend">Roles</legend>
-                <div id="new-user-roles"></div>
+                {# Each modal asks for its own copy of the picker. The two
+                   containers carry different field names, so one response
+                   fanned out to both would make its meaning depend on which
+                   one asked. #}
+                <div id="new-user-roles"
+                     hx-get="/ui/users/role-options?group=new"
+                     hx-trigger="load"
+                     hx-swap="innerHTML">
+                    <span class="loading loading-spinner loading-sm text-primary"></span>
+                </div>
             </fieldset>
             <div class="modal-action">
                 <button type="button" class="btn btn-ghost" data-click-action="closeModal" data-args='["create-user-modal"]'>Cancel</button>
@@ -146,7 +181,12 @@
             </div>
             <fieldset class="fieldset p-0">
                 <legend class="fieldset-legend">Roles</legend>
-                <div id="edit-user-roles"></div>
+                <div id="edit-user-roles"
+                     hx-get="/ui/users/role-options?group=edit"
+                     hx-trigger="load"
+                     hx-swap="innerHTML">
+                    <span class="loading loading-spinner loading-sm text-primary"></span>
+                </div>
             </fieldset>
             <div class="modal-action">
                 <button type="button" class="btn btn-ghost" data-click-action="closeModal" data-args='["edit-user-modal"]'>Cancel</button>
@@ -187,196 +227,37 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* JS toggles .show, not daisyUI .modal-open. Bridge the two. */
-#create-user-modal.show,
-#edit-user-modal.show,
-#reset-password-modal.show {
-    display: grid;
-    place-items: center;
-    pointer-events: auto;
-    visibility: visible;
-    opacity: 1;
-    background-color: oklch(0% 0 0 / 0.4);
-}
-#create-user-modal.show > .modal-box,
-#edit-user-modal.show > .modal-box,
-#reset-password-modal.show > .modal-box {
-    opacity: 1;
-    scale: 1;
-    translate: 0;
-    max-height: 90vh;
-}
-
-/* Role picker: per-role --role-color, hidden checkbox, :checked sibling glow.
-   No daisyUI selectable-card slot carries a CSS custom property this way. */
-.role-widgets { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
-.role-widget { display: block; cursor: pointer; }
-.role-widget-input { display: none; }
-.role-widget-card {
-  border: 2px solid var(--ion-border);
-  border-radius: 10px;
-  padding: 12px 14px;
-  background: var(--bg-card);
-  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
-}
-.role-widget:hover .role-widget-card { border-color: var(--border-bright); background: var(--bg-elevated); }
-.role-widget-input:checked ~ .role-widget-card {
-  border-color: var(--role-color, var(--primary));
-  background: var(--bg-elevated);
-  box-shadow: 0 0 16px -4px var(--role-color, var(--primary));
-}
-.role-widget-header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-.role-widget-icon { font-size: 16px; }
-.role-widget-tier {
-  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
-  color: var(--role-color, var(--primary)); font-family: 'JetBrains Mono', monospace;
-}
-.role-widget-check {
-  margin-left: auto; font-size: 14px; color: var(--role-color, var(--primary));
-  opacity: 0; transition: opacity 0.2s;
-}
-.role-widget-input:checked ~ .role-widget-card .role-widget-check { opacity: 1; }
-.role-widget-name {
-  font-size: 13px; font-weight: 600; color: var(--text-primary); text-transform: capitalize;
-  margin-bottom: 2px;
-}
-.role-widget-desc { font-size: 11px; color: var(--text-muted); line-height: 1.4; margin-bottom: 8px; }
-.role-widget-caps { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 6px; }
-.role-cap-pill {
-  font-size: 9px; padding: 1px 6px; border-radius: 4px;
-  background: rgba(255,255,255,0.05); border: 1px solid var(--ion-border);
-  color: var(--text-secondary); font-weight: 500;
-}
-.role-widget-input:checked ~ .role-widget-card .role-cap-pill {
-  background: color-mix(in srgb, var(--role-color) 10%, transparent);
-  border-color: color-mix(in srgb, var(--role-color) 20%, transparent);
-  color: var(--role-color);
-}
-.role-widget-perms { font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
-
-@media (max-width: 768px) {
-    #create-user-modal.show > .modal-box,
-    #edit-user-modal.show > .modal-box,
-    #reset-password-modal.show > .modal-box { max-height: 95vh; }
-}
-</style>
 <script nonce="{{ csp_nonce }}">
-let availableRoles = [];
+// escapeHtml(), ROLE_META, permissionCapabilities(), renderRoleCheckboxes(),
+// loadRoles() and loadUsers() are gone with the markup they served. Jinja
+// autoescapes, the ts macro renders last_login on the viewer's clock rather
+// than reading a zoneless stamp as local time, and the server decides which
+// of the four write controls each viewer is shown.
+//
+// The 401 branch loadUsers() carried is gone too: static/js/htmx-errors.js
+// is the one definition of what an expired session means, with a way back,
+// and this page no longer holds a second copy of that decision.
 
-async function loadRoles() {
-    try {
-        const response = await fetch('/api/roles');
-        if (response.ok) {
-            availableRoles = await response.json();
-            renderRoleCheckboxes();
-        }
-    } catch (error) {
-        console.error('Error loading roles:', error);
-    }
+// One definition of "what the table shows now". Every mutation below ends
+// here rather than patching rows it would have had to rebuild from strings.
+// It fires the container's own trigger, so the Show-inactive filter rides
+// along through the same hx-include the first paint used.
+function refreshUsers() {
+    document.body.dispatchEvent(new CustomEvent('users:changed'));
 }
 
-// Role metadata for widget rendering
-const ROLE_META = {
-  admin:              { tier: 'Admin',    color: '#f87171', icon: '&#9881;',  short: 'Full system access' },
-  analyst:            { tier: 'L1',       color: '#6de4ff', icon: '&#128270;', short: 'Alert triage & case creation' },
-  senior_analyst:     { tier: 'L2',       color: '#6de4ff', icon: '&#128269;', short: 'Case closure & enrichment' },
-  principal_analyst:  { tier: 'L3',       color: '#6de4ff', icon: '&#127919;', short: 'Playbooks, forensics & security' },
-  lead:               { tier: 'Lead',     color: '#a78bfa', icon: '&#128101;', short: 'Team oversight & operations' },
-  forensic:           { tier: 'DFIR',     color: '#f59e0b', icon: '&#128373;', short: 'Evidence & forensic investigations' },
-  soc_engineer:       { tier: 'Eng L1',   color: '#22c55e', icon: '&#128295;', short: 'Log onboarding & tooling' },
-  senior_engineer:    { tier: 'Eng L2',   color: '#22c55e', icon: '&#9881;',  short: 'Detection engineering & pipelines' },
-  platform_engineer:  { tier: 'Eng L3',   color: '#22c55e', icon: '&#127959;', short: 'Infrastructure & architecture' },
-  engineering:        { tier: 'Eng',      color: '#22c55e', icon: '&#128736;', short: 'Full engineering access' },
-};
-
-// Group permissions into capability areas for display
-function permissionCapabilities(perms) {
-  const caps = [];
-  if (perms.some(p => p.startsWith('alert:')))      caps.push('Alerts');
-  if (perms.some(p => p.startsWith('case:')))        caps.push('Cases');
-  if (perms.some(p => p.startsWith('observable:')))  caps.push('Observables');
-  if (perms.some(p => p.startsWith('playbook:')))    caps.push('Playbooks');
-  if (perms.some(p => p.startsWith('forensic:')))    caps.push('Forensics');
-  if (perms.some(p => p.startsWith('integration:'))) caps.push('Integrations');
-  if (perms.some(p => p.startsWith('security:')))    caps.push('Security');
-  if (perms.some(p => p.startsWith('system:')))      caps.push('System');
-  if (perms.includes('ai:chat'))                     caps.push('AI');
-  if (perms.includes('discover:read'))               caps.push('Discover');
-  return caps;
+// A picker whose read failed holds no checked boxes, and `roles: []` is not
+// "leave the roles alone" to PUT /api/users/{id}/roles: it strips every role
+// the account holds. The fragment marks that state, so a save cannot turn a
+// failed read into a silent de-provisioning.
+function rolesUnreadable(containerId) {
+    return !!document.querySelector('#' + containerId + ' [data-roles-unreadable]');
 }
 
-function renderRoleCheckboxes() {
-  const containers = ['new-user-roles', 'edit-user-roles'];
-  containers.forEach(containerId => {
-    const container = document.getElementById(containerId);
-    container.innerHTML = '<div class="role-widgets">' + availableRoles.map(role => {
-      const meta = ROLE_META[role.name] || { tier: '?', color: '#64748b', icon: '&#9632;', short: role.description || '' };
-      const caps = permissionCapabilities(role.permissions || []);
-      const permCount = (role.permissions || []).length;
-      return `
-        <label class="role-widget" data-ion-style="--role-color:${meta.color}">
-          <input type="checkbox" value="${role.name}" name="${containerId}" class="role-widget-input">
-          <div class="role-widget-card">
-            <div class="role-widget-header">
-              <span class="role-widget-icon">${meta.icon}</span>
-              <span class="role-widget-tier">${meta.tier}</span>
-              <span class="role-widget-check">&#10003;</span>
-            </div>
-            <div class="role-widget-name">${role.name.replace(/_/g, ' ')}</div>
-            <div class="role-widget-desc">${meta.short}</div>
-            <div class="role-widget-caps">${caps.map(c => '<span class="role-cap-pill">' + c + '</span>').join('')}</div>
-            <div class="role-widget-perms">${permCount} permissions</div>
-          </div>
-        </label>`;
-    }).join('') + '</div>';
-  });
-}
-
-async function loadUsers() {
-    const includeInactive = document.getElementById('include-inactive').checked;
-    const tbody = document.getElementById('users-tbody');
-    tbody.innerHTML = '<tr><td colspan="9"><div class="flex justify-center items-center gap-2 py-8 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading users...</div></td></tr>';
-
-    try {
-        const response = await fetch(`/api/users?include_inactive=${includeInactive}`);
-        if (response.status === 401) {
-            window.location.href = '/login?redirect=/users';
-            return;
-        }
-        if (response.status === 403) {
-            tbody.innerHTML = '<tr><td colspan="9"><div class="alert alert-warning m-4">Access denied. Admin privileges required.</div></td></tr>';
-            return;
-        }
-        const users = await response.json();
-
-        if (users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" class="text-center opacity-50 py-8">No users found</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = users.map(user => `
-            <tr class="${user.is_active ? '' : 'opacity-50'}">
-                <td>${escapeHtml(user.username)}</td>
-                <td>${escapeHtml(user.email)}</td>
-                <td>${escapeHtml(user.display_name || '-')}</td>
-                <td>${user.roles.map(r => `<span class="badge badge-sm badge-ghost">${r}</span>`).join(' ')}</td>
-                <td class="font-mono text-[.72rem] max-w-[180px] overflow-hidden text-ellipsis" data-ion-style="color:${user.elastic_uid ? 'var(--primary)' : 'var(--text-muted)'}" title="${escapeHtml(user.elastic_uid || '')}">${escapeHtml(user.elastic_uid || '-')}${user.elastic_username ? '<br><span class="text-[var(--text-secondary)] text-[.65rem]">' + escapeHtml(user.elastic_username) + '</span>' : ''}</td>
-                <td class="font-mono text-[.72rem] max-w-[180px] overflow-hidden text-ellipsis" data-ion-style="color:${user.keycloak_sub ? 'var(--primary)' : 'var(--text-muted)'}" title="${escapeHtml(user.keycloak_sub || '')}">${escapeHtml(user.keycloak_sub || '-')}</td>
-                <td><span class="badge ${user.is_active ? 'badge-success' : 'badge-ghost'}">${user.is_active ? 'Active' : 'Inactive'}</span></td>
-                <td>${user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}</td>
-                <td>
-                    <div class="flex flex-wrap gap-2">
-                    <button class="btn btn-ghost btn-sm" data-click-action="showEditUserModal" data-args='[${user.id}]'>Edit</button>
-                    <button class="btn btn-ghost btn-sm" data-click-action="showResetPasswordModal" data-args='[${user.id}, "${escapeHtml(user.username)}"]'>Reset Password</button>
-                    <button class="btn btn-error btn-sm" data-click-action="deleteUser" data-args='[${user.id}, "${escapeHtml(user.username)}"]'>Delete</button>
-                    </div>
-                </td>
-            </tr>
-        `).join('');
-    } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="9"><div class="alert alert-error m-4">Error loading users</div></td></tr>';
-    }
+function selectedRoles(containerId) {
+    return Array.from(
+        document.querySelectorAll('#' + containerId + ' input:checked')
+    ).map(cb => cb.value);
 }
 
 function showCreateUserModal() {
@@ -388,8 +269,11 @@ function showCreateUserModal() {
 async function createUser(event) {
     event.preventDefault();
 
-    const roles = Array.from(document.querySelectorAll('#new-user-roles input:checked'))
-        .map(cb => cb.value);
+    if (rolesUnreadable('new-user-roles')) {
+        showToast('The role list could not be read. Reopen the dialog before creating the account.', 'error');
+        return;
+    }
+    const roles = selectedRoles('new-user-roles');
 
     const data = {
         username: document.getElementById('new-username').value,
@@ -410,7 +294,7 @@ async function createUser(event) {
         if (response.ok) {
             showToast('User created successfully', 'success');
             closeModal('create-user-modal');
-            loadUsers();
+            refreshUsers();
         } else {
             showToast(result.detail || 'Error creating user', 'error');
         }
@@ -421,7 +305,7 @@ async function createUser(event) {
 
 async function showEditUserModal(userId) {
     try {
-        const response = await fetch(`/api/users/${userId}`);
+        const response = await fetch('/api/users/' + userId);
         const user = await response.json();
 
         document.getElementById('edit-user-id').value = user.id;
@@ -434,7 +318,6 @@ async function showEditUserModal(userId) {
         document.getElementById('edit-keycloak-sub').value = user.keycloak_sub || '';
         document.getElementById('edit-is-active').checked = user.is_active;
 
-        // Set role checkboxes
         document.querySelectorAll('#edit-user-roles input').forEach(cb => {
             cb.checked = user.roles.includes(cb.value);
         });
@@ -449,8 +332,11 @@ async function updateUser(event) {
     event.preventDefault();
 
     const userId = document.getElementById('edit-user-id').value;
-    const roles = Array.from(document.querySelectorAll('#edit-user-roles input:checked'))
-        .map(cb => cb.value);
+    if (rolesUnreadable('edit-user-roles')) {
+        showToast('The role list could not be read, so saving would clear this account’s roles. Reopen the dialog first.', 'error');
+        return;
+    }
+    const roles = selectedRoles('edit-user-roles');
 
     const userData = {
         username: document.getElementById('edit-username').value,
@@ -462,8 +348,7 @@ async function updateUser(event) {
     };
 
     try {
-        // Update user info
-        let response = await fetch(`/api/users/${userId}`, {
+        let response = await fetch('/api/users/' + userId, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(userData)
@@ -475,8 +360,7 @@ async function updateUser(event) {
             return;
         }
 
-        // Update roles
-        response = await fetch(`/api/users/${userId}/roles`, {
+        response = await fetch('/api/users/' + userId + '/roles', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ roles })
@@ -485,7 +369,7 @@ async function updateUser(event) {
         if (response.ok) {
             showToast('User updated successfully', 'success');
             closeModal('edit-user-modal');
-            loadUsers();
+            refreshUsers();
         } else {
             const result = await response.json();
             showToast(result.detail || 'Error updating roles', 'error');
@@ -513,7 +397,7 @@ async function resetPassword(event) {
     };
 
     try {
-        const response = await fetch(`/api/users/${userId}/reset-password`, {
+        const response = await fetch('/api/users/' + userId + '/reset-password', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
@@ -531,17 +415,20 @@ async function resetPassword(event) {
     }
 }
 
+// The server withholds this button on the viewer's own row, because the
+// route refuses it. The confirm stays: it is the only thing between a click
+// and a deleted account.
 async function deleteUser(userId, username) {
-    if (!confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) {
+    if (!confirm('Are you sure you want to delete user "' + username + '"? This action cannot be undone.')) {
         return;
     }
 
     try {
-        const response = await fetch(`/api/users/${userId}`, { method: 'DELETE' });
+        const response = await fetch('/api/users/' + userId, { method: 'DELETE' });
 
         if (response.ok) {
             showToast('User deleted successfully', 'success');
-            loadUsers();
+            refreshUsers();
         } else {
             const result = await response.json();
             showToast(result.detail || 'Error deleting user', 'error');
@@ -559,8 +446,18 @@ function closeModal(modalId) {
     document.getElementById(modalId).classList.remove('show');
 }
 
-// Initialize
-loadRoles();
-loadUsers();
+// event-delegation.js resolves every data-click-action and
+// data-submit-action name through window[], and four of the names below are
+// rendered by the fragment rather than written in this file, so the
+// bindings are stated rather than left to the implicit globals that function
+// declarations happen to create.
+window.showCreateUserModal = showCreateUserModal;
+window.createUser = createUser;
+window.showEditUserModal = showEditUserModal;
+window.updateUser = updateUser;
+window.showResetPasswordModal = showResetPasswordModal;
+window.resetPassword = resetPassword;
+window.deleteUser = deleteUser;
+window.closeModal = closeModal;
 </script>
 {% endblock %}

@@ -1,0 +1,38 @@
+{% macro manage(nodes, depth) %}
+{%- for f in nodes %}
+<div class="{% if depth > 0 %}folder-manage-children{% endif %}">
+  <div class="folder-manage-item">
+    <div class="folder-manage-info">
+      <span>{% if f.children %}<i class="icon-folder-open"></i>{% else %}<i class="icon-folder"></i>{% endif %}</span>
+      <span>{{ f.name if f.name is not none else 'Unnamed folder' }}</span>
+      <span class="folder-manage-counts">
+        {%- if f.templates is not none %}{{ f.templates }} templates{% else %}templates unknown{% endif %},
+        {% if f.documents is not none %}{{ f.documents }} docs{% else %}docs unknown{% endif %}
+      </span>
+    </div>
+    <div>
+      {#- Delete needs template:delete, and the page offered it to every
+          reader. Its argument went through JSON.stringify inside a
+          single-quoted attribute, so a folder called "Bob's folder" closed
+          the attribute early and the button did nothing. -#}
+      {%- if may_delete %}
+      <button class="btn btn-sm btn-danger" data-click-action="deleteFolder"
+              data-args='{{ [f.id, f.name]|tojson }}'>Delete</button>
+      {%- endif %}
+    </div>
+  </div>
+  {%- if f.children %}{{ manage(f.children, depth + 1) }}{% endif %}
+</div>
+{%- endfor %}
+{% endmacro %}
+{# The manage panel's folder tree, from ui/documents.py's folders_view. #}
+{% if state == 'withheld' %}
+<p class="doc-filter-notice">Managing folders needs permission to read the
+  folder hierarchy, which this account does not have.</p>
+{% elif state == 'failed' %}
+<p class="doc-filter-notice">Folders unavailable: the hierarchy did not answer.</p>
+{% elif state == 'empty' %}
+<p class="empty-state">No folders yet. Create one above!</p>
+{% else %}
+{{ manage(nodes, 0) }}
+{% endif %}

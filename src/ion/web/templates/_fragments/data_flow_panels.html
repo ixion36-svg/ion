@@ -1,0 +1,109 @@
+{# The two mock-up panels the page used to build from strings.
+
+   `renderWinlog()` returned one 22-line template literal and
+   `renderKibana()` returned another, and both were written in with
+   `innerHTML` at three call sites. Every rule frontend/ion-pages.css
+   carries for `.df-winlog*`, `.df-kibana*`, `.df-kib-table`,
+   `.df-kib-json`, `.df-kib-missing`, `.df-kib-present` and `.df-kib-alert`
+   was therefore out of reach of a stylesheet sweep.
+
+   They are macros rather than two more fragments because the Kibana panel
+   is needed three times in one response: once as the end stage of whichever
+   pipeline is selected, and twice side by side in the comparison. A
+   separate request per copy would be three requests to say the same thing. #}
+
+{% macro winlog() -%}
+{# Static markup, unchanged from the string renderWinlog() returned. It
+   describes the raw Event 4728 both pipelines start from, so it takes no
+   arguments: there is nothing per-flow about the source event, which is the
+   page's whole point. #}
+<div class="df-winlog">
+    <div class="df-winlog-titlebar">
+        <span><i class="icon-server mr-1.5"></i> Event Viewer - [Event 4728, Security]</span>
+        <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot red"></div></div>
+    </div>
+    <div class="df-winlog-body">
+        <h4>General</h4>
+        <p class="mt-0 mr-0 mb-3 ml-0">A member was added to a security-enabled global group.</p>
+        <div class="df-winlog-row"><span class="lbl">Keywords:</span><span class="val">Audit Success</span></div>
+        <div class="df-winlog-row"><span class="lbl">Event ID:</span><span class="val df-event-id">4728</span></div>
+        <div class="df-winlog-row"><span class="lbl">Task Category:</span><span class="val">Security Group Management</span></div>
+        <div class="df-winlog-detail">
+            <p class="df-winlog-section">Member Information:</p>
+            <p>Member Name: <span class="hl-blue">CN=John Doe,OU=Users,DC=Corp</span></p>
+            <p>Member SID: S-1-5-21-345...-1001</p>
+            <p class="df-winlog-section">Group Information:</p>
+            <p>Target Name: <strong>Privileged_Admins</strong></p>
+            <p class="df-winlog-section">Subject (Admin):</p>
+            <p>Account Name: <span class="hl-orange">Admin_Bob</span></p>
+        </div>
+    </div>
+</div>
+{%- endmacro %}
+
+{% macro kibana(end_state, view, table_url, json_url) -%}
+{# One pipeline's end state in Elastic Security.
+
+   The Table/JSON control is inside this panel because that is where it was
+   and where it reads, and both URLs are passed in already built: the caller
+   is the only thing that knows whether this panel is the selected stage or
+   one half of the comparison, and a URL assembled here would be a second
+   definition of the page's state. Each is one value, so Jinja escapes the
+   whole of it and the `&` separators come back out of getAttribute intact.
+
+   `end_state.missing` is tested three ways on purpose. False means the
+   target user survived the pipeline and is named; true means it was
+   dropped; anything else means nobody established which. Folding the third
+   case into the second would print a forensic identity as PRESENT on the
+   strength of not knowing, which is the opposite of what this page is for. #}
+<div class="df-kibana" data-df-end-state="{{ end_state.side }}">
+    <div class="df-kibana-header">
+        <span>Elastic Security | Privilege Audit</span>
+        <div class="df-kibana-toggle">
+            <button class="{{ 'active' if view == 'table' else '' }}"
+                    data-df-view="table"
+                    hx-get="{{ table_url }}"
+                    hx-target="#df-view"
+                    hx-swap="innerHTML">Table</button>
+            <button class="{{ 'active' if view == 'json' else '' }}"
+                    data-df-view="json"
+                    hx-get="{{ json_url }}"
+                    hx-target="#df-view"
+                    hx-swap="innerHTML">JSON</button>
+        </div>
+    </div>
+    <div class="df-kibana-body">
+        {% if view == 'json' %}
+        {# No whitespace inside the element: `.df-kib-json` is `white-space:
+           pre`, so an indented newline would print as a blank first line.
+           Jinja escapes the quotes to `&#34;`, which the browser decodes on
+           parse, so the document reads exactly as JSON.stringify left it
+           and the hand-rolled escHtml() is gone. #}
+        <div class="df-kib-json">{{ end_state.payload_json }}</div>
+        {% else %}
+        <table class="df-kib-table">
+            <thead><tr><th>Admin User</th><th>Action</th><th>Target Group</th><th>Target User</th></tr></thead>
+            <tbody><tr>
+                <td class="text-[var(--warning)] font-bold">Admin_Bob</td>
+                <td class="text-[var(--text-secondary)]">Added Member</td>
+                <td class="text-[var(--info)] font-semibold">Privileged_Admins</td>
+                <td>
+                    {%- if end_state.missing is true -%}
+                    <span class="df-kib-missing"><i class="icon-eye-off"></i> MISSING</span>
+                    {%- elif end_state.missing is false -%}
+                    <span class="df-kib-present">{{ end_state.target_user }}</span>
+                    {%- else -%}
+                    <span class="df-kib-missing"><i class="icon-eye-off"></i> UNKNOWN</span>
+                    {%- endif -%}
+                </td>
+            </tr></tbody>
+        </table>
+        {% endif %}
+        {% if end_state.missing is true %}
+        <div class="df-kib-alert">
+            <p><strong>Alert:</strong> The identity of the user being added is missing. Forensic correlation is impossible without manually checking raw logs on the DC.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{%- endmacro %}

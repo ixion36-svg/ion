@@ -1,0 +1,49 @@
+{% import '_fragments/analytics_state.html' as st %}
+{% macro rows(items, heading, reference) %}
+<div class="stale-section">
+  <h3>{{ heading }} <span class="stale-badge">{{ items|length }}</span></h3>
+  <table class="analytics-table">
+    <thead><tr>
+      <th>{{ reference }}</th><th>Title</th><th>Severity</th>
+      <th>Assigned To</th><th>Last Activity</th><th>Days Stale</th>
+    </tr></thead>
+    <tbody>
+      {%- for r in items %}
+      <tr>
+        <td>{% if r.reference %}<a href="/cases">{{ r.reference }}</a>{% else %}<span class="an-absent" title="This row carried no reference"></span>{% endif %}</td>
+        <td>{{ r.title if r.title is not none else '' }}</td>
+        {#- A severity the payload did not carry is not a medium one. -#}
+        <td><span class="severity-badge severity-{{ r.severity_key }}">
+          {{- r.severity_label or 'unknown' -}}
+        </span></td>
+        <td>{% if r.assigned %}{{ r.assigned }}{% else %}<span class="an-absent" title="This row carried no assignee">Unassigned</span>{% endif %}</td>
+        <td class="run-time">{% if r.last_activity %}{{ r.last_activity }}{% else %}<span class="an-absent" title="This row carried no last activity"></span>{% endif %}</td>
+        {#- `days > 7 ? 'danger' : 'warn'` is false for a missing figure,
+            so a row with no staleness was drawn as the milder state and
+            then labelled "undefinedd". -#}
+        <td class="days-stale{% if r.urgent is true %} danger{% elif r.urgent is false %} warn{% endif %}">
+          {%- if r.days is not none %}{{ r.days }}d
+          {%- else %}<span class="an-absent" title="This row carried no staleness figure"></span>{% endif %}
+        </td>
+      </tr>
+      {%- endfor %}
+    </tbody>
+  </table>
+</div>
+{% endmacro %}
+{# Stale investigations, from ui/analytics.py's stale_view. #}
+{% if job.state != 'ok' %}
+{{ st.job_notice(job) }}
+{% else %}
+{%- if cases is none and alerts is none %}
+{{ st.unreadable_list('stale cases and alerts') }}
+{%- elif not (cases or alerts) and cases is not none and alerts is not none %}
+<div class="empty-state">No stale investigations found. All items have
+  recent activity.</div>
+{%- else %}
+{%- if cases is none %}{{ st.unreadable_list('stale cases') }}
+{%- elif cases %}{{ rows(cases, 'Stale Cases', 'Case') }}{% endif %}
+{%- if alerts is none %}{{ st.unreadable_list('stale alerts') }}
+{%- elif alerts %}{{ rows(alerts, 'Stale Alerts', 'Alert') }}{% endif %}
+{%- endif %}
+{% endif %}

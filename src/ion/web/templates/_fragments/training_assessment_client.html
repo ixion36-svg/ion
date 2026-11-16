@@ -1,0 +1,24 @@
+<template id="training-rm-message"><div class="rm-loading" role="status"></div></template>
+<template id="training-rm-grid"><div class="rm-role-grid"></div></template>
+<template id="training-rm-role"><div class="rm-role-card" data-click-action="rmStartAssessment"><div class="rm-role-name"><span class="rm-role-tier"></span><span data-field="name"></span></div><div class="rm-role-desc"></div><div class="rm-role-meta"></div></div></template>
+<template id="training-rm-questionnaire"><div><div class="rm-header"><h2></h2><p class="rm-sub"></p><div class="rm-rating-legend"></div></div><div data-field="areas"></div><div class="rm-submit"><button class="btn btn-secondary" data-click-action="rmShowRolePicker">Cancel</button><button class="btn btn-primary" id="rm-submit-btn" data-click-action="rmSubmit">Submit</button></div></div></template>
+<template id="training-rm-rating"><span><strong></strong> <span></span></span></template>
+<template id="training-rm-area"><div class="rm-area"><div class="rm-area-name"></div><div data-field="questions"></div></div></template>
+<template id="training-rm-question"><div class="rm-question"><div class="rm-q-text"></div><div class="rm-q-guidance"></div><div class="rm-q-rate"></div></div></template>
+<template id="training-rm-rate"><button data-click-action="rmRate"></button></template>
+<template id="training-rm-result"><div><div class="rm-result-overall"><div class="rm-result-ring"><div class="rm-result-inner"><div class="rm-result-pct"></div><div class="rm-result-label">Match</div></div></div><div class="rm-result-text"><h3></h3><p></p></div></div><div class="rm-areas-grid"></div><div data-field="recommendations"></div><div class="rm-submit"><button class="btn btn-secondary" data-click-action="rmShowHistory">View History</button><button class="btn btn-primary" data-click-action="rmShowRolePicker">New Assessment</button></div></div></template>
+<template id="training-rm-bar"><div class="rm-area-bar"><div class="rm-area-bar-head"><span class="rm-area-bar-name"></span><span class="rm-area-bar-pct"></span></div><div class="rm-bar"><div class="rm-bar-fill"></div></div></div></template>
+<template id="training-rm-block"><div class="rm-rec-block"><h4><span data-field="title"></span> <span class="badge"></span></h4><div class="rm-rec-list"></div></div></template>
+<template id="training-rm-recommendation"><div class="rm-rec-item"><strong></strong><div class="rm-rec-meta"></div></div></template>
+<template id="training-rm-summary"><div class="rm-rec-block"><h4>AI tutor — your 4-week study plan</h4><div class="rm-ai-summary"></div></div></template>
+<template id="training-rm-history"><table class="rm-history-table"><thead><tr><th>Date</th><th>Role</th><th>Match</th><th>Level</th><th></th></tr></thead><tbody></tbody></table></template>
+<template id="training-rm-history-row"><tr data-click-action="rmRenderResult"><td data-field="date"></td><td data-field="role"></td><td><strong></strong></td><td data-field="level"></td><td><button class="btn btn-secondary btn-sm" data-click-action="rmRenderResult" data-stop-propagation>View</button></td></tr></template>
+<template id="training-cr-domain"><div class="cr-domain-col"><div class="cr-domain-header"><i class="cr-dh-icon"></i><span class="cr-dh-name"></span></div></div></template>
+<template id="training-cr-level"><div class="cr-level-row"></div></template>
+<template id="training-cr-cert"><div class="cr-cert" data-click-action="crShowDetail"><span class="cr-cert-dot"></span><span data-field="abbr"></span> <span class="cr-cert-cost"></span></div></template>
+<template id="training-cr-legend"><span class="cr-legend-item"><span class="cr-legend-swatch"></span><span data-field="provider"></span></span></template>
+<template id="training-cr-option"><option></option></template>
+<template id="training-cr-detail"><div><div class="cr-d-header"><div><div class="cr-d-title"></div><div class="cr-d-provider"></div></div><button class="cr-d-close" data-click-action="crCloseDetail">&times;</button></div><div class="cr-d-stats"></div><div class="cr-d-desc"></div><div class="cr-d-section" data-field="prereqs"><h4>Prerequisites / Recommended</h4><div></div></div><div class="cr-d-section"><h4>Topics Covered</h4><div class="cr-d-tags"></div></div></div></template>
+<template id="training-cr-stat"><div class="cr-d-stat"><span class="cr-d-stat-label"></span><span class="cr-d-stat-value"></span></div></template>
+<template id="training-cr-prereq"><span class="cr-d-prereq-chip" data-click-action="crShowDetail"></span></template>
+<template id="training-cr-topic"><span class="cr-d-tag"></span></template>

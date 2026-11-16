@@ -1,0 +1,172 @@
+{# Threat Intel: the report detail slide-over.
+
+   Replaces three innerHTML sites in tiOpenReport, and swaps the panel's
+   heading out of band so a failed read replaces the previous report's
+   title rather than leaving it above a message about a different one.
+
+   Seven sections, in the order the page built them, over the keys the
+   endpoint actually returns: types, source, confidence and published in a
+   meta row, labels, body, related_actors, related_ttps, related_malware,
+   related_vulns, the country and sector pair, and related_indicators.
+
+   `secs.join('') || '<em>No content available.</em>'` was the page's whole
+   empty handling. That reading is right for a report OpenCTI holds with
+   nothing in it and wrong for a read that failed, which the catch worded
+   separately. Both are kept, and a payload that is not a mapping is a
+   third case rather than rendering nothing at all.
+
+   The report body is escaped text. OpenCTI report bodies are prose from an
+   external feed and ION has no server-side HTML sanitiser, which
+   ui/template_render.py and the alerts case conversion both record. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{# The heading, out of band. #}
+<h3 class="text-base m-0 text-[var(--ion-cyan,#6de4ff)] font-mono" id="ti-report-panel-title" hx-swap-oob="innerHTML">
+  {%- if not configured -%}
+    Report unavailable
+  {%- elif failed or report is none -%}
+    Report could not be read
+  {%- else -%}
+    {{ report.get('name') or 'Report' }}
+  {%- endif -%}
+</h3>
+
+{% if not configured %}
+  <div class="ti-empty">
+    OpenCTI is not configured, so this report cannot be fetched. This is a
+    deployment setting rather than a fault.
+  </div>
+{% elif failed or report is none %}
+  <div class="ti-empty text-[var(--danger)]" role="alert">
+    This report could not be read. Nothing in this panel is known about it:
+    not its content, not its labels, not the actors, malware or indicators
+    it names. Open it again from the Reports tab to try.
+    {% if error %}<div class="mt-1 font-mono text-[.72rem] opacity-80">Reason: {{ error }}</div>{% endif %}
+  </div>
+{% else %}
+  {%- set types = report.get('types') or [] -%}
+  {%- set confidence = report.get('confidence') -%}
+  {%- set labels = report.get('labels') or [] -%}
+  {%- set actors = report.get('related_actors') or [] -%}
+  {%- set ttps = report.get('related_ttps') or [] -%}
+  {%- set malware = report.get('related_malware') or [] -%}
+  {%- set vulns = report.get('related_vulns') or [] -%}
+  {%- set countries = report.get('related_countries') or [] -%}
+  {%- set sectors = report.get('related_sectors') or [] -%}
+  {%- set indicators = report.get('related_indicators') or [] -%}
+
+  {% if report.get('published') or types or report.get('source') or confidence is not none %}
+    <div class="text-[.72rem] text-[var(--text-muted)] mt-1.5 font-mono ti-detail-section">
+      {%- set parts = [] -%}
+      {%- if types %}{% set _ = parts.append(types|join(', ')) %}{% endif -%}
+      {%- if report.get('source') %}{% set _ = parts.append('Source: ' ~ report.get('source')) %}{% endif -%}
+      {# `is not none`. A report assessed at zero confidence is a finding;
+         one with no recorded confidence is not. The page had this right
+         with an explicit null check and it is kept. #}
+      {%- if confidence is not none %}{% set _ = parts.append('Confidence: ' ~ confidence ~ '%') %}{% endif -%}
+      {%- if report.get('published') -%}{{ ts(report.get('published'), 'date') }}{% if parts %} &middot; {% endif %}{%- endif -%}
+      {{ parts|join(' · ') }}
+    </div>
+  {% endif %}
+
+  {% if labels %}
+    <div class="ti-detail-section">
+      {% for l in labels %}<span class="ti-tag">{{ l.get('value') if l is mapping else l }}</span> {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if report.get('body') %}
+    <div class="ti-detail-section">
+      <h4>Report Content</h4>
+      <p class="ti-report-body">{{ report.get('body') }}</p>
+    </div>
+  {% endif %}
+
+  {% if actors %}
+    <div class="ti-detail-section">
+      <h4>Threat Actors</h4>
+      <ul class="list-none p-0 m-0">
+        {% for a in actors %}
+          <li class="py-1 px-0 text-[.8rem]">
+            <span class="text-[var(--ion-cyan,#6de4ff)]">{{ a.get('name') or '' }}</span>
+            {%- set aliases = a.get('aliases') or [] -%}
+            {%- if aliases %} <span class="ml-1.5 text-[var(--text-primary)]">({{ aliases|join(', ') }})</span>{% endif -%}
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  {% if ttps %}
+    <div class="ti-detail-section">
+      <h4>MITRE ATT&amp;CK</h4>
+      <div class="ti-ttp-list">
+        {%- for t in ttps -%}
+          {# Only a technique with a MITRE id can be drilled into, which is
+             what the page did: the drill endpoint keys on that id. One
+             without an id is still a technique OpenCTI recorded, so it
+             renders as plain text rather than a control that cannot work.
+             A button rather than a clickable span, so it is reachable by
+             keyboard. #}
+          {%- if t.get('mitre_id') -%}
+            <button type="button" class="ti-ttp bg-transparent border-0 cursor-pointer"
+                    data-click-action="tiCloseAndDrillTechnique"
+                    data-args='[{{ t.get('mitre_id')|tojson }}]'>{{ t.get('mitre_id') }} &mdash; {{ t.get('name') or '' }}</button>
+          {%- else -%}
+            <span class="ti-ttp">{{ t.get('name') or '' }}</span>
+          {%- endif -%}
+        {%- endfor -%}
+      </div>
+    </div>
+  {% endif %}
+
+  {% if malware %}
+    <div class="ti-detail-section">
+      <h4>Malware</h4>
+      <div class="ti-ttp-list">
+        {% for m in malware %}<span class="ti-tag">{{ m.get('name') or '' }}</span> {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  {% if vulns %}
+    <div class="ti-detail-section">
+      <h4>Vulnerabilities</h4>
+      <div class="ti-ttp-list">
+        {%- for v in vulns -%}<span class="ti-ttp">{{ v.get('name') or '' }}</span>{%- endfor -%}
+      </div>
+    </div>
+  {% endif %}
+
+  {% if countries or sectors %}
+    <div class="ti-detail-section">
+      {% if countries %}<h4>Target Countries</h4><p>{{ countries|join(', ') }}</p>{% endif %}
+      {% if sectors %}<h4>Target Sectors</h4><p>{{ sectors|join(', ') }}</p>{% endif %}
+    </div>
+  {% endif %}
+
+  {% if indicators %}
+    <div class="ti-detail-section">
+      {# The count shown is how many are displayed, with a plus when the
+         list was cut, which is what the page did. The endpoint already caps
+         at 20 and the panel shows 10. #}
+      <h4>Indicators <span class="text-[var(--text-secondary)] font-normal text-xs">({{ [indicators|length, indicator_limit]|min }}{% if indicators|length > indicator_limit %}+{% endif %})</span></h4>
+      <ul class="list-none p-0 m-0">
+        {% for i in indicators[:indicator_limit] %}
+          <li class="py-1.5 px-0 border-b-[1px] border-b-[var(--ion-border)] text-[.8rem]">
+            <code class="text-xs text-[var(--text-muted)]">{{ i.get('pattern') or '' }}</code>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  {% if not (report.get('published') or types or report.get('source') or confidence is not none
+             or labels or report.get('body') or actors or ttps or malware or vulns
+             or countries or sectors or indicators) %}
+    {# Every section absent. A real finding about a thin report, and
+       distinct from the read having failed. #}
+    <em class="text-[.78rem] text-[var(--text-secondary)]">No content available for this report.</em>
+  {% endif %}
+{% endif %}

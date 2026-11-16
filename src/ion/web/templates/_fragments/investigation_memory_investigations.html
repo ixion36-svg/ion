@@ -1,0 +1,6 @@
+{% from "_fragments/_time.html" import ts %}
+{% from "_fragments/investigation_memory_macros.html" import number, pill, duration %}
+{% if data is none %}<tr><td colspan="8" class="text-error">Could not read investigations. Retry the read.</td></tr>
+{% else %}{% for r in data.investigations %}<tr class="cursor-pointer" data-click-action="imShowInv" data-args='[{{ r.id }}]'>
+<td>{{ ts(r.created_at) }}</td><td>{{ r.alert_signature }}</td><td>{{ r.host or '-' }}</td><td>{{ r.user_name or '-' }}</td><td>{{ pill(plain(r.status)) }}</td><td>{{ pill(plain(r.verdict)) }}</td><td>{{ pill(plain(r.severity_assessment)) }}</td><td>{{ duration(r.duration_ms) }}</td></tr>
+{% else %}<tr><td colspan="8">No investigations found.</td></tr>{% endfor %}{% endif %}

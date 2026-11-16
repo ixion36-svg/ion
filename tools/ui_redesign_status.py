@@ -1,0 +1,318 @@
+"""Generate docs/UI_REDESIGN.md: every template, its state, and what is left.
+
+A hand-written checklist for 81 templates goes stale on the first commit
+and silently drops pages. This re-measures the tree and rewrites the
+document, so the list cannot omit a page that exists and cannot claim a
+page is finished when the measurement says otherwise.
+
+Run it after any tranche:
+
+    python tools/ui_redesign_status.py --write
+
+Done is defined per page by things that can be checked, not by opinion:
+
+  light-safe   no literal light-on-dark colour in its inline <style>,
+               because those are invisible on the light page and no
+               variable flip can reach them
+  styled       no inline <style> block; its appearance comes from the
+               compiled stylesheet, so it is themed and cached
+  server-side  no innerHTML or insertAdjacentHTML, so one Jinja partial
+               renders a thing and a restyle reaches all of it
+
+A page is COMPLETE when all three hold. Nothing is marked done by hand.
+"""
+from __future__ import annotations
+
+import argparse
+import glob
+import os
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+TPL = ROOT / "src" / "ion" / "web" / "templates"
+OUT = ROOT / "docs" / "UI_REDESIGN.md"
+
+PARTIALS = {"_components.html", "_icons.html", "_nav_tabs.html", "_queue_rows.html"}
+SHELL = {"base.html", "login.html"}
+
+LIGHT_LITERAL = re.compile(
+    r"(?<![-\w])color\s*:\s*(#fff\b|#ffffff\b|white\b|rgba?\(\s*255\s*,\s*255\s*,\s*255)",
+    re.I,
+)
+
+#: A rule that paints its own background. `var()` counts: the value is
+#: unknown here, but what matters is that the rule sets colour AND
+#: background together, so a light-mode flip of the token moves both halves
+#: or neither. A rule that sets only `color` is text against whatever the
+#: page happens to provide, and that is the one that goes invisible.
+OWN_BACKGROUND = re.compile(
+    r"(?<![-\w])background(?:-color|-image)?\s*:\s*"
+    r"(?!\s*(?:transparent|none|inherit|initial|unset)\s*[;}])",
+    re.I,
+)
+
+RULE_BLOCK = re.compile(r"([^{}]+)\{([^{}]*)\}")
+
+
+def _invisible_light_rules(style: str) -> list[str]:
+    """Selectors whose light `color` has no fill of its own to sit on.
+
+    The first version of this counted every `color: #fff` in the sheet, which
+    cannot tell `.case-badge{color:white}` on a coloured fill (correct) from
+    `.np-note-title{color:#fff}` on the page (invisible in light mode).
+    Measured on 2026-10-12 it reported 133 literals across 24 templates, of
+    which `.notification-success{background:var(--success); color:white}` and
+    13 others were perfectly correct toasts and badges. Driving that number
+    to zero would have rewritten working rules and broken them, which is the
+    trap this file's own cleanup section warns about one table lower.
+
+    Comments are stripped first, because a commented-out rule is not a rule.
+    """
+    style = re.sub(r"/\*.*?\*/", "", style, flags=re.S)
+    out: list[str] = []
+    for m in RULE_BLOCK.finditer(style):
+        decls = m.group(2)
+        if not LIGHT_LITERAL.search(decls):
+            continue
+        if OWN_BACKGROUND.search(decls):
+            continue
+        out.append(" ".join(m.group(1).split())[:60])
+    return out
+
+
+def measure(path: Path) -> dict:
+    s = path.read_text(encoding="utf-8", errors="replace")
+    style = "".join(m.group(1) for m in re.finditer(r"<style[^>]*>(.*?)</style>", s, re.S))
+    js = "".join(
+        m.group(1) for m in re.finditer(r"<script(?![^>]*src=)[^>]*>(.*?)</script>", s, re.S)
+    )
+    # `\+?=` catches `innerHTML +=` as well as `innerHTML =`. The first
+    # version matched only the latter, so bob_eval.html reported 1 write
+    # while building four rows and a pager with `+=`. It never produced a
+    # wrong verdict, because every template using `+=` also has a plain `=`
+    # somewhere and already failed the column, but it under-counted the work
+    # by 7 sites across 5 templates.
+    writes = len(re.findall(
+        r"innerHTML\s*\+?=|insertAdjacentHTML|outerHTML\s*\+?=", js
+    ))
+    invisible = _invisible_light_rules(style)
+    light = len(invisible)
+    return {
+        "name": path.name,
+        "invisible_selectors": invisible,
+        "lines": s.count("\n"),
+        "css": style.count("\n"),
+        "js": js.count("\n"),
+        "writes": writes,
+        "light": light,
+        "light_safe": light == 0,
+        "styled": style.strip() == "",
+        "server_side": writes == 0,
+    }
+
+
+def tier(r: dict) -> str:
+    if r["writes"] == 0:
+        return "A"
+    if r["writes"] <= 10:
+        return "B"
+    return "C"
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--write", action="store_true", help="rewrite docs/UI_REDESIGN.md")
+    args = ap.parse_args()
+
+    rows = [measure(Path(f)) for f in sorted(glob.glob(str(TPL / "*.html")))]
+    pages = [r for r in rows if r["name"] not in PARTIALS and r["name"] not in SHELL]
+    other = [r for r in rows if r["name"] in PARTIALS or r["name"] in SHELL]
+
+    def done(r):
+        return r["light_safe"] and r["styled"] and r["server_side"]
+
+    complete = [r for r in rows if done(r)]
+
+    L = []
+    w = L.append
+    w("<!-- ion-doc:type=PLAN -->")
+    w("<!-- ion-doc:title=UI Redesign, page by page -->")
+    w("<!-- ion-doc:subtitle=Generated by tools/ui_redesign_status.py; do not hand-edit the tables -->")
+    w("<!-- ion-doc:audience=ION maintainer -->")
+    w("")
+    w("# UI redesign")
+    w("")
+    w("Generated. Run `python tools/ui_redesign_status.py --write` to refresh.")
+    w("Every template under `src/ion/web/templates/` appears exactly once, so a")
+    w("page cannot be forgotten. Status is measured, never set by hand.")
+    w("")
+    w("## Definition of done, per page")
+    w("")
+    w("| column | passes when | why it matters |")
+    w("|---|---|---|")
+    w("| light | no light `color` in its `<style>` on a rule with no fill of its own | "
+      "a rule setting colour and background together flips as a pair, so only "
+      "colour-without-fill goes invisible on the light page. Counting both "
+      "reported 133 across 24 templates when 13 across 9 were real |")
+    w("| styled | no inline `<style>` block at all | appearance comes from the compiled sheet, so it is themed, cached and swept once |")
+    w("| server | no `innerHTML` / `insertAdjacentHTML` | one partial renders a thing, so a restyle reaches every instance of it |")
+    w("")
+    w(f"**{len(complete)} of {len(rows)} templates complete.**")
+    w("")
+
+    tot = {
+        "lines": sum(r["lines"] for r in rows),
+        "css": sum(r["css"] for r in rows),
+        "writes": sum(r["writes"] for r in rows),
+        "light": sum(r["light"] for r in rows),
+    }
+    w("| measure | remaining |")
+    w("|---|---|")
+    w(f"| templates | {len(rows)} |")
+    w(f"| total lines | {tot['lines']:,} |")
+    w(f"| inline `<style>` lines | {tot['css']:,} |")
+    w(f"| runtime DOM writes | {tot['writes']:,} |")
+    w(f"| literal light-on-dark colours | {tot['light']} |")
+    w("")
+
+    for label, group, note in (
+        ("Shell and partials", other,
+         "Rendered by or into every page, so these move first or last, never mid-tranche."),
+        ("Tier A, no runtime DOM building", [p for p in pages if tier(p) == "A"],
+         "A restyle here is a markup edit and is fully visible in a screenshot."),
+        ("Tier B, 1 to 10 runtime writes", [p for p in pages if tier(p) == "B"],
+         "Markup plus a short list of class strings in inline JS."),
+        ("Tier C, more than 10 runtime writes", [p for p in pages if tier(p) == "C"],
+         "Needs the server-rendered fragment work first; a markup-only restyle "
+         "cannot reach what JavaScript builds."),
+    ):
+        if not group:
+            continue
+        w(f"## {label}")
+        w("")
+        w(note)
+        w("")
+        w("| template | lines | css | js | writes | light | styled | server | done |")
+        w("|---|--:|--:|--:|--:|:--:|:--:|:--:|:--:|")
+        for r in sorted(group, key=lambda r: -r["lines"]):
+            tick = lambda b: "yes" if b else "no"  # noqa: E731
+            w(f"| `{r['name']}` | {r['lines']} | {r['css']} | {r['js']} | {r['writes']} "
+              f"| {tick(r['light_safe'])} | {tick(r['styled'])} | {tick(r['server_side'])} "
+              f"| {'**done**' if done(r) else ''} |")
+        w("")
+        w(f"Subtotal: {len(group)} templates, {sum(r['lines'] for r in group):,} lines, "
+          f"{sum(r['css'] for r in group):,} inline css lines, "
+          f"{sum(r['writes'] for r in group)} runtime writes, "
+          f"{sum(r['light'] for r in group)} light-mode literals.")
+        w("")
+
+    w("## Cleanup, so nothing is left behind")
+    w("")
+    w("Measured, like the tables above. This section used to be hand-written")
+    w("prose, and after the first cleanup tranche landed it still described")
+    w("files that had been deleted: a generated document asserting the")
+    w("opposite of the tree it describes. Each row now checks the artifact.")
+    w("")
+    w("| artifact | state |")
+    w("|---|---|")
+
+    def _refs(needle: str, *, skip: str = "") -> int:
+        """How many live files mention `needle`, excluding the artifact itself."""
+        n = 0
+        for d in (ROOT / "src", ROOT / "tools", ROOT / "tests"):
+            if not d.exists():
+                continue
+            for f in d.rglob("*"):
+                if not f.is_file() or f.suffix not in {".py", ".html", ".js", ".css"}:
+                    continue
+                if skip and skip in f.as_posix():
+                    continue
+                try:
+                    if needle in f.read_text(encoding="utf-8", errors="replace"):
+                        n += 1
+                except OSError:
+                    pass
+        return n
+
+    arch = ROOT / "archive"
+    if arch.exists():
+        html = len(list(arch.rglob("*.html")))
+        py = len(list(arch.rglob("*.py")))
+        w(f"| `archive/` | **present**, {html} html and {py} py. Delete the tree or "
+          f"move it out of the repo: it inflates every `find` and every grep. |")
+    else:
+        w("| `archive/` | **gone.** Deleted; recoverable from git history. |")
+
+    for rel, label in (
+        ("src/ion/web/templates/_components.html", "`_components.html`"),
+        ("src/ion/web/static/js/plotly.min.js", "`plotly.min.js`"),
+        ("src/ion/web/static/js/html2pdf.bundle.min.js", "`html2pdf.bundle.min.js`"),
+        ("src/ion/web/static/js/turndown.min.js", "`turndown.min.js`"),
+        ("src/ion/web/static/js/turndown-plugin-gfm.js", "`turndown-plugin-gfm.js`"),
+    ):
+        f = ROOT / rel
+        if not f.exists():
+            w(f"| {label} | **gone.** Deleted; recoverable from git history. |")
+            continue
+        kb = f.stat().st_size // 1024
+        n = _refs(f.name, skip=rel)
+        state = (f"**{n} referencing file(s)**" if n else
+                 "**0 references.** Unreferenced; delete or wire it up")
+        w(f"| {label} | present, {kb:,} KB. {state}. |")
+
+    qr_tpl = ROOT / "src/ion/web/templates/_queue_rows.html"
+    qr_fix = ROOT / "tools/fixtures/_queue_rows.html"
+    if qr_tpl.exists():
+        w("| `_queue_rows.html` | in the template tree, rendered by no route. "
+          "Wire it to a `/ui` fragment route, or move it beside the tool that "
+          "uses it. |")
+    elif qr_fix.exists():
+        w("| `_queue_rows.html` | **resolved.** Moved to `tools/fixtures/`, where "
+          "`bench_htmx_rows.py` reads it. It is a benchmark input, not a page, so "
+          "it no longer counts as a live template. |")
+    else:
+        w("| `_queue_rows.html` | **gone.** |")
+
+    w("")
+    w("### Dead CSS")
+    w("")
+    w("Not counted here, deliberately. `tools/dead_css.py` owns this question:")
+    w("it has a vetted reference scanner and a regression suite")
+    w("(`tests/test_dead_css.py`) whose every case is a class the scanner once")
+    w("failed to see. A count in this document would be a second, worse answer.")
+    w("")
+    w("Run `python tools/dead_css.py` for the verdict. Two things to know")
+    w("before passing `--write`:")
+    w("")
+    w("- It reports the sheets it can parse. A rule inside a template's inline")
+    w("  `<style>` is not one of them, which is a further reason to pass the")
+    w("  `styled` column: moving a page's CSS into a sheet is what brings it")
+    w("  under the scanner.")
+    w("- Classes assembled at runtime are the trap. The scanner knows")
+    w("  `'sev-' + x`, `` `sc-${n}` `` and `sr-c-{{ color }}`, each added after")
+    w("  it reported live rules as dead. A construction it does not know yet")
+    w("  will do the same, and the failure is silent: the element renders")
+    w("  unstyled, with no error. That is what left a severity stripe")
+    w("  colourless for three releases.")
+    w("")
+
+    text = "\n".join(L) + "\n"
+    if args.write:
+        OUT.parent.mkdir(parents=True, exist_ok=True)
+        OUT.write_text(text, encoding="utf-8")
+        print(f"wrote {OUT.relative_to(ROOT)}")
+        print(f"  templates      : {len(rows)}  ({len(complete)} complete)")
+        for t in "ABC":
+            g = [p for p in pages if tier(p) == t]
+            print(f"  tier {t}         : {len(g):>3} pages, {sum(r['lines'] for r in g):>6} lines")
+        print(f"  light literals : {tot['light']}")
+        print(f"  inline css     : {tot['css']:,} lines")
+    else:
+        sys.stdout.write(text)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

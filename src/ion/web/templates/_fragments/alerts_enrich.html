@@ -1,0 +1,165 @@
+{# Alerts: OpenCTI enrichment of the alert's triage observables.
+
+   Replaces the writes in enrichObservables and renderEnrichResults.
+
+   Six outcomes, where the page had two sentences and a catch. It wrote
+   `data.results || []` and renderEnrichResults answered
+
+       if (!results || results.length === 0) -> "No results returned."
+
+   so a 503 body with no list, a malformed answer, and an answer that
+   genuinely matched nothing were one sentence. Worse, all three shared the
+   `enrich-no-match` class with the real "no enrichable observables" case
+   and with the catch's "Enrichment failed", so the five states were one
+   picture in one colour. An analyst reading "No results returned" concluded
+   OpenCTI knows nothing about these indicators, when OpenCTI might not have
+   been reachable at all.
+
+   The two button-label writes are gone. They were a loading state, which
+   htmx gives from the request itself: a CSS rule on .htmx-request paints
+   the button while the fragment is in flight, so there is no markup to
+   assemble for it.
+
+   The observables list is swapped out of band from here, so each row gains
+   its found or not-found dot without rebuilding the triage bar above it and
+   discarding whatever the analyst had typed into the notes box. #}
+
+{% if failed and enrichable is none %}
+  {# The triage row itself could not be read, so we do not even know what
+     there was to enrich. #}
+  <div class="enrich-no-match mt-2 text-[var(--danger)]" role="alert">
+    The alert's observables could not be read, so nothing was sent to
+    OpenCTI. This is not an alert with no observables.
+  </div>
+
+{% elif no_observables %}
+  {# A real absence: the triage record exists and carries no observables. #}
+  <div class="enrich-no-match mt-2">
+    This alert has no observables recorded, so there is nothing to enrich.
+  </div>
+
+{% elif enrichable is not none and not enrichable %}
+  {# Also a real absence, and the one case the page already worded
+     correctly. Kept close to its wording. #}
+  <div class="enrich-no-match mt-2">
+    No enrichable observables (IPs, domains, URLs, hashes).
+  </div>
+
+{% elif unavailable %}
+  {# The handler's 503, carrying its reason. The page put this in the same
+     class and colour as a clean result. #}
+  <div class="enrich-no-match mt-2 text-[var(--danger)]" role="alert">
+    OpenCTI could not be queried, so whether these observables are known is
+    not established.
+    <div class="text-xs opacity-80 mt-1 font-mono">Reason: {{ unavailable }}</div>
+  </div>
+
+{% elif failed %}
+  <div class="enrich-no-match mt-2 text-[var(--danger)]" role="alert">
+    The enrichment request failed, so these observables have not been
+    checked against OpenCTI. This is not a clean result.
+  </div>
+
+{% elif results is none %}
+  {# Unreachable by construction, and kept deliberately rather than deleted.
+     The route never answers with `enrichable` set and `results` None
+     without also setting `failed` or `unavailable`, so the two branches
+     above catch every case the module can produce today. Without this one,
+     a future route change that broke that invariant would fall through to
+     the "returned nothing" branch below, because `not none` is true, and
+     report an unreadable answer as a clean lookup. That is the exact
+     substitution this page exists to prevent, so the branch stays and the
+     invariant is asserted in the tests instead of being assumed. #}
+  <div class="enrich-no-match mt-2 text-[var(--danger)]" role="alert">
+    OpenCTI answered with something this panel cannot read, so it cannot say
+    what is known about these observables.
+  </div>
+
+{% elif not results %}
+  {# The request succeeded and returned an empty list. Distinct from every
+     branch above, and the only one of them that is a finding about the
+     observables rather than about the service. #}
+  <div class="enrich-no-match mt-2">
+    OpenCTI was queried and returned nothing for
+    {{ enrichable|length }} observable{{ '' if enrichable|length == 1 else 's' }}.
+  </div>
+
+{% else %}
+  <div class="enrich-results">
+    <div class="text-xs text-[var(--text-muted)] uppercase font-semibold mb-2">
+      OpenCTI Enrichment &mdash; {{ found_count }} of {{ results|length }} matched
+    </div>
+    {% for r in results %}
+      <div class="enrich-result-item">
+        <div class="enrich-result-header">
+          {# `found is True` in the module, not truthiness, so a row whose
+             `found` key is absent is not reported as a clean lookup. #}
+          {% if r.found %}
+            <span class="enrich-match-badge found">MATCH</span>
+          {% else %}
+            <span class="enrich-match-badge clean">NO MATCH</span>
+          {% endif %}
+          <span class="observable-badge {{ r.type }}">{{ r.type_label }}</span>
+          <span class="text-[0.8125rem] font-medium">{{ r.value }}</span>
+        </div>
+
+        {% if r.found %}
+          {% if r.labels %}
+            <div class="my-1 mx-0">
+              {% for lbl in r.labels %}
+                {# data-ion-style, not style=. style-src-attr is 'none' in
+                   this app's CSP, so an inline style attribute is dropped
+                   and the label would lose its colour. #}
+                <span class="enrich-label" data-ion-style="{{ lbl.style }}">{{ lbl.value }}</span>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          {% if r.actors %}
+            <div class="my-1 mx-0">
+              {% for ta in r.actors %}
+                <span class="enrich-actor" title="{{ ta.description }}">&#9760; {{ ta.name or 'unnamed actor' }}</span>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          {% for ind in r.indicators %}
+            <div class="enrich-indicator">
+              <div class="enrich-indicator-name">{{ ind.name or 'unnamed indicator' }}</div>
+              {% if ind.description %}<div class="enrich-indicator-desc">{{ ind.description }}</div>{% endif %}
+              {# `is not none`. An indicator scored 0 is an assessment and
+                 renders; one with no score is not a zero. The page had this
+                 right with an explicit null-and-undefined check. #}
+              {% if ind.score is not none %}<div class="enrich-indicator-desc">Score: {{ ind.score }}</div>{% endif %}
+            </div>
+          {% endfor %}
+
+          {% if r.observable_score is not none %}
+            <div class="text-xs text-[var(--text-muted)] mt-1">Observable score: {{ r.observable_score }}</div>
+          {% endif %}
+        {% endif %}
+
+        {% if r.error %}
+          <div class="text-xs text-[#ef4444] mt-1">{{ r.error }}</div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+
+  {% if ai_available %}
+    <div class="mt-2">
+      <button class="ai-micro-btn"
+              data-click-action="openAIChatWithContext"
+              data-args='[{{ alert_id|tojson }}]'
+              title="Discuss enrichment results with AI">Discuss with AI</button>
+    </div>
+  {% endif %}
+{% endif %}
+
+{% if observables is not none %}
+  {# Out of band, so the dots land on the existing list rather than through
+     this fragment's own target. #}
+  <div id="observables-list" hx-swap-oob="innerHTML">
+    {% include "_fragments/alerts_observables.html" %}
+  </div>
+{% endif %}

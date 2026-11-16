@@ -1,0 +1,41 @@
+{% import '_fragments/analytics_state.html' as st %}
+{# Repeat offenders, from ui/analytics.py's offenders_view.
+
+   `<span class="entity-type-badge ${o.type}">` put a server value into a
+   class attribute. A type carrying a space becomes two classes and one
+   carrying a quote ends the attribute, so the key is restricted to what a
+   class can safely be and the words are rendered as text beside it.
+
+   `(o.rules || []).length` said "0 rules" for a list the payload did not
+   carry, which is a count of something we were not told about.
+#}
+{% if job.state != 'ok' %}
+{{ st.job_notice(job) }}
+{% elif offenders is none %}
+{{ st.unreadable_list('offenders') }}
+{% elif not offenders %}
+<div class="empty-state">No repeat offenders detected in the last 30 days</div>
+{% else %}
+<table class="analytics-table">
+  <thead><tr>
+    <th>Entity</th><th>Type</th><th>Alerts (7d)</th><th>Alerts (30d)</th>
+    <th>Worst Severity</th><th>Distinct Rules</th>
+  </tr></thead>
+  <tbody>
+    {%- for o in offenders %}
+    <tr>
+      <td><strong>{{ o.entity or '' }}</strong></td>
+      <td><span class="entity-type-badge {{ o.kind_key }}">{{ o.kind or 'unknown' }}</span></td>
+      <td class="font-semibold">{% if o.count_7d is not none %}{{ o.count_7d }}{% else %}<span class="an-absent" title="No 7 day count"></span>{% endif %}</td>
+      <td class="font-semibold">{% if o.count_30d is not none %}{{ o.count_30d }}{% else %}<span class="an-absent" title="No 30 day count"></span>{% endif %}</td>
+      <td><span class="severity-badge severity-{{ o.severity_key }}">{{ o.severity_label or 'unknown' }}</span></td>
+      <td class="text-xs"
+          {%- if o.rules %} title="{{ o.rules|join(', ') }}"{% endif %}>
+        {%- if o.rules is not none %}{{ o.rules|length }} rules
+        {%- else %}<span class="an-absent" title="This row carried no rule list"></span>{% endif %}
+      </td>
+    </tr>
+    {%- endfor %}
+  </tbody>
+</table>
+{% endif %}

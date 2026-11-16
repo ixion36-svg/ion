@@ -1,0 +1,78 @@
+{# Threat Intel: the expandable detail row under an actor or campaign.
+
+   One fragment for both, because the detail OpenCTI returns is the same
+   shape for either: a description, related campaigns, MITRE TTPs and
+   indicators. `columns` is the only difference, nine for the actor table
+   and seven for the campaign table, and it exists because a detail row is
+   one cell spanning its parent table.
+
+   Replaces four innerHTML sites across toggleActorDetail and
+   toggleCampaignDetail.
+
+   The defect: both read with `fetch(...).then(r => r.json())` and no r.ok
+   check, then tested each of the four sections for content. A refusal body
+   is {"detail": ...}, which has none of them, so every section was skipped
+   and the final else rendered "No additional detail available." A failed
+   detail read therefore told the reader that OpenCTI holds nothing on this
+   actor, which is the opposite of not having asked successfully. #}
+
+{% from "_fragments/_threat_intel_cells.html" import detail_row_state %}
+
+{% if not configured %}
+  {{ detail_row_state('OpenCTI is not configured, so no detail can be fetched.', columns) }}
+{% elif failed %}
+  {{ detail_row_state(
+       'The detail for this entity could not be read. OpenCTI is configured,
+        so this is a fault rather than an absence of detail.',
+       columns, 'error') }}
+{% elif detail is none %}
+  {{ detail_row_state(
+       'OpenCTI answered with something this panel cannot read, so it cannot
+        say what is recorded against this entity.',
+       columns, 'error') }}
+{% elif not (detail.description or detail.campaigns or detail.ttps or detail.indicators) %}
+  {{ detail_row_state('No additional detail available.', columns) }}
+{% else %}
+<td colspan="{{ columns }}">
+  {% if detail.description %}
+    <div class="ti-detail-section">
+      <h4>Description</h4>
+      <p>{{ detail.description }}</p>
+    </div>
+  {% endif %}
+
+  {% if detail.campaigns %}
+    <div class="ti-detail-section">
+      <h4>Related Campaigns ({{ detail.campaigns|length }})</h4>
+      <div class="ti-detail-tags">
+        {% for c in detail.campaigns %}<span class="ti-tag">{{ c.name }}</span>{% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  {% if detail.ttps %}
+    <div class="ti-detail-section">
+      <h4>MITRE ATT&amp;CK TTPs ({{ detail.ttps|length }})</h4>
+      <div class="ti-ttp-list">
+        {% for t in detail.ttps %}
+          {# The id and the name, or just the name. A TTP with no MITRE id
+             is still a technique OpenCTI recorded; the page got this
+             right and it is kept. #}
+          <span class="ti-ttp" title="{{ t.description or '' }}">
+            {%- if t.mitre_id -%}{{ t.mitre_id }}: {{ t.name }}{%- else -%}{{ t.name }}{%- endif -%}
+          </span>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  {% if detail.indicators %}
+    <div class="ti-detail-section">
+      <h4>Indicators ({{ detail.indicators|length }})</h4>
+      <div class="ti-detail-tags">
+        {% for i in detail.indicators %}<span class="ti-tag">{{ i.name }}</span>{% endfor %}
+      </div>
+    </div>
+  {% endif %}
+</td>
+{% endif %}

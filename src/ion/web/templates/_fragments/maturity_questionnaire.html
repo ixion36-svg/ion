@@ -1,0 +1,118 @@
+{# The blank questionnaire: the scale strip, five domain cards, and submit.
+
+   Replaces three innerHTML writes in maturity.html, including one that
+   assembled 25 question cards and 125 score buttons from nested template
+   literals through a hand-rolled matEsc that Jinja's autoescaping retires.
+
+   The scale strip is built from maturity_service's own MATURITY_LEVELS
+   rather than the second copy of the five level names the JavaScript
+   hardcoded, and each level is coloured from SCORE_BANDS, so a level's
+   colour on the strip is the colour the result ring paints that level with.
+
+   The score buttons are plain buttons dispatched through
+   static/js/event-delegation.js. No hx-trigger event filter, no `js:`
+   hx-vals and no hx-on anywhere on this page: ION serves
+   `script-src 'self' 'nonce-...'` with no unsafe-eval, so anything htmx
+   hands to Function() throws and the feature silently does nothing.
+
+   Each domain's running-average element carries the five band colours as
+   `data-colour-l1` to `data-colour-l5`. That is what lets the live average
+   take its colour from SCORE_BANDS instead of from a second band table in
+   JavaScript, which is the copy that would keep emitting old colours after
+   a band moved.
+
+   The controls that leave this view live in the page header, outside
+   #mat-content, so no swap of this fragment can remove the reader's way
+   out. #}
+
+{% from "_fragments/maturity_failed.html" import read_failed %}
+
+{% if failed %}
+  {{ read_failed('The maturity questionnaire') }}
+{% else %}
+  <div role="note" class="alert alert-info mb-6">
+    <span><strong>SOC-CMM Maturity Assessment</strong>. Rate your SOC across
+      {{ domains|length }} domains on a scale of 1 (Initial) to {{ max_level }}
+      (Optimising). Score each question on the current state, not on
+      aspirations. Results are saved so progress can be tracked over time.</span>
+  </div>
+
+  <div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow mb-6">
+    {% for lvl in levels %}
+      <div class="stat">
+        <div class="stat-value" data-ion-style="color:{{ lvl.colour }}">{{ lvl.level }}</div>
+        <div class="stat-title">{{ lvl.name }}</div>
+      </div>
+    {% endfor %}
+  </div>
+
+  {% for dom in domains %}
+    <div class="card bg-base-200 shadow mb-4">
+      <div class="flex flex-wrap items-center justify-between gap-4 px-6 py-5 cursor-pointer"
+           data-toggle-next-display>
+        <div class="basis-full md:basis-auto md:flex-1">
+          <div class="font-semibold text-lg">{{ dom.name }}</div>
+          <div class="text-xs uppercase tracking-wide opacity-50 mt-1">{{ dom.description }}</div>
+        </div>
+        <div class="font-mono text-2xl font-extrabold"
+             id="mat-domain-score-{{ dom.id }}"
+             {% for b in buttons %}data-colour-l{{ b.level }}="{{ b.colour }}" {% endfor %}>n/a</div>
+      </div>
+      <div class="px-6 py-5 border-t border-base-300">
+        {% for q in dom.questions %}
+          <div class="card bg-base-300 mb-3">
+            <div class="card-body p-4 gap-1">
+              <div class="font-semibold">{{ q.text }}</div>
+              <div class="text-sm italic opacity-60 mb-3">{{ q.guidance }}</div>
+              {# data-domain and data-question are what matSubmit reads the
+                 answers back out of, so the DOM is the only place the
+                 in-progress scores live. The JavaScript kept a parallel
+                 matResponses object beside them. #}
+              <div class="mat-q-score flex gap-1.5 mb-2.5"
+                   id="mat-q-{{ q.id }}"
+                   data-domain="{{ dom.id }}"
+                   data-question="{{ q.id }}">
+                {% for b in buttons %}
+                  <button type="button" class="btn btn-sm w-10"
+                          data-score="{{ b.level }}"
+                          data-click-action="matScore"
+                          data-args='["$target"]'>{{ b.level }}</button>
+                {% endfor %}
+              </div>
+              <input class="input input-sm w-full" placeholder="Notes (optional)"
+                     id="mat-notes-{{ q.id }}">
+            </div>
+          </div>
+        {% endfor %}
+        <div class="text-[.72rem] opacity-70 mt-1.5">
+          Related ION pages:
+          {% for page in dom.pages %}
+            {# Through safe_url even though these come from the service's own
+               DOMAINS constant rather than from a column. Nothing stored
+               reaches an href on this page, and routing the one href that
+               exists through the filter is what keeps that true if the
+               questionnaire ever becomes data. #}
+            {% set href = page|safe_url %}
+            {% if href %}
+              <a class="link link-primary no-underline" href="{{ href }}">{{ page }}</a>
+            {% else %}
+              <span class="opacity-60">{{ page }}</span>
+            {% endif %}
+            {{- ', ' if not loop.last }}
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+
+  <div class="flex flex-wrap justify-end items-center gap-2.5 mt-6">
+    <input class="input input-bordered mat-title flex-1 min-w-[16rem]" id="mat-title" type="text"
+           placeholder="Assessment title (optional)">
+    {# Still a fetch rather than hx-post: POST /api/maturity/assessments takes
+       the scores as nested JSON and is gated on alert:triage, a stricter
+       permission than this read. It writes no markup, and on success it
+       re-requests the result fragment through htmx. #}
+    <button type="button" class="btn btn-primary"
+            data-click-action="matSubmit">Submit Assessment</button>
+  </div>
+{% endif %}

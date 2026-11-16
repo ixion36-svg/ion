@@ -1,0 +1,7 @@
+{% if state == 'failed' %}<div class="error">Failed to load patterns.</div>
+{% elif state == 'empty' %}<div class="empty-state">No patterns detected. Try lowering minimum occurrences or add more observables.</div>
+{% else %}{% for pattern in patterns %}
+<div class="pattern-card"><div class="pattern-header"><div><span class="pattern-count">{{ pattern.occurrence_count if pattern.occurrence_count is defined and pattern.occurrence_count is not none else '—' }}</span> <span class="pattern-count-label">occurrences</span></div><div class="pattern-meta">First: {{ pattern.first_seen or '—' }} | Last: {{ pattern.last_seen or '—' }}</div></div>
+<div class="pattern-observables">{% for obs in pattern.observables|default([]) %}<span class="pattern-observable" data-click-action="showObsAndClosePatterns" data-args='{{ [obs.id]|tojson }}'><span class="obs-type-badge {{ obs.type }}">{{ obs.type }}</span><span>{{ (obs.value|default(''))[:40] }}{% if obs.value|default('')|length > 40 %}...{% endif %}</span><span class="threat-badge {{ obs.threat_level }} text-[0.5625rem]">{{ obs.threat_level }}</span></span>{% endfor %}</div>
+{% if pattern.observables %}<div class="pattern-actions"><button class="btn btn-sm" data-click-action="viewPatternInGraph" data-args='{{ [pattern.observables[0].id]|tojson }}'>View in Graph</button></div>{% endif %}</div>
+{% endfor %}{% endif %}

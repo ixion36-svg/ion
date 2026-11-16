@@ -691,23 +691,24 @@ def technique_drill(
     return out
 
 
-@router.get("/actors/{entity_id}/profile")
-async def actor_profile(
+async def actor_profile_payload(
     entity_id: str,
-    entity_class: str = Query("intrusion_set"),
-    session: Session = Depends(get_db_session),
-    user: User = Depends(require_permission("observable:read")),
-):
-    """v0.27.0: actor deep-dive profile.
+    entity_class: str,
+    session: Session,
+) -> dict:
+    """The actor profile, for the JSON endpoint and the /ui fragment alike.
 
-    Returns the OpenCTI actor detail (description, aliases, TTPs,
-    malware, indicators) plus a "recently active in your cases" feed
-    derived from local cases whose linked alerts mention this actor
-    by name/alias in their analyst notes, observables, or triggered
-    rule names.
+    Extracted so the two cannot answer differently. Both halves are
+    best-effort by design: an OpenCTI error must not take the local-case
+    feed with it, and a failing local query must not blank the actor.
 
-    Best-effort fan-out: OpenCTI errors don't break the local-case
-    half; missing local cases don't break the OpenCTI half.
+    `cases_error` is new. The local-case query used to swallow its
+    exception into `logger.debug` and leave `recent_cases` empty, so a
+    query that failed was indistinguishable from an actor with no cases
+    in 180 days, and the page printed a confident 0 for it. On a threat
+    actor page those are opposite conclusions: one says we have not seen
+    this actor here, the other says we do not know whether we have. The
+    key is additive, so no existing consumer of the JSON changes.
     """
     from datetime import datetime, timedelta, timezone
 
@@ -719,7 +720,9 @@ async def actor_profile(
     out: dict = {
         "entity_id": entity_id, "entity_class": entity_class,
         "actor": None, "actor_error": None,
-        "recent_cases": [],
+        # None means the query ran. A string means it did not, which is not
+        # the same as an actor with no cases, and the page says which.
+        "recent_cases": [], "cases_error": None,
     }
 
     # OpenCTI side
@@ -786,9 +789,35 @@ async def actor_profile(
                 for c in rows
             ]
         except Exception as exc:
-            logger.debug("actor_profile: local case match failed: %s", exc)
+            # Recorded, not only logged. Leaving recent_cases empty here
+            # told the page the actor has no local cases, which is a
+            # finding, when the truth was that the search failed.
+            logger.exception("actor_profile: local case match failed")
+            out["cases_error"] = safe_error(exc, "threat_intel.actor_cases")
 
     return out
+    return out
+
+
+@router.get("/actors/{entity_id}/profile")
+async def actor_profile(
+    entity_id: str,
+    entity_class: str = Query("intrusion_set"),
+    session: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("observable:read")),
+):
+    """v0.27.0: actor deep-dive profile.
+
+    Returns the OpenCTI actor detail (description, aliases, TTPs,
+    malware, indicators) plus a "recently active in your cases" feed
+    derived from local cases whose linked alerts mention this actor
+    by name/alias in their analyst notes, observables, or triggered
+    rule names.
+
+    Best-effort fan-out: OpenCTI errors don't break the local-case
+    half; missing local cases don't break the OpenCTI half.
+    """
+    return await actor_profile_payload(entity_id, entity_class, session)
 
 
 # ── Watch gap analysis (merged from threat_watch_gap_api, route audit phase 2) ──

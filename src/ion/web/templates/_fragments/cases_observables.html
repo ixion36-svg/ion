@@ -1,0 +1,60 @@
+{# Cross-case observable sightings, from ui/cases.py's observables_view.
+
+   `rows is none` covers three things that are all the failed outcome: the
+   read raised, the body was not this shape, or we were handed rows and
+   could not read a single one. None of those is "no matches".
+
+   The page skipped no bad row: `const o = row.observable` then `o.tlp`
+   threw into one catch, so a single malformed row took the whole panel to
+   "unavailable". A row we cannot read is dropped here and its neighbours
+   still render.
+
+   Colours are in static/css/cases-page.css, keyed by `tlp_key`. They were
+   a tlpColors map plus four hard-coded pills in the page's JavaScript.
+#}
+{% if rows is none %}
+<div class="cpanel-empty-hint">Cross-case lookup unavailable</div>
+{% elif not rows %}
+<div class="cpanel-empty-hint">No observables in this case match other cases</div>
+{% else %}
+{%- for r in rows %}
+<div class="case-obs-row">
+  <div class="case-obs-head">
+    <span class="cpanel-alert-badge case-tlp-{{ r.tlp_key }}"
+          title="Traffic Light Protocol">{{ r.tlp_label }}</span>
+    {%- if r.is_ioc %}
+    <span class="cpanel-alert-badge case-ioc-badge"
+          title="Marked as IOC">IOC</span>
+    {%- endif %}
+    {%- if r.type %}<code class="case-obs-type">{{ r.type }}</code>{% endif %}
+    {%- if r.value %}<code class="case-obs-value">{{ r.value }}</code>{% endif %}
+    {#- Not "1x". `o.sighting_count || 1` claimed a single sighting for a
+        count the payload did not carry. -#}
+    {%- if r.sighting_count is not none %}
+    <span class="cpanel-alert-badge case-sim-badge"
+          title="Total sightings">{{ r.sighting_count }}x</span>
+    {%- else %}
+    <span class="cpanel-alert-badge case-sim-badge"
+          title="This observable arrived without a sighting count">count unknown</span>
+    {%- endif %}
+  </div>
+  {%- for s in r.sightings %}
+  <div class="cpanel-alert-card cursor-pointer case-obs-sighting"
+       data-click-action="openCaseDetail" data-args='{{ [s.case_id]|tojson }}'>
+    <div class="cpanel-alert-card-header">
+      <span class="cpanel-alert-id">{{ s.label }}</span>
+      {%- if s.status %}
+      <span class="cpanel-alert-badge case-sighting-status">{{ s.status }}</span>
+      {%- endif %}
+    </div>
+    {%- if s.title %}
+    <div class="cpanel-alert-card-meta">{{ s.title }}</div>
+    {%- endif %}
+  </div>
+  {%- endfor %}
+  {%- if r.hidden %}
+  <div class="case-obs-more">{{ r.hidden }} more&#8230;</div>
+  {%- endif %}
+</div>
+{%- endfor %}
+{% endif %}

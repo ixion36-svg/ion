@@ -1,0 +1,40 @@
+<div class="step-item" id="step-{{ n }}" data-step="{{ n }}">
+    <div class="step-header">
+        <span class="step-number">Step {{ n }}</span>
+        <div class="step-actions">
+            <button type="button" class="btn btn-sm" data-click-action="moveStepUp" data-args='{{ [n]|tojson }}'>Up</button>
+            <button type="button" class="btn btn-sm" data-click-action="moveStepDown" data-args='{{ [n]|tojson }}'>Down</button>
+            <button type="button" class="btn btn-sm" data-click-action="removeStep" data-args='{{ [n]|tojson }}'>Remove</button>
+        </div>
+    </div>
+    <div class="step-row">
+        <div class="form-group flex-1">
+            <label>Type</label>
+            <select class="form-control step-type" data-change-action="onStepTypeChange" data-args='{{ [n]|tojson }}'>
+                <option value="manual_checklist"{% if step_type == 'manual_checklist' %} selected{% endif %}>Manual Checklist</option>
+                <option value="auto_enrich_observables"{% if step_type == 'auto_enrich_observables' %} selected{% endif %}>Auto: Enrich Observables</option>
+                <option value="auto_update_status"{% if step_type == 'auto_update_status' %} selected{% endif %}>Auto: Update Status</option>
+                <option value="auto_create_case"{% if step_type == 'auto_create_case' %} selected{% endif %}>Auto: Create Case</option>
+            </select>
+        </div>
+        <div class="form-group flex-[2]">
+            <label>Title</label>
+            <input type="text" class="form-control step-title" value="{{ title }}" required>
+        </div>
+    </div>
+    <div class="step-row">
+        <div class="form-group flex-1">
+            <label>Description</label>
+            <input type="text" class="form-control step-description" value="{{ description }}">
+        </div>
+        <div class="form-group">
+            <label class="checkbox-label">
+                <input type="checkbox" class="step-required"{% if is_required %} checked{% endif %}>
+                Required
+            </label>
+        </div>
+    </div>
+    <div class="step-params-container" id="step-params-{{ n }}">
+        {% include "_fragments/playbooks_step_params.html" %}
+    </div>
+</div>

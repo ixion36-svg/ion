@@ -83,16 +83,20 @@ def _resolve_enabled() -> bool:
 # ---------------------------------------------------------------------------
 
 
-@router.get(
-    "/api/case-grouper/status",
-    dependencies=[Depends(require_permission("alert:triage"))],
-)
-def status(session: Session = Depends(get_db_session)) -> Dict[str, Any]:
-    """Summary card for the control panel.
+def status_payload(session: Session) -> Dict[str, Any]:
+    """Everything the status card shows, in one definition.
 
-    Returns the static config (enabled flag, interval, window), the
-    last-run timestamp + summary dict, and a count of all auto-grouped
-    cases currently in the DB.
+    Both /api/case-grouper/status and the server-rendered fragment in
+    ion.web.ui.case_grouper call this, so the page and the API cannot
+    disagree about whether the grouper is enabled or which side-effects are
+    switched on. The two side-effect gates are read from the environment the
+    same way the service reads them, and a second copy of a gate keeps
+    emitting "on" after the variable flips.
+
+    ``last_run_at`` is left as the datetime it is. The ISO string is a JSON
+    serialisation detail and belongs to the JSON route: a template needs the
+    instant so the `ts` macro can label it and the viewer's browser can put
+    it on the viewer's own clock.
     """
     last_at, last_result = get_last_run_info()
     return {
@@ -105,10 +109,26 @@ def status(session: Session = Depends(get_db_session)) -> Dict[str, Any]:
         "auto_investigate": os.environ.get(
             "ION_CASE_GROUPER_AUTO_INVESTIGATE", ""
         ).lower() not in ("false", "0", "no"),
-        "last_run_at": last_at.isoformat() if last_at else None,
+        "last_run_at": last_at,
         "last_result": last_result,
         "auto_cases_total": count_auto_cases(session),
     }
+
+
+@router.get(
+    "/api/case-grouper/status",
+    dependencies=[Depends(require_permission("alert:triage"))],
+)
+def status(session: Session = Depends(get_db_session)) -> Dict[str, Any]:
+    """Summary card for the control panel.
+
+    Returns the static config (enabled flag, interval, window), the
+    last-run timestamp + summary dict, and a count of all auto-grouped
+    cases currently in the DB.
+    """
+    payload = status_payload(session)
+    last_at = payload["last_run_at"]
+    return {**payload, "last_run_at": last_at.isoformat() if last_at else None}
 
 
 @router.post(

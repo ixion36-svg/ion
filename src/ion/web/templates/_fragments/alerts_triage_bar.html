@@ -1,0 +1,292 @@
+{# Alerts: the detail modal's triage bar, with the comments and case tabs
+   swapped out of band from the same read.
+
+   Replaces the innerHTML write in renderTriageBar, and the one in
+   loadTriage that preceded it.
+
+   `loadTriage` returned on `!response.ok`, so a failed read left the bar on
+   the shell's "Loading triage..." for the life of the modal. There was no
+   render for a refusal at all, which is why the first branch below exists.
+
+   TWO BUGS THIS FIXES, both measured by reading the old code.
+
+   The Remove button on a MITRE technique deleted the wrong technique.
+   renderMitreSection mapped over the MERGED list, `[auto, ...saved]`, and
+   passed that position as `idx`, while removeMitreTechnique splices
+   `cached.mitre_techniques`, the SAVED list. So whenever the alert carried
+   an auto-detected technique that was not already saved, every saved
+   technique's index was one too high: removing the first deleted the
+   second, and removing the last fell outside the array and the guard
+   `index < current.length` made it silently do nothing. The module's
+   mitre_rows carries the position in the saved list, and None for the auto
+   row, which has no Remove control.
+
+   The Bob badge's early return was dead code:
+
+       if (bobConfidenceInt === null && bobConfidenceInt === undefined && !bobEscalationBadge) return '';
+
+   A value cannot be both null and undefined, so that branch never ran. It
+   happened to be harmless, because the function returned '' at the end when
+   nothing had been pushed, but it is a condition that can never be true and
+   it is gone rather than translated.
+
+   A confidence of 0 renders. `_count` returns None for a non-int, so a
+   missing score is absent and a measured zero is a Low, which `|| 0` and
+   truthiness would have conflated.
+
+   Every data-args goes through `|tojson`. The page built them by
+   interpolating escapeHtml output into a JSON array, and escapeHtml turns a
+   double quote into &quot;, which the browser decodes to a bare quote inside
+   the JSON string; event-delegation.js then throws in JSON.parse, logs, and
+   returns, leaving the control looking functional and doing nothing. #}
+
+{% if failed %}
+  <div class="triage-row" role="alert">
+    <span class="text-[var(--danger)] text-[0.8125rem]">
+      The triage record for this alert could not be read. Nothing in this bar
+      is known: not its status, not its priority, not its observables, not
+      whether it is linked to a case. Close and reopen the alert to try
+      again.
+    </span>
+  </div>
+
+{% else %}
+  <div class="triage-row flex gap-4 items-center flex-wrap">
+    <div class="triage-group">
+      <label>Status</label>
+      {% if can_triage %}
+        <select data-change-action="updateTriage"
+                data-args='[{{ alert_id|tojson }}, "status", "$value"]'>
+          {% for s in statuses %}
+            <option value="{{ s }}"{{ ' selected' if s == view.status else '' }}>{{ s.replace('_', ' ') }}</option>
+          {% endfor %}
+        </select>
+      {% else %}
+        {# PUT .../triage carries alert:triage. The page offered the select
+           to every reader, so changing it answered 403 and the control
+           sprang back with no explanation. #}
+        <span class="text-[0.8125rem]">{{ view.status or 'open' }}</span>
+      {% endif %}
+    </div>
+
+    <div class="triage-group">
+      <label>Priority</label>
+      {% if can_triage %}
+        <select data-change-action="updateTriage"
+                data-args='[{{ alert_id|tojson }}, "priority", "$value"]'>
+          {% for p in [''] + priorities|list %}
+            <option value="{{ p }}"{{ ' selected' if p == view.priority else '' }}>{{ p or '-- priority --' }}</option>
+          {% endfor %}
+        </select>
+      {% else %}
+        <span class="text-[0.8125rem]">{{ view.priority or 'not set' }}</span>
+      {% endif %}
+    </div>
+
+    <div class="triage-group ml-[auto]">
+      {% if case_link == 'read' or case_link == 'withheld' %}
+        {% if case_link == 'withheld' %}
+          {# Linked to a case this viewer may not read. Saying so beats both
+             a dead link and pretending the alert is unlinked. #}
+          <span class="text-xs text-[var(--text-muted)]">Linked to a case. Viewing it needs the {{ case_read_permission }} permission.</span>
+        {% else %}
+          <span class="triage-case-link"
+                data-click-action="__switchDetailTabBySelector"
+                data-tab="case" data-selector="[data-tab=case]">{{ view.case_number or 'linked case' }}</span>
+        {% endif %}
+      {% elif can_create_case %}
+        <button class="btn btn-sm btn-primary" data-click-action="showCreateCaseForm"
+                data-args='[{{ alert_id|tojson }}]'>Create Case</button>
+        <button class="btn btn-sm btn-secondary" data-click-action="linkAlertToCase"
+                data-args='[{{ alert_id|tojson }}]'>Link to Case</button>
+      {% else %}
+        {# POST /api/cases carries case:create. #}
+        <span class="text-xs text-[var(--text-muted)]">Not linked to a case. Creating one needs the case:create permission.</span>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if can_triage %}
+    <div class="alert-closure-actions">
+      <span class="text-xs font-semibold text-[var(--text-muted)] self-center">Close as:</span>
+      <button class="alert-closure-btn benign" data-click-action="showAlertClosureModal"
+              data-args='[{{ alert_id|tojson }}, "benign"]'>&#10003; Benign</button>
+      <button class="alert-closure-btn escalated" data-click-action="showAlertClosureModal"
+              data-args='[{{ alert_id|tojson }}, "escalated"]'>&#9650; Escalated</button>
+      <button class="alert-closure-btn false-positive" data-click-action="showAlertClosureModal"
+              data-args='[{{ alert_id|tojson }}, "false_positive"]'>&#10007; False Positive</button>
+    </div>
+  {% endif %}
+
+  {% if view.bob %}
+    <div class="flex gap-[0.4rem] flex-wrap mt-[0.4rem]">
+      {% if view.bob.confidence is not none %}
+        {%- set colour = {'high': '#22c55e', 'medium': '#f59e0b', 'low': '#ef4444'}[view.bob.level] -%}
+        <span class="inline-flex items-center gap-[0.3rem] py-[0.15rem] px-2 rounded-[9999px] text-[0.72rem] font-semibold"
+              data-ion-style="background:{{ colour }}22; color:{{ colour }}; border:1px solid {{ colour }}55"
+              title="Bob confidence score">&#129302; Bob {{ view.bob.level|capitalize }} {{ view.bob.confidence }}%{% if view.bob.verdict %} &middot; {{ view.bob.verdict }}{% endif %}</span>
+      {% endif %}
+      {% if view.bob.escalated %}
+        <span class="inline-flex items-center gap-[0.3rem] py-[0.15rem] px-2 rounded-[9999px] text-[0.72rem] font-semibold bg-[#f59e0b22] text-[#f59e0b] border border-[#f59e0b55]"
+              title="Bob could not produce a confident verdict, so human review is required">&#9650; Auto-escalated</span>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <div class="triage-notes-row mt-2">
+    <label class="text-xs font-semibold block mb-1">Analyst Notes</label>
+    {% if can_triage %}
+      <div class="flex gap-2">
+        <textarea class="flex-1 min-h-[2.5rem] resize-y text-[0.8125rem] p-1.5 border border-[var(--ion-border)] rounded-[4px] bg-[var(--bg-secondary)] text-[var(--text-primary)]"
+                  id="analyst-notes-input" placeholder="Add analyst assessment...">{{ view.analyst_notes }}</textarea>
+        <button class="btn btn-sm btn-primary self-end" data-click-action="saveAnalystNotes"
+                data-args='[{{ alert_id|tojson }}]'>Save</button>
+      </div>
+    {% elif view.analyst_notes %}
+      <p class="text-[0.8125rem] whitespace-pre-wrap m-0">{{ view.analyst_notes }}</p>
+    {% else %}
+      <p class="text-xs text-[var(--text-muted)] m-0">No analyst notes. Adding them needs the alert:triage permission.</p>
+    {% endif %}
+  </div>
+
+  <div class="observables-section">
+    <div class="flex items-center justify-between mb-1.5">
+      <div class="flex items-center gap-2">
+        <label class="mb-0">Observables</label>
+        {% if ai_available and can_triage %}
+          <button class="ai-micro-btn" data-click-action="aiExtractObservables"
+                  data-args='[{{ alert_id|tojson }}]' title="AI extract observables">AI Extract</button>
+        {% endif %}
+      </div>
+      {# The enrich button requests the fragment itself. `enrichable` is
+         whether any observable maps to an OpenCTI type, which is a stronger
+         test than the page's `observables.length === 0`: a list holding only
+         user accounts enabled the button and then answered "no enrichable
+         observables" after a round trip. #}
+      <button class="enrich-btn" id="enrich-btn"
+              hx-get="/ui/alerts/enrich/{{ alert_id|urlencode }}"
+              hx-target="#enrich-results"
+              hx-swap="innerHTML"
+              {{ '' if view.enrichable else 'disabled' }}>
+        <span class="enrich-icon">&#9733;</span> Enrich via OpenCTI
+      </button>
+    </div>
+    <div id="observables-list">
+      {% with observables = view.observables %}
+        {% include "_fragments/alerts_observables.html" %}
+      {% endwith %}
+    </div>
+    {% if can_triage %}
+      <div class="observable-add-row">
+        <select id="observable-type-select">
+          {% for t in observable_types %}<option value="{{ t }}">{{ t.replace('_', ' ') }}</option>{% endfor %}
+        </select>
+        <input type="text" id="observable-value-input" placeholder="Value..."
+               data-keydown-action="__observableInputEnter" data-alert-id="{{ alert_id }}">
+        <button class="btn btn-sm btn-primary" data-click-action="addObservable"
+                data-args='[{{ alert_id|tojson }}]'>Add</button>
+      </div>
+    {% endif %}
+    <div id="enrich-results"></div>
+  </div>
+
+  <div class="mitre-section">
+    <div class="flex items-center justify-between mb-1.5">
+      <label class="mb-0">MITRE ATT&amp;CK</label>
+    </div>
+    {% if not view.mitre %}
+      <div class="observable-empty">No techniques recorded</div>
+    {% else %}
+      <div class="mitre-list">
+        {% for t in view.mitre %}
+          <span class="mitre-badge {{ 'auto' if t.auto else 'manual' }}"
+                data-click-action="__filterMitreAndClose"
+                data-tech-id="{{ t.technique_id }}"
+                title="{{ 'Auto-detected' if t.auto else 'Manually added' }} - Click to filter">
+            <strong>{{ t.technique_id }}</strong>{% if t.technique_name %} - {{ t.technique_name }}{% endif %}
+            {%- if can_triage and t.index is not none %}
+              {# `t.index` is the position in the SAVED list, which is what
+                 removeMitreTechnique splices. The auto row carries None and
+                 gets no control, which is also what the old code intended
+                 and got wrong by one. #}
+              <span class="remove-btn" data-click-action="removeMitreTechnique" data-stop-propagation
+                    data-args='[{{ alert_id|tojson }}, {{ t.index|tojson }}]'>&times;</span>
+            {%- endif %}
+          </span>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% if can_triage %}
+      <div class="observable-add-row">
+        <input type="text" id="mitre-technique-input" placeholder="T1059">
+        <input type="text" id="mitre-name-input" placeholder="Technique name">
+        <select id="mitre-tactic-select">
+          {% for t in tactics %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
+        </select>
+        <button class="btn btn-sm btn-primary" data-click-action="addMitreTechnique"
+                data-args='[{{ alert_id|tojson }}]'>Add</button>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="playbooks-section" id="playbooks-section">
+    <div class="flex items-center justify-between">
+      <label>Investigation Playbooks</label>
+      {# The reload control sits outside #playbooks-content, the target it
+         refreshes, so a failed render cannot take away the retry. #}
+      <button class="btn btn-sm btn-secondary text-xs" title="Reload playbooks"
+              data-click-action="loadPlaybooksForAlert"
+              data-args='[{{ alert_id|tojson }}]'>&#8635;</button>
+    </div>
+    <div id="playbooks-content"
+         {% if can_read_playbooks %}
+         hx-get="/ui/alerts/playbooks/{{ alert_id|urlencode }}"
+         hx-trigger="load"
+         hx-swap="innerHTML"
+         {% endif %}>
+      {% if not can_read_playbooks %}
+        <span class="text-[var(--text-muted)] text-[0.8125rem]">Playbooks are not shown: reading them requires the playbook:read permission.</span>
+      {% else %}
+        <span class="text-[var(--text-muted)] text-[0.8125rem]">Loading playbooks&hellip;</span>
+      {% endif %}
+    </div>
+  </div>
+{% endif %}
+
+{# The comments tab, out of band, from the same read. #}
+<div id="detail-tab-comments" hx-swap-oob="innerHTML">
+  {% include "_fragments/alerts_comments.html" %}
+</div>
+
+{# The case tab, out of band. Six outcomes, where the page wrote the
+   "Not linked" sentence for one of them and nothing at all for a failed
+   read, which left the previous alert's case on screen. #}
+<div id="detail-tab-case" hx-swap-oob="innerHTML">
+  {% if case_link == 'unread' %}
+    <div class="empty-state text-[var(--danger)]" role="alert">
+      The triage record could not be read, so whether this alert belongs to a
+      case is not known.
+    </div>
+  {% elif case_link == 'none' %}
+    <div class="empty-state">This alert is not linked to a case.</div>
+  {% elif case_link == 'withheld' %}
+    <div class="empty-state">
+      This alert is linked to a case, which viewing needs the
+      {{ case_read_permission }} permission.
+    </div>
+  {% elif case_tab is none %}
+    <div class="empty-state text-[var(--danger)]" role="alert">
+      The linked case could not be read.
+    </div>
+  {% else %}
+    {# The case tab's keys are mapped in explicitly. An include shares the
+       parent context, and `failed` already means "the triage read failed"
+       out here; inside the tab it has to mean "the case read failed", so
+       the `with` shadows it rather than letting the wrong one through. #}
+    {% with missing=case_tab.missing, failed=case_tab.failed,
+            case=case_tab.case, view=case_tab.view, kfp=case_tab.kfp,
+            can_close=case_tab.can_close, case_id=case_tab.case_id %}
+      {% include "_fragments/alerts_case_tab.html" %}
+    {% endwith %}
+  {% endif %}
+</div>

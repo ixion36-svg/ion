@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}{% if template_id %}Edit Template{% else %}New Template{% endif %} - ION{% endblock %}
+{% block page_id %}template_form{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
@@ -15,63 +16,29 @@
     </div>
 </section>
 
+{% set form_url = '/ui/template-form?template_id=' ~ template_id if template_id else '/ui/template-form' %}
+
 <form id="template-form" class="space-y-6 w-full max-w-4xl">
-    <div class="card bg-base-200 shadow">
-        <div class="card-body gap-4">
-            <fieldset class="fieldset p-0">
-                <legend class="fieldset-legend">Name <span class="text-error">*</span></legend>
-                <input type="text" id="name" name="name" required placeholder="Enter template name" class="input w-full">
-            </fieldset>
+    <!-- Two values the server needs that no visible control owns: which
+         template is being edited, and which card a new section lands after.
+         The editor's unsaved state is a third, rendered by the sections
+         fragment, because only a render knows the state after its own edit. -->
+    <input type="hidden" name="template_id" id="template-id" value="{{ template_id if template_id else '' }}">
+    <input type="hidden" name="insert_at" id="insert-at" value="-1">
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <fieldset class="fieldset p-0">
-                    <legend class="fieldset-legend">Format</legend>
-                    <select id="format" name="format" class="select w-full">
-                        <option value="markdown">Markdown</option>
-                        <option value="html">HTML</option>
-                        <option value="text">Plain Text</option>
-                    </select>
-                </fieldset>
-                <fieldset class="fieldset p-0">
-                    <legend class="fieldset-legend">Document Type</legend>
-                    <select id="document_type" name="document_type" class="select w-full">
-                        <option value="">None</option>
-                    </select>
-                </fieldset>
-                <fieldset class="fieldset p-0">
-                    <legend class="fieldset-legend">Tags (comma-separated)</legend>
-                    <input type="text" id="tags" name="tags" placeholder="e.g., work, formal, invoice" class="input w-full">
-                </fieldset>
-            </div>
-
-            <fieldset class="fieldset p-0">
-                <legend class="fieldset-legend">Description</legend>
-                <textarea id="description" name="description" rows="2" placeholder="Brief description of the template" class="textarea w-full"></textarea>
-            </fieldset>
-        </div>
-    </div>
-
-    <!-- Legacy template notice (shown when editing raw templates) -->
-    <div id="legacy-notice" role="alert" class="alert alert-warning se-legacy-notice hidden">
-        <div>
-            <p class="mb-2">This template was created with the raw editor. To use the section editor, the existing content will be placed in a single Text section.</p>
-            <button type="button" class="btn btn-sm" data-click-action="convertToSections">Convert to Sections</button>
-        </div>
-    </div>
-
-    <!-- Section Builder -->
-    <div class="se-builder card bg-base-200 shadow">
-        <div class="card-body gap-4">
-            <div class="se-header flex flex-wrap items-center justify-between gap-3">
-                <label class="font-semibold basis-full md:basis-auto md:flex-1">Template Sections</label>
-                <button type="button" class="btn btn-primary btn-sm" data-click-action="openLibrary" data-args='[-1]'>+ Add Section</button>
-            </div>
-
-            <div id="sections-container" class="se-sections min-h-[60px]">
-                <div class="se-empty border-2 border-dashed border-base-300 rounded-box p-8 text-center text-base-content/60" id="sections-empty">
-                    <p>No sections yet. Click "Add Section" to get started.</p>
-                </div>
-            </div>
+    <!-- The form's fields, its section editor and its Save button are
+         server-rendered into here. Save is inside the swap on purpose: a
+         read that failed renders no form, so there is no way to submit one
+         filled in from a read that did not happen. The page used to leave
+         Save live over empty fields, and saving an empty editor sends no
+         sections, which the API stores as content: '' over the real body. -->
+    <div id="template-form-body"
+         hx-get="{{ form_url }}"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+        <div class="text-center p-10 text-base-content/60">
+            <span class="loading loading-spinner loading-sm text-primary"></span>
+            Loading...
         </div>
     </div>
 
@@ -83,54 +50,47 @@
     <div id="section-library" class="se-library fixed top-0 right-0 z-[1000] flex-col w-[360px] h-screen bg-base-200 border-l border-base-300 shadow-xl hidden">
         <div class="se-library-header flex flex-wrap items-center justify-between gap-3 p-4 border-b border-base-300">
             <h3 class="text-lg font-semibold m-0">Section Library</h3>
+            <!-- Close stays out here. The panel is full height, so a render
+                 of the grids that said they could not be read would
+                 otherwise take the only way out with it. -->
             <button type="button" class="se-library-close btn btn-ghost btn-sm btn-circle" data-click-action="closeLibrary" aria-label="Close">&times;</button>
         </div>
-        <div class="se-library-body flex-1 overflow-y-auto p-4">
-            <h4 class="text-xs uppercase tracking-wide text-base-content/60 mt-0 mb-2">Generic</h4>
-            <div class="se-library-grid grid grid-cols-2 gap-2" id="library-generic"></div>
-            <h4 class="text-xs uppercase tracking-wide text-base-content/60 mt-3 mb-2">SOC-Specific</h4>
-            <div class="se-library-grid grid grid-cols-2 gap-2" id="library-soc"></div>
-        </div>
-    </div>
-
-    {% if template_id %}
-    <div class="card bg-base-200 shadow">
-        <div class="card-body">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <fieldset class="fieldset p-0">
-                    <legend class="fieldset-legend">Version Message</legend>
-                    <input type="text" id="message" name="message" placeholder="Describe your changes" class="input w-full">
-                </fieldset>
-                <fieldset class="fieldset p-0">
-                    <legend class="fieldset-legend">Author</legend>
-                    <input type="text" id="author" name="author" placeholder="Your name" class="input w-full">
-                </fieldset>
+        <div class="se-library-body flex-1 overflow-y-auto p-4"
+             hx-get="/ui/template-form/library"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <div class="text-center p-6 text-base-content/60">
+                <span class="loading loading-spinner loading-sm text-primary"></span>
+                Loading section types...
             </div>
         </div>
     </div>
-    {% endif %}
-
-    <div class="form-actions flex flex-wrap gap-3">
-        <button type="submit" class="btn btn-primary">{% if template_id %}Save Changes{% else %}Create Template{% endif %}</button>
-        <button type="button" class="btn" data-click-action="previewTemplate">Preview</button>
-        <a href="/templates" class="btn btn-ghost">Cancel</a>
-    </div>
 </form>
+
+<!-- Cancel and Reload are the two ways out of a form body that says the
+     read failed, so they sit outside every swap target on the page. -->
+<div class="flex flex-wrap gap-3 mt-6 w-full max-w-4xl">
+    <a href="/templates" class="btn btn-ghost">Cancel</a>
+    <button type="button" class="btn btn-ghost"
+            hx-get="{{ form_url }}"
+            hx-target="#template-form-body"
+            hx-swap="innerHTML">Reload</button>
+</div>
 
 <!-- Preview Modal -->
 <!-- JS opens/closes via element.style.display = 'flex'|'none' (CSSOM, allowed).
      daisyUI .modal uses visibility/opacity, so style.display would not reveal it.
      Overlay hashed class hides it until JS shows it. -->
-<div id="preview-modal" class="fixed inset-0 z-50 items-center justify-center bg-black/60 p-4 hidden">
+<div id="preview-modal" class="fixed inset-0 z-50 items-center justify-center bg-black/60 p-4 hidden" data-close-on-self-click>
     <div class="card bg-base-100 shadow-xl w-11/12 max-w-5xl max-h-[90vh] flex flex-col">
         <div class="card-body overflow-hidden flex flex-col gap-4">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <h2 class="card-title text-lg basis-full md:basis-auto md:flex-1">Template Preview (Generated Jinja2)</h2>
-                <button class="btn btn-ghost btn-sm btn-circle" data-click-action="closePreview" aria-label="Close">&times;</button>
+                <button type="button" class="btn btn-ghost btn-sm btn-circle" data-click-action="closePreview" aria-label="Close">&times;</button>
             </div>
             <pre id="preview-content" class="code-block ion-mono bg-base-200 rounded-box p-4 text-sm overflow-auto flex-1"></pre>
             <div class="flex justify-end">
-                <button class="btn" data-click-action="closePreview">Close</button>
+                <button type="button" class="btn" data-click-action="closePreview">Close</button>
             </div>
         </div>
     </div>
@@ -141,656 +101,34 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* JS builds .se-card / .se-add-inline / .se-field* / .se-library-item at
-   runtime. Those class names are querySelector hooks — they cannot move to
-   daisyUI utilities without changing the script. Theme tokens so light mode
-   flips; sibling-hover and .collapsed have no daisyUI equivalent. */
-
-/* Section card (JS-generated) */
-.se-card {
-    border: 1px solid var(--color-base-300);
-    border-radius: var(--radius-box, 1rem);
-    margin-bottom: 0.5rem;
-    background: var(--color-base-100);
-    transition: box-shadow 0.15s;
-}
-.se-card:hover { box-shadow: 0 2px 8px oklch(0% 0 0 / 0.15); }
-.se-card-header {
-    display: flex;
-    align-items: center;
-    padding: 0.5rem 0.75rem;
-    cursor: pointer;
-    gap: 0.5rem;
-    user-select: none;
-}
-.se-card-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: var(--radius-field, 0.5rem);
-    background: var(--color-primary);
-    color: var(--color-primary-content);
-    font-weight: 700;
-    font-size: 0.65rem;
-    flex-shrink: 0;
-}
-.se-card-title { flex: 1; font-weight: 600; font-size: 0.9rem; }
-.se-card-type { color: color-mix(in oklab, var(--color-base-content) 60%, transparent); font-size: 0.75rem; }
-.se-card-actions {
-    display: flex;
-    gap: 0.25rem;
-    align-items: center;
-}
-.se-card-actions button {
-    background: none;
-    border: 1px solid var(--color-base-300);
-    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
-    cursor: pointer;
-    padding: 0.2rem 0.4rem;
-    border-radius: var(--radius-field, 0.5rem);
-    font-size: 0.75rem;
-    line-height: 1;
-}
-.se-card-actions button:hover {
-    background: color-mix(in oklab, var(--color-primary) 12%, transparent);
-    color: var(--color-base-content);
-}
-.se-card-actions button.se-delete:hover {
-    background: var(--color-error);
-    color: var(--color-error-content);
-    border-color: var(--color-error);
-}
-.se-card-body {
-    padding: 0.75rem;
-    border-top: 1px solid var(--color-base-300);
-}
-.se-card-body.collapsed { display: none; }
-
-/* Inline add: sibling-hover has no Tailwind equivalent without changing JS. */
-.se-add-inline {
-    text-align: center;
-    padding: 0.25rem 0;
-    opacity: 0;
-    transition: opacity 0.15s;
-}
-.se-card:hover + .se-add-inline,
-.se-add-inline:hover { opacity: 1; }
-.se-add-inline button {
-    background: none;
-    border: 1px dashed var(--color-base-300);
-    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
-    cursor: pointer;
-    padding: 0.15rem 0.75rem;
-    border-radius: var(--radius-field, 0.5rem);
-    font-size: 0.75rem;
-}
-.se-add-inline button:hover {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-}
-
-/* Section fields (JS-generated, no daisyUI input/select classes) */
-.se-field { margin-bottom: 0.5rem; }
-.se-field label {
-    display: block;
-    font-size: 0.8rem;
-    font-weight: 500;
-    margin-bottom: 0.2rem;
-    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
-}
-.se-field input[type="text"],
-.se-field textarea,
-.se-field select {
-    width: 100%;
-    padding: 0.4rem 0.5rem;
-    border: 1px solid var(--color-base-300);
-    border-radius: var(--radius-field, 0.5rem);
-    background: var(--color-base-100);
-    color: var(--color-base-content);
-    font-size: 0.85rem;
-    font-family: inherit;
-}
-.se-field textarea { min-height: 60px; resize: vertical; }
-
-/* Variable toggle */
-.se-variable-toggle {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-    padding: 0.4rem 0.5rem;
-    background: var(--color-base-100);
-    border-radius: var(--radius-field, 0.5rem);
-    border: 1px solid var(--color-base-300);
-}
-.se-variable-toggle label {
-    font-size: 0.8rem;
-    margin: 0;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-}
-.se-variable-toggle input[type="text"] {
-    flex: 1;
-    padding: 0.25rem 0.4rem;
-    font-size: 0.8rem;
-    font-family: monospace;
-}
-
-/* Dynamic list fields (items, pairs, columns, etc.) */
-.se-list-field { margin-bottom: 0.5rem; }
-.se-list-item {
-    display: flex;
-    gap: 0.25rem;
-    margin-bottom: 0.25rem;
-    align-items: center;
-}
-.se-list-item input {
-    flex: 1;
-    padding: 0.3rem 0.4rem;
-    border: 1px solid var(--color-base-300);
-    border-radius: var(--radius-field, 0.5rem);
-    background: var(--color-base-100);
-    color: var(--color-base-content);
-    font-size: 0.8rem;
-}
-.se-list-item button {
-    background: none;
-    border: 1px solid var(--color-base-300);
-    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
-    cursor: pointer;
-    padding: 0.2rem 0.35rem;
-    border-radius: var(--radius-field, 0.5rem);
-    font-size: 0.75rem;
-}
-.se-list-item button:hover { color: var(--color-error); }
-.se-list-add {
-    background: none;
-    border: 1px dashed var(--color-base-300);
-    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
-    cursor: pointer;
-    padding: 0.25rem 0.6rem;
-    border-radius: var(--radius-field, 0.5rem);
-    font-size: 0.75rem;
-    margin-top: 0.25rem;
-}
-.se-list-add:hover { border-color: var(--color-primary); color: var(--color-primary); }
-
-/* Checkbox field */
-.se-checkbox {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    margin-top: 0.35rem;
-}
-.se-checkbox label { font-size: 0.8rem; cursor: pointer; margin: 0; }
-
-/* Library tiles (JS-generated in buildLibrary) */
-.se-library-item {
-    border: 1px solid var(--color-base-300);
-    border-radius: var(--radius-field, 0.5rem);
-    padding: 0.6rem;
-    cursor: pointer;
-    text-align: center;
-    transition: all 0.15s;
-    background: var(--color-base-100);
-}
-.se-library-item:hover {
-    border-color: var(--color-primary);
-    background: color-mix(in oklab, var(--color-primary) 12%, transparent);
-}
-.se-library-item-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    border-radius: var(--radius-box, 1rem);
-    background: var(--color-primary);
-    color: var(--color-primary-content);
-    font-weight: 700;
-    font-size: 0.65rem;
-    margin-bottom: 0.35rem;
-}
-.se-library-item-label {
-    font-size: 0.8rem;
-    font-weight: 500;
-    display: block;
-}
-.se-library-item-desc {
-    font-size: 0.7rem;
-    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
-    display: block;
-    margin-top: 0.15rem;
-}
-</style>
 
 <script nonce="{{ csp_nonce }}">
 {% raw %}
-const templateId = {% endraw %}{{ template_id|default('null') }}{% raw %};
+// The editor's state lives in one hidden input, rendered by the server and
+// read back here. There is no module-level copy of it: a second copy is how
+// a structural edit and a field edit end up disagreeing about what the
+// template contains.
+//
+// What is left in this file is the three things a server cannot do: read the
+// visible controls back into the state before it travels, show and hide two
+// overlays, and send the save.
 
-let sectionTypes = {};
-let sections = [];
-let insertAtIndex = -1; // -1 = append at end
-
-// =========================================================================
-// Initialize
-// =========================================================================
-document.addEventListener('DOMContentLoaded', async () => {
-    // Load document types
-    try {
-        const resp = await api.get('/api/document-types');
-        const dtSelect = document.getElementById('document_type');
-        Object.entries(resp.types || {}).forEach(([key, label]) => {
-            const opt = document.createElement('option');
-            opt.value = key;
-            opt.textContent = key + ' - ' + label;
-            dtSelect.appendChild(opt);
-        });
-    } catch (e) {
-        console.error('Failed to load document types:', e);
-    }
-
-    // Load section types
-    try {
-        sectionTypes = await api.get('/api/templates/section-types');
-        buildLibrary();
-    } catch (e) {
-        console.error('Failed to load section types:', e);
-    }
-
-    // If editing, load template
-    if (templateId) {
-        try {
-            const template = await api.get('/api/templates/' + templateId);
-            document.getElementById('name').value = template.name;
-            document.getElementById('format').value = template.format;
-            document.getElementById('document_type').value = template.document_type || '';
-            document.getElementById('description').value = template.description || '';
-            document.getElementById('tags').value = template.tags.join(', ');
-
-            if (template.has_sections && template.sections) {
-                sections = template.sections;
-                renderSections();
-            } else if (template.content) {
-                // Legacy template
-                document.getElementById('legacy-notice').style.display = 'block';
-            }
-
-            const prefs = JSON.parse(localStorage.getItem('ion_prefs') || '{}');
-            if (prefs.author) {
-                document.getElementById('author').value = prefs.author;
-            }
-        } catch (e) {
-            showToast('Failed to load template', 'error');
-        }
-    }
-});
-
-// =========================================================================
-// Section Library
-// =========================================================================
-function buildLibrary() {
-    const genericGrid = document.getElementById('library-generic');
-    const socGrid = document.getElementById('library-soc');
-    genericGrid.innerHTML = '';
-    socGrid.innerHTML = '';
-
-    Object.entries(sectionTypes).forEach(([key, st]) => {
-        const item = document.createElement('div');
-        item.className = 'se-library-item';
-        item.onclick = () => addSection(key);
-        item.innerHTML =
-            '<div class="se-library-item-icon">' + escapeHtml(st.icon) + '</div>' +
-            '<span class="se-library-item-label">' + escapeHtml(st.label) + '</span>' +
-            '<span class="se-library-item-desc">' + escapeHtml(st.description || '') + '</span>';
-
-        if (st.category === 'soc') {
-            socGrid.appendChild(item);
-        } else {
-            genericGrid.appendChild(item);
-        }
-    });
+function templateId() {
+    const el = document.getElementById('template-id');
+    const value = el ? el.value : '';
+    return value === '' ? null : value;
 }
 
-function openLibrary(index) {
-    insertAtIndex = index;
-    document.getElementById('section-library').style.display = 'flex';
-    document.getElementById('section-library-overlay').style.display = 'block';
-}
-
-function closeLibrary() {
-    document.getElementById('section-library').style.display = 'none';
-    document.getElementById('section-library-overlay').style.display = 'none';
-}
-
-// =========================================================================
-// Section CRUD
-// =========================================================================
-function addSection(type) {
-    const st = sectionTypes[type];
-    if (!st) return;
-
-    const section = { type: type, config: buildDefaultConfig(type, st) };
-
-    if (insertAtIndex >= 0 && insertAtIndex < sections.length) {
-        sections.splice(insertAtIndex + 1, 0, section);
-    } else {
-        sections.push(section);
-    }
-
-    closeLibrary();
-    renderSections();
-}
-
-function buildDefaultConfig(type, st) {
-    const config = {};
-    (st.fields || []).forEach(f => {
-        if (f.default !== undefined) {
-            config[f.name] = f.default;
-        } else if (f.type === 'text') {
-            config[f.name] = '';
-        } else if (f.type === 'textarea') {
-            config[f.name] = '';
-        } else if (f.type === 'select' && f.options && f.options.length) {
-            config[f.name] = f.default || f.options[0].value;
-        } else if (f.type === 'checkbox') {
-            config[f.name] = f.default || false;
-        } else if (f.type === 'items' || f.type === 'checklist_items') {
-            config[f.name] = [];
-        } else if (f.type === 'pairs') {
-            config[f.name] = [];
-        } else if (f.type === 'columns') {
-            config[f.name] = [{ name: 'Column 1' }];
-        } else if (f.type === 'metadata_fields') {
-            config[f.name] = [{ label: 'Date', variable_name: 'date' }];
-        } else if (f.type === 'signature_roles') {
-            config[f.name] = [{ role_name: 'Prepared By', variable_name: 'prepared_by' }];
-        }
-    });
-    return config;
-}
-
-function removeSection(idx) {
-    sections.splice(idx, 1);
-    renderSections();
-}
-
-function moveSection(idx, direction) {
-    const newIdx = idx + direction;
-    if (newIdx < 0 || newIdx >= sections.length) return;
-    const temp = sections[idx];
-    sections[idx] = sections[newIdx];
-    sections[newIdx] = temp;
-    renderSections();
-}
-
-// =========================================================================
-// Render Sections
-// =========================================================================
-function renderSections() {
-    const container = document.getElementById('sections-container');
-    const emptyEl = document.getElementById('sections-empty');
-
-    if (sections.length === 0) {
-        emptyEl.style.display = 'block';
-        // Remove all cards and inline buttons
-        container.querySelectorAll('.se-card, .se-add-inline').forEach(el => el.remove());
-        return;
-    }
-
-    emptyEl.style.display = 'none';
-    // Rebuild all section cards
-    container.querySelectorAll('.se-card, .se-add-inline').forEach(el => el.remove());
-
-    sections.forEach((section, idx) => {
-        const st = sectionTypes[section.type] || { label: section.type, icon: '?', fields: [] };
-        const card = document.createElement('div');
-        card.className = 'se-card';
-        card.dataset.idx = idx;
-
-        // Header
-        const header = document.createElement('div');
-        header.className = 'se-card-header';
-        header.onclick = (e) => {
-            if (e.target.closest('.se-card-actions')) return;
-            toggleCardBody(idx);
-        };
-
-        const titleText = getSectionTitle(section, st);
-        header.innerHTML =
-            '<div class="se-card-icon">' + escapeHtml(st.icon) + '</div>' +
-            '<span class="se-card-title">' + escapeHtml(titleText) + '</span>' +
-            '<span class="se-card-type">' + escapeHtml(st.label) + '</span>' +
-            `<div class="se-card-actions">
-                <button type="button" title="Move up" data-click-action="moveSection" data-args='[${idx}, -1]'><i class="icon-chevron-up"></i></button>
-                <button type="button" title="Move down" data-click-action="moveSection" data-args='[${idx}, 1]'><i class="icon-chevron-down"></i></button>
-                <button type="button" class="se-delete" title="Delete" data-click-action="removeSection" data-args='[${idx}]'><i class="icon-x"></i></button>
-            </div>`;
-        card.appendChild(header);
-
-        // Body
-        const body = document.createElement('div');
-        body.className = 'se-card-body';
-        body.id = 'se-body-' + idx;
-        body.innerHTML = buildFieldsHTML(section, idx, st);
-        card.appendChild(body);
-
-        container.appendChild(card);
-
-        // Inline add button after each card
-        const inlineAdd = document.createElement('div');
-        inlineAdd.className = 'se-add-inline';
-        inlineAdd.innerHTML = `<button type="button" data-click-action="openLibrary" data-args='[${idx}]'>+ Add Section</button>`;
-        container.appendChild(inlineAdd);
-    });
-
-    // Attach event listeners for all fields
-    attachFieldListeners();
-}
-
-function getSectionTitle(section, st) {
-    const c = section.config || {};
-    switch (section.type) {
-        case 'heading': return c.text || 'Heading';
-        case 'text': return c.variable ? ('{{ ' + (c.variable_name || '...') + ' }}') : (c.content || 'Text').substring(0, 50);
-        case 'table': return 'Table (' + (c.columns || []).length + ' cols)';
-        case 'list': return (c.ordered ? 'Ordered' : 'Unordered') + ' List';
-        case 'key_value': return 'Key-Value (' + (c.pairs || []).length + ' pairs)';
-        case 'divider': return 'Horizontal Rule';
-        case 'metadata_block': return 'Metadata (' + (c.fields || []).length + ' fields)';
-        case 'signature_block': return 'Signatures (' + (c.roles || []).length + ' roles)';
-        case 'image_placeholder': return c.caption || 'Image';
-        case 'severity_badge': return 'Severity: {{ ' + (c.variable_name || 'severity') + ' }}';
-        case 'ioc_table': return 'IOC Table: {{ ' + (c.variable_name || 'ioc_list') + ' }}';
-        case 'timeline': return 'Timeline: {{ ' + (c.variable_name || 'timeline_entries') + ' }}';
-        case 'mitre_table': return 'MITRE: {{ ' + (c.variable_name || 'mitre_techniques') + ' }}';
-        case 'checklist': return 'Checklist (' + (c.items || []).length + ' items)';
-        case 'evidence_block': return 'Evidence: ' + (c.source || '...');
-        default: return st.label;
-    }
-}
-
-function toggleCardBody(idx) {
-    const body = document.getElementById('se-body-' + idx);
-    if (body) body.classList.toggle('collapsed');
-}
-
-// =========================================================================
-// Field HTML Builders
-// =========================================================================
-function buildFieldsHTML(section, idx, st) {
-    const c = section.config || {};
-    let html = '';
-
-    (st.fields || []).forEach(f => {
-        html += buildSingleField(f, c, idx);
-    });
-
-    // Variable toggle (for types that support it)
-    if (st.supports_variable) {
-        const isVar = c.variable || false;
-        const varName = c.variable_name || suggestVarName(section, st);
-        html += '<div class="se-variable-toggle">';
-        html += '<label><input type="checkbox" data-idx="' + idx + '" data-field="variable" ' + (isVar ? 'checked' : '') + '> Make variable</label>';
-        html += '<input data-ion-style="' + (isVar ? '' : 'display:none') + '" type="text" data-idx="' + idx + '" data-field="variable_name" value="' + escapeHtml(varName) + '" placeholder="variable_name">';
-        html += '</div>';
-    }
-
-    return html;
-}
-
-function buildSingleField(f, config, idx) {
-    const val = config[f.name] !== undefined ? config[f.name] : (f.default || '');
-
-    if (f.type === 'text') {
-        return '<div class="se-field"><label>' + escapeHtml(f.label) + '</label>' +
-            '<input type="text" data-idx="' + idx + '" data-field="' + f.name + '" value="' + escapeHtml(String(val)) + '" placeholder="' + escapeHtml(f.label) + '"></div>';
-    }
-    if (f.type === 'textarea') {
-        return '<div class="se-field"><label>' + escapeHtml(f.label) + '</label>' +
-            '<textarea data-idx="' + idx + '" data-field="' + f.name + '" placeholder="' + escapeHtml(f.label) + '">' + escapeHtml(String(val)) + '</textarea></div>';
-    }
-    if (f.type === 'select') {
-        let opts = '';
-        (f.options || []).forEach(o => {
-            opts += '<option value="' + escapeHtml(o.value) + '"' + (String(val) === String(o.value) ? ' selected' : '') + '>' + escapeHtml(o.label) + '</option>';
-        });
-        return '<div class="se-field"><label>' + escapeHtml(f.label) + '</label>' +
-            '<select data-idx="' + idx + '" data-field="' + f.name + '">' + opts + '</select></div>';
-    }
-    if (f.type === 'checkbox') {
-        return '<div class="se-checkbox"><label><input type="checkbox" data-idx="' + idx + '" data-field="' + f.name + '"' + (val ? ' checked' : '') + '> ' + escapeHtml(f.label) + '</label></div>';
-    }
-    if (f.type === 'items') {
-        return buildListField(f, config[f.name] || [], idx, 'text');
-    }
-    if (f.type === 'checklist_items') {
-        return buildChecklistField(f, config[f.name] || [], idx);
-    }
-    if (f.type === 'pairs') {
-        return buildPairsField(f, config[f.name] || [], idx);
-    }
-    if (f.type === 'columns') {
-        return buildColumnsField(f, config[f.name] || [], idx);
-    }
-    if (f.type === 'metadata_fields') {
-        return buildMetadataFieldsField(f, config[f.name] || [], idx);
-    }
-    if (f.type === 'signature_roles') {
-        return buildSignatureRolesField(f, config[f.name] || [], idx);
-    }
-    return '';
-}
-
-function buildListField(f, items, idx, itemType) {
-    let html = '<div class="se-field"><label>' + escapeHtml(f.label) + '</label><div class="se-list-field" data-idx="' + idx + '" data-field="' + f.name + '" data-list-type="items">';
-    items.forEach((item, i) => {
-        const text = typeof item === 'string' ? item : (item.text || '');
-        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(text) + '" data-list-idx="' + i + '"><button type="button" data-click-action="removeListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', ' + i + ']\'>&#10005;</button></div>';
-    });
-    html += '<button type="button" class="se-list-add" data-click-action="addListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', "items"]\'>+ Add Item</button>';
-    html += '</div></div>';
-    return html;
-}
-
-function buildChecklistField(f, items, idx) {
-    let html = '<div class="se-field"><label>' + escapeHtml(f.label) + '</label><div class="se-list-field" data-idx="' + idx + '" data-field="' + f.name + '" data-list-type="checklist">';
-    items.forEach((item, i) => {
-        const text = typeof item === 'string' ? item : (item.text || '');
-        const checked = typeof item === 'object' ? (item.checked || false) : false;
-        html += '<div class="se-list-item"><input type="checkbox" ' + (checked ? 'checked' : '') + ' data-list-idx="' + i + '" data-check="true"><input type="text" value="' + escapeHtml(text) + '" data-list-idx="' + i + '"><button type="button" data-click-action="removeListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', ' + i + ']\'>&#10005;</button></div>';
-    });
-    html += '<button type="button" class="se-list-add" data-click-action="addListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', "checklist"]\'>+ Add Item</button>';
-    html += '</div></div>';
-    return html;
-}
-
-function buildPairsField(f, pairs, idx) {
-    let html = '<div class="se-field"><label>' + escapeHtml(f.label) + '</label><div class="se-list-field" data-idx="' + idx + '" data-field="' + f.name + '" data-list-type="pairs">';
-    pairs.forEach((p, i) => {
-        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(p.label || '') + '" placeholder="Label" data-list-idx="' + i + '" data-pair="label"><input type="text" value="' + escapeHtml(p.value || '') + '" placeholder="Value" data-list-idx="' + i + '" data-pair="value"><button type="button" data-click-action="removeListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', ' + i + ']\'>&#10005;</button></div>';
-    });
-    html += '<button type="button" class="se-list-add" data-click-action="addListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', "pairs"]\'>+ Add Pair</button>';
-    html += '</div></div>';
-    return html;
-}
-
-function buildColumnsField(f, columns, idx) {
-    let html = '<div class="se-field"><label>' + escapeHtml(f.label) + '</label><div class="se-list-field" data-idx="' + idx + '" data-field="' + f.name + '" data-list-type="columns">';
-    columns.forEach((col, i) => {
-        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(col.name || '') + '" placeholder="Column name" data-list-idx="' + i + '"><button type="button" data-click-action="removeListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', ' + i + ']\'>&#10005;</button></div>';
-    });
-    html += '<button type="button" class="se-list-add" data-click-action="addListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', "columns"]\'>+ Add Column</button>';
-    html += '</div></div>';
-    return html;
-}
-
-function buildMetadataFieldsField(f, fields, idx) {
-    let html = '<div class="se-field"><label>' + escapeHtml(f.label) + '</label><div class="se-list-field" data-idx="' + idx + '" data-field="' + f.name + '" data-list-type="metadata">';
-    fields.forEach((fld, i) => {
-        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(fld.label || '') + '" placeholder="Label" data-list-idx="' + i + '" data-pair="label"><input class="font-mono" type="text" value="' + escapeHtml(fld.variable_name || '') + '" placeholder="variable_name" data-list-idx="' + i + '" data-pair="variable_name"><button type="button" data-click-action="removeListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', ' + i + ']\'>&#10005;</button></div>';
-    });
-    html += '<button type="button" class="se-list-add" data-click-action="addListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', "metadata"]\'>+ Add Field</button>';
-    html += '</div></div>';
-    return html;
-}
-
-function buildSignatureRolesField(f, roles, idx) {
-    let html = '<div class="se-field"><label>' + escapeHtml(f.label) + '</label><div class="se-list-field" data-idx="' + idx + '" data-field="' + f.name + '" data-list-type="signatures">';
-    roles.forEach((r, i) => {
-        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(r.role_name || '') + '" placeholder="Role" data-list-idx="' + i + '" data-pair="role_name"><input class="font-mono" type="text" value="' + escapeHtml(r.variable_name || '') + '" placeholder="variable_name" data-list-idx="' + i + '" data-pair="variable_name"><button type="button" data-click-action="removeListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', ' + i + ']\'>&#10005;</button></div>';
-    });
-    html += '<button type="button" class="se-list-add" data-click-action="addListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', "signatures"]\'>+ Add Role</button>';
-    html += '</div></div>';
-    return html;
-}
-
-// =========================================================================
-// List item operations
-// =========================================================================
-function addListItem(sectionIdx, fieldName, listType) {
-    collectFieldData();
-    const items = sections[sectionIdx].config[fieldName] || [];
-    if (listType === 'pairs') {
-        items.push({ label: '', value: '' });
-    } else if (listType === 'columns') {
-        items.push({ name: '' });
-    } else if (listType === 'metadata') {
-        items.push({ label: '', variable_name: '' });
-    } else if (listType === 'signatures') {
-        items.push({ role_name: '', variable_name: '' });
-    } else if (listType === 'checklist') {
-        items.push({ text: '', checked: false });
-    } else {
-        items.push('');
-    }
-    sections[sectionIdx].config[fieldName] = items;
-    renderSections();
-}
-
-function removeListItem(sectionIdx, fieldName, itemIdx) {
-    collectFieldData();
-    const items = sections[sectionIdx].config[fieldName] || [];
-    items.splice(itemIdx, 1);
-    sections[sectionIdx].config[fieldName] = items;
-    renderSections();
-}
-
-// =========================================================================
-// Collect field data from DOM back into sections array
-// =========================================================================
-function collectFieldData() {
-    document.querySelectorAll('.se-card').forEach(card => {
-        const idx = parseInt(card.dataset.idx);
+// Merge the visible controls over the rendered state. The page called this
+// collectFieldData() and wrote into a module-level array; it takes the array
+// as an argument now, so there is nothing to go stale.
+function collectFieldData(sections) {
+    document.querySelectorAll('#sections-container .se-card').forEach(card => {
+        const idx = parseInt(card.dataset.idx, 10);
         if (isNaN(idx) || !sections[idx]) return;
+        if (!sections[idx].config) sections[idx].config = {};
         const config = sections[idx].config;
 
-        // Simple fields
         card.querySelectorAll('[data-field]').forEach(el => {
             const field = el.dataset.field;
             if (el.closest('.se-list-field')) return; // handled below
@@ -801,7 +139,6 @@ function collectFieldData() {
             }
         });
 
-        // List fields
         card.querySelectorAll('.se-list-field').forEach(listEl => {
             const field = listEl.dataset.field;
             const listType = listEl.dataset.listType;
@@ -836,7 +173,6 @@ function collectFieldData() {
             config[field] = items;
         });
 
-        // Variable toggle
         const varToggle = card.querySelector('.se-variable-toggle input[type="checkbox"]');
         if (varToggle) {
             config.variable = varToggle.checked;
@@ -844,157 +180,88 @@ function collectFieldData() {
             if (varNameInput) config.variable_name = varNameInput.value;
         }
     });
+    return sections;
 }
 
-function attachFieldListeners() {
-    // Toggle variable name visibility
-    document.querySelectorAll('.se-variable-toggle input[type="checkbox"]').forEach(cb => {
-        cb.addEventListener('change', function() {
-            const varInput = this.closest('.se-variable-toggle').querySelector('input[type="text"]');
-            if (varInput) varInput.style.display = this.checked ? '' : 'none';
-        });
-    });
-
-    // Auto-suggest variable name from text fields
-    document.querySelectorAll('.se-variable-toggle input[type="text"]').forEach(input => {
-        const idx = parseInt(input.dataset.idx);
-        if (isNaN(idx) || !sections[idx]) return;
-        // If empty, suggest from content
-        if (!input.value) {
-            input.value = suggestVarName(sections[idx], sectionTypes[sections[idx].type] || {});
-        }
-    });
-}
-
-function suggestVarName(section, st) {
-    const c = section.config || {};
-    let base = '';
-    if (section.type === 'text') base = (c.content || '').substring(0, 30);
-    else if (section.type === 'heading') base = c.text || '';
-    else base = st.label || section.type;
-    return base.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').substring(0, 30) || section.type;
-}
-
-// =========================================================================
-// Legacy conversion
-// =========================================================================
-function convertToSections() {
-    // Wrap existing content in a single text section
-    const templateData = api.get('/api/templates/' + templateId).then(t => {
-        sections = [{
-            type: 'text',
-            config: { content: t.content || '', variable: false, variable_name: '' }
-        }];
-        document.getElementById('legacy-notice').style.display = 'none';
-        renderSections();
-        showToast('Content converted to a Text section. You can now edit it with the section editor.', 'success');
-    }).catch(() => {
-        showToast('Failed to convert template', 'error');
-    });
-}
-
-// =========================================================================
-// Preview
-// =========================================================================
-function previewTemplate() {
-    collectFieldData();
-    // Build a simple preview by simulating assembly
-    // We'll show what the Jinja2 output looks like
-    const previewEl = document.getElementById('preview-content');
-    if (sections.length === 0) {
-        previewEl.textContent = '(No sections defined)';
-    } else {
-        // Show assembled content - we'll build a lightweight version client-side
-        const lines = [];
-        sections.forEach(s => {
-            lines.push(sectionToPreview(s));
-        });
-        previewEl.textContent = lines.join('\n\n');
+// null, not [], when the state cannot be read. An empty editor is a template
+// with no sections and would be saved as one.
+function collectSections() {
+    const stateEl = document.getElementById('sections-state');
+    if (!stateEl) return null;
+    let sections;
+    try {
+        sections = JSON.parse(stateEl.value || '[]');
+    } catch (e) {
+        return null;
     }
+    if (!Array.isArray(sections)) return null;
+    return collectFieldData(sections);
+}
+
+// One place where the state joins a request, rather than a collect call in
+// front of each of the six edits. A state that will not parse is left
+// exactly as rendered, so the server answers with the branch that says so
+// instead of this page guessing an empty editor.
+const STATE_CARRYING_PATHS = ['/ui/template-form/sections', '/ui/template-form/preview'];
+document.addEventListener('htmx:configRequest', function (evt) {
+    if (!evt.detail || STATE_CARRYING_PATHS.indexOf(evt.detail.path) === -1) return;
+    const sections = collectSections();
+    if (sections === null) return;
+    evt.detail.parameters.sections = JSON.stringify(sections);
+});
+
+function openLibrary(index) {
+    document.getElementById('insert-at').value = index;
+    document.getElementById('section-library').style.display = 'flex';
+    document.getElementById('section-library-overlay').style.display = 'block';
+}
+
+function closeLibrary() {
+    document.getElementById('section-library').style.display = 'none';
+    document.getElementById('section-library-overlay').style.display = 'none';
+}
+
+function toggleCardBody(idx) {
+    const body = document.getElementById('se-body-' + idx);
+    if (body) body.classList.toggle('collapsed');
+}
+
+// The variable-name input is only meaningful while the box is ticked. The
+// server renders it with the class already right; this keeps it right
+// without a round trip, since nothing about the state has changed yet.
+function toggleVariableName() {
+    const wrap = this.closest('.se-variable-toggle');
+    if (!wrap) return;
+    const input = wrap.querySelector('input[type="text"]');
+    if (input) input.classList.toggle('hidden', !this.checked);
+}
+
+function openPreview() {
     document.getElementById('preview-modal').style.display = 'flex';
-}
-
-function sectionToPreview(section) {
-    const c = section.config || {};
-    const type = section.type;
-
-    if (type === 'heading') {
-        return '#'.repeat(parseInt(c.level) || 2) + ' ' + (c.text || '');
-    }
-    if (type === 'text') {
-        if (c.variable && c.variable_name) return '{{ ' + c.variable_name + ' }}';
-        return c.content || '';
-    }
-    if (type === 'divider') return '---';
-    if (type === 'table') {
-        const cols = c.columns || [];
-        if (cols.length === 0) return '(empty table)';
-        const header = '| ' + cols.map(col => col.name || 'Column').join(' | ') + ' |';
-        const sep = '| ' + cols.map(() => '---').join(' | ') + ' |';
-        if (c.variable && c.variable_name) {
-            const cells = '| ' + cols.map(col => '{{ row.' + (col.name || 'col').toLowerCase().replace(/[^a-z0-9]+/g, '_') + ' }}').join(' | ') + ' |';
-            return header + '\n' + sep + '\n{% for row in ' + c.variable_name + ' %}\n' + cells + '\n{% endfor %}';
-        }
-        return header + '\n' + sep + '\n| ' + cols.map(() => '').join(' | ') + ' |';
-    }
-    if (type === 'list') {
-        if (c.variable && c.variable_name) {
-            if (c.ordered) return '{% for item in ' + c.variable_name + ' %}\n{{ loop.index }}. {{ item }}\n{% endfor %}';
-            return '{% for item in ' + c.variable_name + ' %}\n- {{ item }}\n{% endfor %}';
-        }
-        return (c.items || []).map((item, i) => {
-            const text = typeof item === 'string' ? item : (item.text || '');
-            return c.ordered ? (i + 1) + '. ' + text : '- ' + text;
-        }).join('\n');
-    }
-    if (type === 'key_value') {
-        if (c.variable && c.variable_name) return '{% for kv in ' + c.variable_name + ' %}\n**{{ kv.label }}:** {{ kv.value }}\n{% endfor %}';
-        return (c.pairs || []).map(p => '**' + (p.label || '') + ':** ' + (p.value || '')).join('\n\n');
-    }
-    if (type === 'metadata_block') {
-        return (c.fields || []).map(f => '**' + (f.label || '') + ':** {{ ' + (f.variable_name || '') + ' }}').join('\n\n');
-    }
-    if (type === 'signature_block') {
-        const lines = ['', '---', '### Signatures', ''];
-        (c.roles || []).forEach(r => { lines.push('**' + (r.role_name || '') + ':** {{ ' + (r.variable_name || '') + ' }}'); lines.push(''); });
-        return lines.join('\n');
-    }
-    if (type === 'image_placeholder') return '![' + (c.caption || 'Image') + ']({{ ' + (c.variable_name || 'image_url') + ' }})';
-    if (type === 'severity_badge') return '**Severity:** {{ ' + (c.variable_name || 'severity') + ' }}';
-    if (type === 'ioc_table') return '| Type | Value | Context |\n| --- | --- | --- |\n{% for ioc in ' + (c.variable_name || 'ioc_list') + ' %}\n| {{ ioc.type }} | {{ ioc.value }} | {{ ioc.context }} |\n{% endfor %}';
-    if (type === 'timeline') return '| Timestamp | Event | Actor |\n| --- | --- | --- |\n{% for entry in ' + (c.variable_name || 'timeline_entries') + ' %}\n| {{ entry.timestamp }} | {{ entry.event }} | {{ entry.actor }} |\n{% endfor %}';
-    if (type === 'mitre_table') return '| Technique ID | Name | Tactic |\n| --- | --- | --- |\n{% for tech in ' + (c.variable_name || 'mitre_techniques') + ' %}\n| {{ tech.id }} | {{ tech.name }} | {{ tech.tactic }} |\n{% endfor %}';
-    if (type === 'checklist') return (c.items || []).map(item => {
-        const text = typeof item === 'object' ? (item.text || '') : String(item);
-        const checked = typeof item === 'object' ? (item.checked || false) : false;
-        return '- [' + (checked ? 'x' : ' ') + '] ' + text;
-    }).join('\n');
-    if (type === 'evidence_block') {
-        const lines = ['#### Evidence', '', '**Source:** ' + (c.source || '')];
-        if (c.hash) lines.push('**Hash:** ' + c.hash);
-        if (c.description) lines.push('**Description:** ' + c.description);
-        lines.push('', '**Chain of Custody:** {{ ' + (c.chain_of_custody_var || 'chain_of_custody') + ' }}');
-        return lines.join('\n');
-    }
-    return '';
 }
 
 function closePreview() {
     document.getElementById('preview-modal').style.display = 'none';
 }
-document.getElementById('preview-modal').addEventListener('click', function(e) {
-    if (e.target.id === 'preview-modal') closePreview();
-});
 
-// =========================================================================
-// Save
-// =========================================================================
 document.getElementById('template-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    collectFieldData();
 
+    const nameEl = document.getElementById('name');
+    if (!nameEl) {
+        showToast('The form did not load, so there is nothing to save', 'error');
+        return;
+    }
+
+    const sections = collectSections();
+    if (sections === null) {
+        showToast('The section editor state could not be read, so saving would store the wrong sections', 'error');
+        return;
+    }
+
+    const id = templateId();
     const data = {
-        name: document.getElementById('name').value,
+        name: nameEl.value,
         format: document.getElementById('format').value,
         document_type: document.getElementById('document_type').value || null,
         description: document.getElementById('description').value || null,
@@ -1008,28 +275,31 @@ document.getElementById('template-form').addEventListener('submit', async (e) =>
     }
 
     const tagsInput = document.getElementById('tags').value;
-    if (!templateId && tagsInput) {
+    if (!id && tagsInput) {
         data.tags = tagsInput.split(',').map(t => t.trim()).filter(t => t);
     }
 
-    if (templateId) {
+    if (id) {
         data.message = document.getElementById('message').value || null;
         data.author = document.getElementById('author').value || null;
     }
 
     try {
-        if (templateId) {
-            await api.put('/api/templates/' + templateId, data);
+        if (id) {
+            await api.put('/api/templates/' + id, data);
             showToast('Template updated', 'success');
+            window.location.href = '/templates/' + id;
         } else {
             const result = await api.post('/api/templates', data);
             showToast('Template created', 'success');
             window.location.href = '/templates/' + result.id;
-            return;
         }
-        window.location.href = '/templates/' + templateId;
-    } catch (e) {
-        showToast(e.message || 'Failed to save template', 'error');
+    } catch (err) {
+        // The form is left exactly as the user typed it. Nothing re-renders
+        // on a rejected save, which is the one thing a form must not do:
+        // a re-render from the server echoes back only the fields the server
+        // accepted, so a validation failure would silently drop the rest.
+        showToast(err.message || 'Failed to save template', 'error');
     }
 });
 {% endraw %}

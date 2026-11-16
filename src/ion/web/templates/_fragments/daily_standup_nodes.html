@@ -1,0 +1,50 @@
+{#
+  Arkime capture-node stats. Four outcomes: the read failed, Arkime is not
+  configured, Arkime answered with an error, or there are nodes (possibly
+  none, which is measured).
+
+  Every counter goes through the view model's byte and number formatters,
+  which return nothing for a field that was not sent. renderArkimeNodes()
+  used `(n.packets_24h || 0).toLocaleString()` on six fields and a fmtBytes
+  whose first line was `if (!b || b === 0) return '0 B'`, so a node that
+  reported no counters looked like a node sitting completely idle.
+
+  `dropping` is a measured total above zero. A node whose three drop
+  counters were never sent is not a clean node, so the drop row appears
+  whenever any of them was measured and says Unknown for the rest.
+#}
+{% if failed %}
+<div role="alert" class="ds-read-failed">Capture-node stats could not be read. Arkime did not answer, so packet, byte and drop counts are unknown rather than zero. Run the checks again to retry.</div>
+{% elif configured is sameas false %}
+<div role="alert" class="ds-logsrc-unconfigured"><strong>Arkime is not configured.</strong> No capture source has been set, so no node was queried.</div>
+{% elif error %}
+<div role="alert" class="ds-logsrc-error"><strong>Arkime refused the stats query.</strong> {{ error }}</div>
+{% elif not nodes %}
+<p class="ds-empty">No capture nodes found. Arkime answered and reported none, which is a measured result.</p>
+{% else %}
+<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+  {%- for n in nodes %}
+  <div class="ds-node-card{% if n.dropping %} ds-node-dropping{% endif %}">
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-sm font-semibold font-mono ds-figure">{{ n.name }}</span>
+      <span class="text-[10px] text-base-content/50">CPU: {% if n.cpu is not none %}{{ n.cpu }}%{% else %}<span class="ds-unmeasured">Unknown</span>{% endif %}</span>
+    </div>
+    <div class="grid grid-cols-3 gap-2 text-[11px]">
+      {%- for label, value in [('Packets', n.packets), ('Data', n.bytes), ('Sessions', n.sessions)] %}
+      <div><div class="text-base-content/50">{{ label }}</div><div class="ds-figure font-mono">{% if value is not none %}{{ value }}{% else %}<span class="ds-unmeasured">Unknown</span>{% endif %}</div></div>
+      {%- endfor %}
+      {%- for label, value in [('Pkt/s', n.packets_per_sec), ('Bytes/s', n.bytes_per_sec), ('Sess/s', n.sessions_per_sec)] %}
+      <div><div class="text-base-content/50">{{ label }}</div><div class="ds-node-rate font-mono">{% if value is not none %}{{ value }}{% else %}<span class="ds-unmeasured">Unknown</span>{% endif %}</div></div>
+      {%- endfor %}
+      {%- if n.drops_known %}
+      {%- for label, value in [('Dropped', n.dropped), ('ES Drop', n.es_dropped), ('Overload', n.overload_dropped)] %}
+      <div><div class="text-base-content/50">{{ label }}</div><div class="ds-node-drop font-mono">{% if value is not none %}{{ value }}{% else %}<span class="ds-unmeasured">Unknown</span>{% endif %}</div></div>
+      {%- endfor %}
+      {%- else %}
+      <div class="col-span-3"><span class="ds-unmeasured" title="None of the three drop counters was reported for this node.">Drop counters unknown</span></div>
+      {%- endif %}
+    </div>
+  </div>
+  {%- endfor %}
+</div>
+{% endif %}

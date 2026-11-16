@@ -1,0 +1,213 @@
+{# The log source health body for /log-sources: the Elasticsearch banner,
+   the six ingestion summary tiles and the per-source cards.
+
+   Replaces six innerHTML writes in log_sources.html (two loading
+   placeholders, two failure lines, the empty-state card and the whole
+   body) and the 191 lines of inline JavaScript that assembled them,
+   including a hand-rolled `lsEsc()` and an `lsFmtTime()` that formatted a
+   timestamp against whichever clock ran it. Jinja autoescapes, which
+   retires `lsEsc`, and the `ts` macro emits `<time>` for
+   static/js/local-time.js, which retires `lsFmtTime`.
+
+   The markup is deliberately the same as what that JavaScript produced, so
+   frontend/ion-pages.css keeps reaching `#ls-content .ls-card.healthy` and
+   its four siblings, the five-colour left stripe that is the fastest read
+   on this page.
+
+   This page is about whether telemetry is arriving, so silence is the one
+   thing it must not get wrong, and the readings a silence can have are
+   kept apart:
+
+     S_NEVER       nothing has ever arrived from this source
+     S_QUIET       it has reported before and the window held no events
+     S_UNREADABLE  ION could not read this source's status at all
+     S_ACTIVE      events in the window
+
+   The JavaScript had one rendering for the first and the third: a source
+   whose ES query failed has no `last_event_at`, so `lsFmtTime(null)`
+   printed the word "never" over a monitoring gap, and the error path's
+   hard-coded `event_count_24h: 0` printed as a measured zero beside it.
+   A misconfigured shipper and an unreachable Elasticsearch need opposite
+   responses.
+
+   The page shell owns Run Health Check and + New Source, so a failed read
+   cannot swap away the control that retries it. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% if registry_count is none %}
+  {# Not an empty registry. With the list unread, "no sources are
+     configured" and "every source is silent" are both unavailable, and a
+     page about blind spots must not pick one of them. #}
+  <div role="alert" class="alert alert-error">
+    The log source registry could not be read. This is not an estate with
+    no sources in it and not one that has gone quiet: the query failed, so
+    what ION expects to receive and whether any of it is arriving are both
+    unknown rather than zero. Refresh to try again.
+  </div>
+
+{% elif registry_count == 0 %}
+  <div class="card bg-base-200 shadow">
+    <div class="card-body items-center text-center py-14">
+      <h3 class="card-title">No log sources yet</h3>
+      <p>Define the ingestion sources you expect ION to see, and we'll
+         continuously check whether they're alive in Elasticsearch.</p>
+      {# These two live in the fragment because only the fragment knows the
+         registry is empty, and Seed makes no sense once it is not. The
+         shell's own + New Source button is the escape hatch if a later
+         render drops this card. lsNewSource, not lsOpenForm: the delegated
+         dispatcher passes an action a MouseEvent when there is no
+         data-args, and lsOpenForm read its first argument as the source to
+         edit. #}
+      <div class="flex flex-wrap gap-2 justify-center">
+        <button class="btn btn-ghost" data-click-action="lsSeedDefaults">Seed 8 Common Sources</button>
+        <button class="btn btn-primary ml-2" data-click-action="lsNewSource">+ Add Manually</button>
+      </div>
+    </div>
+  </div>
+
+{% else %}
+
+{% if none_enabled %}
+  {# check_all returns es_configured False on this path without ever
+     looking at the Elasticsearch config, so the JavaScript showed "config
+     ES in Settings" for an estate whose real problem was that every source
+     is switched off. #}
+  <div role="alert" class="alert alert-warning mb-4">
+    <span><strong>No log source is enabled.</strong>
+    {{ registry_count }} source{{ '' if registry_count == 1 else 's' }}
+    {{ 'is' if registry_count == 1 else 'are' }} registered and the health
+    check had nothing to query, so the figures below are unknown rather
+    than zero. Nothing here says telemetry is missing; it says ION was not
+    asked to look.</span>
+  </div>
+{% else %}
+  {# Three states, not two. A truthiness test would fold the third into
+     "cached", and the third is the one where ION does not know which of
+     the two it is looking at. #}
+  {% if es_configured is true %}
+    {# A live read. The figures below are as of this request. #}
+  {% elif es_configured is false %}
+    <div role="alert" class="alert alert-warning mb-4">
+      <span><strong>Elasticsearch not configured.</strong> Every figure
+      below is the last cached check rather than a live one, so a source
+      shown as healthy is only known to have been healthy when that check
+      ran. Configure ES in
+      <a class="link text-[inherit] underline" href="/settings#elasticsearch">Settings</a>
+      for live data.</span>
+    </div>
+  {% else %}
+    <div role="alert" class="alert alert-warning mb-4">
+      <span><strong>Unknown whether this is a live read.</strong> The health
+      check did not report whether Elasticsearch was reachable, so the
+      figures below may be live or may be a cached snapshot of unknown
+      age.</span>
+    </div>
+  {% endif %}
+{% endif %}
+
+<div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow mb-6">
+  {% for t in tiles %}
+    <div class="stat">
+      <div class="stat-title">{{ t.label }}</div>
+      {# `measured` is `is not none` in the module. Every figure in this row
+         has zero as a real reading: zero silent sources is the all-clear
+         this page exists to show, and it must never share a rendering with
+         a figure nobody obtained. `${summary.silent_count||0}` gave them
+         one. #}
+      {% if t.measured %}
+        <div class="stat-value {{ t.colour }}">{{ t.value }}{{ t.suffix }}</div>
+        {% if t.note %}<div class="stat-desc whitespace-normal">{{ t.note }}</div>{% endif %}
+      {% else %}
+        <div class="stat-value text-base-content/40">Unknown</div>
+        <div class="stat-desc whitespace-normal">Not read. This is not zero.</div>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
+
+{% if rows is none %}
+  <div role="alert" class="alert alert-error">
+    The health check could not be run, so whether telemetry is arriving is
+    unknown for every source. ION expects
+    {{ registry_count }} source{{ '' if registry_count == 1 else 's' }};
+    this is not a report that none of them is sending. Refresh to try
+    again.
+  </div>
+
+{% elif not rows %}
+  <div class="card bg-base-200 shadow">
+    <div class="card-body items-center text-center py-10">
+      <h3 class="card-title">Nothing was checked</h3>
+      <p>Enable a registered source to have ION check whether its events
+         are arriving.</p>
+    </div>
+  </div>
+
+{% else %}
+  <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+  {% for r in rows %}
+    {% set state = r.get('report') %}
+    {# `ls-card {{ status }}` is the stylesheet's hook for the left stripe,
+       so the status word travels with the markup. #}
+    <div class="card bg-base-200 shadow ls-card {{ r.get('status') }}">
+      <div class="card-body p-4">
+      <div class="flex flex-wrap justify-between items-start gap-3">
+        <div>
+          <div class="font-semibold leading-tight">{{ r.get('name') }}</div>
+          <div class="text-xs uppercase tracking-wide opacity-50 mt-0.5">{{ r.get('category') }} &middot; {{ r.get('criticality') }}</div>
+        </div>
+        <span class="badge {{ r.get('badge') }} shrink-0">{{ r.get('status') }}</span>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 mt-2 text-xs opacity-70">
+        {% if state == S_UNREADABLE %}
+          {# Neither field was obtained, so neither gets a figure. The
+             JavaScript printed "never" here and a hard 0 next to it, which
+             together read as a source that is configured wrong rather than
+             a check that failed. #}
+          <div>Last event: <strong class="font-mono text-warning"
+               title="ION could not read this source's status. This is not a source that has never reported.">Unknown</strong></div>
+        {% elif state == S_NEVER %}
+          <div>Last event: <strong class="font-mono text-base-content"
+               title="No event has ever arrived from this source. Check that the shipper is running and that the match field and value are right.">Never reported</strong></div>
+        {% else %}
+          {# fallback, not a dash and never the epoch: events are on record
+             for this source, so a missing timestamp is a gap in the record
+             rather than the "never" the dash used to cover. A stale
+             timestamp is a measurement and renders as one, with the status
+             pill carrying how stale it is. #}
+          <div>Last event: <strong class="font-mono text-base-content">{{ ts(r.get('last_event_at'), fallback='No timestamp recorded') }}</strong></div>
+        {% endif %}
+
+        {% if r.get('expected_interval_minutes') is not none %}
+          <div>Window: <strong class="font-mono text-base-content">{{ r.get('expected_interval_minutes') }}m</strong></div>
+        {% else %}
+          <div>Window: <strong class="font-mono text-warning"
+               title="No expected interval is recorded, so ION has no baseline to call this source silent against.">Unknown</strong></div>
+        {% endif %}
+
+        {% if state == S_UNREADABLE %}
+          <div>Events 24h: <strong class="font-mono text-warning"
+               title="The health query for this source did not complete, so the window was never counted. This is not zero events.">Unknown</strong></div>
+        {% elif state == S_QUIET %}
+          <div>Events 24h: <strong class="font-mono text-base-content"
+               title="The window was queried and held no events. This source has reported before, so a quiet window may be normal for it.">{{ r.get('event_count_24h') }}</strong></div>
+        {% else %}
+          <div>Events 24h: <strong class="font-mono text-base-content">{{ r.get('event_count_24h') }}</strong></div>
+        {% endif %}
+
+        <div>Owner: <strong class="font-mono text-base-content">{{ r.get('owner') or '-' }}</strong></div>
+      </div>
+      <div class="flex gap-2 justify-end mt-2">
+        <button class="btn btn-ghost btn-sm" data-click-action="lsEdit"
+                data-args='[{{ r.get("id") }}]'>Edit</button>
+        <button class="btn btn-ghost btn-sm btn-error" data-click-action="lsDelete"
+                data-args='[{{ r.get("id") }}]'>Delete</button>
+      </div>
+      </div>
+    </div>
+  {% endfor %}
+  </div>
+{% endif %}
+
+{% endif %}

@@ -1,0 +1,99 @@
+{% from "_fragments/_time.html" import ts %}
+{% macro number(value, suffix='') %}{{ (value ~ suffix) if value is not none else 'Unknown' }}{% endmacro %}
+{% macro badge(value) %}<span class="badge badge-sm {{ {'critical':'badge-error','high':'badge-warning','medium':'badge-info','low':'badge-success'}.get(value, 'badge-ghost') }}">{{ value or 'Unknown' }}</span>{% endmacro %}
+{% macro slide(key, name, title) %}
+<div class="deck-slide relative flex flex-1 flex-col overflow-hidden hidden" data-slide="{{ key }}" data-name="{{ name }}">
+  <div class="mb-[1.6vh] text-xs font-semibold uppercase tracking-widest text-primary">Daily SOC Standup</div>
+  <div class="deck-h-title text-[clamp(32px,5vw,64px)] font-semibold leading-[1.05] tracking-tight">{{ title }}</div>
+  <div class="deck-body">{{ caller() }}</div>
+</div>
+{% endmacro %}
+{% macro failed(section, label) %}<div role="alert" class="alert alert-error">{{ label }} could not be read. This section is unknown.{% if section and section.get('error') %} {{ section.error }}{% endif %}</div>{% endmacro %}
+{% macro metrics(section, fields) %}
+<div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow">
+{% for key, label in fields %}<div class="stat"><div class="stat-title">{{ label }}</div><div class="stat-value tabular-nums">{{ number(section.get(key)) }}</div></div>{% endfor %}
+</div>
+{% endmacro %}
+
+{% if data is none %}
+<div role="alert" class="alert alert-error m-10">Standup checks could not be read. This does not mean the SOC is quiet. Refresh to retry.</div>
+{% else %}
+{% call slide('title', 'Daily Standup', 'Daily SOC Standup') %}
+  <div class="deck-title text-[clamp(32px,5vw,64px)]">{{ ts(data.get('timestamp')) }}</div>
+  <p>Operations briefing &middot; automated checks &middot; sign-off</p>
+{% endcall %}
+
+{% call slide('cluster', 'Cluster Health', 'Cluster Health') %}
+  {% set c = data.get('cluster_health') %}
+  {% if c is none or c.get('error') %}{{ failed(c, 'Cluster health') }}{% else %}
+  <p>{{ c.cluster_name or 'Cluster name unknown' }}</p><div class="stats w-full bg-base-200"><div class="stat"><div class="stat-title">Status</div><div class="stat-value">{{ c.status or 'Unknown' }}</div></div><div class="stat"><div class="stat-title">Storage</div><div class="stat-value">{{ c.store_size if c.get('store_size') is not none else 'Unknown' }}</div></div></div>
+  {{ metrics(c, [('indices_count','Indices'), ('unassigned_shards','Unassigned shards')]) }}
+  {% endif %}
+{% endcall %}
+
+{% call slide('criticals', 'Critical Alerts', 'Critical Alerts') %}
+  {% set c = data.get('critical_alerts') %}
+  {% if c is none or c.get('error') %}{{ failed(c, 'Critical alerts') }}{% else %}
+  {% if c.get('source') == 'ion_fallback' %}<div class="alert alert-warning">ION-local fallback active. {{ c.get('fallback_reason') or 'Elasticsearch returned no critical-severity matches.' }}</div>{% endif %}
+  {{ metrics(c, [('critical_count','Critical alerts in 24h')]) }}
+  {% set rows = c.get('alerts') %}
+  {% if rows is none %}<p>Alert list unknown.</p>{% elif not rows %}<div class="alert alert-success">No critical alerts in the last 24 hours.</div>{% else %}
+  <div class="card deck-tablebox bg-base-200 shadow"><table class="table table-sm"><thead><tr><th>Time</th><th>Severity</th><th>Rule</th><th>Host</th></tr></thead><tbody>
+  {% for r in rows[:8] %}<tr><td>{{ ts(r.get('timestamp')) }}</td><td>{{ badge(r.get('severity')) }}</td><td>{{ r.rule_name or r.title or r.id or '(unnamed)' }}</td><td>{{ r.host or '-' }}</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% if rows|length > 8 %}<div class="deck-more text-xs opacity-60">+ {{ rows|length - 8 }} more alerts not shown. See the full list on the standup page or in the .pptx.</div>{% endif %}
+  {% endif %}{% endif %}
+{% endcall %}
+
+{% call slide('stale-cases', 'Stale Cases', 'Stale Cases') %}
+  {% set c = data.get('stale_cases') %}
+  {% if c is none or c.get('error') %}{{ failed(c, 'Stale cases') }}{% else %}
+  {{ metrics(c, [('count','Open beyond threshold')]) }}
+  {% set rows = c.get('cases') %}
+  {% if rows is none %}<p>Case list unknown.</p>{% elif not rows %}<div class="alert alert-success">No stale cases.</div>{% else %}
+  <div class="card deck-tablebox bg-base-200 shadow"><table class="table table-sm"><thead><tr><th>Case</th><th>Title</th><th>Triggered rules</th><th>Severity</th><th>Open</th></tr></thead><tbody>
+  {% for r in rows %}<tr><td>{{ r.case_number }}</td><td>{{ r.title }}</td><td>{{ (r.triggered_rules or [])[:3]|join(', ') }}{% if r.triggered_rules and r.triggered_rules|length > 3 %} +{{ r.triggered_rules|length - 3 }}{% endif %}</td><td>{{ badge(r.get('severity')) }}</td><td>{{ number(r.get('hours_open'), 'h') }}</td></tr>{% endfor %}
+  </tbody></table></div>{% endif %}{% endif %}
+{% endcall %}
+
+{% call slide('backlog', 'Alert Backlog', 'Alert Backlog (30 days)') %}
+  {% set c = data.get('open_alerts_30d') %}
+  {% if c is none or c.get('error') %}{{ failed(c, 'Alert backlog') }}{% else %}
+  {{ metrics(c, [('total','Total alerts'), ('open','Still open'), ('acknowledged','Acknowledged'), ('closed','Closed')]) }}
+  <p>{{ number(c.get('still_open_pct'), '%') }} of 30-day total still open.</p>{% endif %}
+{% endcall %}
+
+{% call slide('case-status', 'Case Status', 'Case Status Today') %}
+  {% set c = data.get('case_status_counts') %}
+  {% if c is none or c.get('error') %}{{ failed(c, 'Case status') }}{% else %}{{ metrics(c, [('open','Opened in 24h, still open'), ('in_progress','In progress'), ('closed_24h','Closed in 24h'), ('intake_24h','Intake in 24h')]) }}{% endif %}
+{% endcall %}
+
+{% call slide('log-health', 'Log Sources', 'Log Sources') %}
+  {% for key, label in [('dc_log_health','Domain Controllers'), ('wef_log_health','Windows Event Forwarding')] %}
+  {% set c = data.get(key) %}<h3>{{ label }}</h3>
+  {% if c is none or c.get('error') %}{{ failed(c, label) }}{% else %}{{ metrics(c, [('hosts_with_gaps','Hosts with gaps'), ('host_count','Total hosts')]) }}{% endif %}
+  {% endfor %}
+{% endcall %}
+
+{% call slide('rule-failures', 'Rule Failures', 'Rule Failures') %}
+  {% set c = data.get('rule_failures') %}
+  {% if c is none or c.get('error') %}{{ failed(c, 'Detection rule failures') }}{% else %}
+  {{ metrics(c, [('count','Failing rules')]) }}
+  {% set rows = c.get('rules') %}
+  {% if rows is none %}<p>Rule list unknown.</p>{% elif not rows %}<div class="alert alert-success">No detection-rule execution failures.</div>{% else %}
+  <div class="card deck-tablebox bg-base-200 shadow"><table class="table table-sm"><thead><tr><th>Rule</th><th>Failures in 24h</th><th>Last failure</th><th>Status</th></tr></thead><tbody>
+  {% for r in rows %}<tr><td>{{ r.name or r.rule_name or '(unnamed)' }}</td><td>{{ number(r.get('failures') if r.get('failures') is not none else r.get('failure_count')) }}</td><td>{{ ts(r.get('last_failure')) }}</td><td>{{ badge(r.get('last_status')) }}</td></tr>{% endfor %}
+  </tbody></table></div>{% endif %}{% endif %}
+{% endcall %}
+
+{% call slide('threat-summary', 'AI Threat Summary', 'AI Threat Summary') %}
+  <p class="text-xs opacity-60">Browser draft from the live standup page. Expires after 12 hours. Save the standup there to retain a shared record.</p>
+  <div class="card bg-base-200 p-6 whitespace-pre-wrap" data-storage-key="ion.standup.ai_summary">No AI threat summary draft available. Generate Summary on /daily-standup, then refresh this deck.</div>
+{% endcall %}
+{% call slide('aob', 'Any Other Business', 'AOB') %}
+  <p class="text-xs opacity-60">Browser draft from the live standup page. Expires after 12 hours. Save the standup there to retain a shared record.</p>
+  <div class="card bg-base-200 p-6 whitespace-pre-wrap" data-storage-key="ion.standup.aob">No AOB draft available. Add Additional Notes on /daily-standup, then refresh this deck.</div>
+{% endcall %}
+{% call slide('close', 'Close', 'Questions? Action items?') %}<p>End of standup. Arrow keys revisit sections. Esc exits.</p>{% endcall %}
+<div id="deck-progress" class="flex gap-1.5" hx-swap-oob="true">{% for i in range(11) %}<span class="deck-progress-dot"></span>{% endfor %}</div>
+{% endif %}

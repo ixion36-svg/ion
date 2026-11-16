@@ -1,0 +1,158 @@
+{# Alerts: the slide-out case panel body, plus its header out of band.
+
+   Replaces the three innerHTML sites in openCasePanel (the loading
+   string, the body from _renderAcpContent, and the catch) and the
+   115-line _renderAcpContent template literal. The markup is what that
+   function produced, so the panel looks unchanged.
+
+   The header spans (#acp-number, #acp-title) sit outside #acp-body next
+   to the Close button, so they are swapped out of band. On a missing or
+   failed read they are swapped too, so nothing of the previously opened
+   case stays on screen under this case's id.
+
+   Three outcomes. The JavaScript rendered "Failed to load case details"
+   with the exception message for both a case that does not exist and a
+   read that failed; those lead to different actions (refresh the list,
+   or try again). #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% if missing %}
+  <span id="acp-number" class="acp-number" hx-swap-oob="true">Case {{ case_id }}</span>
+  <span id="acp-title" class="acp-title" hx-swap-oob="true">not found</span>
+  <div class="p-8 text-center text-[var(--danger)]" role="alert">
+    Case {{ case_id }} no longer exists. It may have been deleted since the
+    Cases card was loaded; refresh the card to see what is there now.
+  </div>
+{% elif failed %}
+  <span id="acp-number" class="acp-number" hx-swap-oob="true">Case {{ case_id }}</span>
+  <span id="acp-title" class="acp-title" hx-swap-oob="true">could not be read</span>
+  <div class="p-8 text-center text-[var(--danger)]" role="alert">
+    Case {{ case_id }} could not be read. Nothing is known about it from
+    this panel: not its status, not its alerts, not its notes. Open it
+    again from the Cases card to try again.
+  </div>
+{% else %}
+  <span id="acp-number" class="acp-number" hx-swap-oob="true">{{ case.case_number or '' }}</span>
+  <span id="acp-title" class="acp-title" hx-swap-oob="true">{{ case.title or '' }}</span>
+
+  {# `view.severity`, never a default. The JavaScript wrote
+     `c.severity || 'medium'`, which rated an unrated case medium. #}
+  <div class="acp-sev-strip{% if view.severity %} sev-{{ view.severity }}{% endif %}">
+    <strong>{% if view.severity %}{{ view.severity }}{% else %}severity not set{% endif %}</strong>
+    <span class="acp-sev-detail">{{ view.alerts|length }} alert{% if view.alerts|length != 1 %}s{% endif %}
+      &middot; {{ view.observables|length }} observable{% if view.observables|length != 1 %}s{% endif %}
+      {#- `age` is None when created_at is missing or unparseable. The
+          JavaScript initialised the age to 0 ms and rendered "0m old". #}
+      &middot; {% if view.age is not none %}{{ view.age }} old{% else %}age unknown{% endif %}</span>
+  </div>
+
+  {% if view.status == 'closed' and case.closure_reason %}
+    <div class="acp-closure-info">
+      <div><strong>Closed:</strong> {{ view.closure }}</div>
+      {% if case.closure_notes %}<div class="mt-1 text-[var(--text-secondary)]">{{ case.closure_notes }}</div>{% endif %}
+      <div class="mt-1 text-[var(--text-muted)] text-[0.7rem]">
+        Closed by {{ case.closed_by or 'unknown' }}{% if case.closed_at %} on {{ ts(case.closed_at) }}{% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="acp-section"><div class="acp-section-title">Metadata</div>
+    <div class="acp-meta-grid">
+      {# Withheld without case:update, which PATCH /api/cases/{id}
+         requires. The page offered both selects to every reader. #}
+      <div class="acp-meta-item"><label>Status</label>
+        {% if can_update %}
+          <select data-change-action="acpUpdateField"
+                  data-args='[{{ case.id }}, "status", "$value", {{ (view.status or 'open')|tojson }}]'>
+            {% for s in status_options %}<option value="{{ s }}"{% if view.status == s %} selected{% endif %}>{{ s }}</option>{% endfor %}
+          </select>
+        {% else %}
+          <div class="acp-meta-value" title="Changing status requires the case:update permission">{{ view.status or '-' }}</div>
+        {% endif %}
+      </div>
+      <div class="acp-meta-item"><label>Severity</label>
+        {% if can_update %}
+          <select data-change-action="acpUpdateField" data-args='[{{ case.id }}, "severity", "$value"]'>
+            {% for s in severity_options %}<option value="{{ s }}"{% if view.severity == s %} selected{% endif %}>{{ s }}</option>{% endfor %}
+          </select>
+        {% else %}
+          <div class="acp-meta-value" title="Changing severity requires the case:update permission">{{ view.severity or '-' }}</div>
+        {% endif %}
+      </div>
+      <div class="acp-meta-item"><label>Created</label>
+        <div class="acp-meta-value">{{ ts(case.created_at) }}</div>
+      </div>
+      <div class="acp-meta-item"><label>Updated</label>
+        <div class="acp-meta-value">{{ ts(case.updated_at) }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="acp-section"><div class="acp-section-title">Linked alerts ({{ view.alerts|length }})</div>
+    <div class="acp-alerts-list">
+      {% if not view.alerts %}
+        <div class="text-[var(--text-muted)] text-[0.8rem]">No alerts linked.</div>
+      {% else %}
+        {% for a in view.alerts_shown %}
+          <div class="acp-item">
+            <div class="acp-item-title">{{ a.rule_name or a.es_alert_id or 'unknown' }}</div>
+            <div class="acp-item-meta">{{ a.status or '' }} &middot; {{ a.es_alert_id or '' }}</div>
+          </div>
+        {% endfor %}
+        {% if view.alerts|length > view.alerts_shown|length %}
+          <div class="text-[var(--text-muted)] text-[0.75rem] mt-1">Showing {{ view.alerts_shown|length }} of {{ view.alerts|length }}. The full case view lists them all.</div>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="acp-section"><div class="acp-section-title">Observables ({{ view.observables|length }})</div>
+    <div class="acp-obs-list">
+      {% if not view.observables %}
+        <div class="text-[var(--text-muted)] text-[0.8rem]">No observables.</div>
+      {% else %}
+        {% for o in view.observables_shown %}
+          <div class="acp-item"><div class="acp-item-title">{{ o.text }}</div>
+            <div class="acp-item-meta">{{ o.type or '' }}{% if o.context %} &middot; {{ o.context }}{% endif %}</div></div>
+        {% endfor %}
+        {% if view.observables|length > view.observables_shown|length %}
+          <div class="text-[var(--text-muted)] text-[0.75rem] mt-1">Showing {{ view.observables_shown|length }} of {{ view.observables|length }}.</div>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="acp-section"><div class="acp-section-title">Notes ({{ view.notes|length }})</div>
+    <div class="acp-notes-list">
+      {% if not view.notes %}
+        <div class="text-[var(--text-muted)] text-[0.8rem]">No notes yet.</div>
+      {% else %}
+        {% for n in view.notes %}
+          <div class="acp-item">
+            <div class="acp-item-meta">{{ n.user or 'unknown' }}
+              &middot; {{ ts(n.created_at, fallback='') }}</div>
+            <div class="mt-1 whitespace-pre-wrap">{{ n.content or '' }}</div>
+          </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+    {# The note form is a POST to /api/cases/{id}/notes, which requires
+       case:update. Withheld rather than offered to answer 403. #}
+    {% if can_update %}
+      <div class="mt-2 flex gap-1.5">
+        <textarea class="flex-1 p-1.5 bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--ion-border)] rounded-[4px] resize-y text-[0.8rem]" id="acp-note-input" rows="2" placeholder="Add note..."></textarea>
+        <button class="btn btn-primary text-xs self-start" data-click-action="acpAddNote" data-args='[{{ case.id }}]'>Add</button>
+      </div>
+    {% else %}
+      <div class="mt-2 text-[var(--text-muted)] text-xs" title="Requires the case:update permission">Read only</div>
+    {% endif %}
+  </div>
+
+  <div class="acp-footer-link">
+    <a href="/cases?selected={{ case.case_number|urlencode }}" target="_blank" rel="noopener">
+      Open full case view (Workbench / Annotations / Similar) &#8599;
+    </a>
+    {% if case.kibana_url %}<a href="{{ case.kibana_url }}" target="_blank" rel="noopener">View in Kibana &#8599;</a>{% endif %}
+  </div>
+{% endif %}

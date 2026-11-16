@@ -1,0 +1,21 @@
+{% if state == 'failed' %}
+<div class="cpanel-alert-fields-empty">{% if unavailable %}Process tree needs a live Elasticsearch connection.{% else %}Failed to load process tree: the context could not be read.{% endif %}</div>
+{% elif state == 'empty' %}
+<div class="cpanel-alert-fields-empty">No process context on this alert.</div>
+{% else %}
+{% if truncated is not none and truncated > 0 %}<div class="cpanel-proc-trunc">+{{ truncated }} earlier ancestor{{ 's' if truncated != 1 else '' }} (entity IDs only — not in alert data)</div>{% endif %}
+{% for node in nodes %}
+<div class="cpanel-proc-node{% if node.is_alert %} is-alert{% endif %}{% if node.is_child %} is-child{% endif %}">
+<div class="cpanel-proc-node-head">
+{% if node.branch %}<i class="icon-corner-down-right cpanel-proc-branch"></i>{% endif %}<i class="icon-cpu cpanel-proc-ic"></i>
+<span class="cpanel-proc-name">{{ node.name }}</span><span class="cpanel-proc-role">{{ node.role }}</span>
+{% if node.meta %}<span class="cpanel-proc-meta">{{ node.meta }}</span>{% endif %}
+{% if (case_id and can_pin) or node.command %}<span class="cpanel-proc-actions">
+{% if case_id and can_pin %}<button type="button" class="cpanel-proc-act" title="Pin as case evidence" data-click-action="pinProcessToCase" data-args='{{ [case_id, node.pin_title]|tojson }}'><i class="icon-bookmark"></i></button>{% endif %}
+{% if node.command %}<button type="button" class="cpanel-proc-act" title="Copy command line" data-click-action="copyProcCmd" data-args='{{ [node.command_key]|tojson }}'><i class="icon-copy"></i></button>{% endif %}
+</span>{% endif %}</div>
+{% if node.command %}<div class="cpanel-proc-cmd">{{ node.command }}</div>{% endif %}
+</div>
+{% endfor %}
+{% endif %}
+<template data-case-process-state="{{ state }}" data-case-process-unavailable="{{ 'true' if unavailable else 'false' }}" data-case-process-commands='{{ commands|tojson }}'></template>

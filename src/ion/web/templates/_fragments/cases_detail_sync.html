@@ -1,0 +1,9 @@
+{% if state == 'failed' %}
+<div class="alert alert-error"><div>Sync status could not be read. Whether this case matches external systems is unknown.</div></div>
+{% elif state == 'data' %}
+<div class="alert {% if abandoned_count > 0 %}alert-error{% else %}alert-warning{% endif %}"><div>
+<div class="font-semibold">{% if abandoned_count > 0 %}{{ abandoned_count }} sync{{ '' if abandoned_count == 1 else 's' }} to external systems gave up{% if retrying_count > 0 %}, {{ retrying_count }} still retrying{% endif %}{% else %}{{ retrying_count }} sync{{ '' if retrying_count == 1 else 's' }} to external systems {{ 'is' if retrying_count == 1 else 'are' }} retrying{% endif %}</div>
+<div class="text-sm opacity-80 mt-1">This case may not match what the external system shows.</div>
+<ul class="text-sm mt-2 list-disc ml-5">{% for item in items %}<li><strong>{{ item.target if item.target is not none else 'Unknown target' }}</strong> {{ item.operation if item.operation is not none else 'Unknown operation' }} &mdash; {{ item.error if item.error is not none else 'no error recorded' }} <span class="opacity-60">({% if item.abandoned %}not retrying any more{% elif item.retry_at is not none %}next attempt {{ item.retry_at }}{% else %}retry time unknown{% endif %}, {{ item.attempts if item.attempts is not none else 'unknown' }} attempt{{ '' if item.attempts == 1 else 's' }}{% if not item.abandoned %}, {{ item.remaining if item.remaining is not none else 'unknown' }} left{% endif %})</span></li>{% endfor %}</ul>
+</div></div>
+{% endif %}

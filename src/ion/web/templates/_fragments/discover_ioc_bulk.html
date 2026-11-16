@@ -1,0 +1,59 @@
+{# The bulk IOC hunt table, from ui/discover.py's bulk_view.
+
+   The Details button is the point. Its argument was
+   `data-args='["${escapeHtml(r.ioc_value)}"]'`, which is the fourth shape
+   of one defect on this project: escapeHtml turns a `"` into `&quot;`,
+   and inside a JSON string that is six literal characters, so JSON.parse
+   handed the dispatcher a different indicator than the one on screen. A
+   value containing `'` closed the attribute outright. An indicator is
+   attacker-supplied by definition, because it is the thing being hunted.
+
+   `found` is a boolean or nothing. A row that did not say whether it was
+   found is not a row that was not found, and the page's ternary made those
+   the same answer.
+#}
+{% if state == 'unconfigured' %}
+<tr><td colspan="6" class="empty-state">{{ detail or 'Elasticsearch is not configured.' }}</td></tr>
+{% elif state == 'refused' %}
+<tr><td colspan="6" class="empty-state">That index pattern is not one this deployment allows.</td></tr>
+{% elif state == 'failed' %}
+<tr><td colspan="6" class="empty-state">The bulk hunt could not be completed{% if detail %}. {{ detail }}{% endif %}</td></tr>
+{% elif state == 'empty' %}
+<tr><td colspan="6" class="empty-state">No indicators were searched</td></tr>
+{% else %}
+{%- for r in rows %}
+<tr>
+  <td>{{ r.value if r.value is not none else '' }}</td>
+  <td>{% if r.kind %}{{ r.kind }}{% else %}<span class="dsc-absent" title="This result carried no indicator type"></span>{% endif %}</td>
+  <td>
+    {%- if r.found is true %}<span class="found-badge">Found</span>
+    {%- elif r.found is false %}<span class="not-found-badge">Not Found</span>
+    {%- else %}<span class="dsc-absent" title="This result did not say whether the indicator was found"></span>{% endif %}
+  </td>
+  <td>{% if r.hits is not none %}{{ r.hits }}{% else %}<span class="dsc-absent" title="This result carried no hit count"></span>{% endif %}</td>
+  <td>{{ r.indices|join(', ') }}{% if r.more %}...{% endif %}</td>
+  <td>
+    {%- if r.found is true and r.value is not none %}
+    <button class="btn btn-sm" data-click-action="huntIOC"
+            data-args='{{ [r.value]|tojson }}'>Details</button>
+    {%- endif %}
+  </td>
+</tr>
+{%- endfor %}
+{% endif %}
+
+<span id="ioc-hunt-result-count" hx-swap-oob="innerHTML:#ioc-hunt-result-count">
+  {%- if found is not none and searched is not none %}{{ found }}/{{ searched }} found
+  {%- else %}counts unknown{% endif %}
+</span>
+<div id="bulk-summary" hx-swap-oob="innerHTML:#bulk-summary">
+  <div class="stat"><span class="stat-label">Total Searched</span><span class="stat-value">
+    {{- searched if searched is not none else 'unknown' -}}
+  </span></div>
+  <div class="stat"><span class="stat-label">Found</span><span class="stat-value found-badge">
+    {{- found if found is not none else 'unknown' -}}
+  </span></div>
+  <div class="stat"><span class="stat-label">Not Found</span><span class="stat-value not-found-badge">
+    {{- not_found if not_found is not none else 'unknown' -}}
+  </span></div>
+</div>

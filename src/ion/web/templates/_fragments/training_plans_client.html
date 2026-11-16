@@ -1,0 +1,14 @@
+<template id="tp-message-template"><div class="tp-empty" role="status"></div></template>
+<template id="tp-plan-placeholder"><option value="">-- Select a plan --</option></template>
+<template id="tp-plan-option"><option></option></template>
+<template id="tp-role-heading-template"><div class="tp-role-heading"></div></template>
+<template id="tp-role-choice-template"><label class="tp-role-choice"><input type="checkbox" class="tp-role-cb"><span></span></label></template>
+<template id="tp-cal-schedule-row">
+    <div class="cal-sched-row">
+        <div class="flex-1 min-w-[150px]"><div class="tp-item-name"></div><div class="tp-item-provider"></div></div>
+        <span class="cal-sched-status"></span>
+        <label>Start:</label><input type="date" data-change-action="calUpdateItemDate">
+        <label>Exam:</label><input type="date" data-change-action="calUpdateItemDate">
+        <label>Weeks:</label><input type="number" min="1" max="52" data-change-action="calUpdateItemWeeks">
+    </div>
+</template>

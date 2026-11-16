@@ -1,0 +1,187 @@
+{# The alert queue, from /ui/alerts/queue. Rendered into #alerts-tbody by
+   way of hx-select="#alerts-queue-rows > tr", so only the rows land in the
+   table and everything after the table is swapped out of band.
+
+   The response starts with <table> on purpose. htmx parses a fragment by
+   its first tag: one that starts with <tr> is wrapped in a table and read
+   at depth two, and any element the HTML parser will not allow inside a
+   table body (a div, a select) is then foster-parented out of the wrapper
+   and the rows are lost. A full table at the top parses as itself, and the
+   out-of-band elements that follow it parse as its siblings.
+
+   Four outcomes, from queue_outcome:
+
+     failed    one row naming the reason, the side lists swapped to "could
+               not be read" with their badges unknown, and a data block
+               that says no data was read. The page then leaves allAlerts
+               alone.
+     degraded  the handler reported a message AND rows came with it (lab
+               fixtures). The rows render, the notice carries the message.
+     empty     "No alerts in this window" and a data block with an empty
+               array, so the page's aggregations read a measured zero.
+     data      the rows, which static/js/alerts-queue.js replaces with its
+               own when it is present. These are the fallback for when it
+               is not, and the one server definition of the row for the
+               stage that retires the module.
+
+   The data block is a script element of type application/json. A
+   non-JavaScript type is never executed, so script-src does not apply, and htmx's
+   evalScript leaves any type other than text/javascript, module or empty
+   alone. It is swapped out of band onto the placeholder beside the table,
+   outside the tbody the module overwrites, so the page can read it after
+   its own render.
+
+   No style attribute: style-src-attr is 'none'. Handlers are
+   data-click-action names event-delegation.js resolves on window. #}
+{% from "_fragments/_time.html" import ts %}
+{% macro system_badge(b) -%}
+{%- if b is none -%}
+<span class="text-[var(--text-muted)]">-</span>
+{%- elif b.cyab_system_id -%}
+<a href="/cyab#{{ b.cyab_system_id }}" class="system-badge linked" title="{{ b.tooltip }}" data-stop-propagation>{{ b.display }}</a>
+{%- else -%}
+<span class="system-badge" title="{{ b.tooltip }}">{{ b.display }}</span>
+{%- endif -%}
+{%- endmacro %}
+<table>
+<tbody id="alerts-queue-rows">
+{% if failed %}
+  <tr>
+    <td colspan="{{ colspan }}" class="aq-empty aq-failed" role="alert">
+      {%- if connection_error -%}
+        Alerts could not be read: Elasticsearch could not be reached.
+        {%- if reason %} <span class="aq-reason whitespace-pre-wrap">{{ reason }}</span>{% endif -%}
+      {%- elif reason -%}
+        Alerts could not be read: <span class="aq-reason whitespace-pre-wrap">{{ reason }}</span>
+      {%- else -%}
+        Alerts could not be read: the server did not produce a list.
+      {%- endif %}
+      This is not an empty queue; nothing was counted.
+    </td>
+  </tr>
+{% elif not rows %}
+  <tr>
+    <td colspan="{{ colspan }}" class="aq-empty">
+      No alerts in this window{% if system %} for system {{ system }}{% endif %}
+      {%- if not include_closed %} (closed alerts not requested){% endif %}.
+    </td>
+  </tr>
+{% else %}
+  {% for a in rows %}
+  <tr class="alert-row aq-fallback-row"
+      data-click-action="showAlertDetail" data-args='{{ [a.id]|tojson }}'
+      data-contextmenu-action="showContextMenu" data-contextmenu-args='{{ ["$event", a.id]|tojson }}'
+      data-alert-id="{{ a.id }}">
+    <td class="checkbox-col" data-stop-propagation>
+      <input type="checkbox" class="alert-checkbox" data-alert-id="{{ a.id }}"
+             data-change-action="toggleAlertSelection" data-args='{{ [a.id, "$checked"]|tojson }}'>
+    </td>
+    <td class="w-[32px] text-center">
+      {%- if not a.triage_read -%}
+      <span class="triage-dot triage-unknown" title="Triage not read"></span>
+      {%- elif a.triage_status -%}
+      <span class="triage-dot triage-{{ a.triage_status }}" title="Triage: {{ a.triage_status }}"></span>
+      {%- else -%}
+      <span class="triage-dot triage-none" title="No triage record"></span>
+      {%- endif -%}
+    </td>
+    <td><span class="severity-badge severity-{{ a.severity or 'unknown' }}">{{ a.severity or 'unknown' }}</span></td>
+    <td title="{{ a.title or '' }}">{{ a.title or '' }}
+      {%- if a.mitre_technique_id %} <span class="mitre-inline-badge" title="{{ a.mitre_technique_name or '' }} ({{ a.mitre_tactic_name or '' }})">{{ a.mitre_technique_id }}</span>{% endif -%}
+      {%- if a.is_lab_fixture %} <span class="lab-fixture-badge" title="Training lab fixture, not a real alert">Lab fixture</span>{% endif -%}
+    </td>
+    <td title="{{ a.host or '-' }}">{{ a.host or '-' }}</td>
+    <td title="{{ a.user or '-' }}">{{ a.user or '-' }}</td>
+    <td title="{{ a.rule_name or '-' }}">{{ a.rule_name or '-' }}</td>
+    <td>{{ system_badge(a.system_badge) }}</td>
+    <td>
+      {%- if not a.triage_read -%}
+      <span class="text-[var(--text-muted)]" title="Triage not read">?</span>
+      {%- elif a.case_number -%}
+      <span class="case-link-badge" title="{{ a.case_title or '' }}">{{ a.case_number }}</span>
+      {%- else -%}
+      <span class="text-[var(--text-muted)]">-</span>
+      {%- endif -%}
+    </td>
+    <td><span class="status-badge alert-status-{{ a.effective_status or 'unknown' }}">{{ a.effective_status or 'unknown' }}</span></td>
+    <td>{{ ts(a.timestamp) }}</td>
+    <td class="quick-actions-col" data-stop-propagation>
+      <div class="quick-actions">
+        {%- if can_triage %}
+        <button class="quick-action-btn" data-click-action="quickAssignToMe" data-args='{{ [a.id]|tojson }}' title="Assign to me"><i class="icon-user-check"></i></button>
+        <button class="quick-action-btn" data-click-action="quickStatusChange" data-args='{{ [a.id, "acknowledged"]|tojson }}' title="Acknowledge"><i class="icon-search"></i></button>
+        {%- endif %}
+        {%- if can_create_case %}
+        <button class="quick-action-btn" data-click-action="showCreateCaseForm" data-args='{{ [a.id]|tojson }}' title="Create case"><i class="icon-folder-plus"></i></button>
+        {%- endif %}
+        {%- if a.arkime %}
+        <a class="quick-action-btn arkime-action-btn text-[#6de4ff]" href="/alerts/{{ a.id|urlencode }}/arkime" title="Arkime PCAP analysis{% if a.arkime_by_ip %} (IP search, no community ID){% endif %}" data-stop-propagation><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg></a>
+        {%- endif %}
+      </div>
+    </td>
+  </tr>
+  {% endfor %}
+{% endif %}
+</tbody>
+</table>
+
+{# The notice line above the table. Empty when there is nothing to say,
+   and the stylesheet hides it when empty, so a previous load's notice is
+   cleared by this one. #}
+{# Whitespace-trimmed throughout: the stylesheet hides the notice with
+   :empty, which a stray text node would defeat. #}
+<div hx-swap-oob="innerHTML:#alerts-queue-notice">
+  {%- if degraded -%}
+  <span role="status" class="aq-notice-item aq-notice-degraded">
+    {%- if connection_error -%}
+    Elasticsearch could not be reached; only lab fixture alerts are shown.
+    {%- else -%}
+    {{ reason }}; only lab fixture alerts are shown.
+    {%- endif -%}
+  </span>
+  {%- endif -%}
+  {%- if truncated -%}
+  <span role="status" class="aq-notice-item aq-notice-truncated">
+    Showing the newest {{ limit }} alerts; the window holds more. Narrow it to see the rest.
+  </span>
+  {%- endif -%}
+  {%- if window.defaulted -%}
+  <span role="status" class="aq-notice-item aq-notice-window">
+    The time range could not be read from the controls; the last {{ window.hours }} hours are shown.
+  </span>
+  {%- endif -%}
+  {%- if triage_failed -%}
+  <span role="status" class="aq-notice-item aq-notice-triage">
+    Triage status could not be read for these rows.
+  </span>
+  {%- endif -%}
+</div>
+
+{# The system select, whole, so its option list has one definition. The
+   requested system stays selected even when no row or registry entry
+   carries it, or the control would silently stop saying what it filters. #}
+<select id="alert-system-filter" name="system" class="ion-select w-auto!" data-change-action="loadAlerts"
+        title="Filter by source system (CyAB-registered systems only)" hx-swap-oob="true">
+  <option value=""{% if not system %} selected{% endif %}>All Systems</option>
+  {%- for s in systems %}
+  <option value="{{ s.value }}"{% if s.selected %} selected{% endif %}>{{ s.label }}</option>
+  {%- endfor %}
+</select>
+
+{% if failed %}
+{# Only on a failed read. On every other outcome the page aggregates the
+   lists from the rows it was handed, following its own filters. #}
+{% for list_id, badge_id in [("top-hosts-list", "hosts-count"), ("top-rules-list", "rules-count"), ("top-users-list", "users-count")] %}
+<div hx-swap-oob="innerHTML:#{{ list_id }}">
+  <div class="empty-state aq-side-failed" role="alert">Could not be read</div>
+</div>
+<div hx-swap-oob="innerHTML:#{{ badge_id }}">?</div>
+{% endfor %}
+{% endif %}
+
+{# The spine. data-outcome is what the page decides on, before it parses
+   anything; the body is the array when one was read and `null` when the
+   read failed. The route builds `data` as None exactly when `failed`, and
+   the route tests pin that, so the template adds no guard of its own. #}
+<script type="application/json" id="alerts-queue-data" hx-swap-oob="true"
+        data-outcome="{{ 'failed' if failed else 'read' }}">{{ data|tojson }}</script>

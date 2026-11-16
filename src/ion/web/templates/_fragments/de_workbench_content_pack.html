@@ -1,0 +1,25 @@
+{# The content-pack controls for /de.
+
+   This region reads nothing, so it has no failure state and no figure. It is
+   a fragment only so the Import control can be withheld from a viewer who
+   does not hold the permission POST /api/de/content-pack/import checks: /de
+   renders its template with no user in the context, so the page shell cannot
+   make that decision and server.py is not this conversion's file.
+
+   Export is a GET gated on the same permission as this fragment, so every
+   viewer who can see this can use it.
+
+   The import itself stays a mutation. It reads a file the user picked, posts
+   it as a JSON body, and then re-requests the proposals and quirks regions
+   rather than building markup for what it created. #}
+
+<div class="flex items-center gap-3 flex-wrap">
+  <a href="/api/de/content-pack/export" class="btn btn-sm btn-primary">Export pack</a>
+  {% if can_propose %}
+    <input type="file" id="cp-file" accept="application/json,.json" class="file-input file-input-sm file-input-bordered max-w-xs">
+    <button type="button" class="btn btn-sm" data-click-action="dwImportPack">Import pack</button>
+    <span id="cp-result" class="text-xs opacity-70"></span>
+  {% else %}
+    <span class="text-xs opacity-60">Importing a pack needs the <span class="font-mono text-xs">de:propose</span> permission.</span>
+  {% endif %}
+</div>

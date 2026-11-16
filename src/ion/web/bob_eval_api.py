@@ -123,18 +123,18 @@ def get_run(
     return run.to_dict()
 
 
-@router.get("/api/bob-eval/runs/{run_id}/samples")
-def get_run_samples(
-    run_id: int,
-    page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=200),
-    current_user: User = Depends(_SETTINGS_PERM),
-    session: Session = Depends(get_db_session),
-):
-    """Paginated samples for a run."""
+def samples_payload(run_id: int, page: int, page_size: int, session: Session) -> dict:
+    """One page of samples for a run, or None if the run does not exist.
+
+    Extracted from get_run_samples so the /ui fragment that renders this
+    table can call it too. The alternative was a second copy of the
+    pagination maths and the reasoning_text gate below, which is exactly the
+    kind of pair that drifts: one of them would keep emitting reasoning
+    after the flag flipped.
+    """
     run = get_eval_run(run_id, session)
     if run is None:
-        raise HTTPException(status_code=404, detail="Eval run not found")
+        return None
 
     offset = (page - 1) * page_size
     samples = list_eval_run_samples(run_id, limit=page_size, offset=offset, session=session)
@@ -170,6 +170,21 @@ def get_run_samples(
         "total_pages": max(1, math.ceil(total / page_size)),
         "samples": sample_dicts,
     }
+
+
+@router.get("/api/bob-eval/runs/{run_id}/samples")
+def get_run_samples(
+    run_id: int,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+    current_user: User = Depends(_SETTINGS_PERM),
+    session: Session = Depends(get_db_session),
+):
+    """Paginated samples for a run."""
+    payload = samples_payload(run_id, page, page_size, session)
+    if payload is None:
+        raise HTTPException(status_code=404, detail="Eval run not found")
+    return payload
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,176 @@
+{# The case grouper's control panel: four stat tiles, the Last run table and
+   the side-effect badges.
+
+   Replaces four innerHTML sites in case_grouper.html (the loading state, the
+   load-failure message, the whole panel body, and the flash line) plus the
+   hand-rolled `esc()` and relative-time formatter they needed. The markup is
+   deliberately the same as what that JavaScript produced, so the page looks
+   unchanged and the move is verifiable rather than a redesign in disguise.
+
+   Every number is tested with `is not none`. This panel's figures are the
+   basis for an analyst deciding whether the grouper is doing its job, and a
+   truthiness test cannot tell "scanned nothing" from "no pass has run": it
+   collapses both into the same cell, in a table where zeros are the normal
+   case on a quiet shift.
+
+   Refresh and Run now live in the page shell, outside #cg-content, so no
+   render of this fragment, success or failure, can remove the control that
+   would retry it. Confirmed by driving it in a browser, not inferred from
+   here. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% if failed %}
+  <div role="alert" class="alert alert-error">
+    <span>
+      The case grouper's status could not be read. No figures are shown below
+      rather than zeros: the read failed, so nothing here is known, which is
+      not the same as a grouper that found nothing to group. Use Refresh to
+      try again.
+    </span>
+  </div>
+{% else %}
+
+<div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow mb-6">
+  {# Enabled, disabled, and neither. A truthiness test would print "Disabled"
+     for a flag the panel could not resolve, which is a claim about the
+     service rather than about the read. #}
+  <div class="stat{{ '' if status.enabled is true else ' opacity-75' }}">
+    <div class="stat-title">Status</div>
+    <div class="stat-value font-mono{{ ' text-success' if status.enabled is true }}">
+      {%- if status.enabled is true %}Enabled
+      {%- elif status.enabled is false %}Disabled
+      {%- else %}Unknown{% endif -%}
+    </div>
+    <div class="stat-desc">Advisory lock 1017 · one worker per container</div>
+  </div>
+  <div class="stat">
+    <div class="stat-title">Poll interval</div>
+    <div class="stat-value font-mono">
+      {%- if status.interval_s is not none %}{{ status.interval_s }}s
+      {%- else %}unknown{% endif -%}
+    </div>
+    <div class="stat-desc">ION_CASE_GROUPER_INTERVAL_S</div>
+  </div>
+  <div class="stat">
+    <div class="stat-title">Extend window</div>
+    <div class="stat-value font-mono">
+      {%- if status.window_minutes is not none %}{{ status.window_minutes }}m
+      {%- else %}unknown{% endif -%}
+    </div>
+    <div class="stat-desc">append alerts to open [Auto] case within this window</div>
+  </div>
+  {# `is not none and > 0`, in that order: a bare `> 0` against None raises in
+     Jinja, and a count the panel does not have is not a count of zero. #}
+  <div class="stat{{ '' if status.auto_cases_total is not none and status.auto_cases_total > 0 else ' opacity-75' }}">
+    <div class="stat-title">Total auto-cases</div>
+    <div class="stat-value font-mono">
+      {%- if status.auto_cases_total is not none %}{{ status.auto_cases_total }}
+      {%- else %}unknown{% endif -%}
+    </div>
+    <div class="stat-desc">all AlertCases with title "[Auto]…"</div>
+  </div>
+</div>
+
+<div class="card bg-base-200 shadow mb-4">
+  <div class="card-body p-0">
+    <div class="px-5 py-3 border-b border-base-300">
+      <h2 class="card-title text-base">Last run</h2>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="table table-sm">
+        <tbody>
+          {# The JavaScript printed its own "5m ago" from the viewer's clock
+             and the raw ISO string beside it. The macro emits one
+             `<time datetime>` that static/js/local-time.js puts on the
+             viewer's clock after the swap, so the server never formats an
+             instant it cannot place, and a missing stamp renders "never"
+             rather than the epoch. #}
+          <tr>
+            <td class="text-base-content/60">Ran at</td>
+            <td class="font-mono">{{ ts(status.last_run_at, fallback='never') }}</td>
+          </tr>
+          {% if metrics is none %}
+            {# No recorded summary at all. Six zeros here would describe a
+               pass that ran and found nothing, which is the opposite
+               conclusion from "no pass has finished yet". #}
+            <tr>
+              <td class="text-base-content/60">Result</td>
+              <td>
+                <span class="italic opacity-60">no completed pass recorded</span>
+                in this process, so there are no figures to show. The
+                background loop records one after each tick; Run now reports
+                its own figures above the panel.
+              </td>
+            </tr>
+          {% else %}
+            {% for row in metrics %}
+              <tr>
+                <td class="text-base-content/60">
+                  {{ row.label }}
+                  <span class="block text-xs opacity-60">{{ row.note }}</span>
+                </td>
+                {# `is not none`, never truthiness. 0 is the normal value of
+                   every row on a quiet shift and it is a measurement. #}
+                <td class="font-mono">
+                  {%- if row.value is not none %}{{ row.value }}
+                  {%- else %}<span class="italic opacity-60">not reported</span>{% endif -%}
+                </td>
+              </tr>
+            {% endfor %}
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+    {% if error_note %}
+      {# A pass that raised stores zeros plus this message. Without it the
+         table reads as a quiet night. #}
+      <div class="px-5 pb-4">
+        <div role="alert" class="alert alert-warning">
+          <span>The last pass failed: {{ error_note }}</span>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card bg-base-200 shadow mb-4">
+  <div class="card-body p-0">
+    <div class="px-5 py-3 border-b border-base-300">
+      <h2 class="card-title text-base">Side-effects</h2>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="table table-sm">
+        <tbody>
+          {# Three states, not two. "off" is a statement that the side-effect
+             is switched off; a gate the panel could not resolve has to say so
+             instead, because switching a side-effect off and failing to read
+             whether it is on are different facts about a run that attaches
+             alerts to cases. #}
+          {% for label, flag in [
+               ('Push new cases to Kibana', status.push_to_kibana),
+               ('Auto-run investigation pipeline', status.auto_investigate),
+             ] %}
+            <tr>
+              <td class="text-base-content/60">{{ label }}</td>
+              <td class="text-end">
+                {%- if flag is true %}
+                  <span class="badge badge-sm uppercase badge-success">on</span>
+                {%- elif flag is false %}
+                  <span class="badge badge-sm uppercase badge-ghost">off</span>
+                {%- else %}
+                  <span class="badge badge-sm uppercase badge-warning">unknown</span>
+                {%- endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="px-5 pb-4 mt-1 text-base-content/60 text-xs">
+      Toggle via ION_CASE_GROUPER_PUSH_TO_KIBANA / ION_CASE_GROUPER_AUTO_INVESTIGATE.
+    </div>
+  </div>
+</div>
+
+{% endif %}

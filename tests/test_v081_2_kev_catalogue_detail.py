@@ -15,6 +15,15 @@ TI = ROOT / "src" / "ion" / "web" / "templates" / "threat_intel.html"
 MODEL = ROOT / "src" / "ion" / "models" / "kev.py"
 SERVICE = ROOT / "src" / "ion" / "services" / "kev_service.py"
 
+# The catalogue rows were built in the page by kevDetail() and
+# kevRansomware(), and the tests below sliced threat_intel.html between those
+# two function names. Both are gone: the rows are server-rendered here, from
+# ui/threat_intel.py. Every behaviour they pinned survived the move and is
+# asserted against the fragment instead, including the escaping, which is
+# Jinja autoescaping now rather than a hand-rolled escapeHtml call.
+FRAGMENT = (ROOT / "src" / "ion" / "web" / "templates" / "_fragments"
+            / "threat_intel_kev.html")
+
 
 # ── the payload carries everything ──────────────────────────────────────────
 
@@ -52,12 +61,14 @@ def test_ransomware_unknown_is_rendered_distinctly_from_known():
     like a definitive negative — which a bare missing badge does — asserts
     something the catalogue does not, on the majority of rows.
     """
-    src = TI.read_text(encoding="utf-8")
-    fn = src[src.index("function kevRansomware("):]
-    fn = fn[:fn.index("\n    function ")]
-    assert "known_ransomware_raw" in fn, "the raw Known/Unknown value must reach the UI"
-    assert "ti-badge-unknown" in fn, "Unknown needs its own badge, not the absence of one"
-    assert "not the same as ruling it out" in fn, \
+    fragment = FRAGMENT.read_text(encoding="utf-8")
+    assert "known_ransomware_raw" in fragment, \
+        "the raw Known/Unknown value must reach the UI"
+    assert "ti-badge-unknown" in fragment, \
+        "Unknown needs its own badge, not the absence of one"
+    assert "ti-badge-ransomware" in fragment, \
+        "and Known needs a different one, or the two read alike"
+    assert "not the same as ruling it out" in fragment, \
         "the Unknown badge must say what Unknown means"
 
 
@@ -68,16 +79,20 @@ def test_ransomware_unknown_is_rendered_distinctly_from_known():
     "catalog_version", "source",
 ])
 def test_the_detail_panel_renders_the_field(field):
-    src = TI.read_text(encoding="utf-8")
-    body = src[src.index("function kevDetail("):]
-    body = body[:body.index("\n    function ")]
-    assert f"e.{field}" in body, f"kevDetail() never reads {field}"
+    fragment = FRAGMENT.read_text(encoding="utf-8")
+    assert field in fragment, f"the KEV fragment never reads {field}"
 
 
 def test_rows_are_expandable_and_collapsed_by_default():
     """1,662 entries expanded at once is not a page."""
+    # The attribute is on the server-rendered row and the handler stayed in
+    # the page, because expanding a row is a client interaction. Asserting
+    # both is what catches the pair being split by a later move: an
+    # attribute with no handler, or a handler nothing triggers.
+    assert 'data-click-action="kevToggle"' in FRAGMENT.read_text(
+        encoding="utf-8")
     src = TI.read_text(encoding="utf-8")
-    assert 'data-click-action="kevToggle"' in src
+    assert "function kevToggle(" in src
     assert "window.kevToggle" in src, "the delegated dispatcher resolves via window[name]"
     # The .ti-kev-* rules moved out of the retired ion-ui.css and into
     # frontend/ion-daisy-theme.css, which is compiled into ion.css.
@@ -92,23 +107,55 @@ def test_rows_are_expandable_and_collapsed_by_default():
 def test_references_are_text_not_links():
     """ION ships to air-gapped sites; an external anchor is a dead end that
     looks broken. The reference is still worth having to hand."""
-    src = TI.read_text(encoding="utf-8")
-    body = src[src.index("function kevDetail("):]
-    body = body[:body.index("\n    function ")]
-    assert "<a " not in body and "href" not in body, \
+    fragment = FRAGMENT.read_text(encoding="utf-8")
+    assert "<a " not in fragment and "href" not in fragment, \
         "references must render as selectable text, not anchors"
-    assert "ti-kev-notes" in body
+    assert "ti-kev-notes" in fragment
 
 
 def test_detail_escapes_every_catalogue_value():
-    """The catalogue is external data reaching the DOM through innerHTML."""
-    src = TI.read_text(encoding="utf-8")
-    body = src[src.index("function kevDetail("):]
-    body = body[:body.index("\n    function ")]
-    # every interpolation of a catalogue value goes through escapeHtml
-    raw = re.findall(r"\$\{(?!escapeHtml)(?!cwes\.map)([^}]*e\.[a-z_]+[^}]*)\}", body)
-    unescaped = [r for r in raw if "escapeHtml" not in r and "===" not in r]
-    assert not unescaped, f"unescaped catalogue values reach innerHTML: {unescaped}"
+    """The catalogue is external data reaching the DOM.
+
+    It used to reach it through innerHTML, so this walked every `${...}`
+    interpolation in kevDetail() and required escapeHtml around any that
+    touched `e.<field>`. The rows are a Jinja fragment now, so the escaping
+    is autoescaping and the thing to look for is the one way out of it.
+
+    `|safe` on a catalogue value would be the same hole the old version
+    guarded, and it is how a stored XSS reached the case panel's alert rail
+    earlier in this redesign. There is one `|safe` in this fragment and it
+    is on a literal, `'&mdash;'`, which is fine because Jinja binds a
+    filter tighter than `or`: the catalogue value in that expression is
+    still autoescaped.
+    """
+    fragment = FRAGMENT.read_text(encoding="utf-8")
+    unsafe = [
+        match for match in re.findall(r"\{\{[^}]*\|\s*safe[^}]*\}\}", fragment)
+        if not re.search(r"'[^']*'\s*\|\s*safe", match)
+    ]
+    assert not unsafe, (
+        "a catalogue value leaves autoescaping: " + str(unsafe))
+    assert "|safe" not in fragment.replace("'&mdash;'|safe", ""), \
+        "a second |safe appeared; check what it is applied to"
+
+
+def test_the_escaping_check_would_notice_a_value_marked_safe():
+    """A control, because the test above passes on a fragment with no
+    `|safe` at all and would therefore also pass if it were looking in the
+    wrong file."""
+    hostile = "<span>{{ e.short_description|safe }}</span>"
+    unsafe = [
+        match for match in re.findall(r"\{\{[^}]*\|\s*safe[^}]*\}\}", hostile)
+        if not re.search(r"'[^']*'\s*\|\s*safe", match)
+    ]
+    assert unsafe, "the pattern no longer catches a value marked safe"
+
+    literal = "<b>{{ status.get('catalog_version') or '&mdash;'|safe }}</b>"
+    allowed = [
+        match for match in re.findall(r"\{\{[^}]*\|\s*safe[^}]*\}\}", literal)
+        if not re.search(r"'[^']*'\s*\|\s*safe", match)
+    ]
+    assert not allowed, "the literal case must not be reported"
 
 
 # ── search covers the description ───────────────────────────────────────────

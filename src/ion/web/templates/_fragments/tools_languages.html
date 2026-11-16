@@ -1,0 +1,44 @@
+{# The translator's two language pickers on /tools.
+
+   The page built these with createElement in a loop, which the status tool
+   does not count as a runtime write and which was still a second
+   definition of a list the server already holds. The "target cannot be
+   auto" rule was an early `return` inside that loop; here it is one `if`
+   next to the option it skips.
+
+   A failed read renders no pickers at all rather than two empty ones. The
+   page's `if (!r.ok) return` left exactly that: two empty dropdowns beside
+   a live Translate button, which submits whatever `select.value` is on an
+   empty select, the empty string, and gets a 400 back. #}
+
+{% if failed %}
+<div role="alert" class="alert alert-error">
+  The language list could not be read, so there is nothing to translate
+  between. This is not a translator with no languages configured.
+</div>
+
+{% else %}
+<div class="flex flex-col gap-1.5 min-w-[180px]">
+  <label class="label-tiny text-slate-500" for="t-source">From</label>
+  <select id="t-source" class="select select-sm">
+    {%- for language in languages %}
+    <option value="{{ language.code }}"{% if language.code == source_default %} selected{% endif %}>{{ language.label }}</option>
+    {%- endfor %}
+  </select>
+</div>
+<div class="flex items-end pb-2 text-slate-500">
+  <svg class="w-4 h-4"><use href="#i-arrow-right"/></svg>
+</div>
+<div class="flex flex-col gap-1.5 min-w-[180px]">
+  <label class="label-tiny text-slate-500" for="t-target">To</label>
+  <select id="t-target" class="select select-sm">
+    {%- for language in languages %}
+    {#- Auto-detect is a source, not a target: asking Ollama to translate
+        into "whatever you detect" is not a request. -#}
+    {%- if language.code != auto_code %}
+    <option value="{{ language.code }}"{% if language.code == target_default %} selected{% endif %}>{{ language.label }}</option>
+    {%- endif %}
+    {%- endfor %}
+  </select>
+</div>
+{% endif %}

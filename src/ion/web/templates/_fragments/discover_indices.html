@@ -1,0 +1,41 @@
+{# The index list, from ui/discover.py's indices_view.
+
+   Index names reach three data-args attributes here. They were
+   interpolated raw into `data-args='["${idx.name}"]'`, and an index name
+   is whatever Elasticsearch holds: a `"` in one produced JSON that
+   event-delegation.js throws on, logs, and returns from, leaving three
+   live-looking controls that did nothing.
+#}
+{% if state == 'unconfigured' %}
+<tr><td colspan="5" class="empty-state">{{ detail or 'Elasticsearch is not configured.' }}</td></tr>
+{% elif state == 'refused' %}
+<tr><td colspan="5" class="empty-state">That index pattern is not one this deployment allows.</td></tr>
+{% elif state == 'failed' %}
+<tr><td colspan="5" class="empty-state">The index list could not be read{% if detail %}. {{ detail }}{% endif %}</td></tr>
+{% elif state == 'empty' %}
+<tr><td colspan="5" class="empty-state">No indices found</td></tr>
+{% else %}
+{%- for i in rows %}
+<tr>
+  {%- if i.name %}
+  <td class="clickable" data-click-action="loadMappings"
+      data-args='{{ [i.name]|tojson }}'>{{ i.name }}</td>
+  {%- else %}
+  <td><span class="dsc-absent" title="This index reported no name"></span></td>
+  {%- endif %}
+  <td><span class="health-{{ i.health or 'unknown' }}">{{ i.health or 'unknown' }}</span></td>
+  {#- Not 0: an index whose document count is missing is not an empty
+      index, and "0 documents" is a thing an analyst acts on. -#}
+  <td>{% if i.docs is not none %}{{ "{:,}".format(i.docs) }}{% else %}<span class="dsc-absent" title="This index reported no document count"></span>{% endif %}</td>
+  <td>{% if i.size %}{{ i.size }}{% else %}<span class="dsc-absent" title="This index reported no size"></span>{% endif %}</td>
+  <td>
+    {%- if i.name %}
+    <button class="btn btn-sm" data-click-action="loadMappings"
+            data-args='{{ [i.name]|tojson }}'>Fields</button>
+    <button class="btn btn-sm" data-click-action="searchIndex"
+            data-args='{{ [i.name]|tojson }}'>Search</button>
+    {%- endif %}
+  </td>
+</tr>
+{%- endfor %}
+{% endif %}

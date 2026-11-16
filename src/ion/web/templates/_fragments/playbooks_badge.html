@@ -1,0 +1,9 @@
+{%- if state == 'count' -%}
+<span class="badge badge-primary badge-sm" id="executions-badge">{{ count }}</span>
+{%- elif state == 'zero' -%}
+<span class="badge badge-primary badge-sm hidden" id="executions-badge"></span>
+{%- elif state == 'withheld' -%}
+<span class="badge badge-primary badge-sm hidden" id="executions-badge" data-state="withheld" title="withheld"></span>
+{%- else -%}
+<span class="badge badge-primary badge-sm" id="executions-badge">unavailable</span>
+{%- endif -%}

@@ -1,0 +1,172 @@
+{# The canary grid body for /canaries: summary tiles, the planted-canary
+   table and recent hits.
+
+   Replaces three innerHTML writes in canaries.html (the loading placeholder,
+   the load-failure line and the whole body) and the 189 lines of inline
+   JavaScript that assembled them, including a hand-rolled `esc()`. Jinja
+   autoescapes, which retires it. The markup is deliberately the same as what
+   that JavaScript produced, so the page looks identical and
+   frontend/ion-pages.css keeps reaching `tr.fired`, `.can-value`,
+   `.can-hit-snippet` and the dimmed `.badge.inactive/.retired`.
+
+   A canary is a deception asset, so each figure here is a security claim and
+   the three readings a count can have are kept apart:
+
+     S_NEVER       fired zero times in its life
+     S_FIRED       has hits on record
+     S_UNREADABLE  ION could not read whether it fired
+
+   The JavaScript had one reading for all three: `${ca.hit_count||0}` printed
+   0 and `(ca.hit_count||0) > 0` then rendered the row as clean. "Nothing has
+   touched this decoy" and "we could not look" lead to opposite actions.
+
+   The page shell owns Scan, New Canary and Refresh, so a failed read cannot
+   swap away the control that retries it.
+
+   `rows` and `hits` each carry their own unreadable state: None is a read
+   that failed, [] is a read that found nothing. One value rather than a
+   value plus a `failed` flag, because the two can only disagree in one
+   direction on this page, and that direction renders "nothing has fired"
+   over a read that never happened. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% if rows is none %}
+  <div role="alert" class="alert alert-error">
+    The canary registry could not be read. This is not an empty grid and not
+    a quiet one: the query failed, so what is planted and whether anything
+    has fired are both unknown rather than zero. Refresh to try again.
+  </div>
+{% else %}
+
+{% if stats_failed %}
+  <div role="alert" class="alert alert-warning mb-4">
+    The summary figures could not be read. The table below is what was
+    planted; the tiles are unknown, not zero.
+  </div>
+{% endif %}
+<div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow mb-6">
+  {% for t in tiles %}
+    <div class="stat">
+      <div class="stat-title">{{ t.label }}</div>
+      {# `measured` is `is not none` in the module. Zero is the most
+         interesting reading on this page: it is what an estate with nothing
+         tripped looks like, and it must never share a rendering with a
+         figure nobody obtained. #}
+      {% if t.measured %}
+        <div class="stat-value {{ t.colour }}">{{ t.value }}</div>
+        {% if t.note %}<div class="stat-desc whitespace-normal">{{ t.note }}</div>{% endif %}
+      {% else %}
+        <div class="stat-value text-base-content/40">Unknown</div>
+        <div class="stat-desc whitespace-normal">Not read. This is not zero.</div>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
+
+{% if not rows %}
+  <div class="card bg-base-200 shadow">
+    <div class="card-body items-center text-center py-14">
+      <h3 class="card-title">No canaries planted yet</h3>
+      <p>Plant a decoy file, account, host, or token. ION will scan recent
+         alerts for any mention and raise a high-confidence breach alert when
+         one fires.</p>
+      {# canNewCanary, not canOpenForm: the delegated dispatcher passes the
+         action a MouseEvent, which canOpenForm read as a canary to edit. #}
+      <button class="btn btn-primary mt-4" data-click-action="canNewCanary">+ Create First Canary</button>
+    </div>
+  </div>
+{% else %}
+  <div class="card bg-base-200 shadow mb-4">
+    <div class="card-body p-0">
+      <div class="px-4 py-3 border-b border-base-300">
+        <div class="text-xs font-bold uppercase tracking-wide opacity-50">Planted Canaries ({{ rows | length }})</div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Name</th><th>Type</th><th>Value</th><th>Location</th>
+              <th>Status</th><th>Hits</th><th>Last Hit</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for r in rows %}
+            {% set state = r.get('hit_state') %}
+            {# The fired stripe is an assertion that this decoy was touched,
+               so only S_FIRED carries it. S_UNREADABLE gets neither the
+               stripe nor the clean row the JavaScript's `||0` gave it. #}
+            <tr class="{{ 'fired' if state == S_FIRED else '' }}">
+              <td><strong>{{ r.get('name') }}</strong></td>
+              <td>{{ (r.get('canary_type') or '') | replace('_', ' ') }}</td>
+              <td><code class="can-value" title="{{ r.get('value') }}">{{ r.get('value') }}</code></td>
+              <td>{{ r.get('location') or '-' }}</td>
+              <td><span class="badge {{ r.get('badge') }} {{ r.get('status') }}">{{ r.get('status') }}</span></td>
+              {% if state == S_UNREADABLE %}
+                <td><span class="text-warning font-bold"
+                          title="ION could not read this canary's hit count. It is not a count of zero.">Unknown</span></td>
+                <td><span class="text-warning"
+                          title="With the hit count unread, whether this canary ever fired is unknown.">Unknown</span></td>
+              {% elif state == S_NEVER %}
+                <td>{{ r.get('hit_count') }}</td>
+                <td><span class="opacity-60" title="No hit has ever been recorded against this canary.">Never fired</span></td>
+              {% else %}
+                <td>{{ r.get('hit_count') }}</td>
+                {# fallback='Unknown', not '-': hits are on record for this
+                   canary, so a missing timestamp is a gap in the record and
+                   not the "never" the dash used to cover. #}
+                <td>{{ ts(r.get('last_hit_at'), fallback='Unknown') }}</td>
+              {% endif %}
+              <td>
+                <div class="flex flex-wrap gap-2 justify-end">
+                  <button class="btn btn-ghost btn-sm" data-click-action="canEdit"
+                          data-args='[{{ r.get("id") }}]'>Edit</button>
+                  <button class="btn btn-ghost btn-sm btn-error" data-click-action="canDelete"
+                          data-args='[{{ r.get("id") }}]'>Delete</button>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+{# The hits card is rendered in all three states. The JavaScript emitted it
+   only `if (hits.length)`, so an unread hit log and an empty one both showed
+   nothing at all, and nothing at all reads as "no canary has fired". #}
+<div class="card bg-base-200 shadow">
+  <div class="px-4 py-3 border-b border-base-300">
+    <div class="text-xs font-bold uppercase tracking-wide opacity-50">
+      {%- if hits is none %}Recent Hits
+      {%- elif hits | length >= hits_limit %}Recent Hits (most recent {{ hits_limit }}, there may be more)
+      {%- else %}Recent Hits ({{ hits | length }}){% endif %}
+    </div>
+  </div>
+  {% if hits is none %}
+    <div class="px-4 py-3">
+      <div role="alert" class="alert alert-warning">
+        The hit log could not be read. This is not a grid with nothing on it:
+        whether a canary has fired recently is unknown.
+      </div>
+    </div>
+  {% elif not hits %}
+    <div class="px-4 py-6 text-center opacity-60">No canary hits recorded.</div>
+  {% else %}
+    {% for h in hits %}
+      <div class="px-4 py-3 border-b border-base-300 last:border-b-0">
+        <div class="flex justify-between items-center gap-4">
+          <span class="font-bold">{{ h.get('name') }}</span>
+          <span class="text-xs font-mono opacity-50">{{ ts(h.get('detected_at')) }}</span>
+        </div>
+        {% if h.get('snippet') %}
+          <div class="can-hit-snippet mt-1 font-mono text-xs bg-base-300 p-2 rounded">{{ h.get('snippet') }}</div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  {% endif %}
+</div>
+
+{% endif %}

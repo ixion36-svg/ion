@@ -1,0 +1,41 @@
+{% from "_fragments/_time.html" import ts %}
+{#
+  ION-submitted packet hunts.
+
+  The status word travels as a state the stylesheet paints; the page held a
+  map of Tailwind colour classes in JavaScript, which is why a restyle
+  never reached this column. A status the map does not recognise is
+  "unknown" rather than defaulting to the neutral grey, because an
+  unrecognised status is worth seeing.
+
+  The Arkime deep link is offered only for a finished hunt that has an
+  Arkime id and a viewer URL to point at. It used to appear only after GET
+  /api/arkime/traffic/retention resolved, because that is where the page
+  read the viewer URL from, so a retention failure quietly removed the link
+  from every finished hunt.
+#}
+{% if failed %}
+<div role="alert" class="atf-state-failed p-3 rounded-box">The hunt list could not be read. Whether any packet hunts are running is unknown, not none.</div>
+{% elif not hunts %}
+<p class="text-base-content/50 text-sm text-center py-6">No hunts submitted yet.</p>
+{% else %}
+<div class="overflow-x-auto">
+  <table class="table table-sm">
+    <thead>
+      <tr><th>Name</th><th>Search</th><th>Status</th><th class="text-right">Matched</th><th>Submitted</th><th></th></tr>
+    </thead>
+    <tbody>
+      {%- for h in hunts %}
+      <tr>
+        <td>{{ h.name or 'Unnamed hunt' }}</td>
+        <td class="font-mono text-xs text-base-content/60">{{ h.search or 'No search term recorded' }}{% if h.search_type %} <span class="text-base-content/40">({{ h.search_type }})</span>{% endif %}</td>
+        <td class="atf-hunt-{{ h.state }}">{{ h.status or 'no status' }}</td>
+        <td class="text-right">{% if h.matched is not none %}{{ h.matched }}{% else %}<span class="atf-unmeasured" title="This hunt has not reported a match count yet, which is not the same as having matched nothing.">Unknown</span>{% endif %}</td>
+        <td class="text-base-content/50 text-xs">{{ ts(h.created_at, fallback='No submission time') }}</td>
+        <td>{% if h.link %}<a href="{{ h.link|safe_url }}" target="_blank" rel="noopener" class="link link-primary text-xs">Open in Arkime &#8599;</a>{% endif %}</td>
+      </tr>
+      {%- endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}

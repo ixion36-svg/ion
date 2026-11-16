@@ -26,63 +26,27 @@
   </button>
 </section>
 
-{# KPI row folded in from the retired /ai-scorecard page (route audit phase 7).
-   That page rendered nothing this table didn't already show per-template — same
-   endpoint, same fields, same tuning flag — and linked back here for every
-   action. These four tiles were its only unique content. #}
-<section class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow mb-6">
-  <div class="stat">
-    <div class="stat-title">Templates with data</div>
-    <div id="sc-kpi-templates" class="stat-value text-primary">—</div>
-  </div>
-  <div class="stat">
-    <div class="stat-title">Feedback rows (30d)</div>
-    <div id="sc-kpi-samples" class="stat-value">—</div>
-  </div>
-  <div class="stat">
-    <div class="stat-title">Overall agreement</div>
-    <div id="sc-kpi-agreement" class="stat-value text-success">—</div>
-  </div>
-  <div class="stat">
-    <div class="stat-title">Needs tuning</div>
-    <div id="sc-kpi-tuning" class="stat-value text-warning">—</div>
-  </div>
-</section>
-
-<section class="card bg-base-200 shadow">
-    <div class="card-body p-0">
-        <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-base-300">
-            <h2 class="card-title text-base">Templates</h2>
-            <div class="flex flex-wrap items-center gap-4">
-                <label class="flex items-center gap-2 cursor-pointer text-sm">
-                    <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" id="filter-enabled-only" data-change-action="loadPrompts">
-                    Enabled only
-                </label>
-                <button class="btn btn-ghost btn-sm" data-click-action="showResolveModal">Test match</button>
-            </div>
-        </div>
-        <div class="overflow-x-auto">
-            <table class="table table-sm" id="prompts-table">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Rule IDs</th>
-                        <th>Rule Groups</th>
-                        <th>Pattern</th>
-                        <th>Priority</th>
-                        <th>Severity</th>
-                        <th>AI Scorecard (30d)</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="prompts-body">
-                    <tr><td colspan="9" class="text-center text-base-content/50 py-8">Loading templates...</td></tr>
-                </tbody>
-            </table>
-        </div>
+<div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+    <h2 class="card-title text-base">Templates</h2>
+    <div class="flex flex-wrap items-center gap-4">
+        <label class="flex items-center gap-2 cursor-pointer text-sm">
+            <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" id="filter-enabled-only"
+                   name="enabled_only" value="true" hx-get="/ui/alert-prompts" hx-trigger="change"
+                   hx-include="#filter-enabled-only" hx-target="#prompts-content" hx-swap="innerHTML">
+            Enabled only
+        </label>
+        <button class="btn btn-ghost btn-sm" hx-get="/ui/alert-prompts"
+                hx-include="#filter-enabled-only" hx-target="#prompts-content" hx-swap="innerHTML">Refresh</button>
+        <button class="btn btn-ghost btn-sm" data-click-action="showResolveModal">Test match</button>
     </div>
-</section>
+</div>
+<div id="prompts-content" hx-get="/ui/alert-prompts" hx-trigger="load, promptsChanged"
+     hx-include="#filter-enabled-only" hx-swap="innerHTML">
+    <div class="text-center text-base-content/50 py-8">
+        <span class="loading loading-spinner loading-sm text-primary"></span>
+        Loading templates...
+    </div>
+</div>
 
 <!-- Create / Edit Modal -->
 <!-- JS opens/closes via element.style.display = 'flex'|'none' (CSSOM, allowed).
@@ -229,16 +193,6 @@
 </div>
 
 <script nonce="{{ csp_nonce }}">
-// ---------------------------------------------------------------------------
-// State
-// ---------------------------------------------------------------------------
-let _cache = [];
-
-function esc(s) {
-    if (s === null || s === undefined) return '';
-    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
 function linesToArray(raw) {
     if (!raw) return [];
     return raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
@@ -249,88 +203,8 @@ function arrayToLines(arr) {
     return arr.join('\n');
 }
 
-// ---------------------------------------------------------------------------
-// List
-// ---------------------------------------------------------------------------
-
-async function loadPrompts() {
-    const enabledOnly = document.getElementById('filter-enabled-only').checked;
-    const [resp, scoreResp] = await Promise.all([
-        fetch(`/api/alert-prompts?enabled_only=${enabledOnly}`, { credentials: 'same-origin' }),
-        fetch(`/api/alert-prompts/scorecards`, { credentials: 'same-origin' }),
-    ]);
-    if (!resp.ok) {
-        document.getElementById('prompts-body').innerHTML =
-            `<tr><td colspan="9" class="text-center text-base-content/50 py-8">Failed to load: ${resp.status}</td></tr>`;
-        return;
-    }
-    const data = await resp.json();
-    _cache = data.templates || [];
-    try {
-        const scoreData = scoreResp.ok ? await scoreResp.json() : { scorecards: {} };
-        _scorecards = scoreData.scorecards || {};
-    } catch(e) { _scorecards = {}; }
-    renderScorecardKpis();
-    renderPrompts(_cache);
-}
-let _scorecards = {};
-
-function renderScorecard(tplId) {
-    const s = _scorecards[tplId];
-    if (!s || !s.sample_size) {
-        return '<span class="text-[var(--text-secondary)] text-xs">no data</span>';
-    }
-    const agree = s.agreement_pct;
-    let color = 'color:var(--text-secondary);';
-    if (agree !== null && agree !== undefined) {
-        if (agree >= 80) color = 'color:#22c55e;';
-        else if (agree >= 60) color = 'color:#f59e0b;';
-        else color = 'color:#ef4444; font-weight:600;';
-    }
-    const flag = s.tuning_needed ? ' <span class="text-[#ef4444]" title="Agreement below 60% on 10+ samples — prompt may need tuning">⚠️ tune</span>' : '';
-    const agreeStr = agree !== null && agree !== undefined ? `${agree}%` : '—';
-    return `<div data-ion-style="${color} font-size:0.78rem">
-        agree <strong>${agreeStr}</strong> · n=${s.sample_size}${flag}
-        <div class="text-[var(--text-secondary)] text-[0.7rem]">TP ${s.tp_rate ?? 0}% · FP ${s.fp_rate ?? 0}% · BTP ${s.btp_rate ?? 0}%</div>
-    </div>`;
-}
-
-function renderPrompts(items) {
-    const body = document.getElementById('prompts-body');
-    if (!items.length) {
-        body.innerHTML = `<tr><td colspan="9" class="text-center text-base-content/50 py-8">No templates yet. Click "+ New Template" to create one.</td></tr>`;
-        return;
-    }
-    body.innerHTML = items.map(t => {
-        const ruleIds = (t.rule_ids || []).map(r => `<span class="badge badge-ghost badge-sm font-mono mr-[0.2rem] mb-[0.2rem]">${esc(r)}</span>`).join('') || '<span class="text-[var(--text-secondary)]">—</span>';
-        const ruleGroups = (t.rule_groups || []).map(g => `<span class="badge badge-ghost badge-sm font-mono mr-[0.2rem] mb-[0.2rem]">${esc(g)}</span>`).join('') || '<span class="text-[var(--text-secondary)]">—</span>';
-        const pattern = t.rule_id_pattern ? `<code>${esc(t.rule_id_pattern)}</code>` : '<span class="text-[var(--text-secondary)]">—</span>';
-        const sevMap = { critical: 'badge-error', high: 'badge-warning', medium: 'badge-info', low: 'badge-success' };
-        const sev = t.severity_hint ? `<span class="badge badge-sm ${sevMap[t.severity_hint] || 'badge-ghost'}">${esc(t.severity_hint)}</span>` : '<span class="text-[var(--text-secondary)]">—</span>';
-        const statusBadge = t.enabled
-            ? `<span class="badge badge-success badge-sm">Enabled</span>`
-            : `<span class="badge badge-ghost badge-sm">Disabled</span>`;
-        const techChips = (t.mitre_techniques || []).map(x => `<span class="badge badge-ghost badge-sm font-mono mr-[0.2rem] mb-[0.2rem]">${esc(x)}</span>`).join('');
-        const tacticChips = (t.mitre_tactics || []).map(x => `<span class="badge badge-ghost badge-sm font-mono mr-[0.2rem] mb-[0.2rem]">${esc(x)}</span>`).join('');
-        const mitreLine = (techChips || tacticChips)
-            ? `<div class="mt-[0.3rem] text-xs"><span class="text-[var(--text-secondary)]">MITRE:</span> ${techChips}${tacticChips}</div>`
-            : '';
-        return `
-            <tr>
-                <td><strong>${esc(t.name)}</strong><div class="text-[var(--text-secondary)] text-[0.8rem]">${esc(t.description || '')}</div>${mitreLine}</td>
-                <td>${ruleIds}</td>
-                <td>${ruleGroups}</td>
-                <td>${pattern}</td>
-                <td>${t.priority}</td>
-                <td>${sev}</td>
-                <td>${renderScorecard(t.id)}</td>
-                <td>${statusBadge}</td>
-                <td>
-                    <button class="btn btn-ghost btn-sm" data-click-action="editTemplate" data-args='[${t.id}]'>Edit</button>
-                    <button class="btn btn-ghost btn-sm btn-error" data-click-action="deleteTemplate" data-args='[${t.id}]'>Delete</button>
-                </td>
-            </tr>`;
-    }).join('');
+function loadPrompts() {
+    htmx.trigger(document.getElementById('prompts-content'), 'promptsChanged');
 }
 
 // ---------------------------------------------------------------------------
@@ -365,9 +239,13 @@ function closeModal() {
     document.getElementById('prompt-modal').style.display = 'none';
 }
 
-function editTemplate(id) {
-    const t = _cache.find(x => x.id === id);
-    if (!t) return;
+async function editTemplate(id) {
+    const resp = await fetch(`/api/alert-prompts/${id}`, { credentials: 'same-origin' });
+    if (!resp.ok) {
+        alert(`Load failed: ${resp.status}`);
+        return;
+    }
+    const t = await resp.json();
     resetForm();
     document.getElementById('prompt-modal-title').textContent = `Edit: ${t.name}`;
     document.getElementById('prompt-id').value = t.id;
@@ -396,7 +274,7 @@ async function saveTemplate() {
         name: document.getElementById('prompt-name').value.trim(),
         description: document.getElementById('prompt-description').value.trim() || null,
         enabled: document.getElementById('prompt-enabled').checked,
-        priority: parseInt(document.getElementById('prompt-priority').value, 10) || 100,
+        priority: parseInt(document.getElementById('prompt-priority').value || '100', 10),
         rule_ids: linesToArray(document.getElementById('prompt-rule-ids').value),
         rule_groups: linesToArray(document.getElementById('prompt-rule-groups').value),
         rule_id_pattern: document.getElementById('prompt-rule-pattern').value.trim() || null,
@@ -437,19 +315,17 @@ async function saveTemplate() {
         return;
     }
     closeModal();
-    await loadPrompts();
+    loadPrompts();
 }
 
-async function deleteTemplate(id) {
-    const t = _cache.find(x => x.id === id);
-    if (!t) return;
-    if (!confirm(`Delete template "${t.name}"?`)) return;
+async function deleteTemplate(id, name) {
+    if (!confirm(`Delete template "${name}"?`)) return;
     const resp = await fetch(`/api/alert-prompts/${id}`, { method: 'DELETE', credentials: 'same-origin' });
     if (!resp.ok) {
         alert(`Delete failed: ${resp.status}`);
         return;
     }
-    await loadPrompts();
+    loadPrompts();
 }
 
 // ---------------------------------------------------------------------------
@@ -512,35 +388,7 @@ async function loadPermissions() {
 // ---------------------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', () => {
     loadPermissions();
-    loadPrompts();
 });
-
-// KPI aggregation folded in from /ai-scorecard. Computed from the exact
-// `evaluated` count the API now returns — the old page approximated it with
-// `evaluated = sample_size`, which over-counts whenever rows were abstentions.
-function renderScorecardKpis() {
-    var ids = Object.keys(_scorecards || {});
-    var samples = 0, evaluated = 0, agreed = 0, tuning = 0;
-    ids.forEach(function (id) {
-        var c = _scorecards[id] || {};
-        samples += c.sample_size || 0;
-        if (c.evaluated) {
-            evaluated += c.evaluated;
-            if (c.agreement_pct !== null && c.agreement_pct !== undefined) {
-                agreed += Math.round(c.evaluated * (c.agreement_pct / 100));
-            }
-        }
-        if (c.tuning_needed) tuning++;
-    });
-    var set = function (id, v) {
-        var el = document.getElementById(id);
-        if (el) el.textContent = v;
-    };
-    set('sc-kpi-templates', ids.length);
-    set('sc-kpi-samples', samples);
-    set('sc-kpi-agreement', evaluated ? Math.round((agreed / evaluated) * 100) + '%' : '—');
-    set('sc-kpi-tuning', tuning);
-}
 
 </script>
 

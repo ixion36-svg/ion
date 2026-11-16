@@ -1,0 +1,59 @@
+{# Threat Intel: one indicator's 12-month local sightings sparkline.
+
+   Replaces four innerHTML sites in tiRenderSpark.
+
+   THE DEFECT, and it is the sharpest on this page. Three outcomes all
+   rendered the same em-dash:
+
+     a failed read      `if (!r.ok) { spark.innerHTML = '-' }`
+     a thrown read      the catch, the same '-'
+     no sightings       '-' with a title saying so
+
+   The only difference between "this indicator has never been seen in your
+   estate" and "we could not check" was a tooltip that one of them
+   happened to carry. For an analyst triaging an indicator those are
+   opposite conclusions: one says ignore it, the other says look again.
+
+   The bars are kept client-side nowhere: the geometry here is one
+   division and a round per bar, not a layout computation, so it belongs in
+   markup like anything else. The knowledge_graph precedent covers a force
+   layout and a canvas, not arithmetic.
+
+   The old SVG also carried `title="N local sightings..."` as an attribute
+   on the <svg> element, which is not how SVG tooltips work; it needs a
+   <title> child. So that count was never readable on hover. Fixed. #}
+
+{% if failed %}
+  <span class="text-[.7rem] text-ion-coral" role="alert"
+        title="The local sightings for this indicator could not be read. This is not a finding that it has never been seen.">!</span>
+{% elif series is none %}
+  <span class="text-[.7rem] text-ion-coral" role="alert"
+        title="The sightings read answered with something this cell cannot read, so it cannot say whether this indicator has been seen.">!</span>
+{% elif not series or not total %}
+  {# `not total` rather than `total == 0`, because the endpoint may omit the
+     field entirely, and a series of all-zero buckets is the same finding as
+     no buckets: nothing seen. Both are genuine answers, unlike the two
+     above. #}
+  <span class="text-[.7rem] text-[var(--text-muted)]"
+        title="No local sightings in the last {{ months }} months">&mdash;</span>
+{% else %}
+  {%- set counts = series | map(attribute='count') | select('number') | list -%}
+  {%- set peak = counts | max if counts else 0 -%}
+  {%- set bar_w = 6 -%}{%- set gap = 1 -%}{%- set height = 14 -%}
+  <svg class="align-middle" width="{{ series|length * (bar_w + gap) }}" height="{{ height }}"
+       role="img" aria-label="{{ total }} local sightings in the last {{ months }} months">
+    {#- An <svg title> attribute does nothing; a <title> child is the
+        tooltip, and it doubles as the accessible name. -#}
+    <title>{{ total }} local sightings in the last {{ months }} months</title>
+    {%- for b in series -%}
+      {%- set count = b.get('count') -%}
+      {%- if count is number and count > 0 and peak > 0 -%}
+        {%- set bh = [1, ((count / peak) * height) | round | int] | max -%}
+        <rect x="{{ loop.index0 * (bar_w + gap) }}" y="{{ height - bh }}"
+              width="{{ bar_w }}" height="{{ bh }}"
+              fill="{{ 'var(--ion-cyan, #6de4ff)' if count == peak else 'var(--text-secondary)' }}"><title>{{ b.get('month') or 'unknown month' }}: {{ count }}</title></rect>
+      {%- endif -%}
+    {%- endfor -%}
+  </svg>
+  <span class="text-[.7rem] text-[var(--text-muted)] ml-1">{{ total }}</span>
+{% endif %}

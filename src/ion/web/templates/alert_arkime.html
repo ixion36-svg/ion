@@ -1,10 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Arkime PCAP · ION{% endblock %}
+{% block head_css %}
+<link rel="stylesheet" href="/static/css/alert-arkime-page.css?v={{ ion_version }}">
+{% endblock %}
+
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 
-  <!-- ── Header ── -->
   <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-3 mb-4">
@@ -21,496 +24,58 @@
         <svg class="w-3.5 h-3.5"><use href="#i-chevron-left"/></svg>
         Back to alert
       </a>
+      {# Refresh is the preview request, same URL as the slot below. It
+         stays out here so an error render cannot remove the control that
+         retries it. There is no filter to include. #}
+      <button type="button" class="btn btn-primary btn-sm" id="arkime-refresh"
+              hx-post="/ui/alerts/{{ alert_id | urlencode }}/arkime"
+              hx-target="#arkime-content"
+              hx-swap="innerHTML">Refresh</button>
     </div>
   </section>
 
-  <!-- ── Status banner ── -->
-  <div id="arkime-status" role="alert" class="alert alert-info mb-6 rise d-2">
-    <span id="status-spinner" class="loading loading-spinner loading-sm"></span>
-    <div>
-      <span id="status-text">Requesting PCAP from Arkime…</span>
-      <div id="status-detail" class="text-xs opacity-70"></div>
+  {# The workspace is rendered whole by ion.web.ui.alert_arkime: the session
+     card, the verdict, findings, destinations, protocols, observables and
+     the attach form. It used to be string-built in render() and written
+     in with innerHTML.
+
+     hx-trigger="load" keeps the shell's first paint immediate and the
+     capture arriving in its own request, which is what the POST it
+     replaces did. hx-disinherit stops the attach form this panel renders
+     from inheriting the preview verb: Attach would otherwise POST the
+     preview back into this slot and discard the form. The form names its
+     own target, so it does not need anything inherited. #}
+  <div id="arkime-content"
+       hx-post="/ui/alerts/{{ alert_id | urlencode }}/arkime"
+       hx-trigger="load"
+       hx-target="#arkime-content"
+       hx-swap="innerHTML"
+       hx-disinherit="hx-post hx-target hx-swap">
+    <div class="flex justify-center items-center gap-2 py-14 text-center opacity-50">
+      <span class="loading loading-spinner loading-sm text-primary"></span>
+      Requesting PCAP from Arkime…
     </div>
   </div>
 
-  <!-- ── Main grid ── -->
-  <div id="arkime-body" class="hidden grid grid-cols-12 gap-6 rise d-3">
-
-    <!-- ── LEFT: Analysis ── -->
-    <section class="col-span-12 lg:col-span-8 min-w-0 flex flex-col gap-6">
-
-      <!-- Arkime session card -->
-      <div class="card bg-base-200 shadow">
-        <div class="card-body">
-          <div class="flex items-center justify-between gap-3">
-            <h2 class="card-title">
-              <svg class="w-4 h-4 text-primary"><use href="#i-network"/></svg>
-              Arkime session
-            </h2>
-            <div class="flex items-center gap-4">
-              <a id="open-in-arkime" href="#" target="_blank" rel="noopener"
-                 class="hidden items-center gap-1.5 link link-primary text-sm">
-                <svg class="w-3.5 h-3.5"><use href="#i-external-link"/></svg>Open in Arkime</a>
-              <span id="session-size" class="font-mono text-xs opacity-60"></span>
-            </div>
-          </div>
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-3 text-sm">
-            <div>
-              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Node</div>
-              <div id="sess-node" class="font-mono">—</div>
-            </div>
-            <div>
-              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Session</div>
-              <div id="sess-id" class="font-mono truncate">—</div>
-            </div>
-            <div>
-              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Src → Dst</div>
-              <div id="sess-flow" class="font-mono truncate">—</div>
-            </div>
-            <div>
-              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Protocol</div>
-              <div id="sess-proto" class="font-mono">—</div>
-            </div>
-            <div>
-              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">First packet</div>
-              <div id="sess-first" class="font-mono">—</div>
-            </div>
-            <div>
-              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Last packet</div>
-              <div id="sess-last" class="font-mono">—</div>
-            </div>
-            <div>
-              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Packets</div>
-              <div id="sess-packets" class="font-mono">—</div>
-            </div>
-            <div>
-              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Community ID</div>
-              <div id="sess-cid" class="font-mono truncate">—</div>
-            </div>
-            <div id="sess-indexed-wrap" class="col-span-2 md:col-span-4 hidden">
-              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Indexed metadata</div>
-              <div id="sess-indexed" class="font-mono text-xs break-all"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Verdict + stats -->
-      <div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow">
-        <div class="stat">
-          <div class="stat-title">Verdict</div>
-          <div id="stat-verdict" class="stat-value text-2xl">—</div>
-          <div id="stat-verdict-sub" class="stat-desc"></div>
-        </div>
-        <div class="stat">
-          <div class="stat-title text-error">Findings</div>
-          <div id="stat-findings" class="stat-value text-error">—</div>
-        </div>
-        <div class="stat">
-          <div class="stat-title text-primary">Observables</div>
-          <div id="stat-obs" class="stat-value text-primary">—</div>
-        </div>
-        <div class="stat">
-          <div class="stat-title text-success">OpenCTI hits</div>
-          <div id="stat-hits" class="stat-value text-success">—</div>
-        </div>
-      </div>
-
-      <!-- Findings list -->
-      <div class="card bg-base-200 shadow">
-        <div class="card-body">
-          <h2 class="card-title">
-            <svg class="w-4 h-4 text-error"><use href="#i-alert-triangle"/></svg>
-            Findings
-          </h2>
-          <div id="findings-list" class="flex flex-col gap-2">
-            <div class="py-6 text-center text-sm opacity-50">No findings yet.</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Top talkers + protocols side by side -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="card bg-base-200 shadow">
-          <div class="card-body">
-            <h2 class="card-title">Top destinations</h2>
-            <div class="overflow-x-auto">
-              <table class="table table-sm">
-                <tbody id="top-dst"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-        <div class="card bg-base-200 shadow">
-          <div class="card-body">
-            <h2 class="card-title">Protocols</h2>
-            <div id="protocols" class="flex flex-col gap-2"></div>
-          </div>
-        </div>
-      </div>
-
-    </section>
-
-    <!-- ── RIGHT: Observables + commit panel ── -->
-    <aside class="col-span-12 lg:col-span-4 min-w-0 flex flex-col gap-6">
-
-      <!-- Observables -->
-      <div class="card bg-base-200 shadow">
-        <div class="card-body">
-          <div class="flex items-center justify-between gap-2">
-            <h2 class="card-title">Observables</h2>
-            <span id="obs-count" class="badge badge-ghost font-mono">0</span>
-          </div>
-          <div id="obs-list" class="flex flex-col gap-2 max-h-[560px] overflow-y-auto">
-            <div class="py-6 text-center text-sm opacity-50">Waiting for analysis…</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Commit panel -->
-      <div class="card bg-base-200 shadow border border-primary/20 sticky top-20">
-        <div class="card-body">
-          <h2 class="card-title text-primary">
-            <svg class="w-4 h-4"><use href="#i-file-text"/></svg>
-            Attach to case
-          </h2>
-          <div class="flex flex-col gap-3">
-            <div class="flex items-center gap-1 p-1 rounded-lg bg-base-300">
-              <button type="button" data-mode="new" class="commit-mode-btn flex-1 px-3 py-2 rounded-md label-tiny text-ink-950 bg-ion-cyan">New case</button>
-              <button type="button" data-mode="existing" class="commit-mode-btn flex-1 px-3 py-2 rounded-md label-tiny text-slate-400 hover:text-white transition">Existing</button>
-            </div>
-
-            <div id="commit-new" class="flex flex-col gap-3">
-              <fieldset class="fieldset p-0">
-                <legend class="fieldset-legend">Case title</legend>
-                <input id="case-title" type="text" class="input input-sm w-full" placeholder="Auto-generated if blank">
-              </fieldset>
-              <fieldset class="fieldset p-0">
-                <legend class="fieldset-legend">Severity</legend>
-                <select id="case-severity" class="select select-sm w-full">
-                  <option value="critical">Critical</option>
-                  <option value="high">High</option>
-                  <option value="medium" selected>Medium</option>
-                  <option value="low">Low</option>
-                </select>
-              </fieldset>
-            </div>
-
-            <div id="commit-existing" class="hidden flex flex-col gap-1.5">
-              <fieldset class="fieldset p-0">
-                <legend class="fieldset-legend">Case ID</legend>
-                <input id="case-id-input" type="number" class="input input-sm w-full" placeholder="e.g. 2847">
-              </fieldset>
-            </div>
-
-            <button id="commit-btn" type="button" class="btn btn-primary">
-              <svg class="w-3.5 h-3.5"><use href="#i-arrow-right"/></svg>
-              Attach analysis
-            </button>
-            <div id="commit-result" class="hidden text-sm text-center"></div>
-          </div>
-        </div>
-      </div>
-    </aside>
-  </div>
-
-  <!-- ── Error panel ── -->
-  <div id="arkime-error" role="alert" class="alert alert-error hidden rise d-3">
-    <svg class="w-4 h-4"><use href="#i-alert-triangle"/></svg>
-    <div>
-      <div class="font-semibold">Arkime error</div>
-      <div id="error-message"></div>
-      <div id="error-detail" class="text-xs font-mono opacity-80"></div>
-    </div>
-  </div>
-
-</div><!-- /ion-tw inner -->
-</div><!-- /ion-tw -->
+</div>
+</div>
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* JS classList toggles .hidden on daisyUI alerts / loading. ID+class so
-   daisyUI .alert { display: grid } and .loading { display: inline-block }
-   cannot win over Tailwind .hidden. */
-#arkime-status.hidden,
-#arkime-error.hidden,
-#status-spinner.hidden { display: none; }
-</style>
 <script nonce="{{ csp_nonce }}">
-  const ALERT_ID = {{ alert_id | tojson }};
-  let previewPayload = null;
-
-  const $ = (id) => document.getElementById(id);
-  const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[c]));
-
-  const SEV_MAP = {
-    critical: 'badge-error', high: 'badge-warning', medium: 'badge-accent',
-    low: 'badge-ghost', info: 'badge-info',
-  };
-
-  function setStatus(text, detail = '', done = false) {
-    $('status-text').textContent = text;
-    $('status-detail').textContent = detail;
-    if (done) $('status-spinner').classList.add('hidden');
-  }
-
-  function showError(message, detail = '') {
-    $('arkime-status').classList.add('hidden');
-    $('arkime-body').classList.add('hidden');
-    const errEl = $('arkime-error');
-    errEl.classList.remove('hidden');
-    $('error-message').textContent = message;
-    $('error-detail').textContent = detail;
-  }
-
-  function fmt(n) {
-    if (n == null) return '—';
-    if (typeof n !== 'number') return n;
-    return n.toLocaleString();
-  }
-
-  function fmtBytes(n) {
-    if (!n) return '0 B';
-    if (n < 1024) return `${n} B`;
-    if (n < 1048576) return `${(n / 1024).toFixed(1)} KB`;
-    if (n < 1073741824) return `${(n / 1048576).toFixed(1)} MB`;
-    return `${(n / 1073741824).toFixed(2)} GB`;
-  }
-
-  function fmtTime(ms) {
-    if (!ms) return '—';
-    const d = new Date(ms);
-    return d.toISOString().replace('T', ' ').slice(0, 19);
-  }
-
-  async function loadPreview() {
-    try {
-      setStatus('Requesting PCAP from Arkime…', 'Resolving community_id → session → downloading capture');
-      const resp = await fetch(`/api/alerts/${encodeURIComponent(ALERT_ID)}/arkime/preview`, {
-        method: 'POST', credentials: 'same-origin',
-      });
-      if (!resp.ok) {
-        let detail = '';
-        try { detail = (await resp.json()).detail || ''; } catch {}
-        showError(`Preview failed (HTTP ${resp.status})`, detail);
-        return;
-      }
-      previewPayload = await resp.json();
-      render(previewPayload);
-      setStatus('Analysis complete.', '', true);
-      setTimeout(() => { $('arkime-status').classList.add('hidden'); }, 600);
-    } catch (e) {
-      showError('Network error', String(e));
-    }
-  }
-
-  function render(p) {
-    $('arkime-body').classList.remove('hidden');
-    $('arkime-body').classList.add('grid');
-
-    // Session metadata
-    const meta = p.session_metadata || {};
-    $('sess-node').textContent = p.arkime_node || '—';
-    $('sess-id').textContent = p.arkime_session_id || '—';
-    $('sess-cid').textContent = p.network_community_id || '—';
-    $('sess-first').textContent = fmtTime(meta.firstPacket);
-    $('sess-last').textContent = fmtTime(meta.lastPacket);
-    $('sess-packets').textContent = fmt(meta.packets);
-    $('sess-proto').textContent = (meta.ipProtocol || meta.protocol || []).toString() || '—';
-    const src = meta.srcIp ? `${meta.srcIp}:${meta.srcPort ?? '?'}` : '—';
-    const dst = meta.dstIp ? `${meta.dstIp}:${meta.dstPort ?? '?'}` : '—';
-    $('sess-flow').textContent = `${src} → ${dst}`;
-    $('session-size').textContent = `${fmtBytes(p.pcap_size_bytes)} · ${fmt(meta.bytes)} raw`;
-    if (p.arkime_web_url) {
-      const link = $('open-in-arkime');
-      link.href = p.arkime_web_url;
-      link.classList.remove('hidden');
-      link.classList.add('inline-flex');
-    }
-
-    // Arkime-indexed depth fields (JA4/JA3/HTTP) — flat or nested shape,
-    // absent entirely on builds that reject the extended field list.
-    const tlsMeta = meta.tls || {};
-    const httpMeta = meta.http || {};
-    const asList = (v) => v == null ? [] : (Array.isArray(v) ? v : [v]);
-    const ja4List = asList(meta['tls.ja4'] ?? tlsMeta.ja4);
-    const ja3List = asList(meta['tls.ja3'] ?? tlsMeta.ja3);
-    const uaList = asList(meta['http.useragent'] ?? httpMeta.useragent);
-    const uriList = asList(meta['http.uri'] ?? httpMeta.uri);
-    const idxParts = [];
-    if (ja4List.length) idxParts.push(`JA4 ${ja4List.slice(0, 3).join(', ')}`);
-    if (ja3List.length) idxParts.push(`JA3 ${ja3List.slice(0, 3).join(', ')}`);
-    if (uaList.length) idxParts.push(`UA ${String(uaList[0]).slice(0, 90)}`);
-    if (uriList.length) idxParts.push(`URI ${uriList.slice(0, 2).map(u => String(u).slice(0, 100)).join(' ')}`);
-    if (idxParts.length) {
-      $('sess-indexed-wrap').classList.remove('hidden');
-      $('sess-indexed').textContent = idxParts.join('  ·  ');
-    }
-
-    // Stats
-    const analysis = p.analysis || {};
-    const verdict = analysis.verdict || {};
-    $('stat-verdict').textContent = verdict.label || 'benign';
-    $('stat-verdict-sub').textContent = verdict.score != null ? `score ${verdict.score}` : '';
-    const findings = analysis.findings || [];
-    $('stat-findings').textContent = findings.length;
-    $('stat-obs').textContent = (p.observables || []).length;
-    const hits = (p.observables || []).filter(o => o.found).length;
-    $('stat-hits').textContent = hits;
-
-    // Findings
-    const fel = $('findings-list');
-    if (findings.length === 0) {
-      fel.innerHTML = `<div class="py-6 text-center text-sm opacity-50">No suspicious findings detected.</div>`;
-    } else {
-      fel.innerHTML = findings.slice(0, 25).map(f => {
-        const sev = (f.severity || 'info').toLowerCase();
-        const color = SEV_MAP[sev] || 'badge-ghost';
-        const title = escHtml(f.title || f.type || '(no title)');
-        const desc = escHtml(f.description || '');
-        return `
-          <div class="flex items-start gap-3 p-3 rounded-lg bg-base-300">
-            <span class="badge badge-sm ${color}">${sev}</span>
-            <div class="flex-1 min-w-0">
-              <div class="text-sm font-medium">${title}</div>
-              ${desc ? `<div class="text-xs opacity-60 mt-0.5">${desc}</div>` : ''}
-            </div>
-          </div>`;
-      }).join('');
-    }
-
-    // Top destinations
-    const topDst = analysis.top_dst_ips || [];
-    const topEl = $('top-dst');
-    if (topDst.length === 0) {
-      topEl.innerHTML = `<tr><td class="opacity-50">No outbound traffic recorded.</td></tr>`;
-    } else {
-      topEl.innerHTML = topDst.slice(0, 8).map(row => {
-        const ip = (row.ip || row) + '';
-        const bytes = row.bytes ? fmtBytes(row.bytes) : '';
-        return `<tr>
-          <td class="font-mono">${escHtml(ip)}</td>
-          <td class="font-mono text-right text-xs opacity-60">${bytes}</td>
-        </tr>`;
-      }).join('');
-    }
-
-    // Protocols
-    const protos = analysis.protocols || {};
-    const proEl = $('protocols');
-    const entries = Object.entries(protos).sort((a, b) => b[1] - a[1]).slice(0, 8);
-    if (entries.length === 0) {
-      proEl.innerHTML = `<div class="opacity-50">—</div>`;
-    } else {
-      const total = entries.reduce((s, [, n]) => s + n, 0) || 1;
-      proEl.innerHTML = entries.map(([name, n]) => {
-        const pct = Math.round((n / total) * 100);
-        return `<div class="flex flex-col gap-1">
-          <div class="flex items-center justify-between text-xs">
-            <span class="font-mono">${escHtml(name)}</span>
-            <span class="font-mono opacity-60">${n} · ${pct}%</span>
-          </div>
-          <div class="h-1 rounded-full bg-base-300 overflow-hidden">
-            <div class="h-full rounded-full bg-primary" data-ion-style="width:${pct}%"></div>
-          </div>
-        </div>`;
-      }).join('');
-    }
-
-    // Observables
-    const obs = p.observables || [];
-    $('obs-count').textContent = obs.length;
-    const obsEl = $('obs-list');
-    if (obs.length === 0) {
-      obsEl.innerHTML = `<div class="py-6 text-center text-sm opacity-50">No observables extracted.</div>`;
-    } else {
-      obsEl.innerHTML = obs.map(o => {
-        const foundBadge = o.found
-          ? `<span class="badge badge-sm badge-success">OpenCTI</span>`
-          : '';
-        const labels = (o.labels || []).slice(0, 3).map(l =>
-          `<span class="badge badge-sm badge-accent">${escHtml(l)}</span>`
-        ).join(' ');
-        const actors = (o.threat_actors || []).slice(0, 2).map(a =>
-          `<span class="badge badge-sm badge-error">${escHtml(a)}</span>`
-        ).join(' ');
-        return `<div class="p-3 rounded-lg bg-base-300">
-          <div class="flex items-center justify-between gap-2 mb-1">
-            <span class="badge badge-ghost badge-sm font-mono">${escHtml(o.type)}</span>
-            ${foundBadge}
-          </div>
-          <div class="font-mono text-sm break-all">${escHtml(o.value)}</div>
-          ${(labels || actors) ? `<div class="mt-2 flex flex-wrap gap-1">${labels} ${actors}</div>` : ''}
-          <div class="mt-1 text-xs opacity-50">via ${escHtml(o.source)}</div>
-        </div>`;
-      }).join('');
-    }
-
-    // Enable commit button
-    $('commit-btn').disabled = false;
-  }
-
-  // ── Commit panel ──
-  document.querySelectorAll('.commit-mode-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.commit-mode-btn').forEach(b => {
-        b.classList.remove('text-ink-950', 'bg-ion-cyan');
-        b.classList.add('text-slate-400', 'hover:text-white');
-      });
-      btn.classList.add('text-ink-950', 'bg-ion-cyan');
-      btn.classList.remove('text-slate-400', 'hover:text-white');
-      const mode = btn.dataset.mode;
-      $('commit-new').classList.toggle('hidden', mode !== 'new');
-      $('commit-existing').classList.toggle('hidden', mode !== 'existing');
-    });
+// After a successful attach, follow the case the fragment linked. The
+// address is the one the server rendered, and only a site-relative path
+// is followed: anything else stays as a link the analyst can read.
+(function () {
+  document.body.addEventListener('htmx:afterSwap', function (evt) {
+    var target = evt.detail && evt.detail.target;
+    if (!target || target.id !== 'commit-result') return;
+    var node = target.querySelector('[data-case-url]');
+    if (!node) return;
+    var url = node.getAttribute('data-case-url') || '';
+    if (url.charAt(0) !== '/') return;
+    window.setTimeout(function () { window.location.assign(url); }, 1500);
   });
-
-  $('commit-btn').addEventListener('click', async () => {
-    if (!previewPayload) return;
-    const btn = $('commit-btn');
-    btn.disabled = true;
-    btn.innerHTML = 'Attaching…';
-
-    const newMode = !$('commit-new').classList.contains('hidden');
-    const body = {
-      create_new_case: newMode,
-      case_id: newMode ? null : parseInt($('case-id-input').value, 10) || null,
-      case_title: newMode ? ($('case-title').value.trim() || null) : null,
-      case_severity: newMode ? $('case-severity').value : 'medium',
-      pcap_size_bytes: previewPayload.pcap_size_bytes,
-      analysis: previewPayload.analysis,
-      observables: previewPayload.observables,
-    };
-
-    try {
-      const resp = await fetch(`/api/alerts/${encodeURIComponent(ALERT_ID)}/arkime/commit`, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(body),
-      });
-      if (!resp.ok) {
-        const detail = (await resp.json().catch(() => ({}))).detail || `HTTP ${resp.status}`;
-        throw new Error(detail);
-      }
-      const result = await resp.json();
-      const resEl = $('commit-result');
-      resEl.classList.remove('hidden');
-      resEl.innerHTML = `<div class="alert alert-success">Attached to <a href="/cases?id=${result.case_id}" class="link">${result.case_number}</a> — ${result.observables_created} observable(s) created.</div>`;
-      btn.innerHTML = 'Done ✓';
-      setTimeout(() => { window.location.href = `/cases?id=${result.case_id}`; }, 1500);
-    } catch (e) {
-      btn.disabled = false;
-      btn.innerHTML = '<svg class="w-3.5 h-3.5"><use href="#i-arrow-right"/></svg> Attach analysis';
-      const resEl = $('commit-result');
-      resEl.classList.remove('hidden');
-      resEl.innerHTML = `<div class="alert alert-error">${escHtml(e.message || String(e))}</div>`;
-    }
-  });
-
-  loadPreview();
+})();
 </script>
 {% endblock %}

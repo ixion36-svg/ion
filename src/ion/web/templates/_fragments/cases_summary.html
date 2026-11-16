@@ -1,0 +1,248 @@
+{# The cases page's eight stat tiles, with the Management Analytics panel and
+   the retry control out of band.
+
+   Replaces nine innerHTML sites (renderDonutChart, renderClosureDonut,
+   renderWorkloadBars, renderOpenCaseAges, renderRecentClosures), nine
+   textContent writes into the tiles (renderStats, renderRow2Stats), and
+   renderSummaryStrip, whose `strip.replaceChildren() + '<div ...'` discarded
+   its own markup and has never rendered.
+
+   The tiles are the primary swap into #cases-stats. The panel body lands in
+   #analytics-panel-body out of band, so the panel's collapsed class on that
+   container is untouched by a refresh. The retry control is a third
+   out-of-band element outside both targets: a failed render cannot remove
+   the thing that retries it.
+
+   Every figure has three renders. A source that could not be read says so
+   in the tile or card it feeds; a figure measured at zero prints 0; data
+   prints data. `is not none`, never truthiness, because 0 open cases is a
+   measurement and None is the absence of one.
+
+   The team-metrics source carries alert:read, which the page's own
+   case:read does not imply. `metrics_withheld` is the viewer lacking it,
+   derived in the module and passed as a fact; the six things that source
+   feeds say the account cannot read them, rather than reading as zero or as
+   a failed read. #}
+
+{% macro tile(label, value, colour, failed_text, sub=None) -%}
+<div class="ion-metric">
+  <div class="ion-metric-label">{{ label }}</div>
+  {%- if value is not none %}
+  <div class="ion-metric-value {{ colour }}">{{ value }}</div>
+  {%- if sub %}<div class="cases-stat-sub">{{ sub }}</div>{% endif %}
+  {%- else %}
+  <div class="ion-metric-value text-base-content/40">&ndash;</div>
+  <div class="cases-stat-sub" role="status">{{ failed_text }}</div>
+  {%- endif %}
+</div>
+{%- endmacro %}
+
+{# The three team-metrics tiles share one set of reasons for having no
+   figure, in this order: the account cannot call for it, the read failed,
+   or the service reported None for a worded reason. #}
+{% macro metrics_reason(none_reason) -%}
+{%- if metrics_withheld %}needs alert:read, not shown
+{%- elif failed.metrics %}read failed, not measured
+{%- else %}{{ none_reason }}{% endif -%}
+{%- endmacro %}
+
+{% macro donut_card(d, centre, failed_text, empty_text) -%}
+{%- if d is none %}
+<p class="cases-card-failed" role="alert">{{ failed_text }}</p>
+{%- elif d.total == 0 %}
+<p class="text-[0.8rem] text-[var(--text-secondary)]">{{ empty_text }}</p>
+{%- else %}
+<svg width="{{ donut_size }}" height="{{ donut_size }}" viewBox="0 0 {{ donut_size }} {{ donut_size }}" role="img" aria-label="{{ d.total }} {{ centre }}">
+  <circle cx="{{ donut_size // 2 }}" cy="{{ donut_size // 2 }}" r="{{ donut_radius }}" fill="none" stroke="rgba(99,110,123,.15)" stroke-width="{{ donut_stroke }}"/>
+  {%- for arc in d.arcs %}
+  <circle cx="{{ donut_size // 2 }}" cy="{{ donut_size // 2 }}" r="{{ donut_radius }}" fill="none" stroke-width="{{ donut_stroke }}" stroke-dasharray="{{ arc.dash }} {{ arc.gap }}" stroke-dashoffset="{{ arc.offset }}" transform="rotate(-90 {{ donut_size // 2 }} {{ donut_size // 2 }})" class="donut-arc case-seg-{{ arc.key }}"/>
+  {%- endfor %}
+  <text x="{{ donut_size // 2 }}" y="{{ donut_size // 2 - 2 }}" text-anchor="middle" dominant-baseline="central" class="donut-center-text">{{ d.total }}</text>
+  <text x="{{ donut_size // 2 }}" y="{{ donut_size // 2 + 12 }}" text-anchor="middle" dominant-baseline="central" class="donut-center-sub">{{ centre }}</text>
+</svg>
+<div class="donut-legend-list">
+  {%- for item in d.legend %}
+  <div class="donut-legend-item">
+    <span class="donut-legend-dot case-dot-{{ item.key }}"></span>
+    <span class="donut-legend-label">{{ item.label }}</span>
+    <span class="donut-legend-val">{{ item.value }} <span class="font-normal text-[var(--text-secondary)] text-[0.65rem]">{{ item.pct }}%</span></span>
+  </div>
+  {%- endfor %}
+  {%- if d.unreadable %}
+  <div class="donut-legend-item text-[var(--text-secondary)]" role="status">Not counted: {{ d.unreadable|join(', ') }}</div>
+  {%- endif %}
+</div>
+{%- endif %}
+{%- endmacro %}
+
+{{ tile("Open Cases", tiles.open, "text-ion-cyan", "read failed, not counted") }}
+{{ tile("Acknowledged", tiles.acknowledged, "text-ion-iris", "read failed, not counted") }}
+{{ tile("Critical Active", tiles.critical_active, "text-ion-coral", "read failed, not counted") }}
+{{ tile("Avg Resolution", tiles.resolution_text, "", "read failed, not measured" if failed.closed else "no case has closed yet") }}
+{{ tile("MTTR · 30d", (tiles.mttr_hours ~ "h") if tiles.mttr_hours is not none else none, "", metrics_reason("no closures in 30d")) }}
+{{ tile("Closure rate · 7d", (tiles.closure_rate ~ "%") if tiles.closure_rate is not none else none, "text-ion-lime", metrics_reason("nothing opened in 7d, nothing to divide by")) }}
+{{ tile("Created / Closed · 7d", (tiles.created_7d ~ " / " ~ tiles.closed_7d) if (tiles.created_7d is not none and tiles.closed_7d is not none) else none, "", metrics_reason("counts not reported by this read")) }}
+{{ tile("Unassigned", tiles.unassigned, "text-ion-amber", "read failed, not counted") }}
+
+<div hx-swap-oob="innerHTML:#analytics-panel-body">
+  {# Summary strip: the four chips renderSummaryStrip described. #}
+  <div class="grid grid-cols-4 max-[1100px]:grid-cols-2 max-[900px]:grid-cols-1 gap-3 mb-4">
+    <div class="summary-chip">
+      <span class="summary-chip-dot sla-red"></span>
+      <span class="summary-chip-label">Critical/High Active</span>
+      {%- if strip.crit_high_active is not none %}
+      <span class="summary-chip-value text-[var(--danger)]">{{ strip.crit_high_active }}</span>
+      {%- else %}
+      <span class="summary-chip-value text-base-content/40" title="read failed, not counted">&ndash;</span>
+      {%- endif %}
+    </div>
+    <div class="summary-chip">
+      <span class="summary-chip-dot sla-yellow"></span>
+      <span class="summary-chip-label">Unassigned</span>
+      {%- if strip.unassigned_active is not none %}
+      <span class="summary-chip-value text-[var(--warning)]">{{ strip.unassigned_active }}</span>
+      {%- else %}
+      <span class="summary-chip-value text-base-content/40" title="read failed, not counted">&ndash;</span>
+      {%- endif %}
+    </div>
+    <div class="summary-chip">
+      <span class="summary-chip-dot {{ strip.oldest_class or '' }}"></span>
+      <span class="summary-chip-label">Oldest Active</span>
+      {%- if strip.oldest_days is not none %}
+      <span class="summary-chip-value">{{ strip.oldest_days }}d</span>
+      {%- elif failed.active %}
+      <span class="summary-chip-value text-base-content/40" title="read failed, not measured">&ndash;</span>
+      {%- else %}
+      <span class="summary-chip-value text-base-content/40" title="no active case with a known age">none</span>
+      {%- endif %}
+    </div>
+    <div class="summary-chip">
+      <span class="summary-chip-dot sla-green"></span>
+      <span class="summary-chip-label">Closed Today (UTC)</span>
+      {%- if strip.closed_today is not none %}
+      <span class="summary-chip-value text-[var(--success)]">{{ strip.closed_today }}</span>
+      {%- else %}
+      <span class="summary-chip-value text-base-content/40" title="read failed, not counted">&ndash;</span>
+      {%- endif %}
+    </div>
+  </div>
+
+  <div class="grid grid-cols-3 max-[1100px]:grid-cols-2 max-[900px]:grid-cols-1 gap-4 mb-4">
+    <div class="bg-base-100 border border-base-300 border-t-2 border-t-error rounded-lg p-4 transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,.15)]">
+      <h4 class="m-0 mb-3 text-[0.7rem] font-semibold text-base-content/60 uppercase tracking-[0.06em]">Severity Distribution</h4>
+      <div class="donut-container">
+        {%- if metrics_withheld %}
+        <p class="text-[0.8rem] text-[var(--text-secondary)]" role="status">This account cannot read team metrics (needs alert:read).</p>
+        {%- else %}
+        {{ donut_card(severity_donut, "cases", "Severity counts could not be read. This is not an estate with no active cases.", "No active cases.") }}
+        {%- endif %}
+      </div>
+    </div>
+    <div class="bg-base-100 border border-base-300 border-t-2 border-t-secondary rounded-lg p-4 transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,.15)]">
+      <h4 class="m-0 mb-3 text-[0.7rem] font-semibold text-base-content/60 uppercase tracking-[0.06em]">Closure Reasons</h4>
+      <div class="donut-container">
+        {{ donut_card(closure_donut, "closed", "Closure reasons could not be read. This is not an estate with no closed cases.", "No closed cases.") }}
+      </div>
+    </div>
+    <div class="bg-base-100 border border-base-300 border-t-2 border-t-info rounded-lg p-4 transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,.15)]">
+      <h4 class="m-0 mb-3 text-[0.7rem] font-semibold text-base-content/60 uppercase tracking-[0.06em]">Status Breakdown</h4>
+      <div class="donut-container">
+        {{ donut_card(status_donut, "total", "Status counts could not be read. This is not an estate with no cases.", "No cases.") }}
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 max-[900px]:grid-cols-1 gap-4 mb-4">
+    <div class="bg-base-100 border border-base-300 border-t-2 border-t-primary rounded-lg p-4 transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,.15)]">
+      <h4 class="m-0 mb-3 text-[0.7rem] font-semibold text-base-content/60 uppercase tracking-[0.06em]">Analyst Workload</h4>
+      {%- if metrics_withheld %}
+      <p class="text-[0.8rem] text-[var(--text-secondary)]" role="status">This account cannot read team metrics (needs alert:read).</p>
+      {%- elif workload is none %}
+      <p class="cases-card-failed" role="alert">Workload could not be read. This is not a team with nothing open.</p>
+      {%- elif not workload %}
+      <p class="text-[0.8rem] text-[var(--text-secondary)]">No open cases to share out.</p>
+      {%- else %}
+      {%- for bar in workload %}
+      <div class="hbar-row">
+        <span class="hbar-label" title="{{ bar.name }}">{{ bar.name }}</span>
+        <div class="hbar-track">
+          {%- if bar.pct is not none %}<div class="hbar-fill case-bar-{{ bar.colour_index }}" data-ion-style="width:{{ bar.pct }}%"></div>{% endif %}
+        </div>
+        <span class="hbar-value">{% if bar.open_count is not none %}{{ bar.open_count }}{% else %}<span title="count not reported">?</span>{% endif %}</span>
+      </div>
+      {%- endfor %}
+      {%- endif %}
+    </div>
+    <div class="bg-base-100 border border-base-300 border-t-2 border-t-warning rounded-lg p-4 transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,.15)]">
+      <h4 class="m-0 mb-1 text-[0.7rem] font-semibold text-base-content/60 uppercase tracking-[0.06em]">Open Case Age</h4>
+      <p class="m-0 mb-3 text-[0.65rem] text-base-content/50">Fixed age thresholds, not an SLA policy.</p>
+      {%- if ages is none %}
+      <p class="cases-card-failed" role="alert">Active cases could not be read. This is not an estate with no active cases.</p>
+      {%- elif ages.total == 0 %}
+      <p class="text-[0.8rem] text-[var(--text-secondary)]">No active cases.</p>
+      {%- else %}
+      <div class="flex gap-1 mb-3">
+        {%- for b in ages.buckets if b.count %}
+        <div class="age-bar-seg {{ b.cls }}" data-ion-style="flex:{{ b.count }}" title="{{ b.label }}: {{ b.count }}"></div>
+        {%- endfor %}
+      </div>
+      <div class="flex flex-wrap gap-3 mb-2 text-[0.65rem] text-[var(--text-secondary)]">
+        {%- for b in ages.buckets %}
+        <span><span class="sla-dot {{ b.cls }} inline-block w-[6px] h-[6px] align-middle mr-0.5"></span>{{ b.label }}: {{ b.count }}</span>
+        {%- endfor %}
+        {%- if ages.unknown %}
+        <span title="active cases with no recorded creation time">age unknown: {{ ages.unknown }}</span>
+        {%- endif %}
+      </div>
+      {%- for c in ages.oldest %}
+      <div class="sla-row" data-click-action="openCaseDetail" data-args="[{{ c.id }}]">
+        <span class="sla-dot {{ c.cls }}"></span>
+        {%- if c.severity %}<span class="cw-sevtag sev-{{ c.severity }} mr-1">{{ c.severity }}</span>{% endif %}
+        <span class="sla-case-num">{{ c.case_number }}</span>
+        <span class="sla-case-title">{{ c.title }}</span>
+        <span class="sla-age">{{ c.age }}</span>
+      </div>
+      {%- endfor %}
+      {%- if ages.total > oldest_shown %}
+      <p class="m-0 mt-2 text-[0.65rem] text-base-content/50">Oldest {{ oldest_shown }} of {{ ages.total }} active.</p>
+      {%- endif %}
+      {%- endif %}
+    </div>
+  </div>
+
+  <div class="bg-base-100 border border-base-300 rounded-lg p-4">
+    <h4 class="m-0 mb-3 text-[0.7rem] font-semibold text-base-content/60 uppercase tracking-[0.06em]">Recent Closures</h4>
+    {%- if metrics_withheld %}
+    <p class="text-[0.8rem] text-[var(--text-secondary)]" role="status">This account cannot read team metrics (needs alert:read).</p>
+    {%- elif closures is none %}
+    <p class="cases-card-failed" role="alert">Recent closures could not be read. This is not a week with no closures.</p>
+    {%- elif not closures %}
+    <p class="text-[0.8rem] text-[var(--text-secondary)]">No recent closures.</p>
+    {%- else %}
+    {%- for c in closures %}
+    <div class="rclosure-row">
+      {%- if c.severity %}<span class="cw-sevtag sev-{{ c.severity }} mr-[0.35rem]">{{ c.severity }}</span>{% endif %}
+      <span class="rclosure-num">{{ c.case_number }}</span>
+      <span class="rclosure-title">{{ c.title }}</span>
+      <span class="rclosure-reason cw-closure {{ c.reason_class }}" title="{{ c.reason_label or 'No closure reason recorded' }}">{{ c.reason_short or '-' }}</span>
+      <span class="rclosure-who">{{ c.closed_by }}</span>
+      <span class="rclosure-when">{% if c.ago is not none %}{{ c.ago }} ago{% else %}closed, time not recorded{% endif %}</span>
+    </div>
+    {%- endfor %}
+    {%- endif %}
+  </div>
+</div>
+
+{# Outside both targets. Rendered only when something failed, so a clean
+   render leaves no control and a failed one leaves exactly one. #}
+<div id="cases-summary-retry" hx-swap-oob="true" class="mb-4">
+  {%- if any_failed %}
+  <div role="alert" class="alert alert-error flex items-center justify-between gap-3">
+    <span>Some of the figures above could not be read. Nothing is missing from the estate: the counts marked as failed were not measured.</span>
+    <button type="button" class="btn btn-sm"
+            hx-get="/ui/cases/summary"
+            hx-target="#cases-stats"
+            hx-swap="innerHTML">Retry</button>
+  </div>
+  {%- endif %}
+</div>

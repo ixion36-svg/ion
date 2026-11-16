@@ -1,0 +1,43 @@
+{#
+  Spike artefact: the server-rendered equivalent of the row that
+  alerts.html:7340 builds in JavaScript.
+
+  Deliberately matches that row's work, not a simplified version, so the
+  timing means something: 12 columns, the same per-field escaping (Jinja
+  autoescape does what escapeHtml() does there), the MITRE and lab-fixture
+  conditional badges, the case badge, the triage-status fallback, and the
+  four quick-action buttons including the conditional Arkime link with its
+  inline SVG.
+
+  Not wired to a route. It exists to be rendered by tools/bench_htmx_rows.py.
+#}
+{% for a in alerts %}
+<tr class="alert-row{% if a.id in selected_ids %} selected{% endif %}"
+    data-click-action="showAlertDetail" data-args='["{{ a.id }}"]'
+    data-contextmenu-action="showContextMenu" data-contextmenu-args='["$event", "{{ a.id }}"]'
+    data-alert-id="{{ a.id }}">
+  <td class="checkbox-col" data-stop-propagation>
+    <input type="checkbox" class="alert-checkbox" data-alert-id="{{ a.id }}"
+           {% if a.id in selected_ids %}checked{% endif %}
+           data-change-action="toggleAlertSelection" data-args='["{{ a.id }}", "$checked"]'>
+  </td>
+  <td class="w-[32px] text-center"><span class="triage-dot triage-{{ a.triage_status }}" title="Triage: {{ a.triage_status }}"></span></td>
+  <td><span class="severity-badge severity-{{ a.severity }}">{{ a.severity }}</span></td>
+  <td title="{{ a.title }}">{{ a.title }}{% if a.mitre_technique_id %}<span class="mitre-inline-badge" title="{{ a.mitre_technique_name }} ({{ a.mitre_tactic_name }})">{{ a.mitre_technique_id }}</span>{% endif %}{% if a.is_lab_fixture %}<span class="lab-fixture-badge" title="Training lab fixture &mdash; not a real alert">Lab fixture</span>{% endif %}</td>
+  <td title="{{ a.host or '-' }}">{{ a.host or '-' }}</td>
+  <td title="{{ a.user or '-' }}">{{ a.user or '-' }}</td>
+  <td title="{{ a.rule_name or '-' }}">{{ a.rule_name or '-' }}</td>
+  <td><span class="system-badge system-{{ a.system }}">{{ a.system }}</span></td>
+  <td>{% if a.case_number %}<span class="case-link-badge" title="{{ a.case_title }}">{{ a.case_number }}</span>{% else %}<span class="text-[var(--text-muted)]">-</span>{% endif %}</td>
+  <td><span class="status-badge alert-status-{{ a.effective_status }}">{{ a.effective_status }}</span></td>
+  <td>{{ a.timestamp_display }}</td>
+  <td class="quick-actions-col" data-stop-propagation>
+    <div class="quick-actions">
+      <button class="quick-action-btn" data-click-action="quickAssignToMe" data-args='["{{ a.id }}"]' title="Assign to me"><i class="icon-user-check"></i></button>
+      <button class="quick-action-btn" data-click-action="quickStatusChange" data-args='["{{ a.id }}", "acknowledged"]' title="Acknowledge"><i class="icon-search"></i></button>
+      <button class="quick-action-btn" data-click-action="showCreateCaseForm" data-args='["{{ a.id }}"]' title="Create case"><i class="icon-folder-plus"></i></button>
+      {% if arkime_enabled and a.has_network %}<a class="quick-action-btn arkime-action-btn text-[#6de4ff]" href="/alerts/{{ a.id | urlencode }}/arkime" title="Arkime PCAP analysis{% if not a.network_community_id %} (IP search &mdash; no community ID){% endif %}" data-stop-propagation><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg></a>{% endif %}
+    </div>
+  </td>
+</tr>
+{% endfor %}

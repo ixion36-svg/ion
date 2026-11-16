@@ -1,0 +1,381 @@
+{# The Arkime PCAP workspace for /alerts/{id}/arkime.
+
+   Replaces the innerHTML writes in alert_arkime.html: the findings list,
+   the destination rows, the protocol bars, the observable cards and the
+   attach result, plus the hand-rolled escHtml() those needed. The markup
+   is the same cards the JavaScript built, so a restyle reaches them.
+
+   The card chrome is here. Refresh is not: it lives in the page shell,
+   outside this swap target, so a failed render cannot take away the
+   control that retries. The attach form is here only after a preview that
+   actually ran, because only then is there a payload to echo. It is
+   re-rendered with that payload; a failed read has nothing to attach and
+   does not draw the form.
+
+   The form carries its own hx-post and hx-disinherit. It is rendered
+   inside #arkime-content, which posts the preview, and a button that
+   inherited that verb would re-run the preview into the panel and throw
+   the form away. Disinheriting on the form as well keeps the submit
+   button from becoming a second request of its own.
+
+   Four renders. kind is set by the route:
+     failed      the read failed. Not an empty capture, and not 0.
+     preview     the workspace.
+     commit_ok   swapped into #commit-result only.
+     commit_bad  the same slot. The form stays, because this response
+                 does not include it. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% if kind == 'commit_ok' %}
+<div role="status" class="alert alert-success">
+  {% set href = case_url | safe_url %}
+  Attached to
+  {% if href %}
+    <a href="{{ href }}" class="link" data-case-url="{{ href }}">{{ case_number if case_number is not none else 'the case' }}</a>
+  {% else %}
+    {{ case_number if case_number is not none else 'the case' }}
+  {% endif %}
+  —
+  {% if observables_created is not none %}
+    {{ observables_created }} observable(s) created.
+  {% else %}
+    the observable count is unknown, not zero.
+  {% endif %}
+</div>
+<button id="commit-btn" type="button" class="btn btn-primary" disabled hx-swap-oob="outerHTML">Attached</button>
+
+{% elif kind == 'commit_bad' %}
+<div role="alert" class="alert alert-error">{{ message }}</div>
+
+{% elif kind == 'failed' %}
+<div class="card bg-base-200 shadow">
+  <div class="card-body">
+    <div role="alert" class="alert alert-error">
+      <svg class="w-4 h-4"><use href="#i-alert-triangle"/></svg>
+      <div>
+        <div class="font-semibold">PCAP analysis could not be read</div>
+        <p>{{ message }}</p>
+        <p class="text-xs opacity-80 mt-1">
+          This is not an empty capture and it is not a verdict of benign.
+          Findings, observables and the OpenCTI count are unknown rather
+          than zero. Refresh to try again.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<div class="flex flex-col gap-6">
+  {% if warnings %}
+    <div role="alert" class="alert alert-warning">
+      <div>
+        {% for warning in warnings %}
+          <div>{{ warning }}</div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="grid grid-cols-12 gap-6">
+    <section class="col-span-12 lg:col-span-8 min-w-0 flex flex-col gap-6">
+
+      <div class="card bg-base-200 shadow">
+        <div class="card-body">
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="card-title">
+              <svg class="w-4 h-4 text-primary"><use href="#i-network"/></svg>
+              Arkime session
+            </h2>
+            <div class="flex items-center gap-4">
+              {% set arkime_href = arkime_web_url | safe_url %}
+              {% if arkime_href %}
+                <a id="open-in-arkime" href="{{ arkime_href }}" target="_blank" rel="noopener"
+                   class="inline-flex items-center gap-1.5 link link-primary text-sm">
+                  <svg class="w-3.5 h-3.5"><use href="#i-external-link"/></svg>Open in Arkime</a>
+              {% endif %}
+              <span id="session-size" class="font-mono text-xs opacity-60">{#
+                #}{% if pcap_size is not none %}{{ pcap_size }}{% else %}—{% endif %}{#
+                #} · {% if raw_bytes is not none %}{{ raw_bytes }}{% else %}—{% endif %} raw</span>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-3 text-sm">
+            <div>
+              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Node</div>
+              <div id="sess-node" class="font-mono">{{ node if node is not none else '—' }}</div>
+            </div>
+            <div>
+              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Session</div>
+              <div id="sess-id" class="font-mono truncate">{{ session_id if session_id is not none else '—' }}</div>
+            </div>
+            <div>
+              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Src → Dst</div>
+              <div id="sess-flow" class="font-mono truncate">{{ flow if flow is not none else '—' }}</div>
+            </div>
+            <div>
+              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Protocol</div>
+              <div id="sess-proto" class="font-mono">{{ proto if proto is not none else '—' }}</div>
+            </div>
+            <div>
+              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">First packet</div>
+              <div id="sess-first" class="font-mono">{{ ts(first_packet, 'datetime', fallback='No packet time') }}</div>
+            </div>
+            <div>
+              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Last packet</div>
+              <div id="sess-last" class="font-mono">{{ ts(last_packet, 'datetime', fallback='No packet time') }}</div>
+            </div>
+            <div>
+              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Packets</div>
+              <div id="sess-packets" class="font-mono">{% if packets is not none %}{{ packets }}{% else %}—{% endif %}</div>
+            </div>
+            <div>
+              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Community ID</div>
+              <div id="sess-cid" class="font-mono truncate">{{ community_id if community_id is not none else '—' }}</div>
+            </div>
+            {% if indexed %}
+              <div id="sess-indexed-wrap" class="col-span-2 md:col-span-4">
+                <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Indexed metadata</div>
+                <div id="sess-indexed" class="font-mono text-xs break-all">{{ indexed | join('  ·  ') }}</div>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      {% if not analysis_ok %}
+        <div role="alert" class="alert alert-error">
+          The capture metadata arrived but the analysis could not be read.
+          The verdict, findings and protocol mix are unknown rather than
+          zero, and there is nothing to attach.
+        </div>
+      {% else %}
+        <div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow">
+          <div class="stat">
+            <div class="stat-title">Verdict</div>
+            <div id="stat-verdict" class="stat-value text-2xl">{#
+              #}{% if verdict_label is not none %}{{ verdict_label }}{% else %}Unknown{% endif %}</div>
+            <div id="stat-verdict-sub" class="stat-desc">{#
+              #}{% if verdict_score is not none %}score {{ verdict_score }}{% endif %}</div>
+          </div>
+          <div class="stat">
+            <div class="stat-title text-error">Findings</div>
+            <div id="stat-findings" class="stat-value text-error">{#
+              #}{% if findings_count is not none %}{{ findings_count }}{% else %}—{% endif %}</div>
+          </div>
+          <div class="stat">
+            <div class="stat-title text-primary">Observables</div>
+            <div id="stat-obs" class="stat-value text-primary">{#
+              #}{% if observables_count is not none %}{{ observables_count }}{% else %}—{% endif %}</div>
+          </div>
+          <div class="stat">
+            <div class="stat-title text-success">OpenCTI hits</div>
+            {# Three states. Off means enrichment never ran, so a hit count
+               of 0 would claim OpenCTI looked and found nothing. A value
+               that is not a boolean is the same as unknown: the string
+               "no" is truthy and must not take the measured branch. #}
+            <div id="stat-hits" class="stat-value text-success">{#
+              #}{% if enrichment_enabled is true %}{% if hits is not none %}{{ hits }}{% else %}—{% endif %}{#
+              #}{% elif enrichment_enabled is false %}Not checked{#
+              #}{% else %}—{% endif %}</div>
+          </div>
+        </div>
+
+        <div class="card bg-base-200 shadow">
+          <div class="card-body">
+            <h2 class="card-title">
+              <svg class="w-4 h-4 text-error"><use href="#i-alert-triangle"/></svg>
+              Findings
+            </h2>
+            <div id="findings-list" class="flex flex-col gap-2">
+              {% if findings is none %}
+                <div class="py-6 text-center text-sm opacity-50">Findings could not be read. This is not zero findings.</div>
+              {% elif not findings %}
+                <div class="py-6 text-center text-sm opacity-50">No suspicious findings detected.</div>
+              {% else %}
+                {% for f in findings %}
+                  <div class="flex items-start gap-3 p-3 rounded-lg bg-base-300">
+                    <span class="badge badge-sm {{ f.severity_css }}">{{ f.severity if f.severity is not none else 'unknown' }}</span>
+                    <div class="flex-1 min-w-0">
+                      <div class="text-sm font-medium">{{ f.title }}</div>
+                      {% if f.description is not none %}
+                        <div class="text-xs opacity-60 mt-0.5">{{ f.description }}</div>
+                      {% endif %}
+                    </div>
+                  </div>
+                {% endfor %}
+                {% if findings_total is not none and findings_total > findings|length %}
+                  <p class="text-xs opacity-60">Showing {{ findings|length }} of {{ findings_total }}. Attaching keeps all of them.</p>
+                {% endif %}
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="card bg-base-200 shadow">
+            <div class="card-body">
+              <h2 class="card-title">Top destinations</h2>
+              <div class="overflow-x-auto">
+                <table class="table table-sm">
+                  <tbody id="top-dst">
+                    {% if destinations is none %}
+                      <tr><td>Destinations could not be read. This is not an empty capture.</td></tr>
+                    {% elif not destinations %}
+                      <tr><td class="opacity-50">No outbound traffic recorded.</td></tr>
+                    {% else %}
+                      {% for row in destinations %}
+                        <tr>
+                          <td class="font-mono">{{ row.ip }}</td>
+                          <td class="font-mono text-right text-xs opacity-60">{#
+                            #}{% if row.bytes_label is not none %}{{ row.bytes_label }}{#
+                            #}{% elif row.count is not none %}{{ row.count }}{#
+                            #}{% else %}—{% endif %}</td>
+                        </tr>
+                      {% endfor %}
+                      {% if destinations_total is not none and destinations_total > destinations|length %}
+                        <tr><td colspan="2" class="text-xs opacity-60">Showing {{ destinations|length }} of {{ destinations_total }}.</td></tr>
+                      {% endif %}
+                    {% endif %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <div class="card bg-base-200 shadow">
+            <div class="card-body">
+              <h2 class="card-title">Protocols</h2>
+              <div id="protocols" class="flex flex-col gap-2">
+                {% if protocols is none %}
+                  <div>Protocol mix could not be read. This is not an empty mix.</div>
+                {% elif not protocols %}
+                  <div class="opacity-50">No protocols recorded.</div>
+                {% else %}
+                  {% for row in protocols %}
+                    <div class="flex flex-col gap-1">
+                      <div class="flex items-center justify-between text-xs">
+                        <span class="font-mono">{{ row.name }}</span>
+                        <span class="font-mono opacity-60">{#
+                          #}{% if row.count is not none %}{{ row.count }}{% else %}—{% endif %}{#
+                          #}{% if row.pct is not none %} · {{ row.pct }}%{% endif %}</span>
+                      </div>
+                      {% if row.pct is not none %}
+                        <div class="h-1 rounded-full bg-base-300 overflow-hidden">
+                          <div class="h-full rounded-full bg-primary" data-ion-style="width:{{ row.pct }}%"></div>
+                        </div>
+                      {% endif %}
+                    </div>
+                  {% endfor %}
+                  {% if protocols_total is not none and protocols_total > protocols|length %}
+                    <p class="text-xs opacity-60">Showing {{ protocols|length }} of {{ protocols_total }}.</p>
+                  {% endif %}
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+    </section>
+
+    <aside class="col-span-12 lg:col-span-4 min-w-0 flex flex-col gap-6">
+      <div class="card bg-base-200 shadow">
+        <div class="card-body">
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="card-title">Observables</h2>
+            <span id="obs-count" class="badge badge-ghost font-mono">{#
+              #}{% if observables_count is not none %}{{ observables_count }}{% else %}—{% endif %}</span>
+          </div>
+          <div id="obs-list" class="flex flex-col gap-2 max-h-[560px] overflow-y-auto">
+            {% if observables is none %}
+              <div class="py-6 text-center text-sm opacity-50">Observables could not be read. This is not an empty list.</div>
+            {% elif not observables %}
+              <div class="py-6 text-center text-sm opacity-50">No observables extracted.</div>
+            {% else %}
+              {% for o in observables %}
+                <div class="p-3 rounded-lg bg-base-300">
+                  <div class="flex items-center justify-between gap-2 mb-1">
+                    <span class="badge badge-ghost badge-sm font-mono">{{ o.type }}</span>
+                    {% if o.found is true %}
+                      <span class="badge badge-sm badge-success">OpenCTI</span>
+                    {% endif %}
+                  </div>
+                  <div class="font-mono text-sm break-all">{{ o.value }}</div>
+                  {% if o.labels or o.actors %}
+                    <div class="mt-2 flex flex-wrap gap-1">
+                      {% for label in o.labels %}<span class="badge badge-sm badge-accent">{{ label }}</span>{% endfor %}
+                      {% for actor in o.actors %}<span class="badge badge-sm badge-error">{{ actor }}</span>{% endfor %}
+                    </div>
+                  {% endif %}
+                  {% if o.error is not none %}
+                    <div class="mt-1 text-xs text-error">{{ o.error }}</div>
+                  {% endif %}
+                  <div class="mt-1 text-xs opacity-50">via {% if o.source is not none %}{{ o.source }}{% else %}—{% endif %}</div>
+                </div>
+              {% endfor %}
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      {% if analysis_json is not none and observables_json is not none %}
+        {# Only a preview that produced both sides can be attached. The
+           values travel in the form because the commit endpoint is
+           stateless: it trusts the payload the analyst just reviewed.
+           Refresh stays outside this fragment; this form is the payload. #}
+        <div class="card bg-base-200 shadow border border-primary/20 sticky top-20">
+          <div class="card-body">
+            <h2 class="card-title text-primary">
+              <svg class="w-4 h-4"><use href="#i-file-text"/></svg>
+              Attach to case
+            </h2>
+            <form id="arkime-commit-form" class="arkime-commit flex flex-col gap-3"
+                  hx-post="/ui/alerts/{{ alert_id | urlencode }}/arkime/commit"
+                  hx-target="#commit-result"
+                  hx-swap="innerHTML"
+                  hx-disabled-elt="find button"
+                  hx-disinherit="hx-post hx-target hx-swap">
+              <input type="radio" name="commit_mode" id="arkime-mode-new" value="new" class="mode-new" checked>
+              <input type="radio" name="commit_mode" id="arkime-mode-existing" value="existing" class="mode-existing">
+              <div class="mode-bar flex items-center gap-1 p-1 rounded-lg bg-base-300">
+                <label for="arkime-mode-new" class="flex-1 px-3 py-2 rounded-md text-center cursor-pointer">New case</label>
+                <label for="arkime-mode-existing" class="flex-1 px-3 py-2 rounded-md text-center cursor-pointer">Existing</label>
+              </div>
+              <div class="commit-fields flex flex-col gap-3">
+                <div class="commit-new flex flex-col gap-3">
+                  <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Case title</legend>
+                    <input name="case_title" type="text" class="input input-sm w-full" placeholder="Auto-generated if blank">
+                  </fieldset>
+                  <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Severity</legend>
+                    <select name="case_severity" class="select select-sm w-full">
+                      <option value="critical">Critical</option>
+                      <option value="high">High</option>
+                      <option value="medium" selected>Medium</option>
+                      <option value="low">Low</option>
+                    </select>
+                  </fieldset>
+                </div>
+                <div class="commit-existing flex flex-col gap-1.5">
+                  <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Case ID</legend>
+                    <input name="case_id" type="number" class="input input-sm w-full" placeholder="e.g. 2847">
+                  </fieldset>
+                </div>
+              </div>
+              <textarea name="analysis" class="hidden" readonly>{{ analysis_json }}</textarea>
+              <textarea name="observables" class="hidden" readonly>{{ observables_json }}</textarea>
+              <input type="hidden" name="pcap_size_bytes" value="{% if pcap_size_raw is not none %}{{ pcap_size_raw }}{% endif %}">
+              <button id="commit-btn" type="submit" class="btn btn-primary">
+                <svg class="w-3.5 h-3.5"><use href="#i-arrow-right"/></svg>
+                Attach analysis
+              </button>
+              <div id="commit-result"></div>
+            </form>
+          </div>
+        </div>
+      {% endif %}
+    </aside>
+  </div>
+</div>
+{% endif %}

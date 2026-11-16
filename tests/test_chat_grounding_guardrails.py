@@ -199,6 +199,43 @@ def test_claims_without_a_verdict_still_count_as_ungrounded():
     assert _normalize_result({"unsupported_claims": ["T1055"]})["grounded"] is False
 
 
+def test_an_unreadable_claims_value_is_not_recorded_as_a_pass():
+    """A non-list used to become [] and then `grounded = not []`.
+
+    A readable empty list is still a pass: the model named nothing. A
+    string is not that list. The result stays visible — skipped is false,
+    which is what ai_api.py requires before it emits the event — and the
+    page's unreadable state is the one it lands in, not the reassurance
+    and not "not checked".
+    """
+    from ion.web.ui.chat import grounding_view
+
+    clean = _normalize_result({"unsupported_claims": []})
+    assert clean["grounded"] is True
+    assert clean["unsupported_claims"] == []
+    assert clean["skipped"] is False
+    assert grounding_view(clean, parsed=True)["state"] == "grounded"
+
+    unread = _normalize_result({
+        "unsupported_claims": "CVE-2024-1 is used in the wild",
+        "notes": "could not structure it",
+    })
+    assert unread["grounded"] is not True
+    assert unread["skipped"] is False
+    assert unread["unsupported_claims"] != []
+    assert "CVE-2024-1" not in str(unread.get("unsupported_claims") or "")
+    assert unread["notes"] == "could not structure it"
+    view = grounding_view(unread, parsed=True)
+    assert view["state"] == "unreadable"
+    assert view["state"] != "grounded"
+    assert view["state"] != "not_checked"
+
+    # A dict is the same defect as a string: not a list, so not a pass.
+    shaped = _normalize_result({"unsupported_claims": {"claim": "x"}})
+    assert shaped["grounded"] is not True
+    assert grounding_view(shaped, parsed=True)["state"] == "unreadable"
+
+
 def test_a_clean_answer_is_grounded():
     assert _normalize_result({"grounded": True, "unsupported_claims": []})["grounded"] is True
 

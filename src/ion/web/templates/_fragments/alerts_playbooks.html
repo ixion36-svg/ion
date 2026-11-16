@@ -1,0 +1,119 @@
+{# Alerts: the Investigation Playbooks section of the alert detail modal.
+
+   Rendered into #playbooks-content by loadPlaybooksForAlert, which the
+   triage bar calls once its markup has landed and which every playbook
+   mutation calls again afterwards. The reload control is beside the
+   section's label, outside this target.
+
+   Replaces renderPlaybooksSection and renderActiveExecution, which built
+   this from two reads folded into `res.ok ? json : { playbooks: [] }`.
+   The two reads are two outcomes each here:
+
+     recommended   missing alert, failed (with the handler's reason when
+                   it gave one), no match, rows
+     executions    withheld (no playbook:execute), failed, read
+
+   A withheld or failed executions read means the active execution and
+   the completed count are unknown, and the section says so. The page
+   showed nothing, which reads as "nothing is running".
+
+   The step checkbox passes "$checked", which event-delegation.js turns
+   into the box's state. The page's data-args carried a JavaScript
+   conditional inside the JSON, which the dispatcher rejected, so ticking
+   a step never reached the server.
+
+   The pending step ids ride on the execution block so skipRemainingSteps
+   reads them off the DOM instead of from a client cache. #}
+
+{% if active %}
+  <div class="playbook-execution" id="playbook-execution-{{ active.id }}"
+       data-execution-id="{{ active.id }}"
+       data-pending-step-ids='{{ active.pending_step_ids|tojson }}'>
+    <div class="playbook-execution-header">
+      <span class="playbook-execution-title">{% if active.playbook and active.playbook.name %}{{ active.playbook.name }}{% else %}Playbook not recorded{% endif %}</span>
+      <span class="playbook-execution-status {{ active.status or '' }}">{{ (active.status or 'status unknown')|replace('_', ' ') }}</span>
+    </div>
+    <div class="text-xs text-[var(--text-muted)] mb-2">
+      {% if active.progress.pct is not none %}
+        Progress: {{ active.progress.pct }}% ({{ active.progress.completed }}/{{ active.progress.total }} steps)
+      {% else %}
+        This playbook has no steps, so there is no progress to report.
+      {% endif %}
+    </div>
+    <div class="playbook-steps-list">
+      {% for step in active.steps %}
+        <div class="playbook-step{% if step.done %} completed{% endif %}">
+          {# PUT /api/playbook-executions/{id}/steps/{sid}, playbook:execute.
+             The whole block is rendered only when executions were read,
+             which needs that permission, so the box is live. #}
+          <input type="checkbox" class="playbook-step-checkbox"
+                 {% if step.done %}checked{% endif %}
+                 data-change-action="updateStepStatus"
+                 data-args='[{{ alert_id|tojson }}, {{ active.id }}, {{ step.id }}, "$checked"]'>
+          <span class="playbook-step-title">{{ step.title }}</span>
+          {% if step.is_required %}<span class="playbook-step-required">Required</span>{% endif %}
+          {% if step.skipped %}<span class="text-[0.625rem] text-[var(--text-muted)]">(skipped)</span>{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+    <div class="flex gap-2 mt-2">
+      <button class="btn btn-sm" data-click-action="completePlaybookExecution" data-args='[{{ alert_id|tojson }}, {{ active.id }}]'>Complete</button>
+      <button class="btn btn-sm" data-click-action="skipRemainingSteps" data-args='[{{ alert_id|tojson }}, {{ active.id }}]'>Skip Remaining</button>
+    </div>
+  </div>
+{% endif %}
+
+{% if alert_missing %}
+  <div class="text-[0.8125rem] text-[var(--danger)]" role="alert">
+    Alert {{ alert_id }} was not found in Elasticsearch, so no playbooks can be
+    recommended for it.
+  </div>
+{% elif recommended_failed %}
+  <div class="text-[0.8125rem] text-[var(--danger)]" role="alert">
+    Recommended playbooks could not be read{% if recommended_error %}: {{ recommended_error }}{% endif %}.
+    Whether any match this alert is not known; use the reload control beside
+    the heading to try again.
+  </div>
+{% elif recommended %}
+  {% if not can_execute %}
+    <div class="text-xs text-[var(--text-muted)] mb-1" title="Requires the playbook:execute permission">
+      Starting a playbook requires the playbook:execute permission; these are
+      the recommendations only.
+    </div>
+  {% endif %}
+  <div class="playbook-recommendations">
+    {% for p in recommended %}
+      <div class="playbook-item">
+        <div class="playbook-item-info">
+          <div class="playbook-item-name">{{ p.name }}</div>
+          <div class="playbook-item-meta">
+            {% if p.step_count is not none %}{{ p.step_count }} steps{% else %}steps not counted{% endif %}
+            | Priority: {% if p.priority is not none %}{{ p.priority }}{% else %}not set{% endif %}
+          </div>
+        </div>
+        {% if can_execute %}
+          <button class="btn btn-sm btn-primary" data-click-action="startPlaybook" data-args='[{{ alert_id|tojson }}, {{ p.id }}]'>Start</button>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+{% elif not active %}
+  <span class="text-[var(--text-muted)] text-[0.8125rem]">No matching playbooks for this alert</span>
+{% endif %}
+
+<span class="playbook-library-toggle" data-click-action="togglePlaybookLibrary" data-args='[{{ alert_id|tojson }}]'>Browse Playbook Library <i class="icon-chevron-down"></i></span>
+<div id="playbook-library-panel" hidden></div>
+
+{% if executions_withheld %}
+  <div class="text-xs text-[var(--text-muted)] mt-2" title="GET /api/elasticsearch/alerts/{id}/playbook-executions requires the playbook:execute permission">
+    Playbook executions for this alert are not shown: reading them requires
+    the playbook:execute permission.
+  </div>
+{% elif executions_failed %}
+  <div class="text-xs text-[var(--danger)] mt-2" role="alert">
+    Playbook executions for this alert could not be read. One may be in
+    progress; use the reload control beside the heading to try again.
+  </div>
+{% elif completed_count %}
+  <div class="text-xs text-[var(--text-muted)] mt-2">{{ completed_count }} playbook(s) completed previously</div>
+{% endif %}

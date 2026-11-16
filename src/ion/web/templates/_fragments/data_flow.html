@@ -1,0 +1,253 @@
+{# The group-membership ingestion flow: the pipeline, the selected stage's
+   payload, the forensic readings, and the side-by-side comparison.
+
+   This replaces all three `innerHTML` writes in data_flow.html plus the two
+   JavaScript constants that described both pipelines, their stage labels
+   and icons, and the two JSON documents. The page now holds a shell and an
+   empty slot. `ion.web.ui.data_flow` says why each piece moved.
+
+   Every control in here is an `hx-get` back to /ui/data-flow carrying the
+   next selection, so the browser holds no state and "what this selection
+   shows" has one definition. The flow toggle is part of that state, which
+   is why it is rendered here and not in the page: only the response knows
+   which segment is active. It is rendered in the failure branch too, and
+   the page keeps a Reload control outside the swap, so no render can take
+   away the way back.
+
+   No htmx feature in here compiles a string: no `hx-on`, no `js:` values
+   and no event filter. ION serves `script-src 'self' 'nonce-...'` with no
+   `unsafe-eval`, so anything handed to Function() throws and the control
+   would silently do nothing while looking correct. #}
+
+{% from "_fragments/data_flow_panels.html" import winlog, kibana %}
+
+{% set state_qs = 'flow=' ~ state.flow ~ '&node=' ~ state.node ~ '&view=' ~ state.view %}
+{% set here = '/ui/data-flow?' ~ state_qs ~ ('&compare=1' if state.compare else '&compare=0') %}
+
+{# The selection, echoed so the page's Reload button can send it back with
+   hx-include. It is outside the branch below because the failure branch has
+   to be retryable at the same selection, not reset to the default one. #}
+<div id="df-state" class="hidden" hidden>
+  <input type="hidden" name="flow" value="{{ state.flow }}">
+  {# `is not none` on the stage index: it is 0 for the first stage, and a
+     truthiness test would send no value for exactly that one, so Reload
+     from stage 0 would fall back to the default instead of staying put. #}
+  {% if state.node is not none %}<input type="hidden" name="node" value="{{ state.node }}">{% endif %}
+  <input type="hidden" name="view" value="{{ state.view }}">
+  <input type="hidden" name="compare" value="{{ 1 if state.compare else 0 }}">
+</div>
+
+<div class="flex justify-end mb-8">
+  <div class="inline-flex bg-base-200 p-1 rounded-box border border-base-300">
+    {% for choice in flow_choices %}
+    {% set flow_url = '/ui/data-flow?flow=' ~ choice.key ~ '&node=0&view=' ~ state.view %}
+    {# Switching pipeline resets to the first stage, which is what
+       dfSetFlow() did, and leaves the comparison, which is what it did by
+       setting showComparison = false. #}
+    <button class="df-toggle-btn{{ ' ' ~ choice.active_class if (not state.compare and state.flow == choice.key) else '' }}"
+            data-df-flow="{{ choice.key }}"
+            hx-get="{{ flow_url }}"
+            hx-target="#df-view"
+            hx-swap="innerHTML">{{ choice.label }}</button>
+    {% endfor %}
+    {# The comparison segment toggles, as dfToggleCompare() did: its URL
+       turns the comparison off when it is on. The server knows which, so
+       the button does not have to. #}
+    {% set compare_url = '/ui/data-flow?' ~ state_qs ~ ('&compare=0' if state.compare else '&compare=1') %}
+    <button class="df-toggle-btn{{ ' active-compare' if state.compare else '' }}"
+            data-df-compare="{{ 1 if state.compare else 0 }}"
+            hx-get="{{ compare_url }}"
+            hx-target="#df-view"
+            hx-swap="innerHTML">
+      <i class="icon-bar-chart-3"></i> Compare
+    </button>
+  </div>
+</div>
+
+{% if payload is none %}
+{# A failed build is not a pipeline that carried nothing. An empty panel
+   here reads as "no events were ingested", which is the opposite conclusion
+   from "we could not describe the ingestion", and the readings in the
+   sidebar would read as measured zeroes. So nothing is printed but the
+   reason, and the retry asks for the same selection again. #}
+<div class="text-center p-10" data-df-flow-failed="true">
+  <div role="alert" class="alert alert-error">
+    <span>This ingestion flow could not be described, so no pipeline and no
+      forensic readings are shown. Nothing here was measured to be zero.</span>
+    <button class="btn btn-sm"
+            hx-get="{{ here }}"
+            hx-target="#df-view"
+            hx-swap="innerHTML">Retry</button>
+  </div>
+</div>
+
+{% elif state.compare %}
+{% set cmp_table = '/ui/data-flow?flow=' ~ state.flow ~ '&node=' ~ state.node ~ '&view=table&compare=1' %}
+{% set cmp_json = '/ui/data-flow?flow=' ~ state.flow ~ '&node=' ~ state.node ~ '&view=json&compare=1' %}
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8" data-df-compare-view="true">
+  <!-- Legacy column -->
+  <div>
+    <h3 class="text-[11px] font-black uppercase tracking-widest mb-4 text-error">Legacy End State (Missing Fields)</h3>
+    {{ kibana(payload.end_states['legacy'], state.view, cmp_table, cmp_json) }}
+    <div class="card bg-base-200 shadow mt-4">
+      <div class="card-body">
+        <h4 class="card-title text-sm"><i class="icon-eye-off text-[var(--danger)]"></i> Field Analysis</h4>
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <thead><tr><th>Target Field</th><th class="text-right">Status</th></tr></thead>
+            <tbody>
+              <tr><td class="font-mono text-[rgba(239,68,68,.7)]">user.target.name</td><td class="text-right"><span class="badge badge-error badge-sm">DROPPED</span></td></tr>
+              <tr><td class="font-mono text-[rgba(239,68,68,.7)]">winlog.event_data.MemberSid</td><td class="text-right"><span class="badge badge-error badge-sm">DROPPED</span></td></tr>
+              <tr><td class="font-mono text-[rgba(239,68,68,.7)]">group.domain</td><td class="text-right"><span class="badge badge-error badge-sm">DROPPED</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Modern column -->
+  <div>
+    <h3 class="text-[11px] font-black uppercase tracking-widest mb-4 text-success">Modern End State (Full Visibility)</h3>
+    {{ kibana(payload.end_states['modern'], state.view, cmp_table, cmp_json) }}
+    <div class="card bg-base-200 shadow mt-4">
+      <div class="card-body">
+        <h4 class="card-title text-sm"><i class="icon-shield-check text-[var(--success)]"></i> Field Analysis</h4>
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <thead><tr><th>Target Field</th><th class="text-right">Status</th></tr></thead>
+            <tbody>
+              <tr><td class="font-mono text-[rgba(16,185,129,.7)]">user.target.name</td><td class="text-right"><span class="badge badge-success badge-sm">PRESENT</span></td></tr>
+              <tr><td class="font-mono text-[rgba(16,185,129,.7)]">user.target.id (SID)</td><td class="text-right"><span class="badge badge-success badge-sm">PRESENT</span></td></tr>
+              <tr><td class="font-mono text-[rgba(16,185,129,.7)]">winlog.event_data.MemberName</td><td class="text-right"><span class="badge badge-success badge-sm">PRESENT</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% else %}
+{% set panel_table = '/ui/data-flow?flow=' ~ payload.flow.key ~ '&node=' ~ payload.node.index ~ '&view=table' %}
+{% set panel_json = '/ui/data-flow?flow=' ~ payload.flow.key ~ '&node=' ~ payload.node.index ~ '&view=json' %}
+<div class="grid grid-cols-1 lg:grid-cols-[7fr_5fr] gap-8" data-df-flow-view="{{ payload.flow.key }}">
+  <div>
+    <!-- Pipeline -->
+    <div class="card bg-base-200 shadow mb-6">
+      <div class="card-body">
+        <div class="relative flex items-center justify-between px-4">
+          <div class="absolute top-1/2 left-0 w-full h-px bg-base-300 z-0"></div>
+          {% for stage in payload.flow.nodes %}
+          {% set stage_url = '/ui/data-flow?flow=' ~ payload.flow.key ~ '&node=' ~ stage.index ~ '&view=' ~ state.view %}
+          {% set selected = stage.index == payload.node.index %}
+          {# `is not none` again: the first stage's index is 0, and a
+             truthiness test would leave that one stage with no index to
+             request, so clicking it would do nothing. #}
+          <div class="relative z-10 flex flex-col items-center gap-2.5 cursor-pointer"
+               {% if stage.index is not none %}data-df-node="{{ stage.index }}"{% endif %}
+               hx-get="{{ stage_url }}"
+               hx-target="#df-view"
+               hx-swap="innerHTML">
+            <button class="df-node-btn{{ ' ' ~ payload.flow.selected_class if selected else '' }}"><i class="{{ stage.icon }}"></i></button>
+            <span class="df-node-label{{ ' selected' if selected else '' }}">{{ stage.label }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="card bg-base-100 shadow min-h-[460px] p-6" id="df-content-panel">
+      <div class="df-content-title"><i class="icon-terminal"></i> {{ payload.node.label }} Payload</div>
+      {% if payload.node.kind == 'winlog' %}
+      {{ winlog() }}
+      {% elif payload.node.kind == 'kibana' %}
+      {{ kibana(payload.end_states[payload.node.side], state.view, panel_table, panel_json) }}
+      {% elif payload.node.kind == 'code' %}
+      {# No whitespace inside the <pre>: it would print as a leading blank
+         line. The old code built this with a hand-rolled escHtml(); Jinja
+         autoescapes, so the escaper is gone rather than ported. #}
+      <div class="df-code-block"><pre>{{ payload.node.code }}</pre></div>
+      {% else %}
+      {# A stage kind nothing here renders. Saying so beats an empty card,
+         which on this page reads as a stage that produced nothing. #}
+      <div role="alert" class="alert alert-warning">
+        <span>This stage is a {{ payload.node.kind }} stage, which this page has no panel for, so its payload is not shown.</span>
+      </div>
+      {% endif %}
+      <div class="df-notes">
+        <div class="df-note-col">
+          <h4>Infrastructure Logic</h4>
+          <p>"{{ payload.node.details }}"</p>
+        </div>
+        <div class="df-note-col">
+          <h4>Analyst Impact</h4>
+          <p class="bright">{{ payload.node.analyst_note }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="flex flex-col gap-6">
+    <div class="card bg-base-200 shadow">
+      <div class="card-body">
+        <h3 class="card-title text-xs uppercase tracking-widest">
+          <i class="icon-activity text-info"></i> Forensic Completeness
+        </h3>
+        {% for metric in payload.flow.metrics %}
+        <div class="{{ '' if loop.last else 'mb-5' }}" data-df-metric="{{ metric.key }}">
+          <div class="flex justify-between text-[10px] font-bold uppercase tracking-wide text-base-content/60 mb-2">
+            <span>{{ metric.label }}</span>
+            <span class="df-metric-status {{ metric.status_class }}">{{ metric.status }}</span>
+          </div>
+          <div class="h-1 w-full bg-base-300 rounded overflow-hidden">
+            {# The bar's width is the one value the stylesheet cannot carry,
+               because it is a reading. `style-src-attr 'none'` forbids an
+               inline style attribute, so it goes out as `data-ion-style`
+               and static/js/ion-dynamic-styles.js applies it with
+               setProperty after this swap.
+
+               `is not none`, not truthiness: two of these readings are
+               literally 0, and a truthiness test would emit no width for
+               exactly the two bars reporting a total loss. An empty track
+               reads as "not measured", which is the opposite of a measured
+               zero, and the percentage-width classes the old markup carried
+               could not say it either, because the stylesheet carries no
+               rule for any of them.
+
+               That sentence used to name one of those classes as a literal.
+               Tailwind scans this file, so naming it generated a rule for
+               it, and writing the sentence made the sentence false. #}
+            <div class="df-bar-fill {{ metric.bar_class }}"
+                 {%- if metric.bar_percent is not none %} data-ion-style="width:{{ metric.bar_percent }}%" data-df-bar-percent="{{ metric.bar_percent }}"{% endif %}></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card bg-base-200 shadow">
+      <div class="card-body">
+        <h3 class="card-title text-xs uppercase tracking-widest">
+          <i class="icon-info text-info"></i> Understanding the Flow
+        </h3>
+        <div class="flex flex-col gap-3">
+          <div class="flex items-start gap-2.5 text-sm text-base-content/70 leading-snug">
+            <span class="w-2 h-2 rounded-full bg-error mt-1 shrink-0"></span>
+            <span><strong class="text-base-content">Legacy (ArcSight/CEF):</strong> SmartConnector maps Event 4728 to CEF, stripping fields not in the standard schema. The target user identity is lost.</span>
+          </div>
+          <div class="flex items-start gap-2.5 text-sm text-base-content/70 leading-snug">
+            <span class="w-2 h-2 rounded-full bg-success mt-1 shrink-0"></span>
+            <span><strong class="text-base-content">Modern (Elastic Agent/ECS):</strong> Elastic Windows Integration preserves all XML attributes from the original event, mapping them to ECS fields automatically.</span>
+          </div>
+          <div class="flex items-start gap-2.5 text-sm text-base-content/70 leading-snug">
+            <span class="w-2 h-2 rounded-full bg-info mt-1 shrink-0"></span>
+            <span><strong class="text-base-content">Impact:</strong> Without the target user, analysts cannot determine <em>who</em> was added to a privileged group without manually checking the DC.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}

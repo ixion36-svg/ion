@@ -1,0 +1,64 @@
+{# Threat Intel: the Reports tab's card list.
+
+   Replaces four innerHTML sites in tiLoadReports.
+
+   The filter stays what it was: a substring match over the 25 reports the
+   endpoint returns, because /api/threat-landscape/reports takes no search
+   parameter. It runs on the server now rather than in the browser, which
+   changes nothing about which reports match and means the empty state can
+   say whether a filter was responsible.
+
+   The published date goes through the ts macro. The page used
+   `new Date(iso).toLocaleDateString()`, which is the viewer's clock, and
+   the macro is where the decision about naive versus aware timestamps has
+   one definition. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% if not configured %}
+  <div class="ti-empty">
+    OpenCTI is not configured, so there are no threat reports to list. This
+    is a deployment setting rather than a fault.
+  </div>
+{% elif failed %}
+  <div class="ti-empty text-[var(--danger)]" role="alert">
+    The report list could not be read. OpenCTI is configured, so this is a
+    fault rather than an absence of reports.
+    {% if error %}<span class="font-mono text-[10px] opacity-80 ml-1">({{ error }})</span>{% endif %}
+  </div>
+{% elif reports is none %}
+  <div class="ti-empty text-[var(--danger)]" role="alert">
+    The report list answered with something this panel cannot read, so it
+    cannot say what reports exist.
+  </div>
+{% elif not reports %}
+  {# Two empty states, not one. The page said "No reports match the filter"
+     or "No reports available", which was already the right distinction and
+     is kept. #}
+  <div class="ti-empty">
+    {% if q %}
+      No reports match {{ q }}. {{ total }} report{{ '' if total == 1 else 's' }}
+      were read, so clearing the filter will show them.
+    {% else %}
+      No reports available.
+    {% endif %}
+  </div>
+{% else %}
+  {% for rep in reports %}
+    <div class="p-3 border border-[var(--ion-border)] border-l-[3px] border-l-[var(--ion-cyan,#6de4ff)] rounded-[var(--radius)] mb-2 bg-[var(--bg-secondary)] ti-report-card"
+         data-click-action="tiOpenReport"
+         data-args='[{{ rep.get('id')|tojson }}]'>
+      {# 'Untitled' rather than an empty heading, which the page had right:
+         a report OpenCTI holds with no name is still a report. #}
+      <div class="text-[.9rem] font-semibold text-[var(--ion-cyan,#6de4ff)] mb-1">{{ rep.get('name') or 'Untitled' }}</div>
+      {%- set description = rep.get('description') or '' -%}
+      <div class="text-xs text-[var(--text-secondary)]">
+        {{- description[:summary_chars] -}}
+        {%- if description|length > summary_chars %}&hellip;{% endif -%}
+      </div>
+      <div class="text-[.72rem] text-[var(--text-muted)] mt-1.5 font-mono">
+        {{ rep.get('report_type') or 'report' }} &middot; {{ ts(rep.get('published'), 'date', fallback='-') }}
+      </div>
+    </div>
+  {% endfor %}
+{% endif %}

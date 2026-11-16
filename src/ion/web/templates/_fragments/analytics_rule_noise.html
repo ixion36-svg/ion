@@ -1,0 +1,49 @@
+{% import '_fragments/analytics_state.html' as st %}
+{# Rule noise, from ui/analytics.py's noise_view.
+
+   `r.fp_ratio > 0.5 ? 'fp-high' : r.fp_ratio > 0.2 ? 'fp-med' : 'fp-low'`
+   is false on both comparisons for a missing ratio, so a rule whose
+   false-positive ratio the job did not record was painted as a low-FP
+   rule: the one colour that says leave this one alone. It has its own
+   band here.
+
+   The bar width is data-ion-style rather than the page's data-pct plus an
+   applyBarWidths() pass, because the hook is applied on a MutationObserver
+   and so lands after an htmx swap without the fragment asking.
+#}
+{% if job.state != 'ok' %}
+{{ st.job_notice(job) }}
+{% elif rules is none %}
+{{ st.unreadable_list('rules') }}
+{% elif not rules %}
+<div class="empty-state">No rule data available</div>
+{% else %}
+<div class="noise-legend">
+  Bar colour:
+  <span class="fp-low-text">low FP</span> |
+  <span class="fp-med-text">medium FP</span> |
+  <span class="fp-high-text">high FP (&gt;50%)</span> |
+  <span class="an-absent-text">ratio not recorded</span>
+</div>
+{%- for r in rules %}
+<div class="noise-bar-row">
+  <span class="noise-bar-label" title="{{ r.name or 'unnamed rule' }}">
+    {{- r.name or 'unnamed rule' -}}
+  </span>
+  <div class="noise-bar-track">
+    {%- if r.width is not none %}
+    <div class="noise-bar-fill {{ r.fp_band or 'fp-unmeasured' }}"
+         data-ion-style="width: {{ r.width }}%"></div>
+    {%- endif %}
+  </div>
+  <span class="noise-bar-count">
+    {{- r.alerts if r.alerts is not none else '' -}}
+    {%- if r.alerts is none %}<span class="an-absent" title="This rule carried no alert count"></span>{% endif %}
+  </span>
+  <span class="noise-bar-count w-[65px]" title="FP ratio">
+    {%- if r.fp_ratio_pct is not none %}{{ r.fp_ratio_pct }}% FP
+    {%- else %}<span class="an-absent" title="This rule carried no false-positive ratio"></span>{% endif %}
+  </span>
+</div>
+{%- endfor %}
+{% endif %}

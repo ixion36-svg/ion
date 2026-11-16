@@ -1,0 +1,156 @@
+{# The verdict-review metrics strip and pending-verdict queue, together.
+
+   Replaces all five innerHTML sites in verdict_review.html: the metrics
+   strip, the queue cards, the empty state and both failure messages. The
+   cards carried the containment proposals and a hand-rolled esc() too, so
+   that whole builder is gone and Jinja escapes instead.
+
+   Metrics and queue are rendered from two independently caught reads. The
+   JavaScript swallowed a metrics failure and drew nothing, which looks the
+   same as a page that loaded, so the strip says so instead.
+
+   The controls (Refresh) live in the page shell, not here, so a render that
+   says the read failed cannot remove the control that retries. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% if metrics_failed %}
+  <div role="alert" class="alert alert-warning mb-6">
+    The review metrics could not be read. This is not a queue depth of zero
+    and not an agreement rate of zero: nothing here has been measured.
+  </div>
+{% elif metrics is not none %}
+  <div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow mb-6">
+    {# `is not none` on every number. A pending count of 0 is the good news
+       this page exists to deliver, and `{% if metrics.pending %}` would
+       render it as unknown. #}
+    <div class="stat">
+      <div class="stat-title">Pending</div>
+      <div class="stat-value text-warning">
+        {{ metrics.pending if metrics.pending is not none else 'Unknown' }}
+      </div>
+    </div>
+    <div class="stat">
+      <div class="stat-title">Reviewed</div>
+      <div class="stat-value text-primary">
+        {{ metrics.reviewed if metrics.reviewed is not none else 'Unknown' }}
+      </div>
+    </div>
+    <div class="stat">
+      <div class="stat-title">Agreement</div>
+      {# None means nothing has been reviewed yet, so there is no rate to
+         quote. 0.0 means Bob has been overridden every single time, which is
+         the most important number on the page. Truthiness cannot tell them
+         apart and would report the second as the first. #}
+      <div class="stat-value text-success">
+        {% if metrics.agreement_rate is not none %}
+          {{ (metrics.agreement_rate * 100) | round | int }}%
+        {% else %}
+          <span class="opacity-60">Not yet measured</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+{% if queue_failed %}
+  <div role="alert" class="alert alert-warning">
+    The review queue could not be read. This is not an empty queue: nothing
+    has been checked, so verdicts may still be waiting for a decision.
+  </div>
+{% elif not rows %}
+  <div role="alert" class="alert alert-info">No verdicts awaiting review.</div>
+{% else %}
+  {% for v in rows %}
+    <div class="vr-card card bg-base-200 shadow mb-3" data-card="{{ v.id }}">
+      <div class="card-body">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div class="basis-full md:basis-auto md:flex-1">
+            <div class="font-semibold">{{ v.rule_name or '(unnamed rule)' }}</div>
+            <div class="text-xs text-base-content/50 font-mono mt-1">
+              alert {{ v.alert_id or '?' }}
+              {% if v.priority is not none and v.priority != '' %}
+                <span class="badge badge-sm {{ v.priority_badge }}">{{ v.priority }}</span>
+              {% endif %}
+              <span class="ml-1">queued {{ ts(v.created_at, fallback='at an unrecorded time') }}</span>
+            </div>
+          </div>
+          <div class="text-sm flex flex-wrap items-center gap-2">
+            <span class="text-base-content/50">Bob:</span>
+            {# Bob abstaining and the circuit breaker firing are different
+               records. auto_escalated says which, and the JavaScript called
+               every missing verdict "escalated (low confidence)" without
+               reading it. #}
+            {% if v.bob_verdict is not none and v.bob_verdict != '' %}
+              <span class="badge {{ v.bob_badge }}">{{ v.bob_verdict.replace('_', ' ') }}</span>
+            {% elif v.auto_escalated %}
+              <span class="badge badge-warning">escalated (low confidence)</span>
+            {% else %}
+              <span class="badge badge-ghost">no verdict recorded</span>
+            {% endif %}
+            {% if v.bob_confidence is not none and v.bob_confidence != '' %}
+              <span class="badge badge-ghost badge-sm">{{ v.bob_confidence }}</span>
+            {% endif %}
+            {# `is not none`: a confidence of 0 is a real score, the lowest
+               one, and it is the score most worth seeing on a page about
+               overriding the model. #}
+            {% if v.bob_confidence_int is not none %}
+              <span class="badge badge-ghost badge-sm">{{ v.bob_confidence_int }}/100</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="flex flex-wrap gap-2 items-center mt-3">
+          <span class="text-xs text-base-content/50 mr-1">Your verdict:</span>
+          {% for o in v.options %}
+            {# Three states, not two. `agreement` is True when Bob suggested
+               this verdict, False when Bob suggested a different one, and
+               None when Bob suggested nothing at all. The JavaScript's
+               `v.bob_verdict === hv` collapsed the last two into one grey
+               button, so an alert the model declined to judge looked
+               identical to one it got wrong. A truthiness test here would
+               do the same thing: it is the `is false` branch that keeps
+               "wrong" and "no claim" apart. #}
+            {% if o.agreement is true %}
+              <button class="vr-resolve btn btn-sm btn-success"
+                      title="Bob suggested this verdict"
+                      data-click-action="resolveVerdict"
+                      data-args='[{{ v.id }}, "{{ o.verdict }}"]'>{{ o.label }}</button>
+            {% elif o.agreement is false %}
+              <button class="vr-resolve btn btn-sm btn-ghost"
+                      title="Bob suggested a different verdict"
+                      data-click-action="resolveVerdict"
+                      data-args='[{{ v.id }}, "{{ o.verdict }}"]'>{{ o.label }}</button>
+            {% else %}
+              {# btn-dash without btn-ghost. With both, btn-ghost's
+                 transparent border colour wins and the dashed border is
+                 invisible, so the abstain state looked identical to the
+                 disagree one on screen while the markup said otherwise. #}
+              <button class="vr-resolve btn btn-sm btn-dash"
+                      title="Bob suggested no verdict, so this records no agreement either way"
+                      data-click-action="resolveVerdict"
+                      data-args='[{{ v.id }}, "{{ o.verdict }}"]'>{{ o.label }}</button>
+            {% endif %}
+          {% endfor %}
+        </div>
+
+        {% if v.proposals %}
+          <div class="mt-4 pt-4 border-t border-base-300">
+            <div class="text-xs uppercase tracking-wide text-base-content/50 mb-2">Propose containment</div>
+            {% for p in v.proposals %}
+              <div class="flex flex-wrap gap-2 items-center mt-1">
+                <code class="text-xs text-base-content/50">{{ p.type }}</code>
+                <span class="text-xs font-mono">{{ p.value }}</span>
+                {% for a in p.actions %}
+                  <button class="vr-propose btn btn-xs btn-warning btn-outline"
+                          data-click-action="proposeAction"
+                          data-act="{{ a.id }}" data-target="{{ p.value }}">{{ a.name }}{% if a.requires_approval %} &#9888;{% endif %}</button>
+                {% endfor %}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  {% endfor %}
+{% endif %}

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Canaries - ION{% endblock %}
+{% block page_id %}canaries{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
@@ -15,12 +16,31 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Tripwire tokens and canary accounts for early breach detection.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="btn btn-ghost" data-click-action="canScan">Scan Recent Alerts</button>
-        <button class="btn btn-primary" data-click-action="canOpenForm">+ New Canary</button>
+        <button class="btn btn-ghost" id="can-scan" data-click-action="canScan">Scan Recent Alerts</button>
+        <button class="btn btn-ghost" id="can-refresh" type="button">Refresh</button>
+        <button class="btn btn-primary" data-click-action="canNewCanary">+ New Canary</button>
     </div>
 </section>
 
-<div id="can-content">
+{# The grid body is rendered whole by ion.web.ui.canaries_fragment: the
+   summary tiles, the planted-canary table and the recent-hits list. It used
+   to be three innerHTML writes assembled by 189 lines of inline JavaScript
+   with a hand-rolled esc(). The markup now has one definition, in Jinja,
+   which escapes it, and a restyle of the table reaches it from the
+   stylesheet.
+
+   hx-trigger="load" keeps the shell's first paint immediate and the data
+   arriving in its own request, which is what the three parallel fetches it
+   replaces already did.
+
+   Scan, Refresh and New Canary stay out here, outside the swap target, so a
+   failed read cannot take away the control that retries it. Refresh and
+   `canaries:changed` (fired after a save, a delete or a scan) are triggers on
+   the same hx-get, so "reload the grid" has one definition. #}
+<div id="can-content"
+     hx-get="/ui/canaries"
+     hx-trigger="load, click from:#can-refresh, canaries:changed from:body"
+     hx-swap="innerHTML">
     <div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading canaries...</div>
 </div>
 
@@ -86,166 +106,46 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* JS toggles .show, not daisyUI .modal-open. Bridge the two. */
-#can-modal-bg.show {
-    pointer-events: auto;
-    visibility: visible;
-    opacity: 1;
-    background-color: oklch(0% 0 0 / 0.4);
-}
-#can-modal-bg.show > .modal-box {
-    opacity: 1;
-    scale: 1;
-    translate: 0;
-    max-width: 640px;
-    max-height: 90vh;
-}
-
-/* JS adds .fired on hit rows — inset critical stripe has no daisyUI equivalent. */
-#can-content tr.fired td {
-    background: color-mix(in oklab, var(--color-error) 6%, transparent);
-}
-#can-content tr.fired td:first-child {
-    box-shadow: inset 3px 0 0 var(--color-error);
-}
-
-/* JS can-value: 280px ellipsis cap is not a daisyUI token. */
-.can-value {
-    font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 0.75rem;
-    max-width: 280px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    display: inline-block;
-    vertical-align: middle;
-}
-
-/* JS snippet: max-height 80px is not a compiled utility. */
-.can-hit-snippet {
-    max-height: 80px;
-    overflow: auto;
-}
-
-/* JS status classes inactive/retired — daisyUI badges have no dimmed slot. */
-.badge.inactive,
-.badge.retired {
-    opacity: 0.5;
-}
-
-@media (max-width: 768px) {
-    .can-value { max-width: 160px; font-size: 0.7rem; }
-    #can-modal-bg.show > .modal-box { max-height: 95vh; }
-}
-</style>
 <script nonce="{{ csp_nonce }}">
+// canEsc() and canFmtTime() are gone with the markup they served: Jinja
+// autoescapes, and the fragment emits <time> for static/js/local-time.js to
+// put on the viewer's clock rather than formatting on the server's. What is
+// left here changes state: the modal, the writes and the scan.
 const CAN_API = '/api/canaries';
-let canCache = [];
 let canTypes = [];
-let canStatuses = [];
 
-function canEsc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
-function canFmtTime(iso){if(!iso)return'-';try{return new Date(iso).toLocaleString()}catch(e){return iso}}
+// The grid has one definition of "reload", the hx-get on #can-content, so a
+// save, a delete and a scan all say the same thing instead of each
+// re-fetching and re-rendering.
+function canReload() {
+    document.body.dispatchEvent(new CustomEvent('canaries:changed'));
+}
 
 async function canBootstrap() {
+    // Only the type list, for the modal's select. The grid itself arrives
+    // from /ui/canaries on load. `statuses` was fetched here and never read.
     try {
         const types = await fetch(CAN_API + '/types').then(r => r.json());
         canTypes = types.types || [];
-        canStatuses = types.statuses || [];
     } catch (e) {}
-    await canRefresh();
 }
 
-async function canRefresh() {
-    const c = document.getElementById('can-content');
-    c.innerHTML = '<div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading canaries...</div>';
-    try {
-        const [list, statsRes, hits] = await Promise.all([
-            fetch(CAN_API).then(r => r.json()),
-            fetch(CAN_API + '/stats').then(r => r.json()),
-            fetch(CAN_API + '/hits?limit=20').then(r => r.json()),
-        ]);
-        canCache = list.canaries || [];
-        canRender(canCache, statsRes, hits.hits || []);
-    } catch (e) {
-        c.innerHTML = `<div class="alert alert-error text-[var(--sev-critical,#f85149)]">${canEsc(e.message || 'Failed to load')}</div>`;
-    }
-}
-
-function canRender(canaries, stats, hits) {
-    const c = document.getElementById('can-content');
-    let html = `<div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow mb-6">
-        <div class="stat"><div class="stat-title">Total</div><div class="stat-value text-primary">${stats.total||0}</div></div>
-        <div class="stat"><div class="stat-title">Active</div><div class="stat-value text-primary">${stats.active||0}</div></div>
-        <div class="stat"><div class="stat-title">Fired</div><div class="stat-value text-warning">${stats.fired||0}</div></div>
-        <div class="stat"><div class="stat-title">Burned</div><div class="stat-value text-error">${stats.burned||0}</div></div>
-        <div class="stat"><div class="stat-title">Hits (24h)</div><div class="stat-value text-error">${stats.hits_24h||0}</div></div>
-    </div>`;
-
-    if (!canaries.length) {
-        html += `<div class="card bg-base-200 shadow">
-            <div class="card-body items-center text-center py-14">
-            <h3 class="card-title">No canaries planted yet</h3>
-            <p>Plant a decoy file, account, host, or token. ION will scan recent alerts for any mention and raise a high-confidence breach alert when one fires.</p>
-            <button class="btn btn-primary mt-4" data-click-action="canOpenForm">+ Create First Canary</button>
-        </div></div>`;
-    } else {
-        html += `<div class="card bg-base-200 shadow mb-4">
-            <div class="card-body p-0">
-            <div class="px-4 py-3 border-b border-base-300">
-            <div class="text-xs font-bold uppercase tracking-wide opacity-50">Planted Canaries (${canaries.length})</div>
-        </div>
-        <div class="overflow-x-auto"><table class="table table-sm"><thead><tr>
-            <th>Name</th><th>Type</th><th>Value</th><th>Location</th><th>Status</th><th>Hits</th><th>Last Hit</th><th></th>
-        </tr></thead><tbody>`;
-        for (const ca of canaries) {
-            const fired = (ca.hit_count || 0) > 0;
-            const st = ca.status || '';
-            const badgeKind = st === 'active' ? 'badge-success' : st === 'burned' ? 'badge-error' : 'badge-ghost';
-            html += `<tr class="${fired ? 'fired' : ''}">
-                <td><strong>${canEsc(ca.name)}</strong></td>
-                <td>${canEsc((ca.canary_type || '').replace(/_/g, ' '))}</td>
-                <td><code class="can-value" title="${canEsc(ca.value)}">${canEsc(ca.value)}</code></td>
-                <td>${canEsc(ca.location || '-')}</td>
-                <td><span class="badge ${badgeKind} ${canEsc(st)}">${canEsc(st)}</span></td>
-                <td>${ca.hit_count || 0}</td>
-                <td>${canFmtTime(ca.last_hit_at)}</td>
-                <td><div class="flex flex-wrap gap-2 justify-end">
-                    <button class="btn btn-ghost btn-sm" data-click-action="canEdit" data-args='[${ca.id}]'>Edit</button>
-                    <button class="btn btn-ghost btn-sm btn-error" data-click-action="canDelete" data-args='[${ca.id}]'>Delete</button>
-                </div></td>
-            </tr>`;
-        }
-        html += '</tbody></table></div></div></div>';
-    }
-
-    if (hits.length) {
-        html += `<div class="card bg-base-200 shadow"><div class="px-4 py-3 border-b border-base-300">
-            <div class="text-xs font-bold uppercase tracking-wide opacity-50">Recent Hits (${hits.length})</div>
-        </div>`;
-        const byId = {};
-        for (const ca of canaries) byId[ca.id] = ca.name;
-        for (const h of hits) {
-            html += `<div class="px-4 py-3 border-b border-base-300 last:border-b-0">
-                <div class="flex justify-between items-center gap-4">
-                    <span class="font-bold">${canEsc(byId[h.canary_id] || ('Canary #' + h.canary_id))}</span>
-                    <span class="text-xs font-mono opacity-50">${canFmtTime(h.detected_at)}</span>
-                </div>
-                ${h.snippet ? `<div class="can-hit-snippet mt-1 font-mono text-xs bg-base-300 p-2 rounded">${canEsc(h.snippet)}</div>` : ''}
-            </div>`;
-        }
-        html += '</div>';
-    }
-
-    c.innerHTML = html;
+// The delegated dispatcher in static/js/event-delegation.js calls an action
+// with (event, dataset) when the element carries no data-args, so a button
+// bound straight to canOpenForm handed it a MouseEvent. A MouseEvent is
+// truthy, so "+ New Canary" opened the form titled "Edit Canary" with the
+// string "undefined" in every field and in the hidden id, and saving sent
+// PATCH /api/canaries/undefined. The two entry points are separate now, and
+// canOpenForm is only ever called from code.
+function canNewCanary() {
+    canOpenForm(null);
 }
 
 function canOpenForm(canary) {
     const m = document.getElementById('can-modal-bg');
     document.getElementById('can-modal-title').textContent = canary ? 'Edit Canary' : 'New Canary';
     const sel = document.getElementById('can-type');
-    sel.innerHTML = '';
+    sel.replaceChildren();
     for (const t of canTypes) {
         const o = document.createElement('option');
         o.value = t.id; o.textContent = t.label;
@@ -266,15 +166,19 @@ function canCloseForm() {
     document.getElementById('can-modal-bg').classList.remove('show');
 }
 
-function canEdit(id) {
-    const c = canCache.find(x => x.id === id);
-    if (c) canOpenForm(c);
+// canCache went with the table that filled it. One canary comes from the
+// endpoint that owns it, so Edit cannot open a copy of a row the grid
+// rendered minutes ago.
+async function canEdit(id) {
+    const r = await fetch(CAN_API + '/' + id, { credentials: 'same-origin' });
+    if (!r.ok) { alert('Could not load canary ' + id + ': ' + r.status); return; }
+    canOpenForm(await r.json());
 }
 
 async function canDelete(id) {
     if (!confirm('Delete this canary? Hit history will be removed too.')) return;
     const r = await fetch(CAN_API + '/' + id, { method: 'DELETE' });
-    if (r.ok) canRefresh();
+    if (r.ok) canReload();
     else alert('Delete failed');
 }
 
@@ -296,7 +200,7 @@ async function canSubmit(ev) {
     const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (r.ok) {
         canCloseForm();
-        canRefresh();
+        canReload();
     } else {
         const j = await r.json().catch(() => ({}));
         alert('Save failed: ' + (j.detail || 'unknown error'));
@@ -305,7 +209,12 @@ async function canSubmit(ev) {
 }
 
 async function canScan() {
-    const btn = event.currentTarget;
+    // By id, not event.currentTarget: the listener that dispatches this lives
+    // on `document`, so currentTarget was the Document, whose textContent
+    // setter is a no-op. The button never said "Scanning..." and never
+    // disabled, so a slow scan looked like a dead button and invited a
+    // second one.
+    const btn = document.getElementById('can-scan');
     const orig = btn.textContent;
     btn.disabled = true;
     btn.textContent = 'Scanning...';
@@ -317,7 +226,7 @@ async function canScan() {
             ? 'Scan completed with warnings: ' + j.error
             : `Scanned ${j.scanned} alerts, ${j.matched} matched, ${j.new_hits} new hits.`;
         alert(msg);
-        canRefresh();
+        canReload();
     } catch (e) {
         alert('Scan failed: ' + e.message);
     } finally {

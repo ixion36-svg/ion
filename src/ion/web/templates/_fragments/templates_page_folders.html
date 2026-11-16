@@ -1,0 +1,3 @@
+{% from '_fragments/templates_page_macros.html' import folders %}
+<button class="folder-item w-full{% if selected == '' %} active{% endif %}" data-folder="">All Templates</button><button class="folder-item w-full{% if selected == 'uncategorized' %} active{% endif %}" data-folder="uncategorized">Uncategorized</button>
+{% if tree is none %}<div class="alert alert-error">Folders could not be read. Folder membership is unknown.</div>{% elif not tree %}<p>No folders yet.</p>{% else %}{{ folders(tree, selected) }}{% endif %}

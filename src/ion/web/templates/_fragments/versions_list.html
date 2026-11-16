@@ -1,0 +1,64 @@
+{# One template's version history, the whole list.
+
+   Replaces three innerHTML sites in versions.html: the row list, the empty
+   state and the failure line. The rows were 20 lines of string
+   concatenation, and `v.message` went in without escapeHtml while the
+   checkpoint name beside it was escaped, which is the kind of omission a
+   second definition of a row invites. Jinja escapes both.
+
+   This fragment carries no card chrome, unlike most of the others. It is
+   swapped into `#versions-list`, and ion-pages.css styles this page through
+   `#versions-list > .error` and `#versions-list > .empty-state`, which are
+   direct-child selectors: a wrapping <section> would leave both states
+   unstyled and nothing would look broken enough to notice. The card, the
+   Refresh button and Create Checkpoint all sit outside the swap target in
+   the page already, so there is no control here for a failed render to take
+   away and nothing to close.
+
+   Three states, not two. A template that does not exist, a read that
+   failed, and a template whose history is empty are three different claims
+   about what the operator should do next, and the JSON endpoint separates
+   the first two as 404 against 500. #}
+{% import "_fragments/versions_meta.html" as meta %}
+{%- if state == 'failed' -%}
+<p class="error">Version history could not be read. This is a failure to look, not an empty history. Use Refresh to try again.</p>
+{%- elif state == 'missing' -%}
+<p class="error">No template {{ template_id }}. It may have been deleted since this page loaded.</p>
+{%- elif not rows -%}
+<p class="empty-state">No versions found</p>
+{%- else -%}
+{%- for v in rows %}
+{# Built as one value, not interpolated twice around a literal: the detail
+   and diff URLs differ only in their tail, and a reader can see the whole
+   of each here rather than reassembling it from the attribute. #}
+{%- set version_base = '/ui/templates/' ~ template_id ~ '/versions' %}
+<div class="version-item{% if v.is_checkpoint %} checkpoint{% endif %}">
+  <div class="version-header">
+    {# `is not none`, so version 0 still reads as a version rather than as a
+       row with nothing in it. It should not exist; if one does, saying so is
+       better than printing "vNone". #}
+    <span class="version-number">{% if v.version_number is not none %}v{{ v.version_number }}{% else %}unnumbered{% endif %}</span>
+    {{ meta.checkpoint_badge(v) }}
+  </div>
+  <div class="version-meta">
+    {{ meta.message(v) }}
+    {{ meta.created(v) }}
+  </div>
+  <div class="version-actions">
+    {% if v.version_number is not none %}
+    <button type="button" class="ion-btn btn-sm"
+            hx-get="{{ version_base ~ '/' ~ v.version_number }}"
+            hx-target="#version-modal-host" hx-swap="innerHTML">View</button>
+    {# The pair is (n - 1, n), in that order, and only from version 2 up:
+       there is nothing before version 1 to compare it against. Both halves
+       come from the same expression so they cannot drift apart by one. #}
+    {% if v.version_number > 1 %}
+    <button type="button" class="ion-btn btn-sm"
+            hx-get="{{ version_base ~ '/diff/' ~ (v.version_number - 1) ~ '/' ~ v.version_number }}"
+            hx-target="#version-modal-host" hx-swap="innerHTML">Diff</button>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+{%- endfor %}
+{%- endif -%}

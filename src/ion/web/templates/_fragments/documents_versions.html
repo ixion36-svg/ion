@@ -1,0 +1,45 @@
+{# The version history table, from ui/documents.py's versions_view.
+
+   Revert appears only where POST /api/documents/{id}/revert/{n} would
+   allow it, which is document:update. The page offered it on every version
+   that was not current, so a reader got a 403 per click.
+
+   `v.amendment_reason || '-'` printed one dash for an amendment nobody
+   explained and the same dash for a field the payload did not carry. Those
+   are different and they are worded differently here.
+#}
+{% if rows is none %}
+<p class="error">Version history unavailable</p>
+{% elif not rows %}
+<p class="empty-state">No version history available</p>
+{% else %}
+<table class="table versions-table">
+  <thead>
+    <tr><th>Version</th><th>Reason</th><th>By</th><th>Date</th><th>Actions</th></tr>
+  </thead>
+  <tbody>
+    {%- for v in rows %}
+    <tr{% if v.is_current %} class="current-version"{% endif %}>
+      <td>v{{ v.number }}{% if v.is_current %} <span class="badge badge-current">Current</span>{% endif %}</td>
+      <td>
+        {%- if v.reason %}{{ v.reason }}
+        {%- else %}<span class="doc-unmeasured">no reason recorded</span>{% endif %}
+      </td>
+      <td>
+        {%- if v.author %}{{ v.author }}
+        {%- else %}<span class="doc-unmeasured">unknown</span>{% endif %}
+      </td>
+      <td>{% if v.when %}{{ v.when }}{% else %}<span class="doc-unmeasured">undated</span>{% endif %}</td>
+      <td>
+        <button class="btn btn-sm" data-click-action="previewVersion"
+                data-args='{{ [v.number]|tojson }}'>View</button>
+        {%- if v.may_revert %}
+        <button class="btn btn-sm btn-warning" data-click-action="confirmRevert"
+                data-args='{{ [v.number]|tojson }}'>Revert</button>
+        {%- endif %}
+      </td>
+    </tr>
+    {%- endfor %}
+  </tbody>
+</table>
+{% endif %}

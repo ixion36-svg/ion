@@ -1,0 +1,4 @@
+{% from '_fragments/templates_page_macros.html' import folders, options %}
+{% if tree is none %}<div class="alert alert-error">Folder management could not be read. Retry before changing folders.</div>{% else %}
+{% if can.create_collection %}<fieldset class="fieldset"><legend>Create New Folder</legend><select id="new-folder-parent" class="select select-sm"><option value="">Root Level</option>{{ options(tree) }}</select><input id="new-folder-name" class="input input-sm" placeholder="Folder name"><input id="new-folder-desc" class="input input-sm" placeholder="Description"><button class="btn btn-primary btn-sm" data-click-action="createFolder">Create</button></fieldset>{% endif %}
+<h3>Existing Folders</h3>{% if not tree %}<p>No folders yet.</p>{% else %}{{ folders(tree, manage=true, can=can) }}{% endif %}{% endif %}

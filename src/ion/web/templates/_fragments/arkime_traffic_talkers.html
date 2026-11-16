@@ -1,0 +1,68 @@
+{#
+  Top talkers, both directions, from one read.
+
+  Which direction is on screen is control state the browser holds, so both
+  tbodies come down together and the tab toggles between them. by_src and
+  by_dst are two halves of one spigraph query, so splitting them across two
+  requests would be a second Arkime aggregation per click.
+
+  The method note and the Top Source IP tile come back as out-of-band
+  swaps, so the note cannot claim a server-side aggregation while the rows
+  came from a sample.
+#}
+
+{%- macro figure(value) -%}
+{%- if value is not none %}{{ value }}{% else %}<span class="atf-unmeasured" title="Arkime did not report this figure. It is unknown, not zero.">Unknown</span>{% endif -%}
+{%- endmacro -%}
+
+{%- macro rows(list_, direction, active) -%}
+<tbody data-atf-dir="{{ direction }}"{% if not active %} class="hidden"{% endif %}>
+  {%- if list_ is none %}
+  <tr><td colspan="3" class="py-4 text-center atf-unmeasured">This direction could not be read.</td></tr>
+  {%- else %}
+  {%- for r in list_ %}
+  <tr>
+    <td class="pr-4">
+      <span class="atf-rank">{{ r.rank }}</span>
+      <span class="ip-cell">{{ r.ip or 'No address' }}</span>
+    </td>
+    <td class="pr-4 bytes-cell">{{ figure(r.bytes) }}</td>
+    <td>{{ figure(r.sessions) }}</td>
+  </tr>
+  {%- else %}
+  <tr><td colspan="3" class="py-8 text-center text-base-content/50">No data for this range</td></tr>
+  {%- endfor %}
+  {%- endif %}
+</tbody>
+{%- endmacro -%}
+
+<div hx-swap-oob="innerHTML:#talkers-method">
+  {%- if failed %}Unread
+  {%- elif demo %}Synthetic data &mdash; Arkime is not configured
+  {%- elif method == 'spigraph' %}Server-side aggregation over every session in the range
+  {%- elif method %}Sampled from top flows ({{ method }}; spigraph unavailable &mdash; approximate)
+  {%- else %}The read did not say how these were counted, so treat them as approximate
+  {%- endif %}
+</div>
+
+<div id="atf-tile-top-src" hx-swap-oob="true" class="stat bg-base-200 rounded-box shadow p-4">
+  <div class="stat-value font-mono text-2xl">{{ figure(top_src) }}</div>
+  <div class="stat-title">Top Source IP</div>
+</div>
+
+{% if failed %}
+<div role="alert" class="atf-state-failed p-3 rounded-box">
+  The top-talker query could not be read. {{ reason or 'Arkime did not answer, so which hosts moved the most traffic is unknown, not none.' }}
+</div>
+{% else %}
+{%- if demo %}<div class="atf-demo-note">Demo mode &mdash; Arkime is not configured, so these rows are synthetic.</div>{% endif %}
+<div class="overflow-x-auto">
+  <table class="table table-sm" id="talkers-table">
+    <thead>
+      <tr><th>IP Address</th><th class="text-right">Volume</th><th class="text-right">Sessions</th></tr>
+    </thead>
+    {{ rows(by_src, 'src', true) }}
+    {{ rows(by_dst, 'dst', false) }}
+  </table>
+</div>
+{% endif %}

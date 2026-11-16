@@ -64,17 +64,28 @@ class TransitionRequest(BaseModel):
     scheduled_end: Optional[str] = None
 
 
-@router.get("/api/change-requests", dependencies=[Depends(require_permission(_PERM))])
-def list_change_requests(
-    status: Optional[str] = None,
-    session: Session = Depends(get_db_session),
-):
+def change_requests_payload(status: Optional[str], session: Session) -> dict:
+    """The filtered change-request list, shared by the JSON route and /ui.
+
+    The query used to sit inline in the route below, so the htmx fragment
+    would have been a second copy of the status filter and the 500-row cap.
+    One definition means the table and the API cannot come to disagree about
+    which rows exist.
+    """
     stmt = select(ChangeRequest)
     if status and status != "all":
         stmt = stmt.where(ChangeRequest.status == status)
     stmt = stmt.order_by(ChangeRequest.created_at.desc()).limit(500)
     rows = session.execute(stmt).scalars().all()
     return {"change_requests": [r.to_dict() for r in rows], "count": len(rows)}
+
+
+@router.get("/api/change-requests", dependencies=[Depends(require_permission(_PERM))])
+def list_change_requests(
+    status: Optional[str] = None,
+    session: Session = Depends(get_db_session),
+):
+    return change_requests_payload(status, session)
 
 
 @router.get("/api/change-requests/changelog", dependencies=[Depends(require_permission(_PERM))])

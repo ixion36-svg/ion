@@ -1,34 +1,28 @@
 {% extends "base.html" %}
 {% block title %}Dashboard · ION{% endblock %}
 {% block content %}
+{#
+  The landing page at `/`. Four regions, each pulled from its own /ui
+  fragment, because the four endpoints the JavaScript fetched carry three
+  different permissions and one route could only carry one of them. See
+  ion.web.ui.dashboard_v2 for the gate per region and for what the old
+  JavaScript got wrong.
+
+  The page shell holds no data and builds no markup. Every control that
+  retries a region sits outside that region's swap target, so a render that
+  says the read failed cannot also remove the button that would try again.
+
+  The page's old hidden Tailwind safelist div is gone: it existed only
+  because the severity and status class names lived in JavaScript template
+  literals, and they are literals in the fragment templates now, which is
+  where Tailwind's `@source` scan has always looked.
+
+  Its local <defs> block of ten icon symbols is gone too. Every one of them
+  is already defined in _icons.html, which base.html includes before this
+  block, so the local copies were duplicate ids that the browser ignored.
+#}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 
-  <!-- Tailwind safelist (classes built dynamically in JS) -->
-  <div class="hidden
-    bg-ion-coral bg-ion-amber bg-ion-iris bg-ion-lime bg-ion-cyan
-    text-ion-coral text-ion-amber text-ion-iris text-ion-lime text-ion-cyan
-    bg-ion-coral/10 bg-ion-amber/10 bg-ion-iris/10 bg-ion-lime/10 bg-slate-500/10 bg-slate-400/10
-    border-ion-coral/20 border-ion-amber/20 border-ion-iris/20 border-ion-lime/20 border-slate-500/20 border-slate-400/20
-    text-slate-400 text-slate-500 bg-slate-400 bg-slate-500
-  " aria-hidden="true"></div>
-
-  <!-- Icon definitions for dashboard -->
-  <svg class="hidden" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-    <defs>
-      <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol>
-      <symbol id="i-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
-      <symbol id="i-arrow-up-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></symbol>
-      <symbol id="i-trending-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 7h6v6"/><path d="m22 7-8.5 8.5-5-5L2 17"/></symbol>
-      <symbol id="i-trending-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/></symbol>
-      <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
-      <symbol id="i-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></symbol>
-      <symbol id="i-alert-triangle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
-      <symbol id="i-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></symbol>
-      <symbol id="i-book-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
-    </defs>
-  </svg>
-
-<!-- ═══════════════════ PAGE ═══════════════════ -->
   <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-14 md:py-20">
 
     <!-- ── WELCOME ROW ── -->
@@ -44,23 +38,27 @@
           <span id="greeting">Welcome</span>, <span id="welcome-name" class="text-primary">—</span>.
         </h1>
         <p id="welcome-message" class="mt-5 max-w-xl text-[17px] text-base-content/60 leading-relaxed">
-          Loading your queue…
+          <span class="loading loading-spinner loading-xs text-primary"></span> Reading your queue…
         </p>
       </div>
 
-      <!-- Focus mode switch + environment -->
-      <div class="flex flex-col items-end gap-3">
+      <div id="dash-status" class="flex flex-col items-end gap-3">
         <div class="badge badge-ghost gap-2 h-auto py-2 px-3">
-          <span id="system-status-dot" class="h-1.5 w-1.5 rounded-full bg-base-content/40"></span>
-          <span id="system-status-text" class="label-tiny">Checking systems…</span>
-        </div>
-        <div id="role-switcher" class="flex items-center gap-1 p-1 rounded-lg bg-base-200 border border-base-300">
-          <button class="btn btn-primary btn-sm">—</button>
+          <span class="loading loading-spinner loading-xs text-primary"></span>
+          <span class="label-tiny">Reading systems…</span>
         </div>
       </div>
     </section>
 
     <!-- ── Customize toggle ── -->
+    {#
+      The four section labels are static, so they are markup rather than
+      something a script assembles. The panel is opened by toggling the
+      `hidden` class: the old code toggled `panel.style.display` on an element
+      the markup hides with that class, so the first click set display:none on
+      something already hidden and the second set it back to the empty string,
+      which `hidden` overrides. The panel never opened.
+    #}
     <div class="flex justify-end mb-4">
       <button data-click-action="toggleDashConfig" class="btn btn-ghost btn-sm">
         <svg class="w-3 h-3"><use href="#i-settings"/></svg> Customize
@@ -69,7 +67,28 @@
     <div id="dash-config" class="card bg-base-200 shadow mb-6 hidden">
       <div class="card-body py-4">
         <div class="text-xs uppercase tracking-wider text-base-content/50 mb-3">Show/Hide Sections</div>
-        <div class="flex flex-wrap gap-3" id="dash-config-items"></div>
+        <div class="flex flex-wrap gap-3">
+          <label class="flex items-center gap-2 text-[12px] cursor-pointer">
+            <input type="checkbox" class="checkbox checkbox-xs" data-dash-section="hero-section"
+                   data-change-action="saveDashPref" data-args='["hero-section", "$checked"]'>
+            Threat Feed
+          </label>
+          <label class="flex items-center gap-2 text-[12px] cursor-pointer">
+            <input type="checkbox" class="checkbox checkbox-xs" data-dash-section="kpi-section"
+                   data-change-action="saveDashPref" data-args='["kpi-section", "$checked"]'>
+            KPI Cards
+          </label>
+          <label class="flex items-center gap-2 text-[12px] cursor-pointer">
+            <input type="checkbox" class="checkbox checkbox-xs" data-dash-section="cases-section"
+                   data-change-action="saveDashPref" data-args='["cases-section", "$checked"]'>
+            My Cases
+          </label>
+          <label class="flex items-center gap-2 text-[12px] cursor-pointer">
+            <input type="checkbox" class="checkbox checkbox-xs" data-dash-section="handover-section"
+                   data-change-action="saveDashPref" data-args='["handover-section", "$checked"]'>
+            Shift Handover
+          </label>
+        </div>
       </div>
     </div>
 
@@ -80,34 +99,33 @@
       <section class="col-span-12 lg:col-span-8 min-w-0 rise d-2">
         <div class="card bg-base-200 shadow">
           <div class="card-body">
-            <!-- Header -->
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-              <div class="flex flex-wrap items-baseline gap-x-4 gap-y-2 basis-full md:basis-auto md:flex-1">
-                <span class="label-tiny text-error flex items-center gap-2">
-                  <span class="h-1.5 w-1.5 rounded-full bg-error pulse-red"></span>
-                  Active threats
-                </span>
-                <span id="hero-critical" class="font-sans font-semibold text-[26px] tracking-tight leading-none">— critical</span>
-                <span class="text-[15px] text-base-content/50">· <span id="hero-high">—</span> high</span>
+            {# Controls outside #alerts-panel, so a render that says the read
+               failed cannot take away the Refresh that retries it. #}
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-2">
+              <span class="label-tiny text-error flex items-center gap-2">
+                <span class="h-1.5 w-1.5 rounded-full bg-error pulse-red"></span>
+                Active threats
+              </span>
+              <div class="flex items-center gap-2">
+                <button class="btn btn-ghost btn-xs"
+                        hx-get="/ui/dashboard-v2/overview"
+                        hx-target="#alerts-panel"
+                        hx-swap="innerHTML">Refresh</button>
+                <a href="/alerts" class="btn btn-primary btn-sm">
+                  Triage queue
+                  <svg class="w-3 h-3"><use href="#i-arrow-right"/></svg>
+                </a>
               </div>
-              <a href="/alerts" class="btn btn-primary btn-sm">
-                Triage queue
-                <svg class="w-3 h-3"><use href="#i-arrow-right"/></svg>
-              </a>
             </div>
 
-            <!-- Alert rows (populated by JS from /api/dashboard) -->
-            <div id="alerts-feed" class="divide-y divide-base-300 -mx-2">
-              <div class="alert alert-info justify-center my-4">Loading alerts…</div>
-            </div>
-
-            <!-- Footer link -->
-            <div class="mt-5 pt-4 border-t border-base-300 flex flex-wrap items-center justify-between gap-2 text-xs">
-              <span class="text-base-content/50">Showing <span id="alerts-shown" class="font-mono text-base-content">—</span> of <span id="alerts-total-footer" class="font-mono text-base-content">—</span> active</span>
-              <a href="#" class="link link-primary flex items-center gap-1">
-                Open alert queue
-                <svg class="w-3 h-3"><use href="#i-arrow-up-right"/></svg>
-              </a>
+            <div id="alerts-panel"
+                 hx-get="/ui/dashboard-v2/overview"
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
+              <div class="flex justify-center items-center gap-2 py-10 opacity-50">
+                <span class="loading loading-spinner loading-sm text-primary"></span>
+                Reading the alert queue…
+              </div>
             </div>
           </div>
         </div>
@@ -116,82 +134,56 @@
       <!-- ┌─── RIGHT: KPI STACK ───┐ -->
       <aside id="kpi-section" class="col-span-12 lg:col-span-4 min-w-0 flex flex-col gap-5 lg:gap-6">
 
-        <!-- KPI 1 -->
+        {# Each tile is replaced whole by the region whose read produces it,
+           as an out-of-band swap beside that region's panel. The placeholder
+           says "not read yet" rather than showing an em-dash on its own: an
+           em-dash beside a title reads as a measured absence, and on a 403
+           the global error handler words the panel and leaves a tile as it
+           found it. #}
         <div class="card bg-base-200 shadow rise d-3">
           <div class="stats w-full bg-transparent">
-            <div class="stat">
-              <div class="stat-figure text-primary">
-                <!-- Real sparkline — driven by /api/dashboard alerts_histogram.
-                     The fill + stroke paths are injected by renderSparkline()
-                     in the script block below. While the fetch is in flight
-                     the SVG is empty so nothing fake is shown. -->
-                <svg id="kpi-open-alerts-spark" viewBox="0 0 140 44" preserveAspectRatio="none" class="w-[140px] h-11 text-primary shrink-0" aria-hidden="true">
-                  <defs>
-                    <linearGradient id="g1" x1="0" x2="0" y1="0" y2="1">
-                      <stop offset="0%" stop-color="currentColor" stop-opacity="0.35"/>
-                      <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
-                    </linearGradient>
-                  </defs>
-                  <path id="kpi-open-alerts-spark-fill" fill="url(#g1)" d=""/>
-                  <path id="kpi-open-alerts-spark-line" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d=""/>
-                </svg>
-              </div>
+            <div class="stat" id="kpi-open-alerts">
               <div class="stat-title">Open alerts · 24h</div>
-              <div id="kpi-open-alerts" class="stat-value">—</div>
-              <div id="kpi-open-alerts-delta" class="stat-desc flex items-center gap-1">
-                <svg class="w-3 h-3"><use href="#i-clock"/></svg>
-                last 24h
-              </div>
+              <div class="stat-value text-base-content/40">—</div>
+              <div class="stat-desc">not read yet</div>
             </div>
           </div>
         </div>
 
-        <!-- KPI 2 -->
         <div class="card bg-base-200 shadow rise d-4">
           <div class="stats w-full bg-transparent">
-            <div class="stat">
-              <div id="kpi-my-cases-breakdown" class="stat-figure flex flex-col items-end gap-1 text-[10px] text-base-content/50">
-                <span>loading…</span>
-              </div>
+            <div class="stat" id="kpi-my-cases">
               <div class="stat-title">My open cases</div>
-              <div id="kpi-my-cases" class="stat-value">—</div>
-              <div id="kpi-cases-tag" class="stat-desc flex items-center gap-1">
-                <svg class="w-3 h-3"><use href="#i-clock"/></svg>
-                assigned to you
-              </div>
+              <div class="stat-value text-base-content/40">—</div>
+              <div class="stat-desc">not read yet</div>
             </div>
           </div>
         </div>
 
-        <!-- KPI 3 -->
-        <div class="card bg-base-200 shadow rise d-5">
-          <div class="stats w-full bg-transparent">
-            <div class="stat">
-              <div class="stat-title">Mean time to resolve</div>
-              <div id="kpi-mttr" class="stat-value">—</div>
-              <div id="kpi-mttr-tag" class="stat-desc flex items-center gap-1">
-                <svg class="w-3 h-3"><use href="#i-clock"/></svg>
-                30d rolling
-              </div>
-            </div>
-          </div>
+        {# The two tiles above are painted out of band by the alert and case
+           regions, which carry their own Refresh in their card headers. These
+           two have no card header to put one in, so the row below is both
+           their label and their retry. It says "team" because they are the
+           only two figures on this page that are not the viewer's own. #}
+        <div class="flex items-center justify-between gap-2 pt-1">
+          <span class="label-tiny text-base-content/50">Team</span>
+          <button class="btn btn-ghost btn-xs"
+                  hx-get="/ui/dashboard-v2/team-metrics"
+                  hx-target="#dash-metrics"
+                  hx-swap="innerHTML">Refresh</button>
         </div>
 
-        <!-- KPI 4 -->
-        <div class="card bg-base-200 shadow rise d-6">
-          <div class="stats w-full bg-transparent">
-            <div class="stat">
-              <div class="stat-title">Closure rate · 7d</div>
-              <div class="stat-value"><span id="kpi-sla">—</span><span class="text-primary text-3xl font-medium">%</span></div>
-              <div id="kpi-sla-tag" class="stat-desc flex items-center gap-1">
-                <svg class="w-3 h-3"><use href="#i-check-circle"/></svg>
-                team-wide
-              </div>
-            </div>
-          </div>
-          <div class="px-8 pb-6">
-            <div class="h-1 w-full rounded-full bg-base-300 overflow-hidden">
-              <div id="kpi-sla-bar" class="h-full rounded-full bg-gradient-to-r from-primary to-success transition-[width] duration-700 w-[0%]"></div>
+        {# One swap target for both team-metrics tiles, because both come from
+           one read. A flex column inside the aside's flex column with the same
+           gap, so the layout is what it was. #}
+        <div id="dash-metrics"
+             hx-get="/ui/dashboard-v2/team-metrics"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+          <div class="card bg-base-200 shadow">
+            <div class="card-body flex-row items-center gap-2 opacity-50">
+              <span class="loading loading-spinner loading-sm text-primary"></span>
+              Reading team metrics…
             </div>
           </div>
         </div>
@@ -210,14 +202,26 @@
               <span class="label-tiny text-base-content/50">My work</span>
               <h2 class="card-title">Open cases</h2>
             </div>
-            <a href="/cases" class="link link-primary text-xs flex items-center gap-1">
-              View all
-              <svg class="w-3 h-3"><use href="#i-arrow-up-right"/></svg>
-            </a>
+            <div class="flex items-center gap-2">
+              <button class="btn btn-ghost btn-xs"
+                      hx-get="/ui/dashboard-v2/my-cases"
+                      hx-target="#cases-panel"
+                      hx-swap="innerHTML">Refresh</button>
+              <a href="/cases" class="link link-primary text-xs flex items-center gap-1">
+                View all
+                <svg class="w-3 h-3"><use href="#i-arrow-up-right"/></svg>
+              </a>
+            </div>
           </div>
 
-          <div id="cases-feed" class="space-y-3">
-            <div class="alert alert-info justify-center">Loading cases…</div>
+          <div id="cases-panel" class="space-y-3"
+               hx-get="/ui/dashboard-v2/my-cases"
+               hx-trigger="load"
+               hx-swap="innerHTML">
+            <div class="flex justify-center items-center gap-2 py-10 opacity-50">
+              <span class="loading loading-spinner loading-sm text-primary"></span>
+              Reading your open cases…
+            </div>
           </div>
         </div>
       </div>
@@ -251,26 +255,34 @@
         </div>
       </div>
 
-      <!-- Shift handover — real data from /api/shift-handover/report -->
+      <!-- Shift handover -->
       <div id="handover-section" class="col-span-12 lg:col-span-3 min-w-0 rise d-6 card bg-base-200 shadow">
         <div class="card-body">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex flex-wrap items-baseline gap-3">
-              <span id="handover-window-label" class="label-tiny text-base-content/50">Last 8h</span>
+              <span class="label-tiny text-base-content/50">Last 8h</span>
               <h2 class="card-title">Handover</h2>
             </div>
-            <a href="/shift-handover" class="link link-primary text-xs flex items-center gap-1">
-              Full
-              <svg class="w-3 h-3"><use href="#i-arrow-up-right"/></svg>
-            </a>
+            <div class="flex items-center gap-2">
+              <button class="btn btn-ghost btn-xs"
+                      hx-get="/ui/dashboard-v2/handover"
+                      hx-target="#handover-panel"
+                      hx-swap="innerHTML">Refresh</button>
+              <a href="/shift-handover" class="link link-primary text-xs flex items-center gap-1">
+                Full
+                <svg class="w-3 h-3"><use href="#i-arrow-up-right"/></svg>
+              </a>
+            </div>
           </div>
 
-          <!-- Stat strip: opened / closed / triaged -->
-          <div id="handover-stats" class="grid grid-cols-3 gap-2 mb-5 text-center"></div>
-
-          <!-- Highlights list -->
-          <div id="handover-highlights" class="space-y-3 text-[12.5px] leading-relaxed">
-            <div class="alert alert-info justify-center">Loading handover…</div>
+          <div id="handover-panel"
+               hx-get="/ui/dashboard-v2/handover"
+               hx-trigger="load"
+               hx-swap="innerHTML">
+            <div class="flex justify-center items-center gap-2 py-10 opacity-50">
+              <span class="loading loading-spinner loading-sm text-primary"></span>
+              Reading the handover…
+            </div>
           </div>
         </div>
       </div>
@@ -281,10 +293,10 @@
     <footer class="mt-10 pt-6 border-t border-base-300 rise d-7">
       <div class="flex items-center justify-between flex-wrap gap-6">
         <div class="flex items-center gap-8 text-xs">
-          <div class="flex items-center gap-2">
-            <span id="es-dot" class="h-1.5 w-1.5 rounded-full bg-base-content/40"></span>
+          <div id="es-footer" class="flex items-center gap-2">
+            <span class="loading loading-spinner loading-xs text-primary"></span>
             <span class="label-tiny text-base-content/50">Elasticsearch</span>
-            <span id="es-label" class="font-mono text-base-content/70">—</span>
+            <span class="font-mono text-base-content/70">not read yet</span>
           </div>
         </div>
         <div class="text-[10px] text-base-content/40 font-mono">
@@ -299,91 +311,19 @@
 
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
-  // ── Helpers ──────────────────────────────────────────────────
-  const $ = (id) => document.getElementById(id);
+  // What is left is the three things the server cannot answer and the
+  // preference toggle, which is per-browser. Nothing here builds markup:
+  // every assignment is textContent, a class, or an input's checked property.
+  //
+  // The clock, the date and the greeting are all the VIEWER's clock. A
+  // server knows only its own, so rendering any of them server-side would
+  // show an analyst in another timezone a date and a greeting that belong to
+  // the machine. The sparkline went the other way: it measured nothing from
+  // the DOM, so its path is computed in the fragment route now, beside the
+  // count it sits under, and renderSparkline() is gone.
   const pad = (n) => String(n).padStart(2, '0');
-  const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[c]));
 
-  const SEV_MAP = {
-    critical: { cls: 'ion-coral', label: 'CRIT', glow: 'shadow-[0_0_12px_rgba(255,108,108,0.6)]' },
-    high:     { cls: 'ion-amber', label: 'HIGH', glow: '' },
-    medium:   { cls: 'ion-iris',  label: 'MED',  glow: '' },
-    low:      { cls: 'slate-400', label: 'LOW',  glow: '' },
-    info:     { cls: 'slate-500', label: 'INFO', glow: '' },
-  };
-
-  function relativeTime(iso) {
-    if (!iso) return '';
-    const then = new Date(iso).getTime();
-    const now = Date.now();
-    const s = Math.max(0, Math.round((now - then) / 1000));
-    if (s < 60)    return `${s}s ago`;
-    if (s < 3600)  return `${Math.round(s / 60)}m ago`;
-    if (s < 86400) return `${Math.round(s / 3600)}h ago`;
-    return `${Math.round(s / 86400)}d ago`;
-  }
-
-  function hhmmss(iso) {
-    if (!iso) return '';
-    const d = new Date(iso);
-    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  }
-
-  function formatHoursMTTR(h) {
-    if (h == null) return '—';
-    if (h < 1)   return `${Math.round(h * 60)}m`;
-    if (h < 24)  return `${Math.floor(h)}h ${Math.round((h % 1) * 60)}m`;
-    return `${Math.floor(h / 24)}d ${Math.round(h % 24)}h`;
-  }
-
-  // ── Sparkline renderer ──────────────────────────────────────
-  //
-  // Takes the histogram array from /api/dashboard (alerts_histogram) —
-  // [{ts, count}, …] oldest → newest — and computes an SVG path that
-  // fits the 140×44 viewBox. Zero-count windows still render as a flat
-  // line along the bottom so the shape doesn't collapse.
-  //
-  // If there's no data or too few points to draw a meaningful line, the
-  // sparkline is hidden entirely — no fake "sample" waveform.
-  function renderSparkline(buckets) {
-    const svg  = $('kpi-open-alerts-spark');
-    const fill = $('kpi-open-alerts-spark-fill');
-    const line = $('kpi-open-alerts-spark-line');
-    if (!svg || !fill || !line) return;
-
-    if (!Array.isArray(buckets) || buckets.length < 2) {
-      svg.style.display = 'none';
-      return;
-    }
-    svg.style.display = '';
-
-    const W = 140, H = 44, PAD = 2;
-    const n = buckets.length;
-    const max = Math.max(1, ...buckets.map(b => b.count || 0));
-    const stepX = (W - PAD * 2) / (n - 1);
-
-    // Build path points
-    const pts = buckets.map((b, i) => {
-      const x = PAD + i * stepX;
-      // Invert Y so higher counts sit near the top of the viewBox,
-      // leaving ~4px of floor so zero values don't touch the bottom edge.
-      const y = H - PAD - ((b.count || 0) / max) * (H - PAD * 2 - 4);
-      return [x, y];
-    });
-
-    const linePath = pts
-      .map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`)
-      .join(' ');
-    const fillPath = `${linePath} L${(W - PAD).toFixed(1)},${H} L${PAD.toFixed(1)},${H} Z`;
-
-    line.setAttribute('d', linePath);
-    fill.setAttribute('d', fillPath);
-  }
-
-  // ── UTC clock ────────────────────────────────────────────────
-  const clock = $('clock');
+  const clock = document.getElementById('clock');
   function tick() {
     const d = new Date();
     clock.textContent = `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
@@ -391,324 +331,82 @@
   tick();
   setInterval(tick, 1000);
 
-  // ── Today label ──────────────────────────────────────────────
   (() => {
     const d = new Date();
     const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
     const MO  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    $('today-label').textContent = `${DOW[d.getDay()]}, ${MO[d.getMonth()]} ${d.getDate()}`;
+    document.getElementById('today-label').textContent =
+      `${DOW[d.getDay()]}, ${MO[d.getMonth()]} ${d.getDate()}`;
   })();
 
-  // ── Greeting by hour ─────────────────────────────────────────
   (() => {
     const h = new Date().getHours();
-    $('greeting').textContent = h < 5 ? 'Working late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+    document.getElementById('greeting').textContent =
+      h < 5 ? 'Working late' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
   })();
 
-  // ── API helper ───────────────────────────────────────────────
-  async function apiGet(path) {
-    const r = await fetch(path, { credentials: 'same-origin' });
-    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-    return r.json();
-  }
+  // ── Per-browser section visibility ──
+  const DASH_PREFS_KEY = 'ion_dash_prefs';
 
-  // ── Renderers ────────────────────────────────────────────────
-  function roleLabel(r) {
-    return r ? r.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'User';
-  }
-
-  function renderAlertRow(a) {
-    const sev = SEV_MAP[a.severity] || SEV_MAP.info;
-    const tactic = a.mitre_tactic_name || a.source || 'Alert';
-    const tid = a.mitre_technique_id || '';
-    const metaBits = [];
-    if (a.host) metaBits.push(`<span class="font-mono text-ion-amber">${escHtml(a.host)}</span>`);
-    if (a.user) metaBits.push(`user <span class="font-mono text-slate-300">${escHtml(a.user)}</span>`);
-    if (a.rule_name) metaBits.push(`<span class="truncate">${escHtml(a.rule_name)}</span>`);
-    const meta = metaBits.join(' <span>·</span> ');
-    return `
-      <a href="/alerts?id=${encodeURIComponent(a.id)}" class="row-hover flex items-start gap-4 py-6 px-2">
-        <div class="sev-bar self-stretch bg-${sev.cls} ${sev.glow}"></div>
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2 mb-1.5">
-            <span class="label-tiny text-${sev.cls}">${sev.label}</span>
-            <span class="text-[10px] text-slate-600">·</span>
-            <span class="label-tiny text-slate-500">${escHtml(tactic)}${tid ? ' · ' + escHtml(tid) : ''}</span>
-          </div>
-          <div class="text-[15px] text-white font-medium truncate">${escHtml(a.title || a.message || 'Untitled alert')}</div>
-          ${meta ? `<div class="mt-1 flex items-center gap-3 text-[12px] text-slate-500 min-w-0 overflow-hidden whitespace-nowrap text-ellipsis">${meta}</div>` : ''}
-        </div>
-        <div class="text-right shrink-0">
-          <div class="font-mono text-[11px] text-slate-500">${hhmmss(a.timestamp)}</div>
-          <div class="text-[11px] text-slate-600 mt-0.5">${relativeTime(a.timestamp)}</div>
-        </div>
-      </a>`;
-  }
-
-  function renderCaseRow(c) {
-    const sevKey = (c.severity || '').toLowerCase();
-    const sev = SEV_MAP[sevKey] || SEV_MAP.low;
-    const pretty = sevKey ? sevKey[0].toUpperCase() + sevKey.slice(1) : 'Low';
-    const bits = [];
-    bits.push(`Updated ${relativeTime(c.updated_at || c.created_at)}`);
-    if (c.observables_count != null) bits.push(`${c.observables_count} observables`);
-    if (c.alert_count) bits.push(`${c.alert_count} alerts`);
-    return `
-      <a href="/cases?id=${encodeURIComponent(c.id)}" class="row-hover flex items-center gap-4 p-4 -mx-4 rounded-lg">
-        <div class="font-mono text-[11px] text-slate-500 w-16 shrink-0">${escHtml(c.case_number || 'CASE-' + c.id)}</div>
-        <div class="flex-1 min-w-0">
-          <div class="text-[14px] text-white truncate">${escHtml(c.title || 'Untitled case')}</div>
-          <div class="text-[11px] text-slate-500 mt-0.5">${bits.join(' · ')}</div>
-        </div>
-        <span class="label-tiny px-2 py-1 rounded-md bg-${sev.cls}/10 text-${sev.cls} border border-${sev.cls}/20">${pretty}</span>
-      </a>`;
-  }
-
-  // ── Main loader ──────────────────────────────────────────────
-  async function loadDashboard() {
-    // Fire in parallel; each call degrades gracefully on failure/permission
-    const [dash, metrics, casesResp, handover] = await Promise.all([
-      apiGet('/api/dashboard').catch((e) => { console.warn('dashboard failed', e); return null; }),
-      apiGet('/api/dashboard/team-metrics').catch((e) => { console.warn('team-metrics failed', e); return null; }),
-      apiGet('/api/cases?status=open').catch((e) => { console.warn('cases failed', e); return null; }),
-      apiGet('/api/shift-handover/report?hours=8').catch((e) => { console.warn('handover failed', e); return null; }),
-    ]);
-
-    // ── User / welcome ──
-    if (dash?.user) {
-      const u = dash.user;
-      const name = (u.display_name || u.username || 'there').split(' ')[0];
-      $('welcome-name').textContent = name;
-      const role = roleLabel(u.focus_role || u.roles?.[0]);
-      const switcher = $('role-switcher');
-      switcher.innerHTML = (u.roles || []).map((r, i) => {
-        const active = (u.focus_role || u.roles[0]) === r;
-        return `<button class="px-3 py-1.5 rounded-md label-tiny ${active ? 'text-ink-950 bg-ion-cyan shadow-[0_0_18px_-4px_rgba(109,228,255,0.8)]' : 'text-slate-400 hover:text-white transition'}">${escHtml(roleLabel(r))}</button>`;
-      }).join('') || `<button class="px-3 py-1.5 rounded-md label-tiny text-ink-950 bg-ion-cyan shadow-[0_0_18px_-4px_rgba(109,228,255,0.8)]">${escHtml(role)}</button>`;
-    }
-
-    // ── Elasticsearch / alerts ──
-    const es = dash?.elasticsearch;
-    if (es) {
-      const critical = es.critical_count || 0;
-      const high = es.high_count || 0;
-      const total = es.total_alerts || 0;
-
-      $('hero-critical').textContent = `${critical} critical`;
-      $('hero-high').textContent = high;
-      $('kpi-open-alerts').textContent = total;
-      $('alerts-total-footer').textContent = total;
-
-      // Real sparkline from the ES date_histogram
-      renderSparkline(es.alerts_histogram || []);
-
-      const feed = $('alerts-feed');
-      const alerts = (es.alerts || []).slice(0, 6);
-      $('alerts-shown').textContent = alerts.length;
-
-      if (alerts.length === 0) {
-        feed.innerHTML = `<div class="py-10 text-center text-[12px] text-slate-500">No active alerts.</div>`;
-      } else {
-        feed.innerHTML = alerts.map(renderAlertRow).join('');
-      }
-
-      // Welcome message
-      const name = dash.user?.display_name?.split(' ')[0] || 'there';
-      let msg;
-      if (total === 0) {
-        msg = `Your queue is clear. No open alerts in the last 24h.`;
-      } else if (critical > 0) {
-        msg = `Your queue has <span class="text-white font-medium">${critical} critical</span> and <span class="text-white font-medium">${high} high</span> alert${high === 1 ? '' : 's'} pending triage.`;
-      } else {
-        msg = `<span class="text-white font-medium">${total}</span> open alert${total === 1 ? '' : 's'} in the last 24h — nothing critical right now.`;
-      }
-      $('welcome-message').innerHTML = msg;
-
-      // ES footer
-      if (es.connected) {
-        $('es-dot').className = 'h-1.5 w-1.5 rounded-full bg-ion-lime';
-        $('es-label').textContent = es.cluster_name || 'connected';
-      } else {
-        $('es-dot').className = 'h-1.5 w-1.5 rounded-full bg-ion-coral';
-        $('es-label').textContent = es.error || 'disconnected';
-      }
-
-      // System status pill
-      if (es.connected) {
-        $('system-status-dot').className = 'h-1.5 w-1.5 rounded-full bg-ion-lime';
-        $('system-status-text').textContent = 'All systems nominal';
-      } else {
-        $('system-status-dot').className = 'h-1.5 w-1.5 rounded-full bg-ion-amber';
-        $('system-status-text').textContent = 'Elasticsearch degraded';
-      }
-    } else {
-      $('welcome-message').textContent = 'Dashboard data unavailable.';
-    }
-
-    // ── Team metrics → MTTR + SLA proxy ──
-    if (metrics) {
-      $('kpi-mttr').textContent = formatHoursMTTR(metrics.mttr_hours);
-
-      const closureRate = metrics.closure_rate_7d;
-      if (closureRate != null) {
-        $('kpi-sla').textContent = Math.round(closureRate);
-        $('kpi-sla-bar').style.width = `${Math.min(100, Math.max(0, closureRate))}%`;
-      } else {
-        $('kpi-sla').textContent = '—';
-      }
-    }
-
-    // ── My open cases ──
-    const currentUsername = dash?.user?.username;
-    if (casesResp?.cases && currentUsername) {
-      const mine = casesResp.cases.filter((c) => c.assigned_to === currentUsername && (c.status || '').toLowerCase() !== 'closed');
-      $('kpi-my-cases').textContent = mine.length;
-
-      // Breakdown by severity
-      const breakdown = { critical: 0, high: 0, medium: 0, low: 0 };
-      for (const c of mine) {
-        const k = (c.severity || 'low').toLowerCase();
-        if (breakdown[k] != null) breakdown[k]++;
-      }
-      const breakdownEl = $('kpi-my-cases-breakdown');
-      const maxW = 32;
-      const total = Math.max(1, mine.length);
-      const rows = [
-        ['critical', 'coral', 'crit'],
-        ['high',     'amber', 'high'],
-        ['medium',   'iris',  'med'],
-      ].filter(([k]) => breakdown[k] > 0);
-      if (rows.length === 0) {
-        breakdownEl.innerHTML = `<span class="font-mono text-[10px] text-slate-600">all clear</span>`;
-      } else {
-        breakdownEl.innerHTML = rows.map(([k, color, label]) => {
-          const w = Math.max(8, Math.round((breakdown[k] / total) * maxW));
-          return `<div class="flex items-center gap-1"><span class="h-1 rounded-full bg-ion-${color}" data-ion-style="width:${w}px"></span><span class="font-mono text-[10px] text-slate-400">${breakdown[k]} ${label}</span></div>`;
-        }).join('');
-      }
-
-      // Case list (top 4 by updated_at desc)
-      const feed = $('cases-feed');
-      const top = mine.slice().sort((a, b) => new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at)).slice(0, 4);
-      if (top.length === 0) {
-        feed.innerHTML = `<div class="py-10 text-center text-[12px] text-slate-500">No open cases assigned to you.</div>`;
-      } else {
-        feed.innerHTML = top.map(renderCaseRow).join('');
-      }
-    } else if (casesResp === null) {
-      // No permission or fetch error — show hint
-      $('kpi-my-cases').textContent = '—';
-      $('cases-feed').innerHTML = `<div class="py-10 text-center text-[12px] text-slate-500">Cases unavailable (permission required).</div>`;
-    }
-
-    // ── Shift handover ──
-    renderHandover(handover);
-  }
-
-  function renderHandover(h) {
-    const statsEl = $('handover-stats');
-    const hlEl = $('handover-highlights');
-    if (!statsEl || !hlEl) return;
-
-    if (!h) {
-      statsEl.innerHTML = '';
-      hlEl.innerHTML = `<div class="py-6 text-center text-[12px] text-slate-500">Handover unavailable.</div>`;
-      return;
-    }
-
-    // Stat strip
-    const opened = h.cases?.opened ?? 0;
-    const closed = h.cases?.closed ?? 0;
-    const triaged = h.alerts?.total_triaged ?? 0;
-    statsEl.innerHTML = `
-      <div>
-        <div class="font-sans font-semibold tabular-nums text-[22px] leading-none text-white">${opened}</div>
-        <div class="label-tiny text-slate-500 mt-1.5">opened</div>
-      </div>
-      <div>
-        <div class="font-sans font-semibold tabular-nums text-[22px] leading-none text-ion-lime">${closed}</div>
-        <div class="label-tiny text-slate-500 mt-1.5">closed</div>
-      </div>
-      <div>
-        <div class="font-sans font-semibold tabular-nums text-[22px] leading-none text-ion-cyan">${triaged}</div>
-        <div class="label-tiny text-slate-500 mt-1.5">triaged</div>
-      </div>
-    `;
-
-    // Highlights list (real highlights from _build_highlights)
-    const highlights = h.highlights || [];
-    const LEVEL_CLS = {
-      critical: 'text-ion-coral',
-      high:     'text-ion-amber',
-      warning:  'text-ion-amber',
-      info:     'text-slate-400',
-    };
-    const LEVEL_DOT = {
-      critical: 'bg-ion-coral',
-      high:     'bg-ion-amber',
-      warning:  'bg-ion-amber',
-      info:     'bg-slate-500',
-    };
-
-    if (highlights.length === 0) {
-      hlEl.innerHTML = `<div class="py-4 text-center text-[11px] text-slate-500">No noteworthy events this shift.</div>`;
-    } else {
-      hlEl.innerHTML = highlights.slice(0, 5).map((hl) => {
-        const cls = LEVEL_CLS[hl.level] || 'text-slate-400';
-        const dot = LEVEL_DOT[hl.level] || 'bg-slate-500';
-        return `
-          <div class="flex gap-2.5 items-start">
-            <span class="h-1.5 w-1.5 rounded-full ${dot} mt-1.5 shrink-0"></span>
-            <span class="${cls}">${escHtml(hl.message)}</span>
-          </div>`;
-      }).join('');
+  function readDashPrefs() {
+    // A quota-blocked or private window throws on read, and a page that
+    // cannot remember a preference must still render every section.
+    try {
+      return JSON.parse(localStorage.getItem(DASH_PREFS_KEY) || '{}');
+    } catch (e) {
+      return {};
     }
   }
 
-  // ── Dashboard customization ────────────────────────────────
-  const DASH_SECTIONS = [
-    {id: 'hero-section', label: 'Threat Feed', default: true},
-    {id: 'kpi-section', label: 'KPI Cards', default: true},
-    {id: 'cases-section', label: 'My Cases', default: true},
-    {id: 'handover-section', label: 'Shift Handover', default: true},
-  ];
+  // Visibility is an inline display written through CSSOM, not a class
+  // toggle. daisyUI's `.card` and Tailwind's `grid` both declare `display`,
+  // so a `hidden` class on one of these elements competes with an author
+  // rule of the same specificity and the winner depends on the order
+  // Tailwind emitted them in. An inline declaration beats both. A CSSOM
+  // write is a DOM property, not an inline `style=` attribute, so CSP's
+  // style-src-attr does not apply to it.
+  //
+  // The `hidden` class in the markup exists only to keep the config panel
+  // closed on the first paint, before this script runs. It is dropped the
+  // first time either function touches the element, after which the inline
+  // declaration is the only thing deciding. The old code toggled the inline
+  // display while leaving the class in place, so the panel never opened:
+  // one click set display:none on something already hidden, and the next set
+  // it back to the empty string, which the class then overrode.
+  function setVisible(el, visible) {
+    if (!el) return;
+    el.classList.remove('hidden');
+    el.style.display = visible ? '' : 'none';
+  }
 
-  function loadDashPrefs() {
-    const saved = JSON.parse(localStorage.getItem('ion_dash_prefs') || '{}');
-    DASH_SECTIONS.forEach(s => {
-      const visible = saved[s.id] !== undefined ? saved[s.id] : s.default;
-      const el = document.getElementById(s.id);
-      if (el) el.style.display = visible ? '' : 'none';
+  function isVisible(el) {
+    return !el.classList.contains('hidden') && el.style.display !== 'none';
+  }
+
+  function applyDashPrefs() {
+    const saved = readDashPrefs();
+    document.querySelectorAll('[data-dash-section]').forEach((box) => {
+      const id = box.dataset.dashSection;
+      const visible = saved[id] !== undefined ? saved[id] : true;
+      box.checked = visible;
+      setVisible(document.getElementById(id), visible);
     });
   }
 
   function toggleDashConfig() {
     const panel = document.getElementById('dash-config');
-    panel.style.display = panel.style.display === 'none' ? '' : 'none';
-    if (panel.style.display !== 'none') renderDashConfig();
-  }
-
-  function renderDashConfig() {
-    const saved = JSON.parse(localStorage.getItem('ion_dash_prefs') || '{}');
-    const container = document.getElementById('dash-config-items');
-    container.innerHTML = DASH_SECTIONS.map(s => {
-      const checked = saved[s.id] !== undefined ? saved[s.id] : s.default;
-      return `<label class="flex items-center gap-2 text-[12px] text-slate-300 cursor-pointer">
-        <input type="checkbox" ${checked ? 'checked' : ''} data-change-action="saveDashPref" data-args='["${s.id}", "$checked"]'>
-        ${s.label}
-      </label>`;
-    }).join('');
+    setVisible(panel, !isVisible(panel));
   }
 
   function saveDashPref(id, visible) {
-    const saved = JSON.parse(localStorage.getItem('ion_dash_prefs') || '{}');
+    const saved = readDashPrefs();
     saved[id] = visible;
-    localStorage.setItem('ion_dash_prefs', JSON.stringify(saved));
-    const el = document.getElementById(id);
-    if (el) el.style.display = visible ? '' : 'none';
+    try {
+      localStorage.setItem(DASH_PREFS_KEY, JSON.stringify(saved));
+    } catch (e) { /* unremembered is better than unrendered */ }
+    setVisible(document.getElementById(id), visible);
   }
 
-  loadDashboard();
-  loadDashPrefs();
+  applyDashPrefs();
 </script>
 {% endblock %}

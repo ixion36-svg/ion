@@ -1,0 +1,93 @@
+{# Threat Intel: the global search bar's grouped results.
+
+   Replaces five innerHTML sites in tiUnifiedSearch.
+
+   The defect: both failure renders used the ti-empty class, which is the
+   no-results styling, so "Search failed: HTTP 403" looked like "no
+   matches". `${d.total}` went in unguarded, so a payload without a total
+   read "undefined results".
+
+   What this fragment cannot fix, and says plainly instead: the endpoint
+   fans out to four sources and wraps each in its own try/except, logging at
+   debug and returning an empty list for one that fails. So a group with no
+   rows means either that the source matched nothing or that it was
+   unreachable, and the payload does not say which. Filed against the
+   endpoint, because telling them apart needs a change to the JSON. The
+   note under the results is there so a reader is not left to assume the
+   first reading. #}
+
+{% if too_short %}
+  <div class="ti-empty">
+    Enter at least {{ min_chars }} characters to search.
+  </div>
+{% elif failed %}
+  <div class="ti-empty text-[var(--danger)]" role="alert">
+    The search for {{ q }} did not complete, so this is a fault rather than
+    an absence of matches. Searching again may succeed.
+  </div>
+{% else %}
+  {% set found = [] %}
+  {%- for key, _ in kinds -%}
+    {%- if groups.get(key) -%}{% set _ = found.append(key) %}{%- endif -%}
+  {%- endfor -%}
+  {% set unreadable = [] %}
+  {%- for key, _ in kinds -%}
+    {%- if groups.get(key) is none -%}{% set _ = unreadable.append(key) %}{%- endif -%}
+  {%- endfor -%}
+
+  {% if not found and not unreadable %}
+    <div class="ti-empty">No matches for {{ q }}.</div>
+  {% else %}
+  <div class="bg-[var(--bg-primary)] border border-[var(--ion-border)] rounded-[var(--ion-radius-lg)] p-4">
+    {# `is not none`, and the count the sources actually returned when the
+       endpoint gives no total. The page printed `${d.total}` straight in. #}
+    <div class="text-[.78rem] text-[var(--text-secondary)] mb-2">
+      {%- set counted = namespace(n=0) -%}
+      {%- for key, _ in kinds -%}{% set counted.n = counted.n + (groups.get(key) or [])|length %}{%- endfor -%}
+      {%- set shown_total = total if total is not none else counted.n -%}
+      {{ shown_total }} result{{ '' if shown_total == 1 else 's' }} for {{ q }}
+    </div>
+
+    {% for key, heading in kinds %}
+      {% set rows = groups.get(key) %}
+      {% if rows is none %}
+        <h4 class="text-[.85rem] mt-2 mr-0 mb-1.5 ml-0 text-[var(--danger)]">{{ heading }}</h4>
+        <div class="ti-empty text-[var(--danger)]" role="alert">
+          This source could not be read, so it is not reporting that it
+          found nothing.
+        </div>
+      {% elif rows %}
+        <h4 class="text-[.85rem] mt-2 mr-0 mb-1.5 ml-0 text-[var(--accent)]">{{ heading }} ({{ rows|length }})</h4>
+        <ul class="list-none p-0 m-0">
+          {% for row in rows %}
+            {% if key in ('actors', 'campaigns') %}
+              <li class="py-1 px-2 bg-[var(--bg-secondary)] mb-0.5 rounded-[4px]">
+                {{ row.get('name') or row.get('id') or '' }}
+              </li>
+            {% elif key == 'iocs' %}
+              <li class="py-1 px-2 bg-[var(--bg-secondary)] mb-0.5 rounded-[4px] flex justify-between gap-2">
+                <span><code class="text-xs text-[var(--text-muted)]">{{ row.get('type') or '' }}</code>
+                <code class="ml-1.5 text-[var(--text-primary)]">{{ row.get('value') or '' }}</code></span>
+                <a class="text-[var(--accent)] text-xs no-underline" href="/observables/{{ row.get('id')|urlencode }}">&rarr; open</a>
+              </li>
+            {% else %}
+              <li class="py-1 px-2 bg-[var(--bg-secondary)] mb-0.5 rounded-[4px] flex justify-between gap-2">
+                <span><code class="text-xs text-[var(--text-muted)]">{{ row.get('case_number') or '' }}</code>
+                <span class="ml-1.5 text-[var(--text-primary)]">{{ row.get('title') or '' }}</span></span>
+                <a class="text-[var(--accent)] text-xs no-underline" href="/cases?selected={{ row.get('id')|urlencode }}">&rarr; open</a>
+              </li>
+            {% endif %}
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endfor %}
+
+    <div class="text-[.7rem] text-[var(--text-muted)] mt-3 pt-2 border-t border-t-[var(--ion-border)]">
+      This search covers threat actors, campaigns, observables and cases.
+      A source that is unreachable contributes nothing and is not
+      distinguished from one that matched nothing, so a heading missing here
+      is not proof that nothing matched under it.
+    </div>
+  </div>
+  {% endif %}
+{% endif %}

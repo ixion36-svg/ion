@@ -1,0 +1,3 @@
+{% if state == 'failed' %}<div class="error">Failed to load heatmap.</div>
+{% elif state == 'empty' %}<div class="empty-state">No activity in the last 30 days.</div>
+{% else %}<div data-heatmap='{{ heatmap|tojson }}' class="flex flex-wrap gap-[3px]"></div>{% endif %}

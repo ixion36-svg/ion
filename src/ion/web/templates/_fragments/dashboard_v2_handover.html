@@ -1,0 +1,81 @@
+{# The shift's opened/closed/triaged strip and its highlights.
+
+   Replaces the `statsEl.innerHTML`, the `hlEl.innerHTML` highlights write
+   and the two `hlEl.innerHTML` empty states in renderHandover().
+
+   The strip and the list are one swapped container because they are one
+   read. The JavaScript split them and got them inconsistent: on a failure it
+   called `statsEl.replaceChildren()`, which removed the three figures with
+   no explanation, and wrote "Handover unavailable." into the list below.
+
+   Three figures, each with its own `is not none`. `h.cases?.opened ?? 0`
+   printed a confident zero for a report that did not carry the key, and
+   "zero cases opened this shift" is a sentence an incoming lead acts on. #}
+
+{% set LEVEL = {
+  'critical': {'text': 'text-ion-coral', 'dot': 'bg-ion-coral'},
+  'high':     {'text': 'text-ion-amber', 'dot': 'bg-ion-amber'},
+  'warning':  {'text': 'text-ion-amber', 'dot': 'bg-ion-amber'},
+  'info':     {'text': 'text-slate-400', 'dot': 'bg-slate-500'}
+} %}
+
+{% if failed %}
+  <div role="alert" class="alert alert-error">
+    The shift handover report could not be read. This is not a quiet shift:
+    nothing in the last {{ hours }}h has been measured. Refresh to try again.
+  </div>
+{% else %}
+  <div class="grid grid-cols-3 gap-2 mb-5 text-center">
+    {% if view.opened is not none %}
+      <div>
+        <div class="font-sans font-semibold tabular-nums text-[22px] leading-none">{{ view.opened }}</div>
+        <div class="label-tiny text-slate-500 mt-1.5">opened</div>
+      </div>
+    {% else %}
+      <div>
+        <div class="font-sans font-semibold tabular-nums text-[22px] leading-none text-base-content/40">—</div>
+        <div class="label-tiny text-slate-500 mt-1.5">opened, not reported</div>
+      </div>
+    {% endif %}
+    {% if view.closed is not none %}
+      <div>
+        <div class="font-sans font-semibold tabular-nums text-[22px] leading-none text-ion-lime">{{ view.closed }}</div>
+        <div class="label-tiny text-slate-500 mt-1.5">closed</div>
+      </div>
+    {% else %}
+      <div>
+        <div class="font-sans font-semibold tabular-nums text-[22px] leading-none text-base-content/40">—</div>
+        <div class="label-tiny text-slate-500 mt-1.5">closed, not reported</div>
+      </div>
+    {% endif %}
+    {% if view.triaged is not none %}
+      <div>
+        <div class="font-sans font-semibold tabular-nums text-[22px] leading-none text-ion-cyan">{{ view.triaged }}</div>
+        <div class="label-tiny text-slate-500 mt-1.5">triaged</div>
+      </div>
+    {% else %}
+      <div>
+        <div class="font-sans font-semibold tabular-nums text-[22px] leading-none text-base-content/40">—</div>
+        <div class="label-tiny text-slate-500 mt-1.5">triaged, not reported</div>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="space-y-3 text-[12.5px] leading-relaxed">
+    {% if not view.highlights %}
+      {# A real finding. The report's own _build_highlights appends a "Quiet
+         shift" highlight when nothing was triaged and nothing opened, so an
+         empty list here means the shift had activity that cleared none of
+         its thresholds. #}
+      <div class="py-4 text-center text-[11px] text-slate-500">No noteworthy events this shift.</div>
+    {% else %}
+      {% for hl in view.highlights %}
+        {% set l = LEVEL.get(hl.level) or LEVEL['info'] %}
+        <div class="flex gap-2.5 items-start">
+          <span class="h-1.5 w-1.5 rounded-full {{ l.dot }} mt-1.5 shrink-0"></span>
+          <span class="{{ l.text }}">{{ hl.message }}</span>
+        </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+{% endif %}

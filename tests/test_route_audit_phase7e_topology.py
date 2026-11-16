@@ -97,16 +97,36 @@ def test_deep_link_switches_to_topology(integrations):
 
 
 def test_topology_markup_came_across(integrations):
-    for marker in ("topo-page-wrap", "topo-diagram", "topo-health-banner",
+    """topo-page-wrap was in this list and was never markup.
+
+    The only "topo-page-wrap" this page ever held was the CSS rule
+    `.topo-page-wrap {` inside its own <style> block, so a test looking
+    for markup was matching a stylesheet. 870b3219 moved that block to
+    integrations-page.css and the match went with it. No element has ever
+    carried the class, and the rule is dead: it sits in the sheet setting
+    a width and a padding for nothing. `tools/dead_css.py --sheet
+    integrations-page.css` reports it now, which it could not while that
+    sheet was outside the scanner's coverage.
+    """
+    for marker in ("topo-diagram", "topo-health-banner",
                    "flow-diagram", 'id="details-grid"'):
         assert marker in integrations, marker
 
 
 def test_topology_css_came_across(integrations):
-    """The diagram is unreadable without its own stylesheet — the styles moved
-    with the markup rather than being left behind in a deleted file."""
-    assert ".topo-node" in integrations
-    assert ".topo-hub" in integrations
+    """The diagram is unreadable without its own stylesheet — the styles
+    moved with the markup rather than being left behind in a deleted file.
+
+    They moved once more since, out of the page's <style> block into
+    integrations-page.css, which is what the redesign's `styled` column
+    asked for and what brought them under the dead-rule scanner.
+    """
+    sheet = (Path("src/ion/web/static/css/integrations-page.css")
+             .read_text(encoding="utf-8"))
+    assert ".topo-node" in sheet
+    assert ".topo-hub" in sheet
+    assert "<style" not in integrations, \
+        "the page kept a style block, so these moved back"
 
 
 # ── the two real hazards ─────────────────────────────────────────────────

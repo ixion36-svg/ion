@@ -1,0 +1,51 @@
+{# The AI chat attachment panel, from ui/chat.py's files_view.
+
+   `formatFileSize` reported "NaN MB" for a file with no recorded size:
+   both of its comparisons are false for undefined, so the megabyte
+   branch ran. A zero-byte file took the first branch and read "0 B",
+   which is right, so only the missing case was wrong.
+
+   `uploadedFiles = data.files || []` drew a payload in the wrong shape as
+   "No files attached", and GET /api/ai/files can return None outright,
+   since it is `for db in get_session(): return {...}` and falls off the
+   end if the generator yields nothing.
+#}
+{%- if state == 'failed' %}
+<div class="ai-files-empty">
+  {%- if error %}{{ error }}
+  {%- else %}The attachment list could not be read.{% endif %}
+</div>
+{%- elif state == 'unreadable' %}
+<div class="ai-files-empty">The attachment list is not in a shape this
+  page can read.</div>
+{%- elif state == 'empty' %}
+<div class="ai-files-empty">No files attached</div>
+{%- else %}
+{%- for f in files %}
+<div class="ai-file-item" data-file-id="{{ f.id or '' }}"{% if f.id is not none %} role="button" tabindex="0" data-click-action="showFileModal" data-args='{{ [f.id]|tojson }}'{% endif %}>
+  <svg class="ai-file-icon" viewBox="0 0 24 24" width="14" height="14"
+       fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+  </svg>
+  <div class="ai-file-info">
+    <div class="ai-file-name">{{ f.name }}</div>
+    <div class="ai-file-meta">
+      {%- if f.size %}{{ f.size }}
+      {%- else %}<span class="an-absent"
+          title="No size was recorded for this file"></span>{% endif %}
+      {#- The endpoint carries a line count that nothing rendered. -#}
+      {%- if f.lines is not none %} &middot; {{ f.lines }} lines{% endif %}
+    </div>
+  </div>
+  <button class="ai-file-delete" data-click-action="deleteUploadedFile"
+          data-stop-propagation data-args='{{ [f.id]|tojson }}'>
+    <svg viewBox="0 0 24 24" width="12" height="12" fill="none"
+         stroke="currentColor" stroke-width="2">
+      <line x1="18" y1="6" x2="6" y2="18"/>
+      <line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  </button>
+</div>
+{%- endfor %}
+{%- endif %}
