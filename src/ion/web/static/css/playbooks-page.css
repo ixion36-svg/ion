@@ -1,15 +1,7 @@
 /* Playbooks page specific styles */
-.page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
-}
 
-.header-actions {
-    display: flex;
-    gap: 0.5rem;
-}
+
+
 
 .section {
     background: var(--bg-secondary);
@@ -29,11 +21,7 @@
     margin: 0;
 }
 
-.filter-controls {
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-}
+
 
 .table-container {
     overflow-x: auto;
@@ -163,21 +151,11 @@
 }
 
 /* Form styles */
-.form-section {
-    margin-bottom: 1.5rem;
-    padding-bottom: 1.5rem;
-    border-bottom: 1px solid var(--ion-border);
-}
 
-.form-section:last-child {
-    border-bottom: none;
-    margin-bottom: 0;
-}
 
-.form-section h4 {
-    margin: 0 0 1rem 0;
-    color: var(--accent-color);
-}
+
+
+
 
 .form-row {
     display: flex;
@@ -218,11 +196,7 @@
     cursor: pointer;
 }
 
-.checkbox-group {
-    display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
+
 
 /* Step builder */
 .step-item {

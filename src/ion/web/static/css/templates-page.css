@@ -121,10 +121,7 @@
     align-items: center;
     gap: 0.5rem;
 }
-.folder-manage-path {
-    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
-    font-size: 0.8rem;
-}
+
 .folder-manage-counts {
     font-size: 0.75rem;
     color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
@@ -149,10 +146,7 @@
 #templates-list .card-title { color: var(--color-base-content); }
 #templates-list .card-title:hover { color: var(--color-primary); }
 #templates-list .card-body { padding: 0; gap: 0; }
-#templates-list .card-description {
-    font-size: 0.875rem;
-    opacity: 0.8;
-}
+
 #templates-list .card-meta {
     display: flex;
     flex-wrap: wrap;

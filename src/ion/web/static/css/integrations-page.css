@@ -344,7 +344,7 @@ body[data-page="integrations"] .flow-section-header{
 }
 body[data-page="integrations"] .flow-section-header h2{ margin: 0; font-size: 1.2rem; display: flex; align-items: center; gap: 8px; }
 body[data-page="integrations"] .flow-section-header h2 i{ color: var(--primary); }
-body[data-page="integrations"] .flow-section-subtitle{ font-size: .82rem; color: var(--text-secondary); margin-left: auto; }
+
 
 /* ── Slide container ──────────────────────────────────────────── */
 body[data-page="integrations"] .flow-diagram-wrap{
@@ -383,11 +383,7 @@ body[data-page="integrations"] .flow-branch-group::before{
 }
 
 /* ── Flow row ─────────────────────────────────────────────────── */
-body[data-page="integrations"] .flow-row{
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
+
 
 /* ── Stage card ───────────────────────────────────────────────── */
 body[data-page="integrations"] .flow-stage{
@@ -469,58 +465,22 @@ body[data-page="integrations"] .flow-harrow-dot{
 }
 
 /* ── Fork zone (Decision → 3 branches) ────────────────────────── */
-body[data-page="integrations"] .flow-fork-zone{
-    display: flex; flex-direction: column; align-items: center;
-    padding: 4px 0;
-}
-body[data-page="integrations"] .flow-fork-stem{ width: 2px; height: 18px; opacity: .45; }
-body[data-page="integrations"] .flow-fork-bar{
-    display: flex; justify-content: center; gap: 24px;
-    position: relative;
-}
-body[data-page="integrations"] .flow-fork-bar::before{
-    content: ""; position: absolute;
-    top: 0; left: 0; right: 0; height: 2px;
-    background: var(--text-secondary); opacity: .25;
-}
-body[data-page="integrations"] .flow-fork-arm{
-    width: 140px;
-    display: flex; flex-direction: column; align-items: center;
-}
-body[data-page="integrations"] .flow-fork-arm-line{ width: 2px; height: 18px; opacity: .45; }
-body[data-page="integrations"] .flow-fork-arm-arrow{
-    width: 0; height: 0;
-    border-left: 5px solid transparent;
-    border-right: 5px solid transparent;
-    opacity: .45;
-}
+
+
+
+
+
+
+
 
 /* ── Merge zone (3 branches → Case Mgmt) ─────────────────────── */
-body[data-page="integrations"] .flow-merge-zone{
-    display: flex; flex-direction: column; align-items: center;
-    padding: 4px 0;
-}
-body[data-page="integrations"] .flow-merge-bar{
-    display: flex; justify-content: center; gap: 24px;
-    position: relative;
-}
-body[data-page="integrations"] .flow-merge-bar::after{
-    content: ""; position: absolute;
-    bottom: 0; left: 0; right: 0; height: 2px;
-    background: var(--text-secondary); opacity: .25;
-}
-body[data-page="integrations"] .flow-merge-arm{
-    width: 140px;
-    display: flex; flex-direction: column; align-items: center;
-}
-body[data-page="integrations"] .flow-merge-arm-line{ width: 2px; height: 18px; opacity: .45; }
-body[data-page="integrations"] .flow-merge-stem{ width: 2px; height: 18px; opacity: .45; }
-body[data-page="integrations"] .flow-merge-arrow{
-    width: 0; height: 0;
-    border-left: 5px solid transparent;
-    border-right: 5px solid transparent;
-    opacity: .45;
-}
+
+
+
+
+
+
+
 
 /* ── Expandable detail panel ──────────────────────────────────── */
 body[data-page="integrations"] .flow-stage-details{
@@ -613,8 +573,8 @@ body[data-page="integrations"] .flow-pipe-step.active .flow-fork-arm-line, body[
     body[data-page="integrations"] .flow-stage.branch .flow-stage-card{ width: 118px; }
     body[data-page="integrations"] .flow-stage.decision .flow-stage-card{ width: 90px; height: 90px; }
     body[data-page="integrations"] .flow-harrow{ width: 28px; }
-    body[data-page="integrations"] .flow-fork-arm, body[data-page="integrations"] .flow-merge-arm{ width: 118px; }
-    body[data-page="integrations"] .flow-fork-bar, body[data-page="integrations"] .flow-merge-bar{ gap: 18px; }
+
+
 }
 @media (max-width: 768px) {
     body[data-page="integrations"] .flow-diagram{ padding: 24px 12px 20px; }
@@ -623,31 +583,20 @@ body[data-page="integrations"] .flow-pipe-step.active .flow-fork-arm-line, body[
     body[data-page="integrations"] .flow-stage.branch .flow-stage-card{ width: 96px; }
     body[data-page="integrations"] .flow-stage.decision .flow-stage-card{ width: 76px; height: 76px; }
     body[data-page="integrations"] .flow-harrow{ width: 20px; }
-    body[data-page="integrations"] .flow-fork-arm, body[data-page="integrations"] .flow-merge-arm{ width: 96px; }
-    body[data-page="integrations"] .flow-fork-bar, body[data-page="integrations"] .flow-merge-bar{ gap: 12px; }
+
+
     body[data-page="integrations"] .flow-stage-details{ width: 150px; }
 }
 
 /* Dashboard Layout */
-body[data-page="integrations"] .dashboard-layout{
-    display: grid;
-    grid-template-columns: 1fr 320px;
-    gap: 1.5rem;
-    margin-bottom: 2rem;
-}
 
-body[data-page="integrations"] .dashboard-main{
-    min-width: 0;
-}
 
-body[data-page="integrations"] .dashboard-sidebar{
-    min-width: 0;
-}
+
+
+
 
 @media (max-width: 1200px) {
-    body[data-page="integrations"] .dashboard-layout{
-        grid-template-columns: 1fr;
-    }
+
 }
 
 /* Integration Cards */
@@ -758,34 +707,18 @@ body[data-page="integrations"] .metrics-grid{
     margin-top: 1rem;
 }
 
-body[data-page="integrations"] .metrics-card-wide{
-    grid-column: span 2;
-}
+
 
 @media (max-width: 768px) {
     body[data-page="integrations"] .metrics-grid{
         grid-template-columns: 1fr;
     }
-    body[data-page="integrations"] .metrics-card-wide{
-        grid-column: span 1;
-    }
+
 }
 
-body[data-page="integrations"] .metrics-card{
-    background: var(--bg-secondary);
-    border: 1px solid var(--ion-border);
-    border-radius: var(--ion-radius-lg);
-    padding: 1rem;
-}
 
-body[data-page="integrations"] .metrics-card h3{
-    margin: 0 0 0.75rem 0;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
+
+
 
 body[data-page="integrations"] .metrics-content{
     font-size: 0.875rem;
@@ -931,19 +864,9 @@ body[data-page="integrations"] .section-header{
     margin-bottom: 1rem;
 }
 
-body[data-page="integrations"] .filter-controls{
-    display: flex;
-    gap: 0.5rem;
-}
 
-body[data-page="integrations"] .filter-controls select{
-    padding: 0.4rem 0.75rem;
-    border: 1px solid var(--ion-border);
-    border-radius: 4px;
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    font-size: 0.875rem;
-}
+
+
 
 /* Status Badges */
 body[data-page="integrations"] .status-badge{
@@ -1073,14 +996,9 @@ body[data-page="integrations"] .form-actions{
     margin-top: 1.5rem;
 }
 
-body[data-page="integrations"] .copy-field{
-    display: flex;
-    gap: 0.5rem;
-}
 
-body[data-page="integrations"] .copy-field input{
-    flex: 1;
-}
+
+
 
 body[data-page="integrations"] .ion-fragment-loading, body[data-page="integrations"] .ion-fragment-message{text-align:center;padding:2rem;color:var(--text-secondary);}
 body[data-page="integrations"] .topology-protocol-label { fill: var(--text-secondary); font-size: 9px; font-family: monospace; opacity: .6; }

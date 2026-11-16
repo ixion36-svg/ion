@@ -55,18 +55,9 @@
    inline styles, and the spot check only reads JS->CSS contracts it can see a
    rule for somewhere. Rules for markup that no longer exists are inert. */
 /* Discover page specific styles */
-.page-subtitle {
-    color: var(--text-secondary);
-    margin-top: 0.5rem;
-}
 
-.discover-search-form,
-.ioc-hunt-form,
-.bulk-ioc-form {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
+
+
 
 .form-row {
     display: flex;

@@ -54,15 +54,10 @@ body[data-page="forensics"] .modal-footer{
 }
 
 /* ── Filter Bar (matches cases.html) ────────────────────── */
-body[data-page="forensics"] .cases-filters-bar{
-    display: flex;
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-    width: 100%;
-}
+
 /* layout-only: visual styling now comes from ion-input / ion-select */
-body[data-page="forensics"] .cases-filter-input{ flex: 1; }
-body[data-page="forensics"] .cases-filter-select{ min-width: 150px; width: auto; }
+
+
 
 /* ── Tabs ───────────────────────────────────────────────── */
 body[data-page="forensics"] .fr-tabs{
@@ -83,28 +78,17 @@ body[data-page="forensics"] .fr-tab:hover{ color: var(--text-primary); }
 body[data-page="forensics"] .fr-panel{ margin-top: 4px; width: 100%; }
 
 /* ── Metric Tiles ───────────────────────────────────────── */
-body[data-page="forensics"] .fr-tiles{
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 12px;
-    margin-bottom: 20px;
-    width: 100%;
-}
-body[data-page="forensics"] .fr-tile{
-    background: var(--bg-secondary);
-    border: 1px solid var(--ion-border);
-    border-radius: 12px; padding: 18px 16px;
-    text-align: center; position: relative; overflow: hidden;
-}
-body[data-page="forensics"] .fr-tile::before{ content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
-body[data-page="forensics"] .fr-tile-blue::before{ background: var(--info); }
-body[data-page="forensics"] .fr-tile-cyan::before{ background: var(--accent, var(--primary)); }
-body[data-page="forensics"] .fr-tile-red::before{ background: var(--danger); }
-body[data-page="forensics"] .fr-tile-green::before{ background: var(--success); }
-body[data-page="forensics"] .fr-tile-purple::before{ background: #bc8cff; }
-body[data-page="forensics"] .fr-tile-amber::before{ background: var(--warning); }
-body[data-page="forensics"] .fr-tile-value{ font-size: 1.8rem; font-weight: 700; color: var(--text-primary); line-height: 1.2; }
-body[data-page="forensics"] .fr-tile-label{ font-size: .75rem; color: var(--text-secondary); margin-top: 4px; text-transform: uppercase; letter-spacing: .5px; }
+
+
+
+
+
+
+
+
+
+
+
 
 /* ── Pipeline / Stage Kanban ────────────────────────────── */
 body[data-page="forensics"] .fr-pipeline{
@@ -126,9 +110,9 @@ body[data-page="forensics"] .fr-stage-header{
     align-items: center; font-weight: 700; font-size: .8rem;
     text-transform: uppercase; letter-spacing: .5px; border-radius: 10px 10px 0 0;
 }
-body[data-page="forensics"] .fr-stage-intake{ background: rgba(88,166,255,.12); color: var(--info); }
-body[data-page="forensics"] .fr-stage-evidence{ background: rgba(63,185,80,.12); color: var(--success); }
-body[data-page="forensics"] .fr-stage-analysis{ background: rgba(240,192,0,.12); color: var(--warning); }
+
+
+
 body[data-page="forensics"] .fr-stage-reporting{ background: rgba(188,140,255,.12); color: var(--sev-info); }
 body[data-page="forensics"] .fr-stage-review{ background: rgba(240,136,62,.12); color: var(--neon-orange); }
 body[data-page="forensics"] .fr-stage-closed{ background: rgba(110,118,129,.12); color: var(--text-muted); }
@@ -294,7 +278,7 @@ body[data-page="forensics"] .btn-extract-ioc{ padding: 4px 10px; font-size: .75r
 body[data-page="forensics"] .btn-extract-ioc:hover{ border-color: var(--accent, var(--primary)); color: var(--accent, var(--primary)); }
 
 /* ── Reference Docs Grid ───────────────────────────────── */
-body[data-page="forensics"] .fr-ref-grid{ display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; width: 100%; }
+
 body[data-page="forensics"] .fr-ref-card{ background: var(--bg-secondary); border: 1px solid var(--ion-border); border-radius: 10px; padding: 20px; cursor: pointer; transition: border-color .15s, transform .15s; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
 body[data-page="forensics"] .fr-ref-card:hover{ border-color: var(--accent, var(--primary)); transform: translateY(-2px); }
 body[data-page="forensics"] .fr-ref-category{ font-size: .7rem; text-transform: uppercase; letter-spacing: .5px; color: var(--accent, var(--primary)); font-weight: 700; margin-bottom: 6px; }
@@ -314,13 +298,13 @@ body[data-page="forensics"] .ref-doc-body li{ margin-bottom: 4px; }
 
 /* ── Responsive ─────────────────────────────────────────── */
 @media (max-width: 1200px) {
-    body[data-page="forensics"] .fr-tiles{ grid-template-columns: repeat(3, 1fr); }
+
     body[data-page="forensics"] .fr-pipeline{ grid-template-columns: repeat(3, 1fr); }
 }
 @media (max-width: 768px) {
-    body[data-page="forensics"] .fr-tiles{ grid-template-columns: repeat(2, 1fr); }
+
     body[data-page="forensics"] .fr-pipeline{ grid-template-columns: 1fr; }
-    body[data-page="forensics"] .cases-filters-bar{ flex-direction: column; }
+
     body[data-page="forensics"] .modal-dialog{ width: 95%; }
 }
 

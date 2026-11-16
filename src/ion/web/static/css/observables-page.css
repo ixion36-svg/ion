@@ -52,26 +52,10 @@ body[data-page="observables"] .watchlist-banner{
     margin-bottom: 1rem;
 }
 
-body[data-page="observables"] .watchlist-alert-icon{
-    background: var(--warning);
-    color: #000;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-}
+
 
 /* Import Modal Styles */
-body[data-page="observables"] .import-tabs{
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-    border-bottom: 1px solid var(--ion-border);
-    padding-bottom: 0.5rem;
-}
+
 
 body[data-page="observables"] .import-tab{
     background: none;
@@ -87,14 +71,7 @@ body[data-page="observables"] .import-tab.active{
     background: var(--bg-secondary);
 }
 
-body[data-page="observables"] .import-example{
-    background: var(--bg-secondary);
-    padding: 0.75rem;
-    border-radius: 4px;
-    font-size: 0.85rem;
-    overflow-x: auto;
-    margin-bottom: 1rem;
-}
+
 
 body[data-page="observables"] .import-tab-content .form-group{
     margin-bottom: 1rem;
@@ -241,13 +218,7 @@ body[data-page="observables"] .stat-label{
 }
 
 /* Filters */
-body[data-page="observables"] .observables-filters{
-    display: flex;
-    gap: 0.75rem;
-    margin-bottom: 1.5rem;
-    flex-wrap: wrap;
-    align-items: center;
-}
+
 
 body[data-page="observables"] .observables-filters select, body[data-page="observables"] .observables-filters .search-input{
     padding: 0.5rem 0.75rem;
@@ -636,49 +607,17 @@ body[data-page="observables"] .modal-xlarge .modal-body{
     flex-direction: column;
 }
 
-body[data-page="observables"] .graph-controls{
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-    margin-bottom: 0.75rem;
-    flex-wrap: wrap;
-}
 
-body[data-page="observables"] .graph-controls label{
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.8125rem;
-}
 
-body[data-page="observables"] .graph-controls input{
-    width: 60px;
-    padding: 0.25rem 0.5rem;
-    border: 1px solid var(--ion-border);
-    border-radius: 4px;
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-}
 
-body[data-page="observables"] .graph-legend{
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 0.75rem;
-    font-size: 0.75rem;
-    flex-wrap: wrap;
-}
 
-body[data-page="observables"] .legend-item{
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-}
 
-body[data-page="observables"] .legend-dot{
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-}
+
+
+
+
+
+
 
 body[data-page="observables"] .graph-container{
     flex: 1;
@@ -690,34 +629,13 @@ body[data-page="observables"] .graph-container{
 }
 
 /* Patterns */
-body[data-page="observables"] .patterns-controls{
-    display: flex;
-    gap: 1rem;
-    align-items: center;
-    margin-bottom: 0.75rem;
-}
 
-body[data-page="observables"] .patterns-controls label{
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.8125rem;
-}
 
-body[data-page="observables"] .patterns-controls input{
-    width: 60px;
-    padding: 0.25rem 0.5rem;
-    border: 1px solid var(--ion-border);
-    border-radius: 4px;
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-}
 
-body[data-page="observables"] .patterns-desc{
-    font-size: 0.8125rem;
-    color: var(--text-muted);
-    margin-bottom: 1rem;
-}
+
+
+
+
 
 body[data-page="observables"] .patterns-list{
     max-height: 60vh;
