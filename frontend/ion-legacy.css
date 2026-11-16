@@ -641,15 +641,7 @@ body::before {
 
 
 
-.nav-links {
-    display: flex;
-    list-style: none;
-    margin: 0 1rem;
-    align-items: center;
-    flex: 1;
-    min-width: 0;
-    justify-content: space-evenly;
-}
+
 
 .nav-links > li > a:not(.nav-dropdown-toggle) {
     color: var(--text-secondary);
@@ -1491,10 +1483,7 @@ select option {
    ============================================================================= */
 
 @media (max-width: 1400px) {
-    .nav-links a {
-        padding: 0.5rem 0.5rem;
-        font-size: 0.75rem;
-    }
+
 }
 
 @media (max-width: 1024px) {
@@ -1504,10 +1493,7 @@ select option {
 
     
 
-    .nav-links a {
-        padding: 0.4rem 0.4rem;
-        font-size: 0.7rem;
-    }
+
 
     
 }
@@ -1517,15 +1503,9 @@ select option {
 
     
 
-    .nav-links {
-        margin-left: 0.5rem;
-        gap: 0;
-    }
 
-    .nav-links a {
-        padding: 0.35rem 0.35rem;
-        font-size: 0.65rem;
-    }
+
+
 
     .user-name {
         display: none;
@@ -1545,9 +1525,7 @@ select option {
 }
 
 @media (max-width: 600px) {
-    .nav-links {
-        display: none;
-    }
+
 
     .container {
         padding: 0.75rem;

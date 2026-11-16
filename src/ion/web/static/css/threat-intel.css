@@ -269,13 +269,10 @@ html[data-glass="on"][data-mode="dark"] :is(.ti-card, .ti-kpi, .ti-tabs, .ti-sta
 /* ── Legacy page pieces, carried over ───────────── */
 
 /* Stat cards */
-.ti-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
-.ti-stat-card {
-    background: var(--bg-secondary); border: 1px solid var(--ion-border);
-    border-radius: var(--ion-radius-lg); padding: 16px 20px; text-align: center;
-}
-.ti-stat-value { font-size: 1.8rem; font-weight: 700; color: var(--accent); }
-.ti-stat-label { font-size: .78rem; color: var(--text-secondary); margin-top: 4px; }
+
+
+
+
 
 .ti-btn {
     padding: 8px 16px; background: var(--accent); color: #000; border: none;

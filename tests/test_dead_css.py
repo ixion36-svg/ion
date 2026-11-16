@@ -19,6 +19,39 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from tools.dead_css import literal_tokens  # noqa: E402
 
 
+def test_sees_a_macro_argument_joined_to_a_class_suffix():
+    from tools.dead_css import constructed_prefixes
+
+    source = '''{% macro sev_pills(items, prefix, alert_count) %}
+        <span class="{{ prefix }}-pill {{ p.short }}">{{ p.count }}</span>
+        {% endmacro %}{{ sev_pills(s.pills, 'sys-sev', s.alert_count) }}'''
+    assert "sys-sev-" in constructed_prefixes(source, kind="markup")
+
+
+def test_inline_host_option_is_scanned_as_javascript(tmp_path, monkeypatch):
+    from tools import dead_css
+
+    (tmp_path / "cases.html").write_text(
+        '<script nonce="{{ csp_nonce }}">ionAlertDetail.mount({classPrefix:"cpanel-alert"});</script>',
+        encoding="utf-8")
+    monkeypatch.setattr(dead_css, "SEARCH_DIRS", [tmp_path])
+    chunks = dead_css.corpus_by_kind()
+    prefixes = set().union(*(dead_css.constructed_prefixes(text, kind=kind)
+                             for kind, text in chunks.items()))
+    assert "cpanel-alert-" in prefixes
+
+
+def test_macro_class_prefixes_follow_keywords_defaults_and_imports():
+    from tools.dead_css import constructed_prefixes
+
+    source = '''{% macro pill(prefix='default') %}<i class="{{ prefix }}-pill"></i>{% endmacro %}
+        {{ pill() }}{{ components.pill(prefix='named') }}
+        {% macro prose(prefix) %}{{ prefix }}-text{% endmacro %}{{ prose('unrelated') }}'''
+    prefixes = constructed_prefixes(source, kind="markup")
+    assert {"default-", "named-"} <= prefixes
+    assert "unrelated-" not in prefixes
+
+
 def test_sees_a_class_beside_a_template_literal_interpolation():
     """`class="a b${x}"` was skipped whole: the value pattern banned braces.
 

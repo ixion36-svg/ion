@@ -193,7 +193,7 @@ html body ._ion-s-c8be1ccba6 { display:none; }
 
 
 
-._ion-s-8bc7ebe99c { flex:1;background:var(--bg-code, rgba(0,0,0,0.08));border-radius:3px;height:14px;overflow:hidden; }
+
 
 
 
@@ -393,8 +393,6 @@ html body ._ion-s-c8be1ccba6 { display:none; }
 
 
 
-._ion-s-e26f061ab9 { background:var(--border-color,#30363d);border-radius:4px;height:6px;overflow:hidden; }
-._ion-s-b76ce82a4d { height:100%;background:var(--accent,#00e5ff);border-radius:4px;transition:width .3s;width:0%; }
 
 
 
@@ -429,14 +427,16 @@ html body ._ion-s-c8be1ccba6 { display:none; }
 
 
 
-._ion-s-5eaab7cb30 { display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;padding:8px;background:var(--bg-secondary,#0d1117);border-radius:6px; }
 
 
 
 
 
 
-._ion-s-a55ef5c079 { flex:1;background:var(--border-color,#30363d);border-radius:3px;height:4px;min-width:40px;overflow:hidden; }
+
+
+
+
 
 
 

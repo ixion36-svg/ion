@@ -20,22 +20,15 @@ body[data-page="integrations"] .int-tab-panel.active{ display: block; }
    ═══════════════════════════════════════════════════════════════ */
 
 /* ── Full-width layout (wrapper is already w-full; no break-out needed) ──── */
-body[data-page="integrations"] .topo-page-wrap{
-    width: 100%;
-    padding: 0 2rem;
-    box-sizing: border-box;
-}
+
 
 /* ── Layout ───────────────────────────────────────────────────── */
-body[data-page="integrations"] .topo-page{ display: flex; flex-direction: column; gap: 20px; padding-bottom: 20px; max-width: 100%; }
 
-body[data-page="integrations"] .topo-header{
-    display: flex; align-items: center; justify-content: space-between;
-    flex-wrap: wrap; gap: 12px;
-}
-body[data-page="integrations"] .topo-header h1{ margin: 0; font-size: 1.4rem; display: flex; align-items: center; gap: 10px; }
-body[data-page="integrations"] .topo-header h1 i{ color: var(--primary); }
-body[data-page="integrations"] .topo-header-actions{ display: flex; gap: 8px; align-items: center; }
+
+
+
+
+
 
 /* ── Overall Health Banner ────────────────────────────────────── */
 body[data-page="integrations"] .topo-health-banner{
@@ -256,11 +249,7 @@ body[data-page="integrations"] .topo-detail-card:hover{ border-color: var(--prim
 body[data-page="integrations"] .topo-detail-head{
     display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
 }
-body[data-page="integrations"] .topo-detail-icon{
-    width: 44px; height: 44px; border-radius: var(--ion-radius-lg);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.3rem; flex-shrink: 0;
-}
+
 body[data-page="integrations"] .topo-detail-icon.healthy{ background: rgba(34,197,94,.12); color: var(--success); }
 body[data-page="integrations"] .topo-detail-icon.error{ background: rgba(239,68,68,.12); color: var(--danger); }
 body[data-page="integrations"] .topo-detail-icon.disabled{ background: rgba(107,114,128,.12); color: var(--text-muted); }
