@@ -79,7 +79,7 @@
     [data-theme="light"] .ion-tw-page .text-white { color: #0f172a !important; }
     [data-theme="light"] .ion-tw-page .bg-white\/5 { background: rgba(0, 0, 0, 0.03) !important; }
     [data-theme="light"] .ion-tw-page .hover\:bg-white\/5:hover { background: rgba(0, 0, 0, 0.06) !important; }
-    [data-theme="light"] .ion-tw-page .bg-grid { opacity: 0.15 !important; }
+
     [data-theme="light"] .ion-tw-page .grain { background-image: none !important; }
 
     /* ── Overlay ─────────────────────────────────── */

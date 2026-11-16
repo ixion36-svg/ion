@@ -1,0 +1,962 @@
+{
+  "scope": "Remaining candidates after the first nine removals; no blanket --write",
+  "source_file_count": 944,
+  "sheets": {
+    "alerts-page.css": {
+      "context": "Current alert fragments use utility classes for filters/cards; hbar-host/rule are LIVE Jinja concatenations and protected by the scanner fix.",
+      "candidates": {
+        "ad-sys-card-hdr": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Current alert fragments use utility classes for filters/cards; hbar-host/rule are LIVE Jinja concatenations and protected by the scanner fix."
+        },
+        "alerts-filters": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Current alert fragments use utility classes for filters/cards; hbar-host/rule are LIVE Jinja concatenations and protected by the scanner fix."
+        },
+        "card-wide": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Current alert fragments use utility classes for filters/cards; hbar-host/rule are LIVE Jinja concatenations and protected by the scanner fix."
+        },
+        "keyboard-selected": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Current alert fragments use utility classes for filters/cards; hbar-host/rule are LIVE Jinja concatenations and protected by the scanner fix."
+        },
+        "list-group": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Current alert fragments use utility classes for filters/cards; hbar-host/rule are LIVE Jinja concatenations and protected by the scanner fix."
+        },
+        "mitre-add-row": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Current alert fragments use utility classes for filters/cards; hbar-host/rule are LIVE Jinja concatenations and protected by the scanner fix."
+        },
+        "submenu-arrow": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Current alert fragments use utility classes for filters/cards; hbar-host/rule are LIVE Jinja concatenations and protected by the scanner fix."
+        }
+      },
+      "removed": [
+        {
+          "selector": ".alerts-filters select,\r\n.alerts-filters .search-input",
+          "line": 31,
+          "sha256": "f3449e5ca6614d4352ffbb56ea5a7b472ada4d0ffcf7289bde4e0f500cbb2ef9",
+          "rule": ".alerts-filters select,\r\n.alerts-filters .search-input {\r\n    padding: 0.5rem 0.75rem;\r\n    border: 1px solid var(--ion-border);\r\n    border-radius: var(--radius);\r\n    font-size: 0.875rem;\r\n    background: var(--bg-secondary);\r\n}"
+        },
+        {
+          "selector": ".alerts-filters .search-input",
+          "line": 40,
+          "sha256": "1d9a1b17b517d1958be5d63a9bcf6e11220816ceaa3ae826d10303474e709133",
+          "rule": ".alerts-filters .search-input {\r\n    flex: 1;\r\n    min-width: 200px;\r\n}"
+        },
+        {
+          "selector": ".context-menu-submenu .submenu-arrow",
+          "line": 249,
+          "sha256": "f69ae0276125a11aa1f9119437b32b8c254a056436cb4ed73b467a27b7c32813",
+          "rule": ".context-menu-submenu .submenu-arrow {\r\n    margin-left: auto;\r\n    font-size: 0.75rem;\r\n}"
+        },
+        {
+          "selector": ".alerts-grid .card-wide",
+          "line": 440,
+          "sha256": "1ce6ec67132ac9ddca362e6dfb008746001880f9177ecdd93e610f116ba82d3f",
+          "rule": ".alerts-grid .card-wide { min-width: 0; max-width: 100%; }"
+        },
+        {
+          "selector": ".alerts-grid .card-wide .card-body",
+          "line": 441,
+          "sha256": "3f8b65b7dd9327a94d186337af96e88c1e7f9b0552c726c9610f36bde278bf12",
+          "rule": ".alerts-grid .card-wide .card-body { overflow-x: auto; }"
+        },
+        {
+          "selector": ".ad-sys-card.mapped .ad-sys-card-hdr::before",
+          "line": 640,
+          "sha256": "d65eea9ec6f040483e32ad5021c149bee8efe50b5c10a2184010e87e81747f57",
+          "rule": ".ad-sys-card.mapped .ad-sys-card-hdr::before {\r\n    background: linear-gradient(90deg, var(--success), rgba(76,175,80,0.2));\r\n}"
+        },
+        {
+          "selector": ".ad-sys-card:not(.mapped) .ad-sys-card-hdr::before",
+          "line": 643,
+          "sha256": "1d888a5ecac0e1a5ddd60a5a535445e9d3aed9e16bbc46bd769e38e2d93bb52a",
+          "rule": ".ad-sys-card:not(.mapped) .ad-sys-card-hdr::before {\r\n    background: linear-gradient(90deg, var(--warning), rgba(255,152,0,0.2));\r\n}"
+        },
+        {
+          "selector": ".card-wide .card-body",
+          "line": 743,
+          "sha256": "59c24211609f7339acd86b2d6f7b02732014860f7b8d30166d76de3010d6b18b",
+          "rule": ".card-wide .card-body {\r\n    overflow-x: auto;\r\n}"
+        },
+        {
+          "selector": ".side-panel .list-group",
+          "line": 813,
+          "sha256": "85bb685a64462f4bca61ab376126c3924e1d6f66e06d3043527febad4808b9a8",
+          "rule": ".side-panel .list-group {\r\n    display: flex;\r\n    flex-direction: column;\r\n    gap: 8px;\r\n    max-height: 240px;\r\n    overflow-y: auto;\r\n}"
+        },
+        {
+          "selector": ".alert-row.keyboard-selected",
+          "line": 987,
+          "sha256": "6bbe772c6c3c3538acaa752e575f799e044b583738687f01c47960af11ce40df",
+          "rule": ".alert-row.keyboard-selected {\r\n    outline: 2px solid var(--primary);\r\n    outline-offset: -2px;\r\n}"
+        },
+        {
+          "selector": ".mitre-add-row input.mitre-name-input",
+          "line": 1389,
+          "sha256": "f0eaaf0b6c4e6dd78fc82db2bda35b49ce26c6fba59cae38bba429c3eb10a39d",
+          "rule": ".mitre-add-row input.mitre-name-input { width: 140px; }"
+        }
+      ],
+      "retained_rules": [],
+      "bytes_removed": 1108,
+      "unapproved_rules_unchanged": true
+    },
+    "arkime-traffic.css": {
+      "context": "Loaded jsvectormap.min.js generates jvm-tooltip; it contains no jvectormap prefix. Legacy .jvectormap-tip.active has no producer.",
+      "candidates": {
+        "jvectormap-tip": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Loaded jsvectormap.min.js generates jvm-tooltip; it contains no jvectormap prefix. Legacy .jvectormap-tip.active has no producer."
+        }
+      },
+      "removed": [
+        {
+          "selector": ".jvectormap-tip.active",
+          "line": 163,
+          "sha256": "f9d6ad746c5711d29c2ed990f05ee691ab9952c90a8b713a81fcc2e937469576",
+          "rule": ".jvectormap-tip.active { display: block; }"
+        }
+      ],
+      "retained_rules": [],
+      "bytes_removed": 42,
+      "unapproved_rules_unchanged": true
+    },
+    "cases-page.css": {
+      "context": "Current case fragments use cpanel/awx observable rows and utility-based controls; no awx-conf/awx-cfv/cases-modal-body/tier-* producer remains.",
+      "candidates": {
+        "awx-cfv": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Current case fragments use cpanel/awx observable rows and utility-based controls; no awx-conf/awx-cfv/cases-modal-body/tier-* producer remains."
+        },
+        "awx-conf": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Current case fragments use cpanel/awx observable rows and utility-based controls; no awx-conf/awx-cfv/cases-modal-body/tier-* producer remains."
+        },
+        "cases-modal-body": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Current case fragments use cpanel/awx observable rows and utility-based controls; no awx-conf/awx-cfv/cases-modal-body/tier-* producer remains."
+        },
+        "tier-high": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Current case fragments use cpanel/awx observable rows and utility-based controls; no awx-conf/awx-cfv/cases-modal-body/tier-* producer remains."
+        },
+        "tier-low": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Current case fragments use cpanel/awx observable rows and utility-based controls; no awx-conf/awx-cfv/cases-modal-body/tier-* producer remains."
+        },
+        "tier-medium": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Current case fragments use cpanel/awx observable rows and utility-based controls; no awx-conf/awx-cfv/cases-modal-body/tier-* producer remains."
+        }
+      },
+      "removed": [
+        {
+          "selector": ".cases-modal-body .form-group",
+          "line": 1359,
+          "sha256": "ee7652dac4b0128c343aacf393289beab18d1f5e6e9ddbea7b92a37aa41d30f4",
+          "rule": ".cases-modal-body .form-group { margin-bottom: 0.75rem; }"
+        },
+        {
+          "selector": ".cases-modal-body .form-control",
+          "line": 1369,
+          "sha256": "67474ed3c89657baade9d68763daabe196730781ac28aeefdb111e482142d4d5",
+          "rule": ".cases-modal-body .form-control {\r\n    width: 100%;\r\n    padding: 0.5rem 0.75rem;\r\n    background: var(--bg-primary);\r\n    border: 1px solid var(--ion-border);\r\n    border-radius: var(--radius);\r\n    color: var(--text-primary);\r\n    font-size: 0.85rem;\r\n    box-sizing: border-box;\r\n}"
+        },
+        {
+          "selector": ".cases-modal-body .form-control:focus",
+          "line": 1380,
+          "sha256": "09effadea9854bc309405f7a2e438bd84c06de04b8b0e7533311aed1d7b45169",
+          "rule": ".cases-modal-body .form-control:focus { outline: none; border-color: var(--accent-color); }"
+        },
+        {
+          "selector": ".cases-modal-body textarea.form-control",
+          "line": 1382,
+          "sha256": "69757fb8a99ad2ac9720dbe63db0e236563331800a999575e60f1237548a5ee2",
+          "rule": ".cases-modal-body textarea.form-control { resize: vertical; font-family: inherit; }"
+        },
+        {
+          "selector": ".awx-cfv.mono",
+          "line": 1864,
+          "sha256": "06f0eddb04c27347c14c1feffd8f8be9cf4e72be63a07afe71066718de21f620",
+          "rule": ".awx-cfv.mono { font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; }"
+        },
+        {
+          "selector": ".awx-conf .awx-fillb",
+          "line": 1913,
+          "sha256": "c95bd2a6d33bc35e540a09430a44f603597087eeb20d4a9ba1118084a15609ef",
+          "rule": ".awx-conf .awx-fillb { height: 100%; border-radius: 99px; }"
+        },
+        {
+          "selector": ".awx-conf .awx-fillb.tier-high",
+          "line": 1914,
+          "sha256": "e1c8e9dbdbf447d729e18cc11702cb032f761acea6333ab196b2a20ebeff25a7",
+          "rule": ".awx-conf .awx-fillb.tier-high { background: var(--success); }"
+        },
+        {
+          "selector": ".awx-conf .awx-fillb.tier-medium",
+          "line": 1915,
+          "sha256": "cb2d7b98cfe5520292404f0cba91924818e8922c88c7a4112b4c9590de42ad0f",
+          "rule": ".awx-conf .awx-fillb.tier-medium { background: var(--sev-medium); }"
+        },
+        {
+          "selector": ".awx-conf .awx-fillb.tier-low",
+          "line": 1916,
+          "sha256": "59ae140a1d4b5829fd4eef4a4d745c4318bd3e2bf0d200734c6c2d690db15da8",
+          "rule": ".awx-conf .awx-fillb.tier-low { background: var(--sev-high); }"
+        }
+      ],
+      "retained_rules": [],
+      "bytes_removed": 855,
+      "unapproved_rules_unchanged": true
+    },
+    "integrations-page.css": {
+      "context": "integrations_topology emits topo-detail-head/title/status, with no icon; current flow renderer emits no fork/merge arm or stem classes.",
+      "candidates": {
+        "flow-fork-arm-line": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "integrations_topology emits topo-detail-head/title/status, with no icon; current flow renderer emits no fork/merge arm or stem classes."
+        },
+        "flow-fork-stem": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "integrations_topology emits topo-detail-head/title/status, with no icon; current flow renderer emits no fork/merge arm or stem classes."
+        },
+        "flow-merge-arm-line": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "integrations_topology emits topo-detail-head/title/status, with no icon; current flow renderer emits no fork/merge arm or stem classes."
+        },
+        "flow-merge-stem": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "integrations_topology emits topo-detail-head/title/status, with no icon; current flow renderer emits no fork/merge arm or stem classes."
+        },
+        "topo-detail-icon": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "integrations_topology emits topo-detail-head/title/status, with no icon; current flow renderer emits no fork/merge arm or stem classes."
+        }
+      },
+      "removed": [
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-detail-icon.healthy",
+          "line": 253,
+          "sha256": "34fe15f72c820c1020a7c3ed701d4245bea0577177e177435056b85f406cfd65",
+          "rule": "body[data-page=\"integrations\"] .topo-detail-icon.healthy{ background: rgba(34,197,94,.12); color: var(--success); }"
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-detail-icon.error",
+          "line": 254,
+          "sha256": "e39e5388f0d6632a95703b812097d67efec63dd00e8823d4e79b95861bea704b",
+          "rule": "body[data-page=\"integrations\"] .topo-detail-icon.error{ background: rgba(239,68,68,.12); color: var(--danger); }"
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-detail-icon.disabled",
+          "line": 255,
+          "sha256": "48118fb73aaa2e3592c17c9cfa4aff96310a57b1655e26a81bb65955c2a893e4",
+          "rule": "body[data-page=\"integrations\"] .topo-detail-icon.disabled{ background: rgba(107,114,128,.12); color: var(--text-muted); }"
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-detail-icon.checking",
+          "line": 256,
+          "sha256": "6058db0b8b040738837f923fb4847f8e32e7f67c91fbec058ad8df4bac4de1e2",
+          "rule": "body[data-page=\"integrations\"] .topo-detail-icon.checking{ background: rgba(234,179,8,.12); color: var(--warning); }"
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-detail-card[data-service=\"elasticsearch\"] .topo-detail-icon.healthy",
+          "line": 259,
+          "sha256": "af41ade20cbb1e1ecb7fce28d1f208aac9794b372255d46b5410b390bab5dc19",
+          "rule": "body[data-page=\"integrations\"] .topo-detail-card[data-service=\"elasticsearch\"] .topo-detail-icon.healthy{ background: rgba(0,191,179,.12); color: #00bfb3; }"
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-detail-card[data-service=\"kibana\"] .topo-detail-icon.healthy",
+          "line": 260,
+          "sha256": "4ac426f2efedbf5e3ba3f8fcce9f956d376bd89be42cc882fe83c3b612083a20",
+          "rule": "body[data-page=\"integrations\"] .topo-detail-card[data-service=\"kibana\"] .topo-detail-icon.healthy{ background: rgba(0,191,179,.12); color: #00bfb3; }"
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-detail-card[data-service=\"gitlab\"] .topo-detail-icon.healthy",
+          "line": 261,
+          "sha256": "937b7e68413e750c438a2687e7ee7de2a74b3c8bd704f0d643c29ccf00bd5ac9",
+          "rule": "body[data-page=\"integrations\"] .topo-detail-card[data-service=\"gitlab\"] .topo-detail-icon.healthy{ background: rgba(252,109,38,.12); color: #fc6d26; }"
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-detail-card[data-service=\"opencti\"] .topo-detail-icon.healthy",
+          "line": 262,
+          "sha256": "e553c4c736f8a0cb478dffb839918a529d1715c21a140380bc6bc88a7e33fa98",
+          "rule": "body[data-page=\"integrations\"] .topo-detail-card[data-service=\"opencti\"] .topo-detail-icon.healthy{ background: rgba(0,27,218,.12); color: #6366f1; }"
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-detail-card[data-service=\"tide\"] .topo-detail-icon.healthy",
+          "line": 263,
+          "sha256": "1b58c80b65accd0d7a66098d5334e204091f9b13c0136ae0e329f98aa74212cc",
+          "rule": "body[data-page=\"integrations\"] .topo-detail-card[data-service=\"tide\"] .topo-detail-icon.healthy{ background: rgba(16,185,129,.12); color: #10b981; }"
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-detail-card[data-service=\"ollama\"] .topo-detail-icon.healthy",
+          "line": 264,
+          "sha256": "6c2399842ee807638ede2f0f7b085d4866ec3437db853c5a63a71aff7cce3cc1",
+          "rule": "body[data-page=\"integrations\"] .topo-detail-card[data-service=\"ollama\"] .topo-detail-icon.healthy{ background: rgba(168,85,247,.12); color: #a855f7; }"
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .topo-detail-card[data-service=\"dfir_iris\"] .topo-detail-icon.healthy",
+          "line": 265,
+          "sha256": "a7f1b91f32faefc446e965bb95a04d0f74f15cfd72cc22a7b6aa86a8e9563a91",
+          "rule": "body[data-page=\"integrations\"] .topo-detail-card[data-service=\"dfir_iris\"] .topo-detail-icon.healthy{ background: rgba(59,130,246,.12); color: #3b82f6; }"
+        },
+        {
+          "selector": "body[data-page=\"integrations\"] .flow-pipe-step.active .flow-fork-arm-line, body[data-page=\"integrations\"] .flow-pipe-step.active .flow-fork-stem, body[data-page=\"integrations\"] .flow-pipe-step.active .flow-merge-arm-line, body[data-page=\"integrations\"] .flow-pipe-step.active .flow-merge-stem",
+          "line": 557,
+          "sha256": "ffb86f08e506615ab9edea3d7d3963a824ae39adc83e81f924f41608cb55ad3d",
+          "rule": "body[data-page=\"integrations\"] .flow-pipe-step.active .flow-fork-arm-line, body[data-page=\"integrations\"] .flow-pipe-step.active .flow-fork-stem, body[data-page=\"integrations\"] .flow-pipe-step.active .flow-merge-arm-line, body[data-page=\"integrations\"] .flow-pipe-step.active .flow-merge-stem{ opacity: .8; }"
+        }
+      ],
+      "retained_rules": [],
+      "bytes_removed": 1827,
+      "unapproved_rules_unchanged": true
+    },
+    "ion-glass.css": {
+      "context": "Shared :is(...) lists contain live alternatives; retain entire rules rather than pruning branches in this cleanup.",
+      "candidates": {
+        "dropdown-content": {
+          "decision": "retain",
+          "source_hits": [],
+          "note": "Shared :is(...) lists contain live alternatives; retain entire rules rather than pruning branches in this cleanup."
+        },
+        "ion-ws-section": {
+          "decision": "retain",
+          "source_hits": [],
+          "note": "Shared :is(...) lists contain live alternatives; retain entire rules rather than pruning branches in this cleanup."
+        },
+        "jvectormap-tip": {
+          "decision": "retain",
+          "source_hits": [],
+          "note": "Shared :is(...) lists contain live alternatives; retain entire rules rather than pruning branches in this cleanup."
+        }
+      },
+      "removed": [],
+      "retained_rules": [
+        {
+          "selector": "html[data-glass=\"on\"][data-mode=\"dark\"] :is(.card, .ion-card, .cpanel-section, .ion-ws-section, .stat-card, .ion-metric)",
+          "reason": "Live/escaped class or mixed selector alternatives; unchanged."
+        },
+        {
+          "selector": "html[data-glass=\"on\"][data-mode=\"dark\"] :is(.case-panel, .modal-box, .np-panel, .tw-drop-menu, .dropdown-content, .menu.dropdown-content)",
+          "reason": "Live/escaped class or mixed selector alternatives; unchanged."
+        },
+        {
+          "selector": "html[data-glass=\"on\"][data-mode=\"dark\"] :is(.acp-panel, .context-menu, .jvectormap-tip, .forensic-toast, .notification-toast, #toast-container > *, .ion-ws-panel),\r\nhtml[data-glass=\"on\"][data-mode=\"dark\"] :is(.saved-filters-modal, .case-create-overlay, .case-mgmt-overlay, .closure-modal-overlay, .acp-closure-overlay, .cases-modal-overlay, .ai-file-modal, .modal-overlay, .outcome-modal-overlay, .wizard-modal-overlay, .sched-modal-backdrop, .day-roster-backdrop, .tp-modal-overlay, .iad-tune-overlay, .modal:not(.modal-box)) > :not(script):not(style)",
+          "reason": "Live/escaped class or mixed selector alternatives; unchanged."
+        }
+      ],
+      "bytes_removed": 0,
+      "unapproved_rules_unchanged": true
+    },
+    "ion-legacy.css": {
+      "context": "Root app.js explicitly documents that nav-links and its mobile menu were removed. Current shell uses tw-nav-*.",
+      "candidates": {
+        "nav-dropdown-toggle": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Root app.js explicitly documents that nav-links and its mobile menu were removed. Current shell uses tw-nav-*."
+        },
+        "nav-links": {
+          "decision": "remove whole rules only",
+          "source_hits": [
+            "src/ion/web/static/js/app.js"
+          ],
+          "note": "app.js documents the removed mobile navigation; current navigation uses tw-nav-*."
+        }
+      },
+      "removed": [
+        {
+          "selector": ".nav-links > li > a:not(.nav-dropdown-toggle)",
+          "line": 646,
+          "sha256": "d2cc9dbe55c3b4aa62af88d6d51e7b25704bfd129c9d4bd0d3018637d86da132",
+          "rule": ".nav-links > li > a:not(.nav-dropdown-toggle) {\r\n    color: var(--text-secondary);\r\n    text-decoration: none;\r\n    padding: 0.5rem 0.85rem;\r\n    border-radius: var(--radius);\r\n    font-size: 0.82rem;\r\n    font-weight: 600;\r\n    letter-spacing: 0.03em;\r\n    text-transform: uppercase;\r\n    transition: all 0.2s ease;\r\n    position: relative;\r\n    white-space: nowrap;\r\n    border: 1px solid transparent;\r\n}"
+        },
+        {
+          "selector": ".nav-links > li > a:not(.nav-dropdown-toggle):hover",
+          "line": 661,
+          "sha256": "1e5476c2a728398105bd5e73620ca1ef00dc4b1c31adf3ab3eac598435a57e76",
+          "rule": ".nav-links > li > a:not(.nav-dropdown-toggle):hover {\r\n    color: var(--primary);\r\n    background: var(--primary-dim);\r\n    border-color: var(--border-bright);\r\n    text-shadow: var(--glow-sm);\r\n}"
+        }
+      ],
+      "retained_rules": [],
+      "bytes_removed": 602,
+      "unapproved_rules_unchanged": true
+    },
+    "ion-migrated-styles.css": {
+      "context": "Hashed identifiers are static migration output. No dynamic hash generator; the one literal occurrence is a migration comment describing replacement utilities.",
+      "candidates": {
+        "_ion-s-09b0c9a2e1": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Hashed identifiers are static migration output. No dynamic hash generator; the one literal occurrence is a migration comment describing replacement utilities."
+        },
+        "_ion-s-0a1c7436f5": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Hashed identifiers are static migration output. No dynamic hash generator; the one literal occurrence is a migration comment describing replacement utilities."
+        },
+        "_ion-s-78cae35616": {
+          "decision": "remove whole rules only",
+          "source_hits": [
+            "src/ion/web/templates/_fragments/detection_engineering_emulation_detail.html"
+          ],
+          "note": "emulation_detail Jinja comment describes the replaced hash; the actual dashed panel uses full utility classes."
+        },
+        "_ion-s-b2ff45bb5d": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Hashed identifiers are static migration output. No dynamic hash generator; the one literal occurrence is a migration comment describing replacement utilities."
+        },
+        "_ion-s-d28cf57fed": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Hashed identifiers are static migration output. No dynamic hash generator; the one literal occurrence is a migration comment describing replacement utilities."
+        },
+        "_ion-s-e080dc03bc": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Hashed identifiers are static migration output. No dynamic hash generator; the one literal occurrence is a migration comment describing replacement utilities."
+        },
+        "_ion-s-e62e34ae9b": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Hashed identifiers are static migration output. No dynamic hash generator; the one literal occurrence is a migration comment describing replacement utilities."
+        },
+        "_ion-s-eaadf28b85": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Hashed identifiers are static migration output. No dynamic hash generator; the one literal occurrence is a migration comment describing replacement utilities."
+        }
+      },
+      "removed": [
+        {
+          "selector": "._ion-s-0a1c7436f5",
+          "line": 208,
+          "sha256": "5de8ce96aee46d3663a00cc1351826fd589e94d884820bf86d0584929016c20f",
+          "rule": "._ion-s-0a1c7436f5 { position:relative; margin-bottom:0.6rem; padding:0.45rem 0.65rem; border-radius:0.3rem; }"
+        },
+        {
+          "selector": "._ion-s-e080dc03bc",
+          "line": 209,
+          "sha256": "bdc6797899bdf445e3b5154fa359b98642fa34ba1ac7818d33157e7bdb2e3cc0",
+          "rule": "._ion-s-e080dc03bc { position:absolute; left:-1.05rem; top:0.55rem; width:0.65rem; height:0.65rem; border-radius:50%; border:2px solid var(--bg-deep); }"
+        },
+        {
+          "selector": "._ion-s-e62e34ae9b",
+          "line": 211,
+          "sha256": "0570ecb68b99861788876053a156b44d47296d804391a6717202f8646eec27f7",
+          "rule": "._ion-s-e62e34ae9b { font-size:0.55rem; font-weight:700; letter-spacing:0.05em; }"
+        },
+        {
+          "selector": "._ion-s-09b0c9a2e1",
+          "line": 213,
+          "sha256": "a4d717b3d811fed0ea53ff71ba437db74930a00dcd28b99b72651c08ff8eed00",
+          "rule": "._ion-s-09b0c9a2e1 { background:var(--success); border-radius:3px; height:6px; }"
+        },
+        {
+          "selector": "._ion-s-b2ff45bb5d",
+          "line": 214,
+          "sha256": "9c5dcda85dc2c7be9a47a29030fc87dafd26eaaa7d8560abc12a4fc1885fd9ce",
+          "rule": "._ion-s-b2ff45bb5d { background:var(--warning); border-radius:3px; height:6px; }"
+        },
+        {
+          "selector": "._ion-s-d28cf57fed",
+          "line": 215,
+          "sha256": "ac6ee490935982acd992da8e146dd79b7dd9518ec3a1bf0f8c0911d6fe3a4125",
+          "rule": "._ion-s-d28cf57fed { background:var(--neon-orange); border-radius:3px; height:6px; }"
+        },
+        {
+          "selector": "._ion-s-eaadf28b85",
+          "line": 216,
+          "sha256": "70c70a6f856f7e68aa5cf2dc1d0c23bde0a4bdcb6c3b87677a885624b39a9471",
+          "rule": "._ion-s-eaadf28b85 { background:var(--danger); border-radius:3px; height:6px; }"
+        },
+        {
+          "selector": "._ion-s-78cae35616",
+          "line": 343,
+          "sha256": "e3559ed2c5a501adc01b39ec72222f22d4f09e71b14d9ac9512e9d4c17c71073",
+          "rule": "._ion-s-78cae35616 { background:var(--bg-tertiary);border:1px dashed var(--ion-border);border-radius:6px;padding:10px 14px;margin-top:10px; }"
+        }
+      ],
+      "retained_rules": [],
+      "bytes_removed": 807,
+      "unapproved_rules_unchanged": true
+    },
+    "ion-pages.css": {
+      "context": "Workforce tree, slide and template-render remnants have no current producer. Mixed guide/deck selector lists are retained whole.",
+      "candidates": {
+        "chat-toggle": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Workforce tree, slide and template-render remnants have no current producer. Mixed guide/deck selector lists are retained whole."
+        },
+        "chat-widget": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Workforce tree, slide and template-render remnants have no current producer. Mixed guide/deck selector lists are retained whole."
+        },
+        "deck-brand-big": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Workforce tree, slide and template-render remnants have no current producer. Mixed guide/deck selector lists are retained whole."
+        },
+        "deck-h-row": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Workforce tree, slide and template-render remnants have no current producer. Mixed guide/deck selector lists are retained whole."
+        },
+        "header-actions": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Workforce tree, slide and template-render remnants have no current producer. Mixed guide/deck selector lists are retained whole."
+        },
+        "navbar": {
+          "decision": "remove whole rules only",
+          "source_hits": [
+            "src/ion/web/static/js/notepad.js"
+          ],
+          "note": "notepad.js has a prose reference to the navbar button, not a class producer."
+        },
+        "se-meta-header": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Workforce tree, slide and template-render remnants have no current producer. Mixed guide/deck selector lists are retained whole."
+        },
+        "title-slide": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Workforce tree, slide and template-render remnants have no current producer. Mixed guide/deck selector lists are retained whole."
+        },
+        "wf-tree": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Workforce tree, slide and template-render remnants have no current producer. Mixed guide/deck selector lists are retained whole."
+        }
+      },
+      "removed": [
+        {
+          "selector": "body[data-page=\"workforce_orbat\"] .wf-tree",
+          "line": 62,
+          "sha256": "580b2b476e362ae110a16638c15db1b66548fd51bf4077db6e8bd2e859b24f93",
+          "rule": "body[data-page=\"workforce_orbat\"] .wf-tree{ --wf-line: color-mix(in srgb, currentColor 22%, transparent); }"
+        },
+        {
+          "selector": "body[data-page=\"workforce_orbat\"] .wf-tree ul",
+          "line": 63,
+          "sha256": "efcacccb4dafec291a59bb64d92206242b9cc47b3d50f72137653cbd9c531b41",
+          "rule": "body[data-page=\"workforce_orbat\"] .wf-tree ul{\r\n    display: flex; align-items: flex-start; justify-content: center;\r\n    padding: 26px 0 0; margin: 0; position: relative;\r\n}"
+        },
+        {
+          "selector": "body[data-page=\"workforce_orbat\"] .wf-tree li",
+          "line": 67,
+          "sha256": "e66a975a830877f68455d2b1226a56729d6515beeaf1c0cc54dc6161fac1a6a8",
+          "rule": "body[data-page=\"workforce_orbat\"] .wf-tree li{\r\n    list-style: none; position: relative;\r\n    display: flex; flex-direction: column; align-items: center;\r\n    padding: 26px 10px 0;\r\n}"
+        },
+        {
+          "selector": "body[data-page=\"workforce_orbat\"] .wf-tree li::before, body[data-page=\"workforce_orbat\"] .wf-tree li::after",
+          "line": 72,
+          "sha256": "a41254c88e915ca8dbd148949b2e472c8ba9e1687e3e7d6c80d3cad12b91d796",
+          "rule": "body[data-page=\"workforce_orbat\"] .wf-tree li::before, body[data-page=\"workforce_orbat\"] .wf-tree li::after{\r\n    content: ''; position: absolute; top: 0; right: 50%;\r\n    border-top: 2px solid var(--wf-line); width: 50%; height: 26px;\r\n}"
+        },
+        {
+          "selector": "body[data-page=\"workforce_orbat\"] .wf-tree li::after",
+          "line": 76,
+          "sha256": "58ed0429d07a5e473ca1cc4ccde2fcfdd81b27abe1e9ca7665dc49dbe2b4a4fb",
+          "rule": "body[data-page=\"workforce_orbat\"] .wf-tree li::after{ right: auto; left: 50%; border-left: 2px solid var(--wf-line); }"
+        },
+        {
+          "selector": "body[data-page=\"workforce_orbat\"] .wf-tree li:only-child::before, body[data-page=\"workforce_orbat\"] .wf-tree li:only-child::after",
+          "line": 77,
+          "sha256": "97d0647d471c2bbd114b1ad71e371140e112dbe0a625b2c4c58d9c466435e91d",
+          "rule": "body[data-page=\"workforce_orbat\"] .wf-tree li:only-child::before, body[data-page=\"workforce_orbat\"] .wf-tree li:only-child::after{ display: none; }"
+        },
+        {
+          "selector": "body[data-page=\"workforce_orbat\"] .wf-tree li:first-child::before, body[data-page=\"workforce_orbat\"] .wf-tree li:last-child::after",
+          "line": 78,
+          "sha256": "cfd657cd41608ca80b98cd76ee31e218a008fb5ae61754cae9870821c25ec43d",
+          "rule": "body[data-page=\"workforce_orbat\"] .wf-tree li:first-child::before, body[data-page=\"workforce_orbat\"] .wf-tree li:last-child::after{ border: 0 none; }"
+        },
+        {
+          "selector": "body[data-page=\"workforce_orbat\"] .wf-tree li:last-child::before",
+          "line": 79,
+          "sha256": "4b27e81b0ff3dafa5e9979bd581727f32b33488fb696913e10e297607c03bc75",
+          "rule": "body[data-page=\"workforce_orbat\"] .wf-tree li:last-child::before{\r\n    border-right: 2px solid var(--wf-line); border-radius: 0 8px 0 0;\r\n}"
+        },
+        {
+          "selector": "body[data-page=\"workforce_orbat\"] .wf-tree li:first-child::after",
+          "line": 82,
+          "sha256": "3b62dca54092a2015155790e7fe0bfdad56124fe3ac203513d4a7580b48c0262",
+          "rule": "body[data-page=\"workforce_orbat\"] .wf-tree li:first-child::after{ border-radius: 8px 0 0 0; }"
+        },
+        {
+          "selector": "body[data-page=\"workforce_orbat\"] .wf-tree ul ul::before",
+          "line": 83,
+          "sha256": "c86a66c364df2e823330c1d16c367d855463ef55c2b6477afdd1b817a27d795e",
+          "rule": "body[data-page=\"workforce_orbat\"] .wf-tree ul ul::before{\r\n    content: ''; position: absolute; top: 0; left: 50%;\r\n    border-left: 2px solid var(--wf-line); width: 0; height: 26px;\r\n}"
+        },
+        {
+          "selector": "body[data-page=\"workforce_orbat\"] .wf-tree",
+          "line": 90,
+          "sha256": "c6c5ed7dd088ffa75f50cd975729d0f6699538ffa0f64d9e6af4ae193c36aa02",
+          "rule": "body[data-page=\"workforce_orbat\"] .wf-tree{ overflow-x: auto; padding-bottom: 8px; }"
+        },
+        {
+          "selector": "body[data-page=\"workforce_orbat\"] .wf-tree > ul",
+          "line": 91,
+          "sha256": "57f102c3870592468dcef111f181fadbc0a9b7ed5c017def5eb4b53776ea6445",
+          "rule": "body[data-page=\"workforce_orbat\"] .wf-tree > ul{ min-width: max-content; }"
+        },
+        {
+          "selector": "body[data-page=\"workforce_orbat\"] .wf-tree > ul",
+          "line": 93,
+          "sha256": "112d335df2b8748f9dbda5ec80b9fd3b173941c0ad16a7965de1085fa3ef3dac",
+          "rule": "body[data-page=\"workforce_orbat\"] .wf-tree > ul{ padding-top: 0; }"
+        },
+        {
+          "selector": "body[data-page=\"workforce_orbat\"] .wf-tree > ul > li",
+          "line": 94,
+          "sha256": "9da4106f21a7fba8c8db48c6d776ff02df3a21504b0c06e702927075b538fb29",
+          "rule": "body[data-page=\"workforce_orbat\"] .wf-tree > ul > li{ padding-top: 0; }"
+        },
+        {
+          "selector": "body[data-page=\"workforce_orbat\"] .wf-tree > ul > li::before, body[data-page=\"workforce_orbat\"] .wf-tree > ul > li::after",
+          "line": 95,
+          "sha256": "00c9d61649529ab13f3a79fbe3a96e139c240392d428e77e7000b16170c38a96",
+          "rule": "body[data-page=\"workforce_orbat\"] .wf-tree > ul > li::before, body[data-page=\"workforce_orbat\"] .wf-tree > ul > li::after{ display: none; }"
+        },
+        {
+          "selector": "body[data-page=\"daily_standup_slides\"] .deck-slide.title-slide",
+          "line": 901,
+          "sha256": "c9894fa95a155be993a1994b88d277d1a9b6921ce0f00752686b56de135f2475",
+          "rule": "body[data-page=\"daily_standup_slides\"] .deck-slide.title-slide{ padding: 0; }"
+        },
+        {
+          "selector": "body[data-page=\"daily_standup_slides\"] .deck-h-row .deck-h-title",
+          "line": 910,
+          "sha256": "a700d8cadf292ed44245aef3b7fe8be9bd96c2d42e45ba3baf3809011ee219dd",
+          "rule": "body[data-page=\"daily_standup_slides\"] .deck-h-row .deck-h-title{ margin-bottom: 0; }"
+        },
+        {
+          "selector": "body[data-page=\"daily_standup_slides\"] .deck-slide.title-slide .deck-title",
+          "line": 916,
+          "sha256": "f87ff8d60ba2c44dbdf69f66abc7aec322dcd17a1721ac1549de9b69d313940f",
+          "rule": "body[data-page=\"daily_standup_slides\"] .deck-slide.title-slide .deck-title{\r\n    background: linear-gradient(180deg, #f8fafc 0%, #94a3b8 100%);\r\n    -webkit-background-clip: text; background-clip: text;\r\n    -webkit-text-fill-color: transparent;\r\n  }"
+        },
+        {
+          "selector": "body[data-page=\"template_render\"] .se-meta-header .se-rendered",
+          "line": 2425,
+          "sha256": "d8cd659dcdb123661b94af9c8c7100edafaff4c964b4f954fc4705700af1564b",
+          "rule": "body[data-page=\"template_render\"] .se-meta-header .se-rendered{ padding: 1rem; }"
+        },
+        {
+          "selector": "body[data-page=\"template_render\"] .se-meta-header .rendered-content",
+          "line": 2426,
+          "sha256": "da370dd695ee878a1f7b5cf4afa2d9b5820c839b4fbdce7101122e85d9434163",
+          "rule": "body[data-page=\"template_render\"] .se-meta-header .rendered-content{ font-size: 0.85rem; }"
+        }
+      ],
+      "retained_rules": [
+        {
+          "selector": "body[data-page=\"guide\"] .navbar, body[data-page=\"guide\"] .g-role-bar, body[data-page=\"guide\"] .g-quicknav, body[data-page=\"guide\"] .header-actions, body[data-page=\"guide\"] .chat-widget, body[data-page=\"guide\"] .chat-toggle",
+          "reason": "Live/escaped class or mixed selector alternatives; unchanged."
+        },
+        {
+          "selector": "body[data-page=\"daily_standup_slides\"] .deck-brand-mark, body[data-page=\"daily_standup_slides\"] .deck-brand-big",
+          "reason": "Live/escaped class or mixed selector alternatives; unchanged."
+        }
+      ],
+      "bytes_removed": 2550,
+      "unapproved_rules_unchanged": true
+    },
+    "ion-shell.css": {
+      "context": "bg-grid has no producer; escaped slash utilities are live and must be retained.",
+      "candidates": {
+        "bg-grid": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "bg-grid has no producer; escaped slash utilities are live and must be retained."
+        },
+        "bg-ink-950": {
+          "decision": "retain",
+          "source_hits": [
+            "src/ion/web/templates/base.html"
+          ],
+          "note": "bg-grid has no producer; escaped slash utilities are live and must be retained."
+        },
+        "bg-white": {
+          "decision": "retain",
+          "source_hits": [
+            "src/ion/web/templates/alerts.html",
+            "src/ion/web/templates/base.html",
+            "src/ion/web/templates/forensics.html",
+            "src/ion/web/templates/network_map.html",
+            "src/ion/web/templates/observables.html",
+            "src/ion/web/templates/tools.html",
+            "src/ion/web/static/js/tenant-switcher.js",
+            "src/ion/web/templates/_fragments/analyst.html",
+            "src/ion/web/templates/_fragments/de_workbench_proposals.html",
+            "src/ion/web/templates/_fragments/network_map_asset.html",
+            "src/ion/web/templates/_fragments/network_map_assets.html",
+            "src/ion/web/templates/_fragments/network_map_topology.html",
+            "src/ion/web/templates/_fragments/wallboard.html"
+          ],
+          "note": "bg-grid has no producer; escaped slash utilities are live and must be retained."
+        },
+        "border-white": {
+          "decision": "retain",
+          "source_hits": [
+            "src/ion/web/templates/alerts.html",
+            "src/ion/web/templates/base.html",
+            "src/ion/web/templates/observables.html",
+            "src/ion/web/templates/tools.html",
+            "src/ion/web/templates/_fragments/analyst.html",
+            "src/ion/web/templates/_fragments/de_workbench_campaigns.html",
+            "src/ion/web/templates/_fragments/de_workbench_proposals.html",
+            "src/ion/web/templates/_fragments/de_workbench_quirks.html",
+            "src/ion/web/templates/_fragments/de_workbench_requests.html",
+            "src/ion/web/templates/_fragments/network_map_asset.html",
+            "src/ion/web/templates/_fragments/network_map_topology.html"
+          ],
+          "note": "bg-grid has no producer; escaped slash utilities are live and must be retained."
+        }
+      },
+      "removed": [
+        {
+          "selector": "[data-theme=\"light\"] .ion-tw-page .bg-grid",
+          "line": 82,
+          "sha256": "29890e791556544ae0d98e40a77f90fd4b6e3120845255dae51aced71085b6ff",
+          "rule": "[data-theme=\"light\"] .ion-tw-page .bg-grid { opacity: 0.15 !important; }"
+        }
+      ],
+      "retained_rules": [
+        {
+          "selector": "[data-theme=\"light\"] .ion-tw-page .bg-ink-900\\/50,\r\n    [data-theme=\"light\"] .ion-tw-page .bg-ink-900\\/40,\r\n    [data-theme=\"light\"] .ion-tw-page .bg-ink-900\\/60,\r\n    [data-theme=\"light\"] .ion-tw-page .bg-ink-950\\/60",
+          "reason": "Live/escaped class or mixed selector alternatives; unchanged."
+        },
+        {
+          "selector": "[data-theme=\"light\"] .ion-tw-page .border-white\\/5,\r\n    [data-theme=\"light\"] .ion-tw-page .border-white\\/10",
+          "reason": "Live/escaped class or mixed selector alternatives; unchanged."
+        },
+        {
+          "selector": "[data-theme=\"light\"] .ion-tw-page .bg-white\\/5",
+          "reason": "Live/escaped class or mixed selector alternatives; unchanged."
+        }
+      ],
+      "bytes_removed": 72,
+      "unapproved_rules_unchanged": true
+    },
+    "observables-page.css": {
+      "context": "Current observables_detail emits ctx-generic. Header/filter markup uses utilities; no ctx source/dest/subject/target/host builder remains.",
+      "candidates": {
+        "ctx-dest": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Current observables_detail emits ctx-generic. Header/filter markup uses utilities; no ctx source/dest/subject/target/host builder remains."
+        },
+        "ctx-host": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Current observables_detail emits ctx-generic. Header/filter markup uses utilities; no ctx source/dest/subject/target/host builder remains."
+        },
+        "ctx-source": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Current observables_detail emits ctx-generic. Header/filter markup uses utilities; no ctx source/dest/subject/target/host builder remains."
+        },
+        "ctx-subject": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Current observables_detail emits ctx-generic. Header/filter markup uses utilities; no ctx source/dest/subject/target/host builder remains."
+        },
+        "ctx-target": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Current observables_detail emits ctx-generic. Header/filter markup uses utilities; no ctx source/dest/subject/target/host builder remains."
+        },
+        "header-actions": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Current observables_detail emits ctx-generic. Header/filter markup uses utilities; no ctx source/dest/subject/target/host builder remains."
+        },
+        "observables-filters": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Current observables_detail emits ctx-generic. Header/filter markup uses utilities; no ctx source/dest/subject/target/host builder remains."
+        }
+      },
+      "removed": [
+        {
+          "selector": "body[data-page=\"observables\"] .header-actions .badge",
+          "line": 203,
+          "sha256": "12e20e2141317c4b56e96ebceb2fe9bf28bc0f035b73d448cf7f36e11eab5152",
+          "rule": "body[data-page=\"observables\"] .header-actions .badge{\r\n    background: var(--warning);\r\n    color: #000;\r\n    padding: 0.15rem 0.4rem;\r\n    border-radius: 10px;\r\n    font-size: 0.7rem;\r\n    margin-left: 0.3rem;\r\n}"
+        },
+        {
+          "selector": "body[data-page=\"observables\"] .observables-filters select, body[data-page=\"observables\"] .observables-filters .search-input",
+          "line": 223,
+          "sha256": "83192e66d2ecb5232792767afa872a4b2e84cebb74822e76df1808cec56a8d7f",
+          "rule": "body[data-page=\"observables\"] .observables-filters select, body[data-page=\"observables\"] .observables-filters .search-input{\r\n    padding: 0.5rem 0.75rem;\r\n    border: 1px solid var(--ion-border);\r\n    border-radius: var(--radius);\r\n    font-size: 0.875rem;\r\n    background: var(--bg-secondary);\r\n    color: var(--text-primary);\r\n    transition: border-color 0.2s;\r\n}"
+        },
+        {
+          "selector": "body[data-page=\"observables\"] .observables-filters .search-input",
+          "line": 233,
+          "sha256": "57d6e93aaafaa1c89cce59e689e4c5073114f525df62c4ced0c567816db7cd56",
+          "rule": "body[data-page=\"observables\"] .observables-filters .search-input{\r\n    flex: 1;\r\n    min-width: 250px;\r\n}"
+        },
+        {
+          "selector": "body[data-page=\"observables\"] .context-badge.ctx-source",
+          "line": 733,
+          "sha256": "6e7efe70c62ccccc478430128dc18ff0f8ae73fb9f00b88b823c41e469cb810d",
+          "rule": "body[data-page=\"observables\"] .context-badge.ctx-source{ background: rgba(59, 130, 246, 0.12); color: #60a5fa; }"
+        },
+        {
+          "selector": "body[data-page=\"observables\"] .context-badge.ctx-dest",
+          "line": 734,
+          "sha256": "6cdef9280ce205ea646e5cf2ab66ecada715c2c41e0a3780b798ec956f3b325e",
+          "rule": "body[data-page=\"observables\"] .context-badge.ctx-dest{ background: rgba(249, 115, 22, 0.12); color: var(--neon-orange); }"
+        },
+        {
+          "selector": "body[data-page=\"observables\"] .context-badge.ctx-subject",
+          "line": 735,
+          "sha256": "23a5bbb01e131f4bb099a19a31437169e6d66239d4248c97520172974d8c3790",
+          "rule": "body[data-page=\"observables\"] .context-badge.ctx-subject{ background: rgba(168, 85, 247, 0.12); color: var(--neon-purple); }"
+        },
+        {
+          "selector": "body[data-page=\"observables\"] .context-badge.ctx-target",
+          "line": 736,
+          "sha256": "83301a77cddcf98b9ea889494ea5452080c7e52a39e8753901681e01e6dab033",
+          "rule": "body[data-page=\"observables\"] .context-badge.ctx-target{ background: rgba(239, 68, 68, 0.12); color: var(--danger); }"
+        },
+        {
+          "selector": "body[data-page=\"observables\"] .context-badge.ctx-host",
+          "line": 737,
+          "sha256": "d9b774c958c89c67c5c4ed989585fffa92a5467515c4742e72d59e39e999643f",
+          "rule": "body[data-page=\"observables\"] .context-badge.ctx-host{ background: rgba(34, 197, 94, 0.12); color: var(--success); }"
+        }
+      ],
+      "retained_rules": [],
+      "bytes_removed": 1275,
+      "unapproved_rules_unchanged": true
+    },
+    "pcap-page.css": {
+      "context": "Upload/progress/verdict markup uses utility classes. pcap.py table tone mapping includes high/critical/primary/warning/info, never medium.",
+      "candidates": {
+        "progress-bar-inner": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Upload/progress/verdict markup uses utility classes. pcap.py table tone mapping includes high/critical/primary/warning/info, never medium."
+        },
+        "progress-bar-outer": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Upload/progress/verdict markup uses utility classes. pcap.py table tone mapping includes high/critical/primary/warning/info, never medium."
+        },
+        "tone-medium": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Upload/progress/verdict markup uses utility classes. pcap.py table tone mapping includes high/critical/primary/warning/info, never medium."
+        },
+        "upload-icon": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Upload/progress/verdict markup uses utility classes. pcap.py table tone mapping includes high/critical/primary/warning/info, never medium."
+        },
+        "verdict-info": {
+          "decision": "remove whole rules only",
+          "source_hits": [],
+          "note": "Upload/progress/verdict markup uses utility classes. pcap.py table tone mapping includes high/critical/primary/warning/info, never medium."
+        }
+      },
+      "removed": [
+        {
+          "selector": ".pcap-tab-badge.tone-medium",
+          "line": 32,
+          "sha256": "d8dd5285832d2ae923e30e90ece7084650ee0429504388d9d8d385ad5d921b10",
+          "rule": ".pcap-tab-badge.tone-medium { background: var(--sev-medium); color: #fff; }"
+        },
+        {
+          "selector": ".pcap-upload-zone .upload-icon",
+          "line": 59,
+          "sha256": "ed2962c8ea1c9b6d5d2219152ede49a46d0629ec4421e422f29178141eae8478",
+          "rule": ".pcap-upload-zone .upload-icon { font-size: 2.5rem; color: var(--text-secondary); margin-bottom: 12px; }"
+        },
+        {
+          "selector": ".pcap-upload-zone.drag-over .upload-icon",
+          "line": 60,
+          "sha256": "c1e9dc8a251a589d9a5a414dccd346c02fbe1c74c1a891d3811a039d8484438f",
+          "rule": ".pcap-upload-zone.drag-over .upload-icon { color: var(--accent); }"
+        },
+        {
+          "selector": ".pcap-progress .progress-bar-outer",
+          "line": 66,
+          "sha256": "bb8dbe0a50b89eb9083bd81a55acd76199eebd3b10021e66ab1abbf2f63eb0c0",
+          "rule": ".pcap-progress .progress-bar-outer {\r\n    height: 6px; border-radius: 3px; background: var(--bg-secondary); overflow: hidden;\r\n}"
+        },
+        {
+          "selector": ".pcap-progress .progress-bar-inner",
+          "line": 69,
+          "sha256": "ba5226c1aad295e9030db16027e626af01a35b1cbc7df09bb9f1f302993867b9",
+          "rule": ".pcap-progress .progress-bar-inner {\r\n    height: 100%; width: 0; background: var(--accent); border-radius: 3px;\r\n    transition: width .3s; animation: pulse-bar 1.5s ease-in-out infinite;\r\n}"
+        },
+        {
+          "selector": ".verdict-info .verdict-confidence",
+          "line": 89,
+          "sha256": "0dc203d38bb448008926d5f62555968668cc812e8b29089176ff21c1aca860b4",
+          "rule": ".verdict-info .verdict-confidence { font-size: .82rem; color: var(--text-secondary); }"
+        }
+      ],
+      "retained_rules": [],
+      "bytes_removed": 650,
+      "unapproved_rules_unchanged": true
+    }
+  },
+  "dynamic_review": "Reviewed nonvendor unresolved concatenations: cases graph keys/IDs, chat message IDs, daily_work dates, security severity/status badges, alert-detail cpanel-alert/alert-parsed host families. Vendor code and all source producers were searched for candidate names. No candidate family reaches those builders.",
+  "protected_live_rules": [
+    ".hbar-fill.hbar-host",
+    ".hbar-fill.hbar-rule",
+    "escaped bg-white/5, border-white/5,/10 and bg-ink-950/60 utilities"
+  ],
+  "scanner_fix": "Conditional Jinja ~ concatenation now protects hbar-*; regression failed before fix and passes after.",
+  "removed_rule_count": 78,
+  "base": "d7c87407b19db1f814c862da18a258d030aa7635",
+  "previously_removed_rules": 9,
+  "cumulative_removed_rules": 87,
+  "verification": {
+    "tests": {
+      "passed": 90,
+      "failed": 0,
+      "skipped": 0,
+      "command": "python -m pytest --noconftest -o addopts= tests/test_dead_css.py tests/unit/test_dead_css_sheet_coverage.py tests/unit/test_dead_css_vetting_proof.py tests/test_migrated_css_sweep.py tests/test_css_is_current.py tests/test_tailwind_build_pin.py tests/unit/test_chat_stylesheet_cascade.py tests/test_shell_styles.py tests/test_glass_surfaces.py tests/test_ui_rewrite_theme_parity.py tests/test_slides_tailwind_classes.py tests/unit/test_ui_settings_integration_styles.py -q"
+    },
+    "tailwind": "Pinned 4.3.3: build succeeded; committed ion.css equals a fresh rebuild. Toolchain is gitignored.",
+    "source_proof": "Each removed rule has an exact selector/body hash. All other source rule selectors and declaration bodies are unchanged; CSS parser diagnostics unchanged. Four newly empty whitespace lines were stripped after removal.",
+    "scanner_remaining": "Two whole-rule flags remain, both false positives from escaped slash utility classes. Mixed guide/deck and glass lists are retained.",
+    "regression": "Conditional Jinja bar-class test failed before the fix, then passed. Live hbar-host/rule styles retained.",
+    "runtime_limit": "Full application suite and live browser checks were not run; tests focus on CSS/scanner/theme/build contracts.",
+    "patch": "Cumulative patch passes git apply --cached --check against the clean base index."
+  }
+}

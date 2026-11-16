@@ -175,6 +175,20 @@ def test_sees_a_class_built_by_a_jinja_interpolation():
     assert "sr-c-" in constructed_prefixes(src)
 
 
+def test_keeps_conditional_jinja_class_concatenation(tmp_path, monkeypatch):
+    from tools import dead_css
+
+    source = '''<span class="hbar-fill{{ ' hbar-' ~ kind if kind }}"></span>'''
+    sheet = tmp_path / "bars.css"
+    sheet.write_text(".hbar-fill.hbar-host {color:blue}\n.hbar-fill.hbar-rule {color:red}\n")
+    monkeypatch.setattr(dead_css, "sheet_path", lambda _: sheet)
+    _, _, dead = dead_css.analyse(
+        "bars.css", dead_css.literal_tokens(source),
+        dead_css.constructed_prefixes(source, kind="markup"),
+    )
+    assert dead == [], "conditional Jinja emits both bar classes at runtime"
+
+
 def test_jinja_and_javascript_construction_are_both_seen():
     """The two forms appear side by side in this codebase, so neither may
     regress in favour of the other."""

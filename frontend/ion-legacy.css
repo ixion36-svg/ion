@@ -643,27 +643,9 @@ body::before {
 
 
 
-.nav-links > li > a:not(.nav-dropdown-toggle) {
-    color: var(--text-secondary);
-    text-decoration: none;
-    padding: 0.5rem 0.85rem;
-    border-radius: var(--radius);
-    font-size: 0.82rem;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    transition: all 0.2s ease;
-    position: relative;
-    white-space: nowrap;
-    border: 1px solid transparent;
-}
 
-.nav-links > li > a:not(.nav-dropdown-toggle):hover {
-    color: var(--primary);
-    background: var(--primary-dim);
-    border-color: var(--border-bright);
-    text-shadow: var(--glow-sm);
-}
+
+
 
 
 

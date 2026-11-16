@@ -1,0 +1,113 @@
+{
+  "base": "d7c87407b19db1f814c862da18a258d030aa7635",
+  "reviewed_source_files": 944,
+  "classes": [
+    "ai-header-icon",
+    "analytics-section",
+    "cpanel-comment",
+    "cpanel-comment-body",
+    "cpanel-comment-header",
+    "cpanel-comment-time",
+    "cpanel-comment-user",
+    "saved-search-actions"
+  ],
+  "sheets": {
+    "cases-page.css": {
+      "removed": [
+        {
+          "selector": ".cpanel-comment",
+          "line": 1281,
+          "rule": ".cpanel-comment {\r\n    padding: 0.6rem 0.75rem;\r\n    background: var(--bg-secondary);\r\n    border: 1px solid var(--ion-border);\r\n    border-left: 3px solid var(--info);\r\n    border-radius: var(--radius);\r\n    margin-bottom: 0.4rem;\r\n}",
+          "sha256": "2ecd38d21f94778e1db3b78b796d71c4fad37913b93a01e54fe1b92f86b18f32"
+        },
+        {
+          "selector": ".cpanel-comment-header",
+          "line": 1290,
+          "rule": ".cpanel-comment-header {\r\n    display: flex;\r\n    justify-content: space-between;\r\n    font-size: 0.75rem;\r\n    color: var(--text-secondary);\r\n    margin-bottom: 0.25rem;\r\n}",
+          "sha256": "03311b16b76b19403ae8d856371a9226846f80c8782e1918f5d3d14ab3b5c019"
+        },
+        {
+          "selector": ".cpanel-comment-user",
+          "line": 1298,
+          "rule": ".cpanel-comment-user {\r\n    font-weight: 600;\r\n    color: var(--info);\r\n}",
+          "sha256": "209e0151818f270978644d17a6676d3b14b021d2687b81a7fa8f678affda7516"
+        },
+        {
+          "selector": ".cpanel-comment-time",
+          "line": 1303,
+          "rule": ".cpanel-comment-time {\r\n    font-size: 0.7rem;\r\n}",
+          "sha256": "8c678df89567363540a7d72fcec2ff4ae8390cfcf4e80455c1782a084b2417e0"
+        },
+        {
+          "selector": ".cpanel-comment-body",
+          "line": 1307,
+          "rule": ".cpanel-comment-body {\r\n    font-size: 0.85rem;\r\n    color: var(--text-primary);\r\n    line-height: 1.5;\r\n    white-space: pre-wrap;\r\n    word-break: break-word;\r\n}",
+          "sha256": "e6029db5dee8004ca6dc7159c06bf4a882698937f94cc19d6b8d5a0242e81fe8"
+        }
+      ],
+      "bytes_removed": 692,
+      "other_rules_unchanged": true
+    },
+    "analytics-page.css": {
+      "removed": [
+        {
+          "selector": ".analytics-section .section-header",
+          "line": 234,
+          "rule": ".analytics-section .section-header {\r\n    display: flex;\r\n    align-items: baseline;\r\n    gap: 0.75rem;\r\n    margin-bottom: 1.25rem;\r\n}",
+          "sha256": "4c1b276e8a416b9919c2b20cc2cbd983136c46b978da488e06b977e7c2cba250"
+        },
+        {
+          "selector": ".analytics-section .section-header h2",
+          "line": 240,
+          "rule": ".analytics-section .section-header h2 {\r\n    margin: 0;\r\n    font-size: 1.125rem;\r\n    color: var(--text-bright);\r\n}",
+          "sha256": "e483d4d0c4a646dd71661492bc4c854e15cc4af93a16a5be262c7af00a236553"
+        }
+      ],
+      "bytes_removed": 251,
+      "other_rules_unchanged": true
+    },
+    "chat-page.css": {
+      "removed": [
+        {
+          "selector": ".ai-header-icon.docgen",
+          "line": 276,
+          "rule": ".ai-header-icon.docgen {\r\n    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(0, 212, 255, 0.15));\r\n    border-color: rgba(16, 185, 129, 0.2);\r\n    color: var(--success);\r\n}",
+          "sha256": "ddf52e1436318babe96fcfc927ec44b5765b98d07bb07ac37098b2f6a24c546e"
+        }
+      ],
+      "bytes_removed": 192,
+      "other_rules_unchanged": true
+    },
+    "discover-page.css": {
+      "removed": [
+        {
+          "selector": ".saved-search-actions .btn",
+          "line": 266,
+          "rule": ".saved-search-actions .btn {\r\n    padding: 0.25rem 0.5rem;\r\n    font-size: 0.75rem;\r\n}",
+          "sha256": "fc34beb5b0dd96d82d7fb8c229a0feb6e1e287a817fbc2d96b2654ae1697009b"
+        }
+      ],
+      "bytes_removed": 86,
+      "other_rules_unchanged": true
+    }
+  },
+  "method": "Exact selector allowlist, whole-rule removals only; all src Python/HTML/JS/JSON/YAML boundary search; scanner literal/prefix cross-check; manual review of nonvendor unresolved joiners and current replacement markup.",
+  "dynamic_review": {
+    "cases/chat/daily_work joiners": "IDs, graph keys and dates, not candidate classes",
+    "security_dashboard._badge": "severity/status badge families",
+    "alert-detail._cls": "alert-parsed or cpanel-alert families, not cpanel-comment",
+    "vendor bundles": "Preserved; no matching candidate namespace or host-supplied candidate prefix identified"
+  },
+  "retained": "All unreviewed scanner candidates and the registered architecture-health API remain unchanged.",
+  "removed_rule_count": 9,
+  "verification": {
+    "targeted_tests": "52 passed, 2 skipped; --noconftest disables unrelated application-wide DB fixtures",
+    "skips": "Tailwind rebuild equality checks: gitignored tailwindcss.exe is absent. The four edited sheets are standalone page stylesheets; generated ion.css was not edited.",
+    "scanner_behavior": "Old and new tool report outputs are byte-identical on the same current stylesheets",
+    "scanner_remaining": "82 rule blocks flagged; 47 unresolved dynamic concatenations remain; not approved for deletion",
+    "patch": "git apply --cached --check passes against the base index",
+    "diff": "git diff --check passes",
+    "runtime_limit": "No live app/browser verification or full application suite run."
+  },
+  "phase": "First cleanup pass; later cumulative changes and verification are documented in ion-remaining-css-review.json."
+}

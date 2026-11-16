@@ -29,7 +29,7 @@
 .pcap-tab-badge.is-empty { display: none; }
 .pcap-tab-badge.tone-critical { background: var(--sev-critical); color: #fff; }
 .pcap-tab-badge.tone-high { background: var(--sev-high); color: #fff; }
-.pcap-tab-badge.tone-medium { background: var(--sev-medium); color: #fff; }
+
 .pcap-tab-badge.tone-primary { background: var(--primary); color: #fff; }
 .pcap-tab-badge.tone-info { background: var(--info); color: #fff; }
 .pcap-tab-badge.tone-warning { background: var(--warning); color: #fff; }
@@ -56,20 +56,15 @@
     border-color: var(--accent);
     background: rgba(0, 229, 255, .04);
 }
-.pcap-upload-zone .upload-icon { font-size: 2.5rem; color: var(--text-secondary); margin-bottom: 12px; }
-.pcap-upload-zone.drag-over .upload-icon { color: var(--accent); }
+
+
 .pcap-upload-zone h3 { margin: 0 0 6px; font-size: 1rem; }
 .pcap-upload-zone p { margin: 0; font-size: .82rem; color: var(--text-secondary); }
 
 /* Progress */
 .pcap-progress { display: none; margin-bottom: 24px; }
-.pcap-progress .progress-bar-outer {
-    height: 6px; border-radius: 3px; background: var(--bg-secondary); overflow: hidden;
-}
-.pcap-progress .progress-bar-inner {
-    height: 100%; width: 0; background: var(--accent); border-radius: 3px;
-    transition: width .3s; animation: pulse-bar 1.5s ease-in-out infinite;
-}
+
+
 @keyframes pulse-bar { 0%,100%{opacity:1} 50%{opacity:.6} }
 .pcap-progress .progress-text { font-size: .8rem; color: var(--text-secondary); margin-top: 6px; }
 
@@ -86,7 +81,7 @@
 .verdict-banner.elevated .verdict-icon { color: var(--warning, #d29922); }
 .verdict-banner.investigate .verdict-icon { color: var(--danger); }
 
-.verdict-info .verdict-confidence { font-size: .82rem; color: var(--text-secondary); }
+
 .verdict-reasons { margin-top: 8px; padding-left: 18px; }
 .verdict-reasons li { font-size: .82rem; color: var(--text-primary); margin-bottom: 3px; }
 
