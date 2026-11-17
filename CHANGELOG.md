@@ -17,7 +17,9 @@ battle, whether the role came from Keycloak or the Users page, and a fresh
 install no longer opens on empty tabs. Detection Health stops bucketing
 alerts as "(unmapped)" when Elasticsearch knows the rule. Bob's custom
 investigation guide can be corrected by hand, and two layout faults in the
-case window are fixed.
+case window are fixed. An alert now opens the way a case does: in the
+workspace window, at an address of its own, with sections the analyst
+arranges.
 Net-new findings: 0C / 0H / 0M / 0L.
 
 ### Added
@@ -48,6 +50,22 @@ Net-new findings: 0C / 0H / 0M / 0L.
   the SOC role catalogue, and a profile can be made the mandatory
   induction. Both were API-only, so the induction could not be created
   from any page.
+- **An alert opens in the workspace window.** `/alerts` opened an alert in
+  a 1180px modal; it now uses the inset window cases and documents use,
+  over the queue, so the filters and the selection are still there on
+  close. The header has previous and next through the queue as the table
+  shows it, with the alert's position.
+- **An alert has its own page.** `/alerts/{id}` loads an alert directly by
+  its Elasticsearch id, including one outside the time range the queue
+  loaded, and the address bar shows it while an alert is open.
+- **Alert sections can be arranged.** Sections move between columns by
+  their handle, fold, and hide from a Sections menu with Triage, Wide and
+  Focus presets. One arrangement is remembered for every alert, separate
+  from the case window's.
+- **Selected alerts sit beside the open one.** The alerts ticked in the
+  queue are listed in a rail, and previous and next step through them
+  when the open alert is one of them. With nothing ticked there is no
+  rail.
 
 ### Changed
 
@@ -60,6 +78,14 @@ Net-new findings: 0C / 0H / 0M / 0L.
 - **Workforce menus are reachable.** Setup has links to its sections and to
   Users, the Me tab links to My Training Plan, and Training tabs can be
   linked by address (`/training#tab-myplan`).
+- **Reset arrangement restores the order.** In the case window a preset,
+  and Reset with it, puts sections back in their original order as well
+  as their columns. It kept the order a drag had left.
+- **Empty alert sections are one line.** A section with nothing to show
+  is a line under its title, not a padded card.
+- **`/alerts/{row_id}` is removed.** It took an alert-triage row number
+  and has led nowhere since the queue was rebuilt. An id in `/alerts/{id}`
+  is an Elasticsearch id.
 
 ### Fixed
 
@@ -76,6 +102,9 @@ Net-new findings: 0C / 0H / 0M / 0L.
 - **Team chart overlap.** The chart forced its column wider than the page
   and pushed the side panel off the edge, and its left end could not be
   scrolled to.
+- **Guide and Sequence on an alert.** On `/alerts` both sections stayed on
+  "Loading..." and "Click to load...": they loaded on a tab click and the
+  page shows sections, not tabs. They load when the alert opens.
 
 ### Upgrade notes
 
@@ -87,6 +116,9 @@ Net-new findings: 0C / 0H / 0M / 0L.
 - Journeys opened at sign-in and at startup are recorded in the audit log
   under the longest-standing account with `workforce:manage`, because ION
   has no system actor.
+- One read-only endpoint is added, `GET
+  /api/elasticsearch/alerts/{id}/detail`, behind `alert:read` like the
+  alert list it mirrors.
 
 ## v0.99.17 — 2026-11-11
 
