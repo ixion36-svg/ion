@@ -530,3 +530,43 @@ body[data-page="detection-engineering"] .dx-locked { display: inline-flex; align
 body[data-page="detection-engineering"] .dx-lock { display: inline-flex; align-items: center; gap: 3px; }
 
 /* ── Work and Bob tabs (below) ─────────────────── */
+body[data-page="detection-engineering"] .dx-acts { display: inline-flex; gap: 6px; justify-content: flex-end; white-space: nowrap; }
+body[data-page="detection-engineering"] .dx-work-table .dx-table { min-width: 860px; }
+body[data-page="detection-engineering"] .dx-work-table td { vertical-align: top; }
+body[data-page="detection-engineering"] .dx-work-table td.mono { white-space: nowrap; }
+body[data-page="detection-engineering"] .dx-work-table .dx-wrap { white-space: normal; min-width: 220px; }
+body[data-page="detection-engineering"] .dx-prop { min-width: 240px; max-width: 520px; }
+body[data-page="detection-engineering"] .dx-clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; }
+body[data-page="detection-engineering"] .dx-ch-act { margin-left: auto; text-transform: none; letter-spacing: 0; }
+body[data-page="detection-engineering"] .dx-src-filter { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; text-transform: none; letter-spacing: 0; font-size: 12px; }
+body[data-page="detection-engineering"] .dx-src-filter button.dx-tag { border: 1px solid transparent; cursor: pointer; }
+body[data-page="detection-engineering"] .dx-src-filter button.dx-tag.on { border-color: currentColor; }
+body[data-page="detection-engineering"] .dx-agree { display: flex; align-items: center; gap: 10px; }
+body[data-page="detection-engineering"] .dx-agree .dx-track { flex: 1; }
+body[data-page="detection-engineering"] #dw-pack-result:empty { display: none; }
+body[data-page="detection-engineering"] #dw-pack-result { padding: 6px 9px 2px; }
+
+/* Dialogs are native <dialog>, opened with showModal(), so Esc and focus trapping come free. */
+body[data-page="detection-engineering"] .dx-dialog {
+    position: fixed; inset: 0; margin: auto; height: fit-content;
+    width: min(560px, calc(100vw - 32px)); max-height: 90vh; padding: 0; overflow: auto;
+    border: 1px solid var(--dx-line-2); border-radius: 12px; background: #0d1529; color: var(--dx-text);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, .5);
+}
+html[data-mode="light"] body[data-page="detection-engineering"] .dx-dialog { background: #fff; }
+body[data-page="detection-engineering"] .dx-dialog-wide { width: min(760px, calc(100vw - 32px)); }
+body[data-page="detection-engineering"] .dx-dialog::backdrop { background: rgba(2, 6, 18, .6); backdrop-filter: blur(2px); }
+body[data-page="detection-engineering"] .dx-dialog-body { display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; }
+body[data-page="detection-engineering"] .dx-dialog h2 { margin: 0; font-size: 16px; font-weight: 650; }
+body[data-page="detection-engineering"] .dx-field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--dx-muted); }
+body[data-page="detection-engineering"] .dx-field :is(input, select, textarea) {
+    width: 100%; padding: 7px 9px; border: 1px solid var(--dx-line-2); border-radius: 8px;
+    background: var(--dx-panel-2); color: var(--dx-text); font: inherit; font-size: 13px;
+}
+body[data-page="detection-engineering"] .dx-field textarea.mono { font-family: var(--dx-mono); font-size: 12px; }
+body[data-page="detection-engineering"] .dx-field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+body[data-page="detection-engineering"] .dx-dialog-foot { display: flex; justify-content: flex-end; gap: 8px; padding-top: 6px; }
+@media (max-width: 640px) {
+    body[data-page="detection-engineering"] .dx-field-row { grid-template-columns: minmax(0, 1fr); }
+    body[data-page="detection-engineering"] .dx-src-filter { margin-left: 0; }
+}

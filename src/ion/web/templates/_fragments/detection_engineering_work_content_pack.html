@@ -1,0 +1,10 @@
+{# The Work tab's content-pack menu. Import needs de:propose, as its POST does. #}
+<button type="button" class="dx-btn ghost" data-click-action="deToggleMenu" data-args='["dw-pack-menu"]' aria-haspopup="true"><svg class="dx-icon" aria-hidden="true"><use href="#i-layers"/></svg>Content pack<svg class="dx-icon" aria-hidden="true"><use href="#i-chevron-down"/></svg></button>
+<div class="dx-menu-list" id="dw-pack-menu" hidden>
+  <button type="button" data-click-action="dwExportPack"><svg aria-hidden="true"><use href="#i-download"/></svg><span>Export pack<small>Quirks + proposals as portable JSON</small></span></button>
+  {% if can_import %}
+  <button type="button" data-click-action="dwPickPack"><svg aria-hidden="true"><use href="#i-upload"/></svg><span>Import pack…<small>Lands as pending / draft until verified</small></span></button>
+  <input type="file" id="dw-pack-file" accept=".json,application/json" hidden data-change-action="dwImportPack" data-args='["$target"]'>
+  {% endif %}
+  <div id="dw-pack-result" class="dx-mute small" role="status"></div>
+</div>

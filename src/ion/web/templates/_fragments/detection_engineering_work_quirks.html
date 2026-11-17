@@ -1,0 +1,57 @@
+{# Work > Quirks: the System Quirks register. A quirk is advisory: it
+   annotates matching alerts until its review date, then goes inert. #}
+{% from "_fragments/_time.html" import ts %}
+{% from "_fragments/detection_engineering_work_macros.html" import actions, failed, tab_count %}
+{{ tab_count('de-count-quirks', count) }}
+<section class="dx-card">
+  <header class="dx-ch">System quirks <span class="dx-n">known benign behaviour, reviewed on a schedule</span>
+    {% if can_propose %}<button type="button" class="dx-btn sm dx-ch-act" data-click-action="dwOpenRaise"><svg class="dx-icon" aria-hidden="true"><use href="#i-plus"/></svg>Raise quirk</button>{% endif %}
+  </header>
+  {% if state == 'failed' %}
+  <div class="dx-cb">{{ failed('The quirk register') }}</div>
+  {% elif state == 'empty' %}
+  <div class="dx-cb"><div class="dx-empty">No quirks recorded. Nothing is annotating alerts as known benign.</div></div>
+  {% else %}
+  <div class="dx-tablewrap dx-work-table"><table class="dx-table">
+    <thead><tr><th>Quirk</th><th>Scope</th><th>Review by</th><th>State</th><th>By</th>{% if rows|selectattr('actions')|list %}<th></th>{% endif %}</tr></thead>
+    <tbody>
+    {% for q in rows %}
+      <tr>
+        <td class="dx-prop"><b>{{ q.title or 'Untitled' }}</b>{% if q.annotation %}<div class="dx-mute small">{{ q.annotation }}</div>{% endif %}</td>
+        <td class="small">{% for chip in q.scope %}<span class="dx-chip mono">{{ chip }}</span> {% else %}<span class="dx-mute">—</span>{% endfor %}</td>
+        <td class="mono small dx-nowrap">{{ ts(q.review_date, fallback='no review date') }}{% if q.review_text %}<div><span class="dx-tag {{ q.review_tag }}">{{ q.review_text }}</span></div>{% endif %}</td>
+        <td>{% if q.status %}<span class="dx-tag {{ q.status_tag }}">{{ q.status }}</span>{% else %}<span class="dx-mute">—</span>{% endif %}</td>
+        <td class="dx-mute small">{{ q.raised_by or '—' }}{% if q.verified_by %}<div>verified by {{ q.verified_by }}</div>{% endif %}</td>
+        {% if rows|selectattr('actions')|list %}<td class="num"><span class="dx-acts">{{ actions(q.actions) }}</span></td>{% endif %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% endif %}
+</section>
+
+{% if can_propose %}
+<dialog id="dw-raise-dialog" class="dx-dialog" aria-labelledby="dw-raise-heading">
+  <div class="dx-dialog-body">
+    <h2 id="dw-raise-heading">Raise a system quirk</h2>
+    <label class="dx-field"><span>Title *</span><input name="title" type="text" placeholder="SCCM agent trips PowerShell rule nightly"></label>
+    <label class="dx-field"><span>Advisory note, shown on matching alerts *</span><textarea name="annotation" rows="2"></textarea></label>
+    <label class="dx-field"><span>Justification, why this is benign *</span><textarea name="justification" rows="2"></textarea></label>
+    <div class="dx-field-row">
+      <label class="dx-field"><span>Review date, UTC (it expires) *</span><input name="review_date" type="date"></label>
+      <label class="dx-field"><span>Priority nudge (−5…0)</span><input name="priority_nudge" type="number" value="0" min="-5" max="5"></label>
+    </div>
+    <div class="dx-note">Scope: at least one is required, so a quirk cannot be global. Comma-separated.</div>
+    <label class="dx-field"><span>Rules</span><input name="scope_rules" type="text"></label>
+    <div class="dx-field-row">
+      <label class="dx-field"><span>Hosts</span><input name="scope_hosts" type="text"></label>
+      <label class="dx-field"><span>Users</span><input name="scope_users" type="text"></label>
+    </div>
+    <label class="dx-field"><span>IPs</span><input name="scope_ips" type="text"></label>
+    <div class="dx-dialog-foot">
+      <button type="button" class="dx-btn ghost" data-click-action="dwCloseDialog" data-args='["dw-raise-dialog"]'>Cancel</button>
+      <button type="button" class="dx-btn primary" data-click-action="dwSubmitRaise">Raise (pending)</button>
+    </div>
+  </div>
+</dialog>
+{% endif %}

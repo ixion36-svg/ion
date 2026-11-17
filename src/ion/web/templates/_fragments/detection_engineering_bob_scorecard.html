@@ -1,0 +1,68 @@
+{# Bob > Scorecard. Agreement is Bob's verdict matching the analyst's
+   closure, over deduped, scored ai_feedback rows. Not an FP rate. #}
+{% from "_fragments/detection_engineering_work_macros.html" import rule_link, failed %}
+{% macro pct(v) -%}{% if v is number %}{{ v|int if v == v|int else v }}%{% else %}—{% endif %}{%- endmacro %}
+{% macro n(v) -%}{% if v is number %}{{ '{:,}'.format(v) }}{% else %}—{% endif %}{%- endmacro %}
+{% set t = tiles %}
+{% if state == 'failed' %}
+{{ failed('The Bob scorecard') }}
+{% else %}
+{% if state == 'empty' %}<div class="dx-banner">No scored verdicts in the last {{ days }} days. Agreement is measured once analysts close alerts Bob suggested a verdict on.</div>{% endif %}
+<div class="dx-kpis">
+  <div class="dx-kpi">
+    <div class="dx-k">Agreement · {{ days }}d</div>
+    <div class="dx-v{{ ' dx-ok' if t.agreement_rate is number and t.agreement_rate >= 80 }}{{ ' warn' if t.agreement_rate is number and t.agreement_rate < 80 }}" data-field="agreement_rate">{{ pct(t.agreement_rate) }}</div>
+    <div class="dx-s">Bob verdict = analyst closure</div>
+    {% if t.agreement_rate is number %}<div class="dx-bar"><i class="{{ 'ok' if t.agreement_rate >= 80 else 'warn' }}{{ ' nz' if t.agreement_rate }}" data-ion-style="width:{{ t.agreement_rate }}%"></i></div>{% endif %}
+  </div>
+  <div class="dx-kpi">
+    <div class="dx-k">Verdicts</div>
+    <div class="dx-v" data-field="scored">{{ n(t.scored) }}</div>
+    <div class="dx-s">scored closures</div>
+  </div>
+  <div class="dx-kpi">
+    <div class="dx-k">Disagreements</div>
+    <div class="dx-v{{ ' warn' if t.disagreements }}" data-field="disagreements">{{ n(t.disagreements) }}</div>
+    <div class="dx-s">{% if t.classes is number %}in {{ n(t.classes) }} rule / verdict classes{% else %}classes unknown{% endif %}</div>
+  </div>
+  <div class="dx-kpi">
+    <div class="dx-k">Proposals accepted</div>
+    {% if accepted %}
+    <div class="dx-v" data-field="accepted">{{ accepted.applied }} <small>/ {{ accepted.total }}</small></div>
+    <div class="dx-s">detection proposals Bob drafted</div>
+    {% else %}
+    <div class="dx-v" data-field="accepted"><span class="dx-dash" title="The proposal read failed">—</span></div>
+    <div class="dx-s">proposal read failed</div>
+    {% endif %}
+  </div>
+  <div class="dx-kpi">
+    <div class="dx-k">Drift</div>
+    <div class="dx-v{{ ' dx-ok' if t.drift_direction == 'improving' }}{{ ' warn' if t.drift_direction == 'declining' }}" data-field="drift">{% if t.drift_delta is number %}{{ '+' if t.drift_delta > 0 }}{{ t.drift_delta }} <small>pts</small>{% else %}—{% endif %}</div>
+    <div class="dx-s">{% if t.drift_delta is number %}{{ t.drift_direction or 'direction not reported' }}, recent vs older half{% else %}needs verdicts in both halves{% endif %}</div>
+  </div>
+</div>
+<div class="dx-note"><b>Gold-exemplar retrieval {% if t.few_shot_enabled is true %}on{% elif t.few_shot_enabled is false %}off{% else %}unknown{% endif %}.</b> {{ t.few_shot_note }}</div>
+{% endif %}
+
+<section class="dx-card">
+  <header class="dx-ch">Agreement by rule <span class="dx-n">worst first · min {{ min_verdicts }} verdicts</span></header>
+  {% if rules_state == 'failed' %}
+  <div class="dx-cb">{{ failed('Agreement by rule') }}</div>
+  {% elif rules_state == 'empty' %}
+  <div class="dx-cb"><div class="dx-empty">No rule has {{ min_verdicts }} scored verdicts in the last {{ days }} days{% if below_minimum %}; {{ below_minimum }} rule{{ 's' if below_minimum != 1 }} below that{% endif %}.</div></div>
+  {% else %}
+  <table class="dx-table">
+    <thead><tr><th>Rule</th><th class="dx-w45">Agreement</th><th class="num">Verdicts</th><th class="num">Disagree</th></tr></thead>
+    <tbody>
+    {% for r in rules %}
+      <tr>
+        <td>{{ rule_link(r.rule_name) }}</td>
+        <td>{% if r.rate is number %}<div class="dx-agree"><div class="dx-track"><i class="{{ 'warn' if r.rate < 80 else 'ok' }}{{ ' nz' if r.rate }}" data-ion-style="width:{{ r.rate }}%"></i></div><span class="mono small">{{ pct(r.rate) }}</span></div>{% else %}—{% endif %}</td>
+        <td class="mono num">{{ n(r.scored) }}</td>
+        <td class="mono num">{{ n(r.disagreed) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>

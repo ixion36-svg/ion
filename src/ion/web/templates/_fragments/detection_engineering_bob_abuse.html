@@ -1,0 +1,25 @@
+{# Bob > Abuse monitor (de:verify). Read-only: it reports, it never changes anything. #}
+{% macro n(v) -%}{% if v is number %}{{ v }}{% else %}—{% endif %}{%- endmacro %}
+<div class="dx-note">Visible only to holders of <b>de:verify</b>. Separation of duties stops one person; this flags what a colluding pair could do: recurring raiser / verifier and drafter / approver pairs, high-volume actors, and over-broad quirks.</div>
+<section class="dx-card">
+  <header class="dx-ch">Abuse monitor <span class="dx-n">{{ days }} days{% if state == 'data' %} · {{ n(high) }} high · {{ n(medium) }} medium{% endif %}</span></header>
+  {% if state == 'failed' %}
+  <div class="dx-cb"><div class="dx-banner warn" role="alert">The abuse scan failed. This is not a clean result: whether any pattern is present is unknown. Refresh to try again.</div></div>
+  {% elif state == 'empty' %}
+  <div class="dx-cb"><div class="dx-empty">No abuse signals in the last {{ days }} days. No collusion, volume or blanket-scope pattern surfaced.</div></div>
+  {% else %}
+  <div class="dx-tablewrap dx-work-table"><table class="dx-table">
+    <thead><tr><th>Severity</th><th>Signal</th><th>Detail</th><th class="num">Count</th></tr></thead>
+    <tbody>
+    {% for s in signals %}
+      <tr>
+        <td><span class="dx-tag {{ 'bad' if s.severity == 'high' else 'warn' if s.severity == 'medium' }}">{{ s.severity or '—' }}</span></td>
+        <td class="mono small">{{ s.type or '—' }}</td>
+        <td class="small">{{ s.description or '—' }}</td>
+        <td class="mono num">{% if s.count is not none %}{{ s.count }}{% else %}—{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% endif %}
+</section>

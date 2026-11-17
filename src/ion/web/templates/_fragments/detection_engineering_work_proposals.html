@@ -1,0 +1,79 @@
+{# Work > Proposals: detection proposals (analyst- or Bob-drafted) and Bob
+   tuning proposals in one table. A source whose read failed is named above
+   the table, and the counts stay blank rather than counting it as zero. #}
+{% from "_fragments/detection_engineering_work_macros.html" import actions, rule_link, failed as failed_banner, tab_count %}
+{{ tab_count('de-count-proposals', count) }}
+<section class="dx-card">
+  <header class="dx-ch">Proposals
+    <span class="dx-n">{% if count is not none %}{{ count }} · {{ bob_count }} from Bob{% else %}count unknown{% endif %}</span>
+    <span class="dx-src-filter" role="group" aria-label="Source">
+      <span class="dx-mute">Source</span>
+      {% for key, label, tag in [('all', 'all', ''), ('bob', 'bob', 'iris'), ('analyst', 'analyst', '')] %}
+      <button type="button" class="dx-tag {{ tag }}{{ ' on' if source == key }}" aria-pressed="{{ 'true' if source == key else 'false' }}" data-click-action="dwProposalSource" data-args='{{ [key]|tojson }}'>{{ label }}</button>
+      {% endfor %}
+    </span>
+  </header>
+  {% for what in failed %}<div class="dx-cb">{{ failed_banner(what[:1]|upper ~ what[1:]) }}</div>{% endfor %}
+  {% if state == 'empty' %}
+  <div class="dx-cb"><div class="dx-empty">{% if source == 'all' %}No proposals yet. Draft one from a tuning request, or from a Bob disagreement.{% else %}No proposals from {{ 'Bob' if source == 'bob' else 'an analyst' }}. Other sources may have some.{% endif %}</div></div>
+  {% elif state == 'data' %}
+  <div class="dx-tablewrap dx-work-table"><table class="dx-table">
+    <thead><tr><th>Source</th><th>Proposal</th><th>Rule</th><th>Status</th><th>Effect</th><th>By</th><th></th></tr></thead>
+    <tbody>
+    {% for p in rows %}
+      <tr>
+        <td><span class="dx-tag {{ 'iris' if p.source == 'bob' }}">{{ p.source }}</span></td>
+        <td class="dx-prop"><b>{{ p.title or 'Untitled' }}</b>{% if p.change_type %} <span class="dx-tag">{{ p.change_type }}</span>{% endif %}{% if p.detail %}<div class="dx-mute small dx-clamp">{{ p.detail }}</div>{% endif %}</td>
+        <td class="small">{{ rule_link(p.rule_name) }}</td>
+        <td>{% if p.status %}<span class="dx-tag {{ p.status_tag }}">{{ p.status }}</span>{% else %}<span class="dx-mute">—</span>{% endif %}</td>
+        <td class="mono small">
+          {% if p.effect %}<span class="{{ 'dx-ok' if p.effect.tag == 'ok' else 'dx-warn' if p.effect.tag == 'warn' }}"{% if p.effect.title %} title="{{ p.effect.title }}"{% endif %}>{{ p.effect.text }}</span>{% endif %}
+          {% if p.effect and p.effect.lost %}<div class="dx-warn dx-wrap">no confirmed threats since the change; check it has not silenced a detection</div>{% endif %}
+          {% if p.forecast %}<div class="dx-mute">{{ p.forecast }}</div>{% endif %}
+          {% if not p.effect and not p.forecast %}<span class="dx-mute">—</span>{% endif %}
+        </td>
+        <td class="dx-mute small">{{ p.by or '—' }}{% if p.decided_by %}<div>decided by {{ p.decided_by }}</div>{% endif %}</td>
+        <td class="num"><span class="dx-acts">{{ actions(p.actions) }}</span></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% endif %}
+</section>
+
+{% if can_propose %}
+<dialog id="dw-edit-dialog" class="dx-dialog" aria-labelledby="dw-edit-heading">
+  <div class="dx-dialog-body">
+    <h2 id="dw-edit-heading">Edit proposal <span class="mono" data-field="id"></span></h2>
+    <label class="dx-field"><span>Title *</span><input name="title" type="text" required></label>
+    <label class="dx-field"><span>Change type</span>
+      <select name="change_type">
+        <option value="exclusion">Exclusion</option><option value="threshold">Threshold</option>
+        <option value="new_rule">New rule</option><option value="retire">Retire</option><option value="other">Other</option>
+      </select>
+    </label>
+    <label class="dx-field"><span>Suggested change *</span><textarea name="suggested_change" rows="4" required></textarea></label>
+    <label class="dx-field"><span>Rationale</span><textarea name="rationale" rows="2"></textarea></label>
+    <label class="dx-field"><span>Scope</span><input name="scope" type="text"></label>
+    <div class="dx-dialog-foot">
+      <button type="button" class="dx-btn ghost" data-click-action="dwCloseDialog" data-args='["dw-edit-dialog"]'>Cancel</button>
+      <button type="button" class="dx-btn primary" data-click-action="dwSaveEdit">Save draft</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="dw-decide-dialog" class="dx-dialog" aria-labelledby="dw-decide-heading">
+  <div class="dx-dialog-body">
+    <h2 id="dw-decide-heading"><span data-field="verb"></span> proposal <span class="mono" data-field="id"></span></h2>
+    <div data-applied-only>
+      <label class="dx-field"><span>Date applied in your detection backend (UTC)</span><input name="applied_at" type="date"></label>
+      <div class="dx-note">ION records that <b>you</b> applied this. It does not push the change anywhere.</div>
+    </div>
+    <label class="dx-field"><span>Decision notes</span><textarea name="notes" rows="3" placeholder="What you actually changed, or why not"></textarea></label>
+    <div class="dx-dialog-foot">
+      <button type="button" class="dx-btn ghost" data-click-action="dwCloseDialog" data-args='["dw-decide-dialog"]'>Cancel</button>
+      <button type="button" class="dx-btn primary" data-click-action="dwConfirmDecide">Confirm</button>
+    </div>
+  </div>
+</dialog>
+{% endif %}

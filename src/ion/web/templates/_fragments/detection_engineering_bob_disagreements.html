@@ -1,0 +1,45 @@
+{# Bob > Disagreements: scored closures where Bob's verdict and the analyst's
+   differed, grouped by rule and verdict shift. #}
+{% from "_fragments/detection_engineering_work_macros.html" import rule_link, failed, tab_count %}
+{{ tab_count('de-count-disagreements', total) }}
+<section class="dx-card">
+  <header class="dx-ch">Disagreements <span class="dx-n">{% if total is number %}{{ total }} in {{ days }} days{% else %}{{ days }} days{% endif %}</span></header>
+  {% if state == 'failed' %}
+  <div class="dx-cb">{{ failed('Bob feedback') }}</div>
+  {% elif state == 'empty' %}
+  <div class="dx-cb"><div class="dx-empty">No scored disagreements in the last {{ days }} days. Bob and the analysts agree.</div></div>
+  {% else %}
+  <div class="dx-tablewrap dx-work-table"><table class="dx-table">
+    <thead><tr><th>Rule</th><th>Bob</th><th>Analyst</th><th class="num">Count</th><th>Sample analyst reasons</th>{% if can_propose %}<th></th>{% endif %}</tr></thead>
+    <tbody>
+    {% for c in rows %}
+      <tr>
+        <td class="small">{{ rule_link(c.rule_name) }}</td>
+        <td><span class="dx-tag iris">{{ c.bob_verdict or '—' }}</span></td>
+        <td><span class="dx-tag">{{ c.human_verdict or '—' }}</span></td>
+        <td class="mono num">{% if c.count is not none %}{{ c.count }}{% else %}—{% endif %}</td>
+        <td class="dx-mute small">{% for reason in c.reasons %}<div>{{ reason }}</div>{% else %}—{% endfor %}</td>
+        {% if can_propose %}<td class="num"><button type="button" class="dx-btn sm" data-click-action="bbDraft" data-args='{{ c.draft_args|tojson }}'>Draft Bob tuning</button></td>{% endif %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% endif %}
+</section>
+
+{% if can_propose %}
+<dialog id="bb-draft-dialog" class="dx-dialog dx-dialog-wide" aria-labelledby="bb-draft-heading">
+  <div class="dx-dialog-body">
+    <h2 id="bb-draft-heading">Draft a Bob tuning proposal</h2>
+    <p class="dx-mute small" data-field="problem"></p>
+    <label class="dx-field"><span>Title *</span><input name="title" type="text"></label>
+    <label class="dx-field"><span>Problem statement</span><textarea name="problem_statement" rows="2"></textarea></label>
+    <label class="dx-field"><span>Proposed prompt guidance * (edit before submitting)</span><textarea name="proposed_text" rows="10" class="mono"></textarea></label>
+    <div class="dx-note">On approval this text replaces the rule's prompt template. Describe what tells benign from malicious; do not hard-code a verdict. A different person must approve it.</div>
+    <div class="dx-dialog-foot">
+      <button type="button" class="dx-btn ghost" data-click-action="dwCloseDialog" data-args='["bb-draft-dialog"]'>Cancel</button>
+      <button type="button" class="dx-btn primary" data-click-action="bbSubmitDraft">Create draft</button>
+    </div>
+  </div>
+</dialog>
+{% endif %}
