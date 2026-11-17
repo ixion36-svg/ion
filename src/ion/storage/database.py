@@ -472,6 +472,18 @@ def _run_migrations(engine: Engine) -> None:
         # rule_name denormalized for case detail rendering
         if "rule_name" not in existing:
             _add_column_tolerant(engine, "alert_triage", "rule_name", "VARCHAR(500)")
+        for col_name, col_type in (
+            ("rule_id", "VARCHAR(255)"),
+            ("rule_uuid", "VARCHAR(64)"),
+            ("rule_identity_checked_at", "TIMESTAMP"),
+        ):
+            if col_name not in existing:
+                _add_column_tolerant(engine, "alert_triage", col_name, col_type)
+        with engine.begin() as conn:
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_alert_triage_rule_id "
+                "ON alert_triage (rule_id)"
+            ))
 
     # users.is_service_account for Bob + other service users
     if insp.has_table("users"):

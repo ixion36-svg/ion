@@ -1,29 +1,27 @@
 """Detection Health — per-rule performance analytics (v0.47.0).
 
-Closes the IR→detection feedback loop using data ION already collects. Reads the
-`AIFeedback` ledger (Bob's verdict + the human closure verdict, written at
-case-close) joined to `AlertTriage.rule_name`, and aggregates per detection rule:
+Closes the IR->detection feedback loop using data ION already collects. The
+closure figures come from ``rule_outcome_service``, the measure DE Metrics and
+the external rule-outcomes API read too, so a rule's false-positive rate is the
+same number on every surface. Per detection rule:
 
-- **volume** — alerts fired (incl. still-open),
-- **closed** — alerts resolved with a real verdict (the rate denominator),
+- **volume** — alerts fired in the window (triage rows created),
+- **closed** — alerts whose case closed with a reason (the rate denominator),
 - **fp_rate / tp_yield** — false-positive rate and true-positive yield,
 - **silent** — fires but has never produced a confirmed true positive,
-- **noisy** — false-positive rate at/above a threshold,
+- **noisy** — ``NoisyPolicy``, defined once in rule_outcome_service,
 - **decaying** — true-positive rate trending down (recent half vs older half),
 - **bob_disagreement_rate** — where Bob's suggested verdict disagreed with the
-  human (excludes abstentions / circuit-breaker auto-escalations).
+  human (excludes abstentions / circuit-breaker auto-escalations). This one
+  stays on the ``AIFeedback`` ledger: it measures Bob, not the rule.
 
 Read/aggregate only — no new external integration. The dashboard's one-click
-"create tuning proposal" reuses the existing `TuningProposal` model.
+"create tuning proposal" reuses the existing proposal queue.
 
-Dedup contract (load-bearing): every alert gets a fire-time `human_verdict =
-"pending"` row AND, later, a case-close row. Readers MUST keep `MAX(id)` per
-(alert_id, alert_prompt_template_id) so a closed alert is counted once with its
-real verdict — identical to `bob_eval_service._fetch_deduped_feedback`.
-
-v2 hook: Bob could draft a `suggested_change` per noisy rule via the existing
-Ollama integration + the `tuning_recommendation` contract — deliberately out of
-scope for v1 (keeps this surface read-only).
+Dedup contract for the Bob figures (load-bearing): every alert gets a fire-time
+``human_verdict = "pending"`` row AND, later, a case-close row. Readers MUST
+keep ``MAX(id)`` per (alert_id, alert_prompt_template_id), identical to
+``bob_eval_service._fetch_deduped_feedback``.
 """
 
 from __future__ import annotations
@@ -44,36 +42,35 @@ from ion.services.attack_detection_service import (
     strategies_for_technique,
 )
 from ion.services.attack_revocation_service import resolve
+from ion.services.rule_outcome_service import (
+    DEFAULT_WINDOW_DAYS,
+    UNMAPPED,
+    NoisyPolicy,
+    RuleKey,
+    RuleOutcome,
+    Window,
+    rule_outcomes,
+)
 
-_PENDING = "pending"
-_UNMAPPED = "(unmapped)"
-_TRUE_POSITIVE = "true_positive"
-_FALSE_POSITIVE = "false_positive"
-_BENIGN_TP = "benign_true_positive"
+_UNMAPPED = UNMAPPED
 
 
 def _thresholds() -> Dict[str, Any]:
     """Env-tunable thresholds, read at call time so tests can monkeypatch."""
-
-    def _f(name: str, default: float) -> float:
-        try:
-            return float(os.environ.get(name, default))
-        except (TypeError, ValueError):
-            return default
-
-    def _i(name: str, default: int) -> int:
-        try:
-            return int(os.environ.get(name, default))
-        except (TypeError, ValueError):
-            return default
-
+    try:
+        lookback = int(os.environ.get("ION_DH_LOOKBACK_DAYS", DEFAULT_WINDOW_DAYS))
+    except (TypeError, ValueError):
+        lookback = DEFAULT_WINDOW_DAYS
+    try:
+        decay = float(os.environ.get("ION_DH_DECAY_DELTA_PCT", 20.0))
+    except (TypeError, ValueError):
+        decay = 20.0
+    policy = NoisyPolicy.from_env()
     return {
-        "lookback_days": _i("ION_DH_LOOKBACK_DAYS", 90),
-        "min_sample": _i("ION_DH_MIN_SAMPLE", 5),
-        "noisy_fp_pct": _f("ION_DH_NOISY_FP_PCT", 70.0),
-        "decay_delta_pct": _f("ION_DH_DECAY_DELTA_PCT", 20.0),
-        "benign_tp_as_fp": os.environ.get("ION_DH_BENIGN_TP_AS_FP", "true").lower()
-        in ("true", "1", "yes", "on"),
+        "lookback_days": lookback,
+        "min_sample": policy.min_closed,
+        "noisy_fp_pct": policy.fp_rate_pct,
+        "decay_delta_pct": decay,
     }
 
 
@@ -84,154 +81,68 @@ def _pct(num: int, denom: int) -> Optional[float]:
     return round(num / denom * 100, 1)
 
 
-class _RuleAgg:
-    """Mutable per-rule accumulator."""
-
-    __slots__ = (
-        "rule_name", "volume", "closed", "tp", "fp",
-        "recent_closed", "recent_tp", "older_closed", "older_tp",
-        "bob_scored", "bob_disagree", "disagreements",
-    )
-
-    def __init__(self, rule_name: str) -> None:
-        self.rule_name = rule_name
-        self.volume = 0
-        self.closed = 0
-        self.tp = 0
-        self.fp = 0
-        self.recent_closed = 0
-        self.recent_tp = 0
-        self.older_closed = 0
-        self.older_tp = 0
-        self.bob_scored = 0  # rows where Bob made a scored suggestion
-        self.bob_disagree = 0
-        self.disagreements: List[Dict[str, Any]] = []
+def _is_decaying(recent: Optional[RuleOutcome], older: Optional[RuleOutcome],
+                 min_sample: int, delta: float) -> bool:
+    """TP rate fell by ``delta`` points; both halves need a sample to compare."""
+    half = max(1, min_sample // 2)
+    if recent is None or older is None:
+        return False
+    if recent.closed < half or older.closed < half:
+        return False
+    return (recent.true_positive / recent.closed * 100
+            <= older.true_positive / older.closed * 100 - delta)
 
 
 def get_detection_health(session: Session, days: Optional[int] = None) -> Dict[str, Any]:
     """Aggregate per-rule detection-health metrics over the lookback window."""
     th = _thresholds()
     lookback = days if days is not None else th["lookback_days"]
-    # AIFeedback.created_at is a naive DateTime (no tz) on both SQLite and
-    # Postgres, so do all window math in naive UTC to avoid aware/naive
-    # comparison errors when bucketing recent-vs-older in Python below.
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    cutoff = now - timedelta(days=lookback)
-    midpoint = cutoff + (now - cutoff) / 2
-    fp_set = {_FALSE_POSITIVE}
-    if th["benign_tp_as_fp"]:
-        fp_set.add(_BENIGN_TP)
+    policy = NoisyPolicy.from_env()
+    window = Window.last(lookback)
+    outcomes = rule_outcomes(session, window)
+    recent = rule_outcomes(session, Window(window.midpoint, window.until))
+    older = rule_outcomes(session, Window(window.since, window.midpoint))
 
-    # Dedup contract lives in ai_feedback_dedupe — see that module for why.
-    deduped_ids = deduped_feedback_ids(cutoff)
-    rows = session.execute(
-        select(
-            AIFeedback.human_verdict,
-            AIFeedback.bob_suggested_verdict,
-            AIFeedback.agreement,
-            AIFeedback.auto_escalated,
-            AIFeedback.created_at,
-            AIFeedback.alert_id,
-            AIFeedback.alert_prompt_template_id,
-            AlertTriage.rule_name,
-        )
-        .outerjoin(AlertTriage, AlertTriage.es_alert_id == AIFeedback.alert_id)
-        .where(AIFeedback.id.in_(deduped_ids))
-    ).all()
-
-    aggs: Dict[str, _RuleAgg] = {}
-    unmapped_count = 0
-
-    for (human_verdict, bob_verdict, agreement, auto_escalated,
-         created_at, alert_id, template_id, rule_name) in rows:
-        rn = rule_name or _UNMAPPED
-        if rule_name is None:
-            unmapped_count += 1
-        agg = aggs.get(rn)
-        if agg is None:
-            agg = aggs[rn] = _RuleAgg(rn)
-
-        agg.volume += 1
-        is_recent = created_at is not None and created_at >= midpoint
-        hv = (human_verdict or "").lower()
-        closed = hv != _PENDING and hv != ""
-        if closed:
-            agg.closed += 1
-            is_tp = hv == _TRUE_POSITIVE
-            is_fp = hv in fp_set
-            if is_tp:
-                agg.tp += 1
-            if is_fp:
-                agg.fp += 1
-            if is_recent:
-                agg.recent_closed += 1
-                if is_tp:
-                    agg.recent_tp += 1
-            else:
-                agg.older_closed += 1
-                if is_tp:
-                    agg.older_tp += 1
-
-        # Bob-vs-analyst: only rows where Bob actually scored a suggestion
-        # (not abstentions / circuit-breaker auto-escalations).
-        if bob_verdict and agreement is not None and not auto_escalated:
-            agg.bob_scored += 1
-            if agreement is False:
-                agg.bob_disagree += 1
-                if len(agg.disagreements) < 25:
-                    agg.disagreements.append({
-                        "alert_id": alert_id,
-                        "bob_suggested_verdict": bob_verdict,
-                        "human_verdict": human_verdict,
-                        "created_at": created_at.isoformat() if created_at else None,
-                    })
-
-    min_sample = th["min_sample"]
-    noisy_pct = th["noisy_fp_pct"]
-    decay_delta = th["decay_delta_pct"]
+    bob = _bob_scores(session, window, outcomes)
+    keys = set(outcomes.records) | set(bob)
 
     rules: List[Dict[str, Any]] = []
     n_silent = n_noisy = n_decaying = 0
-    for agg in aggs.values():
-        fp_rate = _pct(agg.fp, agg.closed)
-        tp_yield = _pct(agg.tp, agg.closed)
-        bob_dis_rate = _pct(agg.bob_disagree, agg.bob_scored)
-
-        flags = {"silent": False, "noisy": False, "decaying": False}
-        if agg.closed >= min_sample:
-            flags["silent"] = agg.tp == 0
-            flags["noisy"] = fp_rate is not None and fp_rate >= noisy_pct
-            # Decay: both halves need a minimum sample to compare fairly.
-            half = max(1, min_sample // 2)
-            if agg.recent_closed >= half and agg.older_closed >= half:
-                recent_tp_rate = agg.recent_tp / agg.recent_closed * 100
-                older_tp_rate = agg.older_tp / agg.older_closed * 100
-                flags["decaying"] = recent_tp_rate <= older_tp_rate - decay_delta
-
+    for key in keys:
+        rec = outcomes.get(key) or RuleOutcome(key=key, rule_name=key.rule_name or _UNMAPPED)
+        scored, disagreed = bob.get(key, (0, 0))
+        judged = policy.judges(rec)
+        flags = {
+            "silent": judged and rec.true_positive == 0,
+            "noisy": policy.is_noisy(rec),
+            "decaying": judged and _is_decaying(
+                recent.get(key), older.get(key), policy.min_closed, th["decay_delta_pct"]),
+        }
         n_silent += flags["silent"]
         n_noisy += flags["noisy"]
         n_decaying += flags["decaying"]
-
         rules.append({
-            "rule_name": agg.rule_name,
-            "volume": agg.volume,
-            "closed": agg.closed,
-            "tp_count": agg.tp,
-            "fp_count": agg.fp,
-            "fp_rate": fp_rate,
-            "tp_yield": tp_yield,
-            "bob_disagreement_rate": bob_dis_rate,
-            "bob_scored": agg.bob_scored,
+            "rule_id": key.rule_id,
+            "rule_name": rec.rule_name,
+            "volume": rec.alerts,
+            "closed": rec.closed,
+            "tp_count": rec.true_positive,
+            "fp_count": rec.false_positive,
+            "fp_rate": rec.fp_rate,
+            "tp_yield": rec.tp_yield,
+            "bob_disagreement_rate": _pct(disagreed, scored),
+            "bob_scored": scored,
             "flags": flags,
             "flagged": any(flags.values()),
         })
 
-    # Worst-first: flagged rules, then by volume.
-    rules.sort(key=lambda r: (not r["flagged"], -(r["volume"] or 0)))
+    # Worst-first: flagged rules, then by volume, then by name so ties are stable.
+    rules.sort(key=lambda r: (not r["flagged"], -(r["volume"] or 0), r["rule_name"]))
 
+    unmapped = outcomes.get(RuleKey())
     return {
         "period_days": lookback,
-        "generated_at": now.isoformat(),
+        "generated_at": window.until.isoformat(),
         "thresholds": th,
         "summary": {
             "rules_tracked": len(rules),
@@ -240,10 +151,37 @@ def get_detection_health(session: Session, days: Optional[int] = None) -> Dict[s
             "silent_rules": n_silent,
             "noisy_rules": n_noisy,
             "decaying_rules": n_decaying,
-            "unmapped_alerts": unmapped_count,
+            "unmapped_alerts": unmapped.alerts if unmapped else 0,
         },
         "rules": rules,
     }
+
+
+def _bob_scores(session: Session, window: Window, outcomes) -> Dict[RuleKey, tuple]:
+    """(scored, disagreed) per rule, keyed exactly as the closure outcomes are.
+
+    Only rows where Bob made a scored suggestion count: not abstentions, not
+    circuit-breaker auto-escalations.
+    """
+    rows = session.execute(
+        select(
+            AIFeedback.bob_suggested_verdict,
+            AIFeedback.agreement,
+            AIFeedback.auto_escalated,
+            AlertTriage.rule_id,
+            AlertTriage.rule_name,
+        )
+        .outerjoin(AlertTriage, AlertTriage.es_alert_id == AIFeedback.alert_id)
+        .where(AIFeedback.id.in_(deduped_feedback_ids(window.since)))
+    ).all()
+    scores: Dict[RuleKey, list] = {}
+    for bob_verdict, agreement, auto_escalated, rule_id, rule_name in rows:
+        if not bob_verdict or agreement is None or auto_escalated:
+            continue
+        tally = scores.setdefault(outcomes.key_for(rule_id, rule_name), [0, 0])
+        tally[0] += 1
+        tally[1] += agreement is False
+    return {k: (v[0], v[1]) for k, v in scores.items()}
 
 
 def get_rule_attack_guidance(

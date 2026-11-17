@@ -1,6 +1,6 @@
 """Detection Health dashboard API (v0.47.0).
 
-Per-rule performance analytics over the AIFeedback ledger + closure verdicts,
+Per-rule performance analytics over closure verdicts (rule_outcome_service),
 plus a one-click action to file a `DetectionProposal` against a flagged rule.
 
 Read views gated `security:read` (lead / detection-engineer audience — a step
