@@ -142,12 +142,17 @@ def test_every_template_lives_outside_the_script_blocks():
             # These stages' comments name the template each render clones,
             # so the question is whether a match is an element or prose.
             assert on_comment_line(body, m.start()), m.group(1)
-    assert len(TEMPLATE_ID.findall(markup())) == 32
+    # 32 the page's own script clones, and the alert window's three rail
+    # templates, which static/js/alerts-window.js clones.
+    assert len(TEMPLATE_ID.findall(markup())) == 35
 
 
 def test_every_cloned_id_is_a_template_the_page_defines():
     defined = set(TEMPLATE_ID.findall(markup()))
-    used = set(CLONE.findall(scripts()))
+    # The alert window's script is a static file with its own clone(), so
+    # its templates are looked for there rather than in the inline script.
+    window_js = (PAGE.parents[1] / "static/js/alerts-window.js").read_text(encoding="utf-8")
+    used = set(CLONE.findall(scripts())) | set(re.findall(r"\bclone\('([^']+)'\)", window_js))
     assert used - defined == set()
     assert defined - used == set(), "a template nothing clones is dead markup"
 

@@ -254,6 +254,7 @@
 {% block scripts %}
 {% include "_fragments/ion_fragment_client.html" %}
 <script src="/static/js/ion-fragments.js?v={{ ion_version }}"></script>
+<script nonce="{{ csp_nonce }}" src="/static/js/ion-arrange.js?v={{ ion_version }}"></script>
 {% if initial_case_id %}<script nonce="{{ csp_nonce }}">window.__initialCaseId = {{ initial_case_id }};</script>{% endif %}
 <script nonce="{{ csp_nonce }}">
 // =============================================================================
@@ -1365,15 +1366,15 @@ function switchPanelTab(tabName) {
 
 // ── Page-mode window arrangement (after TIDE v6) ────────────────────────
 // Every .cpanel-section is a movable, foldable, hideable unit in three
-// columns. ONE arrangement is remembered for all cases
-// (ion-case-window-layout-v1); sections a case does not have keep their
-// saved place, so arranging a small case never forgets a fuller one.
+// columns. ONE arrangement is remembered for all cases; sections a case does
+// not have keep their saved place, so arranging a small case never forgets a
+// fuller one. The machinery is static/js/ion-arrange.js, shared with the
+// alert window; what is the case window's own is below.
 // v2: alerts moved from the centre track to the full-width row, so saved v1
 // layouts have to be dropped or they would pin it back into 609px.
 const PM_LAYOUT_KEY = 'ion-case-window-layout-v2';
-// `full` is a spanning row rather than a track, so it carries no width here;
-// pmFitCols skips it when building grid-template-columns.
-const PM_COL_WIDTHS = { left: 'minmax(230px,1fr)', centre: 'minmax(0,1.7fr)', right: 'minmax(220px,0.9fr)' };
+// `full` is a spanning row rather than a track, so it carries no width.
+const PM_COL_WIDTHS = { left: 'minmax(230px,1fr)', centre: 'minmax(0,1.7fr)', right: 'minmax(220px,0.9fr)', full: null };
 // Alerts hosts a whole nested alert-detail view, which needs ~1100px before its
 // own two-column layout stops collapsing. The centre track is ~609px on a
 // 1600px viewport, so it gets the full-width row instead.
@@ -1381,27 +1382,21 @@ const PM_TAB_COL = { alerts: 'full', timeline: 'centre', attackpath: 'centre',
                      observables: 'left', overview: 'right', actions: 'right', notes: 'right' };
 const PM_SLUG_COL = { 'similar-cases': 'left', 'workbench': 'left',
                       'observable-sightings': 'left' };
-const PM_PRESETS = {
-    triage: null,   // the defaults above
-    dossier: function (key, tab) {
+const PM_PRESETS = [
+    { id: 'triage', label: 'Triage', col: null },   // the defaults above
+    { id: 'dossier', label: 'Dossier', col: function (key, sec) {
+        const tab = sec.dataset.tab;
         if (tab === 'alerts') return 'full';
         return (tab === 'overview' || tab === 'actions' || tab === 'notes') ? 'right' : 'centre';
-    },
-    review: function (key, tab) {
+    } },
+    { id: 'review', label: 'Review', col: function (key, sec) {
+        const tab = sec.dataset.tab;
         if (tab === 'alerts') return 'full';
         if (tab === 'timeline' || key === 'similar-cases' || tab === 'observables') return 'left';
         if (tab === 'overview' || tab === 'actions') return 'right';
         return 'centre';
-    }
-};
-
-function pmReadLayout() {
-    try { return JSON.parse(localStorage.getItem(PM_LAYOUT_KEY) || 'null'); }
-    catch (_) { return null; }
-}
-function pmWriteLayout(v) {
-    try { localStorage.setItem(PM_LAYOUT_KEY, JSON.stringify(v)); } catch (_) { /* blocked */ }
-}
+    } }
+];
 
 function pmKeyFor(sec, seen) {
     const t = sec.querySelector('.cpanel-section-title');
@@ -1414,210 +1409,17 @@ function pmKeyFor(sec, seen) {
     return base;
 }
 
-function pmDefaultCol(key, tab) {
-    return PM_SLUG_COL[key] || PM_TAB_COL[tab] || 'centre';
+// prev / next case, from the already-loaded list order
+function pmStepCase(delta) {
+    const cur = String(window.__initialCaseId);
+    const ids = (allCases || []).map(c => String(c.id));
+    const i = ids.indexOf(cur);
+    if (i === -1 || !ids.length) return;
+    const next = ids[(i + delta + ids.length) % ids.length];
+    if (next && next !== cur) window.location.assign('/cases/' + next);
 }
 
-function pmSections(body) {
-    return [...body.querySelectorAll('.pm-col > .cpanel-section[data-section]')];
-}
-
-function pmCurrentLayout(body) {
-    const cols = {}, hidden = [], collapsed = [];
-    body.querySelectorAll('.pm-col').forEach(col => {
-        cols[col.dataset.col] = [...col.querySelectorAll(':scope > .cpanel-section')].map(sec => {
-            const k = sec.dataset.section;
-            if (sec.hidden) hidden.push(k);
-            if (sec.classList.contains('pm-collapsed')) collapsed.push(k);
-            return k;
-        });
-    });
-    return { cols, hidden, collapsed };
-}
-
-// TIDE's merge: keys absent from THIS case keep their saved place and flags.
-function pmSaveLayout(body) {
-    const now = pmCurrentLayout(body);
-    const saved = pmReadLayout();
-    const present = {};
-    Object.values(now.cols).forEach(list => list.forEach(k => { present[k] = true; }));
-    if (saved && saved.cols) {
-        Object.keys(saved.cols).forEach(c => {
-            const list = now.cols[c] || (now.cols[c] = []);
-            (saved.cols[c] || []).forEach((k, i) => {
-                if (present[k] || list.includes(k)) return;
-                const after = i > 0 ? list.indexOf(saved.cols[c][i - 1]) : -1;
-                list.splice(after !== -1 ? after + 1 : Math.min(i, list.length), 0, k);
-            });
-        });
-        (saved.hidden || []).forEach(k => { if (!present[k] && !now.hidden.includes(k)) now.hidden.push(k); });
-        (saved.collapsed || []).forEach(k => { if (!present[k] && !now.collapsed.includes(k)) now.collapsed.push(k); });
-    }
-    pmWriteLayout(now);
-}
-
-function pmFitCols(body) {
-    const widths = [];
-    body.querySelectorAll('.pm-col').forEach(col => {
-        const any = [...col.children].some(el =>
-            el.classList.contains('cpanel-section') && !el.hidden);
-        col.classList.toggle('pm-col--empty', !any && !_pmDragging);
-        // The full-width row spans every track (grid-column: 1/-1) rather than
-        // being one, so it must not contribute a width or the template would
-        // gain a fourth, undefined track.
-        if (col.dataset.col === 'full') return;
-        if (any || _pmDragging) widths.push(PM_COL_WIDTHS[col.dataset.col]);
-    });
-    body.querySelector('.pm-cols').style.setProperty('--pm-cols', widths.join(' ') || '1fr');
-}
-
-function pmArrange(body, layout) {
-    const byKey = {};
-    pmSections(body).forEach(sec => { byKey[sec.dataset.section] = sec; });
-    body.querySelectorAll('.pm-col').forEach(col => {
-        ((layout.cols || {})[col.dataset.col] || []).forEach(k => {
-            if (byKey[k]) { col.appendChild(byKey[k]); delete byKey[k]; }
-        });
-    });
-    const hidden = layout.hidden || [], collapsed = layout.collapsed || [];
-    pmSections(body).forEach(sec => {
-        sec.hidden = hidden.includes(sec.dataset.section);
-        sec.classList.toggle('pm-collapsed', collapsed.includes(sec.dataset.section));
-    });
-    pmFitCols(body);
-}
-
-function pmApplyPreset(body, name) {
-    const fn = PM_PRESETS[name];
-    pmSections(body).forEach(sec => {
-        const col = fn ? fn(sec.dataset.section, sec.dataset.tab)
-                       : pmDefaultCol(sec.dataset.section, sec.dataset.tab);
-        body.querySelector('.pm-col[data-col="' + col + '"]').appendChild(sec);
-        sec.hidden = false;
-        sec.classList.remove('pm-collapsed');
-    });
-    pmFitCols(body);
-    pmSaveLayout(body);
-}
-
-let _pmDragging = null;
-const _pmMarker = (() => { const m = document.createElement('div'); m.className = 'pm-drop-marker'; return m; })();
-
-function pmWireDrag(body) {
-    body.addEventListener('dragstart', e => {
-        const h = e.target.closest && e.target.closest('.pm-handle');
-        if (!h) return;
-        _pmDragging = h.closest('.cpanel-section');
-        _pmDragging.classList.add('pm-dragging');
-        body.querySelectorAll('.pm-col').forEach(c => c.classList.add('pm-col--drop'));
-        pmFitCols(body);
-        e.dataTransfer.effectAllowed = 'move';
-        try { e.dataTransfer.setDragImage(_pmDragging, 20, 14); } catch (_) { /* optional */ }
-    });
-    body.addEventListener('dragover', e => {
-        if (!_pmDragging) return;
-        const col = e.target.closest && e.target.closest('.pm-col');
-        if (!col) return;
-        e.preventDefault();
-        const after = [...col.querySelectorAll(':scope > .cpanel-section:not(.pm-dragging)')]
-            .find(sec => e.clientY < sec.getBoundingClientRect().top + sec.offsetHeight / 2);
-        if (after) col.insertBefore(_pmMarker, after); else col.appendChild(_pmMarker);
-    });
-    body.addEventListener('drop', e => {
-        if (!_pmDragging) return;
-        e.preventDefault();
-        if (_pmMarker.parentElement) _pmMarker.parentElement.insertBefore(_pmDragging, _pmMarker);
-    });
-    body.addEventListener('dragend', () => {
-        if (!_pmDragging) return;
-        _pmDragging.classList.remove('pm-dragging');
-        _pmDragging = null;
-        _pmMarker.remove();
-        body.querySelectorAll('.pm-col').forEach(c => c.classList.remove('pm-col--drop'));
-        pmFitCols(body);
-        pmSaveLayout(body);
-    });
-}
-
-function pmInjectHeaderTools(body) {
-    const header = document.querySelector('.case-panel-header');
-    if (!header || header.querySelector('.pm-tools')) return;
-    const tools = document.createElement('span');
-    tools.className = 'pm-tools';
-
-    // prev / next case, from the already-loaded list order
-    const mkNav = (label, delta, title) => {
-        const b = document.createElement('button');
-        b.className = 'pm-tool-btn';
-        b.textContent = label;
-        b.title = title;
-        b.addEventListener('click', () => {
-            const cur = String(window.__initialCaseId);
-            const ids = (allCases || []).map(c => String(c.id));
-            const i = ids.indexOf(cur);
-            if (i === -1 || !ids.length) return;
-            const next = ids[(i + delta + ids.length) % ids.length];
-            if (next && next !== cur) window.location.assign('/cases/' + next);
-        });
-        return b;
-    };
-    tools.appendChild(mkNav('\u2190', -1, 'Previous case'));
-    tools.appendChild(mkNav('\u2192', 1, 'Next case'));
-
-    const btn = document.createElement('button');
-    btn.className = 'pm-tool-btn';
-    btn.textContent = 'Sections \u25BE';
-    const menu = document.createElement('div');
-    menu.className = 'pm-menu';
-
-    function rebuild() {
-        menu.textContent = '';
-        const presets = document.createElement('div');
-        presets.className = 'pm-preset-row';
-        [['triage', 'Triage'], ['dossier', 'Dossier'], ['review', 'Review']].forEach(([k, label]) => {
-            const pb = document.createElement('button');
-            pb.className = 'pm-tool-btn';
-            pb.textContent = label;
-            pb.addEventListener('click', () => { pmApplyPreset(body, k); rebuild(); });
-            presets.appendChild(pb);
-        });
-        menu.appendChild(presets);
-        menu.appendChild(document.createElement('hr'));
-        pmSections(body).forEach(sec => {
-            const label = document.createElement('label');
-            const box = document.createElement('input');
-            box.type = 'checkbox';
-            box.checked = !sec.hidden;
-            box.addEventListener('change', () => {
-                sec.hidden = !box.checked;
-                pmFitCols(body);
-                pmSaveLayout(body);
-            });
-            label.appendChild(box);
-            const t = sec.querySelector('.cpanel-section-title');
-            label.appendChild(document.createTextNode(
-                (t ? t.textContent : sec.dataset.section).replace(/\s+/g, ' ').trim()));
-            menu.appendChild(label);
-        });
-        menu.appendChild(document.createElement('hr'));
-        const reset = document.createElement('button');
-        reset.className = 'pm-reset';
-        reset.textContent = 'Reset arrangement';
-        reset.addEventListener('click', () => {
-            try { localStorage.removeItem(PM_LAYOUT_KEY); } catch (_) { /* blocked */ }
-            pmApplyPreset(body, 'triage');
-            menu.classList.remove('pm-open');
-        });
-        menu.appendChild(reset);
-    }
-    btn.addEventListener('click', e => { e.stopPropagation(); rebuild(); menu.classList.toggle('pm-open'); });
-    document.addEventListener('click', e => { if (!menu.contains(e.target)) menu.classList.remove('pm-open'); });
-
-    tools.appendChild(btn);
-    tools.appendChild(menu);
-    const close = header.querySelector('.case-panel-close');
-    header.insertBefore(tools, close);
-}
+let _pmArranger = null;
 
 function applyPageModeLayout() {
     const panel = document.getElementById('case-panel');
@@ -1626,56 +1428,26 @@ function applyPageModeLayout() {
     body.classList.remove('workspace-mode');
     body.querySelectorAll('.cpanel-section[data-tab]').forEach(sec => sec.classList.remove('tab-hidden'));
 
-    if (!body.querySelector('.pm-cols')) {
-        const grid = document.createElement('div');
-        grid.className = 'pm-cols';
-        ['left', 'centre', 'right', 'full'].forEach(c => {
-            const col = document.createElement('div');
-            col.className = 'pm-col';
-            col.dataset.col = c;
-            grid.appendChild(col);
+    if (!_pmArranger) {
+        const header = document.querySelector('.case-panel-header');
+        _pmArranger = ionArrange.create({
+            body: body,
+            candidates: '.cpanel-section[data-tab]',
+            storageKey: PM_LAYOUT_KEY,
+            columns: PM_COL_WIDTHS,
+            defaultCol: (key, sec) => PM_SLUG_COL[key] || PM_TAB_COL[sec.dataset.tab] || 'centre',
+            presets: PM_PRESETS,
+            keyFor: pmKeyFor,
+            titleOf: sec => sec.querySelector('.cpanel-section-title'),
+            toolsHost: header,
+            toolsBefore: header.querySelector('.case-panel-close'),
+            nav: [
+                { label: '←', title: 'Previous case', onClick: () => pmStepCase(-1) },
+                { label: '→', title: 'Next case', onClick: () => pmStepCase(1) },
+            ],
         });
-
-        const seen = {};
-        body.querySelectorAll('.cpanel-section[data-tab]').forEach(sec => {
-            const key = pmKeyFor(sec, seen);
-            sec.dataset.section = key;
-            // chrome: handle + fold on the existing title row
-            const title = sec.querySelector('.cpanel-section-title');
-            const head = document.createElement('div');
-            head.className = 'pm-sec-head';
-            const handle = document.createElement('button');
-            handle.className = 'pm-handle';
-            handle.textContent = '\u2261';
-            handle.title = 'Drag to move this section';
-            handle.draggable = true;
-            head.appendChild(handle);
-            if (title) head.appendChild(title);
-            const fold = document.createElement('span');
-            fold.className = 'pm-fold';
-            fold.textContent = '\u25BC';
-            head.appendChild(fold);
-            const bodyWrap = document.createElement('div');
-            bodyWrap.className = 'pm-sec-body';
-            while (sec.firstChild) bodyWrap.appendChild(sec.firstChild);
-            sec.appendChild(head);
-            sec.appendChild(bodyWrap);
-            head.addEventListener('click', e => {
-                if (e.target.closest('button:not(.pm-handle), a, select, input')) return;
-                if (e.target === handle) return;
-                sec.classList.toggle('pm-collapsed');
-                pmSaveLayout(body);
-            });
-            grid.querySelector('.pm-col[data-col="' + pmDefaultCol(key, sec.dataset.tab) + '"]')
-                .appendChild(sec);
-        });
-
-        body.appendChild(grid);
-        pmWireDrag(body);
-        const saved = pmReadLayout();
-        if (saved && saved.cols) pmArrange(body, saved); else pmFitCols(body);
-        pmInjectHeaderTools(body);
     }
+    _pmArranger.apply();
 
     // the attack path lays edges out from getBoundingClientRect, which is all
     // zeroes until the section is actually visible.

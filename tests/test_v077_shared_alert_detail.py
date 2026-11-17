@@ -178,12 +178,12 @@ def test_alerts_uses_the_stacked_layout(alerts):
 
 
 def test_alerts_keeps_its_page_specific_wiring(alerts):
-    """Modal, investigation timer and triage stay on the page — they are not
+    """Window, investigation timer and triage stay on the page — they are not
     the component's business."""
     js = _inline_js(alerts)
     fn = js[js.index("async function showAlertDetail"):]
     fn = fn[:fn.index("\n}")]
-    for bit in ("alert-detail-modal", "startInvestigationTimer", "loadTriage"):
+    for bit in ("ionAlertWindow.show(", "startInvestigationTimer", "loadTriage"):
         assert bit in fn, bit
 
 

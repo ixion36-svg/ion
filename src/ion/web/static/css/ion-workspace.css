@@ -325,8 +325,10 @@
 .case-panel.page-mode .cpanel-tab-nav { display: none; }
 
 /* Arranged window (after TIDE v6): three columns of movable sections. The
-   column widths live in --pm-cols so an empty column can fold away. */
-.case-panel.page-mode .pm-cols {
+   column widths live in --pm-cols so an empty column can fold away.
+   static/js/ion-arrange.js builds this for the case window and the alert
+   window; .pm-section is the class it puts on every section it arranges. */
+.pm-cols {
     display: grid;
     grid-template-columns: var(--pm-cols, minmax(230px, 1fr) minmax(0, 1.7fr) minmax(220px, 0.9fr));
     gap: 14px;
@@ -336,7 +338,7 @@
 /* Sections needing more room than a single track — currently Alerts, which
    embeds a whole alert-detail view and collapses below ~1100px. Spans every
    track, so it lands on its own row under the three columns. */
-.case-panel.page-mode .pm-col[data-col="full"] { grid-column: 1 / -1; }
+.pm-col[data-col="full"] { grid-column: 1 / -1; }
 .pm-col--empty { display: none; }
 .pm-col--drop { outline: 1.5px dashed var(--accent-color); outline-offset: 4px;
                 border-radius: 10px; min-height: 60px; }
@@ -366,8 +368,8 @@
 }
 .pm-handle:hover { color: var(--accent-color); }
 .pm-fold { color: var(--text-secondary); font-size: 0.62rem; transition: transform 0.12s; }
-.cpanel-section.pm-collapsed .pm-fold { transform: rotate(-90deg); }
-.cpanel-section.pm-collapsed > :not(.pm-sec-head) { display: none; }
+.pm-section.pm-collapsed .pm-fold { transform: rotate(-90deg); }
+.pm-section.pm-collapsed > :not(.pm-sec-head) { display: none; }
 .pm-sec-body { padding: 0.8rem 0.9rem; }
 /* A section holding only its empty hint is one line under its title, not a
    dashed card: five empty sections took about 600 px of CASE-0239. */
@@ -377,7 +379,7 @@
 .pm-sec-body > :only-child > .cpanel-empty-hint:only-child {
     padding: 0; background: none; border: 0; text-align: left; font-size: 0.74rem;
 }
-.cpanel-section.pm-dragging { opacity: 0.35; }
+.pm-section.pm-dragging { opacity: 0.35; }
 .pm-drop-marker { height: 3px; border-radius: 2px; background: var(--accent-color); margin: -7px 4px; }
 
 /* Sections menu in the panel header */
@@ -406,7 +408,7 @@
 .pm-menu .pm-reset:hover { background: rgba(255, 255, 255, 0.04); color: var(--text-primary); }
 
 @media (max-width: 1150px) {
-    .case-panel.page-mode .pm-cols { grid-template-columns: 1fr !important; }
+    .pm-cols { grid-template-columns: 1fr !important; }
 }
 
 

@@ -1554,30 +1554,33 @@ async def profile_page(request: Request, user: User = Depends(require_page_auth)
 
 
 
-@app.get("/alerts", response_class=HTMLResponse)
-async def alerts_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the alerts investigation page.
+def _alerts_page_context(user: User) -> dict:
+    """What alerts.html needs, for the queue and for a single alert alike.
 
     `can_create_case` is what POST /api/cases requires, passed as a fact
     about the viewer so the page does not open a create-case form whose
     submit would answer 403. The page's own alert:read does not imply it.
 
     `can_read_playbooks` is what GET .../recommended-playbooks requires and
-    what the /ui/alerts/playbooks fragment is gated on, so the detail
-    modal's playbook section says it is withheld instead of requesting a
+    what the /ui/alerts/playbooks fragment is gated on, so the alert
+    window's playbook section says it is withheld instead of requesting a
     fragment that answers 403, which htmx would not swap, leaving
-    "Loading playbooks..." on screen for the life of the modal.
+    "Loading playbooks..." on screen for the life of the window.
     """
+    return {
+        "alert_detail_v2": get_config().alert_detail_v2,
+        "alert_field_pins": get_config().alert_field_pins,
+        "bob_custom_templates": get_config().bob_custom_templates,
+        "can_create_case": user.has_permission("case:create"),
+        "can_read_playbooks": user.has_permission("playbook:read"),
+    }
+
+
+@app.get("/alerts", response_class=HTMLResponse)
+async def alerts_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the alerts investigation page."""
     return templates.TemplateResponse(
-        request=request,
-        name="alerts.html",
-        context={
-            "alert_detail_v2": get_config().alert_detail_v2,
-            "alert_field_pins": get_config().alert_field_pins,
-            "bob_custom_templates": get_config().bob_custom_templates,
-            "can_create_case": user.has_permission("case:create"),
-            "can_read_playbooks": user.has_permission("playbook:read"),
-        },
+        request=request, name="alerts.html", context=_alerts_page_context(user),
     )
 
 
@@ -1597,38 +1600,31 @@ async def alert_arkime_page(
     )
 
 
-@app.get("/alerts/{row_id:int}")
-async def alert_deeplink(
-    row_id: int,
+@app.get("/alerts/{alert_id}", response_class=HTMLResponse)
+async def alert_page(
+    alert_id: str,
+    request: Request,
     user: User = Depends(require_page_permission("alert:read")),
 ):
-    """Deep-link to a single alert by AlertTriage row PK.
+    """A single alert as its own page, keyed on its Elasticsearch id.
 
-    v0.30.0: lab_fixture_service._observable_link returns
-    `/alerts/<row_id>` for materialised AlertTriage rows. Pre-fix this
-    404'd because the alerts page is keyed on `es_alert_id` (a string),
-    not the triage row PK. We look up the row, resolve its es_alert_id,
-    and redirect to `/alerts?selected=<es_alert_id>` so the list page
-    can pre-open the detail panel.
+    The same template and alert window as /alerts, rendered in page mode.
+    The alert itself is read by the page from
+    /api/elasticsearch/alerts/{id}/detail, so an id that matches nothing is
+    reported in the window rather than decided here: this route cannot tell
+    a missing alert from an unreachable Elasticsearch without that read.
 
-    If the row doesn't exist we redirect to `/alerts` without a
-    `selected` param so the user lands on a sensible page instead of a
-    404 error.
+    There was a /alerts/{row_id:int} beside this, a redirect from an
+    AlertTriage row id that lab fixtures once linked to. Nothing generates
+    that link any more, and an integer route in front of this one claimed
+    every alert whose Elasticsearch id is all digits, sending it to whatever
+    triage row had that number. An id is an Elasticsearch id here, always.
     """
-
-    from ion.models.alert_triage import AlertTriage
-    from ion.storage.database import get_session
-
-    s: Session = next(get_session())
-    try:
-        triage = s.query(AlertTriage).filter(AlertTriage.id == row_id).one_or_none()
-        if triage is None:
-            return RedirectResponse(url="/alerts", status_code=303)
-        return RedirectResponse(
-            url=f"/alerts?selected={triage.es_alert_id}", status_code=303
-        )
-    finally:
-        s.close()
+    return templates.TemplateResponse(
+        request=request,
+        name="alerts.html",
+        context={**_alerts_page_context(user), "initial_alert_id": alert_id},
+    )
 
 
 @app.get("/cases", response_class=HTMLResponse)
