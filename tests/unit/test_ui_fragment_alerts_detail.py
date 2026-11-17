@@ -735,7 +735,7 @@ def test_no_observables_is_a_real_absence(monkeypatch):
 
 def test_none_enrichable_keeps_the_pages_wording(monkeypatch):
     _enrich(monkeypatch, {"results": []})
-    session = _Session(_Triage([{"type": "user_account", "value": "ana"}]))
+    session = _Session(_Triage([{"type": "process_name", "value": "powershell.exe"}]))
     assert "No enrichable observables" in get(ENRICH, session=session).text
 
 

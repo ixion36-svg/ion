@@ -15,23 +15,23 @@ Server-rendered fragments. `render_view` routes also answer the view model as JS
 | method | path | permission | handler | renders | called from |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/ui/alert-prompts` | `playbook:read` | [alert_prompt_templates.py:41](src/ion/web/ui/alert_prompt_templates.py#L41) | `_fragments/alert_prompt_templates.html` | `alert_prompt_templates.html` |
-| GET | `/ui/alerts/analytics` | `alert:read` | [alerts.py:2560](src/ion/web/ui/alerts.py#L2560) | `_fragments/alerts_analytics.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/case-manage/{case_id}` | `case:read` | [alerts.py:651](src/ion/web/ui/alerts.py#L651) | `_fragments/alerts_case_manage.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/case-panel/{case_id}` | `case:read` | [alerts.py:527](src/ion/web/ui/alerts.py#L527) | `_fragments/alerts_case_panel.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/case-picker` | `case:read` | [alerts.py:611](src/ion/web/ui/alerts.py#L611) | `_fragments/alerts_case_picker.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/case-playbook-executions/{case_id}` | `playbook:execute` | [alerts.py:989](src/ion/web/ui/alerts.py#L989) | `_fragments/alerts_playbook_case_executions.html` | `alert_arkime.html`, `alerts_case_manage.html`, `alert_arkime.html` |
-| GET | `/ui/alerts/case-playbook-picker/{case_id}` | `playbook:read` | [alerts.py:1037](src/ion/web/ui/alerts.py#L1037) | `_fragments/alerts_playbook_case_picker.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| POST | `/ui/alerts/case-summary/{case_id}` | `case:read` | [alerts.py:735](src/ion/web/ui/alerts.py#L735) | `_fragments/alerts_case_ai_summary.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/case-tab/{case_id}` | `alert:read + case:read` | [alerts.py:2160](src/ion/web/ui/alerts.py#L2160) | `_fragments/alerts_case_tab.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/cases-summary` | `case:read` | [alerts.py:432](src/ion/web/ui/alerts.py#L432) | `_fragments/alerts_cases_summary.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/comments/{alert_id}` | `alert:read` | [alerts.py:2136](src/ion/web/ui/alerts.py#L2136) | `_fragments/alerts_comments.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/enrich/{alert_id}` | `alert:read` | [alerts.py:2223](src/ion/web/ui/alerts.py#L2223) | `_fragments/alerts_enrich.html` | `alert_arkime.html`, `alerts_triage_bar.html`, `alert_arkime.html` |
-| GET | `/ui/alerts/kfp-banner/{case_id}` | `alert:read + case:read` | [alerts.py:2184](src/ion/web/ui/alerts.py#L2184) | `_fragments/alerts_kfp_banner.html` | `alert_arkime.html`, `alerts_case_manage.html`, `alert_arkime.html` |
-| GET | `/ui/alerts/playbook-library/{alert_id}` | `playbook:read` | [alerts.py:1175](src/ion/web/ui/alerts.py#L1175) | `_fragments/alerts_playbook_library.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/playbooks/{alert_id}` | `playbook:read` | [alerts.py:1116](src/ion/web/ui/alerts.py#L1116) | `_fragments/alerts_playbooks.html` | `alert_arkime.html`, `alerts_triage_bar.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/queue` | `alert:read` | [alerts.py:1533](src/ion/web/ui/alerts.py#L1533) | `_fragments/alerts_queue.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/systems` | `alert:read` | [alerts.py:2914](src/ion/web/ui/alerts.py#L2914) | `_fragments/alerts_systems.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
-| GET | `/ui/alerts/triage/{alert_id}` | `alert:read` | [alerts.py:2071](src/ion/web/ui/alerts.py#L2071) | `_fragments/alerts_triage_bar.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/analytics` | `alert:read` | [alerts.py:2549](src/ion/web/ui/alerts.py#L2549) | `_fragments/alerts_analytics.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/case-manage/{case_id}` | `case:read` | [alerts.py:652](src/ion/web/ui/alerts.py#L652) | `_fragments/alerts_case_manage.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/case-panel/{case_id}` | `case:read` | [alerts.py:528](src/ion/web/ui/alerts.py#L528) | `_fragments/alerts_case_panel.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/case-picker` | `case:read` | [alerts.py:612](src/ion/web/ui/alerts.py#L612) | `_fragments/alerts_case_picker.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/case-playbook-executions/{case_id}` | `playbook:execute` | [alerts.py:990](src/ion/web/ui/alerts.py#L990) | `_fragments/alerts_playbook_case_executions.html` | `alert_arkime.html`, `alerts_case_manage.html`, `alert_arkime.html` |
+| GET | `/ui/alerts/case-playbook-picker/{case_id}` | `playbook:read` | [alerts.py:1038](src/ion/web/ui/alerts.py#L1038) | `_fragments/alerts_playbook_case_picker.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| POST | `/ui/alerts/case-summary/{case_id}` | `case:read` | [alerts.py:736](src/ion/web/ui/alerts.py#L736) | `_fragments/alerts_case_ai_summary.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/case-tab/{case_id}` | `alert:read + case:read` | [alerts.py:2149](src/ion/web/ui/alerts.py#L2149) | `_fragments/alerts_case_tab.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/cases-summary` | `case:read` | [alerts.py:433](src/ion/web/ui/alerts.py#L433) | `_fragments/alerts_cases_summary.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/comments/{alert_id}` | `alert:read` | [alerts.py:2125](src/ion/web/ui/alerts.py#L2125) | `_fragments/alerts_comments.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/enrich/{alert_id}` | `alert:read` | [alerts.py:2212](src/ion/web/ui/alerts.py#L2212) | `_fragments/alerts_enrich.html` | `alert_arkime.html`, `alerts_triage_bar.html`, `alert_arkime.html` |
+| GET | `/ui/alerts/kfp-banner/{case_id}` | `alert:read + case:read` | [alerts.py:2173](src/ion/web/ui/alerts.py#L2173) | `_fragments/alerts_kfp_banner.html` | `alert_arkime.html`, `alerts_case_manage.html`, `alert_arkime.html` |
+| GET | `/ui/alerts/playbook-library/{alert_id}` | `playbook:read` | [alerts.py:1176](src/ion/web/ui/alerts.py#L1176) | `_fragments/alerts_playbook_library.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/playbooks/{alert_id}` | `playbook:read` | [alerts.py:1117](src/ion/web/ui/alerts.py#L1117) | `_fragments/alerts_playbooks.html` | `alert_arkime.html`, `alerts_triage_bar.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/queue` | `alert:read` | [alerts.py:1534](src/ion/web/ui/alerts.py#L1534) | `_fragments/alerts_queue.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/systems` | `alert:read` | [alerts.py:2903](src/ion/web/ui/alerts.py#L2903) | `_fragments/alerts_systems.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
+| GET | `/ui/alerts/triage/{alert_id}` | `alert:read` | [alerts.py:2060](src/ion/web/ui/alerts.py#L2060) | `_fragments/alerts_triage_bar.html` | `alert_arkime.html`, `alert_arkime.html`, `alerts.html` |
 | POST | `/ui/alerts/{alert_id}/arkime` | `alert:read` | [alert_arkime.py:570](src/ion/web/ui/alert_arkime.py#L570) |  | `alert_arkime.html`, `alert_arkime.html` |
 | POST | `/ui/alerts/{alert_id}/arkime/commit` | `alert:read` | [alert_arkime.py:719](src/ion/web/ui/alert_arkime.py#L719) |  | `alert_arkime.html`, `alert_arkime.html` |
 | GET | `/ui/analyst/alerts` | `alert:read` | [analyst.py:498](src/ion/web/ui/analyst.py#L498) |  | `analyst.html` |
@@ -422,7 +422,7 @@ JSON endpoints.
 | DELETE | `/api/alert-prompts/{template_id}` | `playbook:create or playbook:delete or playbook:update` | [alert_prompt_api.py:346](src/ion/web/alert_prompt_api.py#L346) |  |  |
 | GET | `/api/alert-prompts/{template_id}` | `playbook:read` | [alert_prompt_api.py:211](src/ion/web/alert_prompt_api.py#L211) |  |  |
 | PUT | `/api/alert-prompts/{template_id}` | `playbook:create or playbook:delete or playbook:update` | [alert_prompt_api.py:303](src/ion/web/alert_prompt_api.py#L303) |  |  |
-| GET | `/api/alerts/host-patterns` | `alert:read` | [api.py:5595](src/ion/web/api.py#L5595) |  | `alerts.html` |
+| GET | `/api/alerts/host-patterns` | `alert:read` | [api.py:5590](src/ion/web/api.py#L5590) |  | `alerts.html` |
 | GET | `/api/alerts/investigation-template` | `alert:read` | [rule_template_api.py:40](src/ion/web/rule_template_api.py#L40) |  | `alert-detail.js` |
 | GET | `/api/alerts/investigation-template/pending` | `alert:read` | [rule_template_api.py:54](src/ion/web/rule_template_api.py#L54) |  |  |
 | PUT | `/api/alerts/investigation-template/{template_id}` | `alert:read` | [rule_template_api.py:143](src/ion/web/rule_template_api.py#L143) |  |  |
@@ -436,8 +436,8 @@ JSON endpoints.
 | POST | `/api/alerts/{alert_id}/arkime/commit` | `alert:read` | [arkime_api.py:483](src/ion/web/arkime_api.py#L483) |  |  |
 | POST | `/api/alerts/{alert_id}/arkime/preview` | `alert:read` | [arkime_api.py:324](src/ion/web/arkime_api.py#L324) |  |  |
 | GET | `/api/analyst-efficiency/metrics` | `alert:read` | [analyst_efficiency_api.py:16](src/ion/web/analyst_efficiency_api.py#L16) |  |  |
-| GET | `/api/analyst/knowledge-base` | `document:read` | [api.py:5675](src/ion/web/api.py#L5675) |  |  |
-| GET | `/api/analyst/knowledge-base/search` | `document:read` | [api.py:5805](src/ion/web/api.py#L5805) |  |  |
+| GET | `/api/analyst/knowledge-base` | `document:read` | [api.py:5670](src/ion/web/api.py#L5670) |  |  |
+| GET | `/api/analyst/knowledge-base/search` | `document:read` | [api.py:5800](src/ion/web/api.py#L5800) |  |  |
 | GET | `/api/analytics/dashboard` | `alert:read` | [analytics_api.py:146](src/ion/web/analytics_api.py#L146) |  |  |
 | GET | `/api/analytics/jobs` | `alert:read` | [analytics_api.py:25](src/ion/web/analytics_api.py#L25) |  | `analytics.html` |
 | GET | `/api/analytics/jobs/{job_type}` | `alert:read` | [analytics_api.py:52](src/ion/web/analytics_api.py#L52) |  |  |
@@ -704,20 +704,20 @@ JSON endpoints.
 | GET | `/api/elasticsearch/alerts/systems` | `alert:read` | [elasticsearch_api.py:448](src/ion/web/elasticsearch_api.py#L448) |  |  |
 | POST | `/api/elasticsearch/alerts/{alert_id}/auto-investigate` | `alert:read` | [auto_investigate_api.py:107](src/ion/web/auto_investigate_api.py#L107) |  |  |
 | POST | `/api/elasticsearch/alerts/{alert_id}/close` | `alert:triage` | [api.py:4175](src/ion/web/api.py#L4175) |  |  |
-| POST | `/api/elasticsearch/alerts/{alert_id}/comments` | `alert:triage` | [api.py:4445](src/ion/web/api.py#L4445) |  |  |
+| POST | `/api/elasticsearch/alerts/{alert_id}/comments` | `alert:triage` | [api.py:4440](src/ion/web/api.py#L4440) |  |  |
 | GET | `/api/elasticsearch/alerts/{alert_id}/detail` | `alert:read` | [elasticsearch_api.py:345](src/ion/web/elasticsearch_api.py#L345) |  |  |
 | POST | `/api/elasticsearch/alerts/{alert_id}/investigation-template/generate` | `alert:read` | [rule_template_api.py:63](src/ion/web/rule_template_api.py#L63) |  |  |
-| GET | `/api/elasticsearch/alerts/{alert_id}/playbook-executions` | `playbook:execute` | [api.py:5378](src/ion/web/api.py#L5378) |  | `alerts_playbooks.html` |
-| POST | `/api/elasticsearch/alerts/{alert_id}/playbook/{playbook_id}/start` | `playbook:execute` | [api.py:5293](src/ion/web/api.py#L5293) |  |  |
+| GET | `/api/elasticsearch/alerts/{alert_id}/playbook-executions` | `playbook:execute` | [api.py:5373](src/ion/web/api.py#L5373) |  | `alerts_playbooks.html` |
+| POST | `/api/elasticsearch/alerts/{alert_id}/playbook/{playbook_id}/start` | `playbook:execute` | [api.py:5288](src/ion/web/api.py#L5288) |  |  |
 | GET | `/api/elasticsearch/alerts/{alert_id}/process-tree` | `alert:read` | [elasticsearch_api.py:411](src/ion/web/elasticsearch_api.py#L411) |  |  |
 | GET | `/api/elasticsearch/alerts/{alert_id}/raw` | `alert:read` | [elasticsearch_api.py:381](src/ion/web/elasticsearch_api.py#L381) |  |  |
-| GET | `/api/elasticsearch/alerts/{alert_id}/recommended-playbooks` | `playbook:read` | [api.py:5141](src/ion/web/api.py#L5141) |  |  |
+| GET | `/api/elasticsearch/alerts/{alert_id}/recommended-playbooks` | `playbook:read` | [api.py:5136](src/ion/web/api.py#L5136) |  |  |
 | GET | `/api/elasticsearch/alerts/{alert_id}/related` | `alert:read` | [elasticsearch_api.py:589](src/ion/web/elasticsearch_api.py#L589) |  |  |
 | GET | `/api/elasticsearch/alerts/{alert_id}/sequence` | `alert:read` | [elasticsearch_api.py:395](src/ion/web/elasticsearch_api.py#L395) |  |  |
-| GET | `/api/elasticsearch/alerts/{alert_id}/suggested-playbooks` | `playbook:read` | [api.py:5233](src/ion/web/api.py#L5233) |  |  |
+| GET | `/api/elasticsearch/alerts/{alert_id}/suggested-playbooks` | `playbook:read` | [api.py:5228](src/ion/web/api.py#L5228) |  |  |
 | GET | `/api/elasticsearch/alerts/{alert_id}/triage` | `alert:read` | [api.py:3845](src/ion/web/api.py#L3845) |  |  |
 | PUT | `/api/elasticsearch/alerts/{alert_id}/triage` | `alert:triage` | [api.py:4020](src/ion/web/api.py#L4020) |  |  |
-| POST | `/api/elasticsearch/alerts/{alert_id}/triage/auto-populate-observables` | `alert:triage` | [api.py:4425](src/ion/web/api.py#L4425) |  |  |
+| POST | `/api/elasticsearch/alerts/{alert_id}/triage/auto-populate-observables` | `alert:triage` | [api.py:4420](src/ion/web/api.py#L4420) |  |  |
 | GET | `/api/elasticsearch/assignment_users` | `alert:read` | [api.py:3723](src/ion/web/api.py#L3723) |  | `alerts.html` |
 | GET | `/api/elasticsearch/config` | — | [elasticsearch_api.py:97](src/ion/web/elasticsearch_api.py#L97) |  | `integrations.html` |
 | POST | `/api/elasticsearch/discover/histogram` | — | [elasticsearch_api.py:702](src/ion/web/elasticsearch_api.py#L702) |  |  |
@@ -852,8 +852,8 @@ JSON endpoints.
 | GET | `/api/ioc-staleness` | `alert:read` | [ioc_staleness_api.py:15](src/ion/web/ioc_staleness_api.py#L15) |  |  |
 | GET | `/api/iocs` | `alert:read` | [investigation_memory_api.py:294](src/ion/web/investigation_memory_api.py#L294) |  |  |
 | GET | `/api/iocs/{ioc_type}/{value:path}` | `alert:read` | [investigation_memory_api.py:319](src/ion/web/investigation_memory_api.py#L319) |  |  |
-| GET | `/api/iris/config` | — | [api.py:5931](src/ion/web/api.py#L5931) |  | `integrations.html` |
-| GET | `/api/iris/test` | — | [api.py:5946](src/ion/web/api.py#L5946) |  | `integrations.html` |
+| GET | `/api/iris/config` | — | [api.py:5926](src/ion/web/api.py#L5926) |  | `integrations.html` |
+| GET | `/api/iris/test` | — | [api.py:5941](src/ion/web/api.py#L5941) |  | `integrations.html` |
 | GET | `/api/kev` | `alert:read` | [kev_api.py:46](src/ion/web/kev_api.py#L46) |  |  |
 | POST | `/api/kev/import` | `system:settings` | [kev_api.py:81](src/ion/web/kev_api.py#L81) |  |  |
 | GET | `/api/kev/status` | `alert:read` | [kev_api.py:37](src/ion/web/kev_api.py#L37) |  |  |
@@ -958,12 +958,12 @@ JSON endpoints.
 | GET | `/api/observables/{observable_id}/enrichment/history` | `observable:read` | [observable_api.py:809](src/ion/web/observable_api.py#L809) |  |  |
 | GET | `/api/observables/{observable_id}/heatmap` | `observable:read` | [observable_api.py:1079](src/ion/web/observable_api.py#L1079) |  |  |
 | GET | `/api/observables/{observable_id}/timeline` | `observable:read` | [observable_api.py:1056](src/ion/web/observable_api.py#L1056) |  |  |
-| DELETE | `/api/opencti/config` | `admin` | [api.py:4577](src/ion/web/api.py#L4577) |  | `integrations.html` |
-| GET | `/api/opencti/config` | — | [api.py:4529](src/ion/web/api.py#L4529) |  | `integrations.html` |
-| POST | `/api/opencti/config` | `admin` | [api.py:4543](src/ion/web/api.py#L4543) |  | `integrations.html` |
-| POST | `/api/opencti/enrich` | — | [api.py:4644](src/ion/web/api.py#L4644) |  |  |
-| POST | `/api/opencti/enrich/batch` | — | [api.py:4611](src/ion/web/api.py#L4611) |  |  |
-| GET | `/api/opencti/test` | — | [api.py:4601](src/ion/web/api.py#L4601) |  | `integrations.html` |
+| DELETE | `/api/opencti/config` | `admin` | [api.py:4572](src/ion/web/api.py#L4572) |  | `integrations.html` |
+| GET | `/api/opencti/config` | — | [api.py:4524](src/ion/web/api.py#L4524) |  | `integrations.html` |
+| POST | `/api/opencti/config` | `admin` | [api.py:4538](src/ion/web/api.py#L4538) |  | `integrations.html` |
+| POST | `/api/opencti/enrich` | — | [api.py:4639](src/ion/web/api.py#L4639) |  |  |
+| POST | `/api/opencti/enrich/batch` | — | [api.py:4606](src/ion/web/api.py#L4606) |  |  |
+| GET | `/api/opencti/test` | — | [api.py:4596](src/ion/web/api.py#L4596) |  | `integrations.html` |
 | POST | `/api/pcap/analyze` | `alert:read` | [pcap_api.py:32](src/ion/web/pcap_api.py#L32) |  |  |
 | GET | `/api/pcap/jobs` | `alert:read` | [pcap_api.py:159](src/ion/web/pcap_api.py#L159) |  | `pcap.html` |
 | POST | `/api/pcap/jobs` | `alert:read` | [pcap_api.py:114](src/ion/web/pcap_api.py#L114) |  | `pcap.html` |
@@ -971,18 +971,18 @@ JSON endpoints.
 | POST | `/api/pcap/jobs/{job_id}/attach` | `case:update` | [pcap_api.py:216](src/ion/web/pcap_api.py#L216) |  |  |
 | POST | `/api/pcap/jobs/{job_id}/cancel` | `alert:read` | [pcap_api.py:191](src/ion/web/pcap_api.py#L191) |  |  |
 | GET | `/api/playbook-analytics` | `alert:read` | [playbook_analytics_api.py:15](src/ion/web/playbook_analytics_api.py#L15) |  |  |
-| GET | `/api/playbook-executions` | `playbook:execute` | [api.py:5561](src/ion/web/api.py#L5561) |  | `alerts.html`, `playbooks.html` |
-| GET | `/api/playbook-executions/summary` | `playbook:execute` | [api.py:5344](src/ion/web/api.py#L5344) |  |  |
-| GET | `/api/playbook-executions/{execution_id}` | `playbook:execute` | [api.py:5362](src/ion/web/api.py#L5362) |  |  |
-| POST | `/api/playbook-executions/{execution_id}/complete` | `playbook:execute` | [api.py:5440](src/ion/web/api.py#L5440) |  |  |
-| POST | `/api/playbook-executions/{execution_id}/fail` | `playbook:execute` | [api.py:5530](src/ion/web/api.py#L5530) |  |  |
-| POST | `/api/playbook-executions/{execution_id}/regenerate-report` | `playbook:execute` | [api.py:5498](src/ion/web/api.py#L5498) |  |  |
-| PUT | `/api/playbook-executions/{execution_id}/steps/{step_id}` | `playbook:execute` | [api.py:5394](src/ion/web/api.py#L5394) |  |  |
-| GET | `/api/playbooks` | `playbook:read` | [api.py:4983](src/ion/web/api.py#L4983) |  | `playbooks.html` |
-| POST | `/api/playbooks` | `playbook:create` | [api.py:4999](src/ion/web/api.py#L4999) |  | `playbooks.html` |
-| DELETE | `/api/playbooks/{playbook_id}` | `playbook:delete` | [api.py:5122](src/ion/web/api.py#L5122) |  |  |
-| GET | `/api/playbooks/{playbook_id}` | `playbook:read` | [api.py:5052](src/ion/web/api.py#L5052) |  |  |
-| PUT | `/api/playbooks/{playbook_id}` | `playbook:update` | [api.py:5068](src/ion/web/api.py#L5068) |  |  |
+| GET | `/api/playbook-executions` | `playbook:execute` | [api.py:5556](src/ion/web/api.py#L5556) |  | `alerts.html`, `playbooks.html` |
+| GET | `/api/playbook-executions/summary` | `playbook:execute` | [api.py:5339](src/ion/web/api.py#L5339) |  |  |
+| GET | `/api/playbook-executions/{execution_id}` | `playbook:execute` | [api.py:5357](src/ion/web/api.py#L5357) |  |  |
+| POST | `/api/playbook-executions/{execution_id}/complete` | `playbook:execute` | [api.py:5435](src/ion/web/api.py#L5435) |  |  |
+| POST | `/api/playbook-executions/{execution_id}/fail` | `playbook:execute` | [api.py:5525](src/ion/web/api.py#L5525) |  |  |
+| POST | `/api/playbook-executions/{execution_id}/regenerate-report` | `playbook:execute` | [api.py:5493](src/ion/web/api.py#L5493) |  |  |
+| PUT | `/api/playbook-executions/{execution_id}/steps/{step_id}` | `playbook:execute` | [api.py:5389](src/ion/web/api.py#L5389) |  |  |
+| GET | `/api/playbooks` | `playbook:read` | [api.py:4978](src/ion/web/api.py#L4978) |  | `playbooks.html` |
+| POST | `/api/playbooks` | `playbook:create` | [api.py:4994](src/ion/web/api.py#L4994) |  | `playbooks.html` |
+| DELETE | `/api/playbooks/{playbook_id}` | `playbook:delete` | [api.py:5117](src/ion/web/api.py#L5117) |  |  |
+| GET | `/api/playbooks/{playbook_id}` | `playbook:read` | [api.py:5047](src/ion/web/api.py#L5047) |  |  |
+| PUT | `/api/playbooks/{playbook_id}` | `playbook:update` | [api.py:5063](src/ion/web/api.py#L5063) |  |  |
 | GET | `/api/response/actions` | `playbook:read` | [response_api.py:119](src/ion/web/response_api.py#L119) |  | `response_approvals.html` |
 | GET | `/api/response/actions/inbox` | `response:approve` | [response_api.py:167](src/ion/web/response_api.py#L167) |  | `response_approvals.html` |
 | GET | `/api/response/actions/log` | `playbook:read` | [response_api.py:219](src/ion/web/response_api.py#L219) |  | `response_approvals.html` |
@@ -991,13 +991,13 @@ JSON endpoints.
 | POST | `/api/response/actions/{log_id}/approve` | `response:approve` | [response_api.py:185](src/ion/web/response_api.py#L185) |  | `response_approvals.html` |
 | POST | `/api/response/actions/{log_id}/reject` | `response:approve` | [response_api.py:203](src/ion/web/response_api.py#L203) |  | `response_approvals.html` |
 | GET | `/api/roles` | `user:read` | [api.py:1290](src/ion/web/api.py#L1290) |  |  |
-| GET | `/api/saved-searches` | — | [api.py:4706](src/ion/web/api.py#L4706) |  | `discover.html` |
-| POST | `/api/saved-searches` | — | [api.py:4727](src/ion/web/api.py#L4727) |  | `discover.html` |
-| DELETE | `/api/saved-searches/{search_id}` | — | [api.py:4810](src/ion/web/api.py#L4810) |  |  |
-| GET | `/api/saved-searches/{search_id}` | — | [api.py:4757](src/ion/web/api.py#L4757) |  |  |
-| PUT | `/api/saved-searches/{search_id}` | — | [api.py:4777](src/ion/web/api.py#L4777) |  |  |
-| POST | `/api/saved-searches/{search_id}/execute` | — | [api.py:4833](src/ion/web/api.py#L4833) |  |  |
-| POST | `/api/saved-searches/{search_id}/favorite` | — | [api.py:4912](src/ion/web/api.py#L4912) |  |  |
+| GET | `/api/saved-searches` | — | [api.py:4701](src/ion/web/api.py#L4701) |  | `discover.html` |
+| POST | `/api/saved-searches` | — | [api.py:4722](src/ion/web/api.py#L4722) |  | `discover.html` |
+| DELETE | `/api/saved-searches/{search_id}` | — | [api.py:4805](src/ion/web/api.py#L4805) |  |  |
+| GET | `/api/saved-searches/{search_id}` | — | [api.py:4752](src/ion/web/api.py#L4752) |  |  |
+| PUT | `/api/saved-searches/{search_id}` | — | [api.py:4772](src/ion/web/api.py#L4772) |  |  |
+| POST | `/api/saved-searches/{search_id}/execute` | — | [api.py:4828](src/ion/web/api.py#L4828) |  |  |
+| POST | `/api/saved-searches/{search_id}/favorite` | — | [api.py:4907](src/ion/web/api.py#L4907) |  |  |
 | GET | `/api/scheduler/handlers` | `system:settings` | [scheduler_api.py:191](src/ion/web/scheduler_api.py#L191) |  | `scheduler.html` |
 | GET | `/api/scheduler/jobs` | `system:settings` | [scheduler_api.py:84](src/ion/web/scheduler_api.py#L84) |  | `scheduler.html` |
 | POST | `/api/scheduler/jobs` | `system:settings` | [scheduler_api.py:90](src/ion/web/scheduler_api.py#L90) |  | `scheduler.html` |
