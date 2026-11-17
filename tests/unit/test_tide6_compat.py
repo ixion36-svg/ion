@@ -22,7 +22,6 @@ COPIES = [
 class _Tide(TideService):
     def __init__(self, version: int):
         self.enabled = True
-        self.space = "default"
         self.version = version
         self.sent: list[str] = []
 
@@ -51,9 +50,9 @@ class _Tide(TideService):
             bands = [int(x) for x in re.findall(r"quality_score >= (\d+)\)", q)]
             return {"rows": [{"bands": bands, "total_rules": 0, "enabled_rules": 0,
                               "disabled_rules": 0, "unmapped_rules": 0, "q_excellent": 0,
-                              "q_good": 0, "q_fair": 0, "q_poor": 0, "avg_quality": 0,
+                              "q_good": 0, "q_fair": 0, "q_poor": 0, "q_unscored": 0, "avg_quality": 0,
                               "min_quality": 0, "max_quality": 0, "covered_techniques": 0,
-                              "severity_json": "[]"}]}
+                              "severity_json": "[]", "kinds_json": "[]"}]}
         return {"rows": []}
 
 
@@ -114,7 +113,7 @@ def _http_tide(monkeypatch, status: int):
     tide_breaker._transition(CircuitState.CLOSED)
     svc = ts.TideService.__new__(ts.TideService)
     svc.url, svc.api_key, svc.client_id, svc.enabled = "http://tide.test", "k", "c", True
-    svc.verify, svc.space, svc._resolved_client_id = False, "default", None
+    svc.verify, svc._resolved_client_id = False, None
     return svc, tide_breaker
 
 

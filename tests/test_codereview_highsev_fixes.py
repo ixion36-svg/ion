@@ -40,7 +40,6 @@ def _service_capturing_sql():
     """A TideService whose _query records the SQL instead of hitting TIDE."""
     svc = TideService()
     svc.enabled = True          # bypass the config gate
-    svc.space = "default"
     captured: list[str] = []
 
     def _fake_query(sql, retries=1):

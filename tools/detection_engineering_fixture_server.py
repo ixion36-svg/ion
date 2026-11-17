@@ -32,8 +32,8 @@ def async_result(value):
     return read
 
 rule={'name':'Rule "quoted" <safe>','severity':'critical','quality_score':0,'enabled':False,'mitre_ids':['T1003'],'rule_id':'rule-1'}
-tide.tide_de_spaces=result({'spaces':[{'space':'default','rule_count':2},{'space':'quoted"space','rule_count':0}],'active':'default'})
-tide.tide_de_set_space=lambda space:{'ok':True,'active':space}
+tide.tide_de_destinations=result({'destinations':[{'key':'siem-elastic|default','siem_id':'siem-elastic','space':'default','kind':'elastic','rule_count':2},{'key':'siem-wazuh|*','siem_id':'siem-wazuh','space':'*','kind':'wazuh','rule_count':0}],'active':''})
+tide.tide_de_set_destination=lambda choice:{'ok':True,'active':choice.key,'label':choice.key or 'all destinations'}
 tide.tide_de_sync_status=result({'healthy':0,'total_datasets':0})
 tide.tide_de_sync_now=result({'synced':0,'total':0})
 tide.tide_de_posture=result({'enabled':True,'total_rules':2,'enabled_rules':1,'disabled_rules':1,'covered_techniques':1,'total_techniques':10,'unmapped_rules':0,'total_systems':1,'severity':{'critical':{'total':2,'enabled':1,'disabled':1}},'quality':{'excellent':0,'good':0,'fair':0,'poor':2,'avg_quality':0}})

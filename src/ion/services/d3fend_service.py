@@ -237,22 +237,14 @@ def _get_tide_attack_techniques() -> Dict[str, int]:
     svc = get_tide_service()
     if not svc.enabled:
         return {}
-    sql = """
-    SELECT t.technique_id AS tid, COUNT(*) AS n
-    FROM detection_rules dr,
-         LATERAL unnest(dr.mitre_ids) AS t(technique_id)
-    WHERE dr.enabled = TRUE
-      AND dr.space = '{space}'
-    GROUP BY t.technique_id
-    """.format(space=svc.space)
     try:
-        result = svc._query(sql)
+        rows = svc.get_enabled_rule_counts_by_technique()
     except Exception:
-        result = None
-    if not result or not result.get("rows"):
+        rows = None
+    if not rows:
         return {}
     counts: Dict[str, int] = {}
-    for row in result["rows"]:
+    for row in rows:
         tid = _normalize_tid(row.get("tid") or "")
         if not tid:
             continue

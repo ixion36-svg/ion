@@ -45,6 +45,7 @@ from fastapi.testclient import TestClient
 
 from ion.auth.dependencies import get_current_user
 from ion.models.cyab import CyabDataSource, CyabSystem
+from ion.services.tide_service import Destination, TideFailure
 from ion.web import de_tide_api
 from ion.web.api import get_db_session
 
@@ -55,12 +56,14 @@ from ion.web.api import get_db_session
 class FakeTide:
     """Stands in for TideService. Only the attributes the routes touch."""
 
-    def __init__(self, *, enabled: bool = True, space: str = "default", **data):
+    def __init__(self, *, enabled: bool = True, scope=None, configured_scope=None,
+                 last_failure=None, **data):
         self.enabled = enabled
-        self.space = space
+        self.scope = scope
+        self.configured_scope = configured_scope
+        self.last_failure = last_failure
         self._data = data
         self.calls: list[tuple[str, tuple, dict]] = []
-        self.set_space_raises = False
 
     def _record(self, name, *a, **k):
         self.calls.append((name, a, k))
@@ -93,15 +96,13 @@ class FakeTide:
         self._record("get_detection_rules", search=search, limit=limit)
         return self._data.get("rules", [])
 
-    def get_available_spaces(self):
-        self._record("get_available_spaces")
-        return self._data.get("spaces", [])
+    def get_destinations(self):
+        self._record("get_destinations")
+        return self._data.get("destinations", [])
 
-    def set_space(self, space):
-        self._record("set_space", space)
-        if self.set_space_raises:
-            raise ValueError("bad space")
-        self.space = space
+    def set_scope(self, scope):
+        self._record("set_scope", scope)
+        self.scope = scope
 
     def get_posture_stats(self):
         self._record("get_posture_stats")
@@ -496,12 +497,45 @@ class TestDeSnapshotRoutes:
         assert body["enabled"] is True
         assert body["total_rules"] == 400
 
-    def test_no_posture_reports_disabled(self, client, tide, snapshot):
+    def test_tide_off_reports_disabled(self, client, tide, snapshot):
+        snapshot["value"] = None
+        tide(enabled=False, posture=None)
+
+        assert client.get("/api/cyab/tide/de/posture").json() == {
+            "enabled": False}
+
+    def test_a_refused_posture_read_carries_tides_reason(self, client, tide,
+                                                         snapshot):
+        """A key TIDE 7 no longer accepts used to come back as an empty
+        posture, which the page drew as a tenant with no rules."""
+        snapshot["value"] = None
+        tide(posture=None, last_failure=TideFailure(
+            "auth_rejected", "Invalid or missing API key.", 401))
+
+        body = client.get("/api/cyab/tide/de/posture").json()
+
+        assert body["enabled"] is True
+        assert body["failure"]["kind"] == "auth_rejected"
+        assert body["failure"]["detail"] == "Invalid or missing API key."
+        assert "dev-user-001" in body["failure"]["message"]
+
+    def test_an_empty_read_without_a_reason_still_is_not_data(self, client,
+                                                              tide, snapshot):
         snapshot["value"] = None
         tide(posture=None)
 
         assert client.get("/api/cyab/tide/de/posture").json() == {
-            "enabled": False}
+            "enabled": True, "failure": None}
+
+    def test_a_picked_destination_reads_live_not_the_snapshot(self, client,
+                                                              tide, snapshot):
+        """Snapshots hold the configured scope. Serving one after someone
+        picked another destination showed the wrong rules under its name."""
+        snapshot["value"] = {"total_rules": 5}
+        tide(posture={"total_rules": 2},
+             scope=Destination(space="default", siem_id="siem-elastic"))
+
+        assert client.get("/api/cyab/tide/de/posture").json()["total_rules"] == 2
 
     def test_a_non_dict_posture_is_returned_untouched(self, client, tide,
                                                       snapshot):
@@ -544,7 +578,7 @@ class TestDeSnapshotRoutes:
 
     def test_no_gaps_data_reports_disabled(self, client, tide, snapshot):
         snapshot["value"] = None
-        tide(gaps=None)
+        tide(enabled=False, gaps=None)
 
         assert client.get("/api/cyab/tide/de/gaps").json() == {"enabled": False}
 
@@ -565,48 +599,67 @@ class TestDeSnapshotRoutes:
         assert client.post("/api/cyab/tide/de/sync-now").json() == {"synced": 7}
 
 
-class TestSpaces:
-    def test_spaces_are_listed_with_the_active_one(self, client, tide):
-        tide(spaces=[{"space": "default", "rules": 400}], space="default")
+class TestDestinations:
+    def test_destinations_are_listed_with_the_active_key(self, client, tide):
+        listed = [{"key": "siem-wazuh|*", "siem_id": "siem-wazuh", "space": "*",
+                   "kind": "wazuh", "rule_count": 2}]
+        tide(destinations=listed,
+             scope=Destination(space="*", siem_id="siem-wazuh"))
 
-        body = client.get("/api/cyab/tide/de/spaces").json()
+        body = client.get("/api/cyab/tide/de/destinations").json()
 
-        assert body["active"] == "default"
-        assert body["spaces"][0]["rules"] == 400
+        assert body == {"destinations": listed, "active": "siem-wazuh|*"}
+
+    def test_all_destinations_is_the_empty_key(self, client, tide):
+        tide(destinations=[])
+
+        assert client.get("/api/cyab/tide/de/destinations").json()["active"] == ""
+
+    def test_an_unreadable_list_is_null_not_empty(self, client, tide):
+        tide(destinations=None)
+
+        assert client.get("/api/cyab/tide/de/destinations").json()[
+            "destinations"] is None
 
     def test_tide_off_yields_an_empty_selector_not_an_error(self, client, tide):
-        """The dropdown renders unconditionally, so it needs the shape."""
         tide(enabled=False)
 
-        assert client.get("/api/cyab/tide/de/spaces").json() == {
-            "spaces": [], "active": "default"}
+        assert client.get("/api/cyab/tide/de/destinations").json() == {
+            "destinations": [], "active": ""}
 
-    def test_switching_space_reports_the_new_active_value(self, client, tide):
-        svc = tide(space="default")
+    def test_picking_a_destination_scopes_the_service(self, client, tide):
+        svc = tide()
 
-        body = client.post("/api/cyab/tide/de/spaces/soc").json()
+        body = client.post("/api/cyab/tide/de/destination",
+                           json={"key": "siem-wazuh|linux-servers"}).json()
 
-        assert body == {"ok": True, "active": "soc"}
-        assert svc.space == "soc"
+        assert body["ok"] is True and body["active"] == "siem-wazuh|linux-servers"
+        assert svc.scope == Destination(space="linux-servers", siem_id="siem-wazuh")
+
+    def test_the_empty_key_widens_to_every_destination(self, client, tide):
+        svc = tide(scope=Destination(space="default"))
+
+        body = client.post("/api/cyab/tide/de/destination", json={"key": ""}).json()
+
+        assert body == {"ok": True, "active": "", "label": "all destinations"}
+        assert svc.scope is None
 
     def test_switching_with_tide_off_is_refused_in_the_body(self, client, tide):
         tide(enabled=False)
 
-        assert client.post("/api/cyab/tide/de/spaces/soc").json() == {
+        assert client.post("/api/cyab/tide/de/destination",
+                           json={"key": "a|b"}).json() == {
             "ok": False, "error": "TIDE not configured"}
 
-    def test_an_invalid_space_is_a_400(self, client, tide):
-        """The service validates the space name; a rejection must surface as a
-        400 rather than a 500. (Note: a path-traversal-looking value like
-        "../etc" never reaches the handler — the router 404s it first — so this
-        drives the service's own ValueError instead.)"""
+    def test_a_key_that_could_break_out_of_sql_is_a_400(self, client, tide):
         svc = tide()
-        svc.set_space_raises = True
 
-        r = client.post("/api/cyab/tide/de/spaces/bogus-space")
+        r = client.post("/api/cyab/tide/de/destination",
+                        json={"key": "siem|x' OR '1'='1"})
 
         assert r.status_code == 400
-        assert r.json()["detail"] == "Invalid space value"
+        assert r.json()["detail"] == "Invalid destination"
+        assert svc.scope is None
 
     def test_rule_paging_forwards_every_filter(self, client, tide):
         svc = tide(paginated={"rows": [], "total": 0})
@@ -926,14 +979,14 @@ class TestNavigatorLayer:
     def test_the_layer_downloads_as_a_named_attachment(self, client, tide):
         tide(coverage={"techniques": {"T1059": {"rule_count": 2,
                                                 "enabled_rules": 1}}},
-             space="soc")
+             scope=Destination(space="soc", siem_id="siem-1"))
 
         r = client.get("/api/cyab/tide/de/navigator-layer")
 
         assert r.status_code == 200
         assert r.headers["content-type"].startswith("application/json")
         assert "attachment" in r.headers["content-disposition"]
-        assert "ion-tide-coverage-soc-" in r.headers["content-disposition"]
+        assert "ion-tide-coverage-siem-1-soc-" in r.headers["content-disposition"]
         assert r.headers["x-content-type-options"] == "nosniff"
 
     def test_the_layer_is_valid_navigator_json(self, client, tide):

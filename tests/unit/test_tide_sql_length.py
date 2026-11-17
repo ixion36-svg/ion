@@ -37,11 +37,11 @@ def _subtechnique_ids(n: int) -> list[str]:
 # The query body get_playbooks_with_kill_chains wraps the id list in.
 _PREFIX = (
     "SELECT t.technique_id, "
-    "count(DISTINCT dr.rule_id) as rule_count, "
-    "count(DISTINCT dr.rule_id) FILTER (WHERE dr.enabled = 1) as enabled_rules "
+    "count(DISTINCT (dr.rule_id, dr.siem_id, dr.space)) as rule_count, "
+    "count(DISTINCT (dr.rule_id, dr.siem_id, dr.space)) FILTER (WHERE dr.enabled = 1) as enabled_rules "
     "FROM detection_rules dr, "
     "LATERAL unnest(dr.mitre_ids) AS t(technique_id) "
-    "WHERE dr.space = 'default' AND t.technique_id IN ("
+    "WHERE TRUE AND t.technique_id IN ("
 )
 _SUFFIX = ") GROUP BY t.technique_id"
 _BUDGET = _MAX_SQL_CHARS - len(_PREFIX) - len(_SUFFIX)
@@ -133,7 +133,6 @@ class _RecordingTide(TideService):
 
     def __init__(self, responses: Optional[dict] = None):
         self.enabled = True
-        self.space = "default"
         self.url = "https://tide.invalid"
         self.api_key = "k"
         self.client_id = None

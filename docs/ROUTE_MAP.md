@@ -111,19 +111,19 @@ Server-rendered fragments. `render_view` routes also answer the view model as JS
 | GET | `/ui/de-workbench/requests` | `de:read` | [de_workbench.py:606](src/ion/web/ui/de_workbench.py#L606) |  | `de_workbench.html` |
 | GET | `/ui/detection-engineering/coverage` | `alert:read` | [_detection_engineering_overview.py:352](src/ion/web/ui/_detection_engineering_overview.py#L352) | `_fragments/detection_engineering_coverage.html` | `detection_engineering.html` |
 | GET | `/ui/detection-engineering/d3fend` | `alert:read` | [_detection_engineering_catalogue.py:61](src/ion/web/ui/_detection_engineering_catalogue.py#L61) | `_fragments/detection_engineering_d3fend.html` | `detection_engineering.html` |
+| GET | `/ui/detection-engineering/destinations` | `alert:read` | [_detection_engineering_core.py:194](src/ion/web/ui/_detection_engineering_core.py#L194) | `_fragments/detection_engineering_destinations.html` | `detection_engineering.html` |
 | GET | `/ui/detection-engineering/emulation` | `alert:read` | [_detection_engineering_catalogue.py:92](src/ion/web/ui/_detection_engineering_catalogue.py#L92) | `_fragments/detection_engineering_emulation.html` | `detection_engineering.html` |
 | GET | `/ui/detection-engineering/emulation/{plan_id}` | `alert:read` | [_detection_engineering_catalogue.py:110](src/ion/web/ui/_detection_engineering_catalogue.py#L110) | `_fragments/detection_engineering_emulation_detail.html` |  |
 | GET | `/ui/detection-engineering/execution` | `alert:read` | [_detection_engineering_execution.py:116](src/ion/web/ui/_detection_engineering_execution.py#L116) | `_fragments/detection_engineering_execution.html` | `detection_engineering.html` |
-| GET | `/ui/detection-engineering/gaps` | `alert:read` | [_detection_engineering_core.py:166](src/ion/web/ui/_detection_engineering_core.py#L166) | `_fragments/detection_engineering_gaps.html` |  |
+| GET | `/ui/detection-engineering/gaps` | `alert:read` | [_detection_engineering_core.py:189](src/ion/web/ui/_detection_engineering_core.py#L189) | `_fragments/detection_engineering_gaps.html` |  |
 | GET | `/ui/detection-engineering/killchains` | `alert:read` | [_detection_engineering_rules.py:83](src/ion/web/ui/_detection_engineering_rules.py#L83) | `_fragments/detection_engineering_killchains.html` | `detection_engineering.html` |
 | GET | `/ui/detection-engineering/overview` | `alert:read` | [_detection_engineering_overview.py:221](src/ion/web/ui/_detection_engineering_overview.py#L221) | `_fragments/detection_engineering_overview.html`<br>`_fragments/forensics_overview.html` | `detection_engineering.html` |
-| GET | `/ui/detection-engineering/posture` | `alert:read` | [_detection_engineering_core.py:135](src/ion/web/ui/_detection_engineering_core.py#L135) | `_fragments/detection_engineering_posture.html` |  |
+| GET | `/ui/detection-engineering/posture` | `alert:read` | [_detection_engineering_core.py:156](src/ion/web/ui/_detection_engineering_core.py#L156) | `_fragments/detection_engineering_posture.html` |  |
 | GET | `/ui/detection-engineering/progression` | `alert:read` | [_detection_engineering_rules.py:105](src/ion/web/ui/_detection_engineering_rules.py#L105) | `_fragments/detection_engineering_progression.html` | `detection_engineering.html` |
 | GET | `/ui/detection-engineering/readiness` | `alert:read` | [_detection_engineering_execution.py:122](src/ion/web/ui/_detection_engineering_execution.py#L122) | `_fragments/detection_engineering_readiness_shell.html` | `detection_engineering.html` |
 | GET | `/ui/detection-engineering/readiness/actors` | `alert:read` | [_detection_engineering_execution.py:134](src/ion/web/ui/_detection_engineering_execution.py#L134) | `_fragments/detection_engineering_readiness_actors.html` | `detection_engineering.html` |
 | POST | `/ui/detection-engineering/readiness/system` | `alert:read` | [_detection_engineering_execution.py:153](src/ion/web/ui/_detection_engineering_execution.py#L153) | `_fragments/detection_engineering_readiness_system.html` | `detection_engineering.html` |
 | GET | `/ui/detection-engineering/rules` | `alert:read` | [_detection_engineering_rules.py:90](src/ion/web/ui/_detection_engineering_rules.py#L90) | `_fragments/detection_engineering_rules.html` | `detection_engineering.html` |
-| GET | `/ui/detection-engineering/spaces` | `alert:read` | [_detection_engineering_core.py:171](src/ion/web/ui/_detection_engineering_core.py#L171) | `_fragments/detection_engineering_spaces.html` | `detection_engineering.html` |
 | GET | `/ui/detection-engineering/system-options` | `alert:read` | [_detection_engineering_overview.py:357](src/ion/web/ui/_detection_engineering_overview.py#L357) | `_fragments/detection_engineering_system_options.html` | `detection_engineering.html` |
 | GET | `/ui/detection-engineering/vulns` | `alert:read` | [_detection_engineering_catalogue.py:76](src/ion/web/ui/_detection_engineering_catalogue.py#L76) | `_fragments/detection_engineering_vulns.html` | `detection_engineering.html` |
 | GET | `/ui/detection-health/attack` | `security:read` | [detection_health.py:438](src/ion/web/ui/detection_health.py#L438) | `_fragments/detection_health_attack.html` |  |
@@ -422,7 +422,7 @@ JSON endpoints.
 | DELETE | `/api/alert-prompts/{template_id}` | `playbook:create or playbook:delete or playbook:update` | [alert_prompt_api.py:346](src/ion/web/alert_prompt_api.py#L346) |  |  |
 | GET | `/api/alert-prompts/{template_id}` | `playbook:read` | [alert_prompt_api.py:211](src/ion/web/alert_prompt_api.py#L211) |  |  |
 | PUT | `/api/alert-prompts/{template_id}` | `playbook:create or playbook:delete or playbook:update` | [alert_prompt_api.py:303](src/ion/web/alert_prompt_api.py#L303) |  |  |
-| GET | `/api/alerts/host-patterns` | `alert:read` | [api.py:5594](src/ion/web/api.py#L5594) |  | `alerts.html` |
+| GET | `/api/alerts/host-patterns` | `alert:read` | [api.py:5595](src/ion/web/api.py#L5595) |  | `alerts.html` |
 | GET | `/api/alerts/investigation-template` | `alert:read` | [rule_template_api.py:40](src/ion/web/rule_template_api.py#L40) |  | `alert-detail.js` |
 | GET | `/api/alerts/investigation-template/pending` | `alert:read` | [rule_template_api.py:54](src/ion/web/rule_template_api.py#L54) |  |  |
 | PUT | `/api/alerts/investigation-template/{template_id}` | `alert:read` | [rule_template_api.py:143](src/ion/web/rule_template_api.py#L143) |  |  |
@@ -431,13 +431,13 @@ JSON endpoints.
 | DELETE | `/api/alerts/pinned-fields` | `alert:read` | [pinned_fields_api.py:70](src/ion/web/pinned_fields_api.py#L70) |  | `alert-detail.js` |
 | GET | `/api/alerts/pinned-fields` | `alert:read` | [pinned_fields_api.py:29](src/ion/web/pinned_fields_api.py#L29) |  | `alert-detail.js` |
 | POST | `/api/alerts/pinned-fields` | `alert:read` | [pinned_fields_api.py:43](src/ion/web/pinned_fields_api.py#L43) |  | `alert-detail.js` |
-| POST | `/api/alerts/triage/batch` *(alias)* | `alert:read` | [api.py:3603](src/ion/web/api.py#L3603) |  | `alerts.html` |
-| POST | `/api/alerts/triage/bulk-update` *(alias)* | `alert:triage` | [api.py:3741](src/ion/web/api.py#L3741) |  | `alerts.html` |
+| POST | `/api/alerts/triage/batch` *(alias)* | `alert:read` | [api.py:3604](src/ion/web/api.py#L3604) |  | `alerts.html` |
+| POST | `/api/alerts/triage/bulk-update` *(alias)* | `alert:triage` | [api.py:3742](src/ion/web/api.py#L3742) |  | `alerts.html` |
 | POST | `/api/alerts/{alert_id}/arkime/commit` | `alert:read` | [arkime_api.py:483](src/ion/web/arkime_api.py#L483) |  |  |
 | POST | `/api/alerts/{alert_id}/arkime/preview` | `alert:read` | [arkime_api.py:324](src/ion/web/arkime_api.py#L324) |  |  |
 | GET | `/api/analyst-efficiency/metrics` | `alert:read` | [analyst_efficiency_api.py:16](src/ion/web/analyst_efficiency_api.py#L16) |  |  |
-| GET | `/api/analyst/knowledge-base` | `document:read` | [api.py:5674](src/ion/web/api.py#L5674) |  |  |
-| GET | `/api/analyst/knowledge-base/search` | `document:read` | [api.py:5804](src/ion/web/api.py#L5804) |  |  |
+| GET | `/api/analyst/knowledge-base` | `document:read` | [api.py:5675](src/ion/web/api.py#L5675) |  |  |
+| GET | `/api/analyst/knowledge-base/search` | `document:read` | [api.py:5805](src/ion/web/api.py#L5805) |  |  |
 | GET | `/api/analytics/dashboard` | `alert:read` | [analytics_api.py:146](src/ion/web/analytics_api.py#L146) |  |  |
 | GET | `/api/analytics/jobs` | `alert:read` | [analytics_api.py:25](src/ion/web/analytics_api.py#L25) |  | `analytics.html` |
 | GET | `/api/analytics/jobs/{job_type}` | `alert:read` | [analytics_api.py:52](src/ion/web/analytics_api.py#L52) |  |  |
@@ -589,31 +589,31 @@ JSON endpoints.
 | POST | `/api/cyab/systems/{system_id}/sources` | `case:update` | [cyab_api.py:663](src/ion/web/cyab_api.py#L663) |  | `detection_engineering.html` |
 | GET | `/api/cyab/templates` | `alert:read` | [cyab_api.py:826](src/ion/web/cyab_api.py#L826) |  | `detection_engineering.html` |
 | GET | `/api/cyab/templates/{template_id}` | `alert:read` | [cyab_api.py:833](src/ion/web/cyab_api.py#L833) |  | `detection_engineering.html` |
-| GET | `/api/cyab/tide/de/actor-readiness` | `alert:read` | [de_tide_api.py:1010](src/ion/web/de_tide_api.py#L1010) |  | `detection_engineering.html` |
-| GET | `/api/cyab/tide/de/disabled-critical` | `alert:read` | [de_tide_api.py:487](src/ion/web/de_tide_api.py#L487) |  | `detection_engineering.html` |
-| GET | `/api/cyab/tide/de/execution` | `alert:read` | [de_tide_api.py:1286](src/ion/web/de_tide_api.py#L1286) |  | `detection_engineering.html` |
-| GET | `/api/cyab/tide/de/gaps` | `alert:read` | [de_tide_api.py:636](src/ion/web/de_tide_api.py#L636) |  | `detection_engineering.html` |
-| GET | `/api/cyab/tide/de/kill-chain-alerts` | `alert:read` | [de_tide_api.py:1109](src/ion/web/de_tide_api.py#L1109) |  | `detection_engineering.html` |
-| GET | `/api/cyab/tide/de/kill-chains` | `alert:read` | [de_tide_api.py:500](src/ion/web/de_tide_api.py#L500) |  | `detection_engineering.html` |
-| GET | `/api/cyab/tide/de/navigator-layer` | `alert:read` | [de_tide_api.py:506](src/ion/web/de_tide_api.py#L506) |  | `detection_engineering.html` |
-| GET | `/api/cyab/tide/de/posture` | `alert:read` | [de_tide_api.py:476](src/ion/web/de_tide_api.py#L476) |  | `detection_engineering.html` |
-| POST | `/api/cyab/tide/de/readiness-pdf` | `alert:read` | [de_tide_api.py:820](src/ion/web/de_tide_api.py#L820) |  | `detection_engineering.html` |
-| GET | `/api/cyab/tide/de/rules` | `alert:read` | [de_tide_api.py:625](src/ion/web/de_tide_api.py#L625) |  | `detection_engineering.html` |
-| GET | `/api/cyab/tide/de/spaces` | `alert:read` | [de_tide_api.py:425](src/ion/web/de_tide_api.py#L425) |  | `detection_engineering.html` |
-| POST | `/api/cyab/tide/de/spaces/{space}` | `alert:read` | [de_tide_api.py:440](src/ion/web/de_tide_api.py#L440) |  | `detection_engineering.html` |
-| POST | `/api/cyab/tide/de/sync-now` | `integration:manage` | [de_tide_api.py:463](src/ion/web/de_tide_api.py#L463) |  | `detection_engineering.html` |
-| GET | `/api/cyab/tide/de/sync-status` | `alert:read` | [de_tide_api.py:456](src/ion/web/de_tide_api.py#L456) |  | `detection_engineering.html` |
-| POST | `/api/cyab/tide/de/system-readiness` | `alert:read` | [de_tide_api.py:654](src/ion/web/de_tide_api.py#L654) |  | `detection_engineering.html` |
-| GET | `/api/cyab/tide/de/systems` | `alert:read` | [de_tide_api.py:470](src/ion/web/de_tide_api.py#L470) |  | `detection_engineering.html` |
-| GET | `/api/cyab/tide/de/use-cases` | `alert:read` | [de_tide_api.py:493](src/ion/web/de_tide_api.py#L493) |  | `detection_engineering.html` |
-| GET | `/api/cyab/tide/mitre-coverage` | `alert:read` | [de_tide_api.py:137](src/ion/web/de_tide_api.py#L137) |  | `alerts.html`, `detection_engineering.html` |
-| GET | `/api/cyab/tide/rules` | `alert:read` | [de_tide_api.py:189](src/ion/web/de_tide_api.py#L189) |  | `detection_engineering.html` |
-| GET | `/api/cyab/tide/status` | `alert:read` | [de_tide_api.py:130](src/ion/web/de_tide_api.py#L130) |  | `detection_engineering.html` |
-| GET | `/api/cyab/tide/systems` | `alert:read` | [de_tide_api.py:148](src/ion/web/de_tide_api.py#L148) |  | `detection_engineering.html` |
-| GET | `/api/cyab/tide/systems/{system_id}` | `alert:read` | [de_tide_api.py:155](src/ion/web/de_tide_api.py#L155) |  | `detection_engineering.html` |
-| GET | `/api/cyab/tide/systems/{system_id}/alerts` | `alert:read` | [de_tide_api.py:196](src/ion/web/de_tide_api.py#L196) |  | `detection_engineering.html` |
-| GET | `/api/cyab/tide/systems/{system_id}/mitre` | `alert:read` | [de_tide_api.py:165](src/ion/web/de_tide_api.py#L165) |  | `detection_engineering.html` |
-| GET | `/api/cyab/tide/systems/{system_id}/use-cases` | `alert:read` | [de_tide_api.py:172](src/ion/web/de_tide_api.py#L172) |  | `detection_engineering.html` |
+| GET | `/api/cyab/tide/de/actor-readiness` | `alert:read` | [de_tide_api.py:1030](src/ion/web/de_tide_api.py#L1030) |  | `detection_engineering.html` |
+| POST | `/api/cyab/tide/de/destination` | `alert:read` | [de_tide_api.py:458](src/ion/web/de_tide_api.py#L458) |  | `detection_engineering.html` |
+| GET | `/api/cyab/tide/de/destinations` | `alert:read` | [de_tide_api.py:439](src/ion/web/de_tide_api.py#L439) |  | `detection_engineering.html` |
+| GET | `/api/cyab/tide/de/disabled-critical` | `alert:read` | [de_tide_api.py:504](src/ion/web/de_tide_api.py#L504) |  | `detection_engineering.html` |
+| GET | `/api/cyab/tide/de/execution` | `alert:read` | [de_tide_api.py:1306](src/ion/web/de_tide_api.py#L1306) |  | `detection_engineering.html` |
+| GET | `/api/cyab/tide/de/gaps` | `alert:read` | [de_tide_api.py:655](src/ion/web/de_tide_api.py#L655) |  | `detection_engineering.html` |
+| GET | `/api/cyab/tide/de/kill-chain-alerts` | `alert:read` | [de_tide_api.py:1129](src/ion/web/de_tide_api.py#L1129) |  | `detection_engineering.html` |
+| GET | `/api/cyab/tide/de/kill-chains` | `alert:read` | [de_tide_api.py:517](src/ion/web/de_tide_api.py#L517) |  | `detection_engineering.html` |
+| GET | `/api/cyab/tide/de/navigator-layer` | `alert:read` | [de_tide_api.py:523](src/ion/web/de_tide_api.py#L523) |  | `detection_engineering.html` |
+| GET | `/api/cyab/tide/de/posture` | `alert:read` | [de_tide_api.py:492](src/ion/web/de_tide_api.py#L492) |  | `detection_engineering.html` |
+| POST | `/api/cyab/tide/de/readiness-pdf` | `alert:read` | [de_tide_api.py:840](src/ion/web/de_tide_api.py#L840) |  | `detection_engineering.html` |
+| GET | `/api/cyab/tide/de/rules` | `alert:read` | [de_tide_api.py:644](src/ion/web/de_tide_api.py#L644) |  | `detection_engineering.html` |
+| POST | `/api/cyab/tide/de/sync-now` | `integration:manage` | [de_tide_api.py:479](src/ion/web/de_tide_api.py#L479) |  | `detection_engineering.html` |
+| GET | `/api/cyab/tide/de/sync-status` | `alert:read` | [de_tide_api.py:472](src/ion/web/de_tide_api.py#L472) |  | `detection_engineering.html` |
+| POST | `/api/cyab/tide/de/system-readiness` | `alert:read` | [de_tide_api.py:674](src/ion/web/de_tide_api.py#L674) |  | `detection_engineering.html` |
+| GET | `/api/cyab/tide/de/systems` | `alert:read` | [de_tide_api.py:486](src/ion/web/de_tide_api.py#L486) |  | `detection_engineering.html` |
+| GET | `/api/cyab/tide/de/use-cases` | `alert:read` | [de_tide_api.py:510](src/ion/web/de_tide_api.py#L510) |  | `detection_engineering.html` |
+| GET | `/api/cyab/tide/mitre-coverage` | `alert:read` | [de_tide_api.py:138](src/ion/web/de_tide_api.py#L138) |  | `alerts.html`, `detection_engineering.html` |
+| GET | `/api/cyab/tide/rules` | `alert:read` | [de_tide_api.py:190](src/ion/web/de_tide_api.py#L190) |  | `detection_engineering.html` |
+| GET | `/api/cyab/tide/status` | `alert:read` | [de_tide_api.py:131](src/ion/web/de_tide_api.py#L131) |  | `detection_engineering.html` |
+| GET | `/api/cyab/tide/systems` | `alert:read` | [de_tide_api.py:149](src/ion/web/de_tide_api.py#L149) |  | `detection_engineering.html` |
+| GET | `/api/cyab/tide/systems/{system_id}` | `alert:read` | [de_tide_api.py:156](src/ion/web/de_tide_api.py#L156) |  | `detection_engineering.html` |
+| GET | `/api/cyab/tide/systems/{system_id}/alerts` | `alert:read` | [de_tide_api.py:197](src/ion/web/de_tide_api.py#L197) |  | `detection_engineering.html` |
+| GET | `/api/cyab/tide/systems/{system_id}/mitre` | `alert:read` | [de_tide_api.py:166](src/ion/web/de_tide_api.py#L166) |  | `detection_engineering.html` |
+| GET | `/api/cyab/tide/systems/{system_id}/use-cases` | `alert:read` | [de_tide_api.py:173](src/ion/web/de_tide_api.py#L173) |  | `detection_engineering.html` |
 | POST | `/api/cyab/use-cases/{uc_id}/tide-stub` | `case:update` | [cyab_api.py:2228](src/ion/web/cyab_api.py#L2228) |  | `detection_engineering.html` |
 | GET | `/api/d3fend/coverage` | `alert:read` | [d3fend_api.py:15](src/ion/web/d3fend_api.py#L15) | `_fragments/detection_engineering_coverage.html` |  |
 | GET | `/api/daily-standup/arkime/high-risk-traffic` | `alert:read` | [daily_standup_api.py:1831](src/ion/web/daily_standup_api.py#L1831) |  |  |
@@ -624,8 +624,8 @@ JSON endpoints.
 | GET | `/api/daily-standup/pptx` | `alert:read` | [daily_standup_api.py:1797](src/ion/web/daily_standup_api.py#L1797) |  | `daily_standup.html`, `daily_standup_slides.html` |
 | POST | `/api/daily-standup/pptx` | `alert:read` | [daily_standup_api.py:1769](src/ion/web/daily_standup_api.py#L1769) |  | `daily_standup.html`, `daily_standup_slides.html` |
 | POST | `/api/daily-standup/save` | `alert:read` | [daily_standup_api.py:1327](src/ion/web/daily_standup_api.py#L1327) |  | `daily_standup.html` |
-| GET | `/api/dashboard` | — | [api.py:2639](src/ion/web/api.py#L2639) |  |  |
-| GET | `/api/dashboard/team-metrics` | `alert:read` | [api.py:2881](src/ion/web/api.py#L2881) |  |  |
+| GET | `/api/dashboard` | — | [api.py:2640](src/ion/web/api.py#L2640) |  |  |
+| GET | `/api/dashboard/team-metrics` | `alert:read` | [api.py:2882](src/ion/web/api.py#L2882) |  |  |
 | GET | `/api/de/abuse-scan` | `de:verify` | [de_api.py:678](src/ion/web/de_api.py#L678) |  | `de_bob.html`, `de_metrics.html`, `de_oversight.html` |
 | GET | `/api/de/bob-feedback` | `de:read` | [de_api.py:379](src/ion/web/de_api.py#L379) |  | `de_bob.html`, `de_metrics.html` |
 | GET | `/api/de/bob-proposals` | `de:read` | [de_api.py:541](src/ion/web/de_api.py#L541) |  | `de_bob.html`, `de_metrics.html` |
@@ -679,8 +679,8 @@ JSON endpoints.
 | GET | `/api/documents/{document_id}/versions` | `document:read` | [api.py:2326](src/ion/web/api.py#L2326) |  |  |
 | GET | `/api/documents/{document_id}/versions/{version_number}` | `document:read` | [api.py:2350](src/ion/web/api.py#L2350) |  |  |
 | GET | `/api/elasticsearch/alerts` | `alert:read` | [elasticsearch_api.py:259](src/ion/web/elasticsearch_api.py#L259) |  | `alert-detail.js`, `alerts.html`, `cases.html` |
-| POST | `/api/elasticsearch/alerts-triage/batch` | `alert:read` | [api.py:3603](src/ion/web/api.py#L3603) |  |  |
-| POST | `/api/elasticsearch/alerts-triage/bulk-update` | `alert:triage` | [api.py:3741](src/ion/web/api.py#L3741) |  | `alerts.html` |
+| POST | `/api/elasticsearch/alerts-triage/batch` | `alert:read` | [api.py:3604](src/ion/web/api.py#L3604) |  |  |
+| POST | `/api/elasticsearch/alerts-triage/bulk-update` | `alert:triage` | [api.py:3742](src/ion/web/api.py#L3742) |  | `alerts.html` |
 | GET | `/api/elasticsearch/alerts/cases` | `case:read` | [case_lifecycle_api.py:129](src/ion/web/case_lifecycle_api.py#L129) |  | `discover.html` |
 | POST | `/api/elasticsearch/alerts/cases` | `case:create` | [case_lifecycle_api.py:811](src/ion/web/case_lifecycle_api.py#L811) |  | `discover.html` |
 | GET | `/api/elasticsearch/alerts/cases/facets` | `case:read` | [case_lifecycle_api.py:113](src/ion/web/case_lifecycle_api.py#L113) |  |  |
@@ -703,22 +703,22 @@ JSON endpoints.
 | GET | `/api/elasticsearch/alerts/stats` | `alert:read` | [elasticsearch_api.py:625](src/ion/web/elasticsearch_api.py#L625) |  |  |
 | GET | `/api/elasticsearch/alerts/systems` | `alert:read` | [elasticsearch_api.py:448](src/ion/web/elasticsearch_api.py#L448) |  |  |
 | POST | `/api/elasticsearch/alerts/{alert_id}/auto-investigate` | `alert:read` | [auto_investigate_api.py:107](src/ion/web/auto_investigate_api.py#L107) |  |  |
-| POST | `/api/elasticsearch/alerts/{alert_id}/close` | `alert:triage` | [api.py:4174](src/ion/web/api.py#L4174) |  |  |
-| POST | `/api/elasticsearch/alerts/{alert_id}/comments` | `alert:triage` | [api.py:4444](src/ion/web/api.py#L4444) |  |  |
+| POST | `/api/elasticsearch/alerts/{alert_id}/close` | `alert:triage` | [api.py:4175](src/ion/web/api.py#L4175) |  |  |
+| POST | `/api/elasticsearch/alerts/{alert_id}/comments` | `alert:triage` | [api.py:4445](src/ion/web/api.py#L4445) |  |  |
 | GET | `/api/elasticsearch/alerts/{alert_id}/detail` | `alert:read` | [elasticsearch_api.py:345](src/ion/web/elasticsearch_api.py#L345) |  |  |
 | POST | `/api/elasticsearch/alerts/{alert_id}/investigation-template/generate` | `alert:read` | [rule_template_api.py:63](src/ion/web/rule_template_api.py#L63) |  |  |
-| GET | `/api/elasticsearch/alerts/{alert_id}/playbook-executions` | `playbook:execute` | [api.py:5377](src/ion/web/api.py#L5377) |  | `alerts_playbooks.html` |
-| POST | `/api/elasticsearch/alerts/{alert_id}/playbook/{playbook_id}/start` | `playbook:execute` | [api.py:5292](src/ion/web/api.py#L5292) |  |  |
+| GET | `/api/elasticsearch/alerts/{alert_id}/playbook-executions` | `playbook:execute` | [api.py:5378](src/ion/web/api.py#L5378) |  | `alerts_playbooks.html` |
+| POST | `/api/elasticsearch/alerts/{alert_id}/playbook/{playbook_id}/start` | `playbook:execute` | [api.py:5293](src/ion/web/api.py#L5293) |  |  |
 | GET | `/api/elasticsearch/alerts/{alert_id}/process-tree` | `alert:read` | [elasticsearch_api.py:411](src/ion/web/elasticsearch_api.py#L411) |  |  |
 | GET | `/api/elasticsearch/alerts/{alert_id}/raw` | `alert:read` | [elasticsearch_api.py:381](src/ion/web/elasticsearch_api.py#L381) |  |  |
-| GET | `/api/elasticsearch/alerts/{alert_id}/recommended-playbooks` | `playbook:read` | [api.py:5140](src/ion/web/api.py#L5140) |  |  |
+| GET | `/api/elasticsearch/alerts/{alert_id}/recommended-playbooks` | `playbook:read` | [api.py:5141](src/ion/web/api.py#L5141) |  |  |
 | GET | `/api/elasticsearch/alerts/{alert_id}/related` | `alert:read` | [elasticsearch_api.py:589](src/ion/web/elasticsearch_api.py#L589) |  |  |
 | GET | `/api/elasticsearch/alerts/{alert_id}/sequence` | `alert:read` | [elasticsearch_api.py:395](src/ion/web/elasticsearch_api.py#L395) |  |  |
-| GET | `/api/elasticsearch/alerts/{alert_id}/suggested-playbooks` | `playbook:read` | [api.py:5232](src/ion/web/api.py#L5232) |  |  |
-| GET | `/api/elasticsearch/alerts/{alert_id}/triage` | `alert:read` | [api.py:3844](src/ion/web/api.py#L3844) |  |  |
-| PUT | `/api/elasticsearch/alerts/{alert_id}/triage` | `alert:triage` | [api.py:4019](src/ion/web/api.py#L4019) |  |  |
-| POST | `/api/elasticsearch/alerts/{alert_id}/triage/auto-populate-observables` | `alert:triage` | [api.py:4424](src/ion/web/api.py#L4424) |  |  |
-| GET | `/api/elasticsearch/assignment_users` | `alert:read` | [api.py:3722](src/ion/web/api.py#L3722) |  | `alerts.html` |
+| GET | `/api/elasticsearch/alerts/{alert_id}/suggested-playbooks` | `playbook:read` | [api.py:5233](src/ion/web/api.py#L5233) |  |  |
+| GET | `/api/elasticsearch/alerts/{alert_id}/triage` | `alert:read` | [api.py:3845](src/ion/web/api.py#L3845) |  |  |
+| PUT | `/api/elasticsearch/alerts/{alert_id}/triage` | `alert:triage` | [api.py:4020](src/ion/web/api.py#L4020) |  |  |
+| POST | `/api/elasticsearch/alerts/{alert_id}/triage/auto-populate-observables` | `alert:triage` | [api.py:4425](src/ion/web/api.py#L4425) |  |  |
+| GET | `/api/elasticsearch/assignment_users` | `alert:read` | [api.py:3723](src/ion/web/api.py#L3723) |  | `alerts.html` |
 | GET | `/api/elasticsearch/config` | — | [elasticsearch_api.py:97](src/ion/web/elasticsearch_api.py#L97) |  | `integrations.html` |
 | POST | `/api/elasticsearch/discover/histogram` | — | [elasticsearch_api.py:702](src/ion/web/elasticsearch_api.py#L702) |  |  |
 | POST | `/api/elasticsearch/discover/search` | — | [elasticsearch_api.py:659](src/ion/web/elasticsearch_api.py#L659) |  |  |
@@ -852,8 +852,8 @@ JSON endpoints.
 | GET | `/api/ioc-staleness` | `alert:read` | [ioc_staleness_api.py:15](src/ion/web/ioc_staleness_api.py#L15) |  |  |
 | GET | `/api/iocs` | `alert:read` | [investigation_memory_api.py:294](src/ion/web/investigation_memory_api.py#L294) |  |  |
 | GET | `/api/iocs/{ioc_type}/{value:path}` | `alert:read` | [investigation_memory_api.py:319](src/ion/web/investigation_memory_api.py#L319) |  |  |
-| GET | `/api/iris/config` | — | [api.py:5930](src/ion/web/api.py#L5930) |  | `integrations.html` |
-| GET | `/api/iris/test` | — | [api.py:5945](src/ion/web/api.py#L5945) |  | `integrations.html` |
+| GET | `/api/iris/config` | — | [api.py:5931](src/ion/web/api.py#L5931) |  | `integrations.html` |
+| GET | `/api/iris/test` | — | [api.py:5946](src/ion/web/api.py#L5946) |  | `integrations.html` |
 | GET | `/api/kev` | `alert:read` | [kev_api.py:46](src/ion/web/kev_api.py#L46) |  |  |
 | POST | `/api/kev/import` | `system:settings` | [kev_api.py:81](src/ion/web/kev_api.py#L81) |  |  |
 | GET | `/api/kev/status` | `alert:read` | [kev_api.py:37](src/ion/web/kev_api.py#L37) |  |  |
@@ -873,12 +873,12 @@ JSON endpoints.
 | GET | `/api/knowledge-graph` | `alert:read` | [knowledge_graph_api.py:16](src/ion/web/knowledge_graph_api.py#L16) |  | `knowledge_graph.html` |
 | GET | `/api/knowledge-review` | `alert:read` | [investigation_memory_api.py:510](src/ion/web/investigation_memory_api.py#L510) |  |  |
 | GET | `/api/knowledge-review/summary` | `alert:read` | [investigation_memory_api.py:499](src/ion/web/investigation_memory_api.py#L499) |  |  |
-| GET | `/api/known-false-positives` | `alert:read` | [api.py:3362](src/ion/web/api.py#L3362) |  | `alerts.html` |
-| POST | `/api/known-false-positives` | `alert:triage` | [api.py:3394](src/ion/web/api.py#L3394) |  | `alerts.html` |
-| POST | `/api/known-false-positives/match` | `alert:read` | [api.py:3517](src/ion/web/api.py#L3517) |  |  |
-| DELETE | `/api/known-false-positives/{kfp_id}` | `alert:triage` | [api.py:3500](src/ion/web/api.py#L3500) |  |  |
-| GET | `/api/known-false-positives/{kfp_id}` | `alert:read` | [api.py:3433](src/ion/web/api.py#L3433) |  |  |
-| PUT | `/api/known-false-positives/{kfp_id}` | `alert:triage` | [api.py:3459](src/ion/web/api.py#L3459) |  |  |
+| GET | `/api/known-false-positives` | `alert:read` | [api.py:3363](src/ion/web/api.py#L3363) |  | `alerts.html` |
+| POST | `/api/known-false-positives` | `alert:triage` | [api.py:3395](src/ion/web/api.py#L3395) |  | `alerts.html` |
+| POST | `/api/known-false-positives/match` | `alert:read` | [api.py:3518](src/ion/web/api.py#L3518) |  |  |
+| DELETE | `/api/known-false-positives/{kfp_id}` | `alert:triage` | [api.py:3501](src/ion/web/api.py#L3501) |  |  |
+| GET | `/api/known-false-positives/{kfp_id}` | `alert:read` | [api.py:3434](src/ion/web/api.py#L3434) |  |  |
+| PUT | `/api/known-false-positives/{kfp_id}` | `alert:triage` | [api.py:3460](src/ion/web/api.py#L3460) |  |  |
 | GET | `/api/log-sources` | `alert:read` | [log_source_api.py:51](src/ion/web/log_source_api.py#L51) |  | `log_sources.html` |
 | POST | `/api/log-sources` | `integration:manage` | [log_source_api.py:90](src/ion/web/log_source_api.py#L90) |  | `log_sources.html` |
 | GET | `/api/log-sources/categories` | — | [log_source_api.py:56](src/ion/web/log_source_api.py#L56) |  |  |
@@ -958,12 +958,12 @@ JSON endpoints.
 | GET | `/api/observables/{observable_id}/enrichment/history` | `observable:read` | [observable_api.py:809](src/ion/web/observable_api.py#L809) |  |  |
 | GET | `/api/observables/{observable_id}/heatmap` | `observable:read` | [observable_api.py:1079](src/ion/web/observable_api.py#L1079) |  |  |
 | GET | `/api/observables/{observable_id}/timeline` | `observable:read` | [observable_api.py:1056](src/ion/web/observable_api.py#L1056) |  |  |
-| DELETE | `/api/opencti/config` | `admin` | [api.py:4576](src/ion/web/api.py#L4576) |  | `integrations.html` |
-| GET | `/api/opencti/config` | — | [api.py:4528](src/ion/web/api.py#L4528) |  | `integrations.html` |
-| POST | `/api/opencti/config` | `admin` | [api.py:4542](src/ion/web/api.py#L4542) |  | `integrations.html` |
-| POST | `/api/opencti/enrich` | — | [api.py:4643](src/ion/web/api.py#L4643) |  |  |
-| POST | `/api/opencti/enrich/batch` | — | [api.py:4610](src/ion/web/api.py#L4610) |  |  |
-| GET | `/api/opencti/test` | — | [api.py:4600](src/ion/web/api.py#L4600) |  | `integrations.html` |
+| DELETE | `/api/opencti/config` | `admin` | [api.py:4577](src/ion/web/api.py#L4577) |  | `integrations.html` |
+| GET | `/api/opencti/config` | — | [api.py:4529](src/ion/web/api.py#L4529) |  | `integrations.html` |
+| POST | `/api/opencti/config` | `admin` | [api.py:4543](src/ion/web/api.py#L4543) |  | `integrations.html` |
+| POST | `/api/opencti/enrich` | — | [api.py:4644](src/ion/web/api.py#L4644) |  |  |
+| POST | `/api/opencti/enrich/batch` | — | [api.py:4611](src/ion/web/api.py#L4611) |  |  |
+| GET | `/api/opencti/test` | — | [api.py:4601](src/ion/web/api.py#L4601) |  | `integrations.html` |
 | POST | `/api/pcap/analyze` | `alert:read` | [pcap_api.py:32](src/ion/web/pcap_api.py#L32) |  |  |
 | GET | `/api/pcap/jobs` | `alert:read` | [pcap_api.py:159](src/ion/web/pcap_api.py#L159) |  | `pcap.html` |
 | POST | `/api/pcap/jobs` | `alert:read` | [pcap_api.py:114](src/ion/web/pcap_api.py#L114) |  | `pcap.html` |
@@ -971,18 +971,18 @@ JSON endpoints.
 | POST | `/api/pcap/jobs/{job_id}/attach` | `case:update` | [pcap_api.py:216](src/ion/web/pcap_api.py#L216) |  |  |
 | POST | `/api/pcap/jobs/{job_id}/cancel` | `alert:read` | [pcap_api.py:191](src/ion/web/pcap_api.py#L191) |  |  |
 | GET | `/api/playbook-analytics` | `alert:read` | [playbook_analytics_api.py:15](src/ion/web/playbook_analytics_api.py#L15) |  |  |
-| GET | `/api/playbook-executions` | `playbook:execute` | [api.py:5560](src/ion/web/api.py#L5560) |  | `alerts.html`, `playbooks.html` |
-| GET | `/api/playbook-executions/summary` | `playbook:execute` | [api.py:5343](src/ion/web/api.py#L5343) |  |  |
-| GET | `/api/playbook-executions/{execution_id}` | `playbook:execute` | [api.py:5361](src/ion/web/api.py#L5361) |  |  |
-| POST | `/api/playbook-executions/{execution_id}/complete` | `playbook:execute` | [api.py:5439](src/ion/web/api.py#L5439) |  |  |
-| POST | `/api/playbook-executions/{execution_id}/fail` | `playbook:execute` | [api.py:5529](src/ion/web/api.py#L5529) |  |  |
-| POST | `/api/playbook-executions/{execution_id}/regenerate-report` | `playbook:execute` | [api.py:5497](src/ion/web/api.py#L5497) |  |  |
-| PUT | `/api/playbook-executions/{execution_id}/steps/{step_id}` | `playbook:execute` | [api.py:5393](src/ion/web/api.py#L5393) |  |  |
-| GET | `/api/playbooks` | `playbook:read` | [api.py:4982](src/ion/web/api.py#L4982) |  | `playbooks.html` |
-| POST | `/api/playbooks` | `playbook:create` | [api.py:4998](src/ion/web/api.py#L4998) |  | `playbooks.html` |
-| DELETE | `/api/playbooks/{playbook_id}` | `playbook:delete` | [api.py:5121](src/ion/web/api.py#L5121) |  |  |
-| GET | `/api/playbooks/{playbook_id}` | `playbook:read` | [api.py:5051](src/ion/web/api.py#L5051) |  |  |
-| PUT | `/api/playbooks/{playbook_id}` | `playbook:update` | [api.py:5067](src/ion/web/api.py#L5067) |  |  |
+| GET | `/api/playbook-executions` | `playbook:execute` | [api.py:5561](src/ion/web/api.py#L5561) |  | `alerts.html`, `playbooks.html` |
+| GET | `/api/playbook-executions/summary` | `playbook:execute` | [api.py:5344](src/ion/web/api.py#L5344) |  |  |
+| GET | `/api/playbook-executions/{execution_id}` | `playbook:execute` | [api.py:5362](src/ion/web/api.py#L5362) |  |  |
+| POST | `/api/playbook-executions/{execution_id}/complete` | `playbook:execute` | [api.py:5440](src/ion/web/api.py#L5440) |  |  |
+| POST | `/api/playbook-executions/{execution_id}/fail` | `playbook:execute` | [api.py:5530](src/ion/web/api.py#L5530) |  |  |
+| POST | `/api/playbook-executions/{execution_id}/regenerate-report` | `playbook:execute` | [api.py:5498](src/ion/web/api.py#L5498) |  |  |
+| PUT | `/api/playbook-executions/{execution_id}/steps/{step_id}` | `playbook:execute` | [api.py:5394](src/ion/web/api.py#L5394) |  |  |
+| GET | `/api/playbooks` | `playbook:read` | [api.py:4983](src/ion/web/api.py#L4983) |  | `playbooks.html` |
+| POST | `/api/playbooks` | `playbook:create` | [api.py:4999](src/ion/web/api.py#L4999) |  | `playbooks.html` |
+| DELETE | `/api/playbooks/{playbook_id}` | `playbook:delete` | [api.py:5122](src/ion/web/api.py#L5122) |  |  |
+| GET | `/api/playbooks/{playbook_id}` | `playbook:read` | [api.py:5052](src/ion/web/api.py#L5052) |  |  |
+| PUT | `/api/playbooks/{playbook_id}` | `playbook:update` | [api.py:5068](src/ion/web/api.py#L5068) |  |  |
 | GET | `/api/response/actions` | `playbook:read` | [response_api.py:119](src/ion/web/response_api.py#L119) |  | `response_approvals.html` |
 | GET | `/api/response/actions/inbox` | `response:approve` | [response_api.py:167](src/ion/web/response_api.py#L167) |  | `response_approvals.html` |
 | GET | `/api/response/actions/log` | `playbook:read` | [response_api.py:219](src/ion/web/response_api.py#L219) |  | `response_approvals.html` |
@@ -991,13 +991,13 @@ JSON endpoints.
 | POST | `/api/response/actions/{log_id}/approve` | `response:approve` | [response_api.py:185](src/ion/web/response_api.py#L185) |  | `response_approvals.html` |
 | POST | `/api/response/actions/{log_id}/reject` | `response:approve` | [response_api.py:203](src/ion/web/response_api.py#L203) |  | `response_approvals.html` |
 | GET | `/api/roles` | `user:read` | [api.py:1290](src/ion/web/api.py#L1290) |  |  |
-| GET | `/api/saved-searches` | — | [api.py:4705](src/ion/web/api.py#L4705) |  | `discover.html` |
-| POST | `/api/saved-searches` | — | [api.py:4726](src/ion/web/api.py#L4726) |  | `discover.html` |
-| DELETE | `/api/saved-searches/{search_id}` | — | [api.py:4809](src/ion/web/api.py#L4809) |  |  |
-| GET | `/api/saved-searches/{search_id}` | — | [api.py:4756](src/ion/web/api.py#L4756) |  |  |
-| PUT | `/api/saved-searches/{search_id}` | — | [api.py:4776](src/ion/web/api.py#L4776) |  |  |
-| POST | `/api/saved-searches/{search_id}/execute` | — | [api.py:4832](src/ion/web/api.py#L4832) |  |  |
-| POST | `/api/saved-searches/{search_id}/favorite` | — | [api.py:4911](src/ion/web/api.py#L4911) |  |  |
+| GET | `/api/saved-searches` | — | [api.py:4706](src/ion/web/api.py#L4706) |  | `discover.html` |
+| POST | `/api/saved-searches` | — | [api.py:4727](src/ion/web/api.py#L4727) |  | `discover.html` |
+| DELETE | `/api/saved-searches/{search_id}` | — | [api.py:4810](src/ion/web/api.py#L4810) |  |  |
+| GET | `/api/saved-searches/{search_id}` | — | [api.py:4757](src/ion/web/api.py#L4757) |  |  |
+| PUT | `/api/saved-searches/{search_id}` | — | [api.py:4777](src/ion/web/api.py#L4777) |  |  |
+| POST | `/api/saved-searches/{search_id}/execute` | — | [api.py:4833](src/ion/web/api.py#L4833) |  |  |
+| POST | `/api/saved-searches/{search_id}/favorite` | — | [api.py:4912](src/ion/web/api.py#L4912) |  |  |
 | GET | `/api/scheduler/handlers` | `system:settings` | [scheduler_api.py:191](src/ion/web/scheduler_api.py#L191) |  | `scheduler.html` |
 | GET | `/api/scheduler/jobs` | `system:settings` | [scheduler_api.py:84](src/ion/web/scheduler_api.py#L84) |  | `scheduler.html` |
 | POST | `/api/scheduler/jobs` | `system:settings` | [scheduler_api.py:90](src/ion/web/scheduler_api.py#L90) |  | `scheduler.html` |
@@ -1073,7 +1073,7 @@ JSON endpoints.
 | DELETE | `/api/skills/training-plans/{plan_id}/items/{item_id}` | `alert:read` | [skills_api.py:1418](src/ion/web/skills_api.py#L1418) |  |  |
 | PUT | `/api/skills/training-plans/{plan_id}/items/{item_id}` | `alert:read` | [skills_api.py:1369](src/ion/web/skills_api.py#L1369) |  |  |
 | GET | `/api/soc-health/scorecard` | `alert:read` | [soc_health_api.py:16](src/ion/web/soc_health_api.py#L16) |  |  |
-| GET | `/api/stats` | — | [api.py:2550](src/ion/web/api.py#L2550) |  |  |
+| GET | `/api/stats` | — | [api.py:2551](src/ion/web/api.py#L2551) |  |  |
 | GET | `/api/stories` | `playbook:read` | [story_api.py:190](src/ion/web/story_api.py#L190) |  | `stories.html` |
 | POST | `/api/stories` | `playbook:create` | [story_api.py:219](src/ion/web/story_api.py#L219) |  | `stories.html` |
 | GET | `/api/stories/step-types` | `playbook:read` | [story_api.py:199](src/ion/web/story_api.py#L199) |  |  |

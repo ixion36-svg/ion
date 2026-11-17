@@ -1,12 +1,12 @@
 {% macro figure(value) -%}{{ value if value is not none else 'Unknown' }}{%- endmacro %}
-{% if state == 'failed' %}<div class="de-empty" role="alert">Failed to load posture.</div>
+{% if state == 'failed' %}<div class="de-empty" role="alert">{% if failure %}{{ failure.message }}{% if failure.detail %}<div class="de-stat-sub">TIDE said: {{ failure.detail }}</div>{% endif %}{% else %}Failed to load posture.{% endif %}</div>
 {% elif state == 'unconfigured' %}<div class="de-empty">TIDE not configured</div>
 {% else %}
-{% if state == 'empty' %}<div class="de-empty">No detection rules found in the active space.</div>{% endif %}
+{% if state == 'empty' %}<div class="de-empty">No detection rules found at the selected destinations.</div>{% endif %}
 <div class="de-stats">
 {% for key,label,band in [('total_rules','Total Rules',''),('enabled_rules','Enabled','green'),('disabled_rules','Disabled','warn'),('covered_techniques','MITRE Coverage',''),('unmapped_rules','Unmapped Rules',''),('total_systems','Systems','')] %}
 <div class="de-stat {{ band }}"><div class="de-stat-label">{{ label }}</div><div class="de-stat-val" data-field="{{ key }}">{{ figure(stats[key]) }}</div>
-<div class="de-stat-sub">{% if key == 'total_rules' %}in active space{% elif key == 'enabled_rules' %}{{ figure(enabled_pct) }}{% if enabled_pct is not none %}%{% endif %} of total{% elif key == 'disabled_rules' %}{{ figure(disabled_pct) }}{% if disabled_pct is not none %}%{% endif %} of total{% elif key == 'covered_techniques' %}{% if coverage_pct is not none %}{{ coverage_pct }}% of {{ stats.total_techniques }} techniques with an enabled rule{% else %}with an enabled rule; TIDE did not return a technique total{% endif %}{% elif key == 'unmapped_rules' %}no MITRE mapping{% else %}monitored{% endif %}</div></div>
+<div class="de-stat-sub">{% if key == 'total_rules' %}{% if rules_by_kind %}{% for kind, counts in rules_by_kind|dictsort %}{{ kind|title }} {{ figure(counts.get('total')) }}{{ ' · ' if not loop.last else '' }}{% endfor %}{% else %}at the selected destinations{% endif %}{% elif key == 'enabled_rules' %}{{ figure(enabled_pct) }}{% if enabled_pct is not none %}%{% endif %} of total{% elif key == 'disabled_rules' %}{{ figure(disabled_pct) }}{% if disabled_pct is not none %}%{% endif %} of total{% elif key == 'covered_techniques' %}{% if coverage_pct is not none %}{{ coverage_pct }}% of {{ stats.total_techniques }} techniques with an enabled rule{% else %}with an enabled rule; TIDE did not return a technique total{% endif %}{% elif key == 'unmapped_rules' %}no MITRE mapping{% else %}monitored{% endif %}</div></div>
 {% endfor %}</div>
 <div class="de-cols"><section class="de-section"><div class="de-section-title"><i class="icon-bar-chart-2"></i> Severity Breakdown</div>
 {% if severity is none or severity_total is none %}<div class="de-empty">Severity data unavailable.</div>

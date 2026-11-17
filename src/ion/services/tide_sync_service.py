@@ -88,11 +88,12 @@ def sync_all(session: Session) -> dict:
 
     Returns a summary dict with per-key status.
     """
-    from ion.services.tide_service import get_tide_service, reset_tide_service
+    from ion.services.tide_service import TideService
 
-    # Force a fresh TideService so config changes are picked up.
-    reset_tide_service()
-    svc = get_tide_service()
+    # A service of its own, built from the saved config: snapshots hold the
+    # configured scope, and a destination someone picked on the DE page
+    # (held by the shared service) must not be reset by the next sync.
+    svc = TideService()
 
     if not svc.enabled:
         return {"error": "TIDE not configured", "synced": 0}
@@ -111,7 +112,9 @@ def sync_all(session: Session) -> dict:
             data = method(**kwargs)
             duration_ms = int((time.time() - t0) * 1000)
             if data is None:
-                _upsert_snapshot(session, data_key, None, duration_ms, error="returned None")
+                failure = svc.last_failure
+                error = f"returned None: {failure.kind}" if failure else "returned None"
+                _upsert_snapshot(session, data_key, None, duration_ms, error=error)
                 results[data_key] = {"status": "empty", "ms": duration_ms}
             else:
                 _upsert_snapshot(session, data_key, data, duration_ms)

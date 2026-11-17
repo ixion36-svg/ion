@@ -14,8 +14,8 @@
   <div class="dx-title"><div class="dx-eyebrow">Engineering</div><h1>Detection Engineering</h1></div>
   <span class="dx-grow"></span>
   <span id="de-tide-badge" class="dx-pill" title="Age of ION's cached TIDE data"><span class="de-tide-dot"></span><span data-sync-label>TIDE</span></span>
-  <label class="dx-select"><span>Space</span>
-    <select id="de-space-select" data-change-action="deChangeSpace" data-args='["$value"]' title="SIEM / Kibana space filter"><option value="">Loading spaces…</option></select>
+  <label class="dx-select"><span>Destination</span>
+    <select id="de-destination-select" data-change-action="deChangeDestination" data-args='["$value"]' title="Read rules from every SIEM destination, or from one Kibana space or Wazuh agent group"><option value="">Loading destinations…</option></select>
   </label>
   <label class="dx-select" id="de-system-wrap" hidden><span>System</span>
     <select id="de-system-select" data-change-action="deChangeSystem" data-args='["$value"]' title="Scopes the coverage map and readiness assessments to one system's applied rules"><option value="">All systems</option></select>
@@ -23,6 +23,8 @@
   <button type="button" class="dx-btn" data-click-action="deSyncTide" title="Pull fresh data from TIDE now"><svg class="dx-icon" aria-hidden="true"><use href="#i-refresh"/></svg>Sync</button>
   <button type="button" class="dx-btn ghost" data-click-action="deRefresh" title="Reload these panels from ION's cached TIDE data">Reload</button>
 </header>
+
+<div id="de-tide-failure" class="dx-banner warn" role="alert" hidden><strong data-failure-message></strong> <span data-failure-detail></span></div>
 
 {# Five tabs. The ten older tab ids still resolve: deSwitch() and the URL
    hash map each one to its tab and sub-view (posture → Overview, gaps →
@@ -488,35 +490,56 @@ async function deCheckSyncStatus() {
     }
 }
 
-async function deLoadSpaces() {
-    const selector = $('de-space-select');
+async function deLoadDestinations() {
+    const selector = $('de-destination-select');
     selector.disabled = true;
-    await deLoadFragment('/ui/detection-engineering/spaces', selector, 'Loading spaces...');
+    await deLoadFragment('/ui/detection-engineering/destinations', selector, 'Loading destinations...');
     selector.disabled = !selector.options.length || selector.options[0].disabled;
 }
 
-window.deChangeSpace = async function(space) {
-    if (!space) return;
-    const selector = $('de-space-select');
+/* An empty key is "All destinations", a real choice rather than no choice. */
+window.deChangeDestination = async function(key) {
+    const selector = $('de-destination-select');
     selector.disabled = true;
     try {
-        const response = await fetch(API + '/tide/de/spaces/' + encodeURIComponent(space), {method:'POST', credentials:'include'});
+        const response = await fetch(API + '/tide/de/destination', {
+            method:'POST', credentials:'include',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({key: key || ''}),
+        });
         const payload = await response.json();
-        if (!response.ok || !payload || payload.ok !== true) throw new Error('Space switch failed');
+        if (!response.ok || !payload || payload.ok !== true) throw new Error('Destination switch failed');
         deRefresh();
     } catch (error) {
-        deSetBadge('TIDE (space switch failed)');
+        deSetBadge('TIDE (destination switch failed)');
     } finally {
-        await deLoadSpaces();
+        await deLoadDestinations();
     }
 };
+
+/* TIDE refusing ION's key or tenant leaves every panel empty; say why once,
+   at the top, instead of letting the page read as a tenant with no rules. */
+async function deCheckTideAccess() {
+    const banner = $('de-tide-failure');
+    try {
+        const status = await apiFetch('/tide/status');
+        const failure = status && status.ok === false ? status.failure : null;
+        if (!failure || typeof failure.message !== 'string') { banner.hidden = true; return; }
+        banner.querySelector('[data-failure-message]').textContent = failure.message;
+        banner.querySelector('[data-failure-detail]').textContent = failure.detail ? 'TIDE said: ' + failure.detail : '';
+        banner.hidden = false;
+    } catch (error) {
+        banner.hidden = true;
+    }
+}
 /* ── Init ─────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
     const wanted = decodeURIComponent((location.hash || '').slice(1));
     deSwitch(SUB_TAB[ALIASES[wanted] || wanted] ? wanted : 'overview');
-    deLoadSpaces();
+    deLoadDestinations();
     deLoadSystems();
     deCheckSyncStatus();
+    deCheckTideAccess();
 });
 /* A link to #gaps or #execution from elsewhere on the page, or the back
    button, lands on that sub-view without a reload. */

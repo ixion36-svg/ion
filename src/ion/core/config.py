@@ -197,7 +197,7 @@ class Config:
     tide_url: str = ""  # e.g., https://tide.example.com
     tide_api_key: str = ""  # X-TIDE-API-KEY for external query API
     tide_verify_ssl: bool = False
-    tide_space: str = "default"  # Kibana space where TIDE rules live (e.g., default, production)
+    tide_space: str = ""  # Restrict TIDE reads to one space; empty reads every destination
     tide_client_id: str = ""  # TIDE 4.x tenant (client) id. Leave blank for single-tenant API keys.
 
     # Detection Engineering optional module (licensed). Enforcement ships
@@ -467,7 +467,7 @@ class Config:
             tide_url=data.get("tide_url", ""),
             tide_api_key=data.get("tide_api_key", ""),
             tide_verify_ssl=data.get("tide_verify_ssl", False),
-            tide_space=data.get("tide_space", "default"),
+            tide_space=data.get("tide_space", ""),
             tide_client_id=data.get("tide_client_id", ""),
             de_license_enforced=data.get("de_license_enforced", False),
             workforce_enabled=data.get("workforce_enabled", True),
@@ -886,7 +886,7 @@ def _load_config() -> Config:
     if os.environ.get("ION_TIDE_VERIFY_SSL"):
         cfg.tide_verify_ssl = _get_env_bool("ION_TIDE_VERIFY_SSL", False)
     if os.environ.get("ION_TIDE_SPACE"):
-        cfg.tide_space = os.environ.get("ION_TIDE_SPACE", "default")
+        cfg.tide_space = os.environ.get("ION_TIDE_SPACE", "")
     if os.environ.get("ION_TIDE_CLIENT_ID"):
         cfg.tide_client_id = os.environ.get("ION_TIDE_CLIENT_ID", "")
 
