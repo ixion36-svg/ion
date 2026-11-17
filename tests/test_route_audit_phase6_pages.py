@@ -265,38 +265,9 @@ def test_analyst_efficiency_merged_into_executive_report(paths):
     assert 'data-ion-style="height:' in team
 
 
-@pytest.mark.parametrize("tpl", ["detection_health.html", "de_metrics.html"])
-def test_detection_pages_share_a_permission_aware_strip(tpl):
-    html = (TEMPLATES / tpl).read_text(encoding="utf-8")
-    assert '_nav_tabs.html' in html
-    assert 'has_permission("de:read")' in html
-    assert 'has_permission("security:read")' in html
-
-
-def test_detection_strip_never_advertises_an_unauthorised_tab():
-    from jinja2 import Environment, FileSystemLoader
-
-    src = (TEMPLATES / "de_metrics.html").read_text(encoding="utf-8")
-    end = '{% if tabs | length > 1 %}{% include "_nav_tabs.html" %}{% endif %}'
-    frag = src[src.index("{% set tabs = [] %}"): src.index(end) + len(end)]
-    env = Environment(loader=FileSystemLoader(str(TEMPLATES)))
-
-    class _U:
-        def __init__(self, perms): self._p = perms
-        def has_permission(self, p): return p in self._p
-
-    both = env.from_string(frag).render(current_user=_U({"de:read", "security:read"}),
-                                        active_label="DE Metrics")
-    assert "DE Metrics" in both and "Detection Health" in both
-
-    de_only = env.from_string(frag).render(current_user=_U({"de:read"}),
-                                           active_label="DE Metrics")
-    assert "Detection Health" not in de_only, "must not advertise a page the user cannot open"
-
-    anon = env.from_string(frag).render(current_user=None, active_label="DE Metrics")
-    assert "Detection Health" not in anon and "DE Metrics" not in anon
-
-
 def test_detection_routes_pass_current_user():
     src = Path("src/ion/web/server.py").read_text(encoding="utf-8")
-    assert src.count('context={"current_user": user}') >= 2
+    # Detection Health and DE Metrics are tabs of /detection-engineering now,
+    # which the page loop renders with the user like every other page.
+    assert '("/detection-engineering",  "detection_engineering.html",      "alert:read")' in src
+    assert src.count('context={"current_user": user}') >= 1

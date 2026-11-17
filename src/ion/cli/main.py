@@ -763,5 +763,102 @@ def seed_metis(
         session.close()
 
 
+@app.command("seed-tide")
+def seed_tide(
+    ttl_days: int = typer.Option(
+        365, "--ttl-days", help="Bearer token lifetime in days"
+    ),
+) -> None:
+    """Seed the TIDE service account and mint the token TIDE reads rule outcomes with.
+
+    The account's only permission is rule_outcomes:read. Re-running mints a new
+    token and revokes the previous one.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    from ion.auth.service import AuthService
+    from ion.core.config import get_config
+    from ion.storage.database import get_engine, get_session_factory
+
+    if ttl_days < 1:
+        console.print("[red]Error: --ttl-days must be at least 1[/red]")
+        raise typer.Exit(code=1)
+
+    config = get_config()
+    if not _database_is_ready(config.db_path):
+        console.print("[yellow]ION not initialized.[/yellow]")
+        console.print("Run 'ion init' first, then 'ion upgrade'.")
+        return
+
+    session = get_session_factory(get_engine(config.db_path))()
+    try:
+        auth_service = AuthService(session)
+        auth_service.seed_permissions()
+        auth_service.seed_roles()
+        tide = auth_service.seed_tide_user()
+        session.commit()
+        if tide is None:
+            console.print("[red]Error: failed to seed the tide user[/red]")
+            raise typer.Exit(code=1)
+        token = auth_service.mint_service_account_token(tide.id, ttl_days=ttl_days)
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        console.print(f"[red]Error seeding TIDE service account: {e}[/red]")
+        raise
+    finally:
+        session.close()
+
+    expiry = datetime.now(timezone.utc) + timedelta(days=ttl_days)
+    console.print(f"[green]OK[/green] Service account: {tide.username} (rule_outcomes:read only)")
+    console.print("[bold]Bearer token (save this now):[/bold]")
+    console.print(f"  {token}")
+    console.print(
+        "[yellow]Only its hash is stored. Re-run this command to replace it; "
+        "the old token stops working at once.[/yellow]"
+    )
+    console.print(f"  Expires: {expiry.date().isoformat()} ({ttl_days} days)")
+    console.print("  Send it as: Authorization: Bearer <token>")
+    console.print("  Endpoint:   GET /api/external/v1/rule-outcomes")
+
+
+@app.command("backfill-rule-identity")
+def backfill_rule_identity(
+    batch: int = typer.Option(200, "--batch", min=1, max=1000, help="Rows per Elasticsearch search"),
+) -> None:
+    """Copy rule id, uuid and name from Elasticsearch onto triage rows not yet checked.
+
+    The same pass the server runs every 15 minutes. Safe to re-run and to
+    interrupt: each batch commits, and a checked row is not asked about again.
+    Stops at the first failed search, leaving that batch for the next run.
+    """
+    import asyncio
+
+    from ion.core.config import get_config
+    from ion.services.elasticsearch_service import ElasticsearchService
+    from ion.services.rule_identity_backfill_service import fill_rule_identity
+    from ion.storage.database import get_engine, get_session_factory
+
+    config = get_config()
+    if not _database_is_ready(config.db_path):
+        console.print("[yellow]ION not initialized.[/yellow]")
+        return
+    es = ElasticsearchService()
+    if not es.is_configured:
+        console.print("[red]Elasticsearch is not configured.[/red]")
+        raise typer.Exit(code=1)
+
+    session = get_session_factory(get_engine(config.db_path))()
+    try:
+        filled = asyncio.run(fill_rule_identity(session, es, batch=batch))
+    except Exception as e:
+        session.rollback()
+        console.print(f"[red]Backfill stopped: {e}[/red]")
+        raise typer.Exit(code=1)
+    finally:
+        session.close()
+    console.print(f"[green]OK[/green] {filled} triage row(s) gained a rule id.")
+
+
 if __name__ == "__main__":
     app()

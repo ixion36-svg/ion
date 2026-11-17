@@ -122,7 +122,6 @@ NAV: tuple[Item | Group, ...] = (
         label='Engineering',
         dom_id='nav-group-engineering',
         items=(
-            Item(href='/de', label='DE Workbench', exact=True, gate='de'),
             Item(
                 href='/detection-engineering',
                 label='Detection Engineering',
@@ -130,13 +129,8 @@ NAV: tuple[Item | Group, ...] = (
                 mobile=4,
                 mobile_label='Detection',
             ),
-            Item(href='/de-proposals', label='Detection Proposals', gate='de'),
-            Item(href='/de-quirks', label='System Quirks', gate='de'),
-            Item(href='/de-bob', label='Bob Improvement', gate='de'),
-            Item(href='/de-oversight', label='Abuse Monitor', gate='de'),
             Item(href='/cyab', label='CyAB'),
             Item(href='/network-map', label='Infrastructure', also=('/network-topology', '/data-flow'), shortcut='n'),
-            Item(href='/log-sources', label='Platform Health'),
             Item(
                 href='/architecture',
                 label='Workflow Orchestrator',
@@ -153,8 +147,6 @@ NAV: tuple[Item | Group, ...] = (
             # opens in its own tab rather than replacing the analyst's page.
             Item(href='/wallboard', label='Wallboard (TV mode)', new_tab=True),
             Item(href='/executive-report', label='Executive Report'),
-            Item(href='/detection-health', label='Detection Health'),
-            Item(href='/de-metrics', label='DE Metrics', gate='de'),
             Item(href='/analytics', label='Analytics Engine'),
         ),
     ),

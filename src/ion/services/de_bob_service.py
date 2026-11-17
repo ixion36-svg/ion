@@ -185,3 +185,31 @@ def get_bob_scorecard(session: Session, days: Optional[int] = None) -> Dict[str,
         },
         "top_classes": fb["classes"][:5],
     }
+
+
+def get_agreement_by_rule(session: Session, days: Optional[int] = None,
+                          min_verdicts: int = 20) -> Dict[str, Any]:
+    """Per-rule agreement over the same scored ledger rows as the scorecard, worst first.
+
+    Rules with fewer than ``min_verdicts`` scored closures are left out: a rate
+    over a handful of verdicts ranks noise, not Bob.
+    """
+    lookback = days if days is not None else _lookback()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    tally: Dict[str, list] = {}
+    for (agreement, bob_v, _human_v, auto_esc, *_mid, rule_name) in _deduped_rows(
+            session, now - timedelta(days=lookback)):
+        if not _is_scored(bob_v, agreement, auto_esc):
+            continue
+        counts = tally.setdefault(rule_name or _UNMAPPED, [0, 0])
+        counts[0] += 1
+        counts[1] += agreement is False
+    rules = [
+        {"rule_name": name, "scored": scored, "disagreed": disagreed,
+         "agreement_rate": _pct(scored - disagreed, scored)}
+        for name, (scored, disagreed) in tally.items() if scored >= min_verdicts
+    ]
+    rules.sort(key=lambda r: (r["agreement_rate"], -r["scored"]))
+    return {"period_days": lookback, "min_verdicts": min_verdicts,
+            "below_minimum": sum(1 for scored, _ in tally.values() if scored < min_verdicts),
+            "rules": rules}

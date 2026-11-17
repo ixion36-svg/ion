@@ -5,11 +5,12 @@
  * --sev-low is grey on purpose so low severity cannot read as an accent.
  */
 
-/* No overflow:hidden on the wrapper. An ancestor with non-visible overflow becomes
-   the scroll container for position:sticky, so the column header silently stops
-   sticking and scrolls away under the page chrome. Corners are rounded on the
-   cells instead. border-collapse must stay separate — collapse drops sticky th
-   borders in Chrome. */
+/* The wrapper scrolls sideways (see overflow-x below), and an ancestor with
+   non-visible overflow is the scroll container for position:sticky. So the
+   column header sticks to this wrapper, never to the page, and its `top` is
+   measured from the wrapper's own edge. Corners are rounded on the cells.
+   border-collapse must stay separate — collapse drops sticky th borders in
+   Chrome. */
 .aq-wrap {
     border: 1px solid var(--ion-border, #212b38);
     border-radius: 8px;
@@ -55,7 +56,10 @@ table.aq th {
     background: var(--ion-surface-2, #11141c);
     box-shadow: inset 0 -1px 0 var(--ion-border, #222c39);
     position: sticky;
-    top: var(--aq-stick, 0px);
+    /* Not the height of the page chrome: offsets are against .aq-wrap, so
+       that pushed the header down over the first body row and hid the first
+       group's bar and Select all. */
+    top: 0;
     z-index: 20;
     user-select: none;
 }

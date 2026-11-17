@@ -1,0 +1,81 @@
+{# Health: what was Detection Health, DE Metrics and TIDE Rule Monitoring.
+   Problems come from TIDE Rule Monitoring, or from ION's thresholds when the
+   tenant has none; FP rate and noise campaigns are ION closures; Bob's
+   agreement is its own tile, not part of either. #}
+{% import "_fragments/detection_engineering_rule_macros.html" as m %}
+<span id="de-count-rules" class="dx-tab-count" hx-swap-oob="true">{% if state == 'data' %}{{ total }}{% endif %}</span>
+<span id="de-count-health" class="dx-tab-count" hx-swap-oob="true">{% if state == 'data' and counts.error %}<span class="dx-tag bad">{{ counts.error }}</span>{% endif %}</span>
+{% if state == 'unconfigured' %}<div class="dx-banner">TIDE is not configured. Connect it in <a href="/settings#tide">Settings</a> to see rule health.</div>
+{% elif state == 'failed' %}<div class="dx-banner warn" role="alert">Rules could not be read from TIDE.{% if failure %} {{ failure.message }}{% if failure.detail %} TIDE said: {{ failure.detail }}{% endif %}{% endif %}</div>
+{% else %}
+<div class="dx-kpis">
+  <div class="dx-kpi"><div class="dx-k">{{ 'Rule Monitoring' if monitoring == 'tide' else 'ION volume checks' }}</div>
+    {% if judged %}<div class="dx-v dx-bad-v">{{ counts.error }} <small>errors</small></div>
+    <div class="dx-s">{{ counts.warning }} warnings · {{ counts.info }} info{{ '' if monitoring == 'tide' else ' · no TIDE Rule Monitoring' }}</div>
+    {% else %}<div class="dx-v"><span class="dx-dash" title="No TIDE Rule Monitoring and no alert counts from TIDE or Kibana">—</span></div><div class="dx-s">nothing to judge rules by</div>{% endif %}</div>
+  <div class="dx-kpi"><div class="dx-k">Rules with problems</div>
+    <div class="dx-v">{% if judged %}{{ with_problems }}{% else %}—{% endif %} <small>/ {{ total }}</small></div>
+    <div class="dx-s">{{ with_problems_by_kind.elastic }} Elastic · {{ with_problems_by_kind.wazuh }} Wazuh</div></div>
+  <div class="dx-kpi"><div class="dx-k">Analyst FP rate · {{ closure_days }}d</div>
+    {% if fp_rate is number %}<div class="dx-v warn">{{ fp_rate }}%</div><div class="dx-s">{{ m.num(closures.fp) }} of {{ m.num(closures.closed) }} closures</div>
+    {% elif closures %}<div class="dx-v">—</div><div class="dx-s">no case closed in {{ closure_days }} days</div>
+    {% else %}<div class="dx-v"><span class="dx-dash" title="ION case closures could not be read">—</span></div><div class="dx-s">closures unavailable</div>{% endif %}</div>
+  <div class="dx-kpi"><div class="dx-k">Addressable · {{ closure_days }}d</div>
+    {% if campaign_summary %}<div class="dx-v">{{ campaign_summary.addressable_hours|round|int }}h</div><div class="dx-s">across {{ campaign_summary.campaign_count }} noise campaigns</div>
+    {% elif not can_de %}<div class="dx-v">—</div><div class="dx-s">needs de:read</div>
+    {% else %}<div class="dx-v"><span class="dx-dash" title="Noise campaigns could not be read">—</span></div><div class="dx-s">campaigns unavailable</div>{% endif %}</div>
+  <div class="dx-kpi"><div class="dx-k">Silent rules</div>
+    <div class="dx-v">{% if judged %}{{ silent }}{% else %}—{% endif %}</div><div class="dx-s">{{ 'TIDE: no alert for a long time' if monitoring == 'tide' else 'enabled, nothing in 90 days' }}</div></div>
+  <div class="dx-kpi"><div class="dx-k">Bob agreement</div>
+    {% set s = bob.summary if bob else None %}
+    {% if s and s.agreement_rate is number %}<div class="dx-v dx-ok">{{ s.agreement_rate|round|int }}%</div>
+      <div class="dx-s">{{ s.total_disagreements }} disagreements · <button type="button" class="dx-link" data-click-action="deGo" data-args='["disagreements"]'>review</button></div>
+    {% elif s %}<div class="dx-v">—</div><div class="dx-s">no scored verdicts yet</div>
+    {% elif not can_de %}<div class="dx-v">—</div><div class="dx-s">needs de:read</div>
+    {% else %}<div class="dx-v"><span class="dx-dash" title="Bob's scorecard could not be read">—</span></div><div class="dx-s">scorecard unavailable</div>{% endif %}</div>
+</div>
+{{ m.source_notes(notes) }}
+
+{% if groups %}
+<div class="dx-cols">
+{% for g in groups %}
+<section class="dx-card dx-hgroup">
+  <header class="dx-ch"><span class="dx-{{ m.level_cls(g.level) }}">{{ m.level_icon(g.level) }}</span>{{ g.title }}<span class="dx-count {{ m.level_cls(g.level) }}">{{ g.rows|length }}</span>
+    <span class="dx-why">{{ g.why or ('TIDE Rule Monitoring' if g.source == 'tide' else 'ION') }}</span></header>
+  <div class="dx-cb dx-feed dx-hfeed">
+  {% for row in g.rows %}
+    {% if row.rule %}
+    <div class="dx-row">{{ m.kind(row.rule.kind) }}<div><b>{{ row.rule.name }}</b><div class="dx-mute small">{{ (row.detail or row.cause)|truncate(160) }}</div></div>
+      <button type="button" class="dx-btn sm" data-click-action="deOpenRule" data-args='{{ [row.rule.key]|tojson }}'>Open</button></div>
+    {% else %}
+    <div class="dx-row"><span class="dx-tag">destination</span><div><b>{{ row.dest }}</b><div class="dx-mute small">{{ (row.detail or row.cause)|truncate(200) }}</div>
+      {% for gi in row.gitlab %}<div class="small">{% if gi.url %}<a class="dx-link" href="{{ gi.url|safe_url }}" target="_blank" rel="noopener">GitLab #{{ gi.iid }}</a>{% else %}GitLab #{{ gi.iid }}{% endif %} {{ gi.title }}</div>{% endfor %}</div><span></span></div>
+    {% endif %}
+  {% endfor %}
+  </div>
+</section>
+{% endfor %}
+</div>
+{% else %}
+<div class="dx-empty dx-mb">{% if monitoring == 'tide' %}TIDE Rule Monitoring reports no open problem at these destinations.{% elif judged %}No rule crosses ION's volume thresholds.{% else %}Rules cannot be judged here: this TIDE has no Rule Monitoring or alert counts, and ION's Kibana alerts could not be read.{% endif %}</div>
+{% endif %}
+
+<section class="dx-card">
+  <header class="dx-ch">Noise campaigns <span class="dx-n">ION closures · {{ closure_days }}d</span><span class="dx-r dx-r-mute">Addressable hours = FP closures × minutes per alert</span></header>
+  {% if not can_de %}<div class="dx-cb dx-mute small">Noise campaigns need the de:read permission.</div>
+  {% elif campaigns is none %}<div class="dx-cb"><div class="dx-empty" role="alert">Noise campaigns could not be read from ION's case closures.</div></div>
+  {% elif not campaigns %}<div class="dx-cb"><div class="dx-empty">No rule had enough false-positive closures in {{ closure_days }} days to form a campaign.</div></div>
+  {% else %}
+  <div class="dx-tablewrap"><table class="dx-table dx-campaigns"><thead><tr><th>Rule</th><th class="num">Cases</th><th class="num">FP closures</th><th class="num">FP rate</th><th class="num">Addressable</th><th>Top signatures</th><th></th></tr></thead><tbody>
+  {% for c in campaigns %}
+    <tr><td>{% set k = rule_keys.get(c.rule_name) %}{% if k %}<button type="button" class="dx-link dx-ell" data-click-action="deOpenRule" data-args='{{ [k]|tojson }}' title="{{ c.rule_name }}">{{ c.rule_name }}</button>{% else %}<span class="dx-ell" title="{{ c.rule_name }}">{{ c.rule_name }}</span>{% endif %}</td>
+      <td class="mono num">{{ c.case_count }}</td><td class="mono num">{{ c.fp_alerts }}</td>
+      <td class="mono num{{ ' dx-bad-t' if c.noisy }}">{% if c.fp_rate is number %}{{ c.fp_rate|round|int }}%{% else %}—{% endif %}</td>
+      <td class="mono num"><b>{{ c.cost_hours }}h</b></td>
+      <td class="small dx-mute">{% for s in c.top_signatures[:2] %}{{ s.value if s.value is defined else s }}{{ ', ' if not loop.last }}{% else %}—{% endfor %}</td>
+      <td class="num">{% if can_propose %}<button type="button" class="dx-btn sm" data-click-action="deDraftForRule" data-args='{{ [c.rule_name]|tojson }}'><svg class="dx-icon" aria-hidden="true"><use href="#i-sparkles"/></svg>Draft proposal</button>{% endif %}</td></tr>
+  {% endfor %}
+  </tbody></table></div>
+  {% endif %}
+</section>
+{% endif %}

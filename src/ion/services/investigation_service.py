@@ -39,6 +39,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from ion.core import apm
 from ion.models.investigation import Investigation
+from ion.services.alert_fields import FieldRole, event_document, field_role
 from ion.services.prompt_safety import sanitize_untrusted_counted
 from ion.storage import investigation_memory_repository as inv_repo
 from ion.storage.database import (
@@ -59,25 +60,14 @@ logger = logging.getLogger(__name__)
 # normalized_value, so ignored CVEs (upper), MACs (separators) and
 # trailing-dot domains never matched.
 def _merge_type_to_observable_type(merge_type: str):
-    from ion.models.observable import ObservableType
     from ion.services.observable_service import LEGACY_TYPE_MAP
 
     # LEGACY_TYPE_MAP is the canonical bridge — it is also what the analyst's
     # ignore toggle uses to type the Observable row, so reusing it keeps both
     # sides of the mapping in lockstep. It covers the role-typed strings the
     # case-creation extractor writes into case.observables (source_ip,
-    # destination_hostname, subject_user, ...); the extras below are merge/
-    # extractor spellings it doesn't carry.
-    key = (merge_type or "").lower()
-    if key in LEGACY_TYPE_MAP:
-        return LEGACY_TYPE_MAP[key]
-    return {
-        "ipv4": ObservableType.IPV4,
-        "ipv6": ObservableType.IPV6,
-        "mac": ObservableType.MAC_ADDRESS,
-        "mac_address": ObservableType.MAC_ADDRESS,
-        "cve": ObservableType.CVE,
-    }.get(key)
+    # destination_hostname, subject_user, ...) and the merge spellings.
+    return LEGACY_TYPE_MAP.get((merge_type or "").lower())
 
 
 def _obs_family(obs_type) -> str:
@@ -940,34 +930,6 @@ def _kev_lines(text: Any) -> List[str]:
         return []
 
 
-#: Subtrees of an alert that the rule author wrote, rather than the event.
-#:
-#: A Kibana security alert carries the whole rule definition beside the
-#: matched event, and an investigation guide routinely contains example
-#: IPs, domains and hashes. ``false_positives`` is the sharpest case: that
-#: field exists to list values which are explicitly benign.
-#:
-#: Walking those values made every IOC a rule author ever typed into their
-#: documentation an observable on every alert that rule raised, attached to
-#: a host that never touched it. Reported from a live SOC, 2026-10-08.
-#:
-#: Matched on the path, never on the field name, so a process called
-#: ``rule.exe`` or a user called ``note`` is still evidence. The whole rule
-#: subtree goes rather than a list of leaf names: nothing under it is
-#: event-derived, and Kibana mirrors most of it under ``.parameters``, so a
-#: leaf-by-leaf list would let the same text back in by another path.
-#:
-#: ``kibana.alert.reason`` is deliberately absent from this list. It is
-#: generated per alert from the matched event, so a hostname in it is a
-#: real sighting and excluding it would lose true positives.
-_AUTHORED_SUBTREES = (
-    ("kibana", "alert", "rule"),
-    ("signal", "rule"),            # the pre-8.x alert format
-    ("kibana", "alert", "ancestors"),
-    ("rule",),                     # some forwarders flatten it to the root
-)
-
-
 def _alert_to_text_blob(alert: dict) -> str:
     """Flatten an alert dict into a single text blob for IOC extraction.
 
@@ -977,9 +939,13 @@ def _alert_to_text_blob(alert: dict) -> str:
     label is a real TLD). Walking values-only structurally prevents that, while
     still surfacing hostnames/URLs/hashes embedded in message/reason fields.
 
-    It also skips the rule-definition subtrees in ``_AUTHORED_SUBTREES``,
-    which is the same lesson one level up: the *values* of fields the rule
-    author wrote are no more evidence than the field names were.
+    Only evidence is walked. ``alert_fields.ALERT_FIELD_ROLES`` says which
+    subtrees are the rule's own text or the engine's record keeping; an IP
+    in an investigation guide is no more a sighting than a field name was.
+    The roles are matched from the root of the event document, so the alert
+    is unwrapped first: ``investigate_case`` passes
+    ``ElasticsearchAlert.to_dict()``, which holds the document under
+    ``raw_data``, and matched from there nothing was ever excluded.
     """
     import ipaddress
 
@@ -999,9 +965,6 @@ def _alert_to_text_blob(alert: dict) -> str:
         except ValueError:
             return False
 
-    def _is_authored(path: tuple) -> bool:
-        return any(path[:len(p)] == p for p in _AUTHORED_SUBTREES)
-
     def _walk(node, path: tuple = ()) -> None:
         if isinstance(node, dict):
             for k, v in node.items():
@@ -1009,7 +972,7 @@ def _alert_to_text_blob(alert: dict) -> str:
                 # the path has to be extended by each segment or
                 # {"kibana.alert.rule.note": ...} would slip past.
                 child = path + tuple(k.split(".")) if isinstance(k, str) else path + (k,)
-                if _is_authored(child):
+                if field_role(child) is not FieldRole.EVIDENCE:
                     continue
                 if _is_ip_key(k):
                     parts.append(k)
@@ -1023,7 +986,7 @@ def _alert_to_text_blob(alert: dict) -> str:
             parts.append(str(node))
 
     try:
-        _walk(alert)
+        _walk(event_document(alert))
         return "\n".join(parts)
     except Exception:
         return str(alert)

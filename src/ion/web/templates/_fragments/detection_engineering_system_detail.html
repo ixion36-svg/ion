@@ -1,0 +1,46 @@
+{# One system: coverage, devices, CVEs and CIS, then its failing CIS checks,
+   known-exploited CVEs, log sources and the platform-scoped gaps. #}
+{% import "_fragments/detection_engineering_system_macros.html" as sm %}
+<button type="button" class="dx-btn ghost sm dx-back" data-click-action="deCloseSystem"><svg class="dx-icon" aria-hidden="true"><use href="#i-chevron-left"/></svg>All systems</button>
+{% if state == 'missing' %}<div class="dx-empty">TIDE no longer has this system.</div>
+{% elif state == 'unconfigured' %}<div class="dx-banner">TIDE is not configured.</div>
+{% elif state == 'failed' %}<div class="dx-banner warn" role="alert">TIDE systems could not be read.{% if failure %} {{ failure.message }}{% endif %}</div>
+{% else %}{% set s = system %}
+<div class="dx-detail-head"><h2>{{ s.name }}</h2>{% for p in s.platforms or [] %}<span class="dx-chip">{{ p }}</span>{% endfor %}<span class="dx-grow"></span>
+  <button type="button" class="dx-btn sm" data-click-action="deCoverageForSystem" data-args='{{ [s.id]|tojson }}'><svg class="dx-icon" aria-hidden="true"><use href="#i-map"/></svg>Coverage for this system</button>
+  <button type="button" class="dx-btn sm" data-click-action="deReadinessForSystem" data-args='{{ [s.id]|tojson }}'>Readiness</button></div>
+{% for note in notes %}<div class="dx-note">{{ note }}</div>{% endfor %}
+<div class="dx-kpis dx-kpis-4">
+  <div class="dx-kpi"><div class="dx-k">Baseline coverage</div>{{ sm.coverage(s) }}<div class="dx-s">covered steps of this system's TIDE baselines</div></div>
+  <div class="dx-kpi"><div class="dx-k">Devices</div>{{ sm.agents(s) }}</div>
+  <div class="dx-kpi"><div class="dx-k">Open CVEs</div>{{ sm.cves(s) }}</div>
+  <div class="dx-kpi"><div class="dx-k">CIS hardening</div>{{ sm.cis(s) }}</div>
+</div>
+<div class="dx-grid dx-grid-2">
+  <section class="dx-card"><header class="dx-ch">Top failing CIS checks <span class="dx-n">{{ s.failing|length if s.failing is not none else '' }}</span><span class="dx-r dx-r-mute">Wazuh SCA</span></header>
+    {% if s.failing is none %}<div class="dx-cb dx-mute small">Needs TIDE 7 with Wazuh SCA results.</div>
+    {% elif not s.failing %}<div class="dx-cb dx-mute small">No failing check on this system's hosts.</div>
+    {% else %}<table class="dx-table"><thead><tr><th>Check</th><th>Title</th><th>Hosts</th></tr></thead><tbody>
+      {% for c in s.failing[:failing_shown] %}<tr><td class="mono">{{ c.check }}</td><td>{{ c.title }}</td><td class="dx-mute small">{{ c.hosts }}</td></tr>{% endfor %}
+      {% if s.failing|length > failing_shown %}<tr><td colspan="3" class="dx-mute small">+ {{ s.failing|length - failing_shown }} more</td></tr>{% endif %}
+    </tbody></table>{% endif %}</section>
+  <section class="dx-card"><header class="dx-ch">Known-exploited CVEs <span class="dx-n">{{ s.kev|length if s.kev is not none else '' }}</span><span class="dx-r dx-r-mute">CISA KEV</span></header>
+    {% if s.kev is none %}<div class="dx-cb dx-mute small">Needs TIDE 7 with Wazuh vulnerability findings.</div>
+    {% elif not s.kev %}<div class="dx-cb dx-mute small">No known-exploited CVE on this system{{ ' among ' ~ s.vuln_total ~ ' open' if s.vuln_total }}.</div>
+    {% else %}<table class="dx-table"><thead><tr><th>CVE</th><th>Title</th><th>Severity</th><th>Hosts</th></tr></thead><tbody>
+      {% for v in s.kev %}<tr><td class="dx-nowrap"><span class="dx-kev">KEV</span> <span class="mono">{{ v.cve }}</span></td><td>{{ (v.description or v.package or '')|truncate(90) }}</td><td><span class="de-sev {{ v.severity }}">{{ v.severity or 'unrated' }}</span></td><td class="mono small">{{ v.hosts }}</td></tr>{% endfor %}
+    </tbody></table>{% endif %}</section>
+  <section class="dx-card"><header class="dx-ch">Log sources <span class="dx-n">{{ s.freshness|length }}</span><span class="dx-moved"><svg class="dx-icon" aria-hidden="true"><use href="#i-arrow-right"/></svg><span>Moved here · <b>Log Source Health</b></span></span></header>
+    {% if not s.freshness %}<div class="dx-cb dx-mute small">No Wazuh agent, and no register source tagged "{{ s.name }}".</div>
+    {% else %}<table class="dx-table"><thead><tr><th>Source</th><th class="num">Last event</th><th>State</th></tr></thead><tbody>
+      {% for f in s.freshness %}<tr><td>{{ f.name }}</td><td class="num"><span class="dx-fresh {{ f.state }}">{{ f.age }}{{ ' ago' if f.age != 'never' }}</span></td><td>{{ sm.state_tag(f.state, None) }}</td></tr>{% endfor %}
+    </tbody></table>{% endif %}</section>
+  <section class="dx-card"><header class="dx-ch">Coverage gaps <span class="dx-n">{{ (s.platforms or ['all platforms'])|join(', ') }} only</span><button type="button" class="dx-r" data-click-action="deCoverageForSystem" data-args='{{ [s.id]|tojson }}'>Open map →</button></header>
+    {% if gaps is none %}<div class="dx-cb dx-mute small">This system's coverage could not be read from TIDE.</div>
+    {% elif not gaps %}<div class="dx-cb dx-mute small">Every technique on these platforms has an enabled rule applied here.</div>
+    {% else %}<table class="dx-table"><thead><tr><th>Technique</th><th>Name</th><th>Tactic</th><th>Why</th></tr></thead><tbody>
+      {% for g in gaps %}<tr><td class="mono">{{ g.id }}</td><td>{{ g.name }}</td><td class="dx-mute small">{{ g.tactic }}</td><td><span class="dx-tag {{ g.cls }}">{{ g.why }}</span></td></tr>{% endfor %}
+      {% if gaps_more %}<tr><td colspan="4" class="dx-mute small">+ {{ gaps_more }} more on the coverage map</td></tr>{% endif %}
+    </tbody></table>{% endif %}</section>
+</div>
+{% endif %}

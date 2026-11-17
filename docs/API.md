@@ -322,6 +322,74 @@ assessments, ATT&CK heatmap), `course_api` (`/api/courses`) and
 | `integration_api` | `/api/integrations` | Integration config + webhook config |
 | `wallboard_api` | `/` | Wallboard surface (root-mounted) |
 
+## 6.12 External (machine clients)
+
+| Router | Prefix | Scope |
+|---|---|---|
+| `external_api` | `/api/external/v1` | Read-only data for integrations outside ION. Today: rule outcomes for TIDE |
+
+### `GET /api/external/v1/rule-outcomes`
+
+How each detection rule's alerts were closed by analysts in ION. It is the
+same measure Detection Health and DE Metrics show, from
+`ion.services.rule_outcome_service`.
+
+**Authentication.** `Authorization: Bearer <token>`, where the token belongs to
+a service account. Mint one with `ion seed-tide [--ttl-days 365]`. The command
+creates the `tide` service account and its `tide` role, which holds only
+`rule_outcomes:read`. Re-running it revokes the previous token. A missing or
+unknown token gets `401`. A token without the permission, or a human's session
+token, gets `403`. Rate limited at 60/min per client IP.
+
+**Query parameters.**
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `since` | `until` minus 90 days | Window start, ISO 8601. No offset means UTC |
+| `until` | now | Window end, exclusive |
+| `rule_id` | | Only this rule id |
+| `limit` | 100 | Items per page, 1 to 500 |
+| `cursor` | | `next_cursor` from the previous page |
+
+A window longer than 365 days, a malformed timestamp or a cursor this
+endpoint did not issue gets `400`.
+
+**Response.**
+
+```json
+{
+  "schema_version": "ion.rule_outcomes.v1",
+  "window": {"since": "2026-08-19T00:00:00Z", "until": "2026-11-17T00:00:00Z"},
+  "noisy_policy": {"min_closed": 5, "fp_rate_pct": 70.0},
+  "outcome_keys": ["true_positive", "false_positive", "benign_true_positive",
+                   "duplicate", "insufficient_data", "not_applicable", "other"],
+  "items": [{
+    "rule_id": "a1b2c3d4-...", "rule_name": "Brute Force Authentication Attempt",
+    "rule_uuids": ["5e6f..."], "alerts": 41, "closed": 12,
+    "outcomes": {"true_positive": 2, "false_positive": 9, "benign_true_positive": 1,
+                 "duplicate": 0, "insufficient_data": 0, "not_applicable": 0, "other": 0},
+    "fp_rate_pct": 75.0, "tp_yield_pct": 16.7,
+    "median_seconds_to_close": 5400, "last_closed_at": "2026-11-16T09:12:00Z",
+    "noisy": true
+  }],
+  "next_cursor": null
+}
+```
+
+- One item per rule. `rule_id` is the Kibana `rule_id` or the Wazuh rule id,
+  the key TIDE's `detection_rules.rule_id` joins on. It is `null` for a rule
+  ION knows only by name; join those on `rule_name`. `rule_uuids` are the
+  Kibana saved-object ids seen, one per space the rule fired in.
+- `closed` counts alerts whose case closed with a reason inside the window.
+  `alerts` counts alerts ION first saw inside it. `fp_rate_pct` is
+  `false_positive / closed`; benign true positives are not false positives.
+  Both rates are `null` when `closed` is 0.
+- `noisy` applies `noisy_policy`: at least `min_closed` closures and
+  `fp_rate_pct` at or above the threshold.
+- Items are ordered by rule identity, so following `next_cursor` with the same
+  window visits each rule once.
+- No analyst, note, host, alert or case identifier is in the response.
+
 # 7. Outbound webhooks
 
 ION emits HMAC-signed outbound webhooks on configurable events. Consumers verify the signature before processing.
@@ -389,6 +457,7 @@ ok = hmac.compare_digest(mac, header_value.removeprefix("sha256="))
 | Authenticated read APIs | 600/min per user |
 | Authenticated mutating APIs | 200/min per user |
 | Webhook outbound (per receiver) | 60/min |
+| `/api/external/v1/rule-outcomes` | 60/min per IP |
 
 Customer can override defaults via `/settings` (admin permission required).
 

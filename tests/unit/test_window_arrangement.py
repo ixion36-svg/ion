@@ -30,6 +30,7 @@ ARRANGE_JS = ARRANGE.read_text(encoding="utf-8")
 CASES = (WEB / "templates/cases.html").read_text(encoding="utf-8")
 ALERTS = (WEB / "templates/alerts.html").read_text(encoding="utf-8")
 WINDOW_JS = (WEB / "static/js/alerts-window.js").read_text(encoding="utf-8")
+CASE_WINDOW_JS = (WEB / "static/js/case-window.js").read_text(encoding="utf-8")
 DETAIL_JS = (WEB / "static/js/alert-detail.js").read_text(encoding="utf-8")
 WORKSPACE_CSS = (WEB / "static/css/ion-workspace.css").read_text(encoding="utf-8")
 
@@ -98,14 +99,18 @@ def test_nothing_usable_saved_leaves_the_current_layout_as_it_is(saved):
 # One implementation
 # ---------------------------------------------------------------------------
 
-def test_both_windows_load_the_module_and_neither_keeps_a_copy():
+def test_the_alert_window_loads_the_module_and_neither_page_keeps_a_copy():
+    """The case window stopped arranging sections when it became two
+    layouts (Triage and Read, static/js/case-window.js), so only the alert
+    window loads the module now."""
+    assert "/static/js/ion-arrange.js?v={{ ion_version }}" in ALERTS
+    assert "ion-arrange.js" not in CASES
     for page in (CASES, ALERTS):
-        assert "/static/js/ion-arrange.js?v={{ ion_version }}" in page
         # The functions the inline copy was made of.
         for gone in ("function pmSaveLayout", "function pmArrange", "function pmWireDrag",
                      "function pmInjectHeaderTools", "function pmFitCols"):
             assert gone not in page, gone
-    assert "ionArrange.create({" in CASES
+    assert "ionArrange.create({" not in CASES
     assert "window.ionArrange.create({" in WINDOW_JS
 
 
@@ -119,24 +124,21 @@ def test_the_module_names_no_page():
 
 def test_the_module_is_loaded_before_the_script_that_configures_it():
     assert ALERTS.index("/static/js/ion-arrange.js") < ALERTS.index("/static/js/alerts-window.js")
-    assert CASES.index("/static/js/ion-arrange.js") < CASES.index("ionArrange.create({")
 
 
 def test_each_window_keeps_its_own_storage_key():
-    # Unchanged, so the case arrangement people already saved still applies.
-    assert "const PM_LAYOUT_KEY = 'ion-case-window-layout-v2';" in CASES
-    assert "storageKey: PM_LAYOUT_KEY" in CASES
     assert "storageKey: 'ion-alert-window-layout-v1'" in WINDOW_JS
+    assert "ion-case-window-layout" not in CASES
+    assert "var MODE_KEY = 'ion-case-window-mode';" in CASE_WINDOW_JS
 
 
-def test_the_case_window_keeps_its_presets_columns_and_navigation():
-    block = CASES[CASES.index("const PM_PRESETS = ["):CASES.index("function pmKeyFor")]
-    assert re.findall(r"id: '(\w+)', label: '(\w+)'", block) == [
-        ("triage", "Triage"), ("dossier", "Dossier"), ("review", "Review")]
-    assert "alerts: 'full'" in CASES
-    assert "full: null" in CASES[CASES.index("const PM_COL_WIDTHS"):CASES.index("const PM_TAB_COL")]
+def test_the_case_window_keeps_previous_and_next_case():
+    """The arranger drew these two buttons into the case header; the header
+    carries them itself now."""
     for title in ("Previous case", "Next case"):
-        assert f"title: '{title}'" in CASES
+        assert f'title="{title}"' in CASES, title
+    assert CASES.count('data-click-action="pmStepCase"') == 2
+    assert "function pmStepCase(delta)" in CASES
 
 
 def test_presets_and_reset_place_sections_in_rendered_order():

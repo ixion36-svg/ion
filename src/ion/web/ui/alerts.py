@@ -112,6 +112,7 @@ from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import get_current_user, require_permission
 from ion.models.user import User
+from ion.services.observable_kinds import observable_kind
 from ion.storage.database import get_db_session
 from ion.web.ui._shared import plain, render_view
 
@@ -1411,29 +1412,45 @@ def system_options(alerts: Optional[list], known: Optional[list], selected: str)
     the alerts carry, and the one currently selected even if neither list
     has it, so the control never stops showing what it is filtering by.
 
+    One option per system, not per namespace. A CyAB system has a data
+    source per feed and each names its own data_stream.namespace, so the
+    registry rows sharing a cyab_system_id become one option whose value is
+    their namespaces comma-joined, which a namespace cannot contain.
+
     Sorted by label, case-insensitively, as populateSystemFilterFromAlerts
     sorted them. `known` is list_known_systems' output or None when that
     read failed, in which case the alerts alone supply the list.
     """
-    labels: dict[str, str] = {}
+    groups: dict[str, dict] = {}
+    registered: set[str] = set()
     for row in known or []:
-        if not isinstance(row, dict):
+        if not isinstance(row, dict) or not row.get("namespace"):
             continue
-        ns = row.get("namespace")
-        if ns:
-            labels[str(ns)] = str(row.get("display_name") or ns)
+        ns = str(row["namespace"])
+        system_id = row.get("cyab_system_id")
+        key = f"cyab:{system_id}" if system_id is not None else f"ns:{ns}"
+        group = groups.setdefault(
+            key, {"label": str(row.get("display_name") or ns), "namespaces": set()})
+        group["namespaces"].add(ns)
+        registered.add(ns.lower())
     for a in alerts or []:
         ns = a.get("source_system")
-        if not ns:
+        if not ns or str(ns).lower() in registered:
             continue
         label = a.get("cyab_system_name") or a.get("tide_system_name") or ns
-        labels[str(ns)] = str(label)
-    if selected and selected not in labels:
-        labels[selected] = selected
-    out = [{"value": ns, "label": label, "selected": ns == selected}
-           for ns, label in labels.items()]
+        groups[f"ns:{ns}"] = {"label": str(label), "namespaces": {str(ns)}}
+    wanted = _namespaces(selected)
+    out = [{"value": ",".join(sorted(g["namespaces"])), "label": g["label"],
+            "selected": sorted(g["namespaces"]) == wanted}
+           for g in groups.values()]
+    if wanted and not any(o["selected"] for o in out):
+        out.append({"value": selected, "label": selected, "selected": True})
     out.sort(key=lambda r: r["label"].lower())
     return out
+
+
+def _namespaces(value: Optional[str]) -> list:
+    return sorted({part.strip() for part in (value or "").split(",") if part.strip()})
 
 
 def _system_badge(a: dict) -> Optional[dict]:
@@ -1593,6 +1610,8 @@ async def alerts_queue_fragment(
         triage = await _triage_map([a.get("id") for a in alerts if a.get("id") is not None],
                                    current_user, session)
 
+    known = _known_systems(session)
+    options = system_options(alerts, known, system)
     view = {
         **outcome,
         "rows": queue_rows(alerts, triage, outcome["arkime_enabled"]) if alerts is not None else None,
@@ -1602,8 +1621,11 @@ async def alerts_queue_fragment(
         "truncated": alerts is not None and len(alerts) >= QUEUE_LIMIT,
         "window": window,
         "include_closed": closed,
-        "systems": system_options(alerts, _known_systems(session), system),
+        "systems": options,
         "system": system,
+        "system_label": next((o["label"] for o in options if o["selected"]), system),
+        # A registry that could not be read is not a registry with nothing in it.
+        "systems_unread": known is None,
         "colspan": QUEUE_FALLBACK_COLUMNS,
         "can_triage": _can(current_user, TRIAGE_PERMISSION),
         "can_create_case": _can(current_user, CREATE_PERMISSION),
@@ -1704,18 +1726,6 @@ MITRE_TACTICS = (
     "Exfiltration", "Impact",
 )
 
-#: ION observable type to the OpenCTI type enrichObservables sent. None
-#: means not enrichable; a type absent from the map is sent as itself, which
-#: is what the page did (`typeMap[obs.type] !== undefined ? ... : obs.type`).
-OPENCTI_TYPE_MAP: dict[str, Optional[str]] = {
-    "source_ip": "ipv4-addr",
-    "destination_ip": "ipv4-addr",
-    "hostname": "domain-name",
-    "domain": "domain-name",
-    "url": "url",
-    "user_account": None,
-}
-
 #: Bob confidence thresholds, from the page: 80 and over is High, 60 and
 #: over Medium, anything else Low. A measured 0 is Low, not absent.
 BOB_HIGH = 80
@@ -1804,18 +1814,18 @@ def observable_rows(observables: Any, enrichment: Optional[dict] = None) -> list
 
 
 def enrichable_observables(observables: Any) -> list:
-    """What enrichObservables sent: each observable mapped through
-    OPENCTI_TYPE_MAP, the unmappable dropped, the original type kept for
-    the result rows."""
+    """The observables worth sending to OpenCTI: those whose type is an
+    observable kind at all. The type goes as it is, because the service
+    decides what it means; a page-side map here drifted from the service's
+    and sent host_ip and the hashes as strings it refused."""
     out = []
     for o in observables if isinstance(observables, list) else []:
         if not isinstance(o, dict):
             continue
         otype = o.get("type")
-        mapped = OPENCTI_TYPE_MAP.get(otype, otype) if otype in OPENCTI_TYPE_MAP else otype
-        if not mapped or not o.get("value"):
+        if not o.get("value") or observable_kind(otype, o.get("value")) is None:
             continue
-        out.append({"type": mapped, "value": o.get("value"), "original_type": otype})
+        out.append({"type": otype, "value": o.get("value"), "original_type": otype})
     return out
 
 

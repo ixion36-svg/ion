@@ -1,13 +1,302 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.18 -->
-<!-- ion-doc:version=0.99.18 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.20 -->
+<!-- ion-doc:version=0.99.20 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-11-16 -->
+<!-- ion-doc:date=2026-11-17 -->
 
 # Changelog
+
+## v0.99.20 — 2026-11-17
+
+Cases are worked from a triage inbox. /cases lists every case by its last
+activity, with a preview of the selected one, and the opened case has two
+layouts, Triage and Read. In Triage an analyst marks each alert true
+positive, benign or false positive without closing the case, then closes
+it from the same window. OpenCTI enrichment now asks for the kind of
+observable it means, so most of ION's own types are looked up for the
+first time. A case investigation no longer saves the rule's documentation
+and the alert's own id as observables. Two faults in the /alerts queue
+are fixed.
+Net-new findings: 0C / 0H / 0M / 0L.
+
+### Added
+
+- **A triage inbox at /cases.** A dense list sorted by last activity, the
+  newest of the case's own update, its newest note and its newest alert
+  change. Closed cases sink below open ones. Each row shows the severity,
+  number, title, host, latest activity, alert count, owner and age. Chips
+  for Changed (the last 24 hours), Mine, Unassigned, Critical and Closed
+  drive the existing filters.
+- **A preview beside the list.** It shows the selected case's next action
+  (what stops closure), its key fields, its latest activity and its
+  actions. On a phone it opens as a sheet.
+- **Inbox keys.** j and k move, Enter or a double-click opens the case, a
+  assigns it to you, n adds a note, c closes it and / searches. Esc in an
+  opened case comes back to the list with the selection and the filters
+  kept.
+- **Two layouts for an opened case, Triage and Read.** They share one
+  state, so the ticked alerts, the status filter, the focused alert and
+  its open tab survive a switch. The header toggle or r switches them, and
+  the browser remembers the last one used.
+- **Triage.** A key context strip shows the highlighted fields across the
+  case's alerts and follows the ticked alerts. The alert table sits beside
+  the selected alert's detail and Bob's take. The detail has six tabs:
+  Highlighted, Full fields, Process, Raw JSON, Related and Observables.
+- **Read.** A contents column and numbered sections: the summary with its
+  source named, key context, what stops closure, the alerts as lettered
+  exhibits, observables, storyline, actions, notes and similar cases.
+- **Observables say what is known about them.** Each card shows the
+  OpenCTI result stored at triage and the stored enrichments by source,
+  or says plainly that a value is not enriched. Look up now asks the
+  enabled providers about an IP, domain, URL or SHA-256 on demand and
+  shows the answer without saving it. It needs `observable:enrich`.
+- **Per-alert verdicts.** True positive, Benign and False positive are on
+  the selected alert and on the ticked-alerts bar, and t, b and f mark
+  the focused alert. Marking more than one alert asks first. A failure is
+  listed per alert and that alert stays ticked. A verdict is read back
+  from the case note the close writes, so it survives a reload. Marking
+  needs `alert:triage`.
+- **What stops closure.** An "N block closure" pill lists the blockers
+  the case window derives: linked alerts not triaged, no one assigned,
+  and an open DFIR-IRIS escalation. Triage them ticks the untriaged
+  alerts, and Assign to me takes the case. Close case… opens the close
+  dialog prefilled with a suggested reason, the most common verdict, with
+  the blockers listed as warnings. The blockers never disable the close.
+
+### Changed
+
+- **Closing one alert from the case window leaves the case open.**
+  `POST /api/elasticsearch/alerts/{id}/close` takes an optional
+  `close_case`, default true. The case window sends false, so only that
+  alert's status, its "Alert closed as ..." case note and its
+  Elasticsearch status are written. The alert window's close buttons
+  still close the case and every alert in it.
+- **The alerts blocker is "N linked alerts not triaged".** An alert
+  counts when it is not closed and has no verdict recorded, so an
+  acknowledged true positive no longer blocks closure.
+- **One table maps closure types to case reasons.**
+  `ALERT_CLOSURE_REASONS` replaces the close endpoint's inline map, and
+  the case window reads verdicts back with the same table.
+- **OpenCTI lookups name the entity type.** A hostname is asked for as a
+  Hostname first and a Domain-Name second, an IPv6 address as IPv6-Addr
+  under every IP alias, and a CVE as a Vulnerability by name. One
+  normaliser, `observable_kinds.py`, maps every type string ION uses,
+  and one table, `OPENCTI_TARGETS`, maps each kind to what OpenCTI is
+  asked. A type with no kind is skipped with a warning.
+- **The stat tiles and the attention list are strips** above the inbox.
+- **Esc in an opened case clears the ticked alerts or the find first.**
+  It no longer leaves the case page while the case window has something
+  of its own to clear.
+
+### Fixed
+
+- **The case panel no longer widens `case:read`.** Before this release
+  was cut, the new case window read stored enrichments and Bob's
+  per-alert investigations for anyone who could read the case. It now
+  reads stored enrichments only for `observable:read` and Bob's
+  investigations only for `alert:read`, the permissions those rows need
+  everywhere else, and says which permission is missing. No released
+  version was affected.
+- **The /alerts column header covered the first row.** The header was
+  offset by the page's nav height inside its own scroll wrapper, so it
+  hid the first group's bar and Select all, or the first alert when
+  ungrouped. The fault is present since at least v0.99.10.
+- **The Systems filter on /alerts.** It offered one option per data
+  source, so a system with two sources appeared twice and each option
+  showed part of it. An option is now one whole system. Clear now reloads
+  the queue, the attention chips leave the system alone, and saved views
+  store the system and reload the queue. An empty select says whether no
+  system is registered or the registry could not be read.
+- **Rule documentation saved as observables.** A case investigation
+  walked the rule's investigation guide, description and MITRE reference
+  links, and read the alert's own id as a SHA-256. `alert_fields.py` now
+  names the rule-metadata and record-keeping subtrees once, and only
+  evidence is walked. Across the 215 alerts in the lab Elasticsearch,
+  the case path went from 79 domains, 173 URLs and 73 hashes to 14, 4
+  and 8. IPs and emails are unchanged.
+- **OpenCTI refused most of ION's own observable kinds.** ipv4, ipv6,
+  email, the hashes, filename, user_account, mac, cve, host_ip,
+  subject_user and target_user were refused as unsupported before any
+  request was made. Hostnames came back as whichever domain held the same
+  string, and an IPv6 indicator never verified. Against a seeded OpenCTI
+  6.4.4, 19 of 20 test values of every kind are now found as the right
+  entity type, against 6 before; the twentieth, a process name, has no
+  OpenCTI type and is skipped with a warning.
+- **Arkime retention markers listed as alerts.** The retention job's
+  marker row showed as an exhibit with no document and a blocker that
+  could never clear. It is no longer listed.
+- **Cut-off Bob summaries.** A reply cut off by the token limit showed as
+  raw text. Its summary is now read from the broken reply.
+
+### Removed
+
+- **The case card grid** on /cases, and its styles.
+- **The Triage, Dossier and Review arrangement** of the opened case, with
+  drag-to-rearrange. Every section it placed has a place in Read. The
+  alert window keeps its own arrangement.
+- **Four duplicate observable-type maps**, in the triage enricher, the
+  alert page, the observable service and the pattern-property table.
+
+### Upgrade notes
+
+- **Alert close.** `close_case` is optional and defaults to true, so
+  existing callers keep closing the case and all its alerts. Send
+  `close_case: false` to record a verdict on one alert without closing
+  its case.
+- **Case window layout.** A saved Triage, Dossier or Review arrangement
+  no longer applies to the case window and is ignored. The case window
+  opens in Triage until the analyst picks Read.
+- **/cases.** The inbox replaces the card board. `/ui/cases/board` gains
+  `mine`, `changed` and `mode=activity`, which is now its default order,
+  and `/ui/cases/{id}/preview` is new. Unread markers are deliberately
+  absent, because ION keeps no per-user last-viewed state.
+- **OpenCTI results can change.** Lookups now name an entity type, so a
+  value that matched another type's object by string may stop matching,
+  and kinds that were refused are now looked up.
+- **Saved junk observables stay.** Observables already saved on cases
+  from rule documentation or alert ids are not removed by this release.
+  They stay until the cleanup SQL supplied separately is run.
+
+## v0.99.19 — 2026-11-17
+
+Detection Engineering is one page. Eight tabs replace nine pages spread
+over two menus, and the retired addresses redirect to their tab. ION now
+reads TIDE 7.0.0 as TIDE does: Wazuh rules as well as Elastic ones, at
+every destination, with each system's devices, CVEs and CIS results.
+Per-system figures, which were zero against every TIDE since v4, are now
+counted. A rule's false-positive rate is one figure from analyst
+closures wherever it appears, and TIDE can pull those outcomes through a
+read-only API. When TIDE refuses ION, the page says why and what to fix.
+Net-new findings: 0C / 0H / 0M / 0L.
+
+### Added
+
+- **One Detection Engineering home.** Overview, Coverage, Systems, Rules,
+  Use cases, Readiness, Work and Bob. Rules has a Health view, Work holds
+  tuning requests, proposals (Bob's tuning proposals among them) and the
+  quirk register, and Bob holds the scorecard, disagreements and the abuse
+  monitor. Old in-page tab links still open the right view.
+- **The Overview leads with what needs attention**, errors first: TIDE
+  Rule Monitoring errors, known-exploited CVEs on systems, disabled
+  critical and high rules, rules analysts mostly close as false positive,
+  disconnected Wazuh agents and blind spots past their review date.
+- **A Systems tab.** Each TIDE system shows its platforms, its baseline
+  coverage as TIDE grades it, ATT&CK breadth for its platforms, open CVEs
+  with KEV marked, its CIS score and trend, Wazuh agent status and log
+  source freshness. A system's detail lists its failing CIS checks. The
+  log source register moves here from Log Source Health, and the coverage
+  map can dim techniques outside the chosen system's platforms.
+- **Rules shows what is wrong with each rule.** Kind (Elastic or Wazuh),
+  TIDE quality, a 14-day alert sparkline, how analysts closed its alerts,
+  TIDE's problems by severity and its GitLab issues, with a drawer per
+  rule. Problems come from TIDE Rule Monitoring when the tenant has it,
+  otherwise from ION's own thresholds: over 200 alerts in 14 days, the
+  last 48 hours over four times the baseline, or silent for 90 days. A
+  table older TIDE lacks reads as "needs TIDE 7", never as clean.
+  How analysts closed a rule's alerts, its false-positive rate and the
+  Health view stay behind `security:read`, as Detection Health required,
+  so no read is widened. Without it, the page shows a lock in their
+  place.
+- **TIDE 7 rules at every destination.** TIDE 7 keeps Wazuh rules beside
+  Elastic ones, and ION read only one Kibana space, so a tenant of 2
+  Elastic and 3 Wazuh rules read as 2 rules covering 1 technique. It now
+  reads 5 rules covering 4. Unscored Wazuh rules count as unscored, not
+  poor. A Destination picker, with All destinations, replaces the Space
+  picker. TIDE older than multi-SIEM support keeps space-only behaviour.
+- **TIDE says why it refused.** A refused key, a missing tenant, a bad
+  request, an overloaded TIDE and an unreachable one are told apart, with
+  TIDE's own detail and the fix, on the DE page, on the TIDE status and in
+  the settings connection test. They used to read as empty panels. A
+  refused key no longer opens the circuit breaker.
+- **Rule outcomes for TIDE.** `GET /api/external/v1/rule-outcomes` gives
+  TIDE each rule's alerts, closures by outcome, false-positive rate,
+  true-positive yield, median time to close and last closure, and nothing
+  about analysts, notes, hosts or cases. It needs a service-account token
+  with the new `rule_outcomes:read` permission and refuses human sessions
+  even when they hold it. `ion seed-tide` creates the `tide` service
+  account, whose `tide` role holds only that permission, and mints its
+  token. Limited to 60 requests a minute and windows of 365 days.
+- **Alerts carry their rule's id.** Triage rows gain the Kibana `rule_id`
+  and the rule's saved-object id, copied only from Elasticsearch. The
+  background pass that filled rule names now fills these too, and
+  `ion backfill-rule-identity` runs one pass on demand.
+
+### Changed
+
+- **One measure of how a rule's alerts closed.** Detection Health counted
+  false positives from Bob's feedback ledger, DE Metrics from case
+  closures, and the execution view from Kibana's closed status, over 30 or
+  90 days. Every view now reads the same closures over 90 days, and
+  "noisy" has one meaning: at least 5 closures and 70% or more false
+  positive. Bob's agreement stays a measure of its own.
+- **A benign true positive is not a false positive.** It counts as closed
+  but not as a false positive, so it no longer raises a rule's
+  false-positive rate. Noise cost still counts it, because it still took
+  analyst time.
+- **A saved "default" space now reads every destination**, once. The old
+  settings form wrote `tide_space: "default"` on every save, so the value
+  said nothing about intent and would have hidden every Wazuh rule. The
+  next settings save records the migration, after which a deliberately
+  chosen "default" is kept. `ION_TIDE_SPACE` still wins.
+- **The DE licence gate is removed** from the Detection Engineering pages
+  and from `/api/de`. Each action's permission still decides who can read
+  and write, and the abuse monitor still needs `de:verify`.
+
+### Removed
+
+- **Eight pages become tabs.** Each old address redirects, for GET and
+  HEAD, keeping its query string: `/de` to Requests, `/de-proposals` to
+  Proposals, `/de-quirks` to Quirks, `/de-bob` to the Scorecard,
+  `/de-oversight` to the abuse monitor, `/detection-health` and
+  `/de-metrics` to Health, and `/log-sources` to Systems.
+  `/tuning-proposals` goes to Proposals filtered to Bob's.
+- **Their APIs.** `/api/detection-health/*`, and the Execution view with
+  `/api/cyab/tide/de/execution`, whose `fp_rate` was a workflow-status
+  ratio rather than analyst closures. `/api/cyab/tide/de/spaces` and
+  `/api/cyab/tide/de/spaces/{space}` are replaced by
+  `/api/cyab/tide/de/destinations` and `/api/cyab/tide/de/destination`.
+- **`ION_DH_BENIGN_TP_AS_FP`.** Benign closures are never counted as
+  false positives.
+
+### Fixed
+
+- **Per-system figures were always zero.** ION joined TIDE's applied
+  detections to rule ids, but in every TIDE since v4 they hold step
+  detection ids, so every system read as having no rules: its rules, its
+  coverage, gaps by system and use-case coverage. They now go through the
+  step detection, and detections pinned to a system's hosts count, as in
+  TIDE. Checked on TIDE 7: Domain Controllers 86% and Microsoft 365 80%,
+  matching TIDE.
+- **Rule totals counted duplicates.** The paginated total counted rows
+  before they were de-duplicated.
+- **The Overview tripped TIDE's throttle.** One load sent 33 TIDE
+  statements, 3 at a time; it now sends 17, one at a time.
+- **Wazuh rules read as Elastic until a restart.** A column probe TIDE
+  shed under load was cached as an answer.
+
+### Upgrade notes
+
+- **TIDE scope.** A saved `tide_space` of `default` is read as every
+  destination. To keep reading one Kibana space, set it again in Settings
+  after upgrading. A choice in the Destination picker lasts only until the
+  process restarts.
+- **Backfill.** Three columns and an index are added to `alert_triage`.
+  The background pass fills them 30 seconds after start and every 15
+  minutes; run `ion backfill-rule-identity` to fill them now. Until a row
+  is filled its closures are attributed by rule name.
+- **TIDE API key.** TIDE 7 refuses a key whose owner is not an active
+  user. A key created while TIDE ran with `AUTH_DISABLED` belongs to the
+  synthetic `dev-user-001` and is refused on every call; ION shows this as
+  a rejected key. Mint a new key as a real TIDE user and save it in
+  Settings.
+- **TIDE's pull.** Run `ion seed-tide` (`--ttl-days`, default 365) and
+  give TIDE the token it prints. Running it again mints a new token and
+  revokes the old one.
+- **Licensing.** A deployment without the DE licence now has the
+  Detection Engineering pages and `/api/de`, behind the same permissions.
 
 ## v0.99.18 — 2026-11-16
 

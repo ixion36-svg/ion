@@ -19,36 +19,18 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from ion.models.alert_triage import AlertTriage
-from ion.services.detection_health_service import get_rule_attack_guidance
-from ion.web.ui.detection_health import attack_panel, attack_url
+from ion.services.rule_attack_guidance_service import get_rule_attack_guidance
+from ion.web.ui._detection_engineering_health import attack_panel
 
 _LOADED = {"loaded": True, "attack_version": "20.1"}
 _ROOT = Path(__file__).resolve().parent.parent
 _FRAGMENT = (_ROOT / "src" / "ion" / "web" / "templates" / "_fragments"
-             / "detection_health_attack.html")
+             / "detection_engineering_attack_guidance.html")
 _PAGE_CSS = _ROOT / "frontend" / "ion-pages.css"
 
 
 # --------------------------------------------------------------------------
 # URL building
-# --------------------------------------------------------------------------
-
-def test_attack_url_percent_encodes_a_free_text_rule_name():
-    """Rule names come out of AlertTriage, so they are arbitrary text."""
-    url = attack_url("Defender Tampering & Co", 30)
-    assert url == (
-        "/ui/detection-health/attack?rule=Defender+Tampering+%26+Co&days=30"
-    )
-
-
-def test_attack_url_handles_the_unmapped_bucket_and_a_missing_window():
-    assert "rule=%28unmapped%29" in attack_url("(unmapped)", None)
-    assert "days=" not in attack_url("(unmapped)", None)
-    assert "rule=" in attack_url(None, 90)
-
-
-# --------------------------------------------------------------------------
-# Panel states
 # --------------------------------------------------------------------------
 
 def test_unreadable_snapshot_is_not_an_absence_of_guidance():

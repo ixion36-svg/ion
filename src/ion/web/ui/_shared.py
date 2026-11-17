@@ -21,6 +21,7 @@ from enum import Enum
 from typing import Any, Mapping, Optional
 
 from fastapi import Request, Response
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
 from ion.web.templating import make_templates
@@ -62,7 +63,9 @@ def render_view(
     a caller who may not see the markup cannot see the model either.
     """
     if wants_json(request):
-        return JSONResponse(dict(view), status_code=status_code)
+        # View models hold dataclasses and datetimes; JSONResponse alone
+        # raises on those, which turned the JSON view of such a page into a 500.
+        return JSONResponse(jsonable_encoder(dict(view)), status_code=status_code)
     return templates.TemplateResponse(
         request=request, name=name, context=dict(view), status_code=status_code,
     )

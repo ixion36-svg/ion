@@ -34,7 +34,7 @@ import ion
 from ion.core.config import get_config, get_elasticsearch_config
 from ion.core.config import get_config as get_app_config
 from ion.core.logging import get_logger, setup_logging
-from ion.licensing.gating import de_module_status, require_de_module
+from ion.licensing.gating import de_module_status
 from ion.storage.database import init_db
 from ion.web.admin_api import router as admin_router
 from ion.web.ai_api import router as ai_router
@@ -64,7 +64,6 @@ from ion.web.d3fend_api import router as d3fend_router
 from ion.web.daily_standup_api import router as daily_standup_router
 from ion.web.de_api import router as de_router
 from ion.web.de_tide_api import router as de_tide_router
-from ion.web.detection_health_api import router as detection_health_router
 from ion.web.elasticsearch_api import router as elasticsearch_router
 from ion.web.emulation_api import router as emulation_router
 from ion.web.engineering_analytics_api import router as engineering_analytics_router
@@ -72,6 +71,7 @@ from ion.web.enrichment_api import router as enrichment_router
 from ion.web.entity_timeline_api import router as entity_timeline_router
 from ion.web.events_api import router as events_router
 from ion.web.executive_report_api import router as executive_report_router
+from ion.web.external_api import router as external_router
 from ion.web.forensic_workbench_api import router as forensic_workbench_router
 from ion.web.forensics_api import router as forensics_router
 from ion.web.gitlab_api import router as gitlab_router
@@ -444,10 +444,9 @@ app.include_router(shift_handover_router, prefix="/api")
 app.include_router(entity_timeline_router, prefix="/api")
 app.include_router(analyst_efficiency_router, prefix="/api")
 app.include_router(soc_health_router, prefix="/api")
-# Detection Health (per-rule IR→detection feedback analytics)
-app.include_router(detection_health_router, prefix="/api")
+app.include_router(external_router, prefix="/api")  # /api/external/v1/* — machine clients (TIDE), service-account bearer only
 # Detection Engineering module — Phase 0 (read-only noise campaigns + DE metrics)
-app.include_router(de_router, prefix="/api", dependencies=[Depends(require_de_module)])
+app.include_router(de_router, prefix="/api")
 app.include_router(workforce_router, prefix="/api")  # /api/workforce/* — 404s when ION_WORKFORCE_ENABLED is off
 app.include_router(attack_story_router, prefix="/api")
 app.include_router(case_similarity_router, prefix="/api")
@@ -1182,14 +1181,14 @@ async def _startup_event():
                hold_until_close=True)
 
     from ion.storage.database import LOCK_RULE_NAME_BACKFILL_BG
-    def _start_rule_name_backfill():
-        from ion.services.rule_name_backfill_service import (
+    def _start_rule_identity_backfill():
+        from ion.services.rule_identity_backfill_service import (
             start_background_loop as _rnb_bg,
         )
         _rnb_bg(engine)
-        logger.info("Rule-name backfill background loop started")
-    run_locked(engine, LOCK_RULE_NAME_BACKFILL_BG, "rule_name_backfill_bg_loop",
-               _start_rule_name_backfill, hold_until_close=True)
+        logger.info("Rule-identity backfill background loop started")
+    run_locked(engine, LOCK_RULE_NAME_BACKFILL_BG, "rule_identity_backfill_bg_loop",
+               _start_rule_identity_backfill, hold_until_close=True)
 
     # ---------------------------------------------------------------
     # Case-embedding background producer — embeds cases via Ollama for
@@ -1333,7 +1332,6 @@ _PAGES: list[tuple[str, str, str]] = [
     ("/analytics",              "analytics.html",                  "alert:read"),
     ("/detection-engineering",  "detection_engineering.html",      "alert:read"),
     ("/canaries",               "canaries.html",                   "alert:read"),
-    ("/log-sources",            "log_sources.html",                "alert:read"),
     ("/briefing",               "briefing.html",                   "alert:read"),
     ("/knowledge-graph",        "knowledge_graph.html",            "alert:read"),
     ("/compliance",             "compliance.html",                 "alert:read"),
@@ -1384,6 +1382,34 @@ def _register_pages() -> None:
 
 
 _register_pages()
+
+
+#: Pages Detection Engineering absorbed, and the sub-view each now is. The
+#: anchor survives the redirect, so a bookmark lands on the right tab.
+_DE_ABSORBED = {
+    "/de": "requests",
+    "/de-proposals": "proposals",
+    "/de-quirks": "quirks",
+    "/de-bob": "scorecard",
+    "/de-oversight": "abuse",
+    "/detection-health": "health",
+    "/de-metrics": "health",
+    "/log-sources": "systems",
+}
+
+
+def _register_de_redirects() -> None:
+    for _path, _sub in _DE_ABSORBED.items():
+        def _redirect(request: Request, _sub: str = _sub):
+            from fastapi.responses import RedirectResponse
+            query = f"?{request.url.query}" if request.url.query else ""
+            return RedirectResponse(url=f"/detection-engineering{query}#{_sub}", status_code=302)
+
+        _redirect.__name__ = "redirect_" + _path.strip("/").replace("-", "_")
+        app.api_route(_path, methods=["GET", "HEAD"], include_in_schema=False)(_redirect)
+
+
+_register_de_redirects()
 
 
 @app.get("/api/nav/permissions")
@@ -1784,7 +1810,7 @@ async def investigate_redirect():
     return RedirectResponse(url="/investigation-queue", status_code=302)
 
 
-@app.get("/tuning-proposals")
+@app.api_route("/tuning-proposals", methods=["GET", "HEAD"])
 async def tuning_proposals_redirect():
     """Retired in v0.72.0 (route audit phase 8).
 
@@ -1796,7 +1822,7 @@ async def tuning_proposals_redirect():
     over by the startup migration.
     """
     from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/de-proposals?source=bob", status_code=302)
+    return RedirectResponse(url="/detection-engineering?source=bob#proposals", status_code=302)
 
 
 @app.get("/investigations")
@@ -1878,22 +1904,6 @@ async def analyst_efficiency_redirect():
 
 
 
-@app.get("/detection-health", response_class=HTMLResponse)
-async def detection_health_page(request: Request, user: User = Depends(require_page_permission("security:read"))):
-    """Render the Detection Health (per-rule performance) page."""
-    return templates.TemplateResponse(
-        request=request, name="detection_health.html",
-        context={"current_user": user},
-    )
-
-
-@app.get("/de", response_class=HTMLResponse)
-async def de_workbench_page(request: Request, user: User = Depends(require_page_permission("de:read")), _gate: None = Depends(require_de_module)):
-    """Render the DE Workbench — the detection team's working surface
-    (tuning-request queue + campaigns + proposals + quirks in one place)."""
-    return templates.TemplateResponse(request=request, name="de_workbench.html")
-
-
 @app.get("/verdict-review", response_class=HTMLResponse)
 async def verdict_review_page(request: Request, user: User = Depends(require_page_permission("verdict:review"))):
     """Review Bob's suggested per-alert verdicts (the human-in-the-loop queue)."""
@@ -1969,39 +1979,6 @@ async def workforce_page(request: Request, user: User = Depends(require_page_aut
 # /workforce. Removed rather than redirected, by request -- they were
 # never in nav.py and were only ever reached from another page's header,
 # so there is no menu entry left pointing at them.
-
-
-@app.get("/de-metrics", response_class=HTMLResponse)
-async def de_metrics_page(request: Request, user: User = Depends(require_page_permission("de:read")), _gate: None = Depends(require_de_module)):
-    """Render the Detection-Engineering Metrics page (Phase 0 — noise campaigns)."""
-    return templates.TemplateResponse(
-        request=request, name="de_metrics.html",
-        context={"current_user": user},
-    )
-
-
-@app.get("/de-proposals", response_class=HTMLResponse)
-async def de_proposals_page(request: Request, user: User = Depends(require_page_permission("de:read")), _gate: None = Depends(require_de_module)):
-    """Render the Detection Proposals page (Phase 1 — draft/review/decide)."""
-    return templates.TemplateResponse(request=request, name="de_proposals.html")
-
-
-@app.get("/de-quirks", response_class=HTMLResponse)
-async def de_quirks_page(request: Request, user: User = Depends(require_page_permission("de:read")), _gate: None = Depends(require_de_module)):
-    """Render the System Quirks register page (Phase 2 — raise/verify/revert)."""
-    return templates.TemplateResponse(request=request, name="de_quirks.html")
-
-
-@app.get("/de-bob", response_class=HTMLResponse)
-async def de_bob_page(request: Request, user: User = Depends(require_page_permission("de:read")), _gate: None = Depends(require_de_module)):
-    """Render the Bob improvement loop page (Phase 3 — scorecard + tuning proposals)."""
-    return templates.TemplateResponse(request=request, name="de_bob.html")
-
-
-@app.get("/de-oversight", response_class=HTMLResponse)
-async def de_oversight_page(request: Request, user: User = Depends(require_page_permission("de:verify")), _gate: None = Depends(require_de_module)):
-    """Render the DE abuse monitor (roadmap §4 #7) — oversight, gated de:verify."""
-    return templates.TemplateResponse(request=request, name="de_oversight.html")
 
 
 @app.get("/guide", response_class=HTMLResponse)

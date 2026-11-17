@@ -16,6 +16,7 @@ from ion.services.case_description import build_case_description
 from ion.services.elasticsearch_service import ElasticsearchService
 from ion.services.kibana_cases_service import get_kibana_cases_service
 from ion.services.observable_extractor import extract_observables_from_raw
+from ion.services.rule_identity_backfill_service import apply_alert_identity
 from ion.storage.database import get_engine, get_session_factory
 
 logger = logging.getLogger(__name__)
@@ -253,12 +254,12 @@ class KibanaSyncService:
         if not new_ids:
             return 0
 
-        rule_names: dict[str, Optional[str]] = {}
+        alerts: dict = {}
         try:
             es = ElasticsearchService()
             if es.is_configured:
                 for alert in await es.get_alerts_by_ids(new_ids, index) or []:
-                    rule_names[alert.id] = alert.rule_name
+                    alerts[alert.id] = alert
         except Exception as exc:
             logger.debug("Rule names for Kibana-attached alerts unavailable: %s", exc)
 
@@ -270,11 +271,12 @@ class KibanaSyncService:
         for aid in new_ids:
             triage = triage_by_alert.get(aid)
             if triage is None:
-                triage = AlertTriage(es_alert_id=aid, status=triage_status,
-                                     rule_name=rule_names.get(aid))
+                triage = AlertTriage(es_alert_id=aid, status=triage_status)
                 session.add(triage)
-            elif not triage.rule_name and rule_names.get(aid):
-                triage.rule_name = rule_names[aid]
+            # A missing alert is left for the backfill: this search tolerates
+            # outages, so not finding one here proves nothing.
+            if aid in alerts:
+                apply_alert_identity(triage, alerts[aid])
             triage.case_id = case.id
 
         known = list(case.source_alert_ids or [])

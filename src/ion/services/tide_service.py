@@ -130,6 +130,18 @@ class TideFailure:
                 "detail": self.detail, "message": self.message}
 
 
+@dataclass(frozen=True)
+class TableAbsent:
+    """TIDE answered, but this tenant has no such table (or column): an older
+    TIDE, or a TIDE 7 table not created until its feature first runs."""
+
+    table: str
+
+
+#: Rows (possibly none), the table missing from this TIDE, or a failed read.
+TideRows = Union[list, TableAbsent, TideFailure]
+
+
 def _classify(status: int, detail: str) -> FailureKind:
     if status == 401:
         return "auth_rejected"
@@ -352,11 +364,18 @@ class TideService:
         if self._columns is None:
             if self._query("SELECT count(*) AS n FROM detection_rules") is None:
                 return _RuleColumns()
-            self._columns = _RuleColumns(
-                siem_id=self._query("SELECT siem_id FROM detection_rules LIMIT 0") is not None,
-                rule_type=self._query("SELECT rule_type FROM detection_rules LIMIT 0") is not None,
-                step_siem_id=self._query("SELECT siem_id FROM step_detections LIMIT 0") is not None,
-            )
+            present = []
+            for sql in ("SELECT siem_id FROM detection_rules LIMIT 0",
+                        "SELECT rule_type FROM detection_rules LIMIT 0",
+                        "SELECT siem_id FROM step_detections LIMIT 0"):
+                found = self._query(sql) is not None
+                # Only TIDE refusing the column says it is missing. A probe
+                # shed for load or lost to an outage says nothing, and caching
+                # it read every Wazuh rule as Elastic until a restart.
+                if not found and self.last_failure is not None and self.last_failure.kind != "bad_request":
+                    return _RuleColumns()
+                present.append(found)
+            self._columns = _RuleColumns(siem_id=present[0], rule_type=present[1], step_siem_id=present[2])
         return self._columns
 
     # Every rule query aliases detection_rules as `dr`.
@@ -1477,6 +1496,12 @@ class TideService:
             },
         }
 
+    def get_system_baseline_summaries(self) -> dict:
+        """{system id: get_system_use_case_coverage's summary, or None}. Some
+        fifteen statements a system, so the sync worker snapshots it."""
+        return {str(s["id"]): (self.get_system_use_case_coverage(str(s["id"])) or {}).get("summary")
+                for s in self.get_systems()}
+
     def get_destinations(self) -> Optional[list[dict]]:
         """Every destination holding rules in this tenant, busiest first, or
         None when TIDE could not be asked."""
@@ -1518,6 +1543,158 @@ class TideService:
             GROUP BY t.technique_id
         """)
         return result["rows"] if result else None
+
+    # -----------------------------------------------------------------------
+    # TIDE 7 tenant tables. TIDE creates several of these only when the
+    # feature that writes them first runs, and older TIDE has none of them,
+    # so "Unknown table" is an answer (TableAbsent), not a failure.
+    # -----------------------------------------------------------------------
+
+    def _tenant_rows(self, table: str, sql: str) -> "TideRows":
+        if not self.enabled:
+            return TideFailure("unreachable", "TIDE is not configured")
+        outcome = self._run(sql)
+        if isinstance(outcome, TideFailure):
+            if outcome.kind == "bad_request" and "unknown table" in outcome.detail.lower():
+                return TableAbsent(table)
+            return outcome
+        return [r for r in outcome.get("rows") or [] if isinstance(r, dict)]
+
+    def _dest_sql(self, alias: str) -> str:
+        """The active scope on a TIDE 7 table that names siem_id and space."""
+        if self.scope is None:
+            return "TRUE"
+        clause = f"{alias}.space = '{self.scope.space}'"
+        if self.scope.siem_id is not None:
+            clause = f"{alias}.siem_id = '{self.scope.siem_id}' AND {clause}"
+        return clause
+
+    def get_rule_inventory(self, limit: int = 5000) -> "TideRows":
+        """Every rule in scope with its Kibana id, which rule_alert_counts
+        keys alerts on (rule_uuid = raw_data.id)."""
+        cols = self._rule_columns()
+        siem = "dr.siem_id" if cols.siem_id else "NULL"
+        return self._tenant_rows("detection_rules", f"""
+            SELECT dr.rule_id, dr.name, dr.severity, dr.enabled, dr.quality_score, dr.mitre_ids,
+                   {siem} AS siem_id, dr.space AS space, {self._kind_sql()} AS kind,
+                   json_extract_string(dr.raw_data, '$.id') AS rule_uuid
+            FROM detection_rules dr WHERE {self._scope_sql()}
+            ORDER BY dr.name, dr.rule_id LIMIT {int(limit)}
+        """)
+
+    def get_rule_issues(self) -> "TideRows":
+        """Rule Monitoring's open findings in scope, rule and destination level."""
+        return self._tenant_rows("rule_issues", f"""
+            SELECT ri.issue, ri.cause, ri.siem_id, ri.space, ri.rule_id, ri.severity, ri.detail,
+                   ri.first_seen, ri.last_seen
+            FROM rule_issues ri WHERE ri.resolved_at IS NULL AND {self._dest_sql('ri')}
+        """)
+
+    def get_rule_alert_days(self, days: int) -> "TideRows":
+        """Alerts per rule per UTC day for the last `days` days, any status."""
+        return self._tenant_rows("rule_alert_counts", f"""
+            SELECT rac.siem_id, rac.space, rac.rule_uuid, rac.rule_id, CAST(rac.day AS VARCHAR) AS day,
+                   sum(rac.alerts) AS alerts
+            FROM rule_alert_counts rac
+            WHERE rac.day > current_date - INTERVAL {int(days)} DAY AND {self._dest_sql('rac')}
+            GROUP BY 1, 2, 3, 4, 5
+        """)
+
+    def get_gitlab_issues(self) -> "TideRows":
+        """GitLab issues TIDE opened for rule problems and has not seen closed."""
+        return self._tenant_rows("gitlab_issues", """
+            SELECT gi.iid, gi.title, gi.web_url, gi.state, gi.causes, gi.rules
+            FROM gitlab_issues gi WHERE coalesce(gi.state, '') <> 'closed'
+            ORDER BY gi.iid DESC
+        """)
+
+    def get_elastic_checks(self) -> "TideRows":
+        return self._tenant_rows("rule_elastic_checks", f"""
+            SELECT rec.rule_id, rec.siem_id, rec.space, rec.checked_at, rec.problems
+            FROM rule_elastic_checks rec WHERE {self._dest_sql('rec')}
+        """)
+
+    def get_system_platforms(self) -> "TideRows":
+        """[{id, name, platforms}]; platforms is TIDE 7's, so older TIDE
+        reads as absent."""
+        outcome = self._tenant_rows("systems", "SELECT s.id, s.name, s.platforms FROM systems s ORDER BY s.name")
+        if isinstance(outcome, TideFailure) and outcome.kind == "bad_request" and "platforms" in outcome.detail:
+            return TableAbsent("systems.platforms")
+        return outcome
+
+    def get_hosts(self) -> "TideRows":
+        return self._tenant_rows("hosts", """
+            SELECT h.id, h.system_id, h.name, h.os, h.source FROM hosts h
+        """)
+
+    def get_host_agents(self) -> "TideRows":
+        return self._tenant_rows("host_agents", """
+            SELECT ha.host_id, ha.siem_id, ha.space, ha.agent_id, ha.status,
+                   CAST(ha.last_seen AS VARCHAR) AS last_seen
+            FROM host_agents ha
+        """)
+
+    def get_wazuh_agents(self) -> "TideRows":
+        """Every agent of every Wazuh destination as of its last read."""
+        return self._tenant_rows("wazuh_agents", """
+            SELECT wa.siem_id, wa.space, wa.agent_id, wa.name, wa.status,
+                   CAST(wa.last_seen AS VARCHAR) AS last_seen
+            FROM wazuh_agents wa
+        """)
+
+    def get_system_wazuh_sources(self) -> "TideRows":
+        return self._tenant_rows("system_wazuh_agents", """
+            SELECT swa.system_id, swa.siem_id, swa.space, swa.name_pattern FROM system_wazuh_agents swa
+        """)
+
+    def get_system_vulnerabilities(self) -> "TideRows":
+        """Open findings per system and CVE (current = not resolved)."""
+        return self._tenant_rows("host_vulnerabilities", """
+            SELECT h.system_id, hv.cve_id, max(hv.severity) AS severity, max(hv.cvss) AS cvss,
+                   max(hv.description) AS description, max(hv.package) AS package,
+                   string_agg(DISTINCT h.name, ', ') AS hosts
+            FROM host_vulnerabilities hv JOIN hosts h ON h.id = hv.host_id
+            WHERE hv.resolved_at IS NULL
+            GROUP BY 1, 2
+        """)
+
+    def get_system_sca_scores(self) -> "TideRows":
+        return self._tenant_rows("host_sca_policies", """
+            SELECT h.system_id, p.policy_id, p.name, avg(p.score) AS score, count(*) AS hosts
+            FROM host_sca_policies p JOIN hosts h ON h.id = p.host_id
+            WHERE p.score IS NOT NULL GROUP BY 1, 2, 3
+        """)
+
+    def get_system_sca_history(self, days: int = 70) -> "TideRows":
+        return self._tenant_rows("host_sca_history", f"""
+            SELECT h.system_id, CAST(date_trunc('week', hs.recorded_at) AS VARCHAR) AS week,
+                   avg(hs.score) AS score
+            FROM host_sca_history hs JOIN hosts h ON h.id = hs.host_id
+            WHERE hs.recorded_at > current_date - INTERVAL {int(days)} DAY AND hs.score IS NOT NULL
+            GROUP BY 1, 2 ORDER BY 1, 2
+        """)
+
+    def get_system_failed_checks(self) -> "TideRows":
+        return self._tenant_rows("host_sca_checks", """
+            SELECT h.system_id, c.policy_id, c.check_id, c.title, array_to_string(c.cis_ids, ', ') AS cis,
+                   string_agg(DISTINCT h.name, ', ') AS hosts, count(DISTINCT h.id) AS host_count
+            FROM host_sca_checks c JOIN hosts h ON h.id = c.host_id
+            WHERE c.result = 'failed'
+            GROUP BY 1, 2, 3, 4, 5
+        """)
+
+    def get_blind_spots_due(self) -> "TideRows":
+        """Accepted blind spots whose review date has passed."""
+        outcome = self._tenant_rows("blind_spots", """
+            SELECT bs.id, bs.entity_type, bs.system_id, bs.reason, bs.override_type,
+                   CAST(bs.review_by AS VARCHAR) AS review_by, bs.created_by
+            FROM blind_spots bs
+            WHERE bs.review_by IS NOT NULL AND bs.review_by < current_date
+            ORDER BY bs.review_by
+        """)
+        if isinstance(outcome, TideFailure) and outcome.kind == "bad_request" and "review_by" in outcome.detail:
+            return TableAbsent("blind_spots.review_by")
+        return outcome
 
     def _total_rules_sql(self) -> str:
         return (f"SELECT count(DISTINCT {self._rule_identity()}) AS total "

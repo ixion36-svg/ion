@@ -98,6 +98,21 @@ from ion.web.ui._cases_board import router as board_router
 from ion.web.ui._cases_detail_notes import router as detail_notes_router
 from ion.web.ui._cases_detail_process import router as detail_process_router
 from ion.web.ui._cases_detail_response import router as detail_response_router
+from ion.web.ui._cases_window import (
+    REASONS,
+    UNTRIAGED_DETAIL,
+    VERDICTS,
+    alert_bob,
+    alert_verdicts,
+    blockers,
+    bob_case_note,
+    case_alerts,
+    inline_opencti,
+    letter,
+    observable_cards,
+    read_case_extras,
+    summary_view,
+)
 from ion.web.ui._shared import (
     age_label,
     closure_label,
@@ -1980,15 +1995,20 @@ PANEL_SEV_RANK: dict[str, int] = {
 PANEL_STATUS_CLASSES: tuple[str, ...] = ("open", "acknowledged", "closed")
 
 
-class PanelAlert(TypedDict):
+class PanelAlert(TypedDict, total=False):
     alert_id: str
     index: int
+    letter: str
+    technique: Optional[str]
+    bob: dict
     name: str
     severity: str
     severity_class: Optional[str]
     status: Optional[str]
     status_class: Optional[str]
     bits: list[str]
+    verdict: Optional[str]
+    bob_verdict: Optional[str]
 
 
 class PanelNote(TypedDict):
@@ -2040,6 +2060,19 @@ class PanelView(TypedDict):
     kibana_case_id: Optional[str]
     kibana_url: Optional[str]
     escalated: bool
+    iris_case_id: Optional[int]
+    iris_url: Optional[str]
+    assignee: Optional[str]
+    closure_reason: Optional[str]
+    closure_notes: Optional[str]
+    can_enrich: bool
+    can_triage: bool
+    me_id: Optional[int]
+    verdicts: list[dict]
+    untriaged_detail: str
+    blockers: list[dict]
+    summary: Optional[dict]
+    bob_note: Optional[dict]
 
 
 def _panel_text(value: Any) -> Optional[str]:
@@ -2055,21 +2088,28 @@ def observable_key(raw: Any) -> Optional[tuple[str, str]]:
     return (str(raw.get("type") or ""), str(raw.get("value") or ""))
 
 
-def panel_observables(case_obs: Any, alerts: Any) -> Optional[list[dict]]:
+def panel_observables(case_obs: Any, alerts: Any,
+                      letters: Optional[dict[str, str]] = None) -> Optional[list[dict]]:
     """The case's observables merged with its alerts', duplicates removed.
 
     The page did this so a multi-alert case never shows the same IP twice
     and the count matches the list. None here when either list is not a
     list, because "no observables extracted yet" is a different answer
     from "I could not read them".
+
+    Each chip also names the alerts that carry it, by exhibit letter, and
+    keeps the OpenCTI result triage stored inline on the first copy that
+    has one.
     """
     if not isinstance(case_obs, list):
         return None
     seen: dict[tuple[str, str], dict] = {}
 
-    def take(entry: Any) -> None:
+    def take(entry: Any, alert_id: Optional[str] = None) -> None:
         key = observable_key(entry)
-        if key is not None and key not in seen:
+        if key is None:
+            return
+        if key not in seen:
             threat = entry.get("threat_level")
             seen[key] = {
                 "kind": _panel_text(entry.get("type")),
@@ -2078,7 +2118,16 @@ def panel_observables(case_obs: Any, alerts: Any) -> Optional[list[dict]]:
                                  else entry.get("priority")),
                 "score": entry.get("score"),
                 "source": _panel_text(entry.get("source")),
+                "alert_ids": [],
+                "opencti": None,
             }
+        chip = seen[key]
+        if chip["opencti"] is None:
+            chip["opencti"] = inline_opencti(entry)
+            if chip["opencti"] and chip["score"] is None:
+                chip["score"] = entry.get("score")
+        if alert_id is not None and alert_id not in chip["alert_ids"]:
+            chip["alert_ids"].append(alert_id)
 
     for entry in case_obs:
         take(entry)
@@ -2088,9 +2137,18 @@ def panel_observables(case_obs: Any, alerts: Any) -> Optional[list[dict]]:
                 continue
             nested = alert.get("observables")
             if isinstance(nested, list):
+                alert_id = _panel_text(alert.get("es_alert_id")) or "unknown"
                 for entry in nested:
-                    take(entry)
-    return [observable_chip(v) for v in seen.values()]
+                    take(entry, alert_id)
+    order = letters or {}
+    chips = []
+    for v in seen.values():
+        chip = observable_chip(v)
+        ids = sorted(v["alert_ids"], key=lambda a: (len(order.get(a, "")), order.get(a, "")))
+        chip.update({"alert_ids": ids, "letters": [order[a] for a in ids if a in order],
+                     "opencti": v["opencti"]})
+        chips.append(chip)
+    return chips
 
 
 #: Observable types OpenCTI enrichment can score. Others get a plain
@@ -2233,9 +2291,16 @@ def panel_alerts(alerts: Any, case_severity: str) -> Optional[list[PanelAlert]]:
             destination = _panel_text(alert.get("destination_ip"))
             bits.append("%s \u2192 %s" % (source, destination)
                         if destination else source)
+        techniques = alert.get("mitre_techniques")
+        first = techniques[0] if isinstance(techniques, list) and techniques else None
+        technique = (_panel_text(first) if isinstance(first, str) else
+                     _panel_text((first or {}).get("id") or (first or {}).get("technique_id"))
+                     if isinstance(first, dict) else None)
         out.append({
             "alert_id": identifier,
             "index": index,
+            "letter": letter(index),
+            "technique": technique,
             "name": name,
             "severity": severity,
             "severity_class": (severity if severity in PANEL_SEV_RANK
@@ -2327,7 +2392,9 @@ def read_case_detail(case_id, current_user, session):
 
 
 def panel_view(payload: Any, users: Any,
-               users_withheld: bool) -> PanelView:
+               users_withheld: bool, extras: Optional[dict] = None,
+               can_enrich: bool = False, can_triage: bool = False,
+               me_id: Optional[int] = None) -> PanelView:
     empty: PanelView = {
         "state": "failed", "case_id": 0, "case_number": None,
         "title": None, "severity": "medium",
@@ -2342,15 +2409,35 @@ def panel_view(payload: Any, users: Any,
         "tags": None, "description": None, "observables": None,
         "mitre": None, "alerts": None, "first_alert_id": None,
         "notes": None, "note_count": None, "kibana_case_id": None,
-        "kibana_url": None, "escalated": False,
+        "kibana_url": None, "escalated": False, "iris_case_id": None,
+        "iris_url": None, "assignee": None, "closure_reason": None,
+        "closure_notes": None, "can_enrich": can_enrich,
+        "can_triage": can_triage, "me_id": me_id, "verdicts": list(VERDICTS),
+        "untriaged_detail": UNTRIAGED_DETAIL,
+        "blockers": [],
+        "summary": None, "bob_note": None,
     }
     if not isinstance(payload, dict):
         return empty
+    payload = {**payload, "alerts": case_alerts(payload.get("alerts"))}
 
     severity = _panel_text(payload.get("severity")) or "medium"
     alerts = panel_alerts(payload.get("alerts"), severity)
-    observables = panel_observables(payload.get("observables"),
-                                   payload.get("alerts"))
+    letters = {a["alert_id"]: a["letter"] for a in alerts or []}
+    verdicts = alert_verdicts(payload.get("notes"))
+    for a in alerts or []:
+        a["bob"] = alert_bob(a["alert_id"], extras)
+        a["verdict"] = (verdicts or {}).get(a["alert_id"])
+        bob = a["bob"]
+        a["bob_verdict"] = next((v for v in (bob["verdict"], bob["suggested_verdict"])
+                                 if v in REASONS), None)
+    observables = observable_cards(
+        panel_observables(payload.get("observables"), payload.get("alerts"), letters),
+        extras)
+    bob_note = bob_case_note(payload.get("notes"))
+    if bob_note:
+        bob_note["when"] = instant_label(bob_note["when"])
+    iris_case_id = _wb_int(payload.get("dfir_iris_case_id"))
     notes = panel_notes(payload.get("notes"))
     pills, mismatch = kibana_pills(payload.get("kibana_assignees"),
                                    payload.get("assigned_to_id"))
@@ -2392,6 +2479,22 @@ def panel_view(payload: Any, users: Any,
         "kibana_case_id": _panel_text(payload.get("kibana_case_id")),
         "kibana_url": _panel_text(payload.get("kibana_url")),
         "escalated": payload.get("dfir_iris_case_id") is not None,
+        "iris_case_id": iris_case_id,
+        "iris_url": _panel_text(payload.get("dfir_iris_url")),
+        "assignee": _panel_text(payload.get("assigned_to")),
+        "closure_reason": _panel_text(payload.get("closure_reason")),
+        "closure_notes": _panel_text(payload.get("closure_notes")),
+        "can_enrich": can_enrich,
+        "can_triage": can_triage,
+        "me_id": me_id,
+        "verdicts": list(VERDICTS),
+        "untriaged_detail": UNTRIAGED_DETAIL,
+        "blockers": blockers(payload.get("alerts"), payload.get("assigned_to_id"),
+                             payload.get("dfir_iris_case_id"), payload.get("dfir_iris_url"),
+                             verdicts),
+        "summary": summary_view(bob_note, payload.get("evidence_summary"),
+                                payload.get("description")),
+        "bob_note": bob_note,
     }
 
 
@@ -2428,6 +2531,26 @@ async def cases_panel_fragment(
                 session=session))
         except Exception:
             logger.exception("Case panel could not read the user list")
+    extras = None
+    if isinstance(payload, dict):
+        alerts = payload.get("alerts") if isinstance(payload.get("alerts"), list) else []
+        ids = [str(a.get("es_alert_id")) for a in alerts
+               if isinstance(a, dict) and a.get("es_alert_id")]
+        values = [str(o.get("value")) for a in alerts if isinstance(a, dict)
+                  for o in (a.get("observables") or []) if isinstance(o, dict) and o.get("value")]
+        values += [str(o.get("value")) for o in (payload.get("observables") or [])
+                   if isinstance(o, dict) and o.get("value")]
+        try:
+            extras = read_case_extras(
+                session, case_id, ids, values,
+                read_investigations=permitted,
+                read_enrichments=current_user.has_permission("observable:read"))
+        except Exception:
+            logger.exception("Case panel could not read Bob and enrichment rows for %s", case_id)
     view = panel_view(payload, assignees_view(users, permitted)["users"],
-                      not permitted)
+                      not permitted, extras,
+                      can_enrich=current_user.has_permission("observable:enrich"),
+                      can_triage=current_user.has_permission("alert:triage"),
+                      me_id=(current_user.id if current_user.has_permission("case:update")
+                             else None))
     return render_view(request, PANEL_FRAGMENT, view)

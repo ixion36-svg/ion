@@ -126,14 +126,3 @@ def test_enforced_wrong_module_is_dark(monkeypatch):
     assert gating.de_module_available() is False
 
 
-def test_require_de_module_404_when_dark(monkeypatch):
-    from fastapi import HTTPException
-    _configure(monkeypatch, enforced=True, flag=False, status=LicenceStatus(valid=False))
-    with pytest.raises(HTTPException) as ei:
-        gating.require_de_module()
-    assert ei.value.status_code == 404
-
-
-def test_require_de_module_passes_when_available(monkeypatch):
-    _configure(monkeypatch, enforced=False, flag=False)
-    assert gating.require_de_module() is None

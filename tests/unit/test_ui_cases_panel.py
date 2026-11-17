@@ -91,11 +91,17 @@ def flat(html: str) -> str:
 
 @pytest.fixture
 def case(monkeypatch):
-    def set(payload=None, raises=None, users=None):
+    def set(payload=None, raises=None, users=None, extras=None):
         def handler(case_id, current_user=None, session=None):
             if raises is not None:
                 raise raises
             return payload
+
+        monkeypatch.setattr(
+            "ion.web.ui.cases.read_case_extras",
+            lambda session, case_id, alert_ids, values, **_gates: (
+                extras if extras is not None
+                else {"investigations": {}, "triage": {}, "enrichments": {}}))
 
         async def user_handler(session=None):
             return {"users": users if users is not None else []}
@@ -188,12 +194,16 @@ def test_observables_are_deduplicated_across_case_and_alerts(case):
     assert body.count("10.0.0.1") == 1
 
 
-def test_all_seven_tabs_are_present(case):
+def test_both_layouts_and_their_toggle_are_rendered(case):
+    """Triage and Read are one fragment; the page only shows one."""
     case(payload=_case())
     html = _get(_reader()).text
-    for tab in ("alerts", "overview", "observables", "timeline",
-                "attackpath", "notes", "actions"):
-        assert 'data-tab="%s"' % tab in html, tab
+    assert 'data-cwin-pane="triage"' in html
+    assert re.search(r'data-cwin-pane="read"\s+hidden', html)
+    for mode in ("triage", "read"):
+        assert "data-args='[\"%s\"]'" % mode in html, mode
+    for key in ("sum", "key", "blk", "ev", "obs", "story", "act", "notes", "similar"):
+        assert 'id="cwin-sec-%s"' % key in html, key
 
 
 def test_a_missing_severity_falls_back_to_medium(case):
@@ -316,10 +326,11 @@ def test_mitre_techniques_are_deduplicated_across_alerts(case):
         _alert(es_alert_id="a2", mitre_techniques=[
             {"id": "T1059", "name": "Scripting"},
             "T1071"])]))
-    body = flat(_get(_reader()).text)
-    assert body.count("T1059") == 1
-    assert "T1071" in body
-    assert "MITRE ATT&CK (2)" in body
+    html = _get(_reader()).text
+    mitre = flat(html[html.index("MITRE ATT&amp;CK"):html.index('id="cwin-sec-key"')])
+    assert mitre.count("T1059") == 1
+    assert "T1071" in mitre
+    assert "MITRE ATT&CK (2)" in flat(html)
 
 
 # ---------------------------------------------------------------------------
@@ -359,7 +370,6 @@ def test_the_fragment_states_which_alert_is_first(case):
     match = re.search(r'data-first-alert-id="([^"]*)"', html)
     assert match, html[:500]
     assert match.group(1) == "crit"
-    assert 'data-first-alert-index="0"' in html
 
 
 def test_the_first_rail_row_is_the_selected_one(case):
@@ -370,7 +380,7 @@ def test_the_first_rail_row_is_the_selected_one(case):
     # The class attribute precedes the id on that element, so the row
     # has to be matched from its opening tag rather than forward from
     # the id.
-    row = re.search(r'<div class="[^"]*"\s+id="rail-alert-0"', html)
+    row = re.search(r'<tr class="[^"]*"\s+id="rail-alert-0"', html)
     assert row, html[:600]
     assert "selected" in row.group(0)
 
@@ -465,7 +475,7 @@ def test_an_unreadable_note_list_is_not_zero_notes(case):
     "case-sync-status", "response-actions-container",
     "case-timeline-container", "attack-path-container",
     "similar-cases-container", "similar-observables-container",
-    "cpanel-alert-workspace", "cpanel-alert-guide",
+    "cpanel-alert-workspace", "cwin-rule-guide",
 ])
 def test_every_container_a_loader_fills_still_exists(case, ident):
     """Ten loaders run after the panel paints. A container that moved or
@@ -626,7 +636,7 @@ def test_a_rail_subtitle_cannot_inject_markup(case):
 
     The page this replaced escaped each bit before joining, which is the
     part I dropped. Each bit is emitted separately now so autoescaping
-    applies, and the <br> between them is still real markup.
+    applies, and the separator between them is still real markup.
     """
     case(payload=_case(alerts=[_alert(
         process_name="<img src=x onerror=alert(1)>",
@@ -636,8 +646,91 @@ def test_a_rail_subtitle_cannot_inject_markup(case):
     assert "<img src=x" not in html
     assert "<script>alert(2)" not in html
     assert "&lt;img src=x onerror=alert(1)&gt;" in html
-    # And the separator survives, so two bits still render on two lines.
-    sub = re.search(r'<div class="cpanel-rail-alert-sub">(.*?)</div>',
-                    html, re.S)
-    assert sub, html[:400]
-    assert "<br>" in sub.group(1)
+    # And the separator survives, so the two bits still read as two.
+    assert re.search(r"onerror=alert\(1\)&gt;\s*&middot;\s*&lt;script&gt;", html), html[:400]
+
+
+# ---------------------------------------------------------------------------
+# The two layouts' honest states
+# ---------------------------------------------------------------------------
+
+
+def test_every_observable_says_bob_has_not_assessed_it(case):
+    """ION has no per-observable Bob assessment, so none is invented."""
+    case(payload=_case(observables=[{"type": "ip", "value": "10.0.0.1"},
+                                    {"type": "hostname", "value": "WS-1"}]))
+    body = flat(_get(_reader()).text)
+    assert body.count("No Bob assessment for this observable") == 2
+
+
+def test_an_unenriched_observable_says_so_and_names_the_unstored_sources(case):
+    case(payload=_case())
+    body = flat(_get(_reader()).text)
+    assert "not enriched" in body
+    assert "No enrichment is stored for this value." in body
+    assert "No VirusTotal, AbuseIPDB, Shodan or GeoIP result is stored for it." in body
+
+
+def test_a_failed_enrichment_read_is_not_reported_as_no_enrichment(case):
+    case(payload=_case(), extras={"investigations": {}, "triage": {}, "enrichments": None})
+    body = flat(_get(_reader()).text)
+    assert "could not be read, so whether there are any is unknown" in body
+    assert "No enrichment is stored for this value." not in body
+
+
+def test_the_lookup_is_offered_only_with_the_enrich_permission(case):
+    case(payload=_case())
+    html = _get(_reader()).text
+    assert 'data-click-action="cwLookup"' not in html
+    assert "observable:enrich permission" in flat(html)
+    with TestClient(_app(_User(PERMISSION, "alert:read", "observable:enrich"))) as client:
+        html = client.get(URL).text
+    assert 'data-click-action="cwLookup"' in html
+    assert json.dumps(["ip", "10.0.0.1"]) in unescape(html)
+
+
+def test_bob_on_an_alert_has_three_states(case):
+    alerts = [_alert(es_alert_id="seen"), _alert(es_alert_id="unseen")]
+    case(payload=_case(alerts=alerts), extras={
+        "investigations": {"seen": {"status": "completed", "verdict": "benign_true_positive",
+                                    "confidence_int": 70,
+                                    "summary_text": "```json\n{\"summary\": \"Routine backup.\"}\n```",
+                                    "recommended_actions_json": None}},
+        "triage": {}, "enrichments": {}})
+    html = _get(_reader()).text
+    body = flat(html)
+    assert "Bob's take on this alert" in body
+    assert "Routine backup." in body and "```" not in html
+    assert "No Bob investigation for this alert" in body
+    assert body.count("Run Auto-Investigate") == 1
+    case(payload=_case(alerts=alerts), extras={"investigations": None, "triage": None,
+                                               "enrichments": None})
+    assert flat(_get(_reader()).text).count("Bob's investigations could not be read") == 2
+
+
+def test_the_closure_pill_is_derived_and_does_not_disable_closing(case):
+    case(payload=_case(dfir_iris_case_id=4, alerts=[_alert(status="open")]))
+    html = _get(_reader()).text
+    body = flat(html)
+    assert "3 block closure" in body
+    assert "derived" in body
+    assert "Escalated to DFIR-IRIS #4" in body
+    closes = re.findall(r'<button[^>]*data-click-action="cwCloseCase"[^>]*>', html)
+    assert len(closes) == 2  # the header's, and the popover's
+    assert all("disabled" not in b and "data-args='[7]'" in b for b in closes)
+
+
+def test_a_case_with_nothing_blocking_says_so(case):
+    case(payload=_case(assigned_to_id=3, alerts=[_alert(status="closed")]))
+    assert "Nothing blocks closure" in flat(_get(_reader()).text)
+
+
+def test_the_read_summary_names_where_it_came_from(case):
+    case(payload=_case(description="**Auto-grouped case** — by rule"))
+    assert "The case grouper's templated description" in flat(_get(_reader()).text)
+    bob = ("**\U0001F916 Bob (AI analyst) — `inconclusive`** · severity `low`\n\n"
+           "```json\n{\"summary\": \"Bulk credential read.\"}\n```")
+    case(payload=_case(notes=[{"id": 1, "user": "bob", "content": bob}]))
+    html = _get(_reader()).text
+    assert "Bob's latest case note" in flat(html)
+    assert 'data-note-raw="Bulk credential read."' in html

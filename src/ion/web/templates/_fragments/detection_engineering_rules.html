@@ -1,16 +1,55 @@
-{% macro value(v) %}{{ v if v is not none else 'Unavailable' }}{% endmacro %}
-{% if state == 'failed' %}<div class="de-empty" role="alert">Failed to load detection rules</div>
-{% elif state == 'empty' %}<div class="de-empty">No rules match filters</div>
+{# Rules: every rule in the destination scope with its alerts, ION closures,
+   TIDE problems and GitLab issues. One RuleHealthReport feeds this, the
+   drawer and Health. body_only re-renders the table under the toolbar. #}
+{% import "_fragments/detection_engineering_rule_macros.html" as m %}
+{% macro body() %}
+{% if state == 'unconfigured' %}<div class="dx-banner">TIDE is not configured. Connect it in <a href="/settings#tide">Settings</a> to list rules.</div>
+{% elif state == 'failed' %}<div class="dx-banner warn" role="alert">Rules could not be read from TIDE.{% if failure %} {{ failure.message }}{% if failure.detail %} TIDE said: {{ failure.detail }}{% endif %}{% endif %}</div>
 {% else %}
-<table class="de-table"><thead><tr><th>Rule Name</th><th>Destination</th><th>Severity</th><th>Status</th><th>Quality</th><th>MITRE</th></tr></thead><tbody>
-{% for rule in rules %}<tr>
-<td data-field="name">{{ value(rule.get('name')) }}</td>
-<td data-field="destination">{% if rule.get('space') is none %}Unavailable{% else %}{{ (rule.get('kind') or 'elastic')|title }} · {{ rule.get('siem_id') or 'any SIEM' }} / {{ rule.space }}{% endif %}</td>
-<td data-field="severity"><span class="de-sev {{ rule.get('severity') if rule.get('severity') in ['critical','high','medium','low','info'] else '' }}">{{ value(rule.get('severity')) }}</span></td>
-<td data-field="enabled">{% if rule.get('enabled') is none %}Unavailable{% elif rule.enabled %}<span class="de-enabled">Enabled</span>{% else %}<span class="de-disabled">Disabled</span>{% endif %}</td>
-<td data-field="quality_score" class="mono">{{ 'Unscored' if rule.get('kind') == 'wazuh' and rule.get('quality_score') is none else value(rule.get('quality_score')) }}</td>
-<td data-field="mitre_ids">{% if rule.get('mitre_ids') is none %}Unavailable{% elif rule.mitre_ids is iterable and rule.mitre_ids %}{% for tid in rule.mitre_ids %}<span class="de-mitre-chip">{{ tid }}</span> {% endfor %}{% else %}-{% endif %}</td>
-</tr>{% endfor %}</tbody></table>
-<div class="de-pager"><div class="de-pager-info">{% if total is not none %}Showing {{ offset + 1 }}-{{ [offset + limit, total]|min }} of {{ total }}{% else %}Total unavailable{% endif %}</div>
-<div class="de-pager-btns"><button data-click-action="deRulesPage" data-args='{{ ["prev"]|tojson }}' {% if offset == 0 %}disabled{% endif %}>Prev</button><button data-click-action="deRulesPage" data-args='{{ ["next"]|tojson }}' {% if total is none or offset + limit >= total %}disabled{% endif %}>Next</button></div></div>
+<section class="dx-card">
+  <header class="dx-ch">Rules <span class="dx-n">{{ m.num(shown) }} of {{ m.num(total) }}</span>
+    <span class="dx-legend-out dx-hlegend">{% if closures_locked %}{{ m.locked() }}{% else %}<span><i class="o-tp"></i>TP</span><span><i class="o-fp"></i>FP</span><span><i class="o-bn"></i>Benign</span><span><i class="o-ot"></i>Other</span>{% endif %}
+    <span class="dx-probs"><span class="dx-e">{{ m.err_icon() }}error</span><span class="dx-w">{{ m.warn_icon() }}warning</span><span class="dx-i">{{ m.info_icon() }}info</span></span></span>
+  </header>
+  {% if not rules %}<div class="dx-cb"><div class="dx-empty">{{ 'No rules match these filters.' if total else 'TIDE holds no rules at the selected destinations.' }}</div></div>
+  {% else %}
+  <div class="dx-tablewrap"><table class="dx-table">
+    <thead><tr><th>Kind</th><th>Rule</th><th>Severity</th><th>State</th><th>TIDE quality</th>
+      <th class="num">Alerts · {{ 14 }}d</th><th>ION closures · 90d{% if closures_locked %} {{ m.lock_tag() }}{% endif %}</th><th>TIDE problems</th><th class="num">Issues</th></tr></thead>
+    <tbody>
+    {% for r in rules %}
+    <tr class="dx-click" data-rule-key="{{ r.key }}" data-click-action="deOpenRule" data-args='{{ [r.key]|tojson }}'>
+      <td>{{ m.kind(r.kind) }}</td>
+      <td><div class="dx-rname{{ '' if r.enabled else ' dx-off' }}" title="{{ r.name }}">{{ r.name }}<small>{{ r.mitre or '—' }} · {{ r.dest }}</small></div></td>
+      <td>{{ m.sev(r.severity) }}</td>
+      <td>{{ m.onoff(r.enabled) }}</td>
+      <td>{{ m.quality(r.quality) }}</td>
+      <td class="num">{{ m.alerts(r) }}</td>
+      <td>{{ m.closures(r.closures, closures_locked) }}</td>
+      <td>{{ m.probs(r.e, r.w, r.i) }}</td>
+      <td class="num">{% if r.gitlab %}<span class="dx-gl" title="{{ r.gitlab|length }} open GitLab issue(s)"><svg aria-hidden="true"><use href="#i-git-branch"/></svg>{{ r.gitlab|length }}</span>{% else %}<span class="dx-mute">—</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% if shown > limit %}
+  <div class="dx-pager"><span class="dx-mute small">Showing {{ offset + 1 }}–{{ [offset + limit, shown]|min }} of {{ shown }}</span>
+    <button type="button" class="dx-btn sm ghost" data-click-action="deRulesPage" data-args='{{ [[offset - limit, 0]|max]|tojson }}' {% if offset == 0 %}disabled{% endif %}>Previous</button>
+    <button type="button" class="dx-btn sm ghost" data-click-action="deRulesPage" data-args='{{ [offset + limit]|tojson }}' {% if offset + limit >= shown %}disabled{% endif %}>Next</button></div>
+  {% endif %}
+  {% endif %}
+</section>
+{{ m.source_notes(notes) }}
+{% endif %}
+{% endmacro %}
+{% if body_only %}{{ body() }}{% else %}
+<span id="de-count-rules" class="dx-tab-count" hx-swap-oob="true">{% if state == 'data' %}{{ m.num(total) }}{% endif %}</span>
+<div class="dx-toolbar" id="de-rules-filters">
+  <input type="search" name="q" class="dx-search" value="{{ filter.q }}" placeholder="Search rules, MITRE IDs or Wazuh rule IDs…" data-enter-key-action="deRulesFilter" aria-label="Search rules">
+  <label class="dx-select"><span>Kind</span><select name="kind" data-change-action="deRulesFilter"><option value="">All</option>{% for k in ['elastic', 'wazuh'] %}<option value="{{ k }}"{{ ' selected' if filter.kind == k }}>{{ k|title }}</option>{% endfor %}</select></label>
+  <label class="dx-select"><span>Severity</span><select name="severity" data-change-action="deRulesFilter"><option value="">All</option>{% for s in ['critical','high','medium','low'] %}<option value="{{ s }}"{{ ' selected' if filter.severity == s }}>{{ s }}</option>{% endfor %}</select></label>
+  <label class="dx-select"><span>State</span><select name="state" data-change-action="deRulesFilter"><option value="">Enabled &amp; disabled</option><option value="1"{{ ' selected' if filter.state == '1' }}>Enabled</option><option value="0"{{ ' selected' if filter.state == '0' }}>Disabled</option></select></label>
+  <label class="dx-check"><input type="checkbox" name="problems" data-change-action="deRulesFilter"{{ ' checked' if filter.problems }}>Has problems</label>
+</div>
+<div id="de-rules-body">{{ body() }}</div>
 {% endif %}

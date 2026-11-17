@@ -50,20 +50,6 @@ USE_CASES = [
      'steps': [{'order': 1, 'techniques': ['T1003']}]},
 ]
 
-EXECUTION = {
-    'enabled': True, 'hours': 168,
-    'summary': {'total_alerts': 10000, 'unique_rules_firing': 5, 'noisy_rules': 1, 'silent_enabled_rules': 3,
-                'status': {'open': 25126, 'acknowledged': 4844, 'closed': 30}},
-    'timeline': [{'timestamp': 'a', 'count': 0}, {'timestamp': 'b', 'count': 9}, {'timestamp': 'c', 'count': 3}],
-    'severity_timeline': [],
-    'top_firing': [{'rule_name': 'LT Brute Force', 'alert_count': 6000, 'open': 5000, 'close_rate': 0.1, 'mitre_ids': ['T1110'], 'in_tide': False},
-                   {'rule_name': 'Credential dumping', 'alert_count': 12, 'open': 1, 'close_rate': 80, 'mitre_ids': [], 'in_tide': True,
-                    'tide_severity': 'critical', 'tide_quality': 85}],
-    'noisy_rules': [{'rule_name': 'Credential dumping', 'alert_count': 12}],
-    'silent_rules': [{'rule_name': 'Mass file encryption', 'tide_severity': 'medium', 'tide_quality': 30, 'mitre_ids': ['T1486']}],
-}
-
-
 @pytest.fixture
 def client():
     app = FastAPI()
@@ -79,7 +65,7 @@ def client():
 @pytest.fixture
 def reads(monkeypatch):
     """Every read the overview makes, answering with the loadtest's shape."""
-    state = {'posture': POSTURE, 'disabled': DISABLED, 'gaps': _gaps(), 'use_cases': USE_CASES, 'execution': EXECUTION}
+    state = {'posture': POSTURE, 'disabled': DISABLED, 'gaps': _gaps(), 'use_cases': USE_CASES}
 
     def answer(key):
         def read(**kwargs):
@@ -89,17 +75,10 @@ def reads(monkeypatch):
             return value
         return read
 
-    async def execution(**kwargs):
-        value = state['execution']
-        if isinstance(value, Exception):
-            raise value
-        return value
-
     monkeypatch.setattr(de_tide_api, 'tide_de_posture', answer('posture'))
     monkeypatch.setattr(de_tide_api, 'tide_de_disabled_critical', answer('disabled'))
     monkeypatch.setattr(de_tide_api, 'tide_de_gaps', answer('gaps'))
     monkeypatch.setattr(de_tide_api, 'tide_de_use_cases', answer('use_cases'))
-    monkeypatch.setattr(de_tide_api, 'tide_de_execution', execution)
     return state
 
 
@@ -108,103 +87,6 @@ def _field(html, name):
     assert cell is not None, name
     return cell.get_text(' ', strip=True)
 
-
-def test_overview_combines_posture_gaps_use_cases_and_execution(client, reads):
-    model = client.get('/ui/detection-engineering/overview', headers=JSON).json()
-    assert model['state'] == 'data'
-    assert model['coverage_pct'] == 0.4
-    assert model['use_case_counts'] == {'total': 3, 'ready': 1, 'partial': 1, 'blind': 1, 'unknown': 0, 'empty': 0}
-    assert model['firing']['capped'] is True
-    assert model['needs_action']['total'] == 1 + 1 + 3
-    assert model['needs_action']['partial'] is False
-    credential = next(row for row in model['tactics'] if row['name'] == 'Credential Access')
-    assert credential['covered'] == 1 and credential['total'] == 58 and credential['gaps'] == 57
-
-    html = client.get('/ui/detection-engineering/overview').text
-    assert _field(html, 'total_rules') == '4'
-    assert _field(html, 'coverage_pct').startswith('0.4%')
-    assert _field(html, 'avg_quality').startswith('46%')
-    assert _field(html, 'use_cases_ready') == '1 / 3'
-    # Elasticsearch stopped counting at 10,000; the page says so rather than claim it.
-    assert _field(html, 'firing_total') == '≥10,000'
-    assert 'Excellent (80%+)' in html
-    assert 'Unmapped &lt;noise&gt;' in html and BeautifulSoup(html, 'html.parser').find('noise') is None
-    soup = BeautifulSoup(html, 'html.parser')
-    assert soup.select_one('#de-count-coverage').get_text(strip=True) == '703 gaps'
-    assert soup.select_one('#de-count-coverage')['hx-swap-oob'] == 'true'
-
-
-@pytest.mark.parametrize('scale,label,avg', [('points', 'Excellent (30+)', '46.3 points'), ('percent', 'Excellent (80%+)', '46% TIDE score')])
-def test_overview_quality_follows_the_tide_scale(client, reads, scale, label, avg):
-    reads['posture'] = {**POSTURE, 'quality': {**POSTURE['quality'], 'scale': scale}}
-    html = client.get('/ui/detection-engineering/overview').text
-    assert label in html
-    assert _field(html, 'avg_quality') == avg
-
-
-def test_overview_failed_posture_is_unknown_not_zero(client, reads):
-    reads['posture'] = None
-    model = client.get('/ui/detection-engineering/overview', headers=JSON).json()
-    assert model['state'] == 'failed'
-    assert model['coverage_pct'] is None
-    html = client.get('/ui/detection-engineering/overview').text
-    assert 'Failed to load posture' in html
-    for field in ('total_rules', 'coverage_pct', 'avg_quality'):
-        assert _field(html, field) == '—'
-    # The gap analysis is a separate read and still draws.
-    assert 'Credential Access' in html
-
-
-def test_overview_failed_execution_shows_reason_and_partial_needs_action(client, reads):
-    reads['execution'] = {'enabled': False, 'error': 'Elasticsearch not configured'}
-    model = client.get('/ui/detection-engineering/overview', headers=JSON).json()
-    assert model['firing']['total'] is None
-    assert model['needs_action']['partial'] is True
-    assert model['needs_action']['total'] == 2
-    html = client.get('/ui/detection-engineering/overview').text
-    assert _field(html, 'firing_total') == '—'
-    assert 'Elasticsearch not configured' in html
-    assert _field(html, 'needs_action') == '≥2'
-    assert 'silent unknown' in html
-
-
-def test_overview_nothing_readable_is_a_dash(client, reads):
-    reads.update(posture=None, disabled=RuntimeError('private detail'), gaps=None, use_cases=None, execution=RuntimeError('x'))
-    model = client.get('/ui/detection-engineering/overview', headers=JSON).json()
-    assert model['needs_action']['total'] is None
-    assert model['tactics'] is None and model['use_cases'] is None
-    html = client.get('/ui/detection-engineering/overview').text
-    assert _field(html, 'needs_action') == '—'
-    assert _field(html, 'use_cases_ready') == '—'
-    assert 'Coverage by tactic unavailable' in html
-    assert 'private detail' not in html
-
-
-def test_overview_unconfigured(client, reads):
-    reads['posture'] = {'enabled': False}
-    html = client.get('/ui/detection-engineering/overview').text
-    assert 'TIDE not configured' in html
-    assert 'data-field="total_rules"' not in html
-
-
-def test_unmeasured_use_case_step_is_not_blind(client, reads):
-    reads['use_cases'] = [{'name': 'Half read', 'technique_coverage_measured': False, 'technique_coverage': {},
-                           'steps': [{'order': 1, 'techniques': ['T1200']}]}]
-    model = client.get('/ui/detection-engineering/overview', headers=JSON).json()
-    assert model['use_case_counts']['unknown'] == 1 and model['use_case_counts']['blind'] == 0
-    assert model['use_cases'][0]['pct'] is None
-
-
-def test_needs_action_lists_disabled_unmapped_and_silent(client, reads):
-    html = client.get('/ui/detection-engineering/overview').text
-    feed = BeautifulSoup(html, 'html.parser').select('.dx-feed .dx-row')
-    text = [row.get_text(' ', strip=True) for row in feed]
-    assert any('SMB lateral movement is disabled' in item and 'quick win' in item for item in text)
-    assert any('has no ATT&CK mapping' in item for item in text)
-    assert any('Mass file encryption has not fired in 7 days' in item for item in text)
-
-
-# ── Coverage map ─────────────────────────────────────────────────────
 
 def _global(states):
     techniques = {}
@@ -297,21 +179,28 @@ def test_system_options(client, monkeypatch, payload, state, options):
 
 # ── Shell ────────────────────────────────────────────────────────────
 
-def test_five_tabs_and_every_old_tab_id_still_resolves():
+def test_eight_tabs_and_every_old_tab_id_still_resolves():
     source = (ROOT / 'src/ion/web/templates/detection_engineering.html').read_text(encoding='utf-8')
+    script = (ROOT / 'src/ion/web/static/js/detection-engineering.js').read_text(encoding='utf-8')
     soup = BeautifulSoup(source, 'html.parser')
-    assert [tab['data-tab'] for tab in soup.select('.dx-tab')] == ['overview', 'coverage', 'usecases', 'rules', 'readiness']
-    sub_tab = re.search(r'const SUB_TAB = \{(.*?)\};', source, re.S).group(1)
-    aliases = re.search(r'const ALIASES = \{(.*?)\};', source, re.S).group(1)
-    known = set(re.findall(r'(\w+):', sub_tab)) | set(re.findall(r'(\w+):', aliases))
-    for old in ['posture', 'killchains', 'rules', 'execution', 'readiness', 'progression', 'gaps', 'd3fend', 'emulation', 'vulns']:
-        assert old in known, old
-    for panel in ['killchains', 'rules', 'execution', 'readiness', 'progression', 'd3fend', 'emulation', 'vulns']:
-        assert soup.select_one(f'#de-panel-{panel}') is not None, panel
+    assert [tab['data-tab'] for tab in soup.select('.dx-tab')] == [
+        'overview', 'coverage', 'systems', 'rules', 'usecases', 'readiness', 'work', 'bob']
+    sub_tab = dict(re.findall(r"(\w+):'(\w+)'", re.search(r'const SUB_TAB = \{(.*?)\};', script, re.S).group(1)))
+    aliases = dict(re.findall(r"'?([\w-]+)'?:'(\w+)'", re.search(r'const ALIASES = \{(.*?)\};', script, re.S).group(1)))
+    resolve = lambda name: aliases.get(name, name)
+    for old in ['posture', 'gaps', 'coverage', 'usecases', 'execution', 'killchains', 'progression', 'rules',
+                'readiness', 'emulation', 'vulns', 'd3fend']:
+        assert resolve(old) in sub_tab, old
+        assert soup.select_one(f'#de-panel-{resolve(old)}') is not None, old
+    for anchor in ['requests', 'proposals', 'quirks', 'scorecard', 'abuse', 'health', 'systems']:
+        assert anchor in sub_tab, anchor
 
 
 @pytest.mark.parametrize('name', ['detection_engineering.html', '_fragments/detection_engineering_overview.html',
-                                  '_fragments/detection_engineering_coverage.html'])
+                                  '_fragments/detection_engineering_coverage.html',
+                                  '_fragments/detection_engineering_rules.html', '_fragments/detection_engineering_rule_drawer.html',
+                                  '_fragments/detection_engineering_health.html', '_fragments/detection_engineering_systems.html',
+                                  '_fragments/detection_engineering_system_detail.html'])
 def test_csp_no_inline_styles_or_handlers(name):
     source = (ROOT / 'src/ion/web/templates' / name).read_text(encoding='utf-8')
     markup = re.sub(r'<script\b.*?</script>', '', source, flags=re.S)

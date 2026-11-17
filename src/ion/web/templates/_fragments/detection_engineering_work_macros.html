@@ -1,0 +1,13 @@
+{# Shared by the Work and Bob fragments. #}
+{% macro actions(list) -%}
+{%- for a in list %}<button type="button" class="dx-btn sm{{ ' ghost' if a.label in ['Reject', 'Revert', 'Close'] }}" data-click-action="{{ a.action }}" data-args='{{ a.args|tojson }}'>{{ a.label }}</button>{% endfor -%}
+{%- endmacro %}
+{% macro rule_link(name) -%}
+{%- if name %}<button type="button" class="dx-link dx-ell" data-click-action="deOpenRule" data-args='{{ [name]|tojson }}' title="{{ name }}">{{ name }}</button>{% else %}<span class="dx-mute">—</span>{% endif -%}
+{%- endmacro %}
+{% macro failed(what) -%}
+<div class="dx-banner warn" role="alert">{{ what }} could not be read. This is not an empty list: how many there are is unknown. Refresh to try again.</div>
+{%- endmacro %}
+{% macro tab_count(id, value) -%}
+<span id="{{ id }}" class="dx-tab-count" hx-swap-oob="true">{% if value is number %}{{ value }}{% endif %}</span>
+{%- endmacro %}

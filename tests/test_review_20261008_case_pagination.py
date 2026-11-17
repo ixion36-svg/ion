@@ -463,7 +463,7 @@ class TestWiring:
     def test_the_route_bounds_the_window_itself(self):
         """A limit the caller can raise without bound is not a limit."""
         module = self._board_module()
-        assert "limit: int = Query(24, ge=1, le=500)" in module
+        assert "limit: int = Query(50, ge=1, le=500)" in module
         assert "offset: int = Query(0, ge=0)" in module
 
     def test_the_board_follows_has_more(self):

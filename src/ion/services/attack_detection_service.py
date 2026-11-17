@@ -161,3 +161,17 @@ def summary() -> Dict[str, Any]:
             round(analytic_count / len(strategies), 1) if strategies else None
         ),
     }
+
+
+def technique_platforms() -> Dict[str, set]:
+    """{technique id: the platforms its analytics apply to}. A technique with
+    no Detection Strategy in the snapshot is absent: its platforms are unknown,
+    not none."""
+    by_id = _strategies_by_id()
+    found: Dict[str, set] = {}
+    for tid, ids in (_load().get("by_technique") or {}).items():
+        platforms = {p for sid in ids if sid in by_id
+                     for a in by_id[sid].get("analytics") or [] for p in a.get("platforms") or []}
+        if platforms:
+            found[tid] = platforms
+    return found

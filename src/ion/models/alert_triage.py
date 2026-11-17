@@ -50,6 +50,16 @@ class CaseClosureReason(str, Enum):
     NOT_APPLICABLE = "not_applicable"
 
 
+#: POST /elasticsearch/alerts/{id}/close takes one of these closure types,
+#: and each is a case closure reason: the one the case closes with, and the
+#: verdict the alert's "Alert closed as ..." case note records.
+ALERT_CLOSURE_REASONS: dict[str, str] = {
+    "escalated": CaseClosureReason.TRUE_POSITIVE.value,
+    "benign": CaseClosureReason.BENIGN_TRUE_POSITIVE.value,
+    "false_positive": CaseClosureReason.FALSE_POSITIVE.value,
+}
+
+
 class NoteEntityType(str, Enum):
     """Entity types that can have notes attached."""
 
@@ -157,6 +167,7 @@ class AlertTriage(Base, TimestampMixin):
         Index("ix_alert_triage_status_created", "status", "created_at"),
         # System attribution lookup (per-system rollups, filters)
         Index("ix_alert_triage_source_system", "source_system"),
+        Index("ix_alert_triage_rule_id", "rule_id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -201,6 +212,20 @@ class AlertTriage(Base, TimestampMixin):
     # triage create time when the alert payload is available; nullable so
     # legacy rows and ES-less paths still render (with id-substring fallback).
     rule_name: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    # The rule's stable id, which is what TIDE keys a rule by: Kibana's
+    # kibana.alert.rule.rule_id (the same in every space it is deployed to),
+    # or a Wazuh rule.id. rule_uuid is the Kibana saved-object id, which
+    # differs per space, so it tells deployments of one rule apart. Both are
+    # copied only from Elasticsearch, never from a client payload, because
+    # rule outcomes leave ION keyed on them.
+    rule_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    rule_uuid: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    # When Elasticsearch last answered for this row's rule identity, found or
+    # not. NULL means never asked, so the backfill asks; a set value with a
+    # NULL rule_id means the alert is gone or carries no rule id.
+    rule_identity_checked_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime, nullable=True
+    )
 
     # Relationships
     assigned_to: Mapped[Optional["User"]] = relationship(

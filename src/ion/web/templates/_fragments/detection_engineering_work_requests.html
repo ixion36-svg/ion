@@ -1,0 +1,34 @@
+{# Work > Requests: the open tuning-request queue. #}
+{% from "_fragments/detection_engineering_work_macros.html" import actions, rule_link, failed, tab_count %}
+{{ tab_count('de-count-requests', count) }}
+{{ tab_count('de-count-work', count) }}
+<section class="dx-card">
+  <header class="dx-ch">Tuning requests <span class="dx-n">analyst-raised · GitLab-mirrored</span></header>
+  {% if state == 'failed' %}
+  <div class="dx-cb">{{ failed('The tuning-request queue') }}</div>
+  {% elif state == 'empty' %}
+  <div class="dx-cb"><div class="dx-empty">No open tuning requests. The queue is clear.</div></div>
+  {% else %}
+  <div class="dx-tablewrap dx-work-table"><table class="dx-table">
+    <thead><tr><th>ID</th><th>Request</th><th>Rule</th><th>Raised by</th><th>Status</th><th>Tracking</th><th class="num">FP · 7d</th><th class="num">Age</th>{% if rows|selectattr('actions')|list %}<th></th>{% endif %}</tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td class="mono dx-nowrap">REQ-{{ r.id }}</td>
+        <td><b>{{ r.reason or 'No reason given' }}</b>{% if r.details %}<div class="dx-mute small">{{ r.details }}</div>{% endif %}</td>
+        <td class="small">{{ rule_link(r.rule_name) }}</td>
+        <td class="dx-mute small">{{ r.raised_by or '—' }}</td>
+        <td>{% if r.status %}<span class="dx-tag {{ r.status_tag }}">{{ r.status }}</span>{% else %}<span class="dx-mute">—</span>{% endif %}</td>
+        {# safe_url once, read by both the gate and the href: escaping the
+           characters left a stored javascript: URL clickable. #}
+        {% set ticket = r.gitlab_url|safe_url %}
+        <td class="mono small">{% if ticket %}<a class="dx-link" href="{{ ticket }}" target="_blank" rel="noopener">GitLab {% if r.gitlab_iid is not none %}#{{ r.gitlab_iid }}{% else %}issue{% endif %}</a>{% else %}<span class="dx-mute">—</span>{% endif %}</td>
+        <td class="mono num">{% if r.fp_7d is not none %}{{ r.fp_7d }}{% else %}<span class="dx-mute">—</span>{% endif %}</td>
+        <td class="mono num" title="Raised {{ r.created_at or 'at an unrecorded time' }}">{% if r.age is not none %}{{ r.age }}{% else %}<span class="dx-mute">—</span>{% endif %}</td>
+        {% if rows|selectattr('actions')|list %}<td class="num"><span class="dx-acts">{{ actions(r.actions) }}</span></td>{% endif %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% endif %}
+</section>

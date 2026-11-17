@@ -20,7 +20,6 @@ from jinja2 import FileSystemBytecodeCache
 
 import ion
 from ion.core.config import get_config
-from ion.licensing.gating import de_module_available
 from ion.web import nav
 from ion.web._csp_nonce import _CSPNonceProxy
 from ion.web._csrf_token import _CSRFTokenProxy
@@ -35,8 +34,6 @@ def _workforce_available() -> bool:
 
 def _nav_visible(item: nav.Item) -> bool:
     """Whether a nav entry's licence gate is open, read per render."""
-    if item.gate == "de":
-        return de_module_available()
     if item.gate == "workforce":
         return _workforce_available()
     return True

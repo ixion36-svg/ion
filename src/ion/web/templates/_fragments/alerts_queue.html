@@ -62,7 +62,7 @@
 {% elif not rows %}
   <tr>
     <td colspan="{{ colspan }}" class="aq-empty">
-      No alerts in this window{% if system %} for system {{ system }}{% endif %}
+      No alerts in this window{% if system %} for system {{ system_label or system }}{% endif %}
       {%- if not include_closed %} (closed alerts not requested){% endif %}.
     </td>
   </tr>
@@ -163,6 +163,12 @@
 <select id="alert-system-filter" name="system" class="ion-select w-auto!" data-change-action="loadAlerts"
         title="Filter by source system (CyAB-registered systems only)" hx-swap-oob="true">
   <option value=""{% if not system %} selected{% endif %}>All Systems</option>
+  {%- if not systems %}
+  {#- An empty list reads as a broken control unless it says which empty it is. #}
+  <option disabled>
+    {%- if systems_unread %}Registry could not be read{% else %}None registered or seen{% endif -%}
+  </option>
+  {%- endif %}
   {%- for s in systems %}
   <option value="{{ s.value }}"{% if s.selected %} selected{% endif %}>{{ s.label }}</option>
   {%- endfor %}

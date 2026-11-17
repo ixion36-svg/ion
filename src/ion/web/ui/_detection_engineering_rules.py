@@ -1,4 +1,4 @@
-"""Detection engineering rule, use-case and progression read fragments."""
+"""Detection engineering use-case and progression read fragments."""
 from __future__ import annotations
 
 import logging
@@ -22,14 +22,6 @@ State = Literal['failed', 'empty', 'data']
 class KillChainsView(TypedDict):
     state: State
     playbooks: list[dict[str, Any]] | None
-
-
-class RulesView(TypedDict):
-    state: State
-    rules: list[dict[str, Any]] | None
-    total: int | None
-    offset: int
-    limit: int
 
 
 class ProgressionView(TypedDict):
@@ -85,21 +77,6 @@ def killchains(request: Request, session: Session = Depends(get_db_session)):
     playbooks = use_cases(session)
     view: KillChainsView = {'state': _state(playbooks), 'playbooks': playbooks}
     return render_view(request, '_fragments/detection_engineering_killchains.html', view)
-
-
-@router.get('/detection-engineering/rules', response_class=HTMLResponse)
-def rules_panel(request: Request, search: str = '', severity: str = '', enabled: str = '',
-                offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=200)):
-    rules = None
-    total = None
-    try:
-        payload = de_tide_api.tide_de_rules(search=search, severity=severity, enabled=enabled, offset=offset, limit=limit)
-        rules = _objects(rows(payload, 'rows'))
-        total = payload.get('total') if isinstance(payload, dict) else None
-    except Exception:
-        logger.exception('Could not read detection rules')
-    view: RulesView = {'state': _state(rules), 'rules': rules, 'total': total, 'offset': offset, 'limit': limit}
-    return render_view(request, '_fragments/detection_engineering_rules.html', view)
 
 
 @router.get('/detection-engineering/progression', response_class=HTMLResponse)

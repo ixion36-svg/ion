@@ -14,6 +14,12 @@ Read-only measurement over data ION already collects. Two things, no write path:
 - **DE Metrics** — the campaign roll-up plus a noise trend (recent vs older half)
   and the Bob-vs-human agreement rate off the deduped ``AIFeedback`` ledger.
 
+Each campaign is a rule as ``rule_outcome_service`` keys it, and carries that
+rule's false-positive rate and noisy verdict from there, so this page and
+Detection Health show one number for one rule. The campaign's own counts are
+cost, not rate: they include benign true positives when ``benign_tp_as_fp`` is
+on, because a benign closure takes an analyst's time too.
+
 Design constraints from the roadmap (docs/superpowers/plans/2026-07-26-…):
 *ION drafts and measures; the analyst decides and acts.* Phase 0 has **no write
 path** — nothing here mutates detections, closures or the ledger. "Hours saved"
@@ -35,7 +41,7 @@ keep ``MAX(id)`` per ``(alert_id, alert_prompt_template_id)``.
 from __future__ import annotations
 
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import func, select
@@ -47,11 +53,18 @@ from ion.services.ai_feedback_dedupe import (
     deduped_feedback_ids,
     is_scored,
 )
+from ion.services.rule_outcome_service import (
+    DEFAULT_WINDOW_DAYS,
+    UNMAPPED,
+    NoisyPolicy,
+    Window,
+    rule_outcomes,
+)
 
 _FALSE_POSITIVE = "false_positive"
 _BENIGN_TP = "benign_true_positive"
 _TRUE_POSITIVE = "true_positive"
-_UNMAPPED = "(unmapped)"
+_UNMAPPED = UNMAPPED
 
 
 def _settings() -> Dict[str, Any]:
@@ -70,7 +83,7 @@ def _settings() -> Dict[str, Any]:
             return default
 
     return {
-        "lookback_days": _i("ION_DE_LOOKBACK_DAYS", 90),
+        "lookback_days": _i("ION_DE_LOOKBACK_DAYS", DEFAULT_WINDOW_DAYS),
         # Minutes of analyst time a single FP alert is assumed to cost. Fixed and
         # transparent — good enough to rank campaigns by wasted effort.
         "minutes_per_alert": _f("ION_DE_MINUTES_PER_ALERT", 10.0),
@@ -139,12 +152,13 @@ class _Campaign:
     """Mutable per-rule false-positive accumulator (the Noise Campaign)."""
 
     __slots__ = (
-        "rule_name", "fp_alerts", "case_ids", "first_seen", "last_seen",
+        "key", "rule_name", "fp_alerts", "case_ids", "first_seen", "last_seen",
         "fp_count", "benign_count", "severity", "mitre", "signatures",
         "hosts", "sample_alert_ids",
     )
 
-    def __init__(self, rule_name: str) -> None:
+    def __init__(self, key, rule_name: str) -> None:
+        self.key = key
         self.rule_name = rule_name
         self.fp_alerts = 0
         self.case_ids: set = set()
@@ -165,8 +179,10 @@ def get_noise_campaigns(session: Session, days: Optional[int] = None) -> Dict[st
     lookback = days if days is not None else st["lookback_days"]
     minutes = st["minutes_per_alert"]
     min_campaign = st["min_campaign"]
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    cutoff = now - timedelta(days=lookback)
+    window = Window.last(lookback)
+    now, cutoff = window.until, window.since
+    outcomes = rule_outcomes(session, window)
+    policy = NoisyPolicy.from_env()
 
     reasons = [_FALSE_POSITIVE]
     if st["benign_tp_as_fp"]:
@@ -176,6 +192,7 @@ def get_noise_campaigns(session: Session, days: Optional[int] = None) -> Dict[st
     # its closed case (verdict / closed_at / severity / hosts).
     rows = session.execute(
         select(
+            AlertTriage.rule_id,
             AlertTriage.rule_name,
             AlertTriage.es_alert_id,
             AlertTriage.observables,
@@ -190,15 +207,18 @@ def get_noise_campaigns(session: Session, days: Optional[int] = None) -> Dict[st
         .where(AlertCase.closure_reason.in_(reasons))
         .where(AlertCase.closed_at.is_not(None))
         .where(AlertCase.closed_at >= cutoff)
+        .where(AlertCase.closed_at < now)
     ).all()
 
-    camps: Dict[str, _Campaign] = {}
-    for (rule_name, alert_id, observables, mitre, case_id,
+    camps: Dict[Any, _Campaign] = {}
+    for (rule_id, rule_name, alert_id, observables, mitre, case_id,
          closure_reason, closed_at, severity, hosts) in rows:
-        rn = rule_name or _UNMAPPED
-        c = camps.get(rn)
+        key = outcomes.key_for(rule_id, rule_name)
+        c = camps.get(key)
         if c is None:
-            c = camps[rn] = _Campaign(rn)
+            record = outcomes.get(key)
+            c = camps[key] = _Campaign(
+                key, record.rule_name if record else (rule_name or _UNMAPPED))
 
         c.fp_alerts += 1
         if case_id is not None:
@@ -234,8 +254,13 @@ def get_noise_campaigns(session: Session, days: Optional[int] = None) -> Dict[st
         if c.fp_alerts < min_campaign:
             continue
         cost_hours = round(c.fp_alerts * minutes / 60.0, 1)
+        record = outcomes.get(c.key)
         campaigns.append({
+            "rule_id": c.key.rule_id,
             "rule_name": c.rule_name,
+            "closed": record.closed if record else None,
+            "fp_rate": record.fp_rate if record else None,
+            "noisy": policy.is_noisy(record) if record else False,
             "fp_alerts": c.fp_alerts,
             "case_count": len(c.case_ids),
             "false_positive": c.fp_count,
@@ -386,9 +411,8 @@ def get_de_metrics(session: Session, days: Optional[int] = None) -> Dict[str, An
     """The DE Metrics dashboard payload: campaigns + trend + Bob agreement."""
     st = _settings()
     lookback = days if days is not None else st["lookback_days"]
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    cutoff = now - timedelta(days=lookback)
-    midpoint = cutoff + (now - cutoff) / 2
+    window = Window.last(lookback)
+    now, cutoff, midpoint = window.until, window.since, window.midpoint
     reasons = [_FALSE_POSITIVE]
     if st["benign_tp_as_fp"]:
         reasons.append(_BENIGN_TP)

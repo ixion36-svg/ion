@@ -1,7 +1,6 @@
 from types import SimpleNamespace
 
 import pytest
-from bs4 import BeautifulSoup
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -21,7 +20,6 @@ def client():
 
 @pytest.mark.parametrize('panel,method,empty,data', [
     ('killchains', 'tide_de_use_cases', [], [{'name': 'A < B', 'steps': []}]),
-    ('rules', 'tide_de_rules', {'rows': [], 'total': 0}, {'rows': [{'name': 'A < B'}], 'total': 1}),
     ('progression', 'tide_de_kill_chain_alerts', {'enabled': True, 'progressions': []}, {'enabled': True, 'progressions': [{'host': 'A < B', 'steps': []}]}),
 ])
 @pytest.mark.parametrize('outcome', ['failed', 'empty', 'data', 'exception'])
@@ -42,31 +40,6 @@ def test_outcomes(client, monkeypatch, panel, method, empty, data, outcome):
     assert 'private backend error' not in response.text
     if outcome == 'data':
         assert 'A &lt; B' in response.text
-
-
-@pytest.mark.parametrize('value', [0, None])
-@pytest.mark.parametrize('field', ['quality_score', 'enabled', 'severity', 'name', 'mitre_ids'])
-def test_rule_missing_and_zero(client, monkeypatch, field, value):
-    c, ui = client
-    row = {'name': 'Rule', 'severity': 'high', 'enabled': True, 'quality_score': 50, 'mitre_ids': ['T1003']}
-    row[field] = value
-    monkeypatch.setattr(ui.de_tide_api, 'tide_de_rules', lambda **kw: {'rows': [row], 'total': 1})
-    soup = BeautifulSoup(c.get('/ui/detection-engineering/rules').text, 'html.parser')
-    cell = soup.select_one('[data-field="' + field + '"]')
-    if value is None:
-        assert 'Unavailable' in cell.text
-    elif field == 'quality_score':
-        assert cell.text.strip() == '0'
-    elif field == 'enabled':
-        assert cell.text.strip() == 'Disabled'
-
-
-def test_rule_filters(client, monkeypatch):
-    c, ui = client
-    calls = []
-    monkeypatch.setattr(ui.de_tide_api, 'tide_de_rules', lambda **kw: calls.append(kw) or {'rows': [], 'total': 0})
-    c.get('/ui/detection-engineering/rules?search=a%26b&severity=high&enabled=0&offset=50&limit=50')
-    assert calls == [dict(search='a&b', severity='high', enabled='0', offset=50, limit=50)]
 
 
 @pytest.mark.parametrize('payload', [{'enabled': False}, {'enabled': True, 'error': 'Failed query'}, {'enabled': True}, {}])
@@ -142,10 +115,10 @@ def test_progression_steps(client, monkeypatch, step, text):
 
 def test_permissions_without_licence_gate(client):
     c, ui = client
-    from ion.licensing.gating import require_de_module
-    assert all(require_de_module != dep.call for route in ui.router.routes for dep in route.dependant.dependencies)
+    from ion.licensing import gating
+    assert not hasattr(gating, 'require_de_module')
     c.app.dependency_overrides.clear()
-    assert c.get('/ui/detection-engineering/rules').status_code in (401, 403)
+    assert c.get('/ui/detection-engineering/killchains').status_code in (401, 403)
 
 
 @pytest.mark.parametrize('measured,text', [(True, 'No rules'), (False, 'Coverage unavailable'), (None, 'Coverage unavailable')])

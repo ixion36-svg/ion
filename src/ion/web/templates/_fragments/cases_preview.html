@@ -1,0 +1,55 @@
+{#- The inbox's preview of one case. The key-field line is filled by
+    cases-inbox.js from the alerts' raw documents, read only for the case on
+    screen. -#}
+{%- set next = (blockers or [])[0] if blockers else none %}
+<div class="ci-pv" data-ci-preview="{{ id }}" data-ci-alerts='{{ alert_ids|tojson }}' data-ci-me='{{ me|tojson }}'>
+<button type="button" class="ci-sheet-x" data-click-action="inboxCloseSheet" aria-label="Back to the list">&times;</button>
+{% if state == 'failed' %}
+<p class="ci-pv-failed" role="alert">This case could not be read. Opening it may still work.</p>
+<div class="ci-acts"><button type="button" class="ci-btn primary" data-click-action="openCaseDetail" data-args='{{ [id]|tojson }}'>Open<kbd>&crarr;</kbd></button></div>
+{% else %}
+<header class="ci-pv-head">
+<span class="ci-num">{{ number or '—' }}</span>
+<h2 class="ci-pv-title">{{ title }}{% if host %} <span class="ci-host">— {{ host }}</span>{% endif %}</h2>
+<div class="ci-tags"><span class="ci-sev ci-s-{{ severity }}">{{ severity }}</span><span class="ci-status st-{{ status }}">{{ status }}</span>{% if closure %}<span class="ci-status">{{ closure }}</span>{% endif %}
+<span class="ci-meta">{% for key, word in [('alerts','alert'),('observables','observable'),('notes','note')] %}{% set n = counts[key] %}{{ n if n is not none else '?' }} {{ word }}{{ '' if n == 1 else 's' }}{% if not loop.last %} · {% endif %}{% endfor %}{% if opened_age %} · opened {{ opened_age }} ago{% endif %}</span></div>
+</header>
+<div class="ci-kf" data-ci-keyfields>{% if alert_ids %}<span class="ci-mute">Reading the alerts' key fields&hellip;</span>{% else %}<span class="ci-mute">No linked alerts, so no key fields.</span>{% endif %}</div>
+<section class="ci-next{% if not next %} clear{% endif %}">
+<div class="ci-next-k">Next action</div>
+{% if status == 'closed' %}<b>Closed{% if closure %} · {{ closure }}{% endif %}. Nothing pending.</b>
+{% elif blockers is none %}<b>Unknown</b><span class="ci-mute">The case could not be read.</span>
+{% elif next %}<b>{{ next.title }}</b><span>{{ next.detail }}{% if next.href %} <a class="ci-link" href="{{ next.href }}" target="_blank" rel="noopener">Open in IRIS</a>{% endif %}</span>
+{% else %}<b>Nothing blocks closing it</b>
+{% endif %}
+{% if blockers and blockers|length > 1 %}<ul class="ci-blk" aria-label="Also blocking closure">{% for b in blockers[1:] %}<li class="ci-blk-{{ b.key }}">{{ b.title }}</li>{% endfor %}</ul>{% endif %}
+{% if status != 'closed' %}<p class="ci-why">Derived from the linked alerts, the owner and DFIR-IRIS. It never stops a close.</p>{% endif %}
+</section>
+<div class="ci-acts">
+<button type="button" class="ci-btn primary" data-click-action="openCaseDetail" data-args='{{ [id]|tojson }}'>Open<kbd>&crarr;</kbd></button>
+{% if can_update %}
+{% if assigned_to_id is none and me is not none %}<button type="button" class="ci-btn" data-click-action="inboxAssignMe" data-args='{{ [id]|tojson }}'>Assign to me<kbd>A</kbd></button>
+{% else %}<button type="button" class="ci-btn" data-click-action="inboxReassign" data-args='{{ [id]|tojson }}'>Reassign<kbd>A</kbd></button>{% endif %}
+<button type="button" class="ci-btn" data-click-action="inboxNote" data-args='{{ [id]|tojson }}'>Note<kbd>N</kbd></button>
+{% if status != 'closed' %}<button type="button" class="ci-btn ghost" data-click-action="panelUpdateField" data-args='{{ [id, "status", "closed"]|tojson }}'>Close<kbd>C</kbd></button>{% endif %}
+{% endif %}
+</div>
+{% if can_update %}
+<div class="ci-reassign" data-ci-reassign hidden><label>Owner <select data-ci-owner data-change-action="panelUpdateField" data-args='{{ [id, "assigned_to_id", "$value"]|tojson }}'><option value="">Unassigned</option></select></label></div>
+<div class="ci-notebox" data-ci-notebox data-ci-placeholder="Add a note to {{ number or 'this case' }}" hidden><button type="button" class="ci-btn" data-click-action="addPanelNote" data-args='{{ [id]|tojson }}'>Add note</button></div>
+{% endif %}
+<p class="ci-hint">Double-click or <kbd>&crarr;</kbd> opens the case. <kbd>Esc</kbd> comes back here.</p>
+<section class="ci-sec">
+<h3 class="ci-sec-h">Latest activity</h3>
+{% if activity is none %}<p class="ci-mute" role="status">The timeline could not be read.</p>
+{% elif not activity %}<p class="ci-mute">Nothing on the timeline yet.</p>
+{% else %}<ul class="ci-feed">{% for e in activity %}<li class="ci-ev-{{ e.kind }}"><span class="ci-ev-who">{{ e.kind }}</span><span class="ci-ev-txt"><b>{{ e.title or 'Untitled event' }}</b>{% if e.detail %} {{ e.detail }}{% endif %}</span><span class="ci-ev-when">{{ e.when or '—' }}</span></li>{% endfor %}</ul>{% endif %}
+</section>
+<dl class="ci-facts">
+<dt>Owner</dt><dd>{% if owner %}<span class="ci-av sm av-{{ owner_hue }}">{{ owner_initials }}</span> {{ owner }}{% else %}<span class="ci-av sm none">?</span> Unassigned{% endif %}</dd>
+<dt>Opened</dt><dd class="ci-mono">{{ opened or 'Unknown' }}{% if opened_age %} · {{ opened_age }} ago{% endif %}</dd>
+<dt>Kibana</dt><dd>{% if kibana == 'linked' %}<span class="ci-dot ok"></span>{% if kibana_url %}<a class="ci-link" href="{{ kibana_url }}" target="_blank" rel="noopener">Linked case</a>{% else %}Linked case{% endif %}{% elif kibana == 'pending' %}<span class="ci-dot warn"></span>Sync pending{% else %}<span class="ci-dot"></span>Not linked{% endif %}</dd>
+<dt>DFIR-IRIS</dt><dd>{% if iris_id is not none %}<span class="ci-dot iris"></span>{% if iris_url %}<a class="ci-link" href="{{ iris_url }}" target="_blank" rel="noopener">Escalated, #{{ iris_id }}</a>{% else %}Escalated, #{{ iris_id }}{% endif %}{% else %}<span class="ci-dot"></span>Not escalated{% endif %}</dd>
+</dl>
+{% endif %}
+</div>

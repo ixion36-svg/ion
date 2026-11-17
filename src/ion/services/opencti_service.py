@@ -8,7 +8,8 @@ import asyncio
 import logging
 import re
 import threading
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 
@@ -16,7 +17,9 @@ from ion.core.async_http import current_loop, dispose_client, is_usable_on
 from ion.core.circuit_breaker import opencti_breaker
 from ion.core.config import get_opencti_config, get_ssl_verify
 from ion.core.safe_errors import safe_error
+from ion.models.observable import ObservableType
 from ion.services.country_mapper import country_code_to_flag, get_country_code, get_country_name
+from ion.services.observable_kinds import observable_kind
 
 logger = logging.getLogger(__name__)
 
@@ -99,38 +102,117 @@ class OpenCTIError(Exception):
         self.status_code = status_code
 
 
-#: Which STIX pattern assertion actually speaks about each ION observable
-#: type, and whether the compared value is case-significant.
-#:
-#: Separate from ``OpenCTIService.TYPE_MAP``, which maps to OpenCTI *entity*
-#: types for the observable lookup. A pattern names the STIX SCO type and a
-#: property path instead, and the two are not interchangeable: an
-#: ``IPv4-Addr`` entity is matched by ``ipv4-addr:value``, while a
-#: ``StixFile`` entity is matched by several different hash properties that
-#: must not be mixed with one another.
-#:
-#: The third element marks values where case carries no meaning. DNS names
-#: and hex digests are case-insensitive, so folding them keeps true positives
-#: that differ only in case. URL paths and file names are case-significant,
-#: so folding them would invent matches.
-_PATTERN_PROPERTY = {
-    "ipv4-addr": ("ipv4-addr", "value", False),
-    "ipv6-addr": ("ipv6-addr", "value", True),
-    "domain-name": ("domain-name", "value", True),
-    "url": ("url", "value", False),
-    "email-addr": ("email-addr", "value", True),
-    "file-sha256": ("file", "sha256", True),
-    "file-sha1": ("file", "sha1", True),
-    "file-md5": ("file", "md5", True),
-    "file-name": ("file", "name", False),
-    # ION's own aliases, mirroring TYPE_MAP so a value arriving from the
-    # alert pipeline verifies the same way as one typed into the UI.
-    "ip": ("ipv4-addr", "value", False),
-    "domain": ("domain-name", "value", True),
-    "hostname": ("domain-name", "value", True),
-    "source_ip": ("ipv4-addr", "value", False),
-    "destination_ip": ("ipv4-addr", "value", False),
+@dataclass(frozen=True)
+class OpenCTITarget:
+    """Where one ION observable kind lives in OpenCTI.
+
+    ``entity_types`` is in order of preference, and the first is the type the
+    kind *is*: anything ION ever writes to OpenCTI must use that one. More
+    than one appears only where OpenCTI may legitimately hold the value under
+    a neighbouring type.
+
+    ``patterns`` are the STIX ``(object, property)`` assertions an indicator
+    makes about this kind. An entity type is not a pattern object: a
+    ``StixFile`` is asserted as ``file:hashes.'SHA-256'``, and each hash is a
+    different property that must not be mixed with the others.
+
+    ``fold_case`` marks values where case carries no meaning. DNS names and
+    hex digests are case-insensitive, so folding keeps true positives that
+    differ only in case. URL paths and file names are case-significant, so
+    folding them would invent matches.
+    """
+
+    entity_types: Tuple[str, ...]
+    filter_keys: Tuple[str, ...]
+    patterns: Tuple[Tuple[str, str], ...]
+    fold_case: bool = False
+
+    def filters(self, value: str) -> Dict[str, Any]:
+        """The filter group that finds ``value`` as this kind and no other.
+
+        The entity type is part of the question. ``value`` alone is a key
+        most observable types share, so without it a Hostname lookup returns
+        whichever Domain-Name, Text or Url holds the same string.
+        """
+        return {
+            "mode": "and",
+            "filters": [{
+                "key": "entity_type",
+                "values": list(self.entity_types),
+                "operator": "eq",
+                "mode": "or",
+            }],
+            "filterGroups": [{
+                "mode": "or",
+                "filters": [
+                    {"key": key, "values": [value], "operator": "eq", "mode": "or"}
+                    for key in self.filter_keys
+                ],
+                "filterGroups": [],
+            }],
+        }
+
+
+_VALUE = ("value",)
+
+#: Every ION observable kind, to the OpenCTI entity and filter key that hold
+#: it. Entity types and keys were checked against OpenCTI 6.4.4: the types
+#: are its ``Stix-Cyber-Observable`` subtypes, and it rejects a filter key
+#: that no schema defines.
+OPENCTI_TARGETS: Dict[ObservableType, OpenCTITarget] = {
+    ObservableType.IPV4: OpenCTITarget(
+        ("IPv4-Addr",), _VALUE, (("ipv4-addr", "value"),)),
+    ObservableType.IPV6: OpenCTITarget(
+        ("IPv6-Addr",), _VALUE, (("ipv6-addr", "value"),), fold_case=True),
+    ObservableType.DOMAIN: OpenCTITarget(
+        ("Domain-Name",), _VALUE, (("domain-name", "value"),), fold_case=True),
+    # ION's hostname kind covers more than host names: the extractor files
+    # ``source.domain`` and ``destination.domain`` under it, and a host's
+    # FQDN is a DNS name too. Feeds publish those as Domain-Name, so a
+    # Hostname-only lookup would lose real matches. Hostname is still asked
+    # for first and wins when both exist.
+    ObservableType.HOSTNAME: OpenCTITarget(
+        ("Hostname", "Domain-Name"), _VALUE,
+        (("hostname", "value"), ("domain-name", "value")), fold_case=True),
+    ObservableType.URL: OpenCTITarget(
+        ("Url",), _VALUE, (("url", "value"),)),
+    ObservableType.EMAIL: OpenCTITarget(
+        ("Email-Addr",), _VALUE, (("email-addr", "value"),), fold_case=True),
+    ObservableType.FILE_HASH_MD5: OpenCTITarget(
+        ("StixFile",), ("hashes.MD5",), (("file", "md5"),), fold_case=True),
+    ObservableType.FILE_HASH_SHA1: OpenCTITarget(
+        ("StixFile",), ("hashes.SHA-1",), (("file", "sha1"),), fold_case=True),
+    ObservableType.FILE_HASH_SHA256: OpenCTITarget(
+        ("StixFile",), ("hashes.SHA-256",), (("file", "sha256"),), fold_case=True),
+    ObservableType.FILE_NAME: OpenCTITarget(
+        ("StixFile",), ("name",), (("file", "name"),)),
+    # ECS ``user.id`` is extracted as a user account and holds a SID, not a
+    # login, so both keys are asked.
+    ObservableType.USER_ACCOUNT: OpenCTITarget(
+        ("User-Account",), ("account_login", "user_id"),
+        (("user-account", "account_login"), ("user-account", "user_id"))),
+    ObservableType.MAC_ADDRESS: OpenCTITarget(
+        ("Mac-Addr",), _VALUE, (("mac-addr", "value"),), fold_case=True),
+    # Not an observable. OpenCTI holds a CVE as a Vulnerability domain
+    # object, which ``stixCyberObservables`` never returns, and no indicator
+    # pattern asserts one.
+    ObservableType.CVE: OpenCTITarget(("Vulnerability",), ("name",), ()),
 }
+
+
+def opencti_target(
+    obs_type: Any, obs_value: Optional[str] = None
+) -> Optional[Tuple[ObservableType, OpenCTITarget]]:
+    """The kind and OpenCTI target for one of ION's type strings.
+
+    None when the type is not an observable kind at all. The value decides
+    the IP family, so an IPv6 address filed as ``source_ip`` is IPv6.
+    """
+    kind = observable_kind(obs_type, obs_value)
+    if kind is None:
+        return None
+    return kind, OPENCTI_TARGETS[kind]
+
 
 #: One comparison inside a STIX pattern: ``<object>:<property> <op> '<value>'``.
 #:
@@ -171,6 +253,14 @@ def _unescape_pattern_value(value: str) -> str:
     )
 
 
+def _preference(target: OpenCTITarget, edge: Dict[str, Any]) -> int:
+    """Sort key putting the target's preferred entity type first."""
+    entity_type = (edge.get("node") or {}).get("entity_type")
+    if entity_type in target.entity_types:
+        return target.entity_types.index(entity_type)
+    return len(target.entity_types)
+
+
 def pattern_asserts(
     pattern: Optional[str], obs_type: str, obs_value: Optional[str]
 ) -> bool:
@@ -196,17 +286,17 @@ def pattern_asserts(
     if not pattern or not obs_value or not str(obs_value).strip():
         return False
 
-    target = _PATTERN_PROPERTY.get((obs_type or "").strip().lower())
-    if target is None:
+    resolved = opencti_target(obs_type, obs_value)
+    if resolved is None:
         # An unmapped type cannot be verified, and an unverifiable match is
-        # not a match. Logged because it means a caller is using a type the
-        # map has not caught up with.
+        # not a match.
         logger.debug(
             "No pattern property mapping for observable type %r", obs_type
         )
         return False
 
-    want_obj, want_prop, fold = target
+    target = resolved[1]
+    fold = target.fold_case
     wanted = str(obs_value).strip()
     if fold:
         wanted = wanted.lower()
@@ -214,9 +304,11 @@ def pattern_asserts(
     for m in _PATTERN_COMPARISON.finditer(pattern):
         if m.group("op") != "=":
             continue  # "!=" asserts the opposite of a match.
-        if m.group("obj").strip().lower() != want_obj:
-            continue
-        if _normalise_property(m.group("prop")) != want_prop:
+        asserted = (
+            m.group("obj").strip().lower(),
+            _normalise_property(m.group("prop")),
+        )
+        if asserted not in target.patterns:
             continue
         found = _unescape_pattern_value(m.group("val")).strip()
         if fold:
@@ -228,25 +320,6 @@ def pattern_asserts(
 
 class OpenCTIService:
     """Service for interacting with the OpenCTI GraphQL API."""
-
-    # Map ION observable types to OpenCTI STIX types and filter keys
-    TYPE_MAP = {
-        "ipv4-addr": {"entity_type": "IPv4-Addr", "filter_key": "value"},
-        "ipv6-addr": {"entity_type": "IPv6-Addr", "filter_key": "value"},
-        "domain-name": {"entity_type": "Domain-Name", "filter_key": "value"},
-        "url": {"entity_type": "Url", "filter_key": "value"},
-        "file-sha256": {"entity_type": "StixFile", "filter_key": "hashes.SHA-256"},
-        "file-sha1": {"entity_type": "StixFile", "filter_key": "hashes.SHA-1"},
-        "file-md5": {"entity_type": "StixFile", "filter_key": "hashes.MD5"},
-        "email-addr": {"entity_type": "Email-Addr", "filter_key": "value"},
-        "file-name": {"entity_type": "StixFile", "filter_key": "name"},
-        # Aliases for convenience
-        "ip": {"entity_type": "IPv4-Addr", "filter_key": "value"},
-        "domain": {"entity_type": "Domain-Name", "filter_key": "value"},
-        "hostname": {"entity_type": "Domain-Name", "filter_key": "value"},
-        "source_ip": {"entity_type": "IPv4-Addr", "filter_key": "value"},
-        "destination_ip": {"entity_type": "IPv4-Addr", "filter_key": "value"},
-    }
 
     MITRE_TACTIC_ORDER = [
         ("reconnaissance", "Reconnaissance"),
@@ -448,8 +521,9 @@ class OpenCTIService:
         """Enrich a single observable by querying OpenCTI.
 
         Args:
-            obs_type: Observable type (e.g., "ipv4-addr", "domain-name",
-                      "file-sha256", "url", or ION aliases like "source_ip")
+            obs_type: Any type string ION uses for an observable: an
+                      ``ObservableType`` value, a role such as "source_ip",
+                      or a STIX-style name such as "file-sha256"
             obs_value: The observable value to look up
 
         Returns:
@@ -482,16 +556,27 @@ class OpenCTIService:
             result["error"] = "OpenCTI integration is not configured"
             return result
 
-        type_info = self.TYPE_MAP.get(obs_type)
-        if not type_info:
+        resolved = opencti_target(obs_type, obs_value)
+        if resolved is None:
+            # Said out loud, at the one place every path passes through: a
+            # type ION has no kind for is a gap in the alias table or a
+            # caller sending something that is not an observable.
+            logger.warning(
+                "OpenCTI lookup skipped: %r is not an observable kind ION knows",
+                obs_type,
+            )
             result["error"] = f"Unsupported observable type: {obs_type}"
             return result
+        kind, target = resolved
+
+        if kind is ObservableType.CVE:
+            return await self._enrich_vulnerability(result, obs_value)
 
         try:
             # Query for the observable and its related entities
             query = """
-            query EnrichObservable($filters: FilterGroup) {
-                stixCyberObservables(filters: $filters, first: 1) {
+            query EnrichObservable($filters: FilterGroup, $first: Int) {
+                stixCyberObservables(filters: $filters, first: $first) {
                     edges {
                         node {
                             id
@@ -542,24 +627,16 @@ class OpenCTIService:
             }
             """
 
-            # Build filter for the observable value
-            filters = {
-                "mode": "and",
-                "filters": [
-                    {
-                        "key": type_info["filter_key"],
-                        "values": [obs_value],
-                        "operator": "eq",
-                        "mode": "or",
-                    }
-                ],
-                "filterGroups": [],
-            }
+            # One row per entity type the kind may be held under, so the
+            # preferred type can be picked when more than one answers.
+            data = await self._graphql(query, {
+                "filters": target.filters(obs_value),
+                "first": len(target.entity_types),
+            })
 
-            data = await self._graphql(query, {"filters": filters})
-
-            edges = (
-                data.get("stixCyberObservables", {}).get("edges", [])
+            edges = sorted(
+                data.get("stixCyberObservables", {}).get("edges", []),
+                key=lambda e: _preference(target, e),
             )
 
             if not edges:
@@ -628,6 +705,94 @@ class OpenCTIService:
             result["error"] = str(e)
             logger.warning("OpenCTI enrichment failed for %s=%s: %s", obs_type, obs_value, e)
 
+        return result
+
+    async def _enrich_vulnerability(
+        self, result: Dict[str, Any], cve: str
+    ) -> Dict[str, Any]:
+        """Fill ``result`` for a CVE, which OpenCTI holds as a Vulnerability.
+
+        ``score`` stays None: it is OpenCTI's 0-100 observable score
+        everywhere else, and a CVSS base score is a different scale that
+        would read as "barely suspicious" at its maximum of 10.
+        """
+        query = """
+        query EnrichVulnerability($filters: FilterGroup) {
+            vulnerabilities(filters: $filters, first: 1) {
+                edges {
+                    node {
+                        id
+                        entity_type
+                        name
+                        description
+                        x_opencti_cvss_base_score
+                        objectLabel {
+                            id
+                            value
+                            color
+                        }
+                        createdBy {
+                            name
+                        }
+                        reports {
+                            edges {
+                                node {
+                                    id
+                                    name
+                                    description
+                                    published
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        """
+        # OpenCTI names them in upper case.
+        name = str(cve).strip().upper()
+        filters = {
+            "mode": "and",
+            "filters": [
+                {"key": "name", "values": [name], "operator": "eq", "mode": "or"}
+            ],
+            "filterGroups": [],
+        }
+        try:
+            data = await self._graphql(query, {"filters": filters})
+        except OpenCTIError as e:
+            result["error"] = str(e)
+            logger.warning("OpenCTI enrichment failed for cve=%s: %s", cve, e)
+            return result
+
+        edges = data.get("vulnerabilities", {}).get("edges", [])
+        if not edges:
+            return result
+
+        node = edges[0]["node"]
+        result["found"] = True
+        result["observable"] = {
+            "id": node.get("id"),
+            "type": node.get("entity_type"),
+            "value": node.get("name"),
+            "description": node.get("description"),
+            "score": None,
+            "cvss_base_score": node.get("x_opencti_cvss_base_score"),
+            "created_by": (node.get("createdBy") or {}).get("name"),
+        }
+        for label in node.get("objectLabel", []) or []:
+            result["labels"].append({
+                "value": label.get("value"),
+                "color": label.get("color"),
+            })
+        for edge in (node.get("reports", {}) or {}).get("edges", []):
+            rpt = edge.get("node", {})
+            result["reports"].append({
+                "id": rpt.get("id"),
+                "name": rpt.get("name"),
+                "description": rpt.get("description"),
+                "published": rpt.get("published"),
+            })
         return result
 
     async def _search_indicators(
