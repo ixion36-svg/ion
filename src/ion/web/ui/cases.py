@@ -96,7 +96,11 @@ from ion.models.user import User
 from ion.storage.database import get_db_session
 from ion.web.ui._cases_board import router as board_router
 from ion.web.ui._cases_window import (
+    REASONS,
+    UNTRIAGED_DETAIL,
+    VERDICTS,
     alert_bob,
+    alert_verdicts,
     blockers,
     case_alerts,
     bob_case_note,
@@ -2003,6 +2007,8 @@ class PanelAlert(TypedDict, total=False):
     status: Optional[str]
     status_class: Optional[str]
     bits: list[str]
+    verdict: Optional[str]
+    bob_verdict: Optional[str]
 
 
 class PanelNote(TypedDict):
@@ -2060,6 +2066,10 @@ class PanelView(TypedDict):
     closure_reason: Optional[str]
     closure_notes: Optional[str]
     can_enrich: bool
+    can_triage: bool
+    me_id: Optional[int]
+    verdicts: list[dict]
+    untriaged_detail: str
     blockers: list[dict]
     summary: Optional[dict]
     bob_note: Optional[dict]
@@ -2383,7 +2393,8 @@ def read_case_detail(case_id, current_user, session):
 
 def panel_view(payload: Any, users: Any,
                users_withheld: bool, extras: Optional[dict] = None,
-               can_enrich: bool = False) -> PanelView:
+               can_enrich: bool = False, can_triage: bool = False,
+               me_id: Optional[int] = None) -> PanelView:
     empty: PanelView = {
         "state": "failed", "case_id": 0, "case_number": None,
         "title": None, "severity": "medium",
@@ -2400,7 +2411,10 @@ def panel_view(payload: Any, users: Any,
         "notes": None, "note_count": None, "kibana_case_id": None,
         "kibana_url": None, "escalated": False, "iris_case_id": None,
         "iris_url": None, "assignee": None, "closure_reason": None,
-        "closure_notes": None, "can_enrich": can_enrich, "blockers": [],
+        "closure_notes": None, "can_enrich": can_enrich,
+        "can_triage": can_triage, "me_id": me_id, "verdicts": list(VERDICTS),
+        "untriaged_detail": UNTRIAGED_DETAIL,
+        "blockers": [],
         "summary": None, "bob_note": None,
     }
     if not isinstance(payload, dict):
@@ -2410,8 +2424,13 @@ def panel_view(payload: Any, users: Any,
     severity = _panel_text(payload.get("severity")) or "medium"
     alerts = panel_alerts(payload.get("alerts"), severity)
     letters = {a["alert_id"]: a["letter"] for a in alerts or []}
+    verdicts = alert_verdicts(payload.get("notes"))
     for a in alerts or []:
         a["bob"] = alert_bob(a["alert_id"], extras)
+        a["verdict"] = (verdicts or {}).get(a["alert_id"])
+        bob = a["bob"]
+        a["bob_verdict"] = next((v for v in (bob["verdict"], bob["suggested_verdict"])
+                                 if v in REASONS), None)
     observables = observable_cards(
         panel_observables(payload.get("observables"), payload.get("alerts"), letters),
         extras)
@@ -2466,8 +2485,13 @@ def panel_view(payload: Any, users: Any,
         "closure_reason": _panel_text(payload.get("closure_reason")),
         "closure_notes": _panel_text(payload.get("closure_notes")),
         "can_enrich": can_enrich,
+        "can_triage": can_triage,
+        "me_id": me_id,
+        "verdicts": list(VERDICTS),
+        "untriaged_detail": UNTRIAGED_DETAIL,
         "blockers": blockers(payload.get("alerts"), payload.get("assigned_to_id"),
-                             payload.get("dfir_iris_case_id"), payload.get("dfir_iris_url")),
+                             payload.get("dfir_iris_case_id"), payload.get("dfir_iris_url"),
+                             verdicts),
         "summary": summary_view(bob_note, payload.get("evidence_summary"),
                                 payload.get("description")),
         "bob_note": bob_note,
@@ -2522,5 +2546,8 @@ async def cases_panel_fragment(
             logger.exception("Case panel could not read Bob and enrichment rows for %s", case_id)
     view = panel_view(payload, assignees_view(users, permitted)["users"],
                       not permitted, extras,
-                      can_enrich=current_user.has_permission("observable:enrich"))
+                      can_enrich=current_user.has_permission("observable:enrich"),
+                      can_triage=current_user.has_permission("alert:triage"),
+                      me_id=(current_user.id if current_user.has_permission("case:update")
+                             else None))
     return render_view(request, PANEL_FRAGMENT, view)

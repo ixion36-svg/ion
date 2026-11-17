@@ -50,6 +50,16 @@ class CaseClosureReason(str, Enum):
     NOT_APPLICABLE = "not_applicable"
 
 
+#: POST /elasticsearch/alerts/{id}/close takes one of these closure types,
+#: and each is a case closure reason: the one the case closes with, and the
+#: verdict the alert's "Alert closed as ..." case note records.
+ALERT_CLOSURE_REASONS: dict[str, str] = {
+    "escalated": CaseClosureReason.TRUE_POSITIVE.value,
+    "benign": CaseClosureReason.BENIGN_TRUE_POSITIVE.value,
+    "false_positive": CaseClosureReason.FALSE_POSITIVE.value,
+}
+
+
 class NoteEntityType(str, Enum):
     """Entity types that can have notes attached."""
 

@@ -2048,7 +2048,7 @@
  * One window, two layouts over one state (static/js/case-window.js). Every
  * colour comes from the theme's tokens, so light mode follows on its own.
  */
-.cwin {
+.cwin, .cwin-cx {
     --cwin-line: var(--ion-border, rgba(255, 255, 255, .11));
     --cwin-panel: var(--ion-surface, rgba(255, 255, 255, .04));
     --cwin-text: var(--text-primary, #e6ebf5);
@@ -2060,7 +2060,7 @@
     --cwin-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
     display: flex; flex-direction: column; gap: 14px; color: var(--cwin-text); font-size: 13px;
 }
-.cwin [hidden] { display: none !important; }
+.cwin [hidden], .cwin-cx [hidden] { display: none !important; }
 .cwin-grow { flex: 1 1 auto; }
 .cwin-mono { font-family: var(--cwin-mono); font-size: 12px; }
 .cwin-note { color: var(--cwin-mute); font-size: 12px; }
@@ -2150,8 +2150,8 @@ main.container:has(.case-page-mode) { max-width: none; }
 .cwin-pill.clear .cwin-pill-b { border-color: color-mix(in srgb, var(--cwin-ok) 50%, transparent); background: none; color: var(--cwin-ok); }
 .cwin-pill-s { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; opacity: .75; }
 .cwin-pill-l {
-    position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: min(380px, 86vw); padding: 10px 12px;
-    border: 1px solid var(--cwin-line); border-radius: 10px; background: var(--color-base-200, #111827); box-shadow: var(--shadow-card);
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: min(440px, 86vw); padding: 10px 12px;
+    border: 1px solid var(--cwin-line); border-radius: 10px; background: var(--bg-elevated, #1e232e); box-shadow: var(--shadow-card);
 }
 .cwin-bls { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .cwin-bl { display: flex; align-items: center; gap: 10px; padding: 7px 9px; border: 1px solid var(--cwin-line); border-radius: 8px; }
@@ -2379,3 +2379,47 @@ body:has(.case-page-mode) { overflow-x: clip; overflow-y: visible; }
     .cwin-ht1 { flex-wrap: wrap; }
     .cwin-title { white-space: normal; }
 }
+
+/* Triage verdicts: per alert, on the ticked alerts, and in the close dialog */
+.cwin-verdict {
+    display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--cwin-line);
+    font-size: 10.5px; font-weight: 700; letter-spacing: .02em; color: var(--cwin-mute); white-space: nowrap;
+}
+.cwin-verdict.v-true_positive { color: var(--sev-critical, #ef4444); border-color: color-mix(in srgb, var(--sev-critical, #ef4444) 45%, transparent); }
+.cwin-verdict.v-benign_true_positive { color: var(--cwin-ok); border-color: color-mix(in srgb, var(--cwin-ok) 45%, transparent); }
+.cwin-verdict.v-false_positive { color: var(--cwin-mute); border-color: color-mix(in srgb, var(--cwin-mute) 55%, transparent); }
+.cwin-stc .cwin-verdict { display: block; width: fit-content; margin: 4px 0 0; }
+.cwin-dh-a { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 8px; }
+.cwin-tvs { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.cwin-tv.on { border-color: var(--cwin-accent); background: var(--cwin-accent-bg); color: var(--cwin-accent); }
+.cwin-tv.tv-true_positive:hover { border-color: var(--sev-critical, #ef4444); }
+.cwin-tv.tv-benign_true_positive:hover { border-color: var(--cwin-ok); }
+.cwin-table tr.cwin-busy td { opacity: .55; }
+.cwin-bulk { flex-direction: column; align-items: stretch; gap: 6px; }
+.cwin-bulk-r { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.cwin-bulk > .cwin-note { margin: 0; }
+.cwin-bulk-ask { padding: 7px 9px; border: 1px solid var(--cwin-accent); border-radius: 8px; background: var(--cwin-accent-bg); }
+.cwin-bulk-res { padding: 7px 9px; border: 1px solid color-mix(in srgb, var(--sev-critical, #ef4444) 50%, transparent); border-radius: 8px; font-size: 12px; }
+.cwin-bulk-res ul { margin: 4px 0 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
+.cwin-bl-acts { display: inline-flex; flex-wrap: wrap; gap: 10px; }
+.cwin-pill-f { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--cwin-line); }
+.cwin-pill-f .cwin-note { flex: 1; margin: 0; }
+.cwin-cx { gap: 8px; margin-bottom: 14px; }
+.cwin-cx p { margin: 0; }
+.cwin-cx-w { display: flex; flex-direction: column; gap: 6px; padding: 9px 10px; border: 1px solid color-mix(in srgb, var(--sev-high, #f59e0b) 50%, transparent); border-radius: 8px;
+    background: color-mix(in srgb, var(--sev-high, #f59e0b) 7%, transparent); }
+.cwin-cx-k { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--sev-high, #f59e0b); }
+.cwin-cx .cwin-bls { margin: 0; }
+.cwin-cx .cwin-bl { padding: 5px 7px; }
+.cwin-cx .cwin-bl > div span { color: var(--text-secondary, #94a3b8); }
+@media (max-width: 640px) {
+    .cwin-dh { flex-direction: column; }
+    .cwin-dh-a { justify-content: flex-start; }
+    .cwin-pill-l { position: fixed; left: 16px; right: 16px; top: auto; width: auto; max-height: 70vh; overflow: auto; }
+    .cwin-pill-f { flex-direction: column; align-items: stretch; }
+    .cwin-bl { flex-wrap: wrap; }
+    .cwin-filt { flex-wrap: wrap; }
+}
+/* The theme's base-200 is translucent under glass, which let the case strip
+   read through the popover. */
+html[data-glass="on"][data-mode="dark"] .cwin-pill-l { background: rgba(13, 19, 42, 0.96); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }

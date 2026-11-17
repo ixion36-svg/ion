@@ -2937,6 +2937,7 @@ def get_elasticsearch_service() -> ElasticsearchService:
 # ============================================================================
 
 from ion.models.alert_triage import (
+    ALERT_CLOSURE_REASONS,
     AlertCase,
     AlertCaseStatus,
     AlertTriage,
@@ -2994,6 +2995,10 @@ class AlertClosureRequest(BaseModel):
     match_hosts: Optional[List[str]] = None
     match_users: Optional[List[str]] = None
     match_ips: Optional[List[str]] = None
+    # False records the verdict on the case without closing it, for a case
+    # window that triages its alerts one by one. True is the alert window's
+    # close, which closes the case and every alert in it.
+    close_case: bool = True
 
 
 class BulkTriageUpdate(BaseModel):
@@ -4225,15 +4230,9 @@ async def close_alert(
             session.add(note)
             note_added_to_case = True
 
-            # Close the parent case with mapped closure reason
-            closure_reason_map = {
-                "benign": "benign_true_positive",
-                "escalated": "true_positive",
-                "false_positive": "false_positive",
-            }
-            if case.status != AlertCaseStatus.CLOSED:
+            if data.close_case and case.status != AlertCaseStatus.CLOSED:
                 case.status = AlertCaseStatus.CLOSED
-                case.closure_reason = closure_reason_map.get(data.closure_type, "not_applicable")
+                case.closure_reason = ALERT_CLOSURE_REASONS.get(data.closure_type, "not_applicable")
                 case.closure_notes = data.notes or f"Closed via alert closure ({label})"
                 case.closed_by_id = current_user.id
                 case.closed_at = datetime.utcnow()

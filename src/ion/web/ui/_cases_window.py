@@ -18,6 +18,8 @@ import logging
 import re
 from typing import Any, Literal, Optional, TypedDict
 
+from ion.models.alert_triage import ALERT_CLOSURE_REASONS
+
 logger = logging.getLogger(__name__)
 
 
@@ -219,6 +221,69 @@ def summary_view(note: Optional[BobNote], evidence_summary: Any,
             "verdict": None, "when": None}
 
 
+# ── Alert verdicts ──────────────────────────────────────────────────────
+class Verdict(TypedDict):
+    reason: str
+    closure_type: str
+    label: str
+    key: str
+
+
+_VERDICT_FACE = {"escalated": ("True positive", "t"), "benign": ("Benign", "b"),
+                 "false_positive": ("False positive", "f")}
+
+#: The three verdicts the case window triages with, in button order. Each
+#: is sent to POST /elasticsearch/alerts/{id}/close as its closure type and
+#: is named by the case closure reason it maps to.
+VERDICTS: tuple[Verdict, ...] = tuple(
+    {"reason": ALERT_CLOSURE_REASONS[t], "closure_type": t, "label": label, "key": key}
+    for t, (label, key) in _VERDICT_FACE.items())
+
+REASONS = frozenset(v["reason"] for v in VERDICTS)
+
+# close_alert's note: "**Alert closed as {closure type, title-cased}**",
+# then "Alert: `{id}`" on the next line.
+_CLOSED_AS = re.compile(r"\A\*\*Alert closed as (?P<label>[^*\n]+)\*\*[ \t]*\r?\nAlert: `(?P<id>[^`\n]+)`")
+
+
+def alert_verdicts(notes: Any) -> Optional[dict[str, str]]:
+    """Each alert's latest recorded verdict, as a case closure reason.
+
+    The case note close_alert writes is the only place ION keeps the
+    verdict an alert was closed with. None when the notes are unreadable.
+    """
+    if not isinstance(notes, list):
+        return None
+    latest: dict[str, tuple[str, str]] = {}
+    for index, entry in enumerate(notes):
+        content = entry.get("content") if isinstance(entry, dict) else None
+        match = _CLOSED_AS.match(content) if isinstance(content, str) else None
+        reason = match and ALERT_CLOSURE_REASONS.get(
+            match.group("label").strip().lower().replace(" ", "_"))
+        if not reason:
+            continue
+        stamp = entry.get("created_at")
+        order = (stamp if isinstance(stamp, str) else "") + "|%08d" % index
+        alert_id = match.group("id")
+        if alert_id not in latest or order > latest[alert_id][0]:
+            latest[alert_id] = (order, reason)
+    return {alert_id: reason for alert_id, (_, reason) in latest.items()}
+
+
+def untriaged(alerts: Any, verdicts: Optional[dict[str, str]]) -> Optional[list[str]]:
+    """The alerts nobody has decided: not closed, and no verdict recorded."""
+    if not isinstance(alerts, list):
+        return None
+    decided = verdicts or {}
+    return [str(a.get("es_alert_id")) for a in alerts if isinstance(a, dict)
+            and str(a.get("status") or "open").lower() != "closed"
+            and str(a.get("es_alert_id")) not in decided]
+
+
+def untriaged_title(n: int) -> str:
+    return "%d linked alert%s not triaged" % (n, "" if n == 1 else "s")
+
+
 # ── What stops closure (derived) ────────────────────────────────────────
 class Blocker(TypedDict):
     key: str
@@ -227,26 +292,25 @@ class Blocker(TypedDict):
     href: Optional[str]
 
 
+UNTRIAGED_DETAIL = "Not closed, and no verdict recorded on this case."
+
+
 def blockers(alerts: Any, assigned_to_id: Any, iris_case_id: Any,
-             iris_url: Any) -> list[Blocker]:
+             iris_url: Any, verdicts: Optional[dict[str, str]] = None) -> list[Blocker]:
     """Why this case is not ready to close, from what the panel already read.
 
     ION has no readiness rules, so this is derived and labelled so; it never
-    gates the close action.
+    gates the close action. case-window.js recounts the alerts entry after a
+    triage write, by the same rule as untriaged().
     """
     out: list[Blocker] = []
-    if not isinstance(alerts, list):
+    open_ids = untriaged(alerts, verdicts)
+    if open_ids is None:
         out.append({"key": "alerts-unknown", "title": "Linked alerts could not be read",
                     "detail": "Whether any are still open is unknown.", "href": None})
-    else:
-        still_open = [a for a in alerts if isinstance(a, dict)
-                      and str(a.get("status") or "open").lower() != "closed"]
-        if still_open:
-            n = len(still_open)
-            out.append({"key": "alerts",
-                        "title": "%d linked alert%s not closed" % (n, "" if n == 1 else "s"),
-                        "detail": "Alerts in the case that are still open or acknowledged.",
-                        "href": None})
+    elif open_ids:
+        out.append({"key": "alerts", "title": untriaged_title(len(open_ids)),
+                    "detail": UNTRIAGED_DETAIL, "href": None})
     if assigned_to_id is None:
         out.append({"key": "assignee", "title": "No one is assigned",
                     "detail": "The case has no owner.", "href": None})
