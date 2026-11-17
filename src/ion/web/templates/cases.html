@@ -7,6 +7,7 @@
    page converts for the styled column; the colours the view model used
    to carry are here already. #}
 <link rel="stylesheet" href="/static/css/cases-page.css?v={{ ion_version }}">
+<link rel="stylesheet" href="/static/css/cases-inbox.css?v={{ ion_version }}">
 {% endblock %}
 
 {% block content %}
@@ -14,39 +15,26 @@
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 
   <!-- Header row -->
-  <section class="ion-page-header flex-wrap gap-6 mb-8 rise d-1">
-    <div class="basis-full md:basis-auto md:flex-1 min-w-0">
-      <div class="flex items-center gap-3 mb-4">
-        <span class="h-1.5 w-1.5 rounded-full bg-ion-cyan pulse-cyan"></span>
-        <span class="label-tiny text-ion-cyan">Investigation workflow</span>
-      </div>
-      <h1 class="ion-ph-title font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Cases</h1>
-      <p class="ion-ph-sub mt-3 max-w-2xl text-[15px]">Visual workflow tracking for security investigations.</p>
+  <section class="ci-header">
+    <div class="ci-header-t">
+      <span class="label-tiny text-ion-cyan">Investigate</span>
+      <h1 class="ci-h1">Cases</h1>
+      <p class="ci-sub">Your queue, newest activity first. <kbd>j</kbd><kbd>k</kbd> move, <kbd>&crarr;</kbd> opens.</p>
     </div>
+    <label class="ci-search"><svg class="w-3.5 h-3.5" aria-hidden="true"><use href="#i-search"/></svg>
+      <input type="text" id="filter-search" placeholder="Search case number or title" aria-label="Search cases" data-input-action="debouncedFilter"><kbd>/</kbd>
+    </label>
     <button data-click-action="showCreateCaseModal" class="ion-btn ion-btn-primary">
       <svg class="w-3.5 h-3.5"><use href="#i-plus"/></svg>
       New Case
     </button>
   </section>
 
-  <!-- Attention Banner (JS-populated) -->
-  <div id="attn-banner" class="mb-4 rounded-[12px] border border-ion-amber/30 bg-ion-amber/5 px-5 py-4 flex flex-col gap-3 hidden">
-    <div class="attn-banner-header flex items-center justify-between">
-      <span class="flex items-center gap-2 text-[13px] text-ion-amber font-medium">
-        <svg class="w-4 h-4"><use href="#i-alert-triangle"/></svg>
-        <span id="attn-count">—</span> attention reasons in displayed cases
-      </span>
-      <button data-click-action="dismissAttentionBanner" class="text-slate-400 hover:text-white transition" title="Dismiss">
-        <svg class="w-4 h-4"><use href="#i-x"/></svg>
-      </button>
-    </div>
-    <div id="attn-list" class="attn-banner-list flex flex-wrap gap-2"></div>
-  </div>
-
-  <!-- Stats bar. Server-rendered by /ui/cases/summary, which also fills the
-       Management Analytics panel out of band. Re-requested when loadAllCases()
-       dispatches cases-changed on the body after a status change. -->
-  <div id="cases-stats" class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3 mb-8 rise d-2"
+  <!-- The stat tiles, compacted into a strip. Server-rendered by
+       /ui/cases/summary, which also fills the Management Analytics panel out
+       of band. Re-requested when loadAllCases() dispatches cases-changed on
+       the body after a status change. -->
+  <div id="cases-stats" class="ci-kpis"
        hx-get="/ui/cases/summary"
        hx-trigger="load, cases-changed from:body"
        hx-swap="innerHTML">
@@ -65,7 +53,7 @@
        Replaced out of band by the fragment. The hidden control inside is
        for the request itself failing, when nothing out of band arrives;
        the listener at the end of the script reveals it. -->
-  <div id="cases-summary-retry" class="mb-4">
+  <div id="cases-summary-retry" class="mb-2">
     <div class="hidden" data-summary-retry>
       <div role="alert" class="alert alert-error flex items-center justify-between gap-3">
         <span>The stat tiles and the analytics could not be requested. Nothing here has been measured.</span>
@@ -74,71 +62,79 @@
     </div>
   </div>
 
-<!-- Filled by _fragments/cases_board.html through an hx-swap-oob, so the
-     board never silently shows a subset of the cases (review 2026-10-08,
-     stage 5). This said renderCaseLoadNotice() filled it; that function
-     went when the board moved to /ui/cases/board, and the notice is the
-     server's to write now, as are #cases-total and #cases-shown. -->
-<div id="cases-load-notice" class="mb-4"></div>
+  <!-- Attention strip (filled out of band by the list fragment) -->
+  <div id="attn-banner" class="ci-attn hidden">
+    <span class="ci-attn-k"><svg class="w-3.5 h-3.5"><use href="#i-alert-triangle"/></svg><span id="attn-count">—</span> need attention</span>
+    <div id="attn-list" class="ci-attn-list"></div>
+    <button data-click-action="dismissAttentionBanner" class="ci-attn-x" title="Dismiss">
+      <svg class="w-3.5 h-3.5"><use href="#i-x"/></svg>
+    </button>
+  </div>
 
-<!-- Filters Bar -->
-<div class="flex flex-col sm:flex-row gap-3 mb-4">
-    <input type="text" id="filter-search" class="flex-1 px-3 py-2 bg-base-200 border border-base-300 rounded text-[0.85rem] text-base-content placeholder:text-base-content/50 focus:outline-none focus:border-primary" placeholder="Search case number or title..." data-input-action="debouncedFilter">
-    <select id="filter-severity" class="min-w-[150px] px-3 py-2 bg-base-200 border border-base-300 rounded text-[0.85rem] text-base-content focus:outline-none focus:border-primary" data-change-action="reloadCaseBoard">
+<!-- Filled by _fragments/cases_board.html through an hx-swap-oob, so the
+     list never silently shows a subset of the cases. -->
+<div id="cases-load-notice"></div>
+
+<!-- Chips, the narrower filters and the sort -->
+<div class="ci-bar">
+    <div id="ci-chips" class="ci-chips">{% for key, label in [('changed','Changed'),('mine','Mine'),('unassigned','Unassigned'),('critical','Critical'),('closed','Closed')] %}<button type="button" class="ci-chip" aria-pressed="false" data-ci-chip="{{ key }}" data-click-action="inboxChip" data-args='{{ [key]|tojson }}'>{{ label }}<span class="ci-chip-n"></span></button>{% endfor %}</div>
+    <span class="ci-grow"></span>
+    {# status filter. /api/cases already returns open, acknowledged
+       AND closed — the board just had no way to narrow to one of them, so a
+       closed case could only be found by scrolling past the live ones. #}
+    <select id="filter-severity" class="ci-sel" aria-label="Severity" data-change-action="reloadCaseBoard">
         <option value="">All Severities</option>
         <option value="critical">Critical</option>
         <option value="high">High</option>
         <option value="medium">Medium</option>
         <option value="low">Low</option>
     </select>
-    {# status filter. /api/cases already returns open, acknowledged
-       AND closed — the board just had no way to narrow to one of them, so a
-       closed case could only be found by scrolling past the live ones. #}
-    <select id="filter-status" class="min-w-[150px] px-3 py-2 bg-base-200 border border-base-300 rounded text-[0.85rem] text-base-content focus:outline-none focus:border-primary" data-change-action="reloadCaseBoard">
+    <select id="filter-status" class="ci-sel" aria-label="Status" data-change-action="reloadCaseBoard">
         <option value="">All Statuses</option>
         <option value="open">Open</option>
         <option value="acknowledged">Acknowledged</option>
         <option value="closed">Closed</option>
     </select>
-    <select id="filter-assignee" class="min-w-[150px] px-3 py-2 bg-base-200 border border-base-300 rounded text-[0.85rem] text-base-content focus:outline-none focus:border-primary" data-change-action="reloadCaseBoard">
+    <select id="filter-assignee" class="ci-sel" aria-label="Owner" data-change-action="reloadCaseBoard">
         <option value="">All Assignees</option>
     </select>
-</div>
-
-<!-- Board toolbar (sort + page-size + showing count) -->
-<div class="flex flex-wrap items-center gap-3 mb-4">
-    <div class="text-xs text-base-content/60 tabular-nums">Showing <b id="cases-shown" class="text-base-content font-mono">—</b> of <b id="cases-total" class="text-base-content font-mono">—</b> cases</div>
-    <span class="flex-1"></span>
-    <label class="flex items-center gap-2 text-xs text-base-content/60">
-        <span>Sort</span>
-        <select id="cases-sort" class="min-w-0 px-3 py-2 bg-base-200 border border-base-300 rounded text-[0.85rem] text-base-content focus:outline-none focus:border-primary" data-change-action="changeSort">
+    <label class="ci-sortl"><span>Sort</span>
+        <select id="cases-sort" class="ci-sel" data-change-action="changeSort">
+            <option value="activity">Last activity</option>
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
             <option value="severity">Severity</option>
             <option value="alerts">Most alerts</option>
         </select>
     </label>
-    <label class="flex items-center gap-2 text-xs text-base-content/60">
-        <span>Page size</span>
-        <select id="cases-pagesize" class="min-w-0 px-3 py-2 bg-base-200 border border-base-300 rounded text-[0.85rem] text-base-content focus:outline-none focus:border-primary" data-change-action="changePageSize">
-            <option value="12">12 at a time</option>
-            <option value="24" selected>24 at a time</option>
-            <option value="48">48 at a time</option>
+</div>
+
+<!-- The inbox: the list, and the selected case's preview beside it (a sheet
+     on a phone). It replaced a grid of case cards, which had itself
+     replaced a drag-drop Kanban. -->
+<div class="ci-inbox" id="ci-inbox">
+  <section class="ci-q" aria-label="Case queue">
+    <header class="ci-q-h"><span>Queue</span><span class="ci-mute">Showing <b id="cases-shown">—</b> of <b id="cases-total">—</b></span>
+      <span class="ci-grow"></span>
+      <label class="ci-sortl"><span>Page</span>
+        <select id="cases-pagesize" class="ci-sel" data-change-action="changePageSize">
+            <option value="25">25</option>
+            <option value="50" selected>50</option>
+            <option value="100">100</option>
         </select>
-    </label>
+      </label>
+    </header>
+    <div class="ci-rows" id="cases-board" role="listbox" aria-label="Cases"></div>
+    <div class="ci-more" id="cases-loadmore" hidden>
+        <button type="button" class="ci-btn" data-click-action="loadMoreCases">Load more cases</button>
+        <p>Only requested pages are loaded.</p>
+    </div>
+    <footer class="ci-keys"><span><kbd>j</kbd><kbd>k</kbd>move</span><span><kbd>&crarr;</kbd>open</span><span><kbd>a</kbd>assign to me</span><span><kbd>n</kbd>note</span><span><kbd>c</kbd>close</span><span><kbd>/</kbd>search</span></footer>
+  </section>
+  <aside class="ci-pane" id="ci-pane" aria-label="Case preview">
+    <div id="ci-preview"><p class="ci-mute ci-pv-empty">Select a case to preview it.</p></div>
+  </aside>
 </div>
-
-<!-- Case widget board (replaces the drag-drop Kanban; status changes now on
-     each widget's inline control — same PATCH path the Kanban drop used). -->
-<div class="grid grid-cols-[repeat(auto-fill,minmax(380px,1fr))] max-[640px]:grid-cols-1 gap-4 items-start" id="cases-board"></div>
-
-<!-- Load-more cap -->
-<div class="flex flex-col items-center gap-2.5 mt-[26px]" id="cases-loadmore" hidden>
-    <button type="button" class="font-semibold text-[13px] text-primary bg-primary/[0.12] border border-primary/40 rounded-[10px] px-[22px] py-[11px] cursor-pointer transition hover:bg-primary/20" data-click-action="loadMoreCases">Load more cases</button>
-    <p class="text-[11.5px] text-base-content/50 text-center max-w-[56ch] m-0">Widgets render in pages of your chosen size, so a queue of hundreds of
-        cases opens instantly. The rest stay ready until requested.</p>
-</div>
-
 <!-- Management Analytics Panel -->
 <div class="analytics-toggle" data-click-action="toggleAnalyticsPanel">
     <h3>Management Analytics</h3>
@@ -261,6 +257,7 @@
 {% include "_fragments/ion_fragment_client.html" %}
 <script src="/static/js/ion-fragments.js?v={{ ion_version }}"></script>
 <script nonce="{{ csp_nonce }}" src="/static/js/case-window.js?v={{ ion_version }}"></script>
+<script nonce="{{ csp_nonce }}" src="/static/js/cases-inbox.js?v={{ ion_version }}"></script>
 {% if initial_case_id %}<script nonce="{{ csp_nonce }}">window.__initialCaseId = {{ initial_case_id }};</script>{% endif %}
 <script nonce="{{ csp_nonce }}">
 // =============================================================================
@@ -272,9 +269,9 @@ let pendingClosure = null; // { caseId, targetStatus }
 let attentionDismissed = false;
 let casesLoaded = false;
 
-// widget-grid board: sort + page-size + progressive load-more cap.
-let boardSort = 'newest';
-let boardPageSize = 24;
+// The inbox list: sort + page-size + progressive load-more cap.
+let boardSort = 'activity';
+let boardPageSize = 50;
 let boardShown = 0;
 let boardReadFailed = false;
 let boardRequestSequence = 0;
@@ -391,11 +388,13 @@ async function populateAssigneeDropdowns() {
 async function renderBoard(append = false) {
     const sequence = ++boardRequestSequence;
     const parameters = new URLSearchParams({mode:boardSort,limit:boardPageSize,offset:append ? boardShown : 0});
-    for (const [id,key] of [['filter-search','q'],['filter-severity','severity'],['filter-status','status'],['filter-assignee','assigned_to_id']]) {
+    for (const [id,key] of [['filter-search','q'],['filter-severity','severity'],['filter-status','status']]) {
         const element = document.getElementById(id);
         const value = element && !element.disabled ? element.value.trim() : "";
         if (value) parameters.set(key,value);
     }
+    // The owner filter (Mine, Unassigned, or one person) and Changed.
+    if (window.ionCasesInbox) window.ionCasesInbox.params(parameters);
     document.querySelectorAll('#cases-loadmore button').forEach(button => button.disabled = true);
     const loaded = await ionLoadFragment('/ui/cases/board' + '?' + parameters, 'cases-board', 'Loading cases...', {swap:append ? 'beforeend' : 'innerHTML'});
     if (sequence !== boardRequestSequence) return false;
@@ -422,6 +421,7 @@ async function renderBoard(append = false) {
         more.querySelector('p').textContent = append ? 'The next page could not be read. Previously loaded cases are retained.' : 'The cases could not be read.';
     }
     computeAttentionAlerts();
+    if (window.ionCasesInbox) window.ionCasesInbox.rendered(view, append);
     return !boardReadFailed;
 }
 
@@ -616,11 +616,10 @@ function cancelClosure() {
     if (pendingClosure) {
         const caseObj = allCases.find(c => c.id === pendingClosure.caseId);
         if (caseObj) {
-            // Reset both the panel's status select AND the board widget's
-            // per-widget status select back to the case's real status, so a
-            // cancelled close doesn't leave either dropdown stuck on "closed"
+            // Reset the panel's status select back to the case's real
+            // status, so a cancelled close doesn't leave it stuck on "closed"
             // (a same-value re-pick wouldn't re-fire change).
-            document.querySelectorAll('.cpanel-meta-grid select, .cw-status-select').forEach(sel => {
+            document.querySelectorAll('.cpanel-meta-grid select').forEach(sel => {
                 let parsed = null;
                 try { parsed = JSON.parse(sel.getAttribute('data-args') || ''); }
                 catch (e) { /* not our select */ }
@@ -1652,21 +1651,11 @@ document.addEventListener('keydown', function(e) {
             closeCreateCaseModal();
         } else if (document.getElementById('case-panel').classList.contains('open')
                    && !document.getElementById('case-panel').classList.contains('page-mode')) {
-            // In page mode Esc belongs to the case window (back to the whole
-            // case); leaving the case is the header's close button.
+            // In page mode Esc belongs to the case window first;
+            // cases-inbox.js leaves the case once it has nothing to clear.
             closeCasePanel();
         }
         return;
-    }
-    // Keyboard-activate a focused case widget (role="button"). Ignore the
-    // per-widget status <select> so arrow/Enter selection still works there.
-    if ((e.key === 'Enter' || e.key === ' ')) {
-        const card = e.target.closest && e.target.closest('.cw');
-        if (card && !(e.target.closest && e.target.closest('.cw-status-select'))) {
-            e.preventDefault();
-            const id = parseInt(card.getAttribute('data-case-id') || '0', 10);
-            if (id) openCaseDetail(id);
-        }
     }
 });
 
