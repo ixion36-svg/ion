@@ -37,7 +37,6 @@ class _FakeTide(TideService):
 
     def __init__(self, *, refuse: tuple[str, ...] = ()):
         self.enabled = True
-        self.space = "default"
         self.refuse = refuse
         self.sent: list[str] = []
 
@@ -52,9 +51,9 @@ class _FakeTide(TideService):
             return {"rows": [{
                 "total_rules": 1859, "enabled_rules": 224, "disabled_rules": 1635,
                 "unmapped_rules": 12, "q_excellent": 27, "q_good": 33,
-                "q_fair": 52, "q_poor": 1747, "avg_quality": 1.9,
+                "q_fair": 52, "q_poor": 1747, "q_unscored": 0, "avg_quality": 1.9,
                 "min_quality": 0, "max_quality": 53,
-                "covered_techniques": 94, "severity_json": "[]",
+                "covered_techniques": 94, "severity_json": "[]", "kinds_json": "[]",
             }]}
         return {"rows": []}
 

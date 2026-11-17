@@ -55,6 +55,7 @@ def _stats_row(tid: str, rule_count: int, enabled: int) -> dict:
     return {
         "technique_id": tid,
         "rule_count": rule_count,
+        "scored_rules": rule_count,
         "avg_quality": 2.0,
         "critical_rules": 0, "high_rules": 0, "medium_rules": 0, "low_rules": 0,
         "enabled_rules": enabled,
@@ -64,7 +65,6 @@ def _stats_row(tid: str, rule_count: int, enabled: int) -> dict:
 class _FakeTide(TideService):
     def __init__(self, stats_rows: list[dict]):
         self.enabled = True
-        self.space = "default"
         self._stats_rows = stats_rows
         self.sent: list[str] = []
 
@@ -74,7 +74,7 @@ class _FakeTide(TideService):
             return {"rows": []}
         if "GROUP BY t.technique_id" in sql:
             return {"rows": list(self._stats_rows)}
-        if "count(DISTINCT rule_id) as total" in sql:
+        if "AS total FROM detection_rules" in sql:
             return {"rows": [{"total": 9}]}
         return {"rows": []}
 

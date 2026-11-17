@@ -184,6 +184,7 @@ body[data-page="detection-engineering"] .q-excellent { background: var(--quality
 body[data-page="detection-engineering"] .q-good { background: var(--quality-good, #56d364); stroke: var(--quality-good, #56d364); }
 body[data-page="detection-engineering"] .q-fair { background: var(--quality-fair, var(--dx-warn)); stroke: var(--quality-fair, var(--dx-warn)); }
 body[data-page="detection-engineering"] .q-poor { background: var(--quality-poor, var(--dx-bad)); stroke: var(--quality-poor, var(--dx-bad)); }
+body[data-page="detection-engineering"] .q-unscored, body[data-page="detection-engineering"] .de-qbar-seg.unscored { background: var(--quality-unscored, #8b949e); stroke: var(--quality-unscored, #8b949e); }
 
 /* ── Tables ─────────────────────────────────────── */
 body[data-page="detection-engineering"] .dx-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }

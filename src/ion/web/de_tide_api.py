@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime
 from typing import Optional
 
@@ -34,7 +35,7 @@ from ion.models.cyab import (
     CyabSystem,
 )
 from ion.services.elasticsearch_service import ElasticsearchService
-from ion.services.tide_service import get_tide_service
+from ion.services.tide_service import Destination, get_tide_service, scope_label
 from ion.web.api import get_db_session
 
 logger = logging.getLogger(__name__)
@@ -415,42 +416,57 @@ async def tide_system_alerts(system_id: str, namespace: str = "", hours: int = 1
 def _snapshot_or_live(session: Session, snapshot_key: str, live_fn, live_kwargs: dict = {}):
     """Try the snapshot cache first. Fall back to a live TIDE query."""
     from ion.services.tide_sync_service import get_snapshot
-    cached = get_snapshot(session, snapshot_key)
-    if cached is not None:
-        return cached
-    # No snapshot — fall through to live TIDE query.
+    svc = get_tide_service()
+    # Snapshots are taken at the configured scope, so they answer only
+    # while nobody has picked another destination on the DE page.
+    if getattr(svc, "scope", None) == getattr(svc, "configured_scope", None):
+        cached = get_snapshot(session, snapshot_key)
+        if cached is not None:
+            return cached
     return live_fn(**live_kwargs)
 
 
-@router.get("/tide/de/spaces", dependencies=[Depends(require_permission("alert:read"))])
-def tide_de_spaces():
-    """List available SIEM spaces from TIDE detection_rules.
+def _unavailable(svc) -> dict:
+    """The body for a DE read that came back empty-handed. When TIDE is
+    configured it carries `failure`, TIDE's reason or null when none was
+    recorded, so a refusal never reads as an empty tenant."""
+    if not svc.enabled:
+        return {"enabled": False}
+    failure = getattr(svc, "last_failure", None)
+    return {"enabled": True, "failure": failure.as_dict() if failure else None}
 
-    Returns the distinct space values and rule counts so the UI can
-    offer a space selector dropdown. The currently active space is
-    also included.
-    """
+
+@router.get("/tide/de/destinations", dependencies=[Depends(require_permission("alert:read"))])
+def tide_de_destinations():
+    """The destinations (SIEM and space) holding rules, and the active
+    scope's key, "" meaning all destinations. destinations is null when TIDE
+    could not be asked, so the picker can say so rather than offer nothing."""
     svc = get_tide_service()
     if not svc.enabled:
-        return {"spaces": [], "active": "default"}
-    spaces = svc.get_available_spaces()
-    return {"spaces": spaces, "active": svc.space}
+        return {"destinations": [], "active": ""}
+    return {
+        "destinations": svc.get_destinations(),
+        "active": svc.scope.key if svc.scope else "",
+    }
 
 
-@router.post("/tide/de/spaces/{space}", dependencies=[Depends(require_permission("alert:read"))])
-def tide_de_set_space(space: str):
-    """Switch the active TIDE space filter.
+class DestinationChoice(BaseModel):
+    #: "siem_id|space", or "" for every destination.
+    key: str = ""
 
-    All subsequent TIDE queries will filter by this space value.
-    """
+
+@router.post("/tide/de/destination", dependencies=[Depends(require_permission("alert:read"))])
+def tide_de_set_destination(choice: DestinationChoice):
+    """Scope every later TIDE read to one destination, or to all."""
     svc = get_tide_service()
     if not svc.enabled:
         return {"ok": False, "error": "TIDE not configured"}
     try:
-        svc.set_space(space)
+        scope = Destination.from_key(choice.key) if choice.key.strip() else None
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid space value")
-    return {"ok": True, "active": svc.space}
+        raise HTTPException(status_code=400, detail="Invalid destination")
+    svc.set_scope(scope)
+    return {"ok": True, "active": scope.key if scope else "", "label": scope_label(scope)}
 
 
 @router.get("/tide/de/sync-status", dependencies=[Depends(require_permission("alert:read"))])
@@ -476,9 +492,10 @@ def tide_de_systems(session: Session = Depends(get_db_session)):
 @router.get("/tide/de/posture", dependencies=[Depends(require_permission("alert:read"))])
 def tide_de_posture(session: Session = Depends(get_db_session)):
     """Detection posture overview — totals, severity, quality, coverage."""
-    result = _snapshot_or_live(session, "posture", get_tide_service().get_posture_stats)
+    svc = get_tide_service()
+    result = _snapshot_or_live(session, "posture", svc.get_posture_stats)
     if result is None:
-        return {"enabled": False}
+        return _unavailable(svc)
     if isinstance(result, dict):
         result["enabled"] = True
     return result
@@ -572,8 +589,9 @@ def tide_de_navigator_layer():
             ],
         })
 
+    scope = scope_label(svc.scope)
     layer = {
-        "name": f"ION TIDE Coverage ({svc.space})",
+        "name": f"ION TIDE Coverage ({scope})",
         "versions": {
             "attack": "14",
             "navigator": "5.0.0",
@@ -582,7 +600,7 @@ def tide_de_navigator_layer():
         "domain": "enterprise-attack",
         "description": (
             f"Live coverage from ION at {datetime.utcnow().isoformat()}Z. "
-            f"{len(nav_techniques)} techniques mapped from TIDE space '{svc.space}'."
+            f"{len(nav_techniques)} techniques mapped from TIDE ({scope})."
         ),
         "filters": {
             "platforms": [
@@ -606,12 +624,13 @@ def tide_de_navigator_layer():
         ],
         "metadata": [
             {"name": "Source", "value": "ION Detection Engineering"},
-            {"name": "Space", "value": svc.space},
+            {"name": "Scope", "value": scope},
         ],
     }
 
     body = json.dumps(layer, indent=2)
-    filename = f"ion-tide-coverage-{svc.space}-{datetime.utcnow().strftime('%Y%m%d')}.json"
+    slug = re.sub(r"[^A-Za-z0-9_.-]+", "-", scope).strip("-")
+    filename = f"ion-tide-coverage-{slug}-{datetime.utcnow().strftime('%Y%m%d')}.json"
     return Response(
         content=body,
         media_type="application/json",
@@ -636,9 +655,10 @@ def tide_de_rules(search: str = "", severity: str = "", enabled: str = "",
 @router.get("/tide/de/gaps", dependencies=[Depends(require_permission("alert:read"))])
 def tide_de_gaps(session: Session = Depends(get_db_session)):
     """Gap analysis — blind spots by tactic, unmapped rules, quick wins."""
-    result = _snapshot_or_live(session, "gaps", get_tide_service().get_gaps_analysis)
+    svc = get_tide_service()
+    result = _snapshot_or_live(session, "gaps", svc.get_gaps_analysis)
     if result is None:
-        return {"enabled": False}
+        return _unavailable(svc)
     if isinstance(result, dict):
         result["enabled"] = True
     return result

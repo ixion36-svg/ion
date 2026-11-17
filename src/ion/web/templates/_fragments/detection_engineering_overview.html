@@ -13,14 +13,14 @@
 {% if state == 'unconfigured' %}
 <div class="dx-banner">TIDE not configured. Connect it in <a href="/settings#tide">Settings</a> to see detection posture.</div>
 {% else %}
-{% if state == 'failed' %}<div class="dx-banner warn" role="alert">Failed to load posture. Panels fed by other reads are still shown.</div>
-{% elif state == 'empty' %}<div class="dx-banner">No detection rules found in the active space.</div>{% endif %}
+{% if state == 'failed' %}<div class="dx-banner warn" role="alert">{% if posture.failure %}{{ posture.failure.message }}{% if posture.failure.detail %} TIDE said: {{ posture.failure.detail }}{% endif %}{% else %}Failed to load posture. Panels fed by other reads are still shown.{% endif %}</div>
+{% elif state == 'empty' %}<div class="dx-banner">No detection rules found at the selected destinations.</div>{% endif %}
 
 <div class="dx-kpis">
   <div class="dx-kpi">
     <div class="dx-k">Rules</div>
     <div class="dx-v" data-field="total_rules">{{ num(s.total_rules) }}</div>
-    <div class="dx-s">{% if s.total_rules is none %}TIDE posture unavailable{% else %}{{ num(s.enabled_rules) }} enabled · {{ num(s.disabled_rules) }} disabled{% endif %}</div>
+    <div class="dx-s">{% if s.total_rules is none %}TIDE posture unavailable{% else %}{{ num(s.enabled_rules) }} enabled · {{ num(s.disabled_rules) }} disabled{% if posture.rules_by_kind %}<br>{% for kind, counts in posture.rules_by_kind|dictsort %}{{ kind|title }} {{ num(counts.get('total')) }}{{ ' · ' if not loop.last else '' }}{% endfor %}{% endif %}{% endif %}</div>
     {% if posture.enabled_pct is number %}<div class="dx-bar"><i class="ok" data-ion-style="width:{{ posture.enabled_pct }}%"></i></div>{% endif %}
   </div>
   <div class="dx-kpi">

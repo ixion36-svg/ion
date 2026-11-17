@@ -2493,7 +2493,8 @@ async def deep_health_check(
             checks["tide"] = {
                 "status": "ok" if result.get("ok") else "error",
                 "rules": result.get("rule_count", 0),
-                "space": result.get("space"),
+                "scope": result.get("scope"),
+                **({"error": result["error"]} if result.get("error") else {}),
             }
         else:
             checks["tide"] = {"status": "not_configured"}

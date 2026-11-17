@@ -39,8 +39,9 @@ class TIDEConnector(BaseConnector):
         return {
             "connected": result.get("ok", False),
             "rule_count": result.get("rule_count"),
-            "space": result.get("space"),
+            "scope": result.get("scope"),
             "error": result.get("error"),
+            "failure": result.get("failure"),
         }
 
     async def sync(self, **kwargs) -> Dict[str, Any]:

@@ -2,12 +2,13 @@
 {% if state == 'failed' %}<div class="de-empty" role="alert">Failed to load detection rules</div>
 {% elif state == 'empty' %}<div class="de-empty">No rules match filters</div>
 {% else %}
-<table class="de-table"><thead><tr><th>Rule Name</th><th>Severity</th><th>Status</th><th>Quality</th><th>MITRE</th></tr></thead><tbody>
+<table class="de-table"><thead><tr><th>Rule Name</th><th>Destination</th><th>Severity</th><th>Status</th><th>Quality</th><th>MITRE</th></tr></thead><tbody>
 {% for rule in rules %}<tr>
 <td data-field="name">{{ value(rule.get('name')) }}</td>
+<td data-field="destination">{% if rule.get('space') is none %}Unavailable{% else %}{{ (rule.get('kind') or 'elastic')|title }} · {{ rule.get('siem_id') or 'any SIEM' }} / {{ rule.space }}{% endif %}</td>
 <td data-field="severity"><span class="de-sev {{ rule.get('severity') if rule.get('severity') in ['critical','high','medium','low','info'] else '' }}">{{ value(rule.get('severity')) }}</span></td>
 <td data-field="enabled">{% if rule.get('enabled') is none %}Unavailable{% elif rule.enabled %}<span class="de-enabled">Enabled</span>{% else %}<span class="de-disabled">Disabled</span>{% endif %}</td>
-<td data-field="quality_score" class="mono">{{ value(rule.get('quality_score')) }}</td>
+<td data-field="quality_score" class="mono">{{ 'Unscored' if rule.get('kind') == 'wazuh' and rule.get('quality_score') is none else value(rule.get('quality_score')) }}</td>
 <td data-field="mitre_ids">{% if rule.get('mitre_ids') is none %}Unavailable{% elif rule.mitre_ids is iterable and rule.mitre_ids %}{% for tid in rule.mitre_ids %}<span class="de-mitre-chip">{{ tid }}</span> {% endfor %}{% else %}-{% endif %}</td>
 </tr>{% endfor %}</tbody></table>
 <div class="de-pager"><div class="de-pager-info">{% if total is not none %}Showing {{ offset + 1 }}-{{ [offset + limit, total]|min }} of {{ total }}{% else %}Total unavailable{% endif %}</div>

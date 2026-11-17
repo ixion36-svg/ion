@@ -448,8 +448,8 @@
 
                 <div class="mb-5">
                     <label for="tide_space" class="block mb-2 font-medium text-[0.9rem]">Space</label>
-                    <input type="text" class="ion-input" id="tide_space" name="tide_space" placeholder="default">
-                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Kibana space the TIDE rules belong to (e.g. <code>default</code> or <code>production</code>)</span>
+                    <input type="text" class="ion-input" id="tide_space" name="tide_space" placeholder="All destinations">
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Leave blank to read rules at every destination TIDE holds for this client, Elastic and Wazuh alike. A value restricts ION to that space (a Kibana space or Wazuh agent group) on any SIEM.</span>
                 </div>
 
                 <div class="mb-5">
@@ -1101,7 +1101,7 @@ function populateForms(config) {
     if (config.tide) {
         document.getElementById('tide_enabled').checked = config.tide.tide_enabled;
         document.getElementById('tide_url').value = config.tide.tide_url || '';
-        document.getElementById('tide_space').value = config.tide.tide_space || 'default';
+        document.getElementById('tide_space').value = config.tide.tide_space || '';
         document.getElementById('tide_client_id').value = config.tide.tide_client_id || '';
         document.getElementById('tide_verify_ssl').checked = config.tide.tide_verify_ssl !== false;
         updateSecretStatus('tide_api_key', config.tide.tide_api_key_set);
@@ -1231,7 +1231,7 @@ async function saveSettings(event, section) {
         if (form.tide_api_key.value) {
             data.tide_api_key = form.tide_api_key.value;
         }
-        data.tide_space = form.tide_space.value || 'default';
+        data.tide_space = form.tide_space.value.trim();
         data.tide_client_id = form.tide_client_id.value.trim();
         data.tide_verify_ssl = form.tide_verify_ssl.checked;
     } else if (section === 'arkime') {

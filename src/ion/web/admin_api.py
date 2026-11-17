@@ -1067,7 +1067,7 @@ async def update_tide_settings(
         config.tide_verify_ssl = settings.tide_verify_ssl
 
     if settings.tide_space is not None:
-        config.tide_space = settings.tide_space or "default"
+        config.tide_space = settings.tide_space.strip()
 
     if settings.tide_client_id is not None:
         config.tide_client_id = settings.tide_client_id.strip()
@@ -2080,7 +2080,7 @@ async def get_wizard_integrations(current_user: User = Depends(require_permissio
             "fields": {
                 "url": {"type": "url", "label": "TIDE URL", "placeholder": "https://tide.example.com", "required": True},
                 "api_key": {"type": "password", "label": "API Key", "placeholder": "X-TIDE-API-KEY value", "required": True},
-                "space": {"type": "text", "label": "Space", "placeholder": "default", "default": "default"},
+                "space": {"type": "text", "label": "Space", "placeholder": "Blank reads every destination", "default": ""},
                 "client_id": {"type": "text", "label": "Client ID (TIDE 4.x)", "placeholder": "Leave blank for single-tenant keys"},
                 "verify_ssl": {"type": "checkbox", "label": "Verify SSL Certificate", "default": True},
             },

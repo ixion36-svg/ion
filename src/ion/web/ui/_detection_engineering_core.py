@@ -1,4 +1,4 @@
-"""Detection posture, gaps and spaces, without the separate DE licence gate."""
+"""Detection posture, gaps and destinations, without the separate DE licence gate."""
 from __future__ import annotations
 
 import logging
@@ -24,6 +24,7 @@ QUALITY_LABELS = {
     'percent': {'excellent': 'Excellent (80%+)', 'good': 'Good (50-79%)', 'fair': 'Fair (25-49%)', 'poor': 'Poor (<25%)'},
     'points': {'excellent': 'Excellent (30+)', 'good': 'Good (20-29)', 'fair': 'Fair (10-19)', 'poor': 'Poor (<10)'},
 }
+UNSCORED_LABEL = 'Unscored (mostly Wazuh)'
 
 class PosturePanel(TypedDict):
     state: State
@@ -37,10 +38,13 @@ class PosturePanel(TypedDict):
     quality_scale: Literal['percent', 'points'] | None
     avg_quality: int | float | None
     disabled_critical: list[dict[str, Any]] | None
+    rules_by_kind: dict[str, dict[str, Any]] | None
+    failure: dict[str, Any] | None
 
 
 class GapsPanel(TypedDict):
     state: State
+    failure: dict[str, Any] | None
     total_blind_spots: int | float | None
     blind_spots_by_tactic: dict[str, list[dict[str, Any]]] | None
     unmapped_rules: list[dict[str, Any]] | None
@@ -48,10 +52,22 @@ class GapsPanel(TypedDict):
     systems_coverage: list[dict[str, Any]] | None
 
 
-class SpacesView(TypedDict):
+class DestinationsView(TypedDict):
     state: Literal['failed', 'empty', 'data']
-    spaces: list[dict[str, Any]] | None
-    active: str | None
+    destinations: list[dict[str, Any]] | None
+    total: int | float | None
+    active: str
+    #: The active scope when it is not one of the listed destinations: a
+    #: space-only saved setting, which matches that space on every SIEM.
+    unlisted_active: str | None
+
+
+def _failure(data: dict) -> dict[str, Any] | None:
+    """TIDE's reason for a failed read, or None when none was given."""
+    failure = data.get('failure')
+    if isinstance(failure, dict) and isinstance(failure.get('message'), str):
+        return {'message': failure['message'], 'detail': str(failure.get('detail') or '')}
+    return None
 
 
 def _number(value: object) -> int | float | None:
@@ -116,17 +132,22 @@ def posture_view(session: Session | None) -> PosturePanel:
     quality = None
     if isinstance(quality_payload, dict):
         labels = QUALITY_LABELS.get(quality_payload.get('scale'), QUALITY_LABELS['points'])
+        labels = {**labels, 'unscored': UNSCORED_LABEL}
         quality = [{'key':key, 'label':labels[key], 'count':_number(quality_payload.get(key)),
                     'percentage':_percent(quality_payload.get(key),stats['total_rules'])}
-                   for key in ('excellent','good','fair','poor')]
+                   for key in ('excellent','good','fair','poor','unscored') if key != 'unscored' or key in quality_payload]
+    kinds = data.get('rules_by_kind')
+    failure = _failure(data)
     view: PosturePanel = {
-        'state':'failed' if not isinstance(configured, bool) else 'unconfigured' if not configured else 'empty' if stats['total_rules'] == 0 else 'data',
+        'state':'failed' if 'failure' in data or not isinstance(configured, bool) else 'unconfigured' if not configured else 'empty' if stats['total_rules'] == 0 else 'data',
         'stats':stats, 'enabled_pct':_percent(stats['enabled_rules'],stats['total_rules']),
         'disabled_pct':_percent(stats['disabled_rules'],stats['total_rules']),
         'coverage_pct':_percent(stats['covered_techniques'],stats['total_techniques']) if stats['total_techniques'] else None,
         'severity':severity, 'severity_total':severity_total, 'quality':quality,
         'avg_quality':_number(quality_payload.get('avg_quality')) if isinstance(quality_payload,dict) else None,
         'disabled_critical':disabled,
+        'rules_by_kind':kinds if isinstance(kinds,dict) and all(isinstance(v,dict) for v in kinds.values()) else None,
+        'failure':failure,
         'quality_scale':quality_payload.get('scale') if isinstance(quality_payload,dict) and quality_payload.get('scale') in QUALITY_LABELS else None,
     }
     return view
@@ -154,9 +175,11 @@ def gaps_view(session: Session | None) -> GapsPanel:
     systems = _records(data,'systems_coverage')
     total = _number(data.get('total_blind_spots'))
     configured = data.get('enabled')
+    failure = _failure(data)
     empty = total == 0 and tactics == {} and unmapped == [] and wins == [] and systems == []
     view: GapsPanel = {
-        'state':'failed' if not isinstance(configured,bool) else 'unconfigured' if not configured else 'empty' if empty else 'data',
+        'failure':failure,
+        'state':'failed' if 'failure' in data or not isinstance(configured,bool) else 'unconfigured' if not configured else 'empty' if empty else 'data',
         'total_blind_spots':total, 'blind_spots_by_tactic':tactics,
         'unmapped_rules':unmapped,'quick_wins':wins,'systems_coverage':systems,
     }
@@ -168,19 +191,24 @@ def gaps(request: Request, session: Session = Depends(get_db_session)):
     return render_view(request, '_fragments/detection_engineering_gaps.html', gaps_view(session))
 
 
-@router.get('/detection-engineering/spaces', response_class=HTMLResponse)
-def spaces(request: Request):
+@router.get('/detection-engineering/destinations', response_class=HTMLResponse)
+def destinations(request: Request):
     payload = None
     try:
-        payload = de_tide_api.tide_de_spaces()
+        payload = de_tide_api.tide_de_destinations()
     except Exception:
-        logger.exception('Could not read TIDE spaces')
-    found = _records(payload,'spaces')
-    if found is not None and not all(isinstance(item.get('space'),str) and item['space'] for item in found):
+        logger.exception('Could not read TIDE destinations')
+    found = _records(payload,'destinations')
+    if found is not None and not all(isinstance(item.get('key'),str) and isinstance(item.get('space'),str) for item in found):
         found = None
     active = payload.get('active') if isinstance(payload,dict) else None
-    view: SpacesView = {
+    active = active if isinstance(active,str) else ''
+    counts = [_number(item.get('rule_count')) for item in found or []]
+    view: DestinationsView = {
         'state':'failed' if found is None else 'data' if found else 'empty',
-        'spaces':found,'active':active if isinstance(active,str) else None,
+        'destinations':found,
+        'total':sum(counts) if found is not None and None not in counts else None,
+        'active':active,
+        'unlisted_active':active if active and active not in {item['key'] for item in found or []} else None,
     }
-    return render_view(request, '_fragments/detection_engineering_spaces.html', view)
+    return render_view(request, '_fragments/detection_engineering_destinations.html', view)
