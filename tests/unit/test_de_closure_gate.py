@@ -112,9 +112,11 @@ def test_without_security_read_no_closure_figure_reaches_the_markup(report, pane
     assert LOCK in body or "need the security:read permission" in body
 
 
-@pytest.mark.parametrize("panel", ["rules", "drawer"])
+@pytest.mark.parametrize("panel", ["overview", "rules", "drawer"])
 def test_without_security_read_the_json_model_carries_no_closure_figure(report, panel):
-    model = _client(READER).get(PANELS[panel], headers={"Accept": "application/json"}).json()
+    response = _client(READER).get(PANELS[panel], headers={"Accept": "application/json"})
+    assert response.status_code == 200, panel
+    model = response.json()
     assert _absent(json.dumps(model, default=str)) == [], panel
     assert model.get("closures") is None and model.get("fp_rate") is None and model.get("history") is None
     for rule in model.get("rules") or [model.get("rule")] if "rule" in model or "rules" in model else []:
