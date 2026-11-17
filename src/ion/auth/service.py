@@ -775,6 +775,8 @@ class AuthService:
             ("response:approve", "response", "approve", "Approve high-risk response actions (block/isolate/disable)"),
             # Verdict review — resolve Bob's suggested per-alert verdicts
             ("verdict:review", "verdict", "review", "Review and resolve Bob's suggested verdicts"),
+            # Rule outcomes for TIDE: per-rule closure counts, no analyst data
+            ("rule_outcomes:read", "rule_outcomes", "read", "Read per-rule closure outcomes (external API)"),
             # removed 5 seeded-but-never-enforced permissions
             # (discover:read, alert:comment, case:comment, case:link,
             # investigation:run) — no route gated on them (audit finding, same
@@ -1018,6 +1020,15 @@ class AuthService:
                     "case:read",
                 ],
             ),
+            (
+                # Assigned to the TIDE service account, which pulls rule
+                # outcomes over a minted bearer token. One permission, so a
+                # leaked token reads closure counts and nothing else.
+                "tide",
+                "TIDE integration: reads rule outcomes only (service)",
+                True,
+                ["rule_outcomes:read"],
+            ),
         ]
 
         roles = []
@@ -1101,14 +1112,29 @@ class AuthService:
         email: str = "metis@ion.local",
         display_name: str = "METIS Threat Modelling",
     ) -> Optional[User]:
-        """Create (or top-up) the METIS service user.
+        """Create (or top-up) the METIS service user with the metis role."""
+        return self.seed_service_user(username, email, display_name, "metis")
+
+    def seed_tide_user(
+        self,
+        username: str = "tide",
+        email: str = "tide@ion.local",
+        display_name: str = "TIDE Rule Outcomes",
+    ) -> Optional[User]:
+        """Create (or top-up) the TIDE service user with the tide role."""
+        return self.seed_service_user(username, email, display_name, "tide")
+
+    def seed_service_user(
+        self, username: str, email: str, display_name: str, role_name: str,
+    ) -> Optional[User]:
+        """Create (or top-up) a service user holding one role.
 
         Idempotent, same shape as seed_bob_user(). Ensures:
-          - metis user exists, flagged is_service_account=True, is_active=True.
-          - metis has the metis role.
-          - If metis already exists but is missing the flag or the role, fix it.
+          - the user exists, flagged is_service_account=True, is_active=True.
+          - the user has ``role_name``.
+          - If the user already exists but is missing the flag or the role, fix it.
         """
-        metis_role = self.role_repo.get_by_name("metis")
+        role = self.role_repo.get_by_name(role_name)
 
         existing = self.user_repo.get_by_username(username)
         if existing:
@@ -1119,8 +1145,8 @@ class AuthService:
             if not existing.is_active:
                 existing.is_active = True
                 changed = True
-            if metis_role and not existing.has_role("metis"):
-                self.user_repo.add_role(existing, metis_role)
+            if role and not existing.has_role(role_name):
+                self.user_repo.add_role(existing, role)
                 changed = True
             if changed:
                 self.db_session.flush()
@@ -1136,8 +1162,8 @@ class AuthService:
         user.is_service_account = True
         self.db_session.flush()
 
-        if metis_role:
-            self.user_repo.add_role(user, metis_role)
+        if role:
+            self.user_repo.add_role(user, role)
 
         return user
 

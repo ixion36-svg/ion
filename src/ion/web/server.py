@@ -72,6 +72,7 @@ from ion.web.enrichment_api import router as enrichment_router
 from ion.web.entity_timeline_api import router as entity_timeline_router
 from ion.web.events_api import router as events_router
 from ion.web.executive_report_api import router as executive_report_router
+from ion.web.external_api import router as external_router
 from ion.web.forensic_workbench_api import router as forensic_workbench_router
 from ion.web.forensics_api import router as forensics_router
 from ion.web.gitlab_api import router as gitlab_router
@@ -446,6 +447,7 @@ app.include_router(analyst_efficiency_router, prefix="/api")
 app.include_router(soc_health_router, prefix="/api")
 # Detection Health (per-rule IR→detection feedback analytics)
 app.include_router(detection_health_router, prefix="/api")
+app.include_router(external_router, prefix="/api")  # /api/external/v1/* — machine clients (TIDE), service-account bearer only
 # Detection Engineering module — Phase 0 (read-only noise campaigns + DE metrics)
 app.include_router(de_router, prefix="/api", dependencies=[Depends(require_de_module)])
 app.include_router(workforce_router, prefix="/api")  # /api/workforce/* — 404s when ION_WORKFORCE_ENABLED is off
@@ -1182,14 +1184,14 @@ async def _startup_event():
                hold_until_close=True)
 
     from ion.storage.database import LOCK_RULE_NAME_BACKFILL_BG
-    def _start_rule_name_backfill():
-        from ion.services.rule_name_backfill_service import (
+    def _start_rule_identity_backfill():
+        from ion.services.rule_identity_backfill_service import (
             start_background_loop as _rnb_bg,
         )
         _rnb_bg(engine)
-        logger.info("Rule-name backfill background loop started")
-    run_locked(engine, LOCK_RULE_NAME_BACKFILL_BG, "rule_name_backfill_bg_loop",
-               _start_rule_name_backfill, hold_until_close=True)
+        logger.info("Rule-identity backfill background loop started")
+    run_locked(engine, LOCK_RULE_NAME_BACKFILL_BG, "rule_identity_backfill_bg_loop",
+               _start_rule_identity_backfill, hold_until_close=True)
 
     # ---------------------------------------------------------------
     # Case-embedding background producer — embeds cases via Ollama for

@@ -314,6 +314,9 @@ def campaign_row(index: int, campaign: Any) -> dict[str, Any]:
         "split": closure_split(data.get("false_positive"),
                                data.get("benign_true_positive")),
         "case_count": data.get("case_count"),
+        "fp_rate": _trim(data.get("fp_rate")),
+        "closed": data.get("closed"),
+        "noisy": data.get("noisy") is True,
         "cost_hours": _trim(data.get("cost_hours")),
         # Handed to the `ts` macro exactly as the service emitted it.
         # ion.web.templating._ts_parts owns the question of whether a value

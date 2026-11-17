@@ -1,9 +1,12 @@
 """v0.47.0 — Detection Health (per-rule performance analytics).
 
-Covers the aggregation correctness (dedup, FP/TP math, MIN_SAMPLE suppression,
-silent/noisy/decaying flags, unmapped bucket, Bob-disagreement excluding
-abstentions, empty DB) and the endpoints (security:read gate on metrics,
-tuning:review gate + validation on the proposal POST).
+Covers the aggregation correctness (closure-basis FP/TP math, MIN_SAMPLE
+suppression, silent/noisy/decaying flags, unmapped bucket, Bob-disagreement
+deduped and excluding abstentions, empty DB) and the endpoints (security:read
+gate on metrics, de:propose gate + validation on the proposal POST).
+
+Closure figures come from rule_outcome_service since the rule-outcomes change:
+a closed case is the verdict, whether or not Bob saw the alert.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -13,7 +16,7 @@ from fastapi.testclient import TestClient
 
 from ion.auth.dependencies import get_current_user
 from ion.models.ai_feedback import AIFeedback
-from ion.models.alert_triage import AlertTriage, AlertTriageStatus
+from ion.models.alert_triage import AlertCase, AlertCaseStatus, AlertTriage, AlertTriageStatus
 from ion.models.user import User
 from ion.services.detection_health_service import get_detection_health
 from ion.web.api import get_db_session
@@ -22,9 +25,21 @@ from ion.web.server import app
 _NAIVE_NOW = datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-def _triage(session, alert_id, rule_name):
-    session.add(AlertTriage(es_alert_id=alert_id, rule_name=rule_name,
-                            status=AlertTriageStatus.OPEN))
+def _triage(session, alert_id, rule_name, *, case=None, days_ago=1):
+    t = AlertTriage(es_alert_id=alert_id, rule_name=rule_name,
+                    status=AlertTriageStatus.OPEN, case_id=case.id if case else None)
+    t.created_at = _NAIVE_NOW - timedelta(days=days_ago, hours=1)
+    session.add(t)
+
+
+def _closed(session, alert_id, rule_name, reason, *, days_ago=1):
+    """One alert on one rule, in a case closed with ``reason``."""
+    c = AlertCase(case_number=f"C-{alert_id}", title=alert_id, created_by_id=1,
+                  status=AlertCaseStatus.CLOSED, closure_reason=reason, severity="medium")
+    c.closed_at = _NAIVE_NOW - timedelta(days=days_ago)
+    session.add(c)
+    session.flush()
+    _triage(session, alert_id, rule_name, case=c, days_ago=days_ago)
 
 
 def _fb(session, alert_id, human_verdict, *, template_id=None, bob=None,
@@ -49,21 +64,20 @@ def _rule(health, name):
 # ── dedup ──────────────────────────────────────────────────────────────────
 
 
-def test_dedup_keeps_close_row_over_pending(session, monkeypatch):
+def test_bob_dedup_keeps_close_row_over_pending(session, monkeypatch):
     monkeypatch.setenv("ION_DH_MIN_SAMPLE", "1")
-    _triage(session, "es-1", "Rule A")
+    _closed(session, "es-1", "Rule A", "true_positive")
     # fire-time pending row, then the case-close row (higher id) for same alert.
-    _fb(session, "es-1", "pending", template_id=5)
-    _fb(session, "es-1", "true_positive", template_id=5)
+    _fb(session, "es-1", "pending", template_id=5, bob="true_positive", agreement=None)
+    _fb(session, "es-1", "true_positive", template_id=5, bob="false_positive", agreement=False)
     session.commit()
 
-    health = get_detection_health(session, days=365)
-    a = _rule(health, "Rule A")
-    assert a is not None
-    assert a["volume"] == 1  # deduped to one row
+    a = _rule(get_detection_health(session, days=365), "Rule A")
+    assert a["volume"] == 1
     assert a["closed"] == 1
-    assert a["tp_count"] == 1
     assert a["tp_yield"] == 100.0
+    assert a["bob_scored"] == 1  # deduped to the close row
+    assert a["bob_disagreement_rate"] == 100.0
 
 
 # ── FP/TP math + thresholds ─────────────────────────────────────────────────
@@ -74,14 +88,11 @@ def test_fp_tp_rates_and_noisy_silent_flags(session, monkeypatch):
     monkeypatch.setenv("ION_DH_NOISY_FP_PCT", "70")
     # Noisy rule: 4 FP / 1 TP over 5 closed → fp_rate 80% ≥ 70 → noisy, not silent.
     for i in range(4):
-        _triage(session, f"noisy-{i}", "Noisy Rule")
-        _fb(session, f"noisy-{i}", "false_positive")
-    _triage(session, "noisy-tp", "Noisy Rule")
-    _fb(session, "noisy-tp", "true_positive")
+        _closed(session, f"noisy-{i}", "Noisy Rule", "false_positive")
+    _closed(session, "noisy-tp", "Noisy Rule", "true_positive")
     # Silent rule: 5 FP, 0 TP → silent + noisy.
     for i in range(5):
-        _triage(session, f"silent-{i}", "Silent Rule")
-        _fb(session, f"silent-{i}", "false_positive")
+        _closed(session, f"silent-{i}", "Silent Rule", "false_positive")
     session.commit()
 
     health = get_detection_health(session, days=365)
@@ -100,26 +111,24 @@ def test_min_sample_suppresses_flags_and_rates_stay_but_no_flag(session, monkeyp
     monkeypatch.setenv("ION_DH_MIN_SAMPLE", "5")
     # Only 2 closed (below MIN_SAMPLE 5) → no flags even though 100% FP.
     for i in range(2):
-        _triage(session, f"tiny-{i}", "Tiny Rule")
-        _fb(session, f"tiny-{i}", "false_positive")
+        _closed(session, f"tiny-{i}", "Tiny Rule", "false_positive")
     session.commit()
 
-    health = get_detection_health(session, days=365)
-    tiny = _rule(health, "Tiny Rule")
+    tiny = _rule(get_detection_health(session, days=365), "Tiny Rule")
     assert tiny["closed"] == 2
+    assert tiny["fp_rate"] == 100.0
     assert tiny["flags"]["noisy"] is False  # suppressed under MIN_SAMPLE
     assert tiny["flags"]["silent"] is False
 
 
-def test_benign_tp_counts_as_fp_toggle(session, monkeypatch):
+def test_benign_closure_is_closed_but_not_a_false_positive(session, monkeypatch):
     monkeypatch.setenv("ION_DH_MIN_SAMPLE", "1")
-    monkeypatch.setenv("ION_DH_BENIGN_TP_AS_FP", "false")
-    _triage(session, "b-1", "Benign Rule")
-    _fb(session, "b-1", "benign_true_positive")
+    _closed(session, "b-1", "Benign Rule", "benign_true_positive")
     session.commit()
-    health = get_detection_health(session, days=365)
-    r = _rule(health, "Benign Rule")
-    assert r["fp_count"] == 0  # benign not counted as FP when toggle off
+    r = _rule(get_detection_health(session, days=365), "Benign Rule")
+    assert r["closed"] == 1
+    assert r["fp_count"] == 0
+    assert r["fp_rate"] == 0.0
 
 
 # ── decay ──────────────────────────────────────────────────────────────────
@@ -130,15 +139,12 @@ def test_decaying_flag(session, monkeypatch):
     monkeypatch.setenv("ION_DH_DECAY_DELTA_PCT", "20")
     # window 90d → midpoint 45d. Older half (TP-heavy) vs recent half (FP-heavy).
     for i in range(3):
-        _triage(session, f"old-tp-{i}", "Decay Rule")
-        _fb(session, f"old-tp-{i}", "true_positive", days_ago=70)
+        _closed(session, f"old-tp-{i}", "Decay Rule", "true_positive", days_ago=70)
     for i in range(3):
-        _triage(session, f"new-fp-{i}", "Decay Rule")
-        _fb(session, f"new-fp-{i}", "false_positive", days_ago=5)
+        _closed(session, f"new-fp-{i}", "Decay Rule", "false_positive", days_ago=5)
     session.commit()
 
-    health = get_detection_health(session, days=90)
-    r = _rule(health, "Decay Rule")
+    r = _rule(get_detection_health(session, days=90), "Decay Rule")
     assert r["flags"]["decaying"] is True
 
 
@@ -147,8 +153,7 @@ def test_decaying_flag(session, monkeypatch):
 
 def test_null_rule_name_buckets_as_unmapped(session, monkeypatch):
     monkeypatch.setenv("ION_DH_MIN_SAMPLE", "1")
-    # feedback with no matching triage row → rule_name resolves NULL → "(unmapped)".
-    _fb(session, "orphan-1", "true_positive")
+    _closed(session, "orphan-1", None, "true_positive")
     session.commit()
     health = get_detection_health(session, days=365)
     assert _rule(health, "(unmapped)") is not None
@@ -237,3 +242,17 @@ def test_create_proposal_gate_and_validation(session):
     # Missing suggested_change → 400.
     assert client2.post("/api/detection-health/tuning-proposal",
                         json={"rule_name": "R", "suggested_change": "  "}).status_code == 400
+
+
+def test_a_rule_bob_scored_but_nobody_closed_keeps_its_name(session, monkeypatch):
+    """A triage row older than the window, scored by Bob inside it."""
+    t = AlertTriage(es_alert_id="old-1", rule_name="Old Rule", rule_id="r-old",
+                    status=AlertTriageStatus.OPEN)
+    t.created_at = _NAIVE_NOW - timedelta(days=200)
+    session.add(t)
+    _fb(session, "old-1", "pending", bob="false_positive", agreement=False)
+    session.commit()
+
+    rule = next(r for r in get_detection_health(session, days=90)["rules"] if r["rule_id"] == "r-old")
+    assert rule["rule_name"] == "Old Rule"
+    assert rule["bob_scored"] == 1

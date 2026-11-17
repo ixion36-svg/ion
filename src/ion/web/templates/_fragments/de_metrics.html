@@ -80,7 +80,7 @@
         <table class="table table-sm">
           <thead>
             <tr>
-              <th>Rule</th><th>FP alerts</th><th>Cases</th><th>Cost (hrs)</th>
+              <th>Rule</th><th>FP alerts</th><th>FP rate</th><th>Cases</th><th>Cost (hrs)</th>
               <th>Window</th><th>Severity</th><th>MITRE</th><th></th>
             </tr>
           </thead>
@@ -94,6 +94,14 @@
                   {# Only shown when there is a benign share to break out,
                      otherwise it restates the number above it. #}
                   {%- if c.split is not none %}<div class="text-xs opacity-50">{{ c.split }}</div>{% endif -%}
+                </td>
+                {# The rule's false-positive closures over all its closures,
+                   the same figure Detection Health shows for it. #}
+                <td class="font-mono text-sm">
+                  {%- if c.fp_rate is not none %}{{ c.fp_rate }}%
+                  {%- if c.closed is not none %}<div class="text-xs opacity-50">of {{ c.closed }} closed</div>{% endif -%}
+                  {%- else %}<span class="opacity-50">&mdash;</span>{% endif -%}
+                  {%- if c.noisy %} <span class="badge badge-sm badge-error">noisy</span>{% endif -%}
                 </td>
                 <td class="font-mono text-sm">
                   {%- if c.case_count is not none %}{{ c.case_count }}
@@ -157,7 +165,7 @@
                  Evidence is clicked. It was built on click from the cached
                  payload, so nothing is re-read that was not read before. #}
               <tr id="de-drill-{{ c.index }}" hidden>
-                <td colspan="8">
+                <td colspan="9">
                   <div class="de-drill text-sm bg-base-300 rounded p-2 mt-1">
                     <strong>Top triggering signatures</strong>:
                     {% if c.signatures -%}

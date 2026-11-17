@@ -94,6 +94,7 @@ from ion.licensing.gating import require_de_module
 from ion.models.detection_proposal import DetectionProposalStatus
 from ion.models.system_quirk import SystemQuirkStatus
 from ion.models.user import User
+from ion.services.rule_outcome_service import DEFAULT_WINDOW_DAYS
 from ion.storage.database import get_db_session
 from ion.web.ui._shared import plain, templates
 
@@ -135,10 +136,9 @@ _PROPOSALS_FRAGMENT = "_fragments/de_workbench_proposals.html"
 _QUIRKS_FRAGMENT = "_fragments/de_workbench_quirks.html"
 _CONTENT_PACK_FRAGMENT = "_fragments/de_workbench_content_pack.html"
 
-#: The window /api/de/metrics was fetched with. Not a control: the page has
-#: never offered one, and inventing one in a port is a new feature whose
-#: absence is not a defect.
-CAMPAIGN_DAYS = 30
+#: The window /api/de/metrics is fetched with: the rule-outcome default, so
+#: the panel's rates match DE Metrics and Detection Health. Not a control.
+CAMPAIGN_DAYS = DEFAULT_WINDOW_DAYS
 
 #: How many campaigns the panel shows, from `.slice(0, 6)`.
 CAMPAIGNS_SHOWN = 6
@@ -645,7 +645,7 @@ def de_workbench_campaigns_fragment(
     """The costliest noise campaigns and the addressable-hours tile.
 
     Calls `get_de_metrics`, which is the whole body of GET /api/de/metrics, at
-    the same 30-day window the page has always fetched.
+    the rule-outcome window every other noise figure uses.
     """
     from ion.services.de_metrics_service import get_de_metrics
 

@@ -427,6 +427,8 @@ class ElasticsearchAlert:
     message: str
     timestamp: datetime
     rule_name: Optional[str] = None
+    rule_id: Optional[str] = None
+    rule_uuid: Optional[str] = None
     host: Optional[str] = None
     user: Optional[str] = None
     tags: List[str] = None
@@ -497,6 +499,18 @@ class ElasticsearchAlert:
         if include_raw:
             d["raw_data"] = self.raw_data
         return d
+
+
+def _scalar_text(value: Any) -> Optional[str]:
+    """A string id from a field that may hold a number or a one-item list."""
+    if isinstance(value, list):
+        value = value[0] if value else None
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, (str, int)):
+        text = str(value).strip()
+        return text or None
+    return None
 
 
 class ElasticsearchError(Exception):
@@ -1273,6 +1287,18 @@ class ElasticsearchService:
             source.get("rule_name")
         )
 
+        # Stable rule id first: Kibana's rule_id survives export and is shared
+        # by every space a rule is deployed to, where the uuid is not. A Wazuh
+        # alert carries its numeric id as rule.id.
+        rule_id = _scalar_text(
+            _f(source, "kibana.alert.rule.rule_id")
+            or _f(source, "signal.rule.rule_id")
+            or _f(source, "rule.id")
+        )
+        rule_uuid = _scalar_text(
+            _f(source, "kibana.alert.rule.uuid") or _f(source, "signal.rule.id")
+        )
+
         # MITRE ATT&CK fields
         # Helper to unwrap list-or-scalar values (ES may store as ["Impact"] or "Impact")
         def _first(val):
@@ -1420,6 +1446,8 @@ class ElasticsearchService:
             message=message,
             timestamp=timestamp,
             rule_name=rule_name,
+            rule_id=rule_id,
+            rule_uuid=rule_uuid,
             host=host,
             user=user,
             tags=tags,
@@ -1682,29 +1710,41 @@ class ElasticsearchService:
         Returns:
             List of ElasticsearchAlert objects
         """
-        if not alert_ids:
-            return []
-
-        search_index = index or self.alert_index
-
-        query = {
-            "size": len(alert_ids),
-            "query": {
-                "ids": {
-                    "values": alert_ids
-                }
-            }
-        }
-
         try:
-            result = await self._request(
-                "POST",
-                f"/{search_index}/_search",
-                json=query,
-            )
+            alerts, _complete = await self._search_alerts_by_ids(alert_ids, index)
         except ElasticsearchError as e:
             logger.error("Error fetching alerts by ID: %s", e)
             return []
+        return alerts
+
+    async def find_alerts_by_ids(
+        self,
+        alert_ids: List[str],
+        index: Optional[str] = None,
+    ) -> List[ElasticsearchAlert]:
+        """get_alerts_by_ids, except an answer that might be missing alerts raises.
+
+        For a caller that records "this alert is gone" from the answer: an
+        alert absent from what this returns is absent from the cluster, never
+        unreachable or on a failed shard.
+        """
+        alerts, complete = await self._search_alerts_by_ids(alert_ids, index)
+        if not complete:
+            raise ElasticsearchError("Alert search answered from a partial set of shards")
+        return alerts
+
+    async def _search_alerts_by_ids(
+        self, alert_ids: List[str], index: Optional[str]
+    ) -> tuple[List[ElasticsearchAlert], bool]:
+        """The alerts found, and whether every shard answered."""
+        if not alert_ids:
+            return [], True
+
+        result = await self._request(
+            "POST",
+            f"/{index or self.alert_index}/_search",
+            json={"size": len(alert_ids), "query": {"ids": {"values": alert_ids}}},
+        )
 
         alerts = []
         for hit in result.get("hits", {}).get("hits", []):
@@ -1715,7 +1755,7 @@ class ElasticsearchService:
                 alert.raw_data = source
                 alerts.append(alert)
 
-        return alerts
+        return alerts, not (result.get("_shards") or {}).get("failed")
 
     async def query_esql(self, esql: str, params: Optional[list] = None) -> Dict[str, Any]:
         """Run an ES|QL query via the /_query endpoint (Elasticsearch 8.11+).

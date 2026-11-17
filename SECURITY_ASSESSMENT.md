@@ -124,6 +124,8 @@ ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy 
 | Low | 0 |
 | **Total** | **0** |
 
+Unreleased (feat/rule-outcomes-api) — **Net-new surfaces: one external read route, one permission, one role, one CLI token-minting command and three columns** (see *Net-New Surfaces, unreleased: rule outcomes for TIDE*). No finding opened or closed.
+
 v0.99.18 — **Net-new surfaces: three fragment routes, one write route for Bob's custom guide, one optional API field, three columns, a start-up seed and a background reader** (see *Net-New Surfaces in v0.99.18*). No finding opened or closed. The workforce gate no longer withholds a role from a person who held it before their journey opened, for as long as that journey is open and in good standing; offboarding, a withdrawn journey and a lapsed mandatory item still remove it.
 
 v0.99.17 — **One finding closed, MEDIUM (cross-user information disclosure in chat retrieval; see *Application Version* above). Net-new surfaces: five page routes and two columns; no new permission, dependency or external sink.** The routes are read-only fragments: `/ui/detection-engineering/overview`, `/ui/detection-engineering/coverage` and `/ui/detection-engineering/system-options` (router-wide `alert:read`), `/ui/threat-intel/overview-intel` (`observable:read`) and `/ui/threat-intel/kev-recent` (`alert:read`). The columns are `alert_cases.kibana_synced_status` (the status ION and Kibana last agreed on) and `ai_user_preferences.rag_defaults_version` (marks a one-time switch of chat retrieval sources to on). Retrieval widening: document embeddings now cover every active document, not only the Knowledge Base folder, so Bob's investigations and chat can quote any active document. Every such document was already readable by any `document:read` holder, the model is the local Ollama, and chat now gates documents on `document:read`. TIDE: ION strips its own SQL comments before sending (TIDE refuses a statement containing words such as LOAD or SET anywhere) and no longer counts a refused query toward the TIDE circuit breaker. Arkime: a refused query or an HTML error returned in place of a PCAP now raises rather than reading as empty traffic or a corrupt capture; the real-time monitor stays off by default.
@@ -678,6 +680,26 @@ All migrated routes confirmed to carry `require_permission` or `get_current_user
 | PII logging | OIDC callback logs username only at INFO; email at DEBUG only |
 | Auto-playbook kill switch | `ION_AUTO_PLAYBOOK_ENABLED=false` default (v0.20.0) |
 | Tamper-evident ledger | sha256 chain on ForensicCase (v0.20.1) and AlertCase (v0.20.0); advisory-lock serialised appends |
+
+---
+
+## Net-New Surfaces, unreleased: rule outcomes for TIDE
+
+**TIDE can now pull how ION's analysts closed each rule's alerts.** New route `GET /api/external/v1/rule-outcomes` (`src/ion/web/external_api.py`). New permission `rule_outcomes:read`, held by the new system role `tide` and, as every permission is, by `admin`. New CLI command `ion seed-tide`, which creates the `tide` service account and mints its bearer token. New columns `alert_triage.rule_id`, `alert_triage.rule_uuid` and `alert_triage.rule_identity_checked_at`, with index `ix_alert_triage_rule_id`. The v0.99.18 rule-name backfill loop (advisory lock 1033) now also fills the two id columns, and `ion backfill-rule-identity` runs the same pass once.
+
+**Threat assessment:**
+- **Authentication.** No new credential type. The caller sends `Authorization: Bearer <token>`, validated by `AuthService.validate_session` like every other bearer caller, so the token is stored as a SHA-256 hash, expires at its minted `--ttl-days` without sliding, and is revoked by re-minting. A missing or unknown token is refused with 401.
+- **Authorisation.** `require_permission("rule_outcomes:read")` and then a service-account check: a session belonging to a human is refused with 403 even when it holds the permission, which every admin does. Both refusals write an `audit_logs` `permission_denied` row. The `tide` role holds this one permission, so a leaked TIDE token reads per-rule closure counts and cannot reach alerts, cases, settings or any other route (tested against `/api/detection-health/metrics` and `/api/elasticsearch/alerts`).
+- **Data released.** Per rule: id, name, Kibana saved-object ids, counts per closure reason, false-positive rate, true-positive yield, median time to close and the last closure time. The response is built from explicit Pydantic models, so a field reaches TIDE only when it is added there. No analyst identity, note, host, alert id, case id or case title leaves; a test plants each in a closed case and asserts none appears in the body. Rule names are detection metadata, already sent to and received from TIDE.
+- **Input.** `since`/`until` are parsed as ISO 8601 and the window is capped at 365 days; `limit` is 1 to 500; `rule_id` and `cursor` are length-capped. The cursor is an opaque base64url sort key, and one that does not decode is refused with 400. Every value reaches SQL only through ORM bound parameters, or is compared in Python.
+- **Abuse.** `@limiter.limit("60/minute")` per client IP. One request runs two aggregate queries over `alert_triage` bounded by the window, so the 365-day cap bounds the cost.
+- **CSRF.** None needed: the route is GET and changes nothing. No exemption was added to `csrf_middleware.py`.
+- **Integrity of the join key.** `rule_id` and `rule_uuid` are copied only from Elasticsearch (the backfill and the Kibana case sync), never from a client payload such as a case-create body's `alert_contexts`, so an analyst cannot attribute closures to a different TIDE rule by editing a request. An analyst can still choose a case's closure reason, which is what the measure reports.
+- **Backfill.** Reads alerts by id and writes three columns, each cut to its column length. A row is marked checked only on a complete answer: an unreachable cluster or a partial-shard search raises and the batch stays unmarked for the next pass.
+- **Known limit, recorded and not counted as a finding.** `alert_triage` carries no tenant, so with multi-tenancy on the response covers every estate in the database, as Detection Health and DE Metrics already do for any reader. A per-tenant TIDE token needs a tenant on the triage row first. Successful reads write no `audit_logs` row: the route changes nothing, and a poller would fill the log with identical entries. The token's minting is audited (`service_token_minted`).
+- **Changed measure, not a security control.** Detection Health now computes false-positive rate from case closures rather than the `ai_feedback` ledger, and counts a benign true positive as closed but not as a false positive. `ION_DH_BENIGN_TP_AS_FP` is gone.
+
+**Net new findings:** 0C / 0H / 0M / 0L.
 
 ---
 
