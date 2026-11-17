@@ -19,7 +19,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
 from typing import Any, Literal, Optional
 
@@ -202,6 +202,14 @@ class RuleHealthReport:
         for d in self.destination_problems:
             counts[d.problem.level] += 1
         return counts
+
+
+def without_closures(report: RuleHealthReport) -> RuleHealthReport:
+    """The report with ION's closure outcomes taken out: no per-rule outcome,
+    no noisy verdict and no analyst totals. The cached report is shared, so
+    this copies rather than clears."""
+    return replace(report, closures=None, closure_failed=False,
+                   rules=[replace(r, outcome=None, noisy=False) for r in report.rules])
 
 
 def _level(value: object, default: Level) -> Level:

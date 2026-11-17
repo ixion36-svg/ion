@@ -8,14 +8,14 @@
 {% else %}
 <section class="dx-card">
   <header class="dx-ch">Rules <span class="dx-n">{{ m.num(shown) }} of {{ m.num(total) }}</span>
-    <span class="dx-legend-out dx-hlegend"><span><i class="o-tp"></i>TP</span><span><i class="o-fp"></i>FP</span><span><i class="o-bn"></i>Benign</span><span><i class="o-ot"></i>Other</span>
+    <span class="dx-legend-out dx-hlegend">{% if closures_locked %}{{ m.locked() }}{% else %}<span><i class="o-tp"></i>TP</span><span><i class="o-fp"></i>FP</span><span><i class="o-bn"></i>Benign</span><span><i class="o-ot"></i>Other</span>{% endif %}
     <span class="dx-probs"><span class="dx-e">{{ m.err_icon() }}error</span><span class="dx-w">{{ m.warn_icon() }}warning</span><span class="dx-i">{{ m.info_icon() }}info</span></span></span>
   </header>
   {% if not rules %}<div class="dx-cb"><div class="dx-empty">{{ 'No rules match these filters.' if total else 'TIDE holds no rules at the selected destinations.' }}</div></div>
   {% else %}
   <div class="dx-tablewrap"><table class="dx-table">
     <thead><tr><th>Kind</th><th>Rule</th><th>Severity</th><th>State</th><th>TIDE quality</th>
-      <th class="num">Alerts · {{ 14 }}d</th><th>ION closures · 90d</th><th>TIDE problems</th><th class="num">Issues</th></tr></thead>
+      <th class="num">Alerts · {{ 14 }}d</th><th>ION closures · 90d{% if closures_locked %} {{ m.lock_tag() }}{% endif %}</th><th>TIDE problems</th><th class="num">Issues</th></tr></thead>
     <tbody>
     {% for r in rules %}
     <tr class="dx-click" data-rule-key="{{ r.key }}" data-click-action="deOpenRule" data-args='{{ [r.key]|tojson }}'>
@@ -25,7 +25,7 @@
       <td>{{ m.onoff(r.enabled) }}</td>
       <td>{{ m.quality(r.quality) }}</td>
       <td class="num">{{ m.alerts(r) }}</td>
-      <td>{{ m.closures(r.closures) }}</td>
+      <td>{{ m.closures(r.closures, closures_locked) }}</td>
       <td>{{ m.probs(r.e, r.w, r.i) }}</td>
       <td class="num">{% if r.gitlab %}<span class="dx-gl" title="{{ r.gitlab|length }} open GitLab issue(s)"><svg aria-hidden="true"><use href="#i-git-branch"/></svg>{{ r.gitlab|length }}</span>{% else %}<span class="dx-mute">—</span>{% endif %}</td>
     </tr>

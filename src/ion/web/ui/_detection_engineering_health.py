@@ -5,6 +5,10 @@ RuleHealthReport, so a rule's alert count, its problems and its false-positive
 rate are the same figure wherever they appear. Health folds in what Detection
 Health and DE Metrics used to show: noise campaigns from ION closures, Bob's
 agreement as its own tile, and MITRE's detection guidance for a rule.
+
+ION's closure outcomes per rule (FP rate, the closure bar, noisy) stay behind
+security:read, as Detection Health kept them. A reader without it is served a
+report with those taken out, so no fragment and no JSON model can carry them.
 """
 from __future__ import annotations
 
@@ -26,6 +30,7 @@ from ion.web.ui._shared import render_view
 logger = logging.getLogger(__name__)
 router = APIRouter(dependencies=[Depends(require_permission('alert:read'))])
 
+CLOSURES_PERMISSION = 'security:read'
 RULES_PAGE = 100
 SEVERITIES = ('critical', 'high', 'medium', 'low')
 CAMPAIGNS_SHOWN = 8
@@ -40,6 +45,16 @@ def spark_points(values: Optional[list[int]], width: int = 64, height: int = 18)
     peak = max(values) or 1
     step = width / (len(values) - 1)
     return ' '.join(f'{i * step:.1f},{height - 1 - v / peak * (height - 3):.1f}' for i, v in enumerate(values))
+
+
+def sees_closures(user: Optional[User]) -> bool:
+    return bool(user and user.has_permission(CLOSURES_PERMISSION))
+
+
+async def rule_health_for(session: Optional[Session], user: Optional[User]) -> rh.RuleHealthReport:
+    """The shared rule health report, without ION closures for a reader who may not see them."""
+    report = await rh.cached_rule_health(session)
+    return report if sees_closures(user) else rh.without_closures(report)
 
 
 def closure_view(rule: rh.RuleHealth) -> Optional[dict[str, Any]]:
@@ -104,8 +119,8 @@ def _report_banner(report: rh.RuleHealthReport) -> dict[str, Any]:
 @router.get('/detection-engineering/rules', response_class=HTMLResponse)
 async def rules_panel(request: Request, q: str = '', kind: str = '', severity: str = '', state: str = '',
                       problems: str = '', offset: int = Query(0, ge=0), body: str = '',
-                      session: Session = Depends(get_db_session)):
-    report = await rh.cached_rule_health(session)
+                      session: Session = Depends(get_db_session), user: User = Depends(get_current_user)):
+    report = await rule_health_for(session, user)
     flt = RuleFilter(q=q.strip(), kind=kind if kind in ('elastic', 'wazuh') else '',
                      severity=severity if severity in SEVERITIES else '', state=state, problems=problems == '1')
     matched = [r for r in report.rules if flt.keep(r)]
@@ -113,7 +128,7 @@ async def rules_panel(request: Request, q: str = '', kind: str = '', severity: s
     view = {
         **_report_banner(report), 'filter': asdict(flt), 'body_only': body == '1',
         'rules': [rule_view(r) for r in page], 'shown': len(matched), 'total': len(report.rules),
-        'offset': offset, 'limit': RULES_PAGE,
+        'offset': offset, 'limit': RULES_PAGE, 'closures_locked': not sees_closures(user),
     }
     return render_view(request, '_fragments/detection_engineering_rules.html', view)
 
@@ -121,7 +136,7 @@ async def rules_panel(request: Request, q: str = '', kind: str = '', severity: s
 @router.get('/detection-engineering/rules/drawer', response_class=HTMLResponse)
 async def rule_drawer(request: Request, key: str = Query(..., max_length=400),
                       session: Session = Depends(get_db_session), user: User = Depends(get_current_user)):
-    report = await rh.cached_rule_health(session)
+    report = await rule_health_for(session, user)
     rule = report.by_key().get(key)
     history = None
     can_cases = bool(user and user.has_permission('case:read'))
@@ -135,7 +150,7 @@ async def rule_drawer(request: Request, key: str = Query(..., max_length=400),
         'rule': rule_view(rule) if rule else None, 'history': history, 'can_cases': can_cases,
         'can_propose': bool(user and user.has_permission('de:propose')),
         'closure_days': rh.CLOSURE_DAYS, 'alert_days': rh.ALERT_WINDOW_DAYS,
-        'tide_url': _tide_url(),
+        'tide_url': _tide_url(), 'closures_locked': not sees_closures(user),
     }
     return render_view(request, '_fragments/detection_engineering_rule_drawer.html', view)
 
@@ -187,7 +202,8 @@ def _bob_agreement(session: Session) -> Optional[dict[str, Any]]:
     return card if isinstance(card, dict) else None
 
 
-@router.get('/detection-engineering/health', response_class=HTMLResponse)
+@router.get('/detection-engineering/health', response_class=HTMLResponse,
+            dependencies=[Depends(require_permission(CLOSURES_PERMISSION))])
 async def health_panel(request: Request, session: Session = Depends(get_db_session),
                        user: User = Depends(get_current_user)):
     report = await rh.cached_rule_health(session)
@@ -208,7 +224,6 @@ async def health_panel(request: Request, session: Session = Depends(get_db_sessi
         'closures': closures, 'closure_failed': report.closure_failed, 'closure_days': rh.CLOSURE_DAYS,
         'fp_rate': round(closures['fp'] / closures['closed'] * 100) if closures and closures['closed'] else None,
         'can_de': can_de, 'can_propose': bool(user and user.has_permission('de:propose')),
-        'can_attack': bool(user and user.has_permission('security:read')),
         'campaigns': (campaigns or {}).get('campaigns', [])[:CAMPAIGNS_SHOWN] if campaigns else None,
         'campaign_summary': campaigns, 'bob': bob,
         'rule_keys': {r.name: r.key for r in rules},
@@ -239,7 +254,7 @@ def attack_panel(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 @router.get('/detection-engineering/health/attack', response_class=HTMLResponse,
-            dependencies=[Depends(require_permission('security:read'))])
+            dependencies=[Depends(require_permission(CLOSURES_PERMISSION))])
 def attack_guidance(request: Request, rule: str = Query(..., max_length=500), days: int = Query(90, ge=1, le=365),
                     session: Session = Depends(get_db_session)):
     from ion.services.rule_attack_guidance_service import get_rule_attack_guidance

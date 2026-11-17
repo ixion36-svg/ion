@@ -14,6 +14,7 @@
 <span class="dx-moved"><svg class="dx-icon" aria-hidden="true"><use href="#i-arrow-right"/></svg><span>Moved here · <b>{{ text }}</b></span></span>
 {%- endmacro %}
 {% set can_verify = current_user is defined and current_user and current_user.has_permission('de:verify') %}
+{% set can_health = current_user is defined and current_user and current_user.has_permission('security:read') %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
@@ -63,11 +64,11 @@
 
 <div class="de-panel" id="de-tab-rules" data-tab-panel="rules">
   <div class="dx-subrow">
-    <div class="dx-subnav" role="tablist">{{ subtab('rules', 'Rules') }}{{ subtab('health', 'Health', 'de-count-health') }}</div>
+    <div class="dx-subnav" role="tablist">{{ subtab('rules', 'Rules') }}{% if can_health %}{{ subtab('health', 'Health', 'de-count-health') }}{% else %}<span class="dx-subtab dx-locked" title="Needs the security:read permission"><span>Health</span><span class="dx-tag warn dx-lock"><svg class="dx-icon" aria-hidden="true"><use href="#i-lock"/></svg>security:read</span></span>{% endif %}</div>
     <span data-sub-note="health" hidden>{{ moved('Detection Health, DE Metrics and TIDE Rule Monitoring now live here') }}</span>
   </div>
   <div class="dx-subpanel" id="de-panel-rules" data-sub="rules"></div>
-  <div class="dx-subpanel" id="de-panel-health" data-sub="health" hidden></div>
+  {% if can_health %}<div class="dx-subpanel" id="de-panel-health" data-sub="health" hidden></div>{% endif %}
 </div>
 
 <div class="de-panel" id="de-tab-usecases" data-tab-panel="usecases">

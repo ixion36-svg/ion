@@ -19,7 +19,7 @@ from ion.services import de_systems_service as ds
 from ion.services import rule_health_service as rh
 from ion.services.tide_service import get_tide_service
 from ion.storage.database import get_db_session
-from ion.web.ui._detection_engineering_health import spark_points
+from ion.web.ui._detection_engineering_health import rule_health_for, spark_points
 from ion.web.ui._shared import render_view
 
 logger = logging.getLogger(__name__)
@@ -169,9 +169,10 @@ async def systems_panel(request: Request, system_id: str = '', session: Session 
 
 
 @router.get('/detection-engineering/systems/{system_id}', response_class=HTMLResponse)
-async def system_detail(request: Request, system_id: str, session: Session = Depends(get_db_session)):
+async def system_detail(request: Request, system_id: str, session: Session = Depends(get_db_session),
+                        user: User = Depends(get_current_user)):
     registry = await run_in_threadpool(_register, session)
-    rules = await rh.cached_rule_health(session)
+    rules = await rule_health_for(session, user)
     report = await run_in_threadpool(_systems, session, registry)
     system = report.get(system_id)
     gaps = _gaps(system, rules) if system else None

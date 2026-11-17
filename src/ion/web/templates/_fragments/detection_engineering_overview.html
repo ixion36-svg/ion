@@ -29,7 +29,8 @@
     <div class="dx-s"><span class="dx-probs"><span class="dx-w">{{ m.warn_icon() }}{{ counts.warning }} warnings</span><span class="dx-i">{{ m.info_icon() }}{{ counts.info }} info</span></span></div>
     {% else %}<div class="dx-v" data-field="monitoring_errors">{{ dash('Rules could not be judged') }}</div><div class="dx-s">{{ 'rules unavailable' if rules_total is none else 'no Rule Monitoring or alert counts' }}</div>{% endif %}</div>
   <div class="dx-kpi"><div class="dx-k">Analyst FP rate · {{ closure_days }}d</div>
-    {% if fp_rate is number %}<div class="dx-v warn" data-field="fp_rate">{{ fp_rate }}% <small>{{ m.num(closures.fp) }} of {{ m.num(closures.closed) }}</small></div>
+    {% if closures_locked %}<div class="dx-v" data-field="fp_rate">{{ m.lock_tag() }}</div><div class="dx-s">ION closure outcomes need the security:read permission</div>
+    {% elif fp_rate is number %}<div class="dx-v warn" data-field="fp_rate">{{ fp_rate }}% <small>{{ m.num(closures.fp) }} of {{ m.num(closures.closed) }}</small></div>
     <div class="dx-s">from ION case closures</div>
     <div class="dx-stack dx-stack-kpi">{% for seg in closure_segments %}<i class="{{ seg.cls }}" data-ion-style="width:{{ seg.pct }}%"></i>{% endfor %}</div>
     {% elif closures %}<div class="dx-v" data-field="fp_rate">—</div><div class="dx-s">no case closed in {{ closure_days }} days</div>
@@ -41,7 +42,7 @@
     {% else %}<div class="dx-v" data-field="firing">{{ dash('No alert counts from TIDE or Kibana') }}</div><div class="dx-s">alert counts unavailable</div>{% endif %}</div>
   <div class="dx-kpi"><div class="dx-k">Needs attention</div>
     <div class="dx-v{{ ' warn' if attention_total }}" data-field="needs_attention"{% if not attention_known %} title="Part of TIDE could not be read"{% endif %}>{% if attention_known %}{{ attention_total }}{% elif attention_total %}≥{{ attention_total }}{% else %}{{ dash('Part of TIDE could not be read') }}{% endif %}</div>
-    <div class="dx-s">{{ attention_errors }} errors · {{ attention_kev }} KEV · {{ attention_noisy }} noisy</div></div>
+    <div class="dx-s">{{ attention_errors }} errors · {{ attention_kev }} KEV{% if not closures_locked %} · {{ attention_noisy }} noisy{% endif %}</div></div>
 </div>
 {{ m.source_notes(notes) }}
 
@@ -69,8 +70,9 @@
     </div>
   {% else %}
     {% if not attention_known %}<div class="dx-cb"><div class="dx-empty" role="alert">Part of TIDE could not be read, so ION cannot say what needs attention.</div></div>
-    {% else %}<div class="dx-cb"><div class="dx-empty">Nothing needs attention: no Rule Monitoring error, KEV on a system, disabled critical rule, noisy rule, disconnected agent or overdue blind spot.</div></div>{% endif %}
+    {% else %}<div class="dx-cb"><div class="dx-empty">Nothing needs attention: no Rule Monitoring error, KEV on a system, disabled critical rule, {{ '' if closures_locked else 'noisy rule, ' }}disconnected agent or overdue blind spot.</div></div>{% endif %}
   {% endfor %}
+  {% if closures_locked %}<div class="dx-cb">{{ m.locked('Rules mostly closed as false positive need the security:read permission.') }}</div>{% endif %}
   </section>
 
   <div>

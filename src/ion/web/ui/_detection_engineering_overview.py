@@ -28,7 +28,7 @@ from ion.storage.database import get_db_session
 from ion.web import de_tide_api
 from ion.web.ui._detection_engineering_core import GapsPanel, PosturePanel, _number, gaps_view, posture_view
 from ion.web.ui._detection_engineering_rules import use_cases
-from ion.web.ui._detection_engineering_health import spark_points
+from ion.web.ui._detection_engineering_health import rule_health_for, sees_closures, spark_points
 from ion.web.ui._detection_engineering_systems import baseline_summaries
 from ion.web.ui._shared import render_view
 
@@ -130,7 +130,8 @@ def _age(hours: float | None) -> str:
     return f'{round(hours / 24)} days'
 
 
-def _attention(report: rh.RuleHealthReport, systems: ds.SystemsReport, blind: object) -> list[dict[str, Any]]:
+def _attention(report: rh.RuleHealthReport, systems: ds.SystemsReport, blind: object,
+               health: bool) -> list[dict[str, Any]]:
     rule_btn = lambda r: {'label': 'Open rule', 'fn': 'deOpenRule', 'arg': r.key}
     sys_btn = lambda sid: {'label': 'Open system', 'fn': 'deOpenSystem', 'arg': sid} if sid else None
     groups: list[dict[str, Any] | None] = []
@@ -142,7 +143,8 @@ def _attention(report: rh.RuleHealthReport, systems: ds.SystemsReport, blind: ob
             errors.append(_row({'type': 'sev', 'value': r.severity}, r.name, f'{first.title} · {first.detail}'.strip(' ·'),
                                rule_btn(r), r.kind))
     groups.append(_group('error', 'Rule Monitoring errors' if report.monitoring == 'tide' else 'Rule errors',
-                         'TIDE' if report.monitoring == 'tide' else 'ION', errors, ('Rules health', 'health')))
+                         'TIDE' if report.monitoring == 'tide' else 'ION', errors,
+                         ('Rules health', 'health') if health else ('Rules', 'rules')))
 
     kev = []
     for system in systems.systems:
@@ -211,11 +213,12 @@ async def overview(request: Request, session: Session = Depends(get_db_session),
                    user: User = Depends(get_current_user)):
     # One after the other: ION sheds TIDE queries past three in flight, and
     # these two reads together would trip it.
-    report = await rh.cached_rule_health(session)
+    report = await rule_health_for(session, user)
+    closures_locked = not sees_closures(user)
     posture, gaps, systems, blind, use_case_count = await run_in_threadpool(_overview_reads, session)
     open_requests = await run_in_threadpool(_open_requests, session) if user and user.has_permission('de:read') else None
     tactics = _tactic_rows(_blind_ids(gaps))
-    attention = _attention(report, systems, blind)
+    attention = _attention(report, systems, blind, health=not closures_locked)
     counts = report.problem_counts()
     rules = report.rules
     alerts = [r.alerts for r in rules if r.alerts is not None]
@@ -232,7 +235,7 @@ async def overview(request: Request, session: Session = Depends(get_db_session),
         'rules_enabled': sum(r.enabled for r in rules),
         'by_kind': {k: {'enabled': sum(r.enabled for r in v), 'total': len(v)} for k, v in kinds.items()},
         'monitoring': report.monitoring, 'counts': counts,
-        'closures': closures, 'closure_days': rh.CLOSURE_DAYS,
+        'closures': closures, 'closure_days': rh.CLOSURE_DAYS, 'closures_locked': closures_locked,
         'fp_rate': round(closures['fp'] / closures['closed'] * 100) if closures and closures['closed'] else None,
         'closure_segments': [{'cls': c, 'pct': round(closures[k] / closures['closed'] * 100, 1)}
                              for k, c in (('tp', 'o-tp'), ('fp', 'o-fp'), ('benign', 'o-bn'), ('other', 'o-ot')) if closures[k]]

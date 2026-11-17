@@ -15,8 +15,13 @@
 {%- if i %}<span class="dx-i" title="{{ i }} info">{{ info_icon() }}{{ i }}{{ ' info' if words }}</span>{% endif -%}
 </span>{% else %}<span class="dx-mute">—</span>{% endif %}
 {%- endmacro %}
-{% macro closures(c) -%}
-{% if c %}<span class="dx-out" title="{{ c.n }} closures: {{ c.counts.tp }} TP, {{ c.counts.fp }} FP, {{ c.counts.bn }} benign, {{ c.counts.ot }} other">
+{% macro lock_tag() -%}<span class="dx-tag warn dx-lock" title="Needs the security:read permission"><svg class="dx-icon" aria-hidden="true"><use href="#i-lock"/></svg>security:read</span>{%- endmacro %}
+{% macro locked(text='ION closure outcomes need the security:read permission.') -%}
+<span class="dx-locked">{{ lock_tag() }}<span class="dx-mute small">{{ text }}</span></span>
+{%- endmacro %}
+{% macro closures(c, locked=False) -%}
+{% if locked %}<span class="dx-dash" title="ION closure outcomes need the security:read permission">—</span>
+{% elif c %}<span class="dx-out" title="{{ c.n }} closures: {{ c.counts.tp }} TP, {{ c.counts.fp }} FP, {{ c.counts.bn }} benign, {{ c.counts.ot }} other">
 <span class="dx-stack">{% for s in c.segments %}<i class="{{ s.cls }}" data-ion-style="width:{{ s.pct }}%"></i>{% endfor %}</span>
 <span class="dx-fp{{ ' hi' if c.noisy }}">{% if c.fp_rate is number %}{{ c.fp_rate|round|int }}%{% else %}—{% endif %}</span><span class="dx-mute small mono">n={{ c.n }}</span></span>
 {% else %}<span class="dx-mute small">no closures</span>{% endif %}

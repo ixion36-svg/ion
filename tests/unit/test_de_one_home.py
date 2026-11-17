@@ -95,7 +95,8 @@ def test_the_abuse_monitor_renders_only_for_de_verify():
     assert 'id="de-panel-abuse"' not in without and 'data-subtab="abuse"' not in without
     assert "dx-locked" in without and "de:verify" in without
     holder = _page({"alert:read", "de:read", "de:verify"})
-    assert 'id="de-panel-abuse"' in holder and 'data-subtab="abuse"' in holder and "dx-locked" not in holder
+    assert 'id="de-panel-abuse"' in holder and 'data-subtab="abuse"' in holder
+    assert 'title="Needs the de:verify permission"' not in holder
 
 
 def test_the_abuse_route_refuses_without_de_verify_whatever_the_page_shows():

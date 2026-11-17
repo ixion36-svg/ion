@@ -29,7 +29,8 @@
   </div>
 
   <div class="dx-dsec"><h3>ION closures <span class="dx-n">{{ closure_days }} days{% if rule.closures %} · {{ rule.closures.n }} cases{% endif %}</span></h3>
-    {% if rule.closures %}
+    {% if closures_locked %}{{ m.locked() }}
+    {% elif rule.closures %}
     {% set c = rule.closures.counts %}
     <div class="dx-ministats">
       <div><span class="o-dot o-tp"></span>TP<b>{{ c.tp }}</b></div><div><span class="o-dot o-fp"></span>FP<b>{{ c.fp }}</b></div>
