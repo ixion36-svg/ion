@@ -591,17 +591,33 @@
       + ' custom guide</button></div>';
   }
 
+  // A person can correct what Bob drafted. Saving sends the guide back to
+  // pending review, so the Edit button sits beside Approve and Reject and is
+  // offered whatever the guide's status is.
+  var _GUIDE_EDIT_BTN = '<button type="button" class="btn btn-sm" data-click-action="ionEditGuide">✎ Edit</button>';
+
+  function _guideEditor(custom) {
+    return '<label class="iad2-fhint" for="iad2-guide-edit">Markdown. Saving returns the guide to pending review.</label>'
+      + '<textarea id="iad2-guide-edit" class="iad2-gedit" rows="14" maxlength="20000">'
+      + escapeHtml(String(custom.checklist_text || '')) + '</textarea>'
+      + '<div class="iad2-gactions">'
+      + '<button type="button" class="btn btn-primary btn-sm" data-click-action="ionSaveGuideEdit" data-args=\'[' + custom.id + ']\'>Save</button>'
+      + '<button type="button" class="btn btn-sm" data-click-action="ionCancelGuideEdit">Cancel</button>'
+      + '</div>';
+  }
+
   function _guideReviewBar(custom) {
     if (!custom) return '';
     if (custom.status === 'pending_review') {
       return '<div class="iad2-gactions iad2-greview">'
         + '<span class="iad2-gstatus pending">pending review</span>'
+        + _GUIDE_EDIT_BTN
         + '<button type="button" class="btn btn-sm iad2-gok" data-click-action="ionApproveGuide" data-args=\'[' + custom.id + ']\'>✓ Approve</button>'
         + '<button type="button" class="btn btn-sm iad2-gno" data-click-action="ionRejectGuide" data-args=\'[' + custom.id + ']\'>✕ Reject</button>'
         + '</div>';
     }
     return '<div class="iad2-gactions"><span class="iad2-gstatus ' + escapeHtml(custom.status) + '">'
-      + escapeHtml(String(custom.status).replace(/_/g, ' ')) + '</span></div>';
+      + escapeHtml(String(custom.status).replace(/_/g, ' ')) + '</span>' + _GUIDE_EDIT_BTN + '</div>';
   }
 
   function _guideHtml() {
@@ -616,17 +632,25 @@
     var body;
     if (st.view === 'custom') {
       if (hasCustom) {
-        body = '<div class="iad2-fsrcbar"><span class="iad2-fsrc ai">✦ Bob · AI-derived</span>'
-          + '<span class="iad2-fhint">generated for this rule from its evidence'
+        // "AI-derived" stops being the whole truth once somebody has changed
+        // the words, so the badge says so.
+        var edited = !!st.custom.edited_at;
+        body = '<div class="iad2-fsrcbar"><span class="iad2-fsrc ai">✦ Bob · '
+          + (edited ? 'edited by an analyst' : 'AI-derived') + '</span>'
+          + '<span class="iad2-fhint">'
+          + (edited ? 'drafted by Bob for this rule, then corrected by hand'
+                    : 'generated for this rule from its evidence')
           + (st.custom.model ? ' · ' + escapeHtml(st.custom.model) : '') + '</span></div>'
-          + '<div class="iad2-gtext">' + _guideMd(st.custom.checklist_text) + '</div>'
-          + _guideReviewBar(st.custom);
+          + (st.editing
+              ? _guideEditor(st.custom)
+              : '<div class="iad2-gtext">' + _guideMd(st.custom.checklist_text) + '</div>'
+                + _guideReviewBar(st.custom));
       } else {
         body = '<div class="iad2-gempty">No custom guide yet for this rule.'
           + (st.gen ? ' Generate one from the alert’s evidence.' : ' Generation is disabled.')
           + '</div>';
       }
-      body += _guideGenBar(hasCustom);
+      if (!st.editing) body += _guideGenBar(hasCustom);
     } else {
       var pre = '';
       if (st.desc) pre += '<div class="iad2-gdesc">' + escapeHtml(st.desc) + '</div>';
@@ -647,11 +671,53 @@
   function ionGuideView(view) {
     if (!_guideState) return;
     _guideState.view = (view === 'custom') ? 'custom' : 'predefined';
+    _guideState.editing = false;
     _rerenderGuide();
+  }
+
+  function ionEditGuide() {
+    if (!_guideState || !_guideState.custom) return;
+    _guideState.editing = true;
+    _rerenderGuide();
+    var box = document.getElementById('iad2-guide-edit');
+    if (box) box.focus();
+  }
+
+  function ionCancelGuideEdit() {
+    if (!_guideState) return;
+    _guideState.editing = false;
+    _rerenderGuide();
+  }
+
+  function ionSaveGuideEdit(id) {
+    var box = document.getElementById('iad2-guide-edit');
+    if (!_guideState || !box) return;
+    if (!box.value.trim()) { _notify('The guide cannot be empty. Reject it instead.', 'warning'); return; }
+    fetch('/api/alerts/investigation-template/' + encodeURIComponent(id), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ checklist_text: box.value })
+    })
+      .then(async function (r) {
+        if (!r.ok) { var d = await r.json().catch(function () { return {}; }); throw new Error(typeof d.detail === 'string' ? d.detail : ('HTTP ' + r.status)); }
+        return r.json();
+      })
+      .then(function (d) {
+        _guideState.custom = d.template || _guideState.custom;
+        _guideState.editing = false;
+        _rerenderGuide();
+        _notify('Guide saved. It is pending review again.', 'success');
+      })
+      // The box stays open with the text in it: a failed save must not
+      // cost the analyst what they typed.
+      .catch(function (e) { _notify('The guide was not saved: ' + String((e && e.message) || e), 'error'); });
   }
 
   function ionGenerateGuide() {
     if (!_guideState) return;
+    // Regenerating replaces the row, and with it anything a person wrote.
+    if (_guideState.custom && _guideState.custom.edited_at
+        && !window.confirm('This guide has been edited by hand. Regenerating replaces those edits with a new draft from Bob. Continue?')) return;
     var el = document.getElementById('iad2-guide-content');
     if (el) el.innerHTML = '<div class="loading">Bob is drafting a custom investigation guide from the evidence (15–60s)…</div>';
     fetch('/api/elasticsearch/alerts/' + encodeURIComponent(_guideState.alertId) + '/investigation-template/generate', { method: 'POST' })
@@ -2098,6 +2164,9 @@
   window.ionGuideView = ionGuideView;
   window.ionGenerateGuide = ionGenerateGuide;
   window.ionApproveGuide = ionApproveGuide;
+  window.ionEditGuide = ionEditGuide;
+  window.ionCancelGuideEdit = ionCancelGuideEdit;
+  window.ionSaveGuideEdit = ionSaveGuideEdit;
   window.ionRejectGuide = ionRejectGuide;
   window.loadInvestigationGuide = loadInvestigationGuide;
   window.addAlertFieldsAsEvidence = addAlertFieldsAsEvidence;

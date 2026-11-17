@@ -22,9 +22,17 @@
   <div role="alert" class="alert alert-success mb-4"><span>{{ notice }}</span></div>
 {% endif %}
 
+<nav class="flex flex-wrap gap-2 mb-4" aria-label="Setup sections">
+  <a class="btn btn-sm btn-ghost" href="#profiles">Role profiles</a>
+  <a class="btn btn-sm btn-ghost" href="#establishment">Establishment</a>
+  <a class="btn btn-sm btn-ghost" href="#structure">Structure</a>
+  <a class="btn btn-sm btn-ghost" href="#offboarding">Offboarding</a>
+  <a class="btn btn-sm btn-ghost" href="/users">Assign roles to accounts</a>
+</nav>
+
 {% include "_fragments/_workforce_profiles.html" %}
 
-<div class="card bg-base-200 border border-base-300 mb-5">
+<div id="establishment" class="card bg-base-200 border border-base-300 mb-5">
   <div class="card-body p-5">
     <div class="flex items-center gap-3 flex-wrap">
       <h2 class="card-title text-base">Establishment</h2>
@@ -98,7 +106,7 @@
 
 {% include "_fragments/_workforce_structure.html" %}
 
-<div class="card bg-base-200 border border-base-300">
+<div id="offboarding" class="card bg-base-200 border border-base-300">
   <div class="card-body p-5">
     <h2 class="card-title text-base">Offboarding</h2>
     <p class="text-sm text-base-content/70">Access is revoked at 17:00 on the

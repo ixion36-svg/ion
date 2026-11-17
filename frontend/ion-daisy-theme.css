@@ -2047,6 +2047,24 @@
   padding: 22px 0 0;
 }
 
+/* The whole tree is as wide as its widest row. Centring an overflowing
+ * flex row inside the scroller would push its left end to a negative
+ * offset that no scrollbar reaches, so the root takes its content width
+ * and is centred only while it fits. */
+.ion-orbat > ul {
+  width: max-content;
+  min-width: 100%;
+}
+
+/* The Workforce page is capped for reading width, which is narrower than
+ * a five-unit chart. While the chart is on the page the cap comes off, so
+ * the order of battle is seen whole wherever the window allows it. The
+ * tabs swap in place, so this follows the content and not the URL. */
+main.container:has(.ion-orbat),
+.ion-wf-shell:has(.ion-orbat) {
+  max-width: none;
+}
+
 .ion-orbat li {
   position: relative;
   display: flex;

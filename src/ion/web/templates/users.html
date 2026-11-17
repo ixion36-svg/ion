@@ -119,6 +119,14 @@
                     <span class="loading loading-spinner loading-sm text-primary"></span>
                 </div>
             </fieldset>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Onboard into</legend>
+                <div hx-get="/ui/users/profile-options?group=new"
+                     hx-trigger="load"
+                     hx-swap="innerHTML">
+                    <span class="loading loading-spinner loading-sm text-primary"></span>
+                </div>
+            </fieldset>
             <div class="modal-action">
                 <button type="button" class="btn btn-ghost" data-click-action="closeModal" data-args='["create-user-modal"]'>Cancel</button>
                 <button type="submit" class="btn btn-primary">Create User</button>
@@ -183,6 +191,14 @@
                 <legend class="fieldset-legend">Roles</legend>
                 <div id="edit-user-roles"
                      hx-get="/ui/users/role-options?group=edit"
+                     hx-trigger="load"
+                     hx-swap="innerHTML">
+                    <span class="loading loading-spinner loading-sm text-primary"></span>
+                </div>
+            </fieldset>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Onboard into</legend>
+                <div hx-get="/ui/users/profile-options?group=edit"
                      hx-trigger="load"
                      hx-swap="innerHTML">
                     <span class="loading loading-spinner loading-sm text-primary"></span>
@@ -260,6 +276,13 @@ function selectedRoles(containerId) {
     ).map(cb => cb.value);
 }
 
+// The picker renders no <select> when the viewer cannot open a journey or no
+// profile is published, and then there is no profile to send.
+function pickedProfile(fieldId) {
+    const field = document.getElementById(fieldId);
+    return field && field.value ? Number(field.value) : null;
+}
+
 function showCreateUserModal() {
     document.getElementById('create-user-form').reset();
     document.querySelectorAll('#new-user-roles input').forEach(cb => cb.checked = false);
@@ -280,7 +303,8 @@ async function createUser(event) {
         email: document.getElementById('new-email').value,
         password: document.getElementById('new-password').value,
         display_name: document.getElementById('new-display-name').value || null,
-        roles: roles.length > 0 ? roles : null
+        roles: roles.length > 0 ? roles : null,
+        role_profile_id: pickedProfile('new-user-profile')
     };
 
     try {
@@ -309,6 +333,8 @@ async function showEditUserModal(userId) {
         const user = await response.json();
 
         document.getElementById('edit-user-id').value = user.id;
+        const profilePicker = document.getElementById('edit-user-profile');
+        if (profilePicker) profilePicker.value = '';
         document.getElementById('edit-username').value = user.username;
         document.getElementById('edit-email').value = user.email;
         document.getElementById('edit-display-name').value = user.display_name || '';
@@ -363,7 +389,7 @@ async function updateUser(event) {
         response = await fetch('/api/users/' + userId + '/roles', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ roles })
+            body: JSON.stringify({ roles, role_profile_id: pickedProfile('edit-user-profile') })
         });
 
         if (response.ok) {

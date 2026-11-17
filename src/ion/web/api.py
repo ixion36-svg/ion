@@ -229,6 +229,7 @@ class UserUpdate(BaseModel):
 
 class UserRolesUpdate(BaseModel):
     roles: List[str]
+    role_profile_id: Optional[int] = None
 
 
 class PasswordReset(BaseModel):
@@ -1175,6 +1176,15 @@ def update_user_roles(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
+    # Refused before anything is saved. Answering 200 and dropping the
+    # profile would tell the administrator the person had been onboarded.
+    if roles_update.role_profile_id and not current_user.has_permission(
+            "workforce:manage"):
+        raise HTTPException(
+            status_code=403,
+            detail="Opening a role's onboarding needs the workforce:manage permission.",
+        )
+
     auth_service = AuthService(session)
     auth_service.update_user_roles(
         user=user,
@@ -1184,6 +1194,17 @@ def update_user_roles(
     )
 
     session.commit()
+
+    # After the commit: both of these roll the session back when the
+    # workforce module refuses, and the role change must not go with it.
+    # Held roles first, so a role ticked here is never then withheld by a
+    # journey for the profile picked beside it.
+    from ion.services.workforce_service import enrol_on_role, follow_held_roles
+
+    follow_held_roles(session, user, assigner=current_user)
+    if roles_update.role_profile_id:
+        enrol_on_role(session, user, profile_id=roles_update.role_profile_id,
+                      assigner=current_user)
 
     return {
         "id": user.id,

@@ -212,6 +212,11 @@ class UserJourney(Base, TimestampMixin):
         Integer, ForeignKey("role_profile_versions.id"), nullable=False
     )
     is_cover: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # The person held the profile's access role before this journey opened,
+    # because an administrator had assigned it. The journey then records
+    # their training against the role and never withholds it.
+    role_already_held: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0")
     stage: Mapped[str] = mapped_column(String(20), nullable=False, default=STAGE_PRE_ACCESS)
     sponsor_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True

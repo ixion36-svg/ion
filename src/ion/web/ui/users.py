@@ -45,6 +45,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_permission
+from ion.core.config import get_config
 from ion.models.user import User
 from ion.storage.database import get_db_session
 from ion.web.api import (
@@ -129,6 +130,14 @@ _CAPABILITY_EXACT: tuple[tuple[str, str], ...] = (
 ROLE_GROUPS: dict[str, str] = {
     "new": "new-user-roles",
     "edit": "edit-user-roles",
+}
+
+PROFILES_FRAGMENT = "_fragments/users_profile_options.html"
+
+#: The id each modal's onboarding picker carries, by the same rule.
+PROFILE_FIELDS: dict[str, str] = {
+    "new": "new-user-profile",
+    "edit": "edit-user-profile",
 }
 
 
@@ -357,4 +366,40 @@ def users_role_options_fragment(
         request=request,
         name=ROLES_FRAGMENT,
         context={"roles": roles, "failed": False, "field_name": field_name},
+    )
+
+
+@router.get("/users/profile-options", response_class=HTMLResponse)
+def users_profile_options_fragment(
+    request: Request,
+    group: Literal["new", "edit"] = "new",
+    user: User = Depends(require_permission(_READ_PERM)),
+    session: Session = Depends(get_db_session),
+) -> HTMLResponse:
+    """The "onboard into" picker for one of the two user modals.
+
+    Choosing a profile opens that role's Workforce journey for the account.
+    Opening one needs `workforce:manage`, so an administrator without it is
+    told the picker is not theirs to use instead of being handed a control
+    whose choice would be dropped on save.
+    """
+    context: dict[str, object] = {
+        "field_id": PROFILE_FIELDS[group],
+        "profiles": [],
+        "failed": False,
+        "enabled": get_config().workforce_enabled,
+        "allowed": user.has_permission("workforce:manage"),
+    }
+    if context["enabled"] and context["allowed"]:
+        try:
+            from ion.services.workforce_service import assignable_profiles
+
+            context["profiles"] = [
+                {"id": p.id, "name": p.name} for p in assignable_profiles(session)
+            ]
+        except Exception:
+            logger.exception("Profile options fragment could not be rendered")
+            context["failed"] = True
+    return templates.TemplateResponse(
+        request=request, name=PROFILES_FRAGMENT, context=context,
     )
