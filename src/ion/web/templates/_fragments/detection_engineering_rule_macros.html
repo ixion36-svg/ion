@@ -1,0 +1,38 @@
+{# Pieces every rule surface draws the same way: kind, severity, TIDE problem
+   counts, the ION closure bar, the alert sparkline and TIDE quality. #}
+{% macro num(v) -%}{% if v is number %}{{ '{:,}'.format(v) }}{% else %}—{% endif %}{%- endmacro %}
+{% macro kind(k) -%}<span class="dx-kind {{ 'wazuh' if k == 'wazuh' else 'elastic' }}">{{ 'wazuh' if k == 'wazuh' else 'elastic' }}</span>{%- endmacro %}
+{% macro sev(value) -%}{% set key = value|lower if value is string else '' %}<span class="de-sev {{ key if key in ['critical','high','medium','low'] else '' }}">{{ value or 'unknown' }}</span>{%- endmacro %}
+{% macro err_icon() -%}<svg class="dx-icon" aria-hidden="true"><use href="#i-alert-triangle"/></svg>{%- endmacro %}
+{% macro warn_icon() -%}<span class="dx-wdot" aria-hidden="true"></span>{%- endmacro %}
+{% macro info_icon() -%}<span class="dx-ic" aria-hidden="true">i</span>{%- endmacro %}
+{% macro level_icon(level) -%}{% if level == 'error' %}{{ err_icon() }}{% elif level == 'warning' %}{{ warn_icon() }}{% else %}{{ info_icon() }}{% endif %}{%- endmacro %}
+{% macro level_cls(level) -%}{{ {'error': 'e', 'warning': 'w'}.get(level, 'i') }}{%- endmacro %}
+{% macro probs(e, w, i, words=False) -%}
+{% if e or w or i %}<span class="dx-probs">
+{%- if e %}<span class="dx-e" title="{{ e }} error{{ 's' if e != 1 }}">{{ err_icon() }}{{ e }}{{ ' error' ~ ('s' if e != 1 else '') if words }}</span>{% endif -%}
+{%- if w %}<span class="dx-w" title="{{ w }} warning{{ 's' if w != 1 }}">{{ warn_icon() }}{{ w }}{{ ' warning' ~ ('s' if w != 1 else '') if words }}</span>{% endif -%}
+{%- if i %}<span class="dx-i" title="{{ i }} info">{{ info_icon() }}{{ i }}{{ ' info' if words }}</span>{% endif -%}
+</span>{% else %}<span class="dx-mute">—</span>{% endif %}
+{%- endmacro %}
+{% macro closures(c) -%}
+{% if c %}<span class="dx-out" title="{{ c.n }} closures: {{ c.counts.tp }} TP, {{ c.counts.fp }} FP, {{ c.counts.bn }} benign, {{ c.counts.ot }} other">
+<span class="dx-stack">{% for s in c.segments %}<i class="{{ s.cls }}" data-ion-style="width:{{ s.pct }}%"></i>{% endfor %}</span>
+<span class="dx-fp{{ ' hi' if c.noisy }}">{% if c.fp_rate is number %}{{ c.fp_rate|round|int }}%{% else %}—{% endif %}</span><span class="dx-mute small mono">n={{ c.n }}</span></span>
+{% else %}<span class="dx-mute small">no closures</span>{% endif %}
+{%- endmacro %}
+{% macro spark(points, cls='', w=64, h=18) -%}
+{% if points %}<svg class="dx-sparkline {{ cls }}" viewBox="0 0 {{ w }} {{ h }}" aria-hidden="true"><polyline points="{{ points }}"/></svg>{% endif %}
+{%- endmacro %}
+{% macro alerts(r) -%}
+{% if r.alerts is number %}<span class="dx-cnt"><span class="mono">{{ num(r.alerts) }}</span>{{ spark(r.spark, r.spark_cls) }}</span>
+{% else %}<span class="dx-dash" title="{{ 'Kibana holds no Wazuh alerts, and TIDE keeps no alert counts here' if r.kind == 'wazuh' else 'No alert counts from TIDE or Kibana' }}">—</span>{% endif %}
+{%- endmacro %}
+{% macro quality(q) -%}
+{% if q is none %}<span class="dx-tag" title="TIDE has no score for this rule (it does not score Wazuh rules)">unscored</span>
+{% else %}{% set band = 'excellent' if q >= 80 else 'good' if q >= 60 else 'fair' if q >= 40 else 'poor' %}<span class="dx-q"><span class="mono">{{ q|round|int }}</span><span class="dx-track dx-qtrack"><i class="q-{{ band }}" data-ion-style="width:{{ [q, 100]|min }}%"></i></span></span>{% endif %}
+{%- endmacro %}
+{% macro onoff(enabled) -%}<span class="dx-onoff {{ 'on' if enabled else 'off' }}">{{ 'Enabled' if enabled else 'Disabled' }}</span>{%- endmacro %}
+{% macro source_notes(notes) -%}
+{% for note in notes %}<div class="dx-note">{{ note }}</div>{% endfor %}
+{%- endmacro %}

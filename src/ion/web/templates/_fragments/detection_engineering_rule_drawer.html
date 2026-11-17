@@ -1,0 +1,64 @@
+{# One rule: TIDE's problems in its own words, ION's closures, GitLab issues,
+   Elastic's validator findings and MITRE's detection guidance. #}
+{% import "_fragments/detection_engineering_rule_macros.html" as m %}
+{% from "_fragments/_time.html" import ts %}
+<div class="dx-backdrop" data-click-action="deCloseDrawer"></div>
+<aside class="dx-drawer" role="dialog" aria-label="{{ rule.name if rule else 'Rule' }}">
+{% if not rule %}
+  <div class="dx-dh"><button type="button" class="dx-btn ghost sm dx-x" data-click-action="deCloseDrawer" aria-label="Close"><svg class="dx-icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+  <h2>Rule unavailable</h2></div>
+  <div class="dx-dsec dx-mute small">{{ 'TIDE no longer lists this rule at the selected destinations.' if state == 'missing' else 'TIDE could not be read, so this rule cannot be shown.' }}</div>
+{% else %}
+  <div class="dx-dh">
+    <button type="button" class="dx-btn ghost sm dx-x" data-click-action="deCloseDrawer" aria-label="Close"><svg class="dx-icon" aria-hidden="true"><use href="#i-x"/></svg></button>
+    <div class="dx-dmeta">{{ m.kind(rule.kind) }}{{ m.sev(rule.severity) }}{{ m.onoff(rule.enabled) }}</div>
+    <h2>{{ rule.name }}</h2>
+    <div class="dx-dmeta"><span class="mono">{{ rule.mitre_ids|join(', ') or 'no ATT&CK mapping' }}</span><span>{{ rule.dest }}</span>
+      <span>TIDE quality <b class="mono">{{ rule.quality|round|int if rule.quality is number else 'unscored' }}</b></span>
+      {% if rule.alerts is number %}<span>{{ m.num(rule.alerts) }} alerts / {{ alert_days }}d</span>{{ m.spark(rule.spark) }}{% endif %}</div>
+  </div>
+
+  <div class="dx-dsec"><h3>TIDE problems {{ m.probs(rule.e, rule.w, rule.i) }}</h3>
+    {% for p in rule.problems %}
+    <div class="dx-prob"><span class="dx-{{ m.level_cls(p.level) }}">{{ m.level_icon(p.level) }}</span>
+      <div><b>{{ p.title }}</b> <span class="dx-mute small">{{ p.level }}{{ ' · judged by ION' if p.source == 'ion' }}{% if p.cause %} · {{ p.cause }}{% endif %}</span>
+      {% if p.detail %}<div class="dx-msg {{ m.level_cls(p.level) if p.level != 'error' }}">{{ p.detail }}</div>{% endif %}</div></div>
+    {% else %}<div class="dx-mute small">No Rule Monitoring problem for this rule.</div>{% endfor %}
+    {% if rule.checks %}<div class="dx-mute small dx-mt-s">Elastic's validator:</div>
+      {% for c in rule.checks %}<div class="dx-msg {{ 'w' if c.kind == 'warning' }}">{% if c.line %}line {{ c.line }}:{{ c.column }} {% endif %}{{ c.message }}</div>{% endfor %}{% endif %}
+  </div>
+
+  <div class="dx-dsec"><h3>ION closures <span class="dx-n">{{ closure_days }} days{% if rule.closures %} · {{ rule.closures.n }} cases{% endif %}</span></h3>
+    {% if rule.closures %}
+    {% set c = rule.closures.counts %}
+    <div class="dx-ministats">
+      <div><span class="o-dot o-tp"></span>TP<b>{{ c.tp }}</b></div><div><span class="o-dot o-fp"></span>FP<b>{{ c.fp }}</b></div>
+      <div><span class="o-dot o-bn"></span>Benign<b>{{ c.bn }}</b></div><div><span class="o-dot o-ot"></span>Other<b>{{ c.ot }}</b></div>
+    </div>
+    {% if history %}
+    <table class="dx-table"><thead><tr><th>Closed</th><th>Case</th><th>Outcome</th><th>By</th></tr></thead><tbody>
+      {% for h in history %}{% set short = {'true_positive': ('TP', 'ok'), 'false_positive': ('FP', 'bad'), 'benign_true_positive': ('benign', '')}.get(h.reason, (h.reason|replace('_', ' '), '')) %}
+      <tr><td class="mono small">{{ ts(h.closed_at, 'date') }}</td><td class="mono">{{ h.case }}</td><td><span class="dx-tag {{ short[1] }}">{{ short[0] }}</span></td><td class="dx-mute small">{{ h.by or '—' }}</td></tr>
+      {% endfor %}</tbody></table>
+    {% elif not can_cases %}<div class="dx-mute small">Case history needs case:read.</div>
+    {% elif history is none %}<div class="dx-mute small" role="alert">The case history could not be read.</div>{% endif %}
+    {% else %}<div class="dx-mute small">No ION cases closed for this rule in {{ closure_days }} days.</div>{% endif %}
+  </div>
+
+  <div class="dx-dsec"><h3>GitLab issues <span class="dx-n">{{ rule.gitlab|length }} open</span></h3>
+    {% if rule.gitlab %}<table class="dx-table"><tbody>
+      {% for g in rule.gitlab %}<tr><td class="mono">#{{ g.iid }}</td><td>{% if g.url %}<a class="dx-link" href="{{ g.url|safe_url }}" target="_blank" rel="noopener">{{ g.title }}</a>{% else %}{{ g.title }}{% endif %}</td><td><span class="dx-tag accent">{{ g.state or 'open' }}</span></td></tr>{% endfor %}
+    </tbody></table>{% else %}<div class="dx-mute small">No open issue in TIDE's GitLab link names this rule.</div>{% endif %}
+  </div>
+
+  <div class="dx-dsec"><h3>ATT&amp;CK detection guidance</h3>
+    <div id="de-attack-guidance"><button type="button" class="dx-btn sm" data-click-action="deAttackGuidance" data-args='{{ [rule.name]|tojson }}'>Show MITRE's guidance for this rule's techniques</button></div>
+  </div>
+
+  <div class="dx-dfoot">
+    <button type="button" class="dx-btn ghost" data-click-action="deCloseDrawer">Close</button>
+    {% if tide_url %}<a class="dx-btn" href="{{ tide_url|safe_url }}" target="_blank" rel="noopener"><svg class="dx-icon" aria-hidden="true"><use href="#i-external-link"/></svg>Open in TIDE</a>{% endif %}
+    {% if can_propose %}<button type="button" class="dx-btn primary" data-click-action="deDraftForRule" data-args='{{ [rule.name]|tojson }}'><svg class="dx-icon" aria-hidden="true"><use href="#i-sparkles"/></svg>Draft tuning proposal</button>{% endif %}
+  </div>
+{% endif %}
+</aside>

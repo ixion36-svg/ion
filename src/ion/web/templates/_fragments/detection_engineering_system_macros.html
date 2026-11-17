@@ -1,0 +1,33 @@
+{# The cells a system card and a system's detail page share. #}
+{% macro coverage(s) -%}
+{% if s.baseline_pct is number %}<div class="dx-big">{{ s.baseline_pct }}%<small>{{ s.baseline_covered }} / {{ s.baseline_total }} steps</small></div>
+<div class="dx-bar"><i class="ok{{ ' nz' if s.baseline_covered }}" data-ion-style="width:{{ s.baseline_pct }}%"></i></div>
+{% elif s.baseline_total == 0 %}<div class="dx-big">n.a.</div><div class="dx-mute small">no baseline linked to this system in TIDE</div>
+{% else %}<div class="dx-big">—</div><div class="dx-mute small">baseline coverage unavailable</div>{% endif %}
+{% if s.coverage_pct is number %}<div class="dx-mute small dx-breadth" title="Techniques and sub-techniques of ION's ATT&amp;CK catalogue on {{ (s.platforms or ['any platform'])|join(', ') }}, the Coverage tab's universe, with an enabled rule applied to this system">ATT&amp;CK breadth {{ s.coverage_pct }}% · {{ s.covered }} of {{ s.applicable }} on {{ (s.platforms or ['all platforms'])|join(', ') }}</div>{% endif %}
+{%- endmacro %}
+{% macro cves(s) -%}
+{% if s.vulns is none %}<div class="dx-big">—</div><div class="dx-mute small">needs TIDE 7 Wazuh findings</div>
+{% elif not s.agents and not s.vuln_total %}<div class="dx-big">—</div><div class="dx-mute small">no Wazuh hosts to scan</div>
+{% else %}<div class="dx-big">{{ s.vuln_total }}<small>open</small></div>
+<div class="dx-cves">{% if s.kev %}<span class="dx-kev" title="On the CISA Known Exploited list">KEV {{ s.kev|length }}</span>{% endif %}
+{% for k, short in [('critical', 'crit'), ('high', 'high'), ('medium', 'med'), ('low', 'low')] if s.vulns[k] %}<span class="de-sev {{ k }}">{{ s.vulns[k] }} {{ short }}</span>{% endfor %}</div>{% endif %}
+{%- endmacro %}
+{% macro cis(s) -%}
+{% set c = s.cis %}
+{% if c %}<div class="dx-cis"><div class="dx-big">{{ c.score|int }}<small>/ 100</small></div>
+{% if c.spark %}<svg class="{{ 'up' if c.up else 'dn' }}" viewBox="0 0 92 26" aria-hidden="true"><polyline points="{{ c.spark }}"/></svg><span class="mono {{ 'dx-ok' if c.up else 'dx-warn' }}">{{ '+' if c.delta >= 0 }}{{ c.delta }}</span>{% endif %}</div>
+<div class="dx-mute small">{% if c.weeks %}{{ c.weeks }} weeks · {% endif %}{{ c.policies|join(' · ') }}</div>
+{% else %}<div class="dx-big">—</div><div class="dx-mute small">{{ 'no SCA scan from Wazuh' if s.agents else 'needs TIDE 7 Wazuh SCA' }}</div>{% endif %}
+{%- endmacro %}
+{% macro agents(s) -%}
+{% if s.agents is none %}<div class="dx-big">—</div><div class="dx-mute small">needs TIDE 7 Wazuh agents</div>
+{% elif not s.agents %}<div class="dx-big">—</div><div class="dx-mute small">no Wazuh agents on this system</div>
+{% else %}<div class="dx-big">{{ s.agents_active }}<small>/ {{ s.agents|length }} agents active</small></div>
+<div class="dx-agents">{% for a in s.agents %}<span class="dx-ag {{ a.cls }}" title="{{ a.status }} · last seen {{ a.age }} ago">{{ a.name }}{% if a.cls == 'disc' %} · {{ a.age }}{% endif %}</span>{% endfor %}</div>{% endif %}
+{%- endmacro %}
+{% macro age(hours) -%}{% if hours is none %}never{% elif hours < 1 %}{{ [(hours * 60)|round|int, 1]|max }}m ago{% elif hours < 48 %}{{ hours|round|int }}h ago{% else %}{{ (hours / 24)|round|int }}d ago{% endif %}{%- endmacro %}
+{% macro state_tag(fresh, status) -%}
+{% if status == 'error' %}<span class="dx-tag bad">unreadable</span>{% elif status == 'never' %}<span class="dx-tag bad">never</span>
+{% elif fresh == 'ok' %}<span class="dx-tag ok">fresh</span>{% elif fresh == 'warn' %}<span class="dx-tag warn">late</span>{% elif fresh == 'bad' %}<span class="dx-tag bad">stale</span>{% else %}<span class="dx-tag">unknown</span>{% endif %}
+{%- endmacro %}

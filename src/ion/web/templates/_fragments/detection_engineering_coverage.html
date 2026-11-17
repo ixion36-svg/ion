@@ -22,11 +22,13 @@
   <div class="dx-cb">
     {% for notice in notices %}<div class="dx-note">{{ notice }}</div>{% endfor %}
     {% if basis == 'system' %}<div class="dx-note">Scoped to the rules applied to {{ system.name or system.id }}. Rule-off state is not measured per system.</div>{% endif %}
+    {% if platform_scope %}<div class="dx-scope"><button type="button" class="dx-toggle" aria-pressed="false" data-click-action="dePlatformScope" data-args='["$target"]'><i></i>Only {{ system.name or system.id }} platforms ({{ platform_scope.platforms|join(', ') }})</button>
+      <span class="dx-mute small">{{ platform_scope.applicable }} techniques apply to these platforms</span></div>{% endif %}
     <div class="dx-matrix" id="de-attack-matrix">
       {% for tactic in tactics %}
       <button type="button" class="dx-mcol{{ ' on' if tactic.name == selected }}" data-tactic="{{ tactic.name }}" aria-pressed="{{ 'true' if tactic.name == selected else 'false' }}" data-click-action="deCoverageTactic" data-args='{{ [tactic.name]|tojson }}' title="{{ tactic.name }}: {{ tactic.covered }} of {{ tactic.total }} with an enabled rule">
         <span class="dx-mtitle">{{ tactic.short }}<span>{{ tactic.id or '' }}{{ ' · ' if tactic.id }}{{ tactic.covered }}/{{ tactic.total }}</span></span>
-        <span class="dx-cells">{% for cell in tactic.cells %}<i class="s-{{ cell.state }}" title="{{ cell.id }} {{ cell.name }} — {{ labels[cell.state] }}"></i>{% endfor %}</span>
+        <span class="dx-cells">{% for cell in tactic.cells %}<i class="s-{{ cell.state }}{{ ' na' if cell.na }}" title="{{ cell.id }} {{ cell.name }} — {{ labels[cell.state] }}"></i>{% endfor %}</span>
       </button>
       {% endfor %}
     </div>

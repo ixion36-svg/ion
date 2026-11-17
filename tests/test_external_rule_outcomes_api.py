@@ -116,7 +116,7 @@ def test_a_human_holding_the_permission_is_refused(auth, client, session):
 def test_the_tide_role_can_read_and_do_nothing_else(auth, client, tide_token):
     assert _get(client, tide_token).status_code == 200
     headers = {"Authorization": f"Bearer {tide_token}"}
-    assert client.get("/api/detection-health/metrics", headers=headers).status_code == 403
+    assert client.get("/api/de/metrics", headers=headers).status_code == 403
     assert client.get("/api/elasticsearch/alerts", headers=headers).status_code == 403
 
 

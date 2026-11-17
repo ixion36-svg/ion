@@ -182,13 +182,6 @@ def test_tuning_permissions_removed_only_after_their_enforcement():
     assert not offenders, f"tuning:* still enforced: {offenders}"
 
 
-def test_detection_health_now_files_into_the_de_queue():
-    src = Path("src/ion/web/detection_health_api.py").read_text(encoding="utf-8")
-    assert "DetectionProposal(" in src
-    assert 'require_any_permission(["de:propose"])' in src
-    assert "TuningProposal(" not in src
-
-
 def test_bob_auto_draft_targets_the_governed_queue():
     src = Path("src/ion/services/investigation_service.py").read_text(encoding="utf-8")
     body = src.split("def _write_bob_outputs", 1)[1].split("\ndef ", 1)[0]

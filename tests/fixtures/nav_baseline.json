@@ -83,37 +83,9 @@
       "/daily-work",
       "group:Knowledge"
     ],
-    "/de": [
-      "/de",
-      "group:Engineering"
-    ],
-    "/de-bob": [
-      "/de-bob",
-      "group:Engineering"
-    ],
-    "/de-metrics": [
-      "/de-metrics",
-      "group:Reporting"
-    ],
-    "/de-oversight": [
-      "/de-oversight",
-      "group:Engineering"
-    ],
-    "/de-proposals": [
-      "/de-proposals",
-      "group:Engineering"
-    ],
-    "/de-quirks": [
-      "/de-quirks",
-      "group:Engineering"
-    ],
     "/detection-engineering": [
       "/detection-engineering",
       "group:Engineering"
-    ],
-    "/detection-health": [
-      "/detection-health",
-      "group:Reporting"
     ],
     "/discover": [
       "/discover",
@@ -154,10 +126,6 @@
     "/knowledge-graph": [
       "/knowledge-graph",
       "group:Threat Intel"
-    ],
-    "/log-sources": [
-      "/log-sources",
-      "group:Engineering"
     ],
     "/maturity": [
       "/maturity",
@@ -392,28 +360,8 @@
       {
         "items": [
           {
-            "href": "/de",
-            "label": "DE Workbench"
-          },
-          {
             "href": "/detection-engineering",
             "label": "Detection Engineering"
-          },
-          {
-            "href": "/de-proposals",
-            "label": "Detection Proposals"
-          },
-          {
-            "href": "/de-quirks",
-            "label": "System Quirks"
-          },
-          {
-            "href": "/de-bob",
-            "label": "Bob Improvement"
-          },
-          {
-            "href": "/de-oversight",
-            "label": "Abuse Monitor"
           },
           {
             "href": "/cyab",
@@ -422,10 +370,6 @@
           {
             "href": "/network-map",
             "label": "Infrastructure"
-          },
-          {
-            "href": "/log-sources",
-            "label": "Platform Health"
           },
           {
             "href": "/architecture",
@@ -448,14 +392,6 @@
           {
             "href": "/executive-report",
             "label": "Executive Report"
-          },
-          {
-            "href": "/detection-health",
-            "label": "Detection Health"
-          },
-          {
-            "href": "/de-metrics",
-            "label": "DE Metrics"
           },
           {
             "href": "/analytics",

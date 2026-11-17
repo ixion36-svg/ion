@@ -119,13 +119,13 @@ window.deSwitch = function(id) {
     panel.querySelectorAll('[data-sub-note]').forEach(n => { n.hidden = n.dataset.subNote !== sub; });
     if (location.hash !== '#' + sub) history.replaceState(null, '', location.pathname + location.search + '#' + sub);
     if (tab === 'work' && !_loaded.contentPack) loadContentPack();
-    if (!_loaded[sub]) loadSub(sub);
+    return _loaded[sub] ? Promise.resolve(true) : loadSub(sub);
 };
 
 window.deRefresh = function() {
     _loaded = {};
     deCloseDrawer();
-    loadSub(_activeSub);
+    return loadSub(_activeSub);
 };
 
 /* The fragment for each sub-view, and the query it carries. */
@@ -197,14 +197,122 @@ function deCloseDrawer() {
 window.deCloseDrawer = deCloseDrawer;
 document.addEventListener('keydown', e => { if (e.key === 'Escape') deCloseDrawer(); });
 
+window.deAttackGuidance = function(rule) {
+    deLoadFragment('/ui/detection-engineering/health/attack?rule=' + encodeURIComponent(rule), 'de-attack-guidance', 'Reading MITRE guidance...');
+};
+window.deHideAttack = function() {
+    const host = $('de-attack-guidance');
+    if (host) host.replaceChildren();
+};
+/* Drafts a proposal from the rule's FP closures and saves it as a draft,
+   the way the Work tab's requests do. */
+window.deDraftForRule = async function(rule) {
+    const say = (m, k) => (typeof window.showToast === 'function' ? window.showToast(m, k) : (k === 'error' && alert(m)));
+    const post = async (path, body) => {
+        const r = await fetch('/api/de' + path, {method:'POST', credentials:'include',
+            headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(j.detail || ('HTTP ' + r.status));
+        return j;
+    };
+    try {
+        const proposal = await post('/proposals', await post('/proposals/draft', {rule_name: rule, days: 90}));
+        say('Draft proposal #' + proposal.id + ' created for ' + rule + '. It is under Work > Proposals.', 'success');
+        window.deReloadSub('proposals');
+    } catch (error) {
+        say('Draft failed: ' + error.message, 'error');
+    }
+};
+
 /* ── Systems: list and detail ─────────────────── */
 window.deOpenSystem = function(id) {
     _openSystemId = id || '';
     _loaded.systems = false;
-    deSwitch('systems');
-    if (_activeSub === 'systems' && !_loaded.systems) loadSub('systems');
+    if (_activeSub === 'systems') loadSub('systems');
+    else deSwitch('systems');
 };
 window.deCloseSystem = function() { deOpenSystem(''); };
+
+/* The system's Coverage and Readiness buttons set the header's System
+   filter, which both of those tabs follow. */
+window.deCoverageForSystem = function(id) { deChangeSystem(id); deSwitch('attack'); };
+window.deReadinessForSystem = function(id) { deChangeSystem(id); deSwitch('readiness'); };
+
+/* ── Log source register (was Log Source Health) ─ */
+const LS_API = '/api/log-sources';
+function lsReload() { _loaded.systems = false; if (_activeSub === 'systems') loadSub('systems'); }
+async function lsJson(url, options) {
+    const r = await fetch(url, Object.assign({credentials:'include'}, options || {}));
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.detail || ('HTTP ' + r.status));
+    return j;
+}
+window.lsSeedDefaults = async function() {
+    try { await lsJson(LS_API + '/seed-defaults', {method:'POST'}); lsReload(); }
+    catch (e) { alert('Seed failed: ' + e.message); }
+};
+async function lsOpenForm(source) {
+    const dialog = $('ls-dialog');
+    if (!dialog) return;
+    const form = $('ls-form');
+    const field = name => form.querySelector('[name="' + name + '"]');
+    const category = field('category');
+    if (!category.options.length) {
+        try {
+            for (const c of (await lsJson(LS_API + '/categories')).categories || []) {
+                const o = document.createElement('option');
+                o.value = c.id; o.textContent = c.label;
+                category.appendChild(o);
+            }
+        } catch (e) { /* the select stays empty and the browser refuses the submit */ }
+    }
+    const q = (source && source.query) || {};
+    $('ls-modal-title').textContent = source ? 'Edit log source' : 'New log source';
+    field('id').value = source ? source.id : '';
+    field('name').value = source ? source.name : '';
+    if (source) category.value = source.category;
+    field('match_field').value = q.match_field || '';
+    field('match_value').value = q.match_value || '';
+    field('index_pattern').value = source ? (source.index_pattern || '') : '';
+    field('interval').value = source ? source.expected_interval_minutes : 30;
+    field('criticality').value = source ? source.criticality : 'medium';
+    field('owner').value = source ? (source.owner || '') : '';
+    field('tags').value = source ? (source.tags || []).join(', ') : '';
+    field('description').value = source ? (source.description || '') : '';
+    dialog.showModal();
+}
+window.lsNewSource = function() { lsOpenForm(null); };
+window.lsCloseForm = function() { const d = $('ls-dialog'); if (d && d.open) d.close(); };
+window.lsEdit = async function(id) {
+    try { lsOpenForm(await lsJson(LS_API + '/' + id)); } catch (e) { alert('Could not open the source: ' + e.message); }
+};
+window.lsDelete = async function(id) {
+    if (!confirm('Delete this log source?')) return;
+    try { await lsJson(LS_API + '/' + id, {method:'DELETE'}); lsReload(); } catch (e) { alert('Delete failed: ' + e.message); }
+};
+window.lsSubmit = async function(event) {
+    if (event) event.preventDefault();
+    const form = $('ls-form');
+    const v = name => form.querySelector('[name="' + name + '"]').value.trim();
+    const id = v('id');
+    const body = {
+        name: v('name'), category: v('category'),
+        query: {match_field: v('match_field'), match_value: v('match_value')},
+        index_pattern: v('index_pattern') || null,
+        expected_interval_minutes: parseInt(v('interval'), 10) || 30,
+        criticality: v('criticality'), owner: v('owner') || null, description: v('description') || null,
+        tags: v('tags').split(',').map(t => t.trim()).filter(Boolean),
+    };
+    try {
+        await lsJson(id ? LS_API + '/' + id : LS_API, {method: id ? 'PATCH' : 'POST',
+            headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+        lsCloseForm();
+        lsReload();
+    } catch (e) {
+        alert('Save failed: ' + e.message);
+    }
+    return false;
+};
 
 /* ── Coverage map ─────────────────────────────── */
 window.deCoverageTactic = function(name) {
@@ -465,7 +573,7 @@ window.deChangeDestination = async function(key) {
         });
         const payload = await response.json();
         if (!response.ok || !payload || payload.ok !== true) throw new Error('Destination switch failed');
-        deRefresh();
+        await deRefresh();
     } catch (error) {
         deSetBadge('TIDE (destination switch failed)');
     } finally {
@@ -493,12 +601,15 @@ function wantedFromHash() {
     return resolve(decodeURIComponent((location.hash || '').slice(1)));
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    deSwitch(wantedFromHash() || 'overview');
-    deLoadDestinations();
-    deLoadSystems();
+/* The first panel, then the header's TIDE reads, one after another: ION
+   sheds TIDE queries past three in flight, and these requests arriving
+   together tripped it on an ordinary page load. */
+document.addEventListener('DOMContentLoaded', async () => {
     deCheckSyncStatus();
-    deCheckTideAccess();
+    await deSwitch(wantedFromHash() || 'overview');
+    await deLoadDestinations();
+    await deLoadSystems();
+    await deCheckTideAccess();
 });
 /* A link to #health or #quirks, or the back button, lands on that sub-view without a reload. */
 window.addEventListener('hashchange', () => {

@@ -12,7 +12,6 @@ from types import SimpleNamespace
 import pytest
 
 from ion.models.alert_triage import AlertTriage
-from ion.services.detection_health_service import get_detection_health
 from ion.services.elasticsearch_service import ElasticsearchError
 from ion.services.rule_identity_backfill_service import fill_rule_identity
 
@@ -135,11 +134,11 @@ def test_arkime_markers_are_never_sent_to_elasticsearch(session):
 def test_a_named_alert_leaves_the_unmapped_bucket(session):
     session.add(AlertTriage(es_alert_id="a1"))
     session.commit()
-    before = {r["rule_name"] for r in get_detection_health(session, days=365)["rules"]}
+    before = {r["rule_name"] for r in closures_by_rule(session, days=365)["rules"]}
 
     asyncio.run(fill_rule_identity(session, FakeElasticsearch({"a1": _alert("Brute Force", "r-bf")})))
 
-    after = {r["rule_name"] for r in get_detection_health(session, days=365)["rules"]}
+    after = {r["rule_name"] for r in closures_by_rule(session, days=365)["rules"]}
     assert before == {"(unmapped)"}
     assert after == {"Brute Force"}
 
@@ -166,3 +165,12 @@ def test_the_alert_parser_reads_kibana_signal_and_wazuh_ids():
     assert (kibana.rule_id, kibana.rule_uuid) == ("rid-1", "uuid-1")
     assert (signal.rule_id, signal.rule_uuid) == ("rid-2", "uuid-2")
     assert (wazuh.rule_id, wazuh.rule_uuid) == ("5710", None)
+
+
+def closures_by_rule(session, days=90):
+    """Each rule's closures as the Rules table reads them, by name."""
+    from ion.services.rule_outcome_service import NoisyPolicy, Window, rule_outcomes
+    policy = NoisyPolicy.from_env()
+    return {"rules": [{"rule_name": r.rule_name, "rule_id": r.key.rule_id, "fp_rate": r.fp_rate,
+                       "closed": r.closed, "flags": {"noisy": policy.is_noisy(r)}}
+                      for r in rule_outcomes(session, Window.last(days)).sorted()]}

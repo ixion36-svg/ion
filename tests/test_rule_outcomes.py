@@ -11,7 +11,6 @@ import pytest
 
 from ion.models.alert_triage import AlertCase, AlertCaseStatus, AlertTriage, AlertTriageStatus
 from ion.services.de_metrics_service import get_de_metrics
-from ion.services.detection_health_service import get_detection_health
 from ion.services.rule_outcome_service import (
     NoisyPolicy,
     RuleKey,
@@ -73,7 +72,7 @@ def test_de_metrics_and_detection_health_show_one_fp_rate_for_one_rule(session, 
     estate.close("PowerShell Encoded", "benign_true_positive", rule_id="r-ps")
     session.commit()
 
-    dh = _dh_rule(get_detection_health(session, days=90), "PowerShell Encoded")
+    dh = _dh_rule(closures_by_rule(session, days=90), "PowerShell Encoded")
     dem = _dem_campaign(get_de_metrics(session, days=90), "PowerShell Encoded")
 
     assert dh["fp_rate"] == dem["fp_rate"] == 60.0
@@ -87,7 +86,7 @@ def test_detection_health_counts_closures_bob_never_saw(session, estate):
         estate.close("Quiet Rule", "false_positive")
     session.commit()
 
-    rule = _dh_rule(get_detection_health(session, days=90), "Quiet Rule")
+    rule = _dh_rule(closures_by_rule(session, days=90), "Quiet Rule")
     assert rule["closed"] == 2
     assert rule["fp_rate"] == 100.0
 
@@ -134,7 +133,7 @@ def test_noisy_flags_the_rule_over_the_threshold_and_not_the_others(session, est
     session.commit()
 
     flags = {r["rule_name"]: r["flags"]["noisy"]
-             for r in get_detection_health(session, days=90)["rules"]}
+             for r in closures_by_rule(session, days=90)["rules"]}
     campaigns = {c["rule_name"]: c["noisy"]
                  for c in get_de_metrics(session, days=90)["campaigns"]}
 
@@ -202,3 +201,12 @@ def test_noisy_policy_needs_a_sample():
     assert NoisyPolicy(min_closed=5, fp_rate_pct=70).is_noisy(rec) is False
     rec.outcomes["false_positive"] = 5
     assert NoisyPolicy(min_closed=5, fp_rate_pct=70).is_noisy(rec) is True
+
+
+def closures_by_rule(session, days=90):
+    """Each rule's closures as the Rules table reads them, by name."""
+    from ion.services.rule_outcome_service import NoisyPolicy, Window, rule_outcomes
+    policy = NoisyPolicy.from_env()
+    return {"rules": [{"rule_name": r.rule_name, "rule_id": r.key.rule_id, "fp_rate": r.fp_rate,
+                       "closed": r.closed, "flags": {"noisy": policy.is_noisy(r)}}
+                      for r in rule_outcomes(session, Window.last(days)).sorted()]}

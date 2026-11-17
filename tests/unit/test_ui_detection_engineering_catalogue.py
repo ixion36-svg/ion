@@ -123,12 +123,11 @@ def test_plan_coverage_missing_and_zero(client, monkeypatch, zero):
 
 def test_permissions_have_no_licence_dependency(client):
     from fastapi.routing import APIRoute
-    from ion.licensing.gating import require_de_module
     _, ui = client
     for route in ui.router.routes:
         assert isinstance(route, APIRoute)
         assert route.response_class.__name__ == 'HTMLResponse'
-        assert all(dep.call is not require_de_module for dep in route.dependant.dependencies)
+        assert all(getattr(dep.call, '__module__', '') != 'ion.licensing.gating' for dep in route.dependant.dependencies)
         assert any('alert:read' in (cell.cell_contents for cell in (dep.call.__closure__ or ())) for dep in route.dependant.dependencies if dep.call.__closure__)
 
 

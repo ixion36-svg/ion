@@ -1,16 +1,16 @@
-"""Overview and ATT&CK coverage map, built from the reads the other panels make.
+"""Overview (needs attention first) and the ATT&CK coverage map.
 
-Nothing here asks TIDE anything new. The overview folds together the
-posture, gap, use-case and execution reads the older tabs already made; the
-coverage map adds TIDE's global coverage read (the one the navigator layer
-uses) for the rule-off state, and the per-system read when a system is
-chosen. A figure that one of those reads could not supply is None, which
-the templates draw as a dash with the reason, never as a zero.
+The overview reads what the other tabs read: posture and gaps from the TIDE
+snapshot, rule health (TIDE Rule Monitoring, alert counts, ION closures) and
+the systems report (CVEs with KEV, CIS, Wazuh agents). The coverage map adds
+TIDE's global coverage read for the rule-off state, and the per-system read
+when a system is chosen. A figure a read could not supply is None, which the
+templates draw as a dash with the reason, never as a zero.
 """
 from __future__ import annotations
 
-import asyncio
 import logging
+from textwrap import shorten
 from typing import Any, Literal, TypedDict
 
 from fastapi import APIRouter, Depends, Request
@@ -18,40 +18,31 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from ion.auth.dependencies import require_permission
+from ion.auth.dependencies import get_current_user, require_permission
+from ion.models.user import User
 from ion.services import attack_catalogue
+from ion.services import de_systems_service as ds
+from ion.services import rule_health_service as rh
+from ion.services.tide_service import get_tide_service
 from ion.storage.database import get_db_session
 from ion.web import de_tide_api
 from ion.web.ui._detection_engineering_core import GapsPanel, PosturePanel, _number, gaps_view, posture_view
-from ion.web.ui._detection_engineering_execution import ExecutionView, execution_view
 from ion.web.ui._detection_engineering_rules import use_cases
+from ion.web.ui._detection_engineering_health import spark_points
+from ion.web.ui._detection_engineering_systems import baseline_summaries
 from ion.web.ui._shared import render_view
 
 logger = logging.getLogger(__name__)
 router = APIRouter(dependencies=[Depends(require_permission('alert:read'))])
 
-OVERVIEW_HOURS = 168
 SEVERITIES = ('critical', 'high', 'medium', 'low')
 OTHER_TACTIC = 'Other'
 TACTIC_IDS = {name: tactic_id for tactic_id, name in attack_catalogue.TACTIC_NAMES.items()}
 # Column headings on the coverage map, where fifteen columns share the width.
 SHORT_TACTICS = {'Reconnaissance': 'Recon', 'Resource Development': 'Resource Dev.', 'Privilege Escalation': 'Priv. Escalation',
                  'Defense Impairment': 'Defense Impair.', 'Command and Control': 'C2', 'Credential Access': 'Credential Access'}
-NEEDS_ACTION_SHOWN = 6
+ATTENTION_SHOWN = 5
 TACTICS_SHOWN = 6
-
-
-class OverviewPanel(TypedDict):
-    state: Literal['failed', 'unconfigured', 'empty', 'data']
-    posture: PosturePanel
-    coverage_pct: float | int | None
-    tactics: list[dict[str, Any]] | None
-    tactics_hidden: int
-    use_cases: list[dict[str, Any]] | None
-    use_case_counts: dict[str, int] | None
-    firing: dict[str, Any]
-    needs_action: dict[str, Any]
-    blind_spots: int | float | None
 
 
 class CoveragePanel(TypedDict):
@@ -66,6 +57,7 @@ class CoveragePanel(TypedDict):
     quick_wins: list[dict[str, Any]] | None
     unmapped_rules: list[dict[str, Any]] | None
     systems_coverage: list[dict[str, Any]] | None
+    platform_scope: dict[str, Any] | None
 
 
 class SystemOptions(TypedDict):
@@ -118,124 +110,142 @@ def _tactic_rows(blind: set[str] | None) -> list[dict[str, Any]] | None:
     return sorted(result, key=lambda row: (-row['covered'], -(row['pct'] or 0), row['order']))
 
 
-def _use_case_summary(playbooks: list[dict[str, Any]] | None) -> tuple[list[dict[str, Any]] | None, dict[str, int] | None]:
-    if playbooks is None:
-        return None, None
-    counts = {'total': len(playbooks), 'ready': 0, 'partial': 0, 'blind': 0, 'unknown': 0, 'empty': 0}
-    summary = []
-    for playbook in playbooks:
-        steps = playbook.get('steps')
-        states = [step.get('coverage_state', 'unknown') for step in steps if isinstance(step, dict)] if isinstance(steps, list) else None
-        if states is None or 'unknown' in states:
-            state = 'unknown'
-        elif not states:
-            state = 'empty'
-        elif all(item == 'covered' for item in states):
-            state = 'ready'
-        elif all(item == 'blind' for item in states):
-            state = 'blind'
-        else:
-            state = 'partial'
-        counts[state] += 1
-        covered = states.count('covered') if state != 'unknown' else None
-        summary.append({'name': playbook.get('name'), 'state': state, 'steps': states or [],
-                        'covered': covered, 'total': len(states) if states is not None else None,
-                        'pct': percent(covered, len(states)) if covered is not None and states else None})
-    return summary, counts
+def _row(lead: dict[str, Any], title: str, sub: str, action: dict[str, Any] | None, kind: str | None = None) -> dict[str, Any]:
+    return {'lead': lead, 'title': title, 'kind': kind, 'sub': sub, 'action': action}
 
 
-def _sparkline(timeline: list[dict[str, Any]] | None, width: int = 90, height: int = 28) -> str | None:
-    """SVG polyline points for a volume series, or None when any bucket is unknown."""
-    if not timeline or len(timeline) < 2 or any(item.get('count') is None for item in timeline):
+def _group(level: str, title: str, source: str, rows: list[dict[str, Any]], link: tuple[str, str] | None = None) -> dict[str, Any] | None:
+    if not rows:
         return None
-    peak = max(item['count'] for item in timeline) or 1
-    step = width / (len(timeline) - 1)
-    return ' '.join(f"{index * step:.1f},{height - 2 - item['count'] / peak * (height - 4):.1f}"
-                    for index, item in enumerate(timeline))
+    return {'level': level, 'title': title, 'source': source, 'count': len(rows),
+            'rows': rows[:ATTENTION_SHOWN], 'more': max(len(rows) - ATTENTION_SHOWN, 0),
+            'link': {'label': link[0], 'sub': link[1]} if link else None}
 
 
-def _firing(execution: ExecutionView) -> dict[str, Any]:
-    summary = execution['summary']
-    if execution['state'] == 'failed' or summary is None:
-        return {'total': None, 'reason': execution['error'] or 'Execution metrics unavailable', 'capped': False,
-                'rules': None, 'noisy': None, 'silent': None, 'spark': None, 'top': None, 'noisy_names': set(),
-                'hours': execution['hours']}
-    total = _number(summary.get('total_alerts'))
-    status = summary.get('status')
-    counted = [_number(value) for value in status.values()] if isinstance(status, dict) and status else None
-    status_sum = sum(counted) if counted and all(value is not None for value in counted) else None
-    noisy = execution['noisy_rules']
-    top = execution['top_firing']
-    return {
-        'total': total, 'reason': None,
-        # Elasticsearch reports at most 10,000 hits unless asked to count them
-        # all. The status buckets are exact, so more alerts by status than
-        # hits means the hit total is a floor, not a count.
-        'capped': total is not None and status_sum is not None and status_sum > total,
-        'rules': _number(summary.get('unique_rules_firing')),
-        'noisy': _number(summary.get('noisy_rules')),
-        'silent': _number(summary.get('silent_enabled_rules')),
-        'spark': _sparkline(execution['timeline']),
-        'top': [rule for rule in top if isinstance(rule, dict)][:10] if isinstance(top, list) else None,
-        'noisy_names': {rule.get('rule_name') for rule in noisy if isinstance(rule, dict)} if isinstance(noisy, list) else set(),
-        'hours': execution['hours'],
-    }
+def _age(hours: float | None) -> str:
+    if hours is None:
+        return 'never seen'
+    if hours < 48:
+        return f'{max(round(hours), 1)} hours'
+    return f'{round(hours / 24)} days'
 
 
-def _needs_action(posture: PosturePanel, gaps: GapsPanel, execution: ExecutionView, firing: dict[str, Any]) -> dict[str, Any]:
-    disabled = posture['disabled_critical']
-    unmapped = gaps['unmapped_rules']
-    silent = execution['silent_rules'] if firing['reason'] is None and isinstance(execution['silent_rules'], list) else None
-    unmapped_count = posture['stats']['unmapped_rules']
-    if unmapped_count is None and unmapped is not None and len(unmapped) < 100:
-        unmapped_count = len(unmapped)
-    parts = [
-        {'key': 'disabled', 'label': 'disabled critical/high', 'count': len(disabled) if disabled is not None else None,
-         'reason': 'disabled-rule list unavailable'},
-        {'key': 'unmapped', 'label': 'unmapped', 'count': unmapped_count, 'reason': 'unmapped count unavailable'},
-        {'key': 'silent', 'label': 'silent', 'count': firing['silent'] if silent is not None else None,
-         'reason': 'silent rules need execution data' + (f" ({firing['reason']})" if firing['reason'] else '')},
-    ]
-    quick = {rule.get('rule_id') or rule.get('name') for rule in gaps['quick_wins'] or []}
-    items = []
-    for rule in disabled or []:
-        items.append({'kind': 'disabled', 'name': rule.get('name'), 'severity': rule.get('severity'),
-                      'quality': _number(rule.get('quality_score')), 'mitre_ids': rule.get('mitre_ids') or [],
-                      'quick_win': (rule.get('rule_id') or rule.get('name')) in quick})
-    for rule in unmapped or []:
-        items.append({'kind': 'unmapped', 'name': rule.get('name'), 'severity': rule.get('severity'),
-                      'quality': _number(rule.get('quality_score')), 'enabled': rule.get('enabled'), 'mitre_ids': []})
-    for rule in silent or []:
-        if isinstance(rule, dict):
-            items.append({'kind': 'silent', 'name': rule.get('rule_name'), 'severity': rule.get('tide_severity'),
-                          'quality': _number(rule.get('tide_quality')), 'mitre_ids': rule.get('mitre_ids') or []})
-    known = [part['count'] for part in parts if part['count'] is not None]
-    return {'parts': parts, 'items': items[:NEEDS_ACTION_SHOWN], 'more': max(len(items) - NEEDS_ACTION_SHOWN, 0),
-            'total': sum(known) if known else None, 'partial': len(known) < len(parts)}
+def _attention(report: rh.RuleHealthReport, systems: ds.SystemsReport, blind: object) -> list[dict[str, Any]]:
+    rule_btn = lambda r: {'label': 'Open rule', 'fn': 'deOpenRule', 'arg': r.key}
+    sys_btn = lambda sid: {'label': 'Open system', 'fn': 'deOpenSystem', 'arg': sid} if sid else None
+    groups: list[dict[str, Any] | None] = []
+
+    errors = []
+    for r in report.rules:
+        first = next((p for p in r.problems if p.level == 'error'), None)
+        if first:
+            errors.append(_row({'type': 'sev', 'value': r.severity}, r.name, f'{first.title} · {first.detail}'.strip(' ·'),
+                               rule_btn(r), r.kind))
+    groups.append(_group('error', 'Rule Monitoring errors' if report.monitoring == 'tide' else 'Rule errors',
+                         'TIDE' if report.monitoring == 'tide' else 'ION', errors, ('Rules health', 'health')))
+
+    kev = []
+    for system in systems.systems:
+        for v in system.kev or []:
+            kev.append(_row({'type': 'kev'}, f"{v['cve']} {shorten(v.get('description') or v.get('package') or '', 72, placeholder='…')}".strip(),
+                            f"{system.name} · {v.get('hosts') or 'unknown host'} · {v['severity'] or 'unrated'}",
+                            sys_btn(system.id)))
+    groups.append(_group('error', 'Known-exploited CVEs on systems', 'Wazuh vulnerability detector · CISA KEV', kev,
+                         ('Systems', 'systems')))
+
+    disabled = [_row({'type': 'sev', 'value': r.severity}, f'{r.name} is disabled',
+                     ' · '.join(filter(None, [r.mitre_ids[0] if r.mitre_ids else None,
+                                              f'quality {r.quality:.0f}' if r.quality is not None else 'unscored',
+                                              f"GitLab #{r.gitlab[0]['iid']}: {r.gitlab[0]['title']}" if r.gitlab else 'no open issue explains why'])),
+                     rule_btn(r), r.kind)
+                for r in report.rules if not r.enabled and r.severity in ('critical', 'high')]
+    groups.append(_group('warning', 'Disabled critical / high rules', 'TIDE', disabled))
+
+    # ION's closures cannot tell destinations apart, so one rule id deployed
+    # to two spaces is one noisy rule here.
+    seen: set[str] = set()
+    noisy = [r for r in sorted((r for r in report.rules if r.noisy), key=lambda r: -(r.outcome.fp_rate or 0))
+             if not (r.rule_id in seen or seen.add(r.rule_id))]
+    groups.append(_group('warning', 'Mostly closed as false positive', f'ION closures · {rh.CLOSURE_DAYS}d', [
+        _row({'type': 'fp', 'value': round(r.outcome.fp_rate or 0)}, r.name,
+             f'{r.outcome.false_positive} of {r.outcome.closed} closures were false positives'
+             + (f' · {r.alerts:,} alerts / {rh.ALERT_WINDOW_DAYS}d' if r.alerts is not None else ''),
+             rule_btn(r), r.kind) for r in noisy], ('Noise campaigns', 'health')))
+
+    names = {s.id: s.name for s in systems.systems}
+    groups.append(_group('warning', 'Disconnected Wazuh agents', 'Wazuh manager', [
+        _row({'type': 'age', 'value': _age(a.age_hours), 'bad': a.age_hours is None or a.age_hours >= 24},
+             f"{a.name} · {names.get(a.system_id, 'no system')}",
+             f"{a.status.replace('_', ' ') or 'status unknown'} · {a.siem_id} / {a.space}", sys_btn(a.system_id))
+        for a in systems.disconnected]))
+
+    if isinstance(blind, list):
+        groups.append(_group('info', 'Blind spots past their review date', 'accepted risk', [
+            _row({'type': 'tag', 'value': b.get('override_type') or 'gap'}, f"{names.get(str(b.get('system_id')), 'All systems')}: {b.get('reason') or 'accepted blind spot'}",
+                 f"Review was due {b.get('review_by')} · owner {b.get('created_by') or 'unknown'}",
+                 {'label': 'Review', 'fn': 'deGo', 'arg': 'attack'}) for b in blind]))
+    return [g for g in groups if g]
 
 
-def _snapshot_reads(session: Session | None) -> tuple[PosturePanel, GapsPanel, list[dict[str, Any]] | None]:
-    return posture_view(session), gaps_view(session), use_cases(session)
+def _overview_reads(session: Session | None) -> tuple[PosturePanel, GapsPanel, ds.SystemsReport, object, int | None]:
+    svc = get_tide_service()
+    systems = ds.systems_report(svc, session, with_coverage=False, baselines=baseline_summaries(session))
+    blind = svc.get_blind_spots_due() if svc.enabled else None
+    playbooks = use_cases(session)
+    return posture_view(session), gaps_view(session), systems, blind, len(playbooks) if playbooks is not None else None
+
+
+def _open_requests(session: Session | None) -> int | None:
+    from ion.web.de_api import tuning_requests_payload
+
+    try:
+        rows = tuning_requests_payload(session).get('requests')
+    except Exception:
+        logger.exception('Tuning requests could not be counted')
+        return None
+    return sum(1 for r in rows if isinstance(r, dict) and r.get('status') != 'closed') if isinstance(rows, list) else None
 
 
 @router.get('/detection-engineering/overview', response_class=HTMLResponse)
-async def overview(request: Request, session: Session = Depends(get_db_session)):
-    (posture, gaps, playbooks), execution = await asyncio.gather(
-        run_in_threadpool(_snapshot_reads, session), execution_view(OVERVIEW_HOURS))
-    firing = _firing(execution)
+async def overview(request: Request, session: Session = Depends(get_db_session),
+                   user: User = Depends(get_current_user)):
+    # One after the other: ION sheds TIDE queries past three in flight, and
+    # these two reads together would trip it.
+    report = await rh.cached_rule_health(session)
+    posture, gaps, systems, blind, use_case_count = await run_in_threadpool(_overview_reads, session)
+    open_requests = await run_in_threadpool(_open_requests, session) if user and user.has_permission('de:read') else None
     tactics = _tactic_rows(_blind_ids(gaps))
-    shown = [row for index, row in enumerate(tactics or []) if row['covered'] or index < TACTICS_SHOWN]
-    summary, counts = _use_case_summary(playbooks)
-    view: OverviewPanel = {
-        'state': posture['state'], 'posture': posture,
+    attention = _attention(report, systems, blind)
+    counts = report.problem_counts()
+    rules = report.rules
+    alerts = [r.alerts for r in rules if r.alerts is not None]
+    series = [sum(r.days[i] for r in rules if r.days) for i in range(rh.ALERT_WINDOW_DAYS)] if alerts else None
+    closures = report.closures
+    kinds = {k: [r for r in rules if r.kind == k] for k in ('elastic', 'wazuh')}
+    view = {
+        'state': posture['state'] if report.state != 'failed' else 'failed', 'posture': posture,
+        'failure': report.failure.as_dict() if report.failure else None,
         'coverage_pct': percent(posture['stats']['covered_techniques'], posture['stats']['total_techniques']),
-        'tactics': shown if tactics is not None else None,
-        'tactics_hidden': len(tactics or []) - len(shown),
-        'use_cases': summary, 'use_case_counts': counts,
-        'firing': {key: value for key, value in firing.items() if key != 'noisy_names'}
-                  | {'noisy_names': sorted(name for name in firing['noisy_names'] if isinstance(name, str))},
-        'needs_action': _needs_action(posture, gaps, execution, firing),
-        'blind_spots': gaps['total_blind_spots'],
+        'tactics': [row for row in tactics or [] if row['covered']] if tactics is not None else None,
+        'tactics_uncovered': sum(1 for row in tactics or [] if not row['covered']),
+        'rules_total': len(rules) if report.state == 'data' else None,
+        'rules_enabled': sum(r.enabled for r in rules),
+        'by_kind': {k: {'enabled': sum(r.enabled for r in v), 'total': len(v)} for k, v in kinds.items()},
+        'monitoring': report.monitoring, 'counts': counts,
+        'closures': closures, 'closure_days': rh.CLOSURE_DAYS,
+        'fp_rate': round(closures['fp'] / closures['closed'] * 100) if closures and closures['closed'] else None,
+        'closure_segments': [{'cls': c, 'pct': round(closures[k] / closures['closed'] * 100, 1)}
+                             for k, c in (('tp', 'o-tp'), ('fp', 'o-fp'), ('benign', 'o-bn'), ('other', 'o-ot')) if closures[k]]
+                            if closures and closures['closed'] else [],
+        'firing': sum(alerts) if alerts else None, 'firing_rules': sum(1 for a in alerts if a),
+        'high_volume': sum(1 for a in alerts if a > rh.TOO_MANY_ALERTS), 'alert_days': rh.ALERT_WINDOW_DAYS,
+        'firing_spark': spark_points(series, 90, 28) if series else None,
+        'attention': attention, 'attention_total': sum(g['count'] for g in attention),
+        'attention_errors': sum(g['count'] for g in attention if g['level'] == 'error' and g['title'] != 'Known-exploited CVEs on systems'),
+        'attention_kev': sum(g['count'] for g in attention if g['title'] == 'Known-exploited CVEs on systems'),
+        'attention_noisy': len({r.rule_id for r in rules if r.noisy}),
+        'use_case_count': use_case_count, 'open_requests': open_requests,
+        'systems': systems, 'notes': report.notes + systems.notes,
     }
     return render_view(request, '_fragments/detection_engineering_overview.html', view)
 
@@ -272,6 +282,15 @@ def _system(session: Session | None, system_id: str) -> tuple[dict[str, Any] | N
     return {'id': system_id, 'name': name}, None
 
 
+def _platforms(system_id: str) -> list[str] | None:
+    rows = get_tide_service().get_system_platforms()
+    if not isinstance(rows, list):
+        return None
+    row = next((r for r in rows if str(r.get('id')) == system_id), None)
+    platforms = row.get('platforms') if row else None
+    return [str(p) for p in platforms] if isinstance(platforms, list) and platforms else None
+
+
 def coverage_view(session: Session | None, system_id: str = '') -> CoveragePanel:
     gaps = gaps_view(session)
     playbooks = use_cases(session)
@@ -282,7 +301,7 @@ def coverage_view(session: Session | None, system_id: str = '') -> CoveragePanel
     view: CoveragePanel = {
         'state': 'data', 'error': None, 'basis': None, 'system': None, 'notices': notices, 'tactics': None,
         'selected': None, 'totals': None, 'quick_wins': gaps['quick_wins'], 'unmapped_rules': gaps['unmapped_rules'],
-        'systems_coverage': gaps['systems_coverage'],
+        'systems_coverage': gaps['systems_coverage'], 'platform_scope': None,
     }
     if gaps['state'] == 'unconfigured':
         view['state'] = 'unconfigured'
@@ -344,6 +363,14 @@ def coverage_view(session: Session | None, system_id: str = '') -> CoveragePanel
         })
     view['tactics'] = tactics
     view['totals'] = totals
+    if system_id:
+        platforms = _platforms(system_id)
+        applicable = ds.applicable_techniques(platforms)
+        if applicable is not None:
+            view['platform_scope'] = {'platforms': platforms, 'applicable': len(applicable)}
+            for tactic in tactics:
+                for cell in tactic['cells']:
+                    cell['na'] = cell['id'] not in applicable
     ranked = sorted(tactics, key=lambda tactic: (-tactic['covered'], -tactic['off'], tactics.index(tactic)))
     view['selected'] = ranked[0]['name'] if ranked else None
     return view

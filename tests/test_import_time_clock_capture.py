@@ -33,8 +33,6 @@ CLOCK_CALLS = {
 # by N hours, which is what a run of length N does to them. The full suite is
 # ~3h20m, so these margins are 29x the exposure and up.
 HARMLESS = {
-    "test_v047_detection_health.py":
-        "windows are 90-365d against rows 1-70d old; breaks only at ~83d drift",
     "test_v055_de_metrics.py":
         "90d trend split at a 45d midpoint, rows at 5d and 70d; breaks at ~83d",
     "test_v056_de_proposals.py":

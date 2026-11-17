@@ -96,14 +96,8 @@ body[data-page="detection-engineering"] .dx-subtab { padding: 5px 12px; font-siz
 
 /* ── Cards ──────────────────────────────────────── */
 body[data-page="detection-engineering"] .dx-grid { display: grid; gap: 14px; }
-body[data-page="detection-engineering"] .dx-grid-ov { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr); }
 body[data-page="detection-engineering"] .dx-grid-2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-@media (max-width: 1280px) {
-    body[data-page="detection-engineering"] .dx-grid-ov { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-    body[data-page="detection-engineering"] .dx-grid-ov > :first-child { grid-column: 1 / -1; }
-}
 @media (max-width: 860px) {
-    body[data-page="detection-engineering"] .dx-grid-ov,
     body[data-page="detection-engineering"] .dx-grid-2 { grid-template-columns: minmax(0, 1fr); }
 }
 body[data-page="detection-engineering"] .dx-mt { margin-top: 14px; }
@@ -365,8 +359,8 @@ body[data-page="detection-engineering"] .dx-tablewrap { overflow-x: auto; }
 body[data-page="detection-engineering"] .dx-tablewrap .dx-table { min-width: 1080px; }
 
 /* Overview */
-body[data-page="detection-engineering"] .dx-grid-ov { display: grid; gap: 14px; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); align-items: start; }
-@media (max-width: 1100px) { body[data-page="detection-engineering"] .dx-grid-ov { grid-template-columns: minmax(0, 1fr); } }
+body[data-page="detection-engineering"] .dx-grid-ovw { display: grid; gap: 14px; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); align-items: start; }
+@media (max-width: 1100px) { body[data-page="detection-engineering"] .dx-grid-ovw { grid-template-columns: minmax(0, 1fr); } }
 body[data-page="detection-engineering"] .dx-attn-group { padding: 4px 14px 8px; border-bottom: 1px solid var(--dx-line); }
 body[data-page="detection-engineering"] .dx-attn-group:last-child { border-bottom: 0; }
 body[data-page="detection-engineering"] .dx-attn-h {
@@ -520,14 +514,61 @@ body[data-page="detection-engineering"] .dx-kpi .dx-probs { flex-wrap: wrap; row
 @media (max-width: 640px) {
     body[data-page="detection-engineering"] .dx-attn-h { flex-wrap: wrap; }
     body[data-page="detection-engineering"] .dx-attn-h .dx-src { display: none; }
-    body[data-page="detection-engineering"] .dx-grid-ov .dx-table :is(th, td) { padding: 7px 8px; }
+    body[data-page="detection-engineering"] .dx-grid-ovw .dx-table :is(th, td) { padding: 7px 8px; }
     body[data-page="detection-engineering"] .dx-tac :is(th, td):nth-child(3) { display: none; }
-    body[data-page="detection-engineering"] .dx-grid-ov .dx-ch { flex-wrap: wrap; }
+    body[data-page="detection-engineering"] .dx-grid-ovw .dx-ch { flex-wrap: wrap; }
     body[data-page="detection-engineering"] .dx-kpi .dx-s { white-space: normal; }
 }
 
 body[data-page="detection-engineering"] .dx-locked { display: inline-flex; align-items: center; gap: 6px; cursor: not-allowed; opacity: .75; }
 body[data-page="detection-engineering"] .dx-lock { display: inline-flex; align-items: center; gap: 3px; }
+
+/* Rules and Health additions */
+body[data-page="detection-engineering"] .dx-backdrop { z-index: 10000; }
+body[data-page="detection-engineering"] .dx-drawer { z-index: 10001; }
+body[data-page="detection-engineering"] .dx-stack-kpi { width: 100%; height: 5px; margin-top: 8px; }
+body[data-page="detection-engineering"] .dx-attn-group .dx-row > .dx-fp { justify-self: start; }
+body[data-page="detection-engineering"] .o-ot { background: color-mix(in srgb, var(--dx-iris) 70%, transparent); }
+body[data-page="detection-engineering"] .dx-bad-v { color: var(--dx-bad); }
+body[data-page="detection-engineering"] .dx-bad-t { color: var(--dx-bad); }
+body[data-page="detection-engineering"] .dx-mb { margin-bottom: 14px; }
+body[data-page="detection-engineering"] .dx-mt-s { margin-top: 8px; }
+body[data-page="detection-engineering"] .dx-hfeed { padding-top: 2px; padding-bottom: 4px; }
+body[data-page="detection-engineering"] .dx-hlegend { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 500; }
+body[data-page="detection-engineering"] .dx-q { display: inline-flex; align-items: center; gap: 6px; }
+body[data-page="detection-engineering"] .dx-qtrack { display: inline-block; width: 38px; height: 5px; }
+body[data-page="detection-engineering"] .dx-r-mute { color: var(--dx-muted); font-weight: 500; }
+body[data-page="detection-engineering"] .dx-pager { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--dx-line); }
+body[data-page="detection-engineering"] .dx-pager .dx-mute { margin-right: auto; }
+body[data-page="detection-engineering"] .dx-hgroup .dx-why { margin-left: auto; }
+body[data-page="detection-engineering"] .dx-campaigns td:first-child { max-width: 320px; }
+body[data-page="detection-engineering"] .dx-subrow { margin-bottom: 12px; }
+body[data-page="detection-engineering"] .dx-subrow .dx-menu { margin-left: auto; }
+body[data-page="detection-engineering"] a.dx-btn { text-decoration: none; }
+body[data-page="detection-engineering"] #de-attack-guidance .dh-drill-panel { margin-top: 0; }
+
+/* Systems additions */
+body[data-page="detection-engineering"] .dx-breadth { margin-top: 6px; }
+body[data-page="detection-engineering"] .dx-sys-body > div.dx-wide-line { border-bottom: 1px solid var(--dx-rowline); }
+body[data-page="detection-engineering"] .dx-kpis-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1000px) { body[data-page="detection-engineering"] .dx-kpis-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+body[data-page="detection-engineering"] #de-attack-matrix.scoped .dx-cells i.na { opacity: .12; }
+body[data-page="detection-engineering"] #de-log-register .dx-ch { flex-wrap: wrap; }
+body[data-page="detection-engineering"] #de-log-register .dx-ch .dx-r { margin-left: auto; }
+body[data-page="detection-engineering"] .dx-dialog {
+    position: fixed; inset: 0; margin: auto; width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto;
+    padding: 0; border: 1px solid var(--dx-line-2); border-radius: 14px; background: var(--ion-surface-solid, #0d1529); color: var(--dx-text);
+}
+body[data-page="detection-engineering"] .dx-dialog::backdrop { background: rgba(2, 6, 18, .6); }
+body[data-page="detection-engineering"] .dx-form { display: flex; flex-direction: column; gap: 10px; padding: 18px; }
+body[data-page="detection-engineering"] .dx-form h2 { margin: 0 0 4px; font-size: 16px; font-weight: 650; }
+body[data-page="detection-engineering"] .dx-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 640px) { body[data-page="detection-engineering"] .dx-form-grid { grid-template-columns: minmax(0, 1fr); } }
+body[data-page="detection-engineering"] .dx-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--dx-muted); }
+body[data-page="detection-engineering"] .dx-form :is(input, select, textarea) {
+    padding: 7px 9px; border-radius: 8px; border: 1px solid var(--dx-line); background: var(--dx-panel); color: var(--dx-text); font-size: 12.5px;
+}
+body[data-page="detection-engineering"] .dx-form .dx-dfoot { position: static; padding: 8px 0 0; border-top: 0; }
 
 /* ── Work and Bob tabs (below) ─────────────────── */
 body[data-page="detection-engineering"] .dx-acts { display: inline-flex; gap: 6px; justify-content: flex-end; white-space: nowrap; }

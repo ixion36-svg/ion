@@ -14,7 +14,7 @@
    Four states, never collapsed into "nothing to show". A snapshot that did
    not load, a rule whose alerts carry no technique, and techniques with no
    matching strategy are three different findings, and only one of them is
-   about the rule. ion/web/ui/detection_health.py::attack_panel decides which.
+   about the rule. ion/web/ui/_detection_engineering_health.py::attack_panel decides which.
 
    The Hide control is in every state, for the reason the disagreements
    fragment gives: the row this swaps into is un-hidden by the click that
@@ -142,6 +142,6 @@
       {% endif %}
 
     </div>
-    <button class="btn btn-ghost btn-xs shrink-0" data-click-action="dhHide">Hide</button>
+    <button type="button" class="dx-btn ghost sm" data-click-action="deHideAttack">Hide</button>
   </div>
 </div>

@@ -1,0 +1,74 @@
+{# Systems: one card per TIDE system, then ION's log source register (what
+   was Log Source Health). A register source tagged with a system's name or
+   id also appears in that system's freshness list. #}
+{% import "_fragments/detection_engineering_system_macros.html" as sm %}
+<span id="de-count-systems" class="dx-tab-count" hx-swap-oob="true">{% if state == 'data' and not scoped %}{{ systems|length }}{% endif %}</span>
+<div class="dx-subrow"><span class="dx-moved"><svg class="dx-icon" aria-hidden="true"><use href="#i-arrow-right"/></svg><span>Moved here · <b>Log Source Health</b></span></span>
+  <span class="dx-mute small">Each system's devices, hardening, CVEs and log freshness, from Wazuh and TIDE.</span></div>
+{% if state == 'unconfigured' %}<div class="dx-banner">TIDE is not configured. Connect it in <a href="/settings#tide">Settings</a> to see systems.</div>
+{% elif state == 'failed' %}<div class="dx-banner warn" role="alert">TIDE systems could not be read.{% if failure %} {{ failure.message }}{% if failure.detail %} TIDE said: {{ failure.detail }}{% endif %}{% endif %}</div>
+{% else %}
+{% for note in notes %}<div class="dx-note">{{ note }}</div>{% endfor %}
+{% if not systems %}<div class="dx-empty dx-mb">TIDE has no systems{{ ' matching the System filter' if scoped }}. Define them in TIDE to see coverage, CVEs and hardening per system.</div>{% endif %}
+<div class="dx-sys-grid">
+{% for s in systems %}
+<section class="dx-card dx-sys" data-click-action="deOpenSystem" data-args='{{ [s.id]|tojson }}'>
+  <header class="dx-ch">{{ s.name }} {% for p in s.platforms or [] %}<span class="dx-chip">{{ p }}</span>{% endfor %}<span class="dx-r">Open →</span></header>
+  <div class="dx-sys-body">
+    <div><div class="dx-k">Baseline coverage</div>{{ sm.coverage(s) }}</div>
+    <div><div class="dx-k">Open CVEs</div>{{ sm.cves(s) }}</div>
+    <div><div class="dx-k">CIS hardening</div>{{ sm.cis(s) }}</div>
+    <div class="dx-wide dx-wide-line"><div class="dx-k">Devices</div>{{ sm.agents(s) }}</div>
+    <div class="dx-wide"><div class="dx-k">Log source freshness</div>
+      {% if s.freshness %}<div class="dx-ls">{% for f in s.freshness %}<span><em title="{{ f.name }}">{{ f.name }}</em><b class="dx-fresh {{ f.state }}">{{ f.age }}</b></span>{% endfor %}</div>
+      {% else %}<div class="dx-mute small">No Wazuh agent, and no register source tagged "{{ s.name }}".</div>{% endif %}</div>
+  </div>
+</section>
+{% endfor %}
+</div>
+{% endif %}
+
+<section class="dx-card dx-mt" id="de-log-register">
+  <header class="dx-ch">Log source register <span class="dx-n">{{ register|length if register is not none else '' }} · ION</span>
+    <span class="dx-r dx-r-mute">Tag a source with a system's name to show it on that system</span>
+    {% if can_manage %}<button type="button" class="dx-btn sm" data-click-action="lsNewSource"><svg class="dx-icon" aria-hidden="true"><use href="#i-plus"/></svg>New source</button>{% endif %}</header>
+  {% if register is none %}<div class="dx-cb"><div class="dx-empty" role="alert">The log source register could not be read.</div></div>
+  {% elif not register %}<div class="dx-cb"><div class="dx-empty">No log sources are registered.{% if can_manage %} <button type="button" class="dx-link" data-click-action="lsSeedDefaults">Seed the common defaults</button> or add one.{% endif %}</div></div>
+  {% else %}
+  {% if es_configured is false %}<div class="dx-cb dx-note">Elasticsearch is not configured, so these are the last checked values, not a live read.</div>{% endif %}
+  <div class="dx-tablewrap"><table class="dx-table"><thead><tr><th>Source</th><th>Category</th><th>Tags</th><th class="num">Last event</th><th>State</th>{% if can_manage %}<th></th>{% endif %}</tr></thead><tbody>
+  {% for r in register %}
+    <tr><td>{{ r.name }}{% if not r.enabled %} <span class="dx-tag">disabled</span>{% endif %}</td><td class="dx-mute small">{{ r.category }}</td>
+      <td class="small">{% for t in r.tags %}<span class="dx-chip">{{ t }}</span> {% else %}<span class="dx-mute">—</span>{% endfor %}</td>
+      <td class="num"><span class="dx-fresh {{ r.fresh }}">{{ sm.age(r.age) }}</span></td>
+      <td>{{ sm.state_tag(r.fresh, r.status) }}</td>
+      {% if can_manage %}<td class="num dx-nowrap"><button type="button" class="dx-btn sm ghost" data-click-action="lsEdit" data-args='{{ [r.id]|tojson }}'>Edit</button>
+        <button type="button" class="dx-btn sm ghost" data-click-action="lsDelete" data-args='{{ [r.id]|tojson }}'>Delete</button></td>{% endif %}</tr>
+  {% endfor %}
+  </tbody></table></div>
+  {% endif %}
+</section>
+
+{% if can_manage %}
+<dialog id="ls-dialog" class="dx-dialog">
+  <form id="ls-form" class="dx-form" data-validating-submit-action="lsSubmit">
+    <h2 id="ls-modal-title">New log source</h2>
+    <input type="hidden" name="id" value="">
+    <div class="dx-form-grid">
+      <label>Name *<input name="name" type="text" required maxlength="200" placeholder="Sysmon (Windows endpoints)"></label>
+      <label>Category *<select name="category" required></select></label>
+      <label>Match field *<input name="match_field" type="text" required placeholder="event.module"></label>
+      <label>Match value *<input name="match_value" type="text" required placeholder="sysmon"></label>
+      <label>Index pattern<input name="index_pattern" type="text" placeholder="logs-*-* (optional)"></label>
+      <label>Expected interval (minutes) *<input name="interval" type="number" required min="1" max="10080" value="30"></label>
+      <label>Criticality<select name="criticality">{% for c in ['critical', 'high', 'medium', 'low'] %}<option value="{{ c }}"{{ ' selected' if c == 'medium' }}>{{ c|title }}</option>{% endfor %}</select></label>
+      <label>Owner<input name="owner" type="text" placeholder="Platform team"></label>
+    </div>
+    <label>Tags <span class="dx-mute small">comma-separated; a system's name puts the source on that system</span>
+      <input name="tags" type="text" list="ls-system-names" placeholder="{{ system_names[0] if system_names else 'Domain Controllers' }}"></label>
+    <datalist id="ls-system-names">{% for n in system_names %}<option value="{{ n }}">{% endfor %}</datalist>
+    <label>Description<textarea name="description" rows="3"></textarea></label>
+    <div class="dx-dfoot"><button type="button" class="dx-btn ghost" data-click-action="lsCloseForm">Cancel</button><button type="submit" class="dx-btn primary">Save</button></div>
+  </form>
+</dialog>
+{% endif %}

@@ -10,7 +10,6 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_permission
-from ion.storage.database import get_db_session
 from ion.web import de_tide_api
 from ion.web.ui._shared import render_view, rows
 
@@ -153,11 +152,6 @@ def posture_view(session: Session | None) -> PosturePanel:
     return view
 
 
-@router.get('/detection-engineering/posture', response_class=HTMLResponse)
-def posture(request: Request, session: Session = Depends(get_db_session)):
-    return render_view(request, '_fragments/detection_engineering_posture.html', posture_view(session))
-
-
 def gaps_view(session: Session | None) -> GapsPanel:
     payload = None
     try:
@@ -184,11 +178,6 @@ def gaps_view(session: Session | None) -> GapsPanel:
         'unmapped_rules':unmapped,'quick_wins':wins,'systems_coverage':systems,
     }
     return view
-
-
-@router.get('/detection-engineering/gaps', response_class=HTMLResponse)
-def gaps(request: Request, session: Session = Depends(get_db_session)):
-    return render_view(request, '_fragments/detection_engineering_gaps.html', gaps_view(session))
 
 
 @router.get('/detection-engineering/destinations', response_class=HTMLResponse)

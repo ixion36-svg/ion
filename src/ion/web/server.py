@@ -64,7 +64,6 @@ from ion.web.d3fend_api import router as d3fend_router
 from ion.web.daily_standup_api import router as daily_standup_router
 from ion.web.de_api import router as de_router
 from ion.web.de_tide_api import router as de_tide_router
-from ion.web.detection_health_api import router as detection_health_router
 from ion.web.elasticsearch_api import router as elasticsearch_router
 from ion.web.emulation_api import router as emulation_router
 from ion.web.engineering_analytics_api import router as engineering_analytics_router
@@ -445,8 +444,6 @@ app.include_router(shift_handover_router, prefix="/api")
 app.include_router(entity_timeline_router, prefix="/api")
 app.include_router(analyst_efficiency_router, prefix="/api")
 app.include_router(soc_health_router, prefix="/api")
-# Detection Health (per-rule IR→detection feedback analytics)
-app.include_router(detection_health_router, prefix="/api")
 app.include_router(external_router, prefix="/api")  # /api/external/v1/* — machine clients (TIDE), service-account bearer only
 # Detection Engineering module — Phase 0 (read-only noise campaigns + DE metrics)
 app.include_router(de_router, prefix="/api")
