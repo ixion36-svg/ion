@@ -356,10 +356,12 @@ async def get_alert_detail(
     state of Elasticsearch.
     """
     if alert_id.startswith("lab-fixture-"):
-        for fixture in _fixture_alert_dicts(session, include_closed=True):
-            if fixture["id"] == alert_id:
-                return {"alert": fixture}
-        raise HTTPException(status_code=404, detail="Alert not found")
+        found = [f for f in _fixture_alert_dicts(session, include_closed=True) if f["id"] == alert_id]
+        if not found:
+            raise HTTPException(status_code=404, detail="Alert not found")
+        # The list annotates fixtures along with everything else.
+        _annotate_alert_dicts(session, found[:1])
+        return {"alert": found[0]}
 
     service = get_elasticsearch_service()
     if not get_elasticsearch_config().get("enabled") or not service.is_configured:

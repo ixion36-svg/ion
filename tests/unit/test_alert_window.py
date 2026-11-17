@@ -11,7 +11,7 @@ Three things are pinned here:
     the queue returns it, because an alert opened by URL need not be inside
     the time window the queue loaded.
   * /alerts/{alert_id} renders the page with that alert named for the script,
-    and /alerts/{row_id} redirects to it.
+    whatever the id looks like: no integer route sits in front of it.
   * The page opens an alert through the shared workspace chrome and no longer
     carries the modal.
 """
@@ -146,6 +146,22 @@ def test_a_lab_fixture_is_answered_from_its_triage_row_without_elasticsearch(ses
     assert service.asked == []
 
 
+def test_a_lab_fixture_is_annotated_the_way_the_list_annotates_it(session, service, monkeypatch):
+    """The list extends its alerts with the fixtures and then annotates all
+    of them. The single read returned the fixture bare, so the same fixture
+    carried its KEV and quirk marks in the queue and lost them by URL."""
+    seen: list = []
+    monkeypatch.setattr(es_api, "_annotate_alert_dicts",
+                        lambda _session, alerts: seen.append([a["id"] for a in alerts])
+                        or alerts[0].update(kev=True))
+    session.add(AlertTriage(es_alert_id="lab-fixture-8", status=AlertTriageStatus.OPEN))
+    session.add(AlertTriage(es_alert_id="lab-fixture-9", status=AlertTriageStatus.OPEN))
+    session.commit()
+    alert = _detail("lab-fixture-9", session)["alert"]
+    assert seen == [["lab-fixture-9"]]
+    assert alert["kev"] is True
+
+
 def test_an_unknown_lab_fixture_is_a_404(session, service):
     with pytest.raises(HTTPException) as caught:
         _detail("lab-fixture-nope", session)
@@ -163,7 +179,7 @@ def test_the_single_read_is_registered_and_gated_on_alert_read():
 
 
 # ---------------------------------------------------------------------------
-# /alerts/{alert_id} and /alerts/{row_id}
+# /alerts/{alert_id}
 # ---------------------------------------------------------------------------
 
 @pytest.fixture
@@ -206,31 +222,24 @@ def test_the_queue_page_names_no_alert(rendered):
     assert call["context"]["can_create_case"] is False
 
 
-def test_a_triage_row_link_redirects_to_the_alerts_own_page(session, monkeypatch):
-    import ion.storage.database as database
+def test_an_all_digit_id_reaches_the_alert_page_like_any_other():
+    """An integer route used to sit in front of this one and claim every
+    alert whose Elasticsearch id is all digits, redirecting it to whichever
+    triage row had that number."""
     import ion.web.server as server
 
-    row = AlertTriage(es_alert_id="abc/1 2", status=AlertTriageStatus.OPEN)
-    session.add(row)
-    session.commit()
-    monkeypatch.setattr(database, "get_session", lambda: iter([session]))
-
-    found = asyncio.run(server.alert_deeplink(row.id, user=_User("alert:read")))
-    assert found.status_code == 303
-    # Quoted, so an id with a slash stays one path segment.
-    assert found.headers["location"] == "/alerts/abc%2F1%202"
-
-    monkeypatch.setattr(database, "get_session", lambda: iter([session]))
-    absent = asyncio.run(server.alert_deeplink(row.id + 999, user=_User("alert:read")))
-    assert absent.headers["location"] == "/alerts"
+    matches = [r for r in server.app.routes
+               if getattr(r, "path", "").startswith("/alerts/{") and "arkime" not in r.path]
+    assert [r.path for r in matches] == ["/alerts/{alert_id}"]
+    assert matches[0].endpoint is server.alert_page
+    assert not hasattr(server, "alert_deeplink")
 
 
-def test_the_integer_route_is_registered_before_the_string_route():
-    """Starlette takes the first match, and {alert_id} matches digits too."""
+def test_an_all_digit_id_is_passed_to_the_page_unchanged(rendered):
     import ion.web.server as server
 
-    paths = [getattr(r, "path", "") for r in server.app.routes]
-    assert paths.index("/alerts/{row_id:int}") < paths.index("/alerts/{alert_id}")
+    asyncio.run(server.alert_page("12345", request=object(), user=_User("alert:read")))
+    assert rendered[0]["context"]["initial_alert_id"] == "12345"
 
 
 # ---------------------------------------------------------------------------

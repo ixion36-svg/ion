@@ -1600,39 +1600,6 @@ async def alert_arkime_page(
     )
 
 
-@app.get("/alerts/{row_id:int}")
-async def alert_deeplink(
-    row_id: int,
-    user: User = Depends(require_page_permission("alert:read")),
-):
-    """Deep-link to a single alert by AlertTriage row PK.
-
-    lab_fixture_service._observable_link returns `/alerts/<row_id>` for
-    materialised AlertTriage rows, but an alert's identity everywhere else
-    is its `es_alert_id` (a string): an alert nobody has triaged has no row
-    at all. So this resolves the row and redirects to the alert's own page.
-
-    If the row doesn't exist we redirect to `/alerts` so the user lands on
-    a sensible page instead of a 404 error.
-    """
-
-    from urllib.parse import quote
-
-    from ion.models.alert_triage import AlertTriage
-    from ion.storage.database import get_session
-
-    s: Session = next(get_session())
-    try:
-        triage = s.query(AlertTriage).filter(AlertTriage.id == row_id).one_or_none()
-        if triage is None:
-            return RedirectResponse(url="/alerts", status_code=303)
-        return RedirectResponse(
-            url=f"/alerts/{quote(triage.es_alert_id, safe='')}", status_code=303
-        )
-    finally:
-        s.close()
-
-
 @app.get("/alerts/{alert_id}", response_class=HTMLResponse)
 async def alert_page(
     alert_id: str,
@@ -1646,6 +1613,12 @@ async def alert_page(
     /api/elasticsearch/alerts/{id}/detail, so an id that matches nothing is
     reported in the window rather than decided here: this route cannot tell
     a missing alert from an unreachable Elasticsearch without that read.
+
+    There was a /alerts/{row_id:int} beside this, a redirect from an
+    AlertTriage row id that lab fixtures once linked to. Nothing generates
+    that link any more, and an integer route in front of this one claimed
+    every alert whose Elasticsearch id is all digits, sending it to whatever
+    triage row had that number. An id is an Elasticsearch id here, always.
     """
     return templates.TemplateResponse(
         request=request,
