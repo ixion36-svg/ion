@@ -3816,19 +3816,6 @@ function _aqBindToolbar() {
         if (cb) q.setColumn(cb.dataset.aqCol, cb.checked);
     });
     document.addEventListener('click', () => menu.classList.remove('is-open'));
-
-    // the sticky header sits directly under the page chrome; measuring beats
-    // hardcoding, because that height moves with wrapping and font size
-    const syncStick = () => {
-        const t = document.getElementById('alerts-table');
-        const top = t.getBoundingClientRect().top + window.scrollY;
-        const nav = document.querySelector('.tw-nav, nav');
-        const h = nav ? Math.round(nav.getBoundingClientRect().height) : 0;
-        document.documentElement.style.setProperty('--aq-stick', h + 'px');
-        void top;
-    };
-    window.addEventListener('resize', syncStick);
-    syncStick();
 }
 
 function renderAlerts() {
