@@ -21,6 +21,21 @@ from typing import Any, Literal, Optional, TypedDict
 logger = logging.getLogger(__name__)
 
 
+#: arkime_retention_service files a triage row `retention:<case id>` beside
+#: its PCAP warning note, so it warns once per case. The row is a marker,
+#: not an alert: it has no Elasticsearch document, and listed as one it was
+#: an exhibit whose every tab failed, and an "alert not closed".
+RETENTION_MARKER = "retention:"
+
+
+def case_alerts(alerts: Any) -> Any:
+    """The case's alerts without the retention markers; not-a-list passes through."""
+    if not isinstance(alerts, list):
+        return alerts
+    return [a for a in alerts if not (isinstance(a, dict)
+            and str(a.get("es_alert_id") or "").startswith(RETENTION_MARKER))]
+
+
 def letter(index: int) -> str:
     """A, B, ... Z, AA, AB: the exhibit name of the alert at this rail position."""
     out = ""
@@ -41,11 +56,21 @@ _FENCED = re.compile(r"```[A-Za-z]*[ \t]*\n?(?P<body>.*?)```", re.S)
 _OPEN_FENCE = re.compile(r"```[A-Za-z]*[ \t]*\n?(?P<body>.*)\Z", re.S)
 
 
+_SUMMARY_FIELD = re.compile(r'"summary"\s*:\s*("(?:[^"\\]|\\.)*")')
+
+
 def _json_summary(text: str) -> Optional[str]:
     try:
         parsed = json.loads(text)
     except (TypeError, ValueError):
-        return None
+        # A reply cut off by the token limit is not JSON, but its summary
+        # usually comes first and is complete (CASE-0118's is).
+        found = _SUMMARY_FIELD.search(text)
+        try:
+            salvaged = json.loads(found.group(1)) if found else None
+        except ValueError:
+            salvaged = None
+        return salvaged.strip() if isinstance(salvaged, str) and salvaged.strip() else None
     if isinstance(parsed, dict):
         summary = parsed.get("summary")
         if isinstance(summary, str) and summary.strip():

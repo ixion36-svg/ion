@@ -48,6 +48,14 @@ def test_a_fenced_block_that_does_not_parse_keeps_its_text_without_fences():
     assert text.startswith("Before.") and text.endswith("After.")
 
 
+def test_a_reply_cut_off_mid_json_still_reads_as_its_summary():
+    """CASE-0118: the envelope stops partway through key_observations, so it
+    does not parse, but the summary before the cut is whole."""
+    raw = ('```json\n{\n  "verdict": "true_positive",\n  "summary": "Bulk credential read '
+           'from an \\"unknown\\" host.",\n  "key_observations": [{"field": "sha256", "value": "2562')
+    assert bob_text(raw) == 'Bulk credential read from an "unknown" host.'
+
+
 def test_a_fence_that_never_closes_is_still_unwrapped():
     raw = "```json\n" + json.dumps({"summary": "Truncated reply."})
     assert bob_text(raw) == "Truncated reply."
@@ -187,6 +195,20 @@ def test_stored_enrichments_are_matched_by_value_case_insensitively():
                              {"enrichments": {"evil.test": [row]}})
     rows = dict(cards[0]["sources"][0]["rows"])
     assert rows["Verdict"] == "malicious" and rows["Indicators"] == "2"
+
+
+def test_a_retention_marker_row_is_not_an_alert_of_the_case():
+    """CASE-0003 and CASE-0044 carry `retention:<id>` triage rows, filed by
+    the Arkime retention job to warn once. Listed as alerts they were
+    exhibits with no document and a blocker that could never clear."""
+    view = panel_view({"id": 3, "severity": "critical", "assigned_to_id": 1, "alerts": [
+        {"es_alert_id": "retention:3", "status": "open", "observables": []},
+        {"es_alert_id": "real", "status": "closed", "observables": []}],
+        "observables": [], "notes": []}, [], False,
+        {"investigations": {}, "triage": {}, "enrichments": {}})
+    assert [a["alert_id"] for a in view["alerts"]] == ["real"]
+    assert view["alert_count"] == 1
+    assert view["blockers"] == []
 
 
 # ── The rail's exhibit letters ──────────────────────────────────────────

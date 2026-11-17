@@ -98,6 +98,7 @@ from ion.web.ui._cases_board import router as board_router
 from ion.web.ui._cases_window import (
     alert_bob,
     blockers,
+    case_alerts,
     bob_case_note,
     inline_opencti,
     letter,
@@ -2404,6 +2405,7 @@ def panel_view(payload: Any, users: Any,
     }
     if not isinstance(payload, dict):
         return empty
+    payload = {**payload, "alerts": case_alerts(payload.get("alerts"))}
 
     severity = _panel_text(payload.get("severity")) or "medium"
     alerts = panel_alerts(payload.get("alerts"), severity)
@@ -2414,6 +2416,8 @@ def panel_view(payload: Any, users: Any,
         panel_observables(payload.get("observables"), payload.get("alerts"), letters),
         extras)
     bob_note = bob_case_note(payload.get("notes"))
+    if bob_note:
+        bob_note["when"] = instant_label(bob_note["when"])
     iris_case_id = _wb_int(payload.get("dfir_iris_case_id"))
     notes = panel_notes(payload.get("notes"))
     pills, mismatch = kibana_pills(payload.get("kibana_assignees"),
