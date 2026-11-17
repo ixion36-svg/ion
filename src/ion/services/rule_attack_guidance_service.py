@@ -18,7 +18,8 @@ from ion.services.attack_detection_service import (
     strategies_for_technique,
 )
 from ion.services.attack_revocation_service import resolve
-from ion.services.rule_outcome_service import DEFAULT_WINDOW_DAYS, UNMAPPED as _UNMAPPED
+from ion.services.rule_outcome_service import DEFAULT_WINDOW_DAYS
+from ion.services.rule_outcome_service import UNMAPPED as _UNMAPPED
 
 
 def get_rule_attack_guidance(

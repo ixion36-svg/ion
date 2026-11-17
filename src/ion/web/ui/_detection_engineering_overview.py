@@ -27,8 +27,8 @@ from ion.services.tide_service import get_tide_service
 from ion.storage.database import get_db_session
 from ion.web import de_tide_api
 from ion.web.ui._detection_engineering_core import GapsPanel, PosturePanel, _number, gaps_view, posture_view
-from ion.web.ui._detection_engineering_rules import use_cases
 from ion.web.ui._detection_engineering_health import rule_health_for, sees_closures, spark_points
+from ion.web.ui._detection_engineering_rules import use_cases
 from ion.web.ui._detection_engineering_systems import baseline_summaries
 from ion.web.ui._shared import render_view
 
