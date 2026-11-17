@@ -364,11 +364,18 @@ class TideService:
         if self._columns is None:
             if self._query("SELECT count(*) AS n FROM detection_rules") is None:
                 return _RuleColumns()
-            self._columns = _RuleColumns(
-                siem_id=self._query("SELECT siem_id FROM detection_rules LIMIT 0") is not None,
-                rule_type=self._query("SELECT rule_type FROM detection_rules LIMIT 0") is not None,
-                step_siem_id=self._query("SELECT siem_id FROM step_detections LIMIT 0") is not None,
-            )
+            present = []
+            for sql in ("SELECT siem_id FROM detection_rules LIMIT 0",
+                        "SELECT rule_type FROM detection_rules LIMIT 0",
+                        "SELECT siem_id FROM step_detections LIMIT 0"):
+                found = self._query(sql) is not None
+                # Only TIDE refusing the column says it is missing. A probe
+                # shed for load or lost to an outage says nothing, and caching
+                # it read every Wazuh rule as Elastic until a restart.
+                if not found and self.last_failure is not None and self.last_failure.kind != "bad_request":
+                    return _RuleColumns()
+                present.append(found)
+            self._columns = _RuleColumns(siem_id=present[0], rule_type=present[1], step_siem_id=present[2])
         return self._columns
 
     # Every rule query aliases detection_rules as `dr`.
@@ -1488,6 +1495,12 @@ class TideService:
                 "overall_score": overall_score,
             },
         }
+
+    def get_system_baseline_summaries(self) -> dict:
+        """{system id: get_system_use_case_coverage's summary, or None}. Some
+        fifteen statements a system, so the sync worker snapshots it."""
+        return {str(s["id"]): (self.get_system_use_case_coverage(str(s["id"])) or {}).get("summary")
+                for s in self.get_systems()}
 
     def get_destinations(self) -> Optional[list[dict]]:
         """Every destination holding rules in this tenant, busiest first, or

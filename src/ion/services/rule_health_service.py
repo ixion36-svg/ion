@@ -464,3 +464,48 @@ async def rule_health(session: Optional[Session], svc: Optional[TideService] = N
                                      ("critical", "high", "medium", "low").index(r.severity)
                                      if r.severity in ("critical", "high", "medium", "low") else 4, r.name.lower()))
     return report
+
+
+def recent_closures(session: Session, rule_id: str, rule_name: str, limit: int = 6) -> list[dict]:
+    """The rule's latest closed cases inside CLOSURE_DAYS, newest first."""
+    from sqlalchemy import or_, select
+
+    from ion.models.alert_triage import AlertCase, AlertTriage
+    from ion.models.user import User
+
+    window = Window.last(CLOSURE_DAYS)
+    match = AlertTriage.rule_id == rule_id
+    if rule_name:
+        match = or_(match, (AlertTriage.rule_id.is_(None)) & (AlertTriage.rule_name == rule_name))
+    rows = session.execute(
+        select(AlertCase.case_number, AlertCase.closed_at, AlertCase.closure_reason, User.username)
+        .join(AlertTriage, AlertTriage.case_id == AlertCase.id)
+        .outerjoin(User, User.id == AlertCase.closed_by_id)
+        .where(match, AlertCase.closure_reason.is_not(None),
+               AlertCase.closed_at >= window.since, AlertCase.closed_at < window.until)
+        .group_by(AlertCase.id, AlertCase.case_number, AlertCase.closed_at, AlertCase.closure_reason, User.username)
+        .order_by(AlertCase.closed_at.desc()).limit(limit)
+    ).all()
+    return [{"case": r[0], "closed_at": r[1], "reason": r[2], "by": r[3]} for r in rows]
+
+
+_REPORT_TTL_S = 8.0
+_report_cache: dict[str, tuple[float, RuleHealthReport]] = {}
+
+
+async def cached_rule_health(session: Optional[Session]) -> RuleHealthReport:
+    """rule_health for the shared TIDE service, reused for a few seconds so
+    the Overview, Rules and Health panels of one page load build it once."""
+    import time
+
+    from ion.services.tide_service import scope_label
+
+    svc = get_tide_service()
+    key = scope_label(svc.scope) if svc.enabled else ""
+    hit = _report_cache.get(key)
+    if hit and time.monotonic() - hit[0] < _REPORT_TTL_S:
+        return hit[1]
+    report = await rule_health(session, svc)
+    if report.state == "data":
+        _report_cache[key] = (time.monotonic(), report)
+    return report

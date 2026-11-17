@@ -41,6 +41,7 @@ _SYNC_TARGETS = [
     ("gaps", "get_gaps_analysis", {}),
     ("systems", "get_systems", {}),
     ("use_cases", "get_playbooks_with_kill_chains", {}),
+    ("system_baselines", "get_system_baseline_summaries", {}),
 ]
 
 # Sync interval in seconds (default 5 minutes, configurable via env).

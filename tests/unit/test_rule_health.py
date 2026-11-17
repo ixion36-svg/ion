@@ -115,3 +115,22 @@ def test_ion_thresholds(days, expect):
 def test_a_rule_with_no_rule_table_is_a_failed_read(monkeypatch):
     report = _report({"detection_rules": TideFailure("unreachable", "ConnectError")}, monkeypatch)
     assert report.state == "failed" and report.failure.kind == "unreachable"
+
+
+def test_a_column_probe_shed_for_load_is_not_remembered_as_a_missing_column():
+    class _Shedding(TideService):
+        def __init__(self):
+            self.enabled, self.scope, self.shed = True, None, True
+            self.last_failure = None
+
+        def _query(self, sql, retries=1):
+            if self.shed and "LIMIT 0" in sql:
+                self.last_failure = TideFailure("overloaded", "too many TIDE queries in flight")
+                return None
+            self.last_failure = None
+            return {"rows": []}
+
+    svc = _Shedding()
+    assert svc._rule_columns().rule_type is True and svc._columns is None
+    svc.shed = False
+    assert svc._rule_columns().rule_type is True and svc._columns is not None
