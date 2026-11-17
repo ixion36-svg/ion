@@ -787,7 +787,8 @@ function selectCaseAlert(alertId, idx, caseId) {
 
     // The tab the analyst had open stays open on the next alert.
     const was = host.querySelector('.detail-tab-btn.active');
-    const tab = was ? was.dataset.tab : null;
+    const kept = window.ionCaseWindow && window.ionCaseWindow.state && window.ionCaseWindow.state.tab;
+    const tab = was ? was.dataset.tab : (kept || null);
     const win = document.querySelector('[data-cwin]');
     let obsValues = [];
     try { obsValues = JSON.parse((win && win.dataset.obsValues) || '[]'); } catch (e) { obsValues = []; }

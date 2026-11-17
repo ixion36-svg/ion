@@ -248,7 +248,8 @@
     var line = q('[data-cwin-exline="' + attr(id) + '"]');
     if (line) {
       var cmd = first(raw, ['process.command_line', 'kibana.alert.reason', 'message']);
-      line.textContent = [cmd, host, line.textContent].filter(Boolean).join(' · ');
+      if (!line.hasAttribute('data-cwin-base')) line.setAttribute('data-cwin-base', line.textContent);
+      line.textContent = [cmd, host, line.getAttribute('data-cwin-base')].filter(Boolean).join(' · ');
     }
     var pk = q('[data-cwin-expk="' + attr(id) + '"]');
     if (pk) {
@@ -262,7 +263,7 @@
 
   // Four at a time: a twenty-alert case should not open twenty connections.
   function loadDocs() {
-    var queue = alertIds.slice();
+    var queue = alertIds.filter(function (id) { return !(id in docs); });
     var fetchRaw = window.ionAlertDetailFetchRaw;
     if (!fetchRaw) return;
     var pending = false;
@@ -465,8 +466,14 @@
       var res = (d && d.results) || {};
       out.innerHTML = providers.map(function (p) {
         var r = res[p] || {};
-        var state = r.error ? 'failed: ' + r.error : (r.found === false ? 'no match' : 'answered');
-        return '<div class="cwin-src"><b>' + esc(p) + '</b><span class="cwin-note">' + esc(state) + '</span></div>';
+        var state = r.error ? 'failed: ' + r.error : r.skipped ? 'does not take this type'
+          : (r.found === false ? 'no match' : 'answered');
+        // Providers answer in their own shapes; their flat fields are shown as given.
+        var rows = (!r.error && !r.skipped && r.found !== false) ? Object.keys(r).filter(function (k) {
+          return ['source', 'found', 'raw'].indexOf(k) === -1 && r[k] !== null && typeof r[k] !== 'object';
+        }).slice(0, 6).map(function (k) { return '<dt>' + esc(k) + '</dt><dd>' + esc(r[k]) + '</dd>'; }).join('') : '';
+        return '<div class="cwin-src"><b>' + esc(p) + '</b><span class="cwin-note">' + esc(state) + '</span>'
+          + (rows ? '<dl>' + rows + '</dl>' : '') + '</div>';
       }).join('') + '<p class="cwin-note">Shown, not saved.</p>';
     }).catch(function (e) {
       out.textContent = 'The lookup failed: ' + ((e && e.message) || e);
@@ -475,7 +482,8 @@
 
   // ── keys ──────────────────────────────────────────────────────────────
   document.addEventListener('keydown', function (e) {
-    if (!S || !root || !document.body.contains(root)) return;
+    var panel = document.getElementById('case-panel');
+    if (!S || !root || !document.body.contains(root) || (panel && !panel.classList.contains('open'))) return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     var t = e.target;
     var typing = t && (t.isContentEditable || /^(TEXTAREA|SELECT)$/.test(t.tagName)
@@ -484,7 +492,10 @@
       if (e.key === 'Escape' && t.blur) t.blur();
       return;
     }
-    if (document.querySelector('.cases-modal-overlay:not(.hidden)[style*="flex"]')) return;
+    // The page opens its dialogs with style.display, not a class.
+    if (['closure-modal-overlay', 'create-case-overlay'].some(function (id) {
+      var m = document.getElementById(id); return m && m.style.display === 'flex';
+    })) return;
     var k = e.key;
     if (k === 'r') { setMode(S.mode === 'read' ? 'triage' : 'read'); e.preventDefault(); }
     else if (k === 'j') { step(1); e.preventDefault(); }
@@ -498,6 +509,8 @@
   });
 
   document.addEventListener('click', function (e) {
+    var tabBtn = e.target.closest && e.target.closest('#cpanel-alert-workspace .detail-tab-btn');
+    if (S && tabBtn) S.tab = tabBtn.getAttribute('data-tab');
     var list = q('[data-cwin-pill-list]');
     if (list && !list.hidden && !e.target.closest('[data-cwin-pill]')) window.cwTogglePill();
   });
