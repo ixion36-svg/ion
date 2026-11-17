@@ -112,6 +112,7 @@ from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import get_current_user, require_permission
 from ion.models.user import User
+from ion.services.observable_kinds import observable_kind
 from ion.storage.database import get_db_session
 from ion.web.ui._shared import plain, render_view
 
@@ -1704,18 +1705,6 @@ MITRE_TACTICS = (
     "Exfiltration", "Impact",
 )
 
-#: ION observable type to the OpenCTI type enrichObservables sent. None
-#: means not enrichable; a type absent from the map is sent as itself, which
-#: is what the page did (`typeMap[obs.type] !== undefined ? ... : obs.type`).
-OPENCTI_TYPE_MAP: dict[str, Optional[str]] = {
-    "source_ip": "ipv4-addr",
-    "destination_ip": "ipv4-addr",
-    "hostname": "domain-name",
-    "domain": "domain-name",
-    "url": "url",
-    "user_account": None,
-}
-
 #: Bob confidence thresholds, from the page: 80 and over is High, 60 and
 #: over Medium, anything else Low. A measured 0 is Low, not absent.
 BOB_HIGH = 80
@@ -1804,18 +1793,18 @@ def observable_rows(observables: Any, enrichment: Optional[dict] = None) -> list
 
 
 def enrichable_observables(observables: Any) -> list:
-    """What enrichObservables sent: each observable mapped through
-    OPENCTI_TYPE_MAP, the unmappable dropped, the original type kept for
-    the result rows."""
+    """The observables worth sending to OpenCTI: those whose type is an
+    observable kind at all. The type goes as it is, because the service
+    decides what it means; a page-side map here drifted from the service's
+    and sent host_ip and the hashes as strings it refused."""
     out = []
     for o in observables if isinstance(observables, list) else []:
         if not isinstance(o, dict):
             continue
         otype = o.get("type")
-        mapped = OPENCTI_TYPE_MAP.get(otype, otype) if otype in OPENCTI_TYPE_MAP else otype
-        if not mapped or not o.get("value"):
+        if not o.get("value") or observable_kind(otype, o.get("value")) is None:
             continue
-        out.append({"type": mapped, "value": o.get("value"), "original_type": otype})
+        out.append({"type": otype, "value": o.get("value"), "original_type": otype})
     return out
 
 

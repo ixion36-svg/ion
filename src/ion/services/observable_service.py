@@ -27,6 +27,7 @@ from ion.models.observable import (
     WatchlistAlertType,
 )
 from ion.services.observable_extractor import ENRICHABLE_CONTRACT_TYPES
+from ion.services.observable_kinds import OBSERVABLE_ALIASES
 from ion.services.opencti_service import OpenCTIError, get_opencti_service
 
 logger = logging.getLogger(__name__)
@@ -35,44 +36,10 @@ logger = logging.getLogger(__name__)
 # modest even though the calls are independent.
 _ENRICH_FANOUT = 5
 
-# Map context types (from observable_extractor) and legacy names to ObservableType enum.
 # The context string is preserved on ObservableLink.context so the role (source vs
-# destination, subject vs target) is never lost — this map only resolves to the
+# destination, subject vs target) is never lost — this only resolves to the
 # canonical type for the Observable record itself.
-LEGACY_TYPE_MAP = {
-    # IP addresses (role distinguished by context on the link)
-    "source_ip": ObservableType.IPV4,
-    "destination_ip": ObservableType.IPV4,
-    "host_ip": ObservableType.IPV4,
-    "ip": ObservableType.IPV4,
-    "ipv4-addr": ObservableType.IPV4,
-    "ipv6-addr": ObservableType.IPV6,
-    # Hostnames
-    "hostname": ObservableType.HOSTNAME,
-    "source_hostname": ObservableType.HOSTNAME,
-    "destination_hostname": ObservableType.HOSTNAME,
-    # User accounts (subject/target role distinguished by context)
-    "user_account": ObservableType.USER_ACCOUNT,
-    "subject_user": ObservableType.USER_ACCOUNT,
-    "target_user": ObservableType.USER_ACCOUNT,
-    # URLs and domains
-    "url": ObservableType.URL,
-    "domain": ObservableType.DOMAIN,
-    "domain-name": ObservableType.DOMAIN,
-    # File hashes
-    "sha256": ObservableType.FILE_HASH_SHA256,
-    "sha1": ObservableType.FILE_HASH_SHA1,
-    "md5": ObservableType.FILE_HASH_MD5,
-    "file-sha256": ObservableType.FILE_HASH_SHA256,
-    "file-sha1": ObservableType.FILE_HASH_SHA1,
-    "file-md5": ObservableType.FILE_HASH_MD5,
-    # File names
-    "filename": ObservableType.FILE_NAME,
-    "file_name": ObservableType.FILE_NAME,
-    # Email
-    "email": ObservableType.EMAIL,
-    "email-addr": ObservableType.EMAIL,
-}
+LEGACY_TYPE_MAP = OBSERVABLE_ALIASES
 
 # Types that are extracted as observables for display but don't map to a
 # canonical ObservableType (file paths, process names, registry keys, etc.).
@@ -1130,7 +1097,7 @@ class ObservableService:
             return None
         try:
             return await service.enrich_observable(
-                self._to_opencti_type(observable.type), observable.value
+                observable.type, observable.value
             )
         except OpenCTIError as e:
             logger.error("OpenCTI enrichment failed: %s", e)
@@ -2694,33 +2661,6 @@ class ObservableService:
             return ObservableType[type_str.upper()]
         except KeyError:
             raise ValueError(f"Unknown observable type: {type_str}")
-
-    def _to_opencti_type(self, obs_type: ObservableType) -> str:
-        """Convert ObservableType to OpenCTI STIX type.
-
-        Args:
-            obs_type: Our observable type
-
-        Returns:
-            OpenCTI type string
-        """
-        mapping = {
-            ObservableType.IPV4: "ipv4-addr",
-            ObservableType.IPV6: "ipv6-addr",
-            ObservableType.DOMAIN: "domain-name",
-            ObservableType.HOSTNAME: "hostname",
-            ObservableType.URL: "url",
-            ObservableType.EMAIL: "email-addr",
-            ObservableType.FILE_HASH_MD5: "file-md5",
-            ObservableType.FILE_HASH_SHA1: "file-sha1",
-            ObservableType.FILE_HASH_SHA256: "file-sha256",
-            ObservableType.USER_ACCOUNT: "user_account",
-            ObservableType.FILE_NAME: "file-name",
-            ObservableType.MAC_ADDRESS: "mac-addr",
-            ObservableType.CVE: "vulnerability",
-        }
-        return mapping.get(obs_type, obs_type.value)
-
 
 # Convenience function for getting service with session
 def get_observable_service(session: Session) -> ObservableService:

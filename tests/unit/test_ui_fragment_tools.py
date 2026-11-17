@@ -237,13 +237,13 @@ def test_the_lookup_sends_a_type_which_the_page_never_did(client, monkeypatch):
     ("evil.example", "domain-name"),
 ])
 def test_every_type_it_sends_is_one_the_endpoint_accepts(value, expected):
-    """Each of these is a key of OpenCTIService.TYPE_MAP, which is what the
+    """Each of these resolves to an OpenCTI target, which is what the
     endpoint validates against. An IPv6 address went through a dotted-quad
     regex in the browser and came out as a domain."""
-    from ion.services.opencti_service import OpenCTIService
+    from ion.services.opencti_service import opencti_target
 
     assert ioc_type(value) == expected
-    assert expected in OpenCTIService.TYPE_MAP
+    assert opencti_target(expected, value) is not None
 
 
 def test_a_javascript_url_is_not_typed_as_a_url():

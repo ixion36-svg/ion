@@ -59,25 +59,14 @@ logger = logging.getLogger(__name__)
 # normalized_value, so ignored CVEs (upper), MACs (separators) and
 # trailing-dot domains never matched.
 def _merge_type_to_observable_type(merge_type: str):
-    from ion.models.observable import ObservableType
     from ion.services.observable_service import LEGACY_TYPE_MAP
 
     # LEGACY_TYPE_MAP is the canonical bridge — it is also what the analyst's
     # ignore toggle uses to type the Observable row, so reusing it keeps both
     # sides of the mapping in lockstep. It covers the role-typed strings the
     # case-creation extractor writes into case.observables (source_ip,
-    # destination_hostname, subject_user, ...); the extras below are merge/
-    # extractor spellings it doesn't carry.
-    key = (merge_type or "").lower()
-    if key in LEGACY_TYPE_MAP:
-        return LEGACY_TYPE_MAP[key]
-    return {
-        "ipv4": ObservableType.IPV4,
-        "ipv6": ObservableType.IPV6,
-        "mac": ObservableType.MAC_ADDRESS,
-        "mac_address": ObservableType.MAC_ADDRESS,
-        "cve": ObservableType.CVE,
-    }.get(key)
+    # destination_hostname, subject_user, ...) and the merge spellings.
+    return LEGACY_TYPE_MAP.get((merge_type or "").lower())
 
 
 def _obs_family(obs_type) -> str:

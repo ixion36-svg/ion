@@ -4348,21 +4348,16 @@ async def _background_enrich_triage_observables(triage_id: int, observables: lis
         if not opencti.is_configured:
             return
 
-        # Map observable types to OpenCTI lookup types
-        type_map = {
-            "source_ip": "ipv4-addr", "destination_ip": "ipv4-addr", "host_ip": "ipv4-addr",
-            "hostname": "domain-name", "source_hostname": "domain-name", "destination_hostname": "domain-name",
-            "domain": "domain-name", "url": "url",
-            "sha256": "file-sha256", "sha1": "file-sha1", "md5": "file-md5",
-        }
+        from ion.services.observable_service import DISPLAY_ONLY_TYPES
 
         enriched = []
         for obs in observables:
             obs_copy = dict(obs)
-            lookup_type = type_map.get(obs["type"])
-            if lookup_type:
+            # Process names and command lines are extracted for display and
+            # are not observables; everything else is the service's to type.
+            if obs["type"] not in DISPLAY_ONLY_TYPES:
                 try:
-                    result = await opencti.enrich_observable(lookup_type, obs["value"])
+                    result = await opencti.enrich_observable(obs["type"], obs["value"])
                     if result.get("found"):
                         obs_copy["enriched"] = True
                         obs_copy["threat_labels"] = [l.get("value", "") for l in result.get("labels", [])]
