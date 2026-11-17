@@ -29,7 +29,7 @@ from ion.models.alert_triage import AlertCase, AlertCaseStatus
 from ion.models.document import Document
 from ion.models.template import Collection
 from ion.models.user import User
-from ion.services.opencti_service import OpenCTIService
+from ion.services.opencti_service import opencti_target
 from ion.web.ui.analyst import (
     ALERT_READ,
     CASE_READ,
@@ -785,7 +785,7 @@ def test_ioc_type_matches_the_opencti_map(value, kind):
     """The old lookup posted no type, so the endpoint 422d. javascript: is
     not a URL. Every inferred name has to be one the service will accept."""
     assert _ioc_type(value) == kind
-    assert kind in OpenCTIService.TYPE_MAP
+    assert opencti_target(kind, value) is not None
 
 
 def test_the_lookup_sends_the_inferred_type_and_a_score_of_zero(client, monkeypatch):

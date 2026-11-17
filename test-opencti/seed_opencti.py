@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Seed OpenCTI test instance with threat intelligence data.
 
-Creates indicators, observables, threat actors, malware, and relationships
-via individual GraphQL mutations. Uses raw httpx -- no pycti dependency.
+Creates indicators, observables of every type ION looks up, a vulnerability,
+threat actors, malware, and relationships via individual GraphQL mutations. Uses raw httpx -- no pycti dependency.
 
 Usage:
     python seed_opencti.py [--url URL] [--token TOKEN]
@@ -97,6 +97,41 @@ class OpenCTISeeder:
         r = data["indicatorAdd"]
         self.ids[key] = r["id"]
         print(f"    + Indicator: {r['name']}")
+        self.created += 1
+
+    def _create_observable(self, key: str, obs_type: str, score: int, **fields):
+        # The mutation takes the type twice: as the entity type string and
+        # as the name of the per-type input argument, which is the same
+        # string without its hyphen.
+        arg = obs_type.replace("-", "")
+        mutation = """mutation($type: String!, $input: %sAddInput, $score: Int) {
+            stixCyberObservableAdd(type: $type, %s: $input, x_opencti_score: $score) {
+                id entity_type observable_value
+            }
+        }""" % (arg, arg)
+        data, err = self._gql(
+            mutation, {"type": obs_type, "input": fields, "score": score})
+        if err:
+            print(f"    ERROR observable {obs_type} {fields}: {err}")
+            self.errors += 1
+            return
+        r = data["stixCyberObservableAdd"]
+        self.ids[key] = r["id"]
+        print(f"    + {r['entity_type']}: {r['observable_value']}")
+        self.created += 1
+
+    def _create_vulnerability(self, key: str, **kwargs):
+        mutation = """mutation($input: VulnerabilityAddInput!) {
+            vulnerabilityAdd(input: $input) { id name }
+        }"""
+        data, err = self._gql(mutation, {"input": kwargs})
+        if err:
+            print(f"    ERROR vulnerability '{kwargs.get('name')}': {err}")
+            self.errors += 1
+            return
+        r = data["vulnerabilityAdd"]
+        self.ids[key] = r["id"]
+        print(f"    + Vulnerability: {r['name']}")
         self.created += 1
 
     def _create_relationship(self, from_key: str, rel_type: str, to_key: str,
@@ -348,6 +383,54 @@ class OpenCTISeeder:
         )
 
         # ==============================================================
+        # 3e. One of every other type ION looks up
+        #     The indicators above only produce IPv4-Addr, Domain-Name, Url
+        #     and SHA-256 files, which leaves most of ION's observable
+        #     kinds with nothing to find. The first Hostname deliberately
+        #     shares its value with the phishing Domain-Name: a lookup that
+        #     does not constrain the entity type cannot tell the two apart.
+        # ==============================================================
+        print("\n[3/5] Creating observables of the remaining types ...")
+        self._create_indicator(
+            "ip6_0",
+            name="C2 over IPv6 - 2001:db8:85a3::8a2e:370:7334",
+            description="IPv6 command-and-control endpoint used by APT-TEST-1 implants.",
+            pattern="[ipv6-addr:value = '2001:db8:85a3::8a2e:370:7334']",
+            pattern_type="stix",
+            valid_from="2024-01-01T00:00:00.000Z",
+            x_opencti_main_observable_type="IPv6-Addr",
+            x_opencti_score=85,
+            createObservables=True,
+        )
+        self._create_observable("host_0", "Hostname", 70, value="evil-login.example.com")
+        self._create_observable("host_1", "Hostname", 60, value="srv-staging-07")
+        self._create_observable(
+            "email_0", "Email-Addr", 80, value="billing@evil-login.example.com")
+        self._create_observable("mac_0", "Mac-Addr", 40, value="00:1b:44:11:3a:b7")
+        self._create_observable(
+            "user_0", "User-Account", 75,
+            account_login="svc_backup_adm",
+            user_id="S-1-5-21-1004336348-1177238915-682003330-1105",
+        )
+        # The EICAR test file, so the MD5, SHA-1 and name keys each have
+        # something to hit.
+        self._create_observable(
+            "file_0", "StixFile", 90,
+            name="invoice_q4.exe",
+            hashes=[
+                {"algorithm": "MD5", "hash": "44d88612fea8a8f36de82e1278abb02f"},
+                {"algorithm": "SHA-1",
+                 "hash": "3395856ce81f2b7382dee72602f798b642f14140"},
+            ],
+        )
+        self._create_vulnerability(
+            "vuln_0",
+            name="CVE-2021-44228",
+            description="Log4Shell: remote code execution in Apache Log4j 2 via JNDI lookup.",
+            x_opencti_cvss_base_score=10.0,
+        )
+
+        # ==============================================================
         # 4. Relationships
         # ==============================================================
         print("\n[4/5] Creating relationships ...")
@@ -360,6 +443,7 @@ class OpenCTISeeder:
         for key, _, _, _, _, actor_key, _ in hash_intel:
             self._create_relationship(key, "indicates", actor_key)
         self._create_relationship("url_0", "indicates", "ta_apt1")
+        self._create_relationship("ip6_0", "indicates", "ta_apt1")
 
         # Indicator → malware (indicates)
         for key, _, _, _, _, _, malware_key in hash_intel:

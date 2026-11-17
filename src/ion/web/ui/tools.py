@@ -209,7 +209,7 @@ def _text(value: object) -> Optional[str]:
 def ioc_type(value: str) -> str:
     """The OpenCTI type for a value an analyst pasted.
 
-    Every name returned is a key of `OpenCTIService.TYPE_MAP`, which is
+    Every name returned is an alias `observable_kind` resolves, which is
     what POST /api/opencti/enrich validates against. The page sent no type
     at all, so this function is the fix for its oldest defect rather than a
     tidier version of something that worked.

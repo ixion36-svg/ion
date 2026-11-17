@@ -340,7 +340,7 @@ def _ioc_type(value: str) -> str:
 
     The same order as tools.html `detectIOCType`, plus IPv6 via
     `ipaddress` (the old check was a dotted-quad only). Every name returned
-    is a key of `OpenCTIService.TYPE_MAP`. `javascript:alert(1)` is not a
+    is an alias `observable_kind` resolves. `javascript:alert(1)` is not a
     URL: only an http(s) scheme is.
     """
     text = value.strip()
