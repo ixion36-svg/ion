@@ -8,19 +8,40 @@
 {% endmacro %}
 {% macro sev(s) %}<span class="cwin-sev sev-{{ s }}">{{ s }}</span>{% endmacro %}
 {% macro status_badge(a) %}<span class="cpanel-alert-badge{% if a.status_class %} status-{{ a.status_class }}{% endif %}">{{ a.status }}</span>{% endmacro %}
+{% macro verdict_chip(a) %}<span class="cwin-verdict{% if a.verdict %} v-{{ a.verdict }}{% endif %}" data-cwin-verdict="{{ a.alert_id }}"
+  {%- if not a.verdict %} hidden{% endif %}>{% for v in verdicts if v.reason == a.verdict %}{{ v.label }}{% endfor %}</span>{% endmacro %}
+{% macro alerts_blocker(title, detail, hidden) %}
+<li class="cwin-bl cwin-bl-alerts" data-cwin-bl="alerts"{% if hidden %} hidden{% endif %}>
+  <div><b data-cwin-bl-title>{{ title }}</b><span>{{ detail }}</span></div>
+  <span class="cwin-bl-acts">
+  {%- if can_triage %}
+  <button type="button" class="cwin-link" data-click-action="cwTriageThem">Triage them</button>
+  {%- endif %}
+  <button type="button" class="cwin-link" data-click-action="cwFilter" data-args='["untriaged"]'>Show them</button></span>
+</li>
+{% endmacro %}
+{#- The alerts entry is always present when the alerts are readable, hidden
+    when none is left, so case-window.js can recount it after a triage
+    write. Every other entry is fixed until the case is re-read. -#}
 {% macro blocker_items() %}
+{%- set ns = namespace(alerts=false) %}
 {%- for b in blockers %}
-<li class="cwin-bl cwin-bl-{{ b.key }}">
+{%- if b.key == 'alerts' %}{% set ns.alerts = true %}{{ alerts_blocker(b.title, b.detail, false) }}
+{%- else %}
+<li class="cwin-bl cwin-bl-{{ b.key }}" data-cwin-bl="{{ b.key }}">
   <div><b>{{ b.title }}</b><span>{{ b.detail }}</span></div>
-  {%- if b.key == 'alerts' %}
-  <button type="button" class="cwin-link" data-click-action="cwFilter" data-args='["unclosed"]'>Show them</button>
+  {%- if b.key == 'assignee' and me_id is not none %}
+  <button type="button" class="cwin-link" data-click-action="cwAssignMe"
+          data-args='{{ [case_id, me_id]|tojson }}'>Assign to me</button>
   {%- elif b.key == 'assignee' %}
   <button type="button" class="cwin-link" data-click-action="cwGoto" data-args='["cwin-sec-meta"]'>Assign</button>
   {%- elif b.href %}
   <a class="cwin-link" href="{{ b.href }}" target="_blank" rel="noopener">Open in IRIS</a>
   {%- endif %}
 </li>
+{%- endif %}
 {%- endfor %}
+{%- if alerts is not none and not ns.alerts %}{{ alerts_blocker('', untriaged_detail, true) }}{% endif %}
 {% endmacro %}
 {% macro section(key, n, title, sub='') %}
 <section class="cwin-sec" id="cwin-sec-{{ key }}" data-cwin-spy>
@@ -49,7 +70,9 @@
 {%- set obs_values = (observables or []) | map(attribute='value') | map('lower') | list %}
 <div class="cwin" data-cwin data-mode="triage" data-case-id="{{ case_id }}"
      data-first-alert-id="{{ first_alert_id or '' }}"
-     data-obs-values="{{ obs_values | tojson | forceescape }}">
+     data-obs-values="{{ obs_values | tojson | forceescape }}"
+     data-verdicts="{{ verdicts | tojson | forceescape }}"
+     data-case-status="{{ status or '' }}">
 <header class="cwin-head">
   <div class="cwin-ht">
     <div class="cwin-ht1">
@@ -81,23 +104,29 @@
     <kbd class="cwin-hide-s" title="Press r to switch">r</kbd>
   </div>
   <div class="cwin-pill{% if not blockers %} clear{% endif %}" data-cwin-pill>
-    <button type="button" class="cwin-pill-b" aria-expanded="false"
+    <button type="button" class="cwin-pill-b" aria-expanded="false" aria-haspopup="dialog"
             data-click-action="cwTogglePill">
-      {%- if blockers %}<b>{{ blockers | length }} block closure</b>
-      {%- else %}<b>Nothing blocks closure</b>{% endif %}
+      <b data-cwin-pill-n>{% if blockers %}{{ blockers | length }} block closure{% else %}Nothing blocks closure{% endif %}</b>
       <span class="cwin-pill-s">derived</span></button>
-    <div class="cwin-pill-l" data-cwin-pill-list hidden>
+    <div class="cwin-pill-l" data-cwin-pill-list role="dialog" aria-label="What stops closure" hidden>
       <p class="cwin-note">Derived from this case's own data. ION has no closure
         rules, so this never stops you closing.</p>
-      {%- if blockers %}<ul class="cwin-bls">{{ blocker_items() }}</ul>
-      {%- else %}<p class="cwin-note">No open alerts, an owner is set and nothing is
-        escalated elsewhere.</p>{% endif %}
+      <ul class="cwin-bls">{{ blocker_items() }}</ul>
+      <p class="cwin-note" data-cwin-bl-none{% if blockers %} hidden{% endif %}>Every linked alert is
+        triaged, an owner is set and nothing is escalated elsewhere.</p>
+      {%- if status != 'closed' %}
+      <div class="cwin-pill-f">
+        <p class="cwin-note" data-cwin-suggest></p>
+        <button type="button" class="cwin-btn primary sm" data-click-action="cwCloseCase"
+                data-args='{{ [case_id]|tojson }}'>Close case&hellip;</button>
+      </div>
+      {%- endif %}
     </div>
   </div>
   {%- if status != 'closed' %}
   <button type="button" class="cwin-btn primary"
-          data-click-action="panelUpdateField"
-          data-args='{{ [case_id, "status", "closed"]|tojson }}'>Close case&hellip;</button>
+          data-click-action="cwCloseCase"
+          data-args='{{ [case_id]|tojson }}'>Close case&hellip;</button>
   {%- endif %}
 </header>
 {#- Filled by loadCaseSyncStatus, and empty when nothing has drifted. Above
@@ -212,7 +241,7 @@
     <section class="cwin-card cwin-list">
       <header class="cwin-ch">Alerts
         {%- if alerts is not none %}
-        <span class="cwin-n">{{ alerts | rejectattr('status', 'equalto', 'closed') | list | length }} not closed</span>{% endif %}
+        <span class="cwin-n"><span data-cwin-notclosed>{{ alerts | rejectattr('status', 'equalto', 'closed') | list | length }}</span> not closed</span>{% endif %}
         <span class="cwin-grow"></span>
         {%- if alerts %}
         <div class="cwin-seg cwin-filt" role="tablist" aria-label="Status filter">
@@ -220,10 +249,8 @@
                   data-click-action="cwFilter" data-args='["all"]'>All <span class="cwin-mono">{{ alerts | length }}</span></button>
           {%- for s in ('open', 'acknowledged', 'closed') %}
           {%- set n = alerts | selectattr('status', 'equalto', s) | list | length %}
-          {%- if n %}
-          <button type="button" data-filt-btn="{{ s }}"
-                  data-click-action="cwFilter" data-args='{{ [s]|tojson }}'>{{ s | capitalize }} <span class="cwin-mono">{{ n }}</span></button>
-          {%- endif %}
+          <button type="button" data-filt-btn="{{ s }}"{% if not n %} hidden{% endif %}
+                  data-click-action="cwFilter" data-args='{{ [s]|tojson }}'>{{ s | capitalize }} <span class="cwin-mono" data-cwin-fcount="{{ s }}">{{ n }}</span></button>
           {%- endfor %}
         </div>
         {%- endif %}
@@ -233,9 +260,29 @@
       <div class="cpanel-empty-hint"><i class="icon-shield"></i> No linked
         alerts</div>
       {%- else %}
-      <div class="cwin-bulk" data-cwin-bulk hidden><b data-cwin-selcount></b>
-        <button type="button" class="cwin-link" data-click-action="cwClearPicks">Clear</button>
-        <span class="cwin-grow"></span><span class="cwin-note">key context and observables follow the ticked alerts</span></div>
+      <div class="cwin-bulk" data-cwin-bulk hidden>
+        <div class="cwin-bulk-r"><b data-cwin-selcount></b>
+          <button type="button" class="cwin-link" data-click-action="cwClearPicks">Clear</button>
+          <span class="cwin-grow"></span>
+          {%- if can_triage %}
+          <span class="cwin-tvs" data-cwin-bulk-acts>
+            {%- for v in verdicts %}
+            <button type="button" class="cwin-btn sm cwin-tv tv-{{ v.reason }}"
+                    data-click-action="cwBulkTriage" data-args='{{ [v.reason]|tojson }}'>Mark {{ v.label | lower }}</button>
+            {%- endfor %}
+          </span>
+          {%- else %}
+          <span class="cwin-note">Marking alerts needs the alert:triage permission.</span>
+          {%- endif %}
+        </div>
+        <div class="cwin-bulk-r cwin-bulk-ask" data-cwin-bulk-ask hidden>
+          <span data-cwin-bulk-q></span><span class="cwin-grow"></span>
+          <button type="button" class="cwin-btn sm" data-click-action="cwBulkCancel">Cancel</button>
+          <button type="button" class="cwin-btn sm primary" data-click-action="cwBulkConfirm">Mark them</button>
+        </div>
+        <div class="cwin-bulk-res" data-cwin-bulk-res role="status" hidden></div>
+        <p class="cwin-note cwin-hide-s">key context and observables follow the ticked alerts</p>
+      </div>
       <div class="cwin-tscroll">
       <table class="cwin-table">
         <thead><tr>
@@ -246,6 +293,7 @@
         {%- for a in alerts %}
         <tr class="cpanel-rail-alert{% if loop.first %} selected{% endif %}" id="rail-alert-{{ a.index }}"
             data-alert-id="{{ a.alert_id }}" data-status="{{ a.status }}"
+            data-verdict="{{ a.verdict or '' }}" data-bob-verdict="{{ a.bob_verdict or '' }}"
             data-click-action="selectCaseAlert"
             data-args='{{ [a.alert_id, a.index, case_id]|tojson }}'>
           <td class="cwin-cbx"><input type="checkbox" aria-label="Tick exhibit {{ a.letter }}"
@@ -257,13 +305,14 @@
               {%- if a.technique %} &middot; {{ a.technique }}{% endif %}
               {%- for bit in a.bits %} &middot; {{ bit }}{% endfor %}</span></td>
           <td>{{ sev(a.severity) }}</td>
-          <td>{{ status_badge(a) }}</td>
+          <td class="cwin-stc">{{ status_badge(a) }}{{ verdict_chip(a) }}</td>
         </tr>
         {%- endfor %}
         </tbody>
       </table>
       </div>
       <p class="cwin-keys cwin-hide-s"><span><kbd>j</kbd><kbd>k</kbd> move</span><span><kbd>x</kbd> tick</span>
+        {%- if can_triage %}<span>{% for v in verdicts %}<kbd>{{ v.key }}</kbd>{% endfor %} mark</span>{% endif %}
         <span><kbd>r</kbd> read the file</span><span><kbd>Esc</kbd> whole case</span></p>
       {%- endif %}
     </section>
@@ -280,8 +329,20 @@
             <h3 data-cwin-d-title></h3>
             <div class="cwin-meta" data-cwin-d-meta></div>
           </div>
-          <button class="cpanel-pin-btn" type="button" data-cwin-pin
-                  data-click-action="pinAlertToCase">Pin as evidence</button>
+          <div class="cwin-dh-a">
+            {%- if can_triage %}
+            <div class="cwin-tvs" role="group" aria-label="Triage this alert" data-cwin-tvs>
+              <span class="cwin-note">Triage</span>
+              {%- for v in verdicts %}
+              <button type="button" class="cwin-btn sm cwin-tv tv-{{ v.reason }}" data-tv="{{ v.reason }}"
+                      aria-pressed="false" title="{{ v.label }} (press {{ v.key }})"
+                      data-click-action="cwTriage" data-args='{{ [v.reason]|tojson }}'>{{ v.label }}</button>
+              {%- endfor %}
+            </div>
+            {%- endif %}
+            <button class="cpanel-pin-btn" type="button" data-cwin-pin
+                    data-click-action="pinAlertToCase">Pin as evidence</button>
+          </div>
         </header>
         <div class="cwin-bob-slot" id="cwin-bob-slot"></div>
         <details class="cwin-guide">
@@ -424,9 +485,9 @@
     {% endcall %}
 
     {% call section('blk', 3, 'What stops closure', 'derived from this case, not enforced') %}
-      {%- if blockers %}<ul class="cwin-bls cwin-bls-doc">{{ blocker_items() }}</ul>
-      {%- else %}<p class="cwin-note">Nothing: every linked alert is closed, an owner is set and
-        nothing is escalated elsewhere.</p>{% endif %}
+      <ul class="cwin-bls cwin-bls-doc">{{ blocker_items() }}</ul>
+      <p class="cwin-note" data-cwin-bl-none{% if blockers %} hidden{% endif %}>Nothing: every linked
+        alert is triaged, an owner is set and nothing is escalated elsewhere.</p>
     {% endcall %}
 
     {% call section('ev', 4, 'Evidence', 'the alert you had open in triage is open here') %}
@@ -437,7 +498,7 @@
       {%- elif not alerts %}<div class="cpanel-empty-hint">No linked alerts</div>
       {%- else %}
       {%- for a in alerts %}
-      <article class="cwin-ex" data-ex="{{ a.alert_id }}" data-status="{{ a.status }}">
+      <article class="cwin-ex" data-ex="{{ a.alert_id }}" data-status="{{ a.status }}" data-verdict="{{ a.verdict or '' }}">
         <header class="cwin-exh">
           <label class="cwin-exl"><input type="checkbox" aria-label="Tick exhibit {{ a.letter }}"
                  data-click-action="cwPick" data-args='{{ [a.alert_id, "$checked"]|tojson }}'>
@@ -445,7 +506,7 @@
           <span class="cwin-mono cwin-note" data-cwin-time="{{ a.alert_id }}"></span>
           <button type="button" class="cwin-exr" data-click-action="cwFocusAlert"
                   data-args='{{ [a.alert_id]|tojson }}'>{{ a.name }}</button>
-          {{ sev(a.severity) }} {{ status_badge(a) }}
+          {{ sev(a.severity) }} {{ status_badge(a) }} {{ verdict_chip(a) }}
         </header>
         <p class="cwin-exd cwin-mono" data-cwin-exline="{{ a.alert_id }}">
           {%- if a.technique %}{{ a.technique }}{% endif %}</p>
@@ -564,6 +625,24 @@
     {% endcall %}
   </article>
 </div>
+
+{#- What the close dialog (cases.html's #closure-modal-overlay) shows above
+    its reason: the blockers as warnings and where the suggested reason came
+    from. case-window.js fills it each time it opens the dialog. It never
+    disables the close. -#}
+<template data-cwin-close-extra>
+  <div class="cwin-cx" data-cwin-cx>
+    <div class="cwin-cx-w" data-cwin-cx-warn>
+      <p class="cwin-cx-k">Still open <span class="cwin-mono" data-cwin-cx-n></span></p>
+      <ul class="cwin-bls" data-cwin-cx-list></ul>
+      <p class="cwin-note">Derived from this case, not enforced. You can close anyway.</p>
+    </div>
+    <p class="cwin-note" data-cwin-cx-suggest hidden></p>
+    {%- if alert_count %}
+    <p class="cwin-note">Closing sets every linked alert to closed, here and in Elasticsearch.</p>
+    {%- endif %}
+  </div>
+</template>
 
 {#- Bob on each alert. case-window.js copies the selected alert's into
     #cwin-bob-slot, so the Auto-Investigate container exists once. -#}

@@ -28,8 +28,87 @@
                  'event.kind', 'event.type', 'event.category', 'event.outcome',
                  'event.dataset', 'event.module', 'event.agent_id_status', 'event.original'];
 
+  // ── triage, without the DOM (tests run these under node) ──────────────
+  // An alert is {id, status, verdict, bob}: verdict is the analyst's (a
+  // case closure reason, or ''), bob is Bob's or the triage suggestion.
+  // verdicts is the fragment's data-verdicts table, in button order.
+  var logic = {
+    untriaged: function (alerts) {
+      return alerts.filter(function (a) { return a.status !== 'closed' && !a.verdict; })
+        .map(function (a) { return a.id; });
+    },
+    untriagedTitle: function (n) { return n + ' linked alert' + (n === 1 ? '' : 's') + ' not triaged'; },
+    pillText: function (n) { return n ? n + ' block closure' : 'Nothing blocks closure'; },
+
+    // Everything the window shows that follows from the alerts. `others` is
+    // how many blockers do not depend on them (owner, IRIS).
+    derive: function (alerts, others, verdicts) {
+      var byStatus = { open: 0, acknowledged: 0, closed: 0 };
+      alerts.forEach(function (a) { if (a.status in byStatus) byStatus[a.status] += 1; });
+      var open = logic.untriaged(alerts).length;
+      var blocking = others + (open ? 1 : 0);
+      return {
+        notClosed: alerts.length - byStatus.closed, byStatus: byStatus,
+        untriaged: open, untriagedTitle: logic.untriagedTitle(open),
+        blockers: blocking, pill: logic.pillText(blocking),
+        suggestion: logic.suggest(alerts, verdicts)
+      };
+    },
+
+    // The alert window's close, told to leave the case open: the case
+    // window records one alert's verdict at a time.
+    closeRequest: function (alertId, verdict) {
+      return {
+        url: '/api/elasticsearch/alerts/' + encodeURIComponent(alertId) + '/close',
+        method: 'POST',
+        body: { closure_type: verdict.closure_type, notes: null, close_case: false }
+      };
+    },
+    bulkRequests: function (ids, verdict) {
+      return ids.map(function (id) { return logic.closeRequest(id, verdict); });
+    },
+
+    // The most common verdict across the case's alerts. The analyst's own
+    // verdicts count when there are any, else Bob's; a tie goes to the
+    // earlier verdict in the table.
+    suggest: function (alerts, verdicts) {
+      var source = 'analyst';
+      var pool = alerts.map(function (a) { return a.verdict; }).filter(Boolean);
+      if (!pool.length) {
+        source = 'bob';
+        pool = alerts.map(function (a) { return a.bob; }).filter(Boolean);
+      }
+      var best = null;
+      verdicts.forEach(function (v) {
+        var n = pool.filter(function (r) { return r === v.reason; }).length;
+        if (n && (!best || n > best.count)) best = { reason: v.reason, label: v.label, count: n };
+      });
+      if (!best) return null;
+      best.of = alerts.length;
+      best.source = source;
+      return best;
+    },
+
+    // What a key does, or null. Nothing acts while a dialog is open, the
+    // popover and a pending bulk confirm take only Escape, and typing keeps
+    // every key.
+    keyAction: function (c) {
+      if (c.mod || c.typing || c.dialog) return null;
+      if (c.popover) return c.key === 'Escape' ? 'popover' : null;
+      if (c.asking) return c.key === 'Escape' ? 'escape' : null;
+      if (c.key === 'r') return 'mode';
+      if (c.key === 'j') return 'next';
+      if (c.key === 'k') return 'prev';
+      if (c.key === 'x') return c.focus ? 'tick' : null;
+      if (c.key === 'Escape') return 'escape';
+      var v = (c.verdicts || []).filter(function (x) { return x.key === c.key; })[0];
+      return v && c.canTriage && c.focus ? 'triage:' + v.reason : null;
+    }
+  };
+
   var S = null;
   var root = null;
+  var verdicts = [];    // the fragment's data-verdicts
   var docs = {};        // alert id -> raw document, or null when the read failed
   var alertIds = [];    // in rail order
   var letters = {};
@@ -59,6 +138,7 @@
     var st = row ? row.getAttribute('data-status') : '';
     if (S.filter === 'all') return true;
     if (S.filter === 'unclosed') return st !== 'closed';
+    if (S.filter === 'untriaged') return st !== 'closed' && !(row && row.getAttribute('data-verdict'));
     return st === S.filter;
   }
 
@@ -107,6 +187,13 @@
       bulk.hidden = !S.picks.size;
       var n = q('[data-cwin-selcount]');
       if (n) n.textContent = S.picks.size + ' ticked';
+      if (!S.picks.size) S.ask = null;
+      var ask = q('[data-cwin-bulk-ask]');
+      if (ask) ask.hidden = !S.ask;
+      var acts = q('[data-cwin-bulk-acts]');
+      if (acts) acts.hidden = !!S.ask;
+      var res = q('[data-cwin-bulk-res]');
+      if (res && !S.picks.size) res.hidden = true;
     }
     qa('tr[data-alert-id], .cwin-ex').forEach(function (el) {
       var id = el.getAttribute('data-alert-id') || el.getAttribute('data-ex');
@@ -297,8 +384,16 @@
     var meta = q('[data-cwin-d-meta]');
     if (meta) {
       meta.replaceChildren();
-      row.querySelectorAll('.cwin-sev, .cpanel-alert-badge').forEach(function (b) { meta.appendChild(b.cloneNode(true)); });
+      row.querySelectorAll('.cwin-sev, .cpanel-alert-badge, .cwin-verdict:not([hidden])').forEach(function (b) {
+        meta.appendChild(b.cloneNode(true));
+      });
     }
+    var verdict = row.getAttribute('data-verdict');
+    qa('[data-cwin-tvs] [data-tv]').forEach(function (b) {
+      var on = b.getAttribute('data-tv') === verdict;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
     var bob = q('template[data-bob-for="' + attr(id) + '"]');
     var slot = document.getElementById('cwin-bob-slot');
     if (slot) slot.replaceChildren(bob ? bob.content.cloneNode(true) : document.createTextNode(''));
@@ -315,6 +410,7 @@
       letters[r.getAttribute('data-alert-id')] = l ? l.textContent : '?';
     });
     try { obsValues = JSON.parse(root.getAttribute('data-obs-values') || '[]'); } catch (e) { obsValues = []; }
+    try { verdicts = JSON.parse(root.getAttribute('data-verdicts') || '[]'); } catch (e) { verdicts = []; }
     var keep = S && S.caseId === (kase && kase.id);
     if (!keep) {
       S = { caseId: kase && kase.id, mode: savedMode(), focus: root.getAttribute('data-first-alert-id') || null,
@@ -324,6 +420,7 @@
       S.picks.forEach(function (id) { if (alertIds.indexOf(id) === -1) S.picks.delete(id); });
     }
     apply();
+    recount();
     alertIds.forEach(function (id) { if (id in docs) fillRow(id); });
     loadDocs();
   }
@@ -374,13 +471,245 @@
     apply();
   }
 
+  // ── triage ────────────────────────────────────────────────────────────
+  // The rows' data-status and data-verdict are the alerts' state; every
+  // count, the blockers and the suggestion are recomputed from them.
+  function alertModel() {
+    return qa('tr[data-alert-id]').map(function (r) {
+      return { id: r.getAttribute('data-alert-id'), status: r.getAttribute('data-status'),
+               verdict: r.getAttribute('data-verdict') || '', bob: r.getAttribute('data-bob-verdict') || '' };
+    });
+  }
+  function verdictOf(reason) { return verdicts.filter(function (v) { return v.reason === reason; })[0] || null; }
+  function toast(msg, kind) { if (typeof window.showToast === 'function') window.showToast(msg, kind); }
+
+  function suggestionText(s) {
+    if (!s) return 'No alert carries a verdict yet, so there is no suggested reason.';
+    return 'Suggested reason: ' + s.label + ', the most common verdict (' + s.count + ' of ' + s.of
+      + ' alert' + (s.of === 1 ? '' : 's') + ', ' + (s.source === 'analyst' ? 'yours' : "Bob's")
+      + '). A suggestion, not a rule.';
+  }
+
+  function recount() {
+    var model = alertModel();
+    var others = qa('[data-cwin-pill-list] [data-cwin-bl]').filter(function (li) {
+      return !li.hidden && li.getAttribute('data-cwin-bl') !== 'alerts';
+    }).length;
+    var d = logic.derive(model, others, verdicts);
+    var n = q('[data-cwin-notclosed]');
+    if (n) n.textContent = d.notClosed;
+    qa('[data-cwin-fcount]').forEach(function (el) {
+      var s = el.getAttribute('data-cwin-fcount');
+      el.textContent = d.byStatus[s];
+      el.closest('[data-filt-btn]').hidden = !d.byStatus[s] && S.filter !== s;
+    });
+    qa('[data-cwin-bl="alerts"]').forEach(function (li) {
+      li.hidden = !d.untriaged;
+      var t = li.querySelector('[data-cwin-bl-title]');
+      if (t) t.textContent = d.untriagedTitle;
+    });
+    var pill = q('[data-cwin-pill]');
+    if (pill) pill.classList.toggle('clear', !d.blockers);
+    var label = q('[data-cwin-pill-n]');
+    if (label) label.textContent = d.pill;
+    qa('[data-cwin-bl-none]').forEach(function (p) { p.hidden = !!d.blockers; });
+    var sug = q('[data-cwin-suggest]');
+    if (sug) sug.textContent = suggestionText(d.suggestion);
+  }
+
+  function setBadge(holder, status, reason) {
+    if (!holder) return;
+    holder.setAttribute('data-status', status);
+    holder.setAttribute('data-verdict', reason);
+    var badge = holder.querySelector('.cpanel-alert-badge');
+    if (badge) {
+      badge.textContent = status;
+      badge.className = 'cpanel-alert-badge status-' + status;
+    }
+    var chip = holder.querySelector('[data-cwin-verdict]');
+    var v = verdictOf(reason);
+    if (chip) {
+      chip.hidden = !v;
+      chip.textContent = v ? v.label : '';
+      chip.className = 'cwin-verdict' + (v ? ' v-' + v.reason : '');
+    }
+  }
+
+  function recorded(id, status, reason) {
+    setBadge(rowOf(id), status, reason);
+    setBadge(q('.cwin-ex[data-ex="' + attr(id) + '"]'), status, reason);
+    recount();
+    if (S.focus === id) describeFocus();
+    apply();
+  }
+
+  function post(req) {
+    return fetch(req.url, {
+      method: req.method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(req.body)
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (!r.ok) throw new Error((d && d.detail) || ('HTTP ' + r.status));
+        return d;
+      });
+    });
+  }
+
+  // Resolves to {id, ok, error}; never rejects, so a bulk run reports each.
+  function triageOne(id, v) {
+    var row = rowOf(id);
+    if (row) row.classList.add('cwin-busy');
+    return post(logic.closeRequest(id, v)).then(function (d) {
+      recorded(id, (d && d.status) || 'closed', v.reason);
+      return { id: id, ok: true };
+    }, function (e) {
+      return { id: id, ok: false, error: (e && e.message) || String(e) };
+    }).then(function (res) {
+      if (row) row.classList.remove('cwin-busy');
+      return res;
+    });
+  }
+
+  function triageMany(ids, v) {
+    var queue = ids.slice();
+    var results = [];
+    function worker() {
+      var id = queue.shift();
+      if (id === undefined) return Promise.resolve();
+      return triageOne(id, v).then(function (r) { results.push(r); return worker(); });
+    }
+    var workers = [];
+    for (var i = 0; i < Math.min(4, ids.length); i++) workers.push(worker());
+    return Promise.all(workers).then(function () { return results; });
+  }
+
+  function reportBulk(results, v) {
+    var failed = results.filter(function (r) { return !r.ok; });
+    var done = results.length - failed.length;
+    S.picks = new Set(failed.map(function (r) { return r.id; }));
+    S.ask = null;
+    apply();
+    var box = q('[data-cwin-bulk-res]');
+    if (box) {
+      box.hidden = !failed.length;
+      box.innerHTML = failed.length
+        ? '<b>' + done + ' marked ' + esc(v.label.toLowerCase()) + ', ' + failed.length + ' failed.</b> Still ticked:<ul>'
+          + failed.map(function (r) {
+            return '<li><span class="cwin-letter">' + esc(letters[r.id] || '?') + '</span> ' + esc(r.error) + '</li>';
+          }).join('') + '</ul>'
+        : '';
+    }
+    if (done) toast(done + ' alert' + (done === 1 ? '' : 's') + ' marked ' + v.label.toLowerCase(), 'success');
+    if (failed.length) toast(failed.length + ' alert' + (failed.length === 1 ? '' : 's') + ' could not be marked', 'error');
+  }
+
+  function triageFocused(reason) {
+    var v = verdictOf(reason);
+    var id = S && S.focus;
+    if (!v || !id) return;
+    var row = rowOf(id);
+    if (row && row.classList.contains('cwin-busy')) return;
+    triageOne(id, v).then(function (r) {
+      if (!r.ok) { toast('Exhibit ' + (letters[id] || '?') + ' could not be marked: ' + r.error, 'error'); return; }
+      toast('Exhibit ' + (letters[id] || '?') + ' marked ' + v.label.toLowerCase(), 'success');
+      if (!visible(id)) step(1);
+    });
+  }
+
+  function closePill() {
+    var list = q('[data-cwin-pill-list]');
+    if (list && !list.hidden) window.cwTogglePill();
+  }
+
+  // The close dialog belongs to cases.html. Its body gets this window's
+  // warnings and the suggested reason each time it is opened from here.
+  function fillCloseDialog() {
+    var overlay = document.getElementById('closure-modal-overlay');
+    var select = document.getElementById('closure-reason');
+    var tpl = q('template[data-cwin-close-extra]');
+    if (!overlay || !select || !tpl) return;
+    dropCloseExtra();
+    var extra = tpl.content.firstElementChild.cloneNode(true);
+    var items = qa('[data-cwin-pill-list] [data-cwin-bl]').filter(function (li) { return !li.hidden; });
+    var list = extra.querySelector('[data-cwin-cx-list]');
+    items.forEach(function (li) {
+      var copy = li.cloneNode(true);
+      copy.removeAttribute('data-cwin-bl');
+      copy.querySelectorAll('button').forEach(function (b) { b.remove(); });
+      list.appendChild(copy);
+    });
+    extra.querySelector('[data-cwin-cx-n]').textContent = items.length;
+    extra.querySelector('[data-cwin-cx-warn]').hidden = !items.length;
+    var s = logic.suggest(alertModel(), verdicts);
+    var line = extra.querySelector('[data-cwin-cx-suggest]');
+    if (s) {
+      select.value = s.reason;
+      line.hidden = false;
+      line.textContent = suggestionText(s);
+    }
+    var anchor = select.closest('.mb-3') || select;
+    anchor.parentNode.insertBefore(extra, anchor);
+  }
+  function dropCloseExtra() {
+    var old = document.querySelector('#closure-modal-overlay [data-cwin-cx]');
+    if (old) old.remove();
+  }
+
   // ── handlers named by data-click-action ───────────────────────────────
+  window.cwTriage = function (reason) { triageFocused(reason); };
+  window.cwBulkTriage = function (reason) {
+    if (!S || !S.picks.size) return;
+    var v = verdictOf(reason);
+    if (!v) return;
+    var ids = alertIds.filter(function (id) { return S.picks.has(id); });
+    if (ids.length === 1) { triageMany(ids, v).then(function (r) { reportBulk(r, v); }); return; }
+    S.ask = { reason: reason, ids: ids };
+    var qn = q('[data-cwin-bulk-q]');
+    if (qn) qn.innerHTML = 'Mark <b>' + ids.length + ' alerts</b> (' + esc(lettersOf(ids).join(', ')) + ') <b>'
+      + esc(v.label.toLowerCase()) + '</b>?';
+    apply();
+  };
+  window.cwBulkConfirm = function () {
+    if (!S || !S.ask) return;
+    var v = verdictOf(S.ask.reason);
+    var ids = S.ask.ids;
+    S.ask = null;
+    apply();
+    triageMany(ids, v).then(function (r) { reportBulk(r, v); });
+  };
+  window.cwBulkCancel = function () { if (!S) return; S.ask = null; apply(); };
+  window.cwTriageThem = function () {
+    if (!S) return;
+    closePill();
+    if (S.mode !== 'triage') setMode('triage');
+    S.picks = new Set(logic.untriaged(alertModel()));
+    S.filter = 'all';
+    apply();
+    var firstPick = q('tr.cwin-picked');
+    if (firstPick) firstPick.scrollIntoView({ block: 'nearest' });
+    var bulk = q('[data-cwin-bulk]');
+    if (bulk) bulk.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  };
+  window.cwAssignMe = function (caseId, userId) {
+    closePill();
+    post({ url: '/api/cases/' + encodeURIComponent(caseId), method: 'PATCH', body: { assigned_to_id: userId } })
+      .then(function () {
+        toast('Case assigned to you', 'success');
+        if (typeof window.openCaseDetail === 'function') window.openCaseDetail(caseId);
+      }, function (e) { toast('Could not assign the case: ' + ((e && e.message) || e), 'error'); });
+  };
+  window.cwCloseCase = function (caseId) {
+    if (typeof window.panelUpdateField !== 'function') return;
+    closePill();
+    window.panelUpdateField(caseId, 'status', 'closed');
+    fillCloseDialog();
+  };
+
   window.cwSetMode = setMode;
   window.cwFocusAlert = focusAlert;
   window.cwCaseTab = function (tab) { if (!S) return; S.ctab = tab === 'observables' ? 'observables' : 'kc'; apply(); };
   window.cwFilter = function (f) {
     if (!S) return;
-    S.filter = ['all', 'unclosed', 'open', 'acknowledged', 'closed'].indexOf(f) !== -1 ? f : 'all';
+    S.filter = ['all', 'unclosed', 'untriaged', 'open', 'acknowledged', 'closed'].indexOf(f) !== -1 ? f : 'all';
     var list = q('[data-cwin-pill-list]');
     if (list) list.hidden = true;
     apply();
@@ -484,36 +813,44 @@
   document.addEventListener('keydown', function (e) {
     var panel = document.getElementById('case-panel');
     if (!S || !root || !document.body.contains(root) || (panel && !panel.classList.contains('open'))) return;
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
     var t = e.target;
-    var typing = t && (t.isContentEditable || /^(TEXTAREA|SELECT)$/.test(t.tagName)
+    var typing = !!t && (t.isContentEditable || /^(TEXTAREA|SELECT)$/.test(t.tagName)
       || (t.tagName === 'INPUT' && !/^(checkbox|radio|button)$/.test(t.type)));
-    if (typing) {
-      if (e.key === 'Escape' && t.blur) t.blur();
-      return;
-    }
-    // The page opens its dialogs with style.display, not a class.
-    if (['closure-modal-overlay', 'create-case-overlay'].some(function (id) {
-      var m = document.getElementById(id); return m && m.style.display === 'flex';
-    })) return;
-    var k = e.key;
-    if (k === 'r') { setMode(S.mode === 'read' ? 'triage' : 'read'); e.preventDefault(); }
-    else if (k === 'j') { step(1); e.preventDefault(); }
-    else if (k === 'k') { step(-1); e.preventDefault(); }
-    else if (k === 'x' && S.focus) { togglePick(S.focus); e.preventDefault(); }
-    else if (k === 'Escape') {
-      var list = q('[data-cwin-pill-list]');
-      if (list && !list.hidden) { window.cwTogglePill(); return; }
+    if (typing && e.key === 'Escape' && t.blur) t.blur();
+    var list = q('[data-cwin-pill-list]');
+    var action = logic.keyAction({
+      key: e.key, mod: e.ctrlKey || e.metaKey || e.altKey, typing: typing, dialog: dialogOpen(),
+      popover: !!list && !list.hidden, asking: !!S.ask, focus: S.focus, canTriage: !!q('[data-cwin-tvs]'), verdicts: verdicts
+    });
+    if (!action) return;
+    if (action !== 'escape' && action !== 'popover') e.preventDefault();
+    if (action === 'mode') setMode(S.mode === 'read' ? 'triage' : 'read');
+    else if (action === 'next') step(1);
+    else if (action === 'prev') step(-1);
+    else if (action === 'tick') togglePick(S.focus);
+    else if (action === 'popover') window.cwTogglePill();
+    else if (action === 'escape') {
+      if (S.ask) { S.ask = null; apply(); return; }
       S.picks = new Set(); S.find = null; apply();
-    }
+    } else if (action.indexOf('triage:') === 0) triageFocused(action.slice(7));
   });
+
+  // The page opens its dialogs with style.display, not a class; the
+  // alert-detail component appends its own overlays to the body.
+  function dialogOpen() {
+    return ['closure-modal-overlay', 'create-case-overlay'].some(function (id) {
+      var m = document.getElementById(id); return m && m.style.display === 'flex';
+    }) || !!document.querySelector('#iad-tune-overlay, #alert-closure-modal-overlay');
+  }
 
   document.addEventListener('click', function (e) {
     var tabBtn = e.target.closest && e.target.closest('#cpanel-alert-workspace .detail-tab-btn');
     if (S && tabBtn) S.tab = tabBtn.getAttribute('data-tab');
     var list = q('[data-cwin-pill-list]');
     if (list && !list.hidden && !e.target.closest('[data-cwin-pill]')) window.cwTogglePill();
+    if (e.target.closest && e.target.closest('#closure-modal-overlay [data-click-action="cancelClosure"],'
+        + ' #closure-modal-overlay [data-click-action="confirmClosure"]')) setTimeout(dropCloseExtra, 0);
   });
 
-  window.ionCaseWindow = { init: init, focused: focused, setMode: setMode, get state() { return S; } };
+  window.ionCaseWindow = { init: init, focused: focused, setMode: setMode, logic: logic, get state() { return S; } };
 })();

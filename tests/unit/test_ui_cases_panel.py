@@ -715,8 +715,9 @@ def test_the_closure_pill_is_derived_and_does_not_disable_closing(case):
     assert "3 block closure" in body
     assert "derived" in body
     assert "Escalated to DFIR-IRIS #4" in body
-    close = re.search(r'<button[^>]*data-args=\'\[7, "status", "closed"\]\'[^>]*>', html)
-    assert close and "disabled" not in close.group(0)
+    closes = re.findall(r'<button[^>]*data-click-action="cwCloseCase"[^>]*>', html)
+    assert len(closes) == 2  # the header's, and the popover's
+    assert all("disabled" not in b and "data-args='[7]'" in b for b in closes)
 
 
 def test_a_case_with_nothing_blocking_says_so(case):
