@@ -1667,8 +1667,6 @@ function filterToAttention(severity, maxAgeHours) {
     // Clear existing filters
     document.getElementById('alert-severity-filter').value = '';
     document.getElementById('alert-status-filter').value = '';
-    const _sysFilter = document.getElementById('alert-system-filter');
-    if (_sysFilter) _sysFilter.value = '';
     document.getElementById('alert-search').value = '';
     entityFilter = null;
     document.getElementById('active-filter-banner').style.display = 'none';
@@ -1698,8 +1696,6 @@ function filterToAttention(severity, maxAgeHours) {
 function filterToAttentionUnassigned() {
     document.getElementById('alert-severity-filter').value = '';
     document.getElementById('alert-status-filter').value = '';
-    const _sysFilter = document.getElementById('alert-system-filter');
-    if (_sysFilter) _sysFilter.value = '';
     document.getElementById('alert-search').value = '';
     entityFilter = null;
     document.getElementById('active-filter-banner').style.display = 'none';
@@ -3498,14 +3494,19 @@ function clearEntityFilter() {
 }
 
 function clearAllFilters() {
+    const _sysFilter = document.getElementById('alert-system-filter');
+    const _range = document.getElementById('alert-time-range');
+    // The system and the window are applied by the server. Resetting either
+    // control without reading the queue again leaves the old rows under it.
+    const reread = !!(_sysFilter && _sysFilter.value) || _range.value !== '24';
     document.getElementById('alert-severity-filter').value = '';
     document.getElementById('alert-status-filter').value = '';
-    const _sysFilter = document.getElementById('alert-system-filter');
     if (_sysFilter) _sysFilter.value = '';
     document.getElementById('alert-search').value = '';
-    document.getElementById('alert-time-range').value = '24';
+    _range.value = '24';
     document.getElementById('custom-time-range').style.display = 'none';
     clearEntityFilter();
+    if (reread) loadAlerts();
 }
 
 // =========================================================================
@@ -3669,11 +3670,12 @@ function renderFilterChips() {
     const sev = document.getElementById('alert-severity-filter').value;
     const st = document.getElementById('alert-status-filter').value;
     const search = document.getElementById('alert-search').value.trim();
-    const sys = document.getElementById('alert-system-filter')?.value;
+    const sysSel = document.getElementById('alert-system-filter');
+    const sys = sysSel?.value;
 
     if (sev) chips.push(['sev', 'Severity', sev]);
     if (st) chips.push(['status', 'Status', st]);
-    if (sys) chips.push(['system', 'System', sys]);
+    if (sys) chips.push(['system', 'System', sysSel.selectedOptions[0]?.textContent.trim() || sys]);
     if (entityFilter) chips.push(['entity', entityFilter.type, entityFilter.value]);
     if (search) chips.push(['search', 'Text', `"${search}"`]);
 
@@ -5552,9 +5554,20 @@ function getCurrentFilterState() {
         triageStatus: document.getElementById('alert-status-filter').value,
         severity: document.getElementById('alert-severity-filter').value,
         status: document.getElementById('alert-status-filter').value,
+        system: document.getElementById('alert-system-filter')?.value || '',
         search: document.getElementById('alert-search').value,
         entityFilter: entityFilter
     };
+}
+
+function setSystemFilter(value) {
+    const sel = document.getElementById('alert-system-filter');
+    if (!sel) return;
+    // The options are the server's, for the window last read. A select
+    // handed a value none of them carries falls back to All Systems, so the
+    // value gets an option; the next read replaces it with the labelled one.
+    if (value && ![...sel.options].some(o => o.value === value)) sel.add(new Option(value, value));
+    sel.value = value;
 }
 
 function applyFilterState(state) {
@@ -5569,9 +5582,12 @@ function applyFilterState(state) {
     document.getElementById('alert-status-filter').value = state.triageStatus || '';
     document.getElementById('alert-severity-filter').value = state.severity || '';
     document.getElementById('alert-status-filter').value = state.status || '';
+    setSystemFilter(state.system || '');
     document.getElementById('alert-search').value = state.search || '';
     entityFilter = state.entityFilter || null;
     applyFilters();
+    // The window, the system and closed alerts are the server's to apply.
+    loadAlerts();
 }
 
 function saveCurrentFilter() {
@@ -5579,7 +5595,7 @@ function saveCurrentFilter() {
 
     // Check if there are any filters applied
     const hasFilters = state.triageStatus || state.severity || state.status ||
-                       state.search || state.entityFilter;
+                       state.system || state.search || state.entityFilter;
 
     if (!hasFilters && state.timeRange === '24') {
         showNotification('No filters to save', 'warning');
@@ -5592,6 +5608,7 @@ function saveCurrentFilter() {
     if (state.triageStatus) parts.push(`Triage: ${state.triageStatus}`);
     if (state.severity) parts.push(`Severity: ${state.severity}`);
     if (state.status) parts.push(`Status: ${state.status}`);
+    if (state.system) parts.push(`System: ${state.system}`);
     if (state.search) parts.push(`Search: "${state.search}"`);
     if (state.entityFilter) parts.push(`${state.entityFilter.type}: ${state.entityFilter.value}`);
     const description = parts.join(', ');

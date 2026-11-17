@@ -116,14 +116,14 @@ def _select(body: str) -> str:
 
 def test_a_select_with_no_system_to_offer_says_why():
     body = _select(_render())
-    assert "<option disabled>No system is registered or seen in this window</option>" in body
+    assert "<option disabled>None registered or seen</option>" in body
     assert "could not be read" not in body
 
 
 def test_an_unread_registry_is_not_reported_as_no_systems():
     body = _select(_render(systems_unread=True))
-    assert "<option disabled>The system registry could not be read</option>" in body
-    assert "No system is registered" not in body
+    assert "<option disabled>Registry could not be read</option>" in body
+    assert "None registered" not in body
 
 
 def test_a_select_with_systems_carries_no_notice():
