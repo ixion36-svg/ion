@@ -99,7 +99,7 @@ def case(monkeypatch):
 
         monkeypatch.setattr(
             "ion.web.ui.cases.read_case_extras",
-            lambda session, case_id, alert_ids, values: (
+            lambda session, case_id, alert_ids, values, **_gates: (
                 extras if extras is not None
                 else {"investigations": {}, "triage": {}, "enrichments": {}}))
 

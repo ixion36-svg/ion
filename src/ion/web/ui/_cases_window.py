@@ -133,7 +133,7 @@ def bob_case_note(notes: Any) -> Optional[BobNote]:
 
 # ── Bob per alert ───────────────────────────────────────────────────────
 class AlertBob(TypedDict):
-    state: Literal["investigated", "none", "unknown"]
+    state: Literal["investigated", "none", "unknown", "withheld"]
     summary: Optional[str]
     verdict: Optional[str]
     confidence: Optional[int]
@@ -171,6 +171,9 @@ def alert_bob(alert_id: str, extras: Optional[dict]) -> AlertBob:
     view["suggested_verdict"] = triage.get("suggested_verdict")
     view["suggested_confidence"] = triage.get("suggested_confidence")
     view["badge"] = triage.get("badge")
+    if "investigations" in (extras.get("withheld") or ()):
+        view["state"] = "withheld"
+        return view
     investigations = extras.get("investigations")
     if not isinstance(investigations, dict):
         return view
@@ -385,6 +388,7 @@ def observable_cards(observables: Optional[list[dict]], extras: Optional[dict]) 
     if observables is None:
         return None
     stored = extras.get("enrichments") if isinstance(extras, dict) else None
+    withheld = isinstance(extras, dict) and "enrichments" in (extras.get("withheld") or ())
     out = []
     for chip in observables:
         sources: list[SourceCard] = []
@@ -394,19 +398,26 @@ def observable_cards(observables: Optional[list[dict]], extras: Optional[dict]) 
         rows = (stored or {}).get(str(chip.get("value") or "").lower(), [])
         sources.extend(stored_source(r) for r in rows)
         out.append({**chip, "sources": sources,
-                    "stored_unknown": not isinstance(stored, dict),
+                    "stored_withheld": withheld,
+                    "stored_unknown": not withheld and not isinstance(stored, dict),
                     "lookup_type": LOOKUP_TYPES.get(chip.get("kind") or "")})
     return out
 
 
 # ── The one extra read ──────────────────────────────────────────────────
 def read_case_extras(session: Any, case_id: int, alert_ids: list[str],
-                     values: list[str]) -> dict:
+                     values: list[str], *, read_investigations: bool = True,
+                     read_enrichments: bool = True) -> dict:
     """Bob's investigations, the triage suggestions and stored enrichments.
 
     Each part fails on its own into None, so a missing table costs that part
     only. The rollback keeps a failed statement from poisoning the next one
     on Postgres.
+
+    A part the caller may not read is skipped and recorded in `withheld`:
+    stored enrichments are `observable:read` data and Bob's investigations
+    `alert:read` data everywhere else in ION, and the case panel only
+    requires `case:read`.
     """
     from sqlalchemy import select
 
@@ -414,7 +425,8 @@ def read_case_extras(session: Any, case_id: int, alert_ids: list[str],
     from ion.models.investigation import Investigation
     from ion.models.observable import Observable, ObservableEnrichment
 
-    extras: dict[str, Any] = {"investigations": None, "triage": None, "enrichments": None}
+    extras: dict[str, Any] = {"investigations": None, "triage": None, "enrichments": None,
+                              "withheld": set()}
 
     def attempt(key, read):
         try:
@@ -469,7 +481,13 @@ def read_case_extras(session: Any, case_id: int, alert_ids: list[str],
             })
         return found
 
-    attempt("investigations", investigations)
+    if read_investigations:
+        attempt("investigations", investigations)
+    else:
+        extras["withheld"].add("investigations")
     attempt("triage", triage)
-    attempt("enrichments", enrichments)
+    if read_enrichments:
+        attempt("enrichments", enrichments)
+    else:
+        extras["withheld"].add("enrichments")
     return extras

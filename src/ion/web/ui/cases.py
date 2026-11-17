@@ -2541,7 +2541,10 @@ async def cases_panel_fragment(
         values += [str(o.get("value")) for o in (payload.get("observables") or [])
                    if isinstance(o, dict) and o.get("value")]
         try:
-            extras = read_case_extras(session, case_id, ids, values)
+            extras = read_case_extras(
+                session, case_id, ids, values,
+                read_investigations=permitted,
+                read_enrichments=current_user.has_permission("observable:read"))
         except Exception:
             logger.exception("Case panel could not read Bob and enrichment rows for %s", case_id)
     view = panel_view(payload, assignees_view(users, permitted)["users"],

@@ -205,7 +205,8 @@
             </div>
             {%- endif %}
             <p class="cwin-note">
-              {%- if o.stored_unknown %}The stored enrichments could not be read, so whether there are any is unknown.
+              {%- if o.stored_withheld %}Stored enrichments need the observable:read permission.
+              {%- elif o.stored_unknown %}The stored enrichments could not be read, so whether there are any is unknown.
               {%- elif not o.sources %}No enrichment is stored for this value.
               {%- endif %}
               No {{ 'other ' if o.sources else '' }}VirusTotal, AbuseIPDB, Shodan or GeoIP result is stored for it.</p>
@@ -665,6 +666,8 @@
       <div id="autoinv-content">
         <button type="button" class="cwin-btn sm" data-click-action="runAutoInvestigate">Run Auto-Investigate</button>
       </div>
+    {%- elif b.state == 'withheld' %}
+      <div class="cwin-bob-h"><b>Bob's investigations need the alert:read permission</b></div>
     {%- else %}
       <div class="cwin-bob-h"><b>Bob's investigations could not be read</b></div>
       <p class="cwin-note">Whether Bob has looked at this alert is unknown.</p>
