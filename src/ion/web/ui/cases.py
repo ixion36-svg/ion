@@ -95,6 +95,9 @@ from ion.models.alert_triage import AlertCase, AlertCaseStatus
 from ion.models.user import User
 from ion.storage.database import get_db_session
 from ion.web.ui._cases_board import router as board_router
+from ion.web.ui._cases_detail_notes import router as detail_notes_router
+from ion.web.ui._cases_detail_process import router as detail_process_router
+from ion.web.ui._cases_detail_response import router as detail_response_router
 from ion.web.ui._cases_window import (
     REASONS,
     UNTRIAGED_DETAIL,
@@ -102,17 +105,14 @@ from ion.web.ui._cases_window import (
     alert_bob,
     alert_verdicts,
     blockers,
-    case_alerts,
     bob_case_note,
+    case_alerts,
     inline_opencti,
     letter,
     observable_cards,
     read_case_extras,
     summary_view,
 )
-from ion.web.ui._cases_detail_notes import router as detail_notes_router
-from ion.web.ui._cases_detail_process import router as detail_process_router
-from ion.web.ui._cases_detail_response import router as detail_response_router
 from ion.web.ui._shared import (
     age_label,
     closure_label,

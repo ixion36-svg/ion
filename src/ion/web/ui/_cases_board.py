@@ -56,6 +56,8 @@ CHIPS: tuple[tuple[ChipKey, str], ...] = (
 
 SEVERITIES = ("critical", "high", "medium", "low", "info")
 STATUSES = ("open", "acknowledged", "closed")
+_CACHE_KEYS = ("id", "case_number", "title", "status", "severity", "assigned_to",
+               "assigned_to_id", "created_at", "updated_at")
 
 
 class Filters(TypedDict):
@@ -279,7 +281,7 @@ def inbox_view(payload: object, activity: Optional[dict], counts: Optional[dict]
     return {
         "state": "failed" if records is None else "data" if records else "empty",
         "rows": [inbox_row(row, activity.get(row.get("id")), now) for row in records] if records is not None else None,
-        "cache": [{key: row.get(key) for key in ("id", "case_number", "title", "status", "severity", "assigned_to", "assigned_to_id", "created_at", "updated_at")} for row in records] if records is not None else None,
+        "cache": [{key: row.get(key) for key in _CACHE_KEYS} for row in records] if records is not None else None,
         "total": total,
         "shown": min(shown, total) if shown is not None and total is not None else shown,
         "offset": offset,

@@ -121,7 +121,10 @@
   }
   function q(sel) { return root ? root.querySelector(sel) : null; }
   function qa(sel) { return root ? Array.prototype.slice.call(root.querySelectorAll(sel)) : []; }
-  function attr(v) { return (window.CSS && CSS.escape) ? CSS.escape(v) : String(v).replace(/"/g, '\\"'); }
+  function attr(v) {
+    if (window.CSS && CSS.escape) return CSS.escape(v);
+    return String(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  }
   function rowOf(id) { return q('tr[data-alert-id="' + attr(id) + '"]'); }
 
   function savedMode() {

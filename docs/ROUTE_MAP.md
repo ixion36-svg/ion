@@ -61,8 +61,8 @@ Server-rendered fragments. `render_view` routes also answer the view model as JS
 | GET | `/ui/bug-reports` | — | [bug_reports.py:51](src/ion/web/ui/bug_reports.py#L51) | `_fragments/bug_reports.html` | `bug_reports.html`, `bug_reports.html` |
 | GET | `/ui/canaries` | `alert:read` | [canaries.py:176](src/ion/web/ui/canaries.py#L176) | `_fragments/canaries.html` | `canaries.html` |
 | GET | `/ui/case-grouper/status` | `alert:triage` | [case_grouper.py:88](src/ion/web/ui/case_grouper.py#L88) | `_fragments/case_grouper_status.html` | `case_grouper.html` |
-| GET | `/ui/cases/assignees` | `case:read` | [_cases_board.py:489](src/ion/web/ui/_cases_board.py#L489) | `_fragments/cases_assignees.html` | `cases-inbox.js`, `cases.html` |
-| GET | `/ui/cases/board` | `case:read` | [_cases_board.py:326](src/ion/web/ui/_cases_board.py#L326) | `_fragments/cases_board.html` | `cases-inbox.js`, `cases.html` |
+| GET | `/ui/cases/assignees` | `case:read` | [_cases_board.py:493](src/ion/web/ui/_cases_board.py#L493) | `_fragments/cases_assignees.html` | `cases-inbox.js`, `cases.html` |
+| GET | `/ui/cases/board` | `case:read` | [_cases_board.py:328](src/ion/web/ui/_cases_board.py#L328) | `_fragments/cases_board.html` | `cases-inbox.js`, `cases.html` |
 | GET | `/ui/cases/detail/process-tree/{alert_id}` | `case:read` | [_cases_detail_process.py:133](src/ion/web/ui/_cases_detail_process.py#L133) | `_fragments/cases_detail_process.html` | `cases-inbox.js`, `cases.html` |
 | POST | `/ui/cases/detail/rule-guide` | `case:read` | [_cases_detail_process.py:150](src/ion/web/ui/_cases_detail_process.py#L150) | `_fragments/cases_detail_rule_guide.html` | `cases-inbox.js`, `cases.html` |
 | POST | `/ui/cases/note-translation` | `case:read` | [_cases_detail_notes.py:90](src/ion/web/ui/_cases_detail_notes.py#L90) | `_fragments/cases_detail_translation.html` | `cases-inbox.js`, `cases.html` |
@@ -71,7 +71,7 @@ Server-rendered fragments. `render_view` routes also answer the view model as JS
 | GET | `/ui/cases/{case_id}/attack-path` | `case:read` | [cases.py:1899](src/ion/web/ui/cases.py#L1899) | `_fragments/cases_attack_path.html` | `cases-inbox.js`, `cases.html` |
 | GET | `/ui/cases/{case_id}/panel` | `case:read` | [cases.py:2501](src/ion/web/ui/cases.py#L2501) | `_fragments/cases_panel.html` | `cases-inbox.js`, `cases.html` |
 | GET | `/ui/cases/{case_id}/playbooks` | `case:read` | [cases.py:1634](src/ion/web/ui/cases.py#L1634) | `_fragments/cases_playbooks.html` | `cases-inbox.js`, `cases.html` |
-| GET | `/ui/cases/{case_id}/preview` | `case:read` | [_cases_board.py:466](src/ion/web/ui/_cases_board.py#L466) | `_fragments/cases_preview.html` | `cases-inbox.js`, `cases.html` |
+| GET | `/ui/cases/{case_id}/preview` | `case:read` | [_cases_board.py:470](src/ion/web/ui/_cases_board.py#L470) | `_fragments/cases_preview.html` | `cases-inbox.js`, `cases.html` |
 | POST | `/ui/cases/{case_id}/response-actions` | `case:read + playbook:read` | [_cases_detail_response.py:174](src/ion/web/ui/_cases_detail_response.py#L174) | `_fragments/cases_detail_response_actions.html` | `cases-inbox.js`, `cases.html` |
 | GET | `/ui/cases/{case_id}/response-log` | `case:read + playbook:read` | [_cases_detail_response.py:190](src/ion/web/ui/_cases_detail_response.py#L190) | `_fragments/cases_detail_response_log.html` | `cases-inbox.js`, `cases.html` |
 | GET | `/ui/cases/{case_id}/similar` | `case:read` | [cases.py:826](src/ion/web/ui/cases.py#L826) | `_fragments/cases_similar.html` | `cases-inbox.js`, `cases.html` |
