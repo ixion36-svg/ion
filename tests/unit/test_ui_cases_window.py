@@ -133,11 +133,11 @@ def test_no_investigation_is_none_and_a_failed_read_is_unknown():
 # ── What stops closure: derived, never enforced ─────────────────────────
 
 
-def test_blockers_come_from_open_alerts_owner_and_iris():
+def test_blockers_come_from_untriaged_alerts_owner_and_iris():
     found = blockers([{"status": "open"}, {"status": "acknowledged"}, {"status": "closed"}],
                      None, 4, "https://iris.test/case/4")
     assert [b["key"] for b in found] == ["alerts", "assignee", "iris"]
-    assert found[0]["title"] == "2 linked alerts not closed"
+    assert found[0]["title"] == "2 linked alerts not triaged"  # no verdicts: open and acknowledged both count
     assert found[2]["href"] == "https://iris.test/case/4"
 
 
