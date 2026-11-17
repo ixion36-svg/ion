@@ -476,7 +476,7 @@ def test_write_actions_need_case_update(client, preview_reads):
     c, user = client
     page = soup(c, "/ui/cases/3/preview")
     assert page.select_one("[data-click-action=inboxAssignMe]") is None
-    assert page.select_one("#panel-note-input") is None
+    assert page.select_one("[data-ci-notebox]") is None
     user.has_permission = lambda permission: True
     page = soup(c, "/ui/cases/3/preview")
     assert page.select_one("[data-click-action=inboxAssignMe]")["data-args"] == "[3]"
@@ -535,3 +535,20 @@ def test_assignee_option_values_are_ids(client, monkeypatch):
     page = soup(c, "/ui/cases/assignees")
     assert page.select_one('#filter-assignee option[value="9"]').text == "Person <safe>"
     assert page.select_one('#new-case-assignee option[value="9"]') is not None
+
+
+def test_the_retention_marker_is_not_latest_activity(client, preview_reads):
+    c, _ = client
+    preview_reads["timeline"] = {"events": [
+        {"ts": iso(1), "kind": "system", "title": "Alert linked: retention:3", "source_type": "alert", "source_id": "retention:3"},
+        {"ts": iso(2), "kind": "system", "title": "Alert linked: real", "source_type": "alert", "source_id": "real-1"},
+    ]}
+    assert [e["title"] for e in preview(c)["activity"]] == ["Alert linked: real"]
+
+
+def test_the_note_box_carries_no_id_until_it_is_opened(client, preview_reads):
+    c, user = client
+    user.has_permission = lambda permission: True
+    page = soup(c, "/ui/cases/3/preview")
+    assert page.select_one("[data-ci-notebox]")["data-ci-placeholder"] == "Add a note to CASE-0003"
+    assert page.select_one("#panel-note-input") is None

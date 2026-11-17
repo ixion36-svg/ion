@@ -1241,4 +1241,4 @@ def test_the_list_row_now_carries_the_closure_reason_the_badge_keys_on():
         dfir_iris_case_id = None
         closure_reason = "duplicate"
 
-    assert _summary((Row(), None, 0))["closure_reason"] == "duplicate"
+    assert _summary((Row(), None, 0, None))["closure_reason"] == "duplicate"

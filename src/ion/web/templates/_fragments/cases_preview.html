@@ -11,7 +11,7 @@
 <header class="ci-pv-head">
 <span class="ci-num">{{ number or '—' }}</span>
 <h2 class="ci-pv-title">{{ title }}{% if host %} <span class="ci-host">— {{ host }}</span>{% endif %}</h2>
-<div class="ci-tags"><span class="ci-sev sev-{{ severity }}">{{ severity }}</span><span class="ci-status st-{{ status }}">{{ status }}</span>{% if closure %}<span class="ci-status">{{ closure }}</span>{% endif %}
+<div class="ci-tags"><span class="ci-sev ci-s-{{ severity }}">{{ severity }}</span><span class="ci-status st-{{ status }}">{{ status }}</span>{% if closure %}<span class="ci-status">{{ closure }}</span>{% endif %}
 <span class="ci-meta">{% for key, word in [('alerts','alert'),('observables','observable'),('notes','note')] %}{% set n = counts[key] %}{{ n if n is not none else '?' }} {{ word }}{{ '' if n == 1 else 's' }}{% if not loop.last %} · {% endif %}{% endfor %}{% if opened_age %} · opened {{ opened_age }} ago{% endif %}</span></div>
 </header>
 <div class="ci-kf" data-ci-keyfields>{% if alert_ids %}<span class="ci-mute">Reading the alerts' key fields&hellip;</span>{% else %}<span class="ci-mute">No linked alerts, so no key fields.</span>{% endif %}</div>
@@ -36,7 +36,7 @@
 </div>
 {% if can_update %}
 <div class="ci-reassign" data-ci-reassign hidden><label>Owner <select data-ci-owner data-change-action="panelUpdateField" data-args='{{ [id, "assigned_to_id", "$value"]|tojson }}'><option value="">Unassigned</option></select></label></div>
-<div class="ci-notebox" data-ci-notebox hidden><textarea id="panel-note-input" rows="3" placeholder="Add a note to {{ number or 'this case' }}"></textarea><button type="button" class="ci-btn" data-click-action="addPanelNote" data-args='{{ [id]|tojson }}'>Add note</button></div>
+<div class="ci-notebox" data-ci-notebox data-ci-placeholder="Add a note to {{ number or 'this case' }}" hidden><button type="button" class="ci-btn" data-click-action="addPanelNote" data-args='{{ [id]|tojson }}'>Add note</button></div>
 {% endif %}
 <p class="ci-hint">Double-click or <kbd>&crarr;</kbd> opens the case. <kbd>Esc</kbd> comes back here.</p>
 <section class="ci-sec">

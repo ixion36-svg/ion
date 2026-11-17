@@ -284,7 +284,20 @@
     panelUpdateField(id, 'assigned_to_id', me);
   };
   window.inboxReassign = function () { toggleBox('data-ci-reassign', 'select'); };
-  window.inboxNote = function () { toggleBox('data-ci-notebox', 'textarea'); };
+  // The textarea is made here, not sent in the fragment: something sets its
+  // style, and htmx copies the attributes of a same-id element across a
+  // swap, which CSP refuses as an inline style.
+  window.inboxNote = function () {
+    var box = document.querySelector('#ci-preview [data-ci-notebox]');
+    if (box && !box.querySelector('textarea')) {
+      var t = document.createElement('textarea');
+      t.id = 'panel-note-input';
+      t.rows = 3;
+      t.placeholder = box.dataset.ciPlaceholder || '';
+      box.prepend(t);
+    }
+    toggleBox('data-ci-notebox', 'textarea');
+  };
   window.inboxCloseSheet = function () { $('ci-inbox').classList.remove('sheet-open'); };
 
   // ── keys ──────────────────────────────────────────────────────────────

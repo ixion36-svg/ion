@@ -25,7 +25,7 @@ from ion.auth.dependencies import require_permission
 from ion.services import case_query_service as cq
 from ion.storage.database import get_db_session
 from ion.web import api, case_lifecycle_api
-from ion.web.ui._cases_window import blockers, case_alerts
+from ion.web.ui._cases_window import RETENTION_MARKER, blockers, case_alerts
 from ion.web.ui._shared import age_label, closure_label, closure_short, instant_label, parse_instant, plain, render_view, rows
 
 logger = logging.getLogger(__name__)
@@ -396,7 +396,9 @@ def preview_events(timeline: object) -> Optional[list[PreviewEvent]]:
     events = rows(timeline, "events")
     if events is None:
         return None
-    dated = [e for e in events if isinstance(e, dict) and parse_instant(e.get("ts")) is not None]
+    # The retention marker is not an alert (see _cases_window.case_alerts).
+    dated = [e for e in events if isinstance(e, dict) and parse_instant(e.get("ts")) is not None
+             and not (e.get("source_type") == "alert" and str(e.get("source_id") or "").startswith(RETENTION_MARKER))]
     dated.sort(key=lambda e: parse_instant(e["ts"]), reverse=True)
     return [
         {

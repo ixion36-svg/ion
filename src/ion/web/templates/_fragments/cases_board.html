@@ -5,7 +5,7 @@
 {% if state == 'failed' %}<div class="ci-empty" data-case-board-failed>The case list could not be read. This is not an empty queue.</div>
 {% elif state == 'empty' and offset == 0 %}{% if filtered %}<div class="ci-empty">No cases match these filters. <button type="button" class="ci-link" data-click-action="inboxClearFilters">Clear filters</button></div>{% else %}<div class="ci-empty">No cases yet. A new case, or one the grouper opens, lands here.</div>{% endif %}
 {% else %}{% for r in rows or [] %}
-<div class="ci-row sev-{{ r.severity }}{% if r.status == 'closed' %} is-closed{% endif %}" role="option" aria-selected="false" tabindex="-1"{% if r.id is not none %} id="ci-row-{{ r.id }}" data-ci-row="{{ r.id }}" data-click-action="inboxSelect" data-args='{{ [r.id]|tojson }}'{% endif %}>
+<div class="ci-row ci-s-{{ r.severity }}{% if r.status == 'closed' %} is-closed{% endif %}" role="option" aria-selected="false" tabindex="-1"{% if r.id is not none %} id="ci-row-{{ r.id }}" data-ci-row="{{ r.id }}" data-click-action="inboxSelect" data-args='{{ [r.id]|tojson }}'{% endif %}>
 <i class="ci-stripe" aria-hidden="true"></i><span class="ci-num">{{ r.number or '—' }}</span>
 <span class="ci-main"><span class="ci-title">{{ r.title }}{% if r.host %} <span class="ci-host">{{ r.host }}</span>{% endif %}</span><span class="ci-act ci-act-{{ r.activity_kind }}">{{ r.activity or 'No activity recorded' }}</span></span>
 <span class="ci-n" title="Alerts">{{ r.alert_count if r.alert_count is not none else '—' }}</span>
