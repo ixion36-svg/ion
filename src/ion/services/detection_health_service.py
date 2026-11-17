@@ -109,8 +109,9 @@ def get_detection_health(session: Session, days: Optional[int] = None) -> Dict[s
     rules: List[Dict[str, Any]] = []
     n_silent = n_noisy = n_decaying = 0
     for key in keys:
-        rec = outcomes.get(key) or RuleOutcome(key=key, rule_name=key.rule_name or _UNMAPPED)
-        scored, disagreed = bob.get(key, (0, 0))
+        scored, disagreed, bob_name = bob.get(key, (0, 0, None))
+        rec = outcomes.get(key) or RuleOutcome(
+            key=key, rule_name=key.rule_name or bob_name or _UNMAPPED)
         judged = policy.judges(rec)
         flags = {
             "silent": judged and rec.true_positive == 0,
@@ -158,7 +159,10 @@ def get_detection_health(session: Session, days: Optional[int] = None) -> Dict[s
 
 
 def _bob_scores(session: Session, window: Window, outcomes) -> Dict[RuleKey, tuple]:
-    """(scored, disagreed) per rule, keyed exactly as the closure outcomes are.
+    """(scored, disagreed, a rule name) per rule, keyed as the closure outcomes are.
+
+    The name is for a rule Bob scored that has no alert or closure in the
+    window, so it has no outcome record to take a name from.
 
     Only rows where Bob made a scored suggestion count: not abstentions, not
     circuit-breaker auto-escalations.
@@ -178,10 +182,11 @@ def _bob_scores(session: Session, window: Window, outcomes) -> Dict[RuleKey, tup
     for bob_verdict, agreement, auto_escalated, rule_id, rule_name in rows:
         if not bob_verdict or agreement is None or auto_escalated:
             continue
-        tally = scores.setdefault(outcomes.key_for(rule_id, rule_name), [0, 0])
+        tally = scores.setdefault(outcomes.key_for(rule_id, rule_name), [0, 0, None])
         tally[0] += 1
         tally[1] += agreement is False
-    return {k: (v[0], v[1]) for k, v in scores.items()}
+        tally[2] = tally[2] or rule_name
+    return {k: tuple(v) for k, v in scores.items()}
 
 
 def get_rule_attack_guidance(

@@ -5,7 +5,7 @@ while DE Metrics counted every closure, so the same rule showed two
 false-positive rates, and "noisy" meant three different things.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 import pytest
 
@@ -17,9 +17,8 @@ from ion.services.rule_outcome_service import (
     RuleKey,
     Window,
     rule_outcomes,
+    utcnow,
 )
-
-NOW = datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class Estate:
@@ -31,7 +30,7 @@ class Estate:
 
     def close(self, rule_name, reason, *, rule_id=None, days_ago=1, hours_open=2):
         self.n += 1
-        closed_at = NOW - timedelta(days=days_ago)
+        closed_at = utcnow() - timedelta(days=days_ago)
         case = AlertCase(case_number=f"C-{self.n}", title=f"case {self.n}", created_by_id=1,
                          status=AlertCaseStatus.CLOSED, closure_reason=reason,
                          severity="medium")
@@ -49,7 +48,7 @@ class Estate:
         self.n += 1
         triage = AlertTriage(es_alert_id=f"a-{self.n}", rule_name=rule_name, rule_id=rule_id,
                              status=AlertTriageStatus.OPEN)
-        triage.created_at = NOW - timedelta(days=days_ago)
+        triage.created_at = utcnow() - timedelta(days=days_ago)
         self.session.add(triage)
         self.session.flush()
 
@@ -99,17 +98,17 @@ def test_closures_outside_the_window_are_not_counted(session, estate):
     estate.close("Windowed", "true_positive", days_ago=400)
     session.commit()
 
-    last_30 = rule_outcomes(session, Window.last(30, now=NOW)).get(RuleKey(rule_name="Windowed"))
-    last_90 = rule_outcomes(session, Window.last(90, now=NOW)).get(RuleKey(rule_name="Windowed"))
+    last_30 = rule_outcomes(session, Window.last(30, now=utcnow())).get(RuleKey(rule_name="Windowed"))
+    last_90 = rule_outcomes(session, Window.last(90, now=utcnow())).get(RuleKey(rule_name="Windowed"))
 
     assert last_30.outcomes["false_positive"] == 1 and last_30.closed == 1
     assert last_90.closed == 2 and last_90.fp_rate == 50.0
 
 
 def test_the_window_end_is_exclusive(session, estate):
-    estate.close("Edge", "false_positive", days_ago=0)
+    edge = estate.close("Edge", "false_positive", days_ago=0)
     session.commit()
-    closed_at = NOW
+    closed_at = edge.case.closed_at
     window = Window(since=closed_at - timedelta(days=1), until=closed_at)
 
     assert rule_outcomes(session, window).get(RuleKey(rule_name="Edge")).closed == 0
@@ -117,7 +116,7 @@ def test_the_window_end_is_exclusive(session, estate):
 
 def test_a_window_longer_than_a_year_is_refused():
     with pytest.raises(ValueError):
-        Window(since=NOW - timedelta(days=366), until=NOW)
+        Window(since=utcnow() - timedelta(days=366), until=utcnow())
 
 
 def test_noisy_flags_the_rule_over_the_threshold_and_not_the_others(session, estate, monkeypatch):

@@ -242,3 +242,17 @@ def test_create_proposal_gate_and_validation(session):
     # Missing suggested_change → 400.
     assert client2.post("/api/detection-health/tuning-proposal",
                         json={"rule_name": "R", "suggested_change": "  "}).status_code == 400
+
+
+def test_a_rule_bob_scored_but_nobody_closed_keeps_its_name(session, monkeypatch):
+    """A triage row older than the window, scored by Bob inside it."""
+    t = AlertTriage(es_alert_id="old-1", rule_name="Old Rule", rule_id="r-old",
+                    status=AlertTriageStatus.OPEN)
+    t.created_at = _NAIVE_NOW - timedelta(days=200)
+    session.add(t)
+    _fb(session, "old-1", "pending", bob="false_positive", agreement=False)
+    session.commit()
+
+    rule = next(r for r in get_detection_health(session, days=90)["rules"] if r["rule_id"] == "r-old")
+    assert rule["rule_name"] == "Old Rule"
+    assert rule["bob_scored"] == 1

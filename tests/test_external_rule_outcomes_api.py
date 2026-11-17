@@ -6,7 +6,7 @@ override.
 """
 
 import base64
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,11 +14,11 @@ from fastapi.testclient import TestClient
 from ion.auth.service import AuthService
 from ion.models.alert_triage import AlertCase, AlertCaseStatus, AlertTriage, AlertTriageStatus
 from ion.models.user import User
+from ion.services.rule_outcome_service import utcnow
 from ion.storage.database import get_db_session
 from ion.web.server import app
 
 URL = "/api/external/v1/rule-outcomes"
-NOW = datetime.now(timezone.utc).replace(tzinfo=None)
 
 ITEM_FIELDS = {
     "rule_id", "rule_name", "rule_uuids", "alerts", "closed", "outcomes",
@@ -70,7 +70,7 @@ def _close(session, n, rule_name, reason, *, rule_id=None, analyst=None, notes=N
                      status=AlertCaseStatus.CLOSED, closure_reason=reason,
                      closure_notes=notes, severity="high",
                      closed_by_id=analyst.id if analyst else None)
-    case.closed_at = NOW - timedelta(days=1)
+    case.closed_at = utcnow() - timedelta(days=1)
     session.add(case)
     session.flush()
     triage = AlertTriage(es_alert_id=f"alert-{n}", rule_name=rule_name, rule_id=rule_id,
@@ -104,7 +104,7 @@ def test_a_human_holding_the_permission_is_refused(auth, client, session):
     admin = auth.seed_admin_user(password="An-Adm1n-Pw-For-Tests-Only-77")
     admin.must_change_password = False
     auth.session_repo.create(user_id=admin.id, session_token="human-token",
-                             expires_at=NOW + timedelta(hours=1))
+                             expires_at=utcnow() + timedelta(hours=1))
     session.commit()
     assert admin.has_permission("rule_outcomes:read")
 
@@ -195,8 +195,8 @@ def test_a_window_over_365_days_is_refused(auth, client, tide_token):
 
 def test_the_window_is_applied(auth, client, tide_token, session):
     _close(session, 1, "Brute Force", "false_positive", rule_id="r-bf")
-    before = (NOW - timedelta(days=30)).isoformat() + "Z"
-    two_days_ago = (NOW - timedelta(days=2)).isoformat() + "Z"
+    before = (utcnow() - timedelta(days=30)).isoformat() + "Z"
+    two_days_ago = (utcnow() - timedelta(days=2)).isoformat() + "Z"
     assert _get(client, tide_token, since=before, until=two_days_ago).json()["items"] == []
     assert len(_get(client, tide_token, since=before).json()["items"]) == 1
 
