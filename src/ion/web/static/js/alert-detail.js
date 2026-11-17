@@ -59,6 +59,17 @@
     { id: 'rawdata',         label: 'Raw Data' }
   ];
 
+  // layout: 'case', the opened case's window. Its own tab set, because the
+  // case shows the alert's head itself and wants the fields split in two.
+  var CASE_SECTIONS = [
+    { id: 'highlighted', label: 'Highlighted' },
+    { id: 'fields',      label: 'Full fields', count: true },
+    { id: 'process',     label: 'Process' },
+    { id: 'rawdata',     label: 'Raw JSON' },
+    { id: 'related',     label: 'Related', count: true },
+    { id: 'observables', label: 'Observables', count: true }
+  ];
+
   var _current = null;
   var _opts = {};
   // Related + Timeline share ONE /related request; this stops the two tabs
@@ -357,11 +368,30 @@
     return null;
   }
 
-  function _fieldsV2Html(alertId, raw, flat, allKeys, extracted) {
+  // One rule for "highlighted", shared by the Fields tab, the case layout's
+  // Highlighted tab and the case window's key context strip.
+  function _highlightTest(flat) {
     var inv = _investigationFields(flat);
-    var isHl = inv
+    var test = inv
       ? function (k) { return inv.some(function (f) { return k === f || k.indexOf(f + '.') === 0; }); }
       : function (k) { return _keyPrefixes().some(function (p) { return k === p || k.indexOf(p) === 0; }); };
+    return { test: test, investigation: !!inv };
+  }
+
+  // [{n, v}] of the highlighted fields in a raw document; every field when
+  // none matches, as the Fields tab does.
+  function highlightedFields(raw) {
+    var flat = flattenAlertFields(raw || {});
+    var keys = Object.keys(flat).sort();
+    var hl = _highlightTest(flat).test;
+    var picked = keys.filter(hl);
+    return (picked.length ? picked : keys).map(function (k) { return { n: k, v: String(flat[k]) }; });
+  }
+
+  function _fieldsV2Html(alertId, raw, flat, allKeys, extracted) {
+    var hlRule = _highlightTest(flat);
+    var inv = hlRule.investigation;
+    var isHl = hlRule.test;
     var fields = allKeys.map(function (k) { return { n: k, v: String(flat[k]), hl: isHl(k) }; });
     var hlCount = fields.filter(function (f) { return f.hl; }).length;
     if (!hlCount) { fields.forEach(function (f) { f.hl = true; }); hlCount = fields.length; }
@@ -467,6 +497,200 @@
     _fieldsState.filter = value || '';
     var body = document.getElementById('iad2-fields-body');
     if (body) body.innerHTML = _fieldsRows();   // keeps the input focused
+  }
+
+  // ── Case layout: Highlighted and Full fields ─────────────────────────────
+  // The opened case's window shows one alert as six tabs (CASE_SECTIONS). Both
+  // field tabs read one model built from the raw document, so the filter and
+  // the two toggles re-render rows without re-fetching.
+  var _caseFields = null;
+
+  // Like flattenAlertFields, but an empty value is kept and marked, because
+  // the Full fields tab can show the empties on request.
+  function _flattenAll(obj, prefix, out) {
+    out = out || [];
+    prefix = prefix || '';
+    if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+      var keys = Object.keys(obj);
+      if (!keys.length && prefix) out.push({ n: prefix, v: '', raw: obj });
+      keys.forEach(function (k) { _flattenAll(obj[k], prefix ? prefix + '.' + k : k, out); });
+    } else if (Array.isArray(obj)) {
+      if (obj.every(function (x) { return x === null || typeof x !== 'object'; })) {
+        out.push({ n: prefix, v: obj.join(', '), raw: obj });
+      } else {
+        obj.forEach(function (x, i) { _flattenAll(x, prefix + '[' + i + ']', out); });
+      }
+    } else {
+      out.push({ n: prefix, v: (obj === null || obj === undefined) ? '' : String(obj), raw: obj });
+    }
+    return out;
+  }
+
+  // Read from the value, not the index mapping, which ION does not fetch.
+  function _valueType(raw, v) {
+    if (v === '') return 'empty';
+    if (typeof raw === 'number') return 'number';
+    if (typeof raw === 'boolean') return 'boolean';
+    if (Array.isArray(raw)) return 'list';
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v)) return 'date';
+    return 'text';
+  }
+
+  function _onCase(v) {
+    var vals = _opts.observableValues;
+    return !!(vals && v && vals.indexOf(String(v).toLowerCase()) !== -1);
+  }
+
+  function _setTabCount(id, n) {
+    var el = document.querySelector('[data-tab-count="' + id + '"]');
+    if (el) el.textContent = (n == null) ? '' : String(n);
+  }
+
+  function _buildCaseFields(alertId, raw) {
+    var all = _flattenAll(raw || {}).filter(function (f) { return f.n; })
+      .sort(function (a, b) { return a.n < b.n ? -1 : a.n > b.n ? 1 : 0; });
+    var flat = {};
+    all.forEach(function (f) { if (f.v !== '') flat[f.n] = f.v; });
+    var hl = _highlightTest(flat).test;
+    var rows = all.map(function (f) {
+      return { n: f.n, v: f.v, empty: f.v === '', hl: f.v !== '' && hl(f.n), type: _valueType(f.raw, f.v) };
+    });
+    if (!rows.some(function (r) { return r.hl; })) rows.forEach(function (r) { r.hl = !r.empty; });
+    _caseFields = { alertId: alertId, rows: rows, q: '', hlOnly: false, showEmpty: false };
+    _alertParsedKeyFields = rows.filter(function (r) { return r.hl; })
+      .map(function (r) { return { key: r.n, value: r.v }; });
+    _setTabCount('fields', rows.filter(function (r) { return !r.empty; }).length);
+  }
+
+  function _caseHighlightedHtml() {
+    var rows = _caseFields.rows.filter(function (r) { return r.hl; });
+    if (!rows.length) return '<div class="iad-empty">This alert has no fields.</div>';
+    return '<div class="iad-hlgrid">' + rows.map(function (r) {
+      return '<div class="iad-hlcard' + (_onCase(r.v) ? ' on-case' : '') + '">'
+        + '<span class="iad-hlk">' + escapeHtml(r.n) + '</span>'
+        + '<span class="iad-hlv" title="' + escapeHtml(r.v) + '">' + escapeHtml(r.v)
+        + (_onCase(r.v) ? '<span class="iad-obsmark" title="An observable on this case">✓</span>' : '')
+        + '</span></div>';
+    }).join('') + '</div>';
+  }
+
+  function _caseFieldRows() {
+    var st = _caseFields;
+    var q = st.q.trim().toLowerCase();
+    var shown = st.rows.filter(function (r) {
+      return (st.showEmpty || !r.empty) && (!st.hlOnly || r.hl)
+        && (!q || r.n.toLowerCase().indexOf(q) !== -1 || r.v.toLowerCase().indexOf(q) !== -1);
+    });
+    var groups = [], byNs = {};
+    shown.forEach(function (r) {
+      var ns = r.n.split(/[.[]/)[0];
+      if (!byNs[ns]) { byNs[ns] = []; groups.push(ns); }
+      byNs[ns].push(r);
+    });
+    var h = groups.map(function (ns) {
+      return '<div class="iad-ffg"><div class="iad-ffgh"><b>' + escapeHtml(ns) + '</b>'
+        + '<span>' + byNs[ns].length + '</span></div>'
+        + byNs[ns].map(function (r) {
+          var val = r.empty ? '<span class="iad-ffempty">empty</span>' : escapeHtml(r.v);
+          var copy = r.empty ? '' : '<button type="button" class="iad-ffcopy" title="Copy value"'
+            + ' data-click-action="ionCopyFieldValue" data-args="' + escapeHtml(JSON.stringify([r.n])) + '">Copy</button>';
+          return '<div class="iad-ffr' + (r.hl ? ' hl' : '') + (r.empty ? ' empty' : '') + '">'
+            + '<span class="iad-ffhl" title="' + (r.hl ? 'Highlighted' : '') + '">' + (r.hl ? '●' : '') + '</span>'
+            + '<span class="iad-fff">' + escapeHtml(r.n) + '</span>'
+            + '<span class="iad-ffv">' + val + (_onCase(r.v) ? ' <span class="iad-ffon">on the case</span>' : '') + '</span>'
+            + '<span class="iad-fft">' + r.type + '</span><span class="iad-ffa">' + copy + '</span></div>';
+        }).join('') + '</div>';
+    }).join('');
+    var total = st.rows.length;
+    var counter = document.getElementById('iad-ff-count');
+    if (counter) counter.textContent = shown.length + ' of ' + total + ' shown';
+    return h || '<div class="iad-empty">No fields match.</div>';
+  }
+
+  function _caseFullFieldsHtml() {
+    var st = _caseFields;
+    var empties = st.rows.filter(function (r) { return r.empty; }).length;
+    return '<div class="iad-ff">'
+      + '<div class="iad-ffbar"><label class="iad-ffq"><input type="search" placeholder="Filter '
+      +   st.rows.length + ' fields by name or value" aria-label="Filter fields" autocomplete="off"'
+      +   ' data-input-action="ionCaseFieldsFilter" data-args=\'["$value"]\' value="' + escapeHtml(st.q) + '"></label>'
+      + '<label class="iad-fftg"><input type="checkbox" data-change-action="ionCaseFieldsToggle"'
+      +   ' data-args=\'["hlOnly","$checked"]\'' + (st.hlOnly ? ' checked' : '') + '> Highlighted only</label>'
+      + '<label class="iad-fftg"><input type="checkbox" data-change-action="ionCaseFieldsToggle"'
+      +   ' data-args=\'["showEmpty","$checked"]\'' + (st.showEmpty ? ' checked' : '') + '> Show empty <span class="iad-mono">'
+      +   empties + '</span></label>'
+      + '<span class="iad-ffn" id="iad-ff-count"></span></div>'
+      + '<div class="iad-ffhead"><span></span><span>Field</span><span>Value</span>'
+      +   '<span title="Read from the value; ION does not fetch the index mapping">Type</span><span></span></div>'
+      + '<div id="iad-ff-body">' + _caseFieldRows() + '</div></div>';
+  }
+
+  // Fills both field tabs from the one shared raw read.
+  function _loadCaseFields(alert) {
+    var hlEl = document.getElementById('iad-hl-content');
+    var ffEl = document.getElementById('alert-fields-content');
+    if (!hlEl || !ffEl || hlEl.getAttribute('data-loaded')) return;
+    hlEl.setAttribute('data-loaded', '1');
+    fetchRawOnce(alert.id).then(function (raw) {
+      if (!_current || _current.id !== alert.id) return;
+      if (!raw) {
+        var none = '<div class="iad-empty">Elasticsearch returned no document for this alert, so its fields are unknown.</div>';
+        hlEl.innerHTML = none; ffEl.innerHTML = none;
+        _setTabCount('fields', null);
+        return;
+      }
+      _buildCaseFields(alert.id, raw);
+      hlEl.innerHTML = _caseHighlightedHtml();
+      ffEl.innerHTML = _caseFullFieldsHtml();
+      var c = document.getElementById('iad-ff-count');
+      if (c) _caseFieldRows();
+    }).catch(function (e) {
+      hlEl.removeAttribute('data-loaded');
+      var msg = '<div class="error">The alert document could not be read: '
+        + escapeHtml(String((e && e.message) || e)) + '</div>';
+      hlEl.innerHTML = msg; ffEl.innerHTML = msg;
+    });
+  }
+
+  function ionCaseFieldsFilter(value) {
+    if (!_caseFields) return;
+    _caseFields.q = value || '';
+    var body = document.getElementById('iad-ff-body');
+    if (body) body.innerHTML = _caseFieldRows();
+  }
+
+  function ionCaseFieldsToggle(key, on) {
+    if (!_caseFields || (key !== 'hlOnly' && key !== 'showEmpty')) return;
+    _caseFields[key] = !!on;
+    var body = document.getElementById('iad-ff-body');
+    if (body) body.innerHTML = _caseFieldRows();
+  }
+
+  function ionCopyFieldValue(name) {
+    if (!_caseFields) return;
+    var row = _caseFields.rows.filter(function (r) { return r.n === name; })[0];
+    if (!row || !navigator.clipboard) return;
+    navigator.clipboard.writeText(row.v).then(function () { _notify('Copied ' + name, 'success'); },
+      function () { _notify('The clipboard refused the copy', 'error'); });
+  }
+
+  // The alert's own observables, as triage extracted them, with the OpenCTI
+  // result triage stored on each. The case's Observables view has the rest.
+  function _caseObservablesHtml(alert) {
+    var obs = Array.isArray(alert.observables) ? alert.observables : [];
+    if (!obs.length) return '<div class="iad-empty">Triage extracted no observables from this alert.</div>';
+    return '<ul class="iad-aobs">' + obs.map(function (o) {
+      if (!o) return '';
+      var cti = o.enriched === true
+        ? '<b>OpenCTI</b> score ' + escapeHtml(o.score == null ? 'not given' : String(o.score))
+          + ' · ' + escapeHtml(String(o.indicator_count == null ? '?' : o.indicator_count)) + ' indicators'
+        : 'No OpenCTI result stored';
+      return '<li class="iad-aob"><span class="iad-otype">' + escapeHtml(String(o.type || 'unknown').replace(/_/g, ' ')) + '</span>'
+        + '<b class="iad-mono">' + escapeHtml(String(o.value || '')) + '</b>'
+        + '<span class="iad-aobl">' + cti + '</span>'
+        + '<button type="button" class="iad-link" data-click-action="cwShowObservable"'
+        + ' data-args="' + escapeHtml(JSON.stringify([String(o.value || '')])) + '">Enrichment</button></li>';
+    }).join('') + '</ul>';
   }
 
   // ── V2 field pins (ION_ALERT_FIELD_PINS) ─────────────────────────────────
@@ -1013,7 +1237,8 @@
           // Sort chronologically
           timelineAlerts.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-          _timelineInto(timelineContainer, timelineAlerts);
+          _setTabCount('related', timelineAlerts.length - 1);
+          if (timelineContainer) _timelineInto(timelineContainer, timelineAlerts);
 
           // V2 Case-context: the deduped related-alert count (excludes the current one).
           const relCount = document.getElementById('iad2-cc-related');
@@ -1022,7 +1247,7 @@
       } catch (error) {
           console.error('Error loading related alerts:', error);
           relatedContainer.innerHTML = '<div class="empty-state">Failed to load related alerts</div>';
-          timelineContainer.innerHTML = '<div class="empty-state">Failed to load timeline</div>';
+          if (timelineContainer) timelineContainer.innerHTML = '<div class="empty-state">Failed to load timeline</div>';
       }
   }
 
@@ -1293,6 +1518,8 @@
   }
 
   function switchDetailTab(tabId, btn) {
+      // A click on the count inside a tab lands on the span.
+      if (btn && btn.closest) btn = btn.closest('.detail-tab-btn') || btn;
       document.querySelectorAll('.detail-tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.detail-tab-content').forEach(c => c.classList.remove('active'));
       btn.classList.add('active');
@@ -1325,9 +1552,13 @@
           const g = document.getElementById('iad2-guide-content');
           if (g && g.classList.contains('loading')) loadInvestigationGuide(_current);
       }
+      if (_opts.layout === 'case' && _current) {
+          if (tabId === 'highlighted' || tabId === 'fields') _loadCaseFields(_current);
+          if (tabId === 'process') _hostSection('process');
+      }
       // Lazy-load the parsed-fields view on first click (same logic as the
       // /cases linked-alert dropdown: extracted values + well-known fields + show-all).
-      if (tabId === 'fields' && _current) {
+      if (tabId === 'fields' && _current && _opts.layout !== 'case') {
           const container = document.getElementById('alert-fields-content');
           if (container && container.querySelector('.loading')) {
               loadAlertParsedFields(_current.id, container);
@@ -1790,8 +2021,38 @@
     return h;
   }
 
+  function _sectionsHtmlCase(alert) {
+    var nObs = Array.isArray(alert.observables) ? alert.observables.length : 0;
+    var h = '<div class="detail-tabs iad-ctabs" role="tablist">';
+    CASE_SECTIONS.forEach(function (s, i) {
+      h += '<button type="button" class="detail-tab-btn' + (i === 0 ? ' active' : '') + '" data-tab="' + s.id + '"'
+         + ' data-click-action="switchDetailTab" data-args=\'["' + s.id + '", "$target"]\'>' + s.label
+         + (s.count ? ' <span class="iad-tabn" data-tab-count="' + s.id + '">'
+            + (s.id === 'observables' ? nObs : '') + '</span>' : '')
+         + '</button>';
+    });
+    h += '</div>';
+    CASE_SECTIONS.forEach(function (s, i) {
+      h += '<div id="detail-tab-' + s.id + '" class="detail-tab-content' + (i === 0 ? ' active' : '') + '">'
+         + _sectionPlaceholder(s.id, alert) + '</div>';
+    });
+    return h;
+  }
+
+  // A section the host fills (the process tree is the case page's own
+  // fragment). Asked once per alert.
+  var _hostAsked = {};
+  function _hostSection(id) {
+    if (_hostAsked[id] || typeof _opts.onSection !== 'function') return;
+    _hostAsked[id] = true;
+    _opts.onSection(id, document.getElementById('iad-host-' + id), _current);
+  }
+
   function _sectionPlaceholder(id, alert) {
     switch (id) {
+      case 'highlighted': return '<div id="iad-hl-content"><div class="loading">Loading highlighted fields\u2026</div></div>';
+      case 'process':  return '<div id="iad-host-process"><div class="loading">Loading process tree\u2026</div></div>';
+      case 'observables': return _caseObservablesHtml(alert);
       case 'related':  return '<div class="loading">Loading related alerts...</div>';
       case 'timeline': return '<div class="loading">Loading timeline...</div>';
       case 'comments': return '<div class="loading">Loading comments...</div>';
@@ -1805,7 +2066,8 @@
           + '<button type="button" class="btn btn-primary" data-click-action="runAutoInvestigate">'
           + '\uD83D\uDD0D Run Auto-Investigate</button></div>';
       case 'guide':    return '<div id="iad2-guide-content" class="loading">Loading investigation guide…</div>';
-      case 'fields':   return '<div id="alert-fields-content"><div class="loading">Click to load parsed fields...</div></div>';
+      case 'fields':   return '<div id="alert-fields-content"><div class="loading">'
+          + (_opts.layout === 'case' ? 'Loading fields\u2026' : 'Click to load parsed fields...') + '</div></div>';
       case 'rawdata':  return '<div class="raw-data-container" id="raw-data-content">'
           + (alert.raw_data ? syntaxHighlightJSON(alert.raw_data)
                             : '<div class="loading">Click to load raw data...</div>') + '</div>';
@@ -1817,6 +2079,7 @@
   function render(alert, opts) {
     _opts = opts || {};
     _current = alert;
+    if (_opts.layout === 'case') return _sectionsHtmlCase(alert);
     // V2 (ION_ALERT_DETAIL_V2): decision-first header + source-badged tab strip.
     // Only the 'tabs' arrangement is reskinned; 'stacked' keeps the v1 render so
     // the /cases jump-link layout is untouched.
@@ -1945,6 +2208,8 @@
     if (!container) return;
     _relatedLoaded = false;           // new alert — the shared fetch must re-run
     _commentsLoaded = false;
+    _hostAsked = {};
+    _caseFields = null;
     _fromObservables(alert);          // free — the data is already in hand
     container.innerHTML = render(alert, opts);
     _hydrateFromRaw(alert);           // only for what observables cannot supply
@@ -1963,6 +2228,13 @@
       loadInvestigationGuide(alert);
       _loadSequence();
       _observeSections();
+      return;
+    }
+    if (_opts.layout === 'case') {
+      // The tab strip shows the Related count, so that read starts now.
+      _relatedLoaded = true;
+      loadRelatedAlerts(alert);
+      _loadCaseFields(alert);
       return;
     }
     // Load only the section on screen; the rest fetch when first opened.
@@ -2035,6 +2307,7 @@
     render: render,
     mount: mount,
     showSection: showSection,
+    highlightedFields: highlightedFields,
     SECTIONS: SECTIONS,
     get current() { return _current; },
     set current(a) { _current = a; }
@@ -2159,6 +2432,9 @@
   window.ionFieldsView = ionFieldsView;
   window.ionFieldsMode = ionFieldsMode;
   window.ionFieldsFilter = ionFieldsFilter;
+  window.ionCaseFieldsFilter = ionCaseFieldsFilter;
+  window.ionCaseFieldsToggle = ionCaseFieldsToggle;
+  window.ionCopyFieldValue = ionCopyFieldValue;
   window.ionFieldPin = ionFieldPin;
   window.ionFieldUnpin = ionFieldPin;   // chip ✕ toggles off the same way
   window.ionGuideView = ionGuideView;
