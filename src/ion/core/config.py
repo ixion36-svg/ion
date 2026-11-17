@@ -198,6 +198,9 @@ class Config:
     tide_api_key: str = ""  # X-TIDE-API-KEY for external query API
     tide_verify_ssl: bool = False
     tide_space: str = ""  # Restrict TIDE reads to one space; empty reads every destination
+    # Set once the saved tide_space has been through the all-destinations
+    # upgrade (see from_file), so a later deliberate "default" is kept.
+    tide_scope_migrated: bool = True
     tide_client_id: str = ""  # TIDE 4.x tenant (client) id. Leave blank for single-tenant API keys.
 
     # Detection Engineering optional module (licensed). Enforcement ships
@@ -467,7 +470,16 @@ class Config:
             tide_url=data.get("tide_url", ""),
             tide_api_key=data.get("tide_api_key", ""),
             tide_verify_ssl=data.get("tide_verify_ssl", False),
-            tide_space=data.get("tide_space", ""),
+            # upgrade migration, once: the old settings form always wrote
+            # "default", so a saved "default" from before the marker existed
+            # is the form's value, not a choice, and would pin TIDE reads to
+            # one space when every destination is meant. The marker is saved
+            # with the next write, after which "default" is honoured.
+            tide_space=(
+                "" if not data.get("tide_scope_migrated") and data.get("tide_space") == "default"
+                else data.get("tide_space", "")
+            ),
+            tide_scope_migrated=True,
             tide_client_id=data.get("tide_client_id", ""),
             de_license_enforced=data.get("de_license_enforced", False),
             workforce_enabled=data.get("workforce_enabled", True),
