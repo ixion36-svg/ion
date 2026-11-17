@@ -7,6 +7,14 @@
 <link rel="stylesheet" href="/static/css/detection-engineering.css?v={{ ion_version }}">
 {% endblock %}
 
+{% macro subtab(id, label, count_id=None) -%}
+<button type="button" class="dx-subtab" role="tab" data-subtab="{{ id }}" data-click-action="deSwitch" data-args='{{ [id]|tojson }}'>{{ label }}{% if count_id %}<span id="{{ count_id }}" class="dx-tab-count"></span>{% endif %}</button>
+{%- endmacro %}
+{% macro moved(text) -%}
+<span class="dx-moved"><svg class="dx-icon" aria-hidden="true"><use href="#i-arrow-right"/></svg><span>Moved here · <b>{{ text }}</b></span></span>
+{%- endmacro %}
+{% set can_verify = current_user is defined and current_user and current_user.has_permission('de:verify') %}
+
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="dx-page">
@@ -18,71 +26,91 @@
     <select id="de-destination-select" data-change-action="deChangeDestination" data-args='["$value"]' title="Read rules from every SIEM destination, or from one Kibana space or Wazuh agent group"><option value="">Loading destinations…</option></select>
   </label>
   <label class="dx-select" id="de-system-wrap" hidden><span>System</span>
-    <select id="de-system-select" data-change-action="deChangeSystem" data-args='["$value"]' title="Scopes the coverage map and readiness assessments to one system's applied rules"><option value="">All systems</option></select>
+    <select id="de-system-select" data-change-action="deChangeSystem" data-args='["$value"]' title="Scopes coverage, systems and readiness to one system"><option value="">All systems</option></select>
   </label>
-  <button type="button" class="dx-btn" data-click-action="deSyncTide" title="Pull fresh data from TIDE now"><svg class="dx-icon" aria-hidden="true"><use href="#i-refresh"/></svg>Sync</button>
-  <button type="button" class="dx-btn ghost" data-click-action="deRefresh" title="Reload these panels from ION's cached TIDE data">Reload</button>
+  <button type="button" class="dx-btn" data-click-action="deSyncTide" title="Pull fresh data from TIDE now and reload these panels"><svg class="dx-icon" aria-hidden="true"><use href="#i-refresh"/></svg>Sync</button>
 </header>
 
 <div id="de-tide-failure" class="dx-banner warn" role="alert" hidden><strong data-failure-message></strong> <span data-failure-detail></span></div>
 
-{# Five tabs. The ten older tab ids still resolve: deSwitch() and the URL
-   hash map each one to its tab and sub-view (posture → Overview, gaps →
-   Coverage, execution → Rules, and so on). #}
+{# Eight tabs. Every older tab id and every absorbed page's anchor still
+   resolves: SUB_TAB and ALIASES in detection-engineering.js map each one to
+   its tab and sub-view, and the old URLs redirect here with that anchor. #}
 <nav class="dx-tabs" id="de-tabs" role="tablist">
   <button type="button" class="dx-tab active" role="tab" data-tab="overview" data-click-action="deTab" data-args='["overview"]'>Overview</button>
   <button type="button" class="dx-tab" role="tab" data-tab="coverage" data-click-action="deTab" data-args='["coverage"]'>Coverage<span id="de-count-coverage" class="dx-tab-count"></span></button>
-  <button type="button" class="dx-tab" role="tab" data-tab="usecases" data-click-action="deTab" data-args='["usecases"]'>Use cases<span id="de-count-usecases" class="dx-tab-count"></span></button>
+  <button type="button" class="dx-tab" role="tab" data-tab="systems" data-click-action="deTab" data-args='["systems"]'>Systems<span id="de-count-systems" class="dx-tab-count"></span></button>
   <button type="button" class="dx-tab" role="tab" data-tab="rules" data-click-action="deTab" data-args='["rules"]'>Rules<span id="de-count-rules" class="dx-tab-count"></span></button>
+  <button type="button" class="dx-tab" role="tab" data-tab="usecases" data-click-action="deTab" data-args='["usecases"]'>Use cases<span id="de-count-usecases" class="dx-tab-count"></span></button>
   <button type="button" class="dx-tab" role="tab" data-tab="readiness" data-click-action="deTab" data-args='["readiness"]'>Readiness</button>
+  <button type="button" class="dx-tab" role="tab" data-tab="work" data-click-action="deTab" data-args='["work"]'>Work<span id="de-count-work" class="dx-tab-count"></span></button>
+  <button type="button" class="dx-tab" role="tab" data-tab="bob" data-click-action="deTab" data-args='["bob"]'>Bob</button>
 </nav>
 
 <div class="de-panel active" id="de-tab-overview" data-tab-panel="overview">
   <div class="dx-subpanel" id="de-panel-overview" data-sub="overview"></div>
 </div>
+
 <div class="de-panel" id="de-tab-coverage" data-tab-panel="coverage">
-  <div class="dx-subnav" role="tablist">
-    <button type="button" class="dx-subtab active" data-subtab="attack" data-click-action="deSwitch" data-args='["attack"]'>ATT&amp;CK</button>
-    <button type="button" class="dx-subtab" data-subtab="d3fend" data-click-action="deSwitch" data-args='["d3fend"]'>D3FEND</button>
-  </div>
+  <div class="dx-subrow"><div class="dx-subnav" role="tablist">{{ subtab('attack', 'ATT&CK') }}{{ subtab('d3fend', 'D3FEND') }}</div></div>
   <div class="dx-subpanel" id="de-panel-attack" data-sub="attack"></div>
   <div class="dx-subpanel" id="de-panel-d3fend" data-sub="d3fend" hidden></div>
 </div>
-<div class="de-panel" id="de-tab-usecases" data-tab-panel="usecases">
-  <div class="dx-subnav" role="tablist">
-    <button type="button" class="dx-subtab active" data-subtab="killchains" data-click-action="deSwitch" data-args='["killchains"]'>Use cases</button>
-    <button type="button" class="dx-subtab" data-subtab="progression" data-click-action="deSwitch" data-args='["progression"]'>Kill chain progression</button>
+
+<div class="de-panel" id="de-tab-systems" data-tab-panel="systems">
+  <div class="dx-subpanel" id="de-panel-systems" data-sub="systems"></div>
+</div>
+
+<div class="de-panel" id="de-tab-rules" data-tab-panel="rules">
+  <div class="dx-subrow">
+    <div class="dx-subnav" role="tablist">{{ subtab('rules', 'Rules') }}{{ subtab('health', 'Health', 'de-count-health') }}</div>
+    <span data-sub-note="health" hidden>{{ moved('Detection Health, DE Metrics and TIDE Rule Monitoring now live here') }}</span>
   </div>
+  <div class="dx-subpanel" id="de-panel-rules" data-sub="rules"></div>
+  <div class="dx-subpanel" id="de-panel-health" data-sub="health" hidden></div>
+</div>
+
+<div class="de-panel" id="de-tab-usecases" data-tab-panel="usecases">
+  <div class="dx-subrow"><div class="dx-subnav" role="tablist">{{ subtab('killchains', 'Kill chains') }}{{ subtab('progression', 'Progression') }}</div></div>
   <div class="dx-subpanel" id="de-panel-killchains" data-sub="killchains"></div>
   <div class="dx-subpanel" id="de-panel-progression" data-sub="progression" hidden></div>
 </div>
-<div class="de-panel" id="de-tab-rules" data-tab-panel="rules">
-  <div class="dx-subnav" role="tablist">
-    <button type="button" class="dx-subtab active" data-subtab="rules" data-click-action="deSwitch" data-args='["rules"]'>Rules</button>
-    <button type="button" class="dx-subtab" data-subtab="execution" data-click-action="deSwitch" data-args='["execution"]'>Execution</button>
-  </div>
-  <div class="dx-subpanel" id="de-panel-rules" data-sub="rules"></div>
-  <div class="dx-subpanel" id="de-panel-execution" data-sub="execution" hidden></div>
-</div>
-<template id="de-rules-toolbar-template"><div>
-    <div class="de-rules-toolbar">
-        <input type="text" id="de-rules-search" placeholder="Search rules or MITRE IDs..." data-enter-key-action="deRulesSearch">
-        <select id="de-rules-sev" data-change-action="deRulesSearch"><option value="">All Severities</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option></select>
-        <select id="de-rules-enabled" data-change-action="deRulesSearch"><option value="">Enabled &amp; Disabled</option><option value="1">Enabled</option><option value="0">Disabled</option></select>
-        <button class="btn btn-secondary" data-click-action="deRulesSearch">Search</button>
-    </div><div id="de-rules-body"></div>
-</div></template>
+
 <div class="de-panel" id="de-tab-readiness" data-tab-panel="readiness">
-  <div class="dx-subnav" role="tablist">
-    <button type="button" class="dx-subtab active" data-subtab="readiness" data-click-action="deSwitch" data-args='["readiness"]'>Actor readiness</button>
-    <button type="button" class="dx-subtab" data-subtab="emulation" data-click-action="deSwitch" data-args='["emulation"]'>Emulation</button>
-    <button type="button" class="dx-subtab" data-subtab="vulns" data-click-action="deSwitch" data-args='["vulns"]'>Vulnerabilities</button>
-  </div>
+  <div class="dx-subrow"><div class="dx-subnav" role="tablist">{{ subtab('readiness', 'Actor') }}{{ subtab('emulation', 'Emulation') }}{{ subtab('vulns', 'Vulnerabilities') }}</div></div>
   <div class="dx-subpanel" id="de-panel-readiness" data-sub="readiness"></div>
   <div class="dx-subpanel" id="de-panel-emulation" data-sub="emulation" hidden></div>
   <div class="dx-subpanel" id="de-panel-vulns" data-sub="vulns" hidden></div>
 </div>
 
+<div class="de-panel" id="de-tab-work" data-tab-panel="work">
+  <div class="dx-subrow">
+    <div class="dx-subnav" role="tablist">{{ subtab('requests', 'Requests', 'de-count-requests') }}{{ subtab('proposals', 'Proposals', 'de-count-proposals') }}{{ subtab('quirks', 'Quirks', 'de-count-quirks') }}</div>
+    <span data-sub-note="requests" hidden>{{ moved('DE Workbench now lives here') }}</span>
+    <span data-sub-note="proposals" hidden>{{ moved('Detection Proposals now live here · Bob tuning proposals included') }}</span>
+    <span data-sub-note="quirks" hidden>{{ moved('System Quirks now live here') }}</span>
+    <div class="dx-menu" id="de-content-pack"></div>
+  </div>
+  <div class="dx-subpanel" id="de-panel-requests" data-sub="requests"></div>
+  <div class="dx-subpanel" id="de-panel-proposals" data-sub="proposals" hidden></div>
+  <div class="dx-subpanel" id="de-panel-quirks" data-sub="quirks" hidden></div>
+</div>
+
+<div class="de-panel" id="de-tab-bob" data-tab-panel="bob">
+  <div class="dx-subrow">
+    <div class="dx-subnav" role="tablist">
+      {{ subtab('scorecard', 'Scorecard') }}{{ subtab('disagreements', 'Disagreements', 'de-count-disagreements') }}
+      {% if can_verify %}{{ subtab('abuse', 'Abuse monitor') }}{% else %}<span class="dx-subtab dx-locked" title="Needs the de:verify permission"><span>Abuse monitor</span><span class="dx-tag warn dx-lock"><svg class="dx-icon" aria-hidden="true"><use href="#i-lock"/></svg>de:verify</span></span>{% endif %}
+    </div>
+    <span data-sub-note="scorecard" hidden>{{ moved('Bob Improvement now lives here') }}</span>
+    <span data-sub-note="abuse" hidden>{{ moved('Abuse Monitor now lives here') }}</span>
+  </div>
+  <div class="dx-subpanel" id="de-panel-scorecard" data-sub="scorecard"></div>
+  <div class="dx-subpanel" id="de-panel-disagreements" data-sub="disagreements" hidden></div>
+  {% if can_verify %}<div class="dx-subpanel" id="de-panel-abuse" data-sub="abuse" hidden></div>{% endif %}
+</div>
+
+<div id="de-drawer-host"></div>
 </div><!-- /dx-page -->
 </div><!-- /ion-tw -->
 {% endblock %}
@@ -90,464 +118,5 @@
 {% block scripts %}
 {% include "_fragments/detection_engineering_client.html" %}
 <script src="/static/js/detection-engineering.js?v={{ ion_version }}"></script>
-<script nonce="{{ csp_nonce }}">
-(function(){
-'use strict';
-
-const API = '/api/cyab';
-/* Each sub-view belongs to one of the five tabs. The ten tab ids the page
-   used to have are sub-view ids here, or aliases of one, so deSwitch('gaps'),
-   deSwitch('posture') and a #execution link all still land somewhere. */
-const SUB_TAB = {overview:'overview', attack:'coverage', d3fend:'coverage', killchains:'usecases', progression:'usecases',
-                 rules:'rules', execution:'rules', readiness:'readiness', emulation:'readiness', vulns:'readiness'};
-const ALIASES = {posture:'overview', gaps:'attack', coverage:'attack', usecases:'killchains'};
-let _tabSub = {overview:'overview', coverage:'attack', usecases:'killchains', rules:'rules', readiness:'readiness'};
-let _activeSub = 'overview';
-let _rulesPage = {search:'', severity:'', enabled:'', offset:0, limit:50};
-let _execHours = 168;
-let _selectedSystemId = '';
-let _loaded = {};
-
-/* ── Helpers ──────────────────────────────────── */
-async function apiFetch(path) {
-    const r = await fetch(API + path, {credentials:'include'});
-    if (!r.ok) throw new Error(`${r.status}`);
-    return r.json();
-}
-function $(id){ return document.getElementById(id); }
-
-/* ── Tab and sub-view switching ───────────────── */
-window.deTab = function(tab) { deSwitch(_tabSub[tab] || tab); };
-
-window.deSwitch = function(id) {
-    const sub = ALIASES[id] || id;
-    const tab = SUB_TAB[sub];
-    if (!tab) return;
-    _activeSub = sub;
-    _tabSub[tab] = sub;
-    document.querySelectorAll('.dx-tab').forEach(t => {
-        const on = t.dataset.tab === tab;
-        t.classList.toggle('active', on);
-        t.setAttribute('aria-selected', on ? 'true' : 'false');
-    });
-    document.querySelectorAll('.de-panel').forEach(p => p.classList.toggle('active', p.dataset.tabPanel === tab));
-    const panel = $('de-tab-' + tab);
-    panel.querySelectorAll('.dx-subtab').forEach(b => b.classList.toggle('active', b.dataset.subtab === sub));
-    panel.querySelectorAll('.dx-subpanel').forEach(p => { p.hidden = p.dataset.sub !== sub; });
-    if (location.hash !== '#' + sub) history.replaceState(null, '', '#' + sub);
-    if (!_loaded[sub]) loadTab(sub);
-};
-
-window.deRefresh = function() {
-    _loaded = {};
-    loadTab(_activeSub);
-};
-
-function loadTab(sub) {
-    switch(sub) {
-        case 'overview': loadOverview(); break;
-        case 'attack': loadCoverage(); break;
-        case 'killchains': loadKillChains(); break;
-        case 'rules': loadRules(); break;
-        case 'execution': loadExecution(); break;
-        case 'd3fend': loadD3fend(); break;
-        case 'emulation': loadEmulation(); break;
-        case 'vulns': loadVulns(); break;
-        case 'readiness': loadReadiness(); break;
-        case 'progression': loadProgression(); break;
-    }
-}
-
-/* ── Overview ─────────────────────────────────── */
-async function loadOverview() {
-    _loaded.overview = await deLoadFragment('/ui/detection-engineering/overview', 'de-panel-overview', 'Loading detection overview...');
-}
-window.deOpenRule = function(name) {
-    _rulesPage = {search: name || '', severity:'', enabled:'', offset:0, limit:50};
-    _loaded.rules = false;
-    deSwitch('rules');
-};
-
-/* ── Coverage map ─────────────────────────────── */
-async function loadCoverage() {
-    const query = _selectedSystemId ? '?system_id=' + encodeURIComponent(_selectedSystemId) : '';
-    _loaded.attack = await deLoadFragment('/ui/detection-engineering/coverage' + query, 'de-panel-attack', 'Loading ATT&CK coverage...');
-}
-window.deCoverageTactic = function(name) {
-    const root = $('de-panel-attack');
-    root.querySelectorAll('.dx-mcol').forEach(c => {
-        const on = c.dataset.tactic === name;
-        c.classList.toggle('on', on);
-        c.setAttribute('aria-pressed', on ? 'true' : 'false');
-    });
-    root.querySelectorAll('[data-tactic-panel]').forEach(p => { p.hidden = p.dataset.tacticPanel !== name; });
-};
-
-/* ── System scope ─────────────────────────────── */
-async function deLoadSystems() {
-    const selector = $('de-system-select');
-    const ok = await deLoadFragment('/ui/detection-engineering/system-options', selector, 'Loading systems...', {failure:'Systems unavailable'});
-    /* Shown only when TIDE has systems to choose between. */
-    $('de-system-wrap').hidden = !ok || selector.options.length < 2;
-    selector.value = _selectedSystemId;
-}
-window.deChangeSystem = function(id) {
-    _selectedSystemId = id || '';
-    const header = $('de-system-select');
-    if (header && header.value !== _selectedSystemId) header.value = _selectedSystemId;
-    const local = $('de-readiness-system');
-    if (local && local.value !== _selectedSystemId) local.value = _selectedSystemId;
-    document.querySelectorAll('#de-readiness-body [data-click-action="deGenerateReport"]').forEach(button => {
-        button.textContent = _selectedSystemId ? 'Assess (System)' : 'Assess (Global)';
-    });
-    _loaded.attack = false;
-    if (_activeSub === 'attack') loadCoverage();
-};
-
-/* ── Use Cases tab (TIDE baselines / playbooks) ─── */
-async function loadKillChains() {
-    _loaded.killchains = await deLoadFragment('/ui/detection-engineering/killchains', 'de-panel-killchains', 'Loading use cases...');
-}
-
-/* ── Rules tab ────────────────────────────────── */
-async function loadRules() {
-    const toolbar = cloneTemplate('de-rules-toolbar-template');
-    $('de-panel-rules').replaceChildren(toolbar);
-    $('de-rules-search').value = _rulesPage.search;
-    $('de-rules-sev').value = _rulesPage.severity;
-    $('de-rules-enabled').value = _rulesPage.enabled;
-    await fetchRules();
-}
-
-window.deRulesSearch = function() {
-    _rulesPage.search = $('de-rules-search').value;
-    _rulesPage.severity = $('de-rules-sev').value;
-    _rulesPage.enabled = $('de-rules-enabled').value;
-    _rulesPage.offset = 0;
-    fetchRules();
-};
-
-window.deRulesPage = function(dir) {
-    if (dir === 'next') _rulesPage.offset += _rulesPage.limit;
-    else _rulesPage.offset = Math.max(0, _rulesPage.offset - _rulesPage.limit);
-    fetchRules();
-};
-
-async function fetchRules() {
-    const p = _rulesPage;
-    const params = new URLSearchParams({search:p.search, severity:p.severity, enabled:p.enabled, offset:p.offset, limit:p.limit});
-    _loaded.rules = await deLoadFragment('/ui/detection-engineering/rules?' + params.toString(), 'de-rules-body', 'Loading rules...');
-}
-
-/* ── Execution tab ────────────────────────────── */
-window.deExecSetHours = function(h) {
-    _execHours = h;
-    _loaded.execution = false;
-    loadExecution();
-};
-async function loadExecution() {
-    _loaded.execution = await deLoadFragment('/ui/detection-engineering/execution?hours=' + _execHours,
-        'de-panel-execution', 'Loading execution metrics...');
-}
-
-/* ── Actor Readiness tab ──────────────────────── */
-let _readinessSearch = '';
-window.__setSelectedSystemId = function(event) {
-    deChangeSystem(event.target.value);
-};
-async function loadReadiness() {
-    if (!await deLoadFragment('/ui/detection-engineering/readiness', 'de-panel-readiness', 'Loading systems...')) return;
-    $('de-readiness-search').value = _readinessSearch;
-    $('de-readiness-system').value = _selectedSystemId;
-    await fetchReadiness();
-}
-window.deReadinessSearch = function() {
-    _readinessSearch = $('de-readiness-search').value;
-    deChangeSystem($('de-readiness-system').value);
-    fetchReadiness();
-};
-async function fetchReadiness() {
-    _loaded.readiness = await deLoadFragment('/ui/detection-engineering/readiness/actors?search=' + encodeURIComponent(_readinessSearch),
-        'de-readiness-body', 'Querying OpenCTI + TIDE...');
-    if (_loaded.readiness) {
-        $('de-readiness-body').querySelectorAll('[data-click-action="deGenerateReport"]').forEach(button => {
-            button.textContent = _selectedSystemId ? 'Assess (System)' : 'Assess (Global)';
-        });
-    }
-}
-window.toggleActorDetail = function(el) {
-    el.closest('.de-actor').classList.toggle('open');
-};
-window.deGenerateReport = async function(actorId, actorType, event) {
-    const btn = event ? event.target.closest('button') : document.activeElement;
-    btn.disabled = true;
-    btn.textContent = 'Assessing...';
-    try {
-        await deLoadFragment('/ui/detection-engineering/readiness/system', 'de-sysreadiness-' + actorId, 'Assessing...',
-            {method: 'POST', values: {actor_id: actorId, actor_type: actorType, system_id: _selectedSystemId}});
-    } finally {
-        btn.disabled = false;
-        btn.textContent = _selectedSystemId ? 'Assess (System)' : 'Assess (Global)';
-    }
-};
-window.deDownloadPdf = async function(actorId, actorType, event) {
-    const systemId = _selectedSystemId || '';
-    const btn = event ? event.target.closest('button') : document.activeElement;
-    btn.disabled = true;
-    btn.textContent = 'Generating report...';
-
-    try {
-        const payload = {actor_id: actorId, actor_type: actorType, generate_ai: true};
-        if (systemId) payload.system_id = systemId;
-
-        const resp = await fetch(API + '/tide/de/readiness-pdf', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            credentials: 'include',
-            body: JSON.stringify(payload),
-        });
-        if (!resp.ok) {
-            const err = await resp.json().catch(()=>({detail:'Report generation failed'}));
-            alert(err.detail || 'Failed');
-            return;
-        }
-        const contentType = resp.headers.get('Content-Type') || '';
-        const blob = await resp.blob();
-        const url = URL.createObjectURL(blob);
-
-        if (contentType.includes('application/pdf')) {
-            // Direct PDF download
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = resp.headers.get('Content-Disposition')?.split('filename=')[1]?.replace(/"/g,'') || 'readiness_report.pdf';
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-        } else {
-            // HTML fallback — open in new tab for printing
-            window.open(url, '_blank');
-        }
-    } catch(e) {
-        alert('Report failed: ' + e.message);
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Download PDF';
-    }
-};
-
-/* ── Kill Chain Progression tab ───────────────── */
-let _progHours = 24;
-
-window.deProgSetHours = function(h) {
-    _progHours = h;
-    _loaded.progression = false;
-    loadProgression();
-};
-
-async function loadProgression() {
-    _loaded.progression = await deLoadFragment('/ui/detection-engineering/progression?hours=' + encodeURIComponent(_progHours), 'de-panel-progression', 'Scanning for kill chain progressions...');
-}
-
-/* ────────────────────────────────────────────────────────────────────── */
-/*  D3FEND defensive coverage                                              */
-/* ────────────────────────────────────────────────────────────────────── */
-async function loadD3fend() {
-    _loaded.d3fend = await deLoadFragment('/ui/detection-engineering/d3fend', 'de-panel-d3fend', 'Loading defensive coverage');
-}
-
-async function loadEmulation() {
-    _loaded.emulation = await deLoadFragment('/ui/detection-engineering/emulation', 'de-panel-emulation', 'Loading emulation plans');
-}
-
-window.emCreatePrompt = async function() {
-    const name = prompt('Plan name:');
-    if (!name) return;
-    const actor = prompt('Threat actor (optional):') || null;
-    const r = await fetch('/api/emulation/plans', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        credentials: 'include',
-        body: JSON.stringify({name, actor_name: actor}),
-    });
-    if (r.ok) { _loaded.emulation = false; loadTab('emulation'); }
-};
-
-window.emDeletePlan = async function(id) {
-    if (!confirm('Delete this plan and all its steps?')) return;
-    await fetch(`/api/emulation/plans/${id}`, {method: 'DELETE', credentials: 'include'});
-    _loaded.emulation = false; loadTab('emulation');
-};
-
-window.emOpenPlan = async function(id) {
-    _emCurrentPlan = id;
-    return deLoadFragment(`/ui/detection-engineering/emulation/${encodeURIComponent(id)}`, 'de-emulation-detail', 'Loading emulation plan');
-};
-
-window.emAddStep = async function(planId) {
-    const title = $('em-newstep-title').value.trim();
-    if (!title) return;
-    const tids = ($('em-newstep-tids').value || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
-    await fetch(`/api/emulation/plans/${planId}/steps`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        credentials: 'include',
-        body: JSON.stringify({title, mitre_techniques: tids}),
-    });
-    emOpenPlan(planId);
-};
-
-window.emExecuteStep = async function(id) {
-    await fetch(`/api/emulation/steps/${id}/execute`, {method: 'POST', credentials: 'include'});
-    const planId = _emCurrentPlan; if (planId) emOpenPlan(planId);
-};
-
-window.emVerifyStep = async function(id) {
-    const r = await fetch(`/api/emulation/steps/${id}/verify?lookback_hours=4`, {method: 'POST', credentials: 'include'});
-    const j = await r.json();
-    if (j.error) alert('Verify warning: ' + j.error);
-    const planId = _emCurrentPlan; if (planId) emOpenPlan(planId);
-};
-
-window.emDeleteStep = async function(id) {
-    if (!confirm('Delete step?')) return;
-    await fetch(`/api/emulation/steps/${id}`, {method: 'DELETE', credentials: 'include'});
-    const planId = _emCurrentPlan; if (planId) emOpenPlan(planId);
-};
-
-let _emCurrentPlan = null;
-/* ────────────────────────────────────────────────────────────────────── */
-/*  Vulnerability ↔ detection coverage                                     */
-/* ────────────────────────────────────────────────────────────────────── */
-async function loadVulns() {
-    _loaded.vulns = await deLoadFragment('/ui/detection-engineering/vulns', 'de-panel-vulns', 'Loading vulnerability coverage');
-}
-
-window.vlnCreatePrompt = async function() {
-    const title = prompt('Vulnerability title:');
-    if (!title) return;
-    const cve = prompt('CVE ID (optional, e.g. CVE-2025-12345):') || null;
-    const sev = prompt('Severity (critical / high / medium / low / info):', 'medium') || 'medium';
-    const tids = prompt('ATT&CK techniques used to exploit (comma-separated, e.g. T1190, T1059):') || '';
-    const body = {
-        title,
-        cve_id: cve,
-        severity: sev,
-        mitre_techniques: tids.split(',').map(s => s.trim().toUpperCase()).filter(Boolean),
-    };
-    const r = await fetch('/api/vulnerabilities', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        credentials: 'include',
-        body: JSON.stringify(body),
-    });
-    if (r.ok) { _loaded.vulns = false; loadTab('vulns'); }
-};
-
-window.vlnDelete = async function(id) {
-    if (!confirm('Delete this vulnerability?')) return;
-    await fetch(`/api/vulnerabilities/${id}`, {method: 'DELETE', credentials: 'include'});
-    _loaded.vulns = false; loadTab('vulns');
-};
-
-/* ── TIDE Sync ────────────────────────────────── */
-window.deSyncTide = async function() {
-    deSetBadge('Syncing...');
-    try {
-        const response = await fetch(API + '/tide/de/sync-now', {method:'POST', credentials:'include'});
-        if (!response.ok) throw new Error('Sync failed');
-        const payload = await response.json();
-        if (!payload || payload.error) {
-            deSetBadge(payload && typeof payload.error === 'string' ? 'TIDE (' + payload.error + ')' : 'TIDE (sync failed)');
-            return;
-        }
-        deSetBadge('TIDE · synced ' + (payload.synced ?? 'Unknown') + '/' + (payload.total ?? 'Unknown') + ' just now', true);
-        deRefresh();
-    } catch (error) {
-        deSetBadge('TIDE (sync failed)');
-    }
-};
-
-function deAge(seconds) {
-    if (seconds < 90) return 'just now';
-    if (seconds < 5400) return Math.round(seconds / 60) + ' min ago';
-    if (seconds < 129600) return Math.round(seconds / 3600) + ' h ago';
-    return Math.round(seconds / 86400) + ' d ago';
-}
-
-async function deCheckSyncStatus() {
-    try {
-        const payload = await apiFetch('/tide/de/sync-status');
-        if (!payload || typeof payload !== 'object' || !payload.datasets || typeof payload.datasets !== 'object') throw new Error('Invalid sync status');
-        const healthy = Object.values(payload.datasets).filter(d => d && !d.error && typeof d.age_seconds === 'number');
-        const total = payload.total_datasets;
-        if (!healthy.length) { deSetBadge('TIDE · not synced yet'); return; }
-        /* The oldest healthy dataset, so the pill never claims fresher data than it has. */
-        const age = deAge(Math.max(...healthy.map(d => d.age_seconds)));
-        const complete = typeof total === 'number' && healthy.length >= total;
-        deSetBadge('TIDE · ' + (complete ? '' : healthy.length + '/' + (total ?? '?') + ' datasets · ') + 'synced ' + age, complete);
-    } catch (error) {
-        deSetBadge('TIDE · status unavailable');
-    }
-}
-
-async function deLoadDestinations() {
-    const selector = $('de-destination-select');
-    selector.disabled = true;
-    await deLoadFragment('/ui/detection-engineering/destinations', selector, 'Loading destinations...');
-    selector.disabled = !selector.options.length || selector.options[0].disabled;
-}
-
-/* An empty key is "All destinations", a real choice rather than no choice. */
-window.deChangeDestination = async function(key) {
-    const selector = $('de-destination-select');
-    selector.disabled = true;
-    try {
-        const response = await fetch(API + '/tide/de/destination', {
-            method:'POST', credentials:'include',
-            headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({key: key || ''}),
-        });
-        const payload = await response.json();
-        if (!response.ok || !payload || payload.ok !== true) throw new Error('Destination switch failed');
-        deRefresh();
-    } catch (error) {
-        deSetBadge('TIDE (destination switch failed)');
-    } finally {
-        await deLoadDestinations();
-    }
-};
-
-/* TIDE refusing ION's key or tenant leaves every panel empty; say why once,
-   at the top, instead of letting the page read as a tenant with no rules. */
-async function deCheckTideAccess() {
-    const banner = $('de-tide-failure');
-    try {
-        const status = await apiFetch('/tide/status');
-        const failure = status && status.ok === false ? status.failure : null;
-        if (!failure || typeof failure.message !== 'string') { banner.hidden = true; return; }
-        banner.querySelector('[data-failure-message]').textContent = failure.message;
-        banner.querySelector('[data-failure-detail]').textContent = failure.detail ? 'TIDE said: ' + failure.detail : '';
-        banner.hidden = false;
-    } catch (error) {
-        banner.hidden = true;
-    }
-}
-/* ── Init ─────────────────────────────────────── */
-document.addEventListener('DOMContentLoaded', () => {
-    const wanted = decodeURIComponent((location.hash || '').slice(1));
-    deSwitch(SUB_TAB[ALIASES[wanted] || wanted] ? wanted : 'overview');
-    deLoadDestinations();
-    deLoadSystems();
-    deCheckSyncStatus();
-    deCheckTideAccess();
-});
-/* A link to #gaps or #execution from elsewhere on the page, or the back
-   button, lands on that sub-view without a reload. */
-window.addEventListener('hashchange', () => {
-    const wanted = decodeURIComponent((location.hash || '').slice(1));
-    if (SUB_TAB[ALIASES[wanted] || wanted] && (ALIASES[wanted] || wanted) !== _activeSub) deSwitch(wanted);
-});
-
-})();
-</script>
+<script src="/static/js/detection-engineering-work.js?v={{ ion_version }}"></script>
 {% endblock %}

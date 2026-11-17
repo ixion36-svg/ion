@@ -44,7 +44,6 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_permission
-from ion.licensing.gating import require_de_module
 from ion.models.bob_tuning_proposal import BobTuningProposalStatus
 from ion.storage.database import get_db_session
 from ion.web.ui._shared import plain, templates
@@ -240,7 +239,6 @@ def _proposals(rows: object) -> list[dict[str, Any]]:
     "/de-bob",
     response_class=HTMLResponse,
     dependencies=[
-        Depends(require_de_module),
         Depends(require_permission(PERMISSION)),
     ],
 )

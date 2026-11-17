@@ -46,16 +46,3 @@ def de_module_status() -> dict:
         "customer_id": st.customer_id,
         "expired": st.expired,
     }
-
-
-def require_de_module() -> None:
-    """FastAPI dependency: 404 when the DE module is not available.
-
-    404 (not 403) so a licence-gated deployment exposes nothing — the endpoint
-    is indistinguishable from one that does not exist, matching the opt-in-SOAR
-    pattern in response_api.
-    """
-    from fastapi import HTTPException
-
-    if not de_module_available():
-        raise HTTPException(status_code=404, detail="Not found")

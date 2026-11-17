@@ -90,7 +90,6 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import get_current_user, require_permission
-from ion.licensing.gating import require_de_module
 from ion.models.detection_proposal import DetectionProposalStatus
 from ion.models.system_quirk import SystemQuirkStatus
 from ion.models.user import User
@@ -600,7 +599,7 @@ def _render(
 #: them and wrong on the fifth. The order is the whole point: the module gate
 #: first means an unlicensed deployment answers 404 before authentication is
 #: considered, and a 401 would confirm the feature exists.
-DE_GATES = [Depends(require_de_module), Depends(require_permission(PERMISSION))]
+DE_GATES = [Depends(require_permission(PERMISSION))]
 
 
 @router.get(

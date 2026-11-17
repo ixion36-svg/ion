@@ -38,7 +38,6 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_permission
-from ion.licensing.gating import require_de_module
 from ion.models.system_quirk import SystemQuirkStatus
 from ion.storage.database import get_db_session
 from ion.web.ui._shared import plain, templates
@@ -150,7 +149,6 @@ def _row(q: dict[str, Any]) -> dict[str, Any]:
     "/de-quirks",
     response_class=HTMLResponse,
     dependencies=[
-        Depends(require_de_module),
         Depends(require_permission(PERMISSION)),
     ],
 )

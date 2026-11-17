@@ -58,7 +58,6 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import get_current_user, require_permission
-from ion.licensing.gating import require_de_module
 from ion.models.user import User
 from ion.storage.database import get_db_session
 from ion.web.ui._shared import plain, templates
@@ -356,7 +355,6 @@ def campaign_rows(payload: Any) -> list[dict[str, Any]]:
     "/de-metrics",
     response_class=HTMLResponse,
     dependencies=[
-        Depends(require_de_module),
         Depends(require_permission(PERMISSION)),
     ],
 )

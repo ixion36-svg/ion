@@ -39,7 +39,6 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_permission
-from ion.licensing.gating import require_de_module
 from ion.models.detection_proposal import (
     DetectionProposalSource,
     DetectionProposalStatus,
@@ -286,7 +285,6 @@ def _row(p: dict[str, Any]) -> dict[str, Any]:
     "/de-proposals",
     response_class=HTMLResponse,
     dependencies=[
-        Depends(require_de_module),
         Depends(require_permission(PERMISSION)),
     ],
 )

@@ -21,6 +21,9 @@ body[data-page="detection-engineering"] {
     --dx-track: color-mix(in srgb, var(--dx-text) 9%, transparent);
     --dx-rowline: color-mix(in srgb, var(--dx-text) 6%, transparent);
     --dx-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+    --dx-info: var(--sev-info, #58a6ff);
+    --dx-iris: #a78bfa;
+    --dx-elastic: #36c5d6;
 }
 
 body[data-page="detection-engineering"] [hidden] { display: none !important; }
@@ -274,3 +277,256 @@ body[data-page="detection-engineering"] .s-unknown {
     background: repeating-linear-gradient(45deg, var(--dx-track) 0 3px, transparent 3px 6px);
 }
 body[data-page="detection-engineering"] .dx-dot { margin-right: 6px; }
+
+/* ── The one-home tabs: Overview attention list, Systems, Rules and its
+   drawer, Health, menus. Ported from the approved prototype. ───────── */
+
+/* Moved-here hint */
+body[data-page="detection-engineering"] .dx-moved {
+    display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; margin: 0 0 10px; border-radius: 999px;
+    font-size: 11.5px; color: var(--dx-muted);
+    border: 1px dashed color-mix(in srgb, var(--dx-accent) 40%, transparent);
+    background: color-mix(in srgb, var(--dx-accent) 6%, transparent);
+}
+body[data-page="detection-engineering"] .dx-moved b { color: var(--dx-accent); font-weight: 650; }
+body[data-page="detection-engineering"] .dx-moved svg { width: 12px; height: 12px; color: var(--dx-accent); }
+body[data-page="detection-engineering"] .dx-subrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+body[data-page="detection-engineering"] .dx-subrow .dx-subnav { margin-bottom: 0; }
+body[data-page="detection-engineering"] .dx-subrow + * { margin-top: 12px; }
+body[data-page="detection-engineering"] .dx-subrow .dx-moved { margin: 0; }
+body[data-page="detection-engineering"] .dx-subtab .dx-tag { margin-left: 6px; vertical-align: 1px; }
+
+/* Kind badge */
+body[data-page="detection-engineering"] .dx-kind {
+    display: inline-block; min-width: 52px; text-align: center; padding: 2px 6px; border-radius: 5px;
+    font-size: 9.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+}
+body[data-page="detection-engineering"] .dx-kind.elastic { color: var(--dx-elastic); background: color-mix(in srgb, var(--dx-elastic) 15%, transparent); }
+body[data-page="detection-engineering"] .dx-kind.wazuh { color: var(--dx-iris); background: color-mix(in srgb, var(--dx-iris) 16%, transparent); }
+
+/* TIDE problem counts */
+body[data-page="detection-engineering"] .dx-probs { display: inline-flex; gap: 8px; font: 600 11.5px var(--dx-mono); white-space: nowrap; }
+body[data-page="detection-engineering"] .dx-probs span { display: inline-flex; align-items: center; gap: 3px; }
+body[data-page="detection-engineering"] .dx-probs svg { width: 13px; height: 13px; }
+body[data-page="detection-engineering"] .dx-e { color: var(--dx-bad); }
+body[data-page="detection-engineering"] .dx-w { color: var(--dx-warn); }
+body[data-page="detection-engineering"] .dx-i { color: var(--dx-info); }
+body[data-page="detection-engineering"] .dx-ic {
+    display: inline-grid; place-items: center; width: 13px; height: 13px; border-radius: 50%;
+    border: 1.5px solid currentColor; font: 800 8.5px/1 Georgia, serif;
+}
+body[data-page="detection-engineering"] .dx-wdot {
+    display: inline-block; width: 11px; height: 11px; border-radius: 50%; border: 1.6px solid currentColor;
+}
+
+/* Closure outcome stacked mini-bar */
+body[data-page="detection-engineering"] .dx-out { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+body[data-page="detection-engineering"] .dx-stack { display: flex; width: 84px; height: 8px; border-radius: 4px; overflow: hidden; background: var(--dx-track); }
+body[data-page="detection-engineering"] .dx-stack i { display: block; height: 100%; }
+body[data-page="detection-engineering"] .o-tp { background: var(--dx-ok); }
+body[data-page="detection-engineering"] .o-fp { background: var(--dx-bad); }
+body[data-page="detection-engineering"] .o-bn { background: color-mix(in srgb, var(--dx-muted) 55%, transparent); }
+body[data-page="detection-engineering"] .o-es { background: var(--dx-iris); }
+body[data-page="detection-engineering"] .dx-fp { font: 600 11.5px var(--dx-mono); min-width: 34px; text-align: right; }
+body[data-page="detection-engineering"] .dx-fp.hi { color: var(--dx-bad); }
+body[data-page="detection-engineering"] .dx-legend-out { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; color: var(--dx-muted); }
+body[data-page="detection-engineering"] .dx-legend-out i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+
+/* Inline sparklines */
+body[data-page="detection-engineering"] .dx-sparkline { width: 64px; height: 18px; fill: none; stroke: var(--dx-accent); stroke-width: 1.5; stroke-linejoin: round; vertical-align: middle; }
+body[data-page="detection-engineering"] .dx-sparkline.bad { stroke: var(--dx-bad); }
+body[data-page="detection-engineering"] .dx-sparkline.flat { stroke: var(--dx-muted); opacity: .6; }
+body[data-page="detection-engineering"] .dx-cnt { display: inline-flex; align-items: center; gap: 8px; justify-content: flex-end; }
+
+/* Toolbar */
+body[data-page="detection-engineering"] .dx-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+body[data-page="detection-engineering"] .dx-search {
+    flex: 1 1 260px; min-width: 0; padding: 7px 11px; border-radius: 8px; border: 1px solid var(--dx-line);
+    background: var(--dx-panel); color: var(--dx-text); font-size: 12.5px;
+}
+body[data-page="detection-engineering"] .dx-search::placeholder { color: var(--dx-muted); }
+body[data-page="detection-engineering"] .dx-check {
+    display: inline-flex; align-items: center; gap: 7px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--dx-line);
+    background: var(--dx-panel); font-size: 12px; color: var(--dx-text); cursor: pointer; white-space: nowrap;
+}
+body[data-page="detection-engineering"] .dx-check input { accent-color: var(--dx-accent); }
+body[data-page="detection-engineering"] .dx-table tbody tr.dx-click { cursor: pointer; }
+body[data-page="detection-engineering"] .dx-table tbody tr.dx-click:hover td { background: color-mix(in srgb, var(--dx-accent) 5%, transparent); }
+body[data-page="detection-engineering"] .dx-table tr.dx-sel td { background: color-mix(in srgb, var(--dx-accent) 9%, transparent); }
+body[data-page="detection-engineering"] .dx-rname { font-weight: 600; max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body[data-page="detection-engineering"] .dx-rname small { display: block; font: 500 10.5px var(--dx-mono); color: var(--dx-muted); }
+body[data-page="detection-engineering"] .dx-off { color: var(--dx-muted); }
+body[data-page="detection-engineering"] .dx-onoff { font-size: 11.5px; font-weight: 600; }
+body[data-page="detection-engineering"] .dx-onoff.on { color: var(--dx-ok); }
+body[data-page="detection-engineering"] .dx-onoff.off { color: var(--dx-warn); }
+body[data-page="detection-engineering"] .dx-gl { display: inline-flex; align-items: center; gap: 4px; font: 600 11.5px var(--dx-mono); color: var(--dx-text); }
+body[data-page="detection-engineering"] .dx-gl svg { width: 12px; height: 12px; color: #fc6d26; }
+body[data-page="detection-engineering"] .dx-tablewrap { overflow-x: auto; }
+body[data-page="detection-engineering"] .dx-tablewrap .dx-table { min-width: 1080px; }
+
+/* Overview */
+body[data-page="detection-engineering"] .dx-grid-ov { display: grid; gap: 14px; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); align-items: start; }
+@media (max-width: 1100px) { body[data-page="detection-engineering"] .dx-grid-ov { grid-template-columns: minmax(0, 1fr); } }
+body[data-page="detection-engineering"] .dx-attn-group { padding: 4px 14px 8px; border-bottom: 1px solid var(--dx-line); }
+body[data-page="detection-engineering"] .dx-attn-group:last-child { border-bottom: 0; }
+body[data-page="detection-engineering"] .dx-attn-h {
+    display: flex; align-items: center; gap: 8px; padding: 8px 0 2px; font-size: 12.5px; font-weight: 650; color: var(--dx-text);
+}
+body[data-page="detection-engineering"] .dx-attn-h .dx-count { font: 700 11px var(--dx-mono); padding: 1px 7px; border-radius: 999px; }
+body[data-page="detection-engineering"] .dx-count.e { color: var(--dx-bad); background: color-mix(in srgb, var(--dx-bad) 15%, transparent); }
+body[data-page="detection-engineering"] .dx-count.w { color: var(--dx-warn); background: color-mix(in srgb, var(--dx-warn) 15%, transparent); }
+body[data-page="detection-engineering"] .dx-count.i { color: var(--dx-info); background: color-mix(in srgb, var(--dx-info) 15%, transparent); }
+body[data-page="detection-engineering"] .dx-attn-h .dx-r { font-size: 11.5px; }
+body[data-page="detection-engineering"] .dx-attn-group .dx-row { grid-template-columns: 74px minmax(0, 1fr) auto; }
+body[data-page="detection-engineering"] .dx-src { font-size: 10.5px; color: var(--dx-muted); font-weight: 500; }
+body[data-page="detection-engineering"] .dx-kpi-split { display: flex; gap: 10px; font-size: 11.5px; color: var(--dx-muted); }
+body[data-page="detection-engineering"] .dx-kpi-split b { color: var(--dx-text); font-weight: 600; }
+
+/* Systems */
+body[data-page="detection-engineering"] .dx-sys-grid { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 1000px) { body[data-page="detection-engineering"] .dx-sys-grid { grid-template-columns: minmax(0, 1fr); } }
+body[data-page="detection-engineering"] .dx-sys { cursor: pointer; transition: border-color .15s; }
+body[data-page="detection-engineering"] .dx-sys:hover { border-color: var(--dx-accent); }
+body[data-page="detection-engineering"] .dx-sys .dx-ch { text-transform: none; letter-spacing: 0; font-size: 14px; font-weight: 650; flex-wrap: wrap; }
+body[data-page="detection-engineering"] .dx-chip {
+    display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
+    color: var(--dx-text); border: 1px solid var(--dx-line-2); background: var(--dx-panel-2);
+}
+body[data-page="detection-engineering"] .dx-sys-body { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
+body[data-page="detection-engineering"] .dx-sys-body > div { padding: 11px 14px; border-right: 1px solid var(--dx-rowline); border-bottom: 1px solid var(--dx-rowline); min-width: 0; }
+body[data-page="detection-engineering"] .dx-sys-body > div:nth-child(3n) { border-right: 0; }
+body[data-page="detection-engineering"] .dx-sys-body > div.dx-wide { grid-column: 1 / -1; border-right: 0; border-bottom: 0; }
+body[data-page="detection-engineering"] .dx-big { font-size: 20px; font-weight: 700; color: var(--dx-text); display: flex; align-items: baseline; gap: 8px; }
+body[data-page="detection-engineering"] .dx-big small { font-size: 11.5px; font-weight: 600; color: var(--dx-muted); }
+body[data-page="detection-engineering"] .dx-agents { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 6px; font: 500 11.5px var(--dx-mono); }
+body[data-page="detection-engineering"] .dx-ag::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: 1px; background: var(--dx-ok); }
+body[data-page="detection-engineering"] .dx-ag.disc::before { background: var(--dx-bad); }
+body[data-page="detection-engineering"] .dx-ag.never::before { background: var(--dx-muted); }
+body[data-page="detection-engineering"] .dx-ag.disc { color: var(--dx-bad); }
+body[data-page="detection-engineering"] .dx-cves { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; align-items: center; }
+body[data-page="detection-engineering"] .dx-cves .de-sev { font-size: 10.5px; padding: 1px 6px; }
+body[data-page="detection-engineering"] .dx-kev {
+    display: inline-flex; align-items: center; gap: 4px; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 800; letter-spacing: .05em;
+    color: #fff; background: color-mix(in srgb, var(--dx-bad) 80%, #000);
+}
+body[data-page="detection-engineering"] .dx-cis { display: flex; align-items: center; gap: 10px; }
+body[data-page="detection-engineering"] .dx-cis svg { width: 92px; height: 26px; fill: none; stroke-width: 1.8; stroke-linejoin: round; }
+body[data-page="detection-engineering"] .dx-cis .up { stroke: var(--dx-ok); }
+body[data-page="detection-engineering"] .dx-cis .dn { stroke: var(--dx-bad); }
+body[data-page="detection-engineering"] .dx-ls { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 16px; margin-top: 4px; font-size: 12px; }
+body[data-page="detection-engineering"] .dx-ls span { display: flex; justify-content: space-between; gap: 8px; min-width: 0; }
+body[data-page="detection-engineering"] .dx-ls span > em { font-style: normal; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body[data-page="detection-engineering"] .dx-fresh { font: 600 11px var(--dx-mono); white-space: nowrap; }
+body[data-page="detection-engineering"] .dx-fresh.ok { color: var(--dx-ok); }
+body[data-page="detection-engineering"] .dx-fresh.warn { color: var(--dx-warn); }
+body[data-page="detection-engineering"] .dx-fresh.bad { color: var(--dx-bad); }
+body[data-page="detection-engineering"] .dx-back { margin-bottom: 12px; }
+body[data-page="detection-engineering"] .dx-detail-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+body[data-page="detection-engineering"] .dx-detail-head h2 { margin: 0; font-size: 18px; font-weight: 650; color: var(--dx-text); }
+body[data-page="detection-engineering"] .dx-scope { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+
+/* Matrix scoping */
+body[data-page="detection-engineering"] #de-attack-matrix.scoped .dx-cells i.na { opacity: .12; }
+body[data-page="detection-engineering"] .dx-toggle {
+    display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px 5px 6px; border-radius: 999px; border: 1px solid var(--dx-line);
+    background: var(--dx-panel); color: var(--dx-text); font-size: 12px; font-weight: 600; cursor: pointer;
+}
+body[data-page="detection-engineering"] .dx-toggle i { position: relative; width: 28px; height: 16px; border-radius: 999px; background: var(--dx-track); transition: background .15s; }
+body[data-page="detection-engineering"] .dx-toggle i::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--dx-muted); transition: left .15s, background .15s; }
+body[data-page="detection-engineering"] .dx-toggle.on i { background: color-mix(in srgb, var(--dx-accent) 35%, transparent); }
+body[data-page="detection-engineering"] .dx-toggle.on i::after { left: 14px; background: var(--dx-accent); }
+
+/* Drawer */
+body[data-page="detection-engineering"] .dx-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(2, 6, 18, .55); backdrop-filter: blur(2px); }
+body[data-page="detection-engineering"] .dx-drawer {
+    position: fixed; top: 0; right: 0; bottom: 0; z-index: 61; width: min(560px, 100vw); overflow-y: auto;
+    border-left: 1px solid var(--dx-line-2); background: color-mix(in srgb, #0b1224 94%, transparent);
+    box-shadow: -18px 0 48px rgba(0, 0, 0, .45); backdrop-filter: blur(14px);
+}
+html[data-mode="light"] body[data-page="detection-engineering"] .dx-drawer { background: #fff; }
+body[data-page="detection-engineering"] .dx-dh { position: sticky; top: 0; z-index: 1; padding: 16px 18px 12px; border-bottom: 1px solid var(--dx-line); background: inherit; }
+body[data-page="detection-engineering"] .dx-dh h2 { margin: 6px 0 4px; font-size: 16px; line-height: 1.3; font-weight: 650; color: var(--dx-text); }
+body[data-page="detection-engineering"] .dx-dh .dx-x { position: absolute; top: 12px; right: 12px; }
+body[data-page="detection-engineering"] .dx-dmeta { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 12px; color: var(--dx-muted); }
+body[data-page="detection-engineering"] .dx-dsec { padding: 12px 18px; border-bottom: 1px solid var(--dx-rowline); }
+body[data-page="detection-engineering"] .dx-dsec h3 { margin: 0 0 8px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--dx-text); display: flex; gap: 8px; align-items: center; }
+body[data-page="detection-engineering"] .dx-prob { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 8px; padding: 6px 0; font-size: 12.5px; color: var(--dx-text); }
+body[data-page="detection-engineering"] .dx-prob svg { width: 14px; height: 14px; margin-top: 2px; }
+body[data-page="detection-engineering"] .dx-msg {
+    margin-top: 5px; padding: 7px 9px; border-radius: 7px; font: 500 11.5px/1.45 var(--dx-mono); color: var(--dx-text);
+    background: color-mix(in srgb, var(--dx-bad) 9%, transparent); border: 1px solid color-mix(in srgb, var(--dx-bad) 25%, transparent);
+    white-space: pre-wrap; word-break: break-word;
+}
+body[data-page="detection-engineering"] .dx-msg.w { background: color-mix(in srgb, var(--dx-warn) 8%, transparent); border-color: color-mix(in srgb, var(--dx-warn) 25%, transparent); }
+body[data-page="detection-engineering"] .dx-msg.i { background: color-mix(in srgb, var(--dx-info) 8%, transparent); border-color: color-mix(in srgb, var(--dx-info) 25%, transparent); }
+body[data-page="detection-engineering"] .dx-dfoot { position: sticky; bottom: 0; display: flex; gap: 8px; justify-content: flex-end; padding: 12px 18px; border-top: 1px solid var(--dx-line); background: inherit; }
+body[data-page="detection-engineering"] .dx-btn.primary { background: var(--dx-accent); border-color: var(--dx-accent); color: #04121f; }
+body[data-page="detection-engineering"] .dx-ministats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+body[data-page="detection-engineering"] .dx-ministats div { padding: 7px 9px; border-radius: 8px; border: 1px solid var(--dx-line); font-size: 11px; color: var(--dx-muted); }
+body[data-page="detection-engineering"] .dx-ministats b { display: block; font-size: 16px; color: var(--dx-text); }
+body[data-page="detection-engineering"] .dx-ministats .o-dot { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; }
+
+/* Menu */
+body[data-page="detection-engineering"] .dx-menu { position: relative; margin-left: auto; }
+body[data-page="detection-engineering"] .dx-menu-list {
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; min-width: 230px; padding: 6px; border-radius: 10px;
+    border: 1px solid var(--dx-line-2); background: #0d1529; box-shadow: 0 12px 32px rgba(0, 0, 0, .45);
+}
+body[data-page="detection-engineering"] .dx-menu-list button {
+    display: flex; width: 100%; align-items: center; gap: 8px; padding: 7px 9px; border: 0; border-radius: 7px; background: none;
+    color: var(--dx-text); font-size: 12.5px; text-align: left; cursor: pointer;
+}
+body[data-page="detection-engineering"] .dx-menu-list button:hover { background: var(--dx-panel-2); }
+body[data-page="detection-engineering"] .dx-menu-list small { display: block; color: var(--dx-muted); font-size: 11px; }
+body[data-page="detection-engineering"] .dx-menu-list svg { width: 14px; height: 14px; flex: 0 0 auto; color: var(--dx-accent); }
+
+/* Health groups */
+body[data-page="detection-engineering"] .dx-hgroup .dx-ch { text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 650; }
+body[data-page="detection-engineering"] .dx-hgroup .dx-ch svg { width: 15px; height: 15px; }
+body[data-page="detection-engineering"] .dx-hgroup .dx-ch .dx-ic { width: 15px; height: 15px; font-size: 10px; }
+body[data-page="detection-engineering"] .dx-why { font-size: 11.5px; color: var(--dx-muted); font-weight: 500; }
+body[data-page="detection-engineering"] .dx-cols { columns: 2 420px; column-gap: 14px; }
+body[data-page="detection-engineering"] .dx-cols > .dx-card { break-inside: avoid; margin-bottom: 14px; display: inline-block; width: 100%; }
+body[data-page="detection-engineering"] .dx-status { font-size: 11px; font-weight: 650; }
+body[data-page="detection-engineering"] .dx-tag.ok { color: var(--dx-ok); background: color-mix(in srgb, var(--dx-ok) 15%, transparent); }
+body[data-page="detection-engineering"] .dx-tag.bad { color: var(--dx-bad); background: color-mix(in srgb, var(--dx-bad) 15%, transparent); }
+body[data-page="detection-engineering"] .dx-tag.info { color: var(--dx-info); background: color-mix(in srgb, var(--dx-info) 15%, transparent); }
+body[data-page="detection-engineering"] .dx-tag.iris { color: var(--dx-iris); background: color-mix(in srgb, var(--dx-iris) 16%, transparent); }
+body[data-page="detection-engineering"] .dx-tag.accent { color: var(--dx-accent); background: color-mix(in srgb, var(--dx-accent) 14%, transparent); }
+body[data-page="detection-engineering"] .dx-lock { display: inline-flex; align-items: center; gap: 4px; }
+body[data-page="detection-engineering"] .dx-lock svg { width: 11px; height: 11px; }
+
+@media (max-width: 640px) {
+    body[data-page="detection-engineering"] .dx-head .dx-grow { display: none; }
+    body[data-page="detection-engineering"] .dx-title { flex: 1 1 100%; }
+    body[data-page="detection-engineering"] .dx-select select { min-width: 0; max-width: 150px; }
+    body[data-page="detection-engineering"] .dx-sys-body { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    body[data-page="detection-engineering"] .dx-attn-group .dx-row { grid-template-columns: 64px minmax(0, 1fr); }
+    body[data-page="detection-engineering"] .dx-attn-group .dx-row > .dx-btn { display: none; }
+    body[data-page="detection-engineering"] .dx-kpi .dx-v { font-size: 20px; }
+}
+body[data-page="detection-engineering"] :is(.dx-e, .dx-w, .dx-i) > svg { width: 14px; height: 14px; flex: 0 0 auto; }
+body[data-page="detection-engineering"] .dx-attn-h > span:first-child { display: inline-flex; }
+body[data-page="detection-engineering"] .dx-cis .dx-big { white-space: nowrap; }
+body[data-page="detection-engineering"] .dx-cis svg { width: 72px; flex: 0 1 auto; min-width: 0; }
+body[data-page="detection-engineering"] .dx-mtitle { hyphens: auto; -webkit-hyphens: auto; }
+body[data-page="detection-engineering"] .dx-subrow ~ [data-sub] { margin-top: 12px; }
+body[data-page="detection-engineering"] .dx-count { font: 700 11px var(--dx-mono); padding: 1px 7px; border-radius: 999px; }
+body[data-page="detection-engineering"] .dx-moved { text-transform: none; letter-spacing: 0; font-weight: 500; }
+body[data-page="detection-engineering"] .dx-ch .dx-moved { margin: 0 0 0 4px; }
+body[data-page="detection-engineering"] .dx-nowrap { white-space: nowrap; }
+body[data-page="detection-engineering"] .dx-ell { display: inline-block; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; text-align: left; }
+body[data-page="detection-engineering"] .dx-kpi .dx-probs { flex-wrap: wrap; row-gap: 2px; }
+@media (max-width: 640px) {
+    body[data-page="detection-engineering"] .dx-attn-h { flex-wrap: wrap; }
+    body[data-page="detection-engineering"] .dx-attn-h .dx-src { display: none; }
+    body[data-page="detection-engineering"] .dx-grid-ov .dx-table :is(th, td) { padding: 7px 8px; }
+    body[data-page="detection-engineering"] .dx-tac :is(th, td):nth-child(3) { display: none; }
+    body[data-page="detection-engineering"] .dx-grid-ov .dx-ch { flex-wrap: wrap; }
+    body[data-page="detection-engineering"] .dx-kpi .dx-s { white-space: normal; }
+}
+
+body[data-page="detection-engineering"] .dx-locked { display: inline-flex; align-items: center; gap: 6px; cursor: not-allowed; opacity: .75; }
+body[data-page="detection-engineering"] .dx-lock { display: inline-flex; align-items: center; gap: 3px; }
+
+/* ── Work and Bob tabs (below) ─────────────────── */
