@@ -2207,6 +2207,7 @@ main.container:has(.case-page-mode) { max-width: none; }
 .cwin-table tr.selected td { background: var(--cwin-accent-bg); }
 .cwin-table tr.selected td:first-child { box-shadow: inset 3px 0 0 var(--cwin-accent); }
 .cwin-table tr.cwin-hit td { background: color-mix(in srgb, var(--cwin-ok) 10%, transparent); }
+.cwin-table tr.cwin-picked td:nth-child(2) .cwin-letter, .cwin-ex.cwin-picked .cwin-exn { color: var(--cwin-accent); border-color: var(--cwin-accent); }
 .cwin-cbx { width: 34px; }
 .cwin-time { white-space: nowrap; }
 .cwin-rule b { display: block; font-weight: 600; }
