@@ -519,41 +519,6 @@
     "ion_style_hooks": 0,
     "raw_inline_styles": 0
   },
-  "de_bob.html": {
-    "lines": 265,
-    "hashed_classes": [],
-    "hashed_count": 0,
-    "ion_style_hooks": 0,
-    "raw_inline_styles": 0
-  },
-  "de_metrics.html": {
-    "lines": 224,
-    "hashed_classes": [],
-    "hashed_count": 0,
-    "ion_style_hooks": 0,
-    "raw_inline_styles": 0
-  },
-  "de_proposals.html": {
-    "lines": 284,
-    "hashed_classes": [],
-    "hashed_count": 0,
-    "ion_style_hooks": 0,
-    "raw_inline_styles": 0
-  },
-  "de_quirks.html": {
-    "lines": 205,
-    "hashed_classes": [],
-    "hashed_count": 0,
-    "ion_style_hooks": 0,
-    "raw_inline_styles": 0
-  },
-  "de_workbench.html": {
-    "lines": 369,
-    "hashed_classes": [],
-    "hashed_count": 0,
-    "ion_style_hooks": 0,
-    "raw_inline_styles": 0
-  },
   "detection_engineering.html": {
     "lines": 1659,
     "hashed_classes": [
@@ -643,13 +608,6 @@
     ],
     "hashed_count": 103,
     "ion_style_hooks": 23,
-    "raw_inline_styles": 0
-  },
-  "detection_health.html": {
-    "lines": 241,
-    "hashed_classes": [],
-    "hashed_count": 0,
-    "ion_style_hooks": 0,
     "raw_inline_styles": 0
   },
   "discover.html": {
@@ -932,17 +890,6 @@
     ],
     "hashed_count": 1,
     "ion_style_hooks": 1,
-    "raw_inline_styles": 0
-  },
-  "log_sources.html": {
-    "lines": 352,
-    "hashed_classes": [
-      "_ion-s-0510f285a6",
-      "_ion-s-3c9b2ebd4d",
-      "_ion-s-5dd2a67868"
-    ],
-    "hashed_count": 4,
-    "ion_style_hooks": 0,
     "raw_inline_styles": 0
   },
   "login.html": {
