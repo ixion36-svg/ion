@@ -39,12 +39,13 @@ bug to be told about.
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import String, case, cast, func, or_, select
 from sqlalchemy.orm import Session
 
-from ion.models.alert_triage import AlertCase, AlertCaseStatus
+from ion.models.alert_triage import AlertCase, AlertCaseStatus, AlertTriage, Note, NoteEntityType
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,7 @@ SORTABLE_FIELDS = (
     "severity",
     "status",
     "title",
+    "last_activity",
 )
 
 #: Triage order, highest first. The string column sorts alphabetically,
@@ -92,6 +94,37 @@ def _severity_rank_expr():
         {k: v for k, v in _SEVERITY_RANK.items()},
         value=func.lower(AlertCase.severity),
         else_=_UNRANKED,
+    )
+
+
+def _last_activity_expr():
+    """The latest of the case row's own update, its newest note and its
+    newest alert change.
+
+    `updated_at` alone misses a note: adding one inserts into `notes` and
+    leaves the case row untouched. Written as a CASE rather than GREATEST
+    because SQLite's multi-argument max() is NULL when any argument is.
+    """
+    note_at = (
+        select(func.max(Note.created_at))
+        .where(Note.entity_type == NoteEntityType.CASE,
+               Note.entity_id == cast(AlertCase.id, String))
+        .correlate(AlertCase)
+        .scalar_subquery()
+    )
+    alert_at = (
+        select(func.max(AlertTriage.updated_at))
+        .where(AlertTriage.case_id == AlertCase.id)
+        .correlate(AlertCase)
+        .scalar_subquery()
+    )
+    own = AlertCase.updated_at
+    note = func.coalesce(note_at, own)
+    alert = func.coalesce(alert_at, own)
+    return case(
+        ((note > own) & (note >= alert), note),
+        (alert > own, alert),
+        else_=own,
     )
 
 
@@ -127,6 +160,7 @@ def _apply_filters(
     assigned_to_id: Optional[int],
     unassigned: bool,
     q: Optional[str],
+    active_since: Optional[datetime] = None,
 ):
     """Add the WHERE clauses. Shared by the page and the count."""
     if status:
@@ -163,6 +197,9 @@ def _apply_filters(
             )
         )
 
+    if active_since is not None:
+        stmt = stmt.where(_last_activity_expr() >= active_since)
+
     return stmt
 
 
@@ -181,6 +218,8 @@ def _order_by(sort: str, order: str):
 
     if sort == "severity":
         primary = _severity_rank_expr()
+    elif sort == "last_activity":
+        primary = _last_activity_expr()
     else:
         primary = getattr(AlertCase, sort)
 
@@ -188,6 +227,9 @@ def _order_by(sort: str, order: str):
     # The tiebreak follows the requested direction so a reversed sort is the
     # exact reverse, and ties cannot drift between pages.
     tiebreak = AlertCase.id.desc() if direction == "desc" else AlertCase.id.asc()
+    if sort == "last_activity":
+        # A queue: closed cases sink below live ones whatever their activity.
+        return [(AlertCase.status == AlertCaseStatus.CLOSED).asc(), primary, tiebreak]
     return [primary, tiebreak]
 
 
@@ -199,7 +241,7 @@ def _summary(row) -> dict:
     field would transfer megabytes to render a table. The detail endpoint
     serves those.
     """
-    case_row, assignee_name, alert_count = row
+    case_row, assignee_name, alert_count, last_activity = row
     status = case_row.status
     return {
         "id": case_row.id,
@@ -214,6 +256,7 @@ def _summary(row) -> dict:
             case_row.updated_at.isoformat() if case_row.updated_at else None
         ),
         "closed_at": case_row.closed_at.isoformat() if case_row.closed_at else None,
+        "last_activity_at": last_activity.isoformat() if last_activity else None,
         # A 50-character enum value, not a narrative field. The alerts page
         # badges a closed case with it (TP, FP, BTP ...) and had keyed that
         # badge on a field this row never carried, so it never rendered.
@@ -234,6 +277,7 @@ def list_cases_page(
     assigned_to_id: Optional[int] = None,
     unassigned: bool = False,
     q: Optional[str] = None,
+    active_since: Optional[datetime] = None,
     sort: str = "created_at",
     order: str = "desc",
     limit: int = DEFAULT_LIMIT,
@@ -249,6 +293,8 @@ def list_cases_page(
         unassigned: Restrict to cases with no assignee. Mutually exclusive
             with ``assigned_to_id``.
         q: Substring match on title or case number. Wildcards are literal.
+        active_since: Only cases whose last activity (see
+            ``_last_activity_expr``) is at or after this naive-UTC instant.
         sort: One of :data:`SORTABLE_FIELDS`.
         order: ``asc`` or ``desc``.
         limit: Page size, capped at :data:`MAX_LIMIT`.
@@ -273,12 +319,11 @@ def list_cases_page(
         raise CaseQueryError("offset cannot be negative")
     limit = min(limit, MAX_LIMIT)
 
-    from ion.models.alert_triage import AlertTriage
     from ion.models.user import User
 
     filters = dict(
         status=status, severity=severity, assigned_to_id=assigned_to_id,
-        unassigned=unassigned, q=q,
+        unassigned=unassigned, q=q, active_since=active_since,
     )
 
     # The count runs over the same filters, so "showing 50 of 1,284 matching"
@@ -298,7 +343,7 @@ def list_cases_page(
     )
 
     stmt = (
-        select(AlertCase, User.username, alert_count)
+        select(AlertCase, User.username, alert_count, _last_activity_expr())
         .outerjoin(User, AlertCase.assigned_to_id == User.id)
     )
     stmt = _apply_filters(stmt, **filters)
@@ -357,6 +402,91 @@ def case_facets(session: Session) -> dict:
     }
 
 
+def inbox_counts(session: Session, *, user_id: Optional[int],
+                 active_since: datetime) -> dict:
+    """The case inbox's chip counts, in one pass over the table.
+
+    Each is a count of every case the chip would show on its own, not of
+    the current page. ``mine`` is None when there is no user id to own
+    anything, rather than a zero that reads as "you own nothing".
+    """
+    def total(condition):
+        return func.coalesce(func.sum(case((condition, 1), else_=0)), 0)
+
+    row = session.execute(select(
+        total(_last_activity_expr() >= active_since),
+        total(AlertCase.assigned_to_id == user_id) if user_id is not None else func.count(AlertCase.id),
+        total(AlertCase.assigned_to_id.is_(None)),
+        total(func.lower(AlertCase.severity) == "critical"),
+        total(AlertCase.status == AlertCaseStatus.CLOSED),
+    )).one()
+    changed, mine, unassigned, critical, closed = (int(v or 0) for v in row)
+    return {
+        "changed": changed,
+        "mine": mine if user_id is not None else None,
+        "unassigned": unassigned,
+        "critical": critical,
+        "closed": closed,
+    }
+
+
+def case_activity(session: Session, case_ids: list[int]) -> dict[int, dict]:
+    """For each case: its first affected host, its newest note and its
+    newest alert change, as the inbox's one-line "latest activity" reads
+    them.
+
+    Batched for a page of ids so a list of fifty is three queries, not a
+    hundred and fifty. The two "newest" reads are window functions so only
+    one row per case leaves the database.
+    """
+    from ion.models.user import User
+
+    if not case_ids:
+        return {}
+    out: dict[int, dict] = {
+        cid: {"host": None, "note": None, "alert": None} for cid in case_ids
+    }
+    for cid, hosts in session.execute(
+        select(AlertCase.id, AlertCase.affected_hosts).where(AlertCase.id.in_(case_ids))
+    ).all():
+        first = next((h for h in hosts if isinstance(h, str) and h), None) if isinstance(hosts, list) else None
+        out[cid]["host"] = first
+
+    keys = [str(cid) for cid in case_ids]
+    rank = func.row_number().over(partition_by=Note.entity_id,
+                                  order_by=(Note.created_at.desc(), Note.id.desc())).label("rank")
+    notes = (
+        select(Note.entity_id, Note.content, Note.created_at, User.username, rank)
+        .outerjoin(User, Note.user_id == User.id)
+        .where(Note.entity_type == NoteEntityType.CASE, Note.entity_id.in_(keys))
+        .subquery()
+    )
+    for entity_id, content, at, username, _ in session.execute(
+        select(notes).where(notes.c.rank == 1)
+    ).all():
+        cid = int(entity_id)
+        out[cid]["note"] = {"at": at.isoformat() if at else None, "user": username, "content": content}
+
+    rank = func.row_number().over(partition_by=AlertTriage.case_id,
+                                  order_by=(AlertTriage.updated_at.desc(), AlertTriage.id.desc())).label("rank")
+    alerts = (
+        select(AlertTriage.case_id, AlertTriage.rule_name, AlertTriage.status,
+               AlertTriage.created_at, AlertTriage.updated_at, rank)
+        .where(AlertTriage.case_id.in_(case_ids))
+        .subquery()
+    )
+    for cid, rule, status, created, updated, _ in session.execute(
+        select(alerts).where(alerts.c.rank == 1)
+    ).all():
+        out[cid]["alert"] = {
+            "at": updated.isoformat() if updated else None,
+            "linked": created is not None and updated is not None and (updated - created).total_seconds() < 60,
+            "rule": rule,
+            "status": status.value if hasattr(status, "value") else status,
+        }
+    return out
+
+
 __all__ = [
     "CaseQueryError",
     "DEFAULT_LIMIT",
@@ -364,4 +494,6 @@ __all__ = [
     "SORTABLE_FIELDS",
     "list_cases_page",
     "case_facets",
+    "inbox_counts",
+    "case_activity",
 ]
