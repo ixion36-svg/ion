@@ -25,7 +25,7 @@ from ion.auth.dependencies import require_permission
 from ion.services import case_query_service as cq
 from ion.storage.database import get_db_session
 from ion.web import api, case_lifecycle_api
-from ion.web.ui._cases_window import RETENTION_MARKER, blockers, case_alerts
+from ion.web.ui._cases_window import RETENTION_MARKER, alert_verdicts, blockers, case_alerts
 from ion.web.ui._shared import age_label, closure_label, closure_short, instant_label, parse_instant, plain, render_view, rows
 
 logger = logging.getLogger(__name__)
@@ -445,7 +445,9 @@ def preview_view(case_id: int, detail: object, timeline: object, user, now: date
             "observables": count(detail.get("observables")),
             "notes": count(detail.get("notes")),
         },
-        "blockers": blockers(alerts, detail.get("assigned_to_id"), detail.get("dfir_iris_case_id"), detail.get("dfir_iris_url")) if status != "closed" else [],
+        "blockers": blockers(alerts, detail.get("assigned_to_id"), detail.get("dfir_iris_case_id"),
+                             detail.get("dfir_iris_url"),
+                             alert_verdicts(detail.get("notes"))) if status != "closed" else [],
         "alert_ids": [a["es_alert_id"] for a in alert_rows if text(a.get("es_alert_id"))][:PREVIEW_ALERT_DOCS],
         "activity": preview_events(timeline),
         "owner": owner,

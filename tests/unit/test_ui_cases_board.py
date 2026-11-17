@@ -402,10 +402,17 @@ def test_the_next_action_is_the_case_windows_closure_blockers(client, preview_re
     data = preview(c)
     # The retention marker is not an alert, as in the case window.
     assert [b["key"] for b in data["blockers"]] == ["alerts", "assignee", "iris"]
-    assert data["blockers"][0]["title"] == "2 linked alerts not closed"
+    assert data["blockers"][0]["title"] == "2 linked alerts not triaged"
     page = soup(c, "/ui/cases/3/preview")
-    assert page.select_one(".ci-next > b").text == "2 linked alerts not closed"
+    assert page.select_one(".ci-next > b").text == "2 linked alerts not triaged"
     assert [li.text for li in page.select(".ci-blk li")] == ["No one is assigned", "Escalated to DFIR-IRIS #12"]
+
+
+def test_a_recorded_verdict_clears_the_alert_as_the_case_window_does(client, preview_reads):
+    c, _ = client
+    note = {"content": "**Alert closed as Escalated**\nAlert: `open-2`", "created_at": "2026-11-17T10:00:00"}
+    preview_reads["detail"] = {**DETAIL, "notes": [note]}
+    assert preview(c)["blockers"][0]["title"] == "1 linked alert not triaged"
 
 
 def test_nothing_blocking_says_so(client, preview_reads):
