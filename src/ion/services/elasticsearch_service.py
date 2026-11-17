@@ -859,13 +859,14 @@ class ElasticsearchService:
                 }
             })
 
-        if system:
-            # Filter by data_stream.namespace which is what we surface as
-            # the alert's `source_system` field. Lowercased to match the
-            # ES storage convention enforced by CyAB on save.
-            must_clauses.append({
-                "term": {"data_stream.namespace": system.strip().lower()}
-            })
+        # Filter by data_stream.namespace which is what we surface as
+        # the alert's `source_system` field. Lowercased to match the
+        # ES storage convention enforced by CyAB on save. `system` may name
+        # several, comma-joined: a CyAB system has a namespace per data
+        # source, and a comma is not a legal namespace character.
+        namespaces = sorted({ns.strip().lower() for ns in (system or "").split(",") if ns.strip()})
+        if namespaces:
+            must_clauses.append({"terms": {"data_stream.namespace": namespaces}})
 
         must_not_clauses = [
             {"exists": {"field": "kibana.alert.building_block_type"}}

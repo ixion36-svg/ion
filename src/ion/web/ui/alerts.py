@@ -1411,29 +1411,45 @@ def system_options(alerts: Optional[list], known: Optional[list], selected: str)
     the alerts carry, and the one currently selected even if neither list
     has it, so the control never stops showing what it is filtering by.
 
+    One option per system, not per namespace. A CyAB system has a data
+    source per feed and each names its own data_stream.namespace, so the
+    registry rows sharing a cyab_system_id become one option whose value is
+    their namespaces comma-joined, which a namespace cannot contain.
+
     Sorted by label, case-insensitively, as populateSystemFilterFromAlerts
     sorted them. `known` is list_known_systems' output or None when that
     read failed, in which case the alerts alone supply the list.
     """
-    labels: dict[str, str] = {}
+    groups: dict[str, dict] = {}
+    registered: set[str] = set()
     for row in known or []:
-        if not isinstance(row, dict):
+        if not isinstance(row, dict) or not row.get("namespace"):
             continue
-        ns = row.get("namespace")
-        if ns:
-            labels[str(ns)] = str(row.get("display_name") or ns)
+        ns = str(row["namespace"])
+        system_id = row.get("cyab_system_id")
+        key = f"cyab:{system_id}" if system_id is not None else f"ns:{ns}"
+        group = groups.setdefault(
+            key, {"label": str(row.get("display_name") or ns), "namespaces": set()})
+        group["namespaces"].add(ns)
+        registered.add(ns.lower())
     for a in alerts or []:
         ns = a.get("source_system")
-        if not ns:
+        if not ns or str(ns).lower() in registered:
             continue
         label = a.get("cyab_system_name") or a.get("tide_system_name") or ns
-        labels[str(ns)] = str(label)
-    if selected and selected not in labels:
-        labels[selected] = selected
-    out = [{"value": ns, "label": label, "selected": ns == selected}
-           for ns, label in labels.items()]
+        groups[f"ns:{ns}"] = {"label": str(label), "namespaces": {str(ns)}}
+    wanted = _namespaces(selected)
+    out = [{"value": ",".join(sorted(g["namespaces"])), "label": g["label"],
+            "selected": sorted(g["namespaces"]) == wanted}
+           for g in groups.values()]
+    if wanted and not any(o["selected"] for o in out):
+        out.append({"value": selected, "label": selected, "selected": True})
     out.sort(key=lambda r: r["label"].lower())
     return out
+
+
+def _namespaces(value: Optional[str]) -> list:
+    return sorted({part.strip() for part in (value or "").split(",") if part.strip()})
 
 
 def _system_badge(a: dict) -> Optional[dict]:
@@ -1593,6 +1609,8 @@ async def alerts_queue_fragment(
         triage = await _triage_map([a.get("id") for a in alerts if a.get("id") is not None],
                                    current_user, session)
 
+    known = _known_systems(session)
+    options = system_options(alerts, known, system)
     view = {
         **outcome,
         "rows": queue_rows(alerts, triage, outcome["arkime_enabled"]) if alerts is not None else None,
@@ -1602,8 +1620,11 @@ async def alerts_queue_fragment(
         "truncated": alerts is not None and len(alerts) >= QUEUE_LIMIT,
         "window": window,
         "include_closed": closed,
-        "systems": system_options(alerts, _known_systems(session), system),
+        "systems": options,
         "system": system,
+        "system_label": next((o["label"] for o in options if o["selected"]), system),
+        # A registry that could not be read is not a registry with nothing in it.
+        "systems_unread": known is None,
         "colspan": QUEUE_FALLBACK_COLUMNS,
         "can_triage": _can(current_user, TRIAGE_PERMISSION),
         "can_create_case": _can(current_user, CREATE_PERMISSION),
