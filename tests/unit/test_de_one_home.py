@@ -27,9 +27,10 @@ def app():
 
 @pytest.mark.parametrize("path,sub", sorted(ABSORBED.items()))
 def test_each_absorbed_page_redirects_to_its_tab(app, path, sub):
-    response = TestClient(app).get(path, follow_redirects=False)
-    assert response.status_code == 302
-    assert response.headers["location"] == f"/detection-engineering#{sub}"
+    for method in ("GET", "HEAD"):
+        response = TestClient(app).request(method, path, follow_redirects=False)
+        assert response.status_code == 302, method
+        assert response.headers["location"] == f"/detection-engineering#{sub}"
 
 
 def test_a_redirect_keeps_the_query_string(app):

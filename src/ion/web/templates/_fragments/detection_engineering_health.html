@@ -10,10 +10,11 @@
 {% else %}
 <div class="dx-kpis">
   <div class="dx-kpi"><div class="dx-k">{{ 'Rule Monitoring' if monitoring == 'tide' else 'ION volume checks' }}</div>
-    <div class="dx-v dx-bad-v">{{ counts.error }} <small>errors</small></div>
-    <div class="dx-s">{{ counts.warning }} warnings · {{ counts.info }} info{{ '' if monitoring == 'tide' else ' · no TIDE Rule Monitoring' }}</div></div>
+    {% if judged %}<div class="dx-v dx-bad-v">{{ counts.error }} <small>errors</small></div>
+    <div class="dx-s">{{ counts.warning }} warnings · {{ counts.info }} info{{ '' if monitoring == 'tide' else ' · no TIDE Rule Monitoring' }}</div>
+    {% else %}<div class="dx-v"><span class="dx-dash" title="No TIDE Rule Monitoring and no alert counts from TIDE or Kibana">—</span></div><div class="dx-s">nothing to judge rules by</div>{% endif %}</div>
   <div class="dx-kpi"><div class="dx-k">Rules with problems</div>
-    <div class="dx-v">{{ with_problems }} <small>/ {{ total }}</small></div>
+    <div class="dx-v">{% if judged %}{{ with_problems }}{% else %}—{% endif %} <small>/ {{ total }}</small></div>
     <div class="dx-s">{{ with_problems_by_kind.elastic }} Elastic · {{ with_problems_by_kind.wazuh }} Wazuh</div></div>
   <div class="dx-kpi"><div class="dx-k">Analyst FP rate · {{ closure_days }}d</div>
     {% if fp_rate is number %}<div class="dx-v warn">{{ fp_rate }}%</div><div class="dx-s">{{ m.num(closures.fp) }} of {{ m.num(closures.closed) }} closures</div>
@@ -24,7 +25,7 @@
     {% elif not can_de %}<div class="dx-v">—</div><div class="dx-s">needs de:read</div>
     {% else %}<div class="dx-v"><span class="dx-dash" title="Noise campaigns could not be read">—</span></div><div class="dx-s">campaigns unavailable</div>{% endif %}</div>
   <div class="dx-kpi"><div class="dx-k">Silent rules</div>
-    <div class="dx-v">{{ silent }}</div><div class="dx-s">{{ 'TIDE: no alert for a long time' if monitoring == 'tide' else 'enabled, nothing in 90 days' }}</div></div>
+    <div class="dx-v">{% if judged %}{{ silent }}{% else %}—{% endif %}</div><div class="dx-s">{{ 'TIDE: no alert for a long time' if monitoring == 'tide' else 'enabled, nothing in 90 days' }}</div></div>
   <div class="dx-kpi"><div class="dx-k">Bob agreement</div>
     {% set s = bob.summary if bob else None %}
     {% if s and s.agreement_rate is number %}<div class="dx-v dx-ok">{{ s.agreement_rate|round|int }}%</div>
@@ -56,7 +57,7 @@
 {% endfor %}
 </div>
 {% else %}
-<div class="dx-empty dx-mb">{{ 'TIDE Rule Monitoring reports no open problem at these destinations.' if monitoring == 'tide' else 'No rule crosses ION\'s volume thresholds.' }}</div>
+<div class="dx-empty dx-mb">{% if monitoring == 'tide' %}TIDE Rule Monitoring reports no open problem at these destinations.{% elif judged %}No rule crosses ION's volume thresholds.{% else %}Rules cannot be judged here: this TIDE has no Rule Monitoring or alert counts, and ION's Kibana alerts could not be read.{% endif %}</div>
 {% endif %}
 
 <section class="dx-card">

@@ -199,6 +199,9 @@ async def health_panel(request: Request, session: Session = Depends(get_db_sessi
     rules = report.rules
     view = {
         **_report_banner(report), 'counts': counts, 'groups': _group_problems(report),
+        # Without Rule Monitoring and without alert counts nothing was judged,
+        # which is not the same as nothing being wrong.
+        'judged': report.monitoring == 'tide' or report.alerts_from is not None,
         'with_problems': sum(1 for r in rules if r.problems), 'total': len(rules),
         'with_problems_by_kind': {k: sum(1 for r in rules if r.problems and r.kind == k) for k in ('elastic', 'wazuh')},
         'silent': sum(1 for r in rules if any(p.kind == 'silent' for p in r.problems)),

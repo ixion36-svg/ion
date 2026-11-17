@@ -25,8 +25,9 @@
     <div class="dx-kpi-split">{% for k in ['elastic', 'wazuh'] if by_kind[k].total %}<span>{{ m.kind(k) }} <b>{{ by_kind[k].enabled }}/{{ by_kind[k].total }}</b></span>{% endfor %}</div>
     {% else %}<div class="dx-v" data-field="rules_enabled">{{ dash('TIDE rules could not be read') }}</div><div class="dx-s">rules unavailable</div>{% endif %}</div>
   <div class="dx-kpi"><div class="dx-k">{{ 'Rule Monitoring' if monitoring == 'tide' else 'Rule volume checks' }}</div>
-    <div class="dx-v dx-bad-v" data-field="monitoring_errors">{{ counts.error }} <small>errors</small></div>
-    <div class="dx-s"><span class="dx-probs"><span class="dx-w">{{ m.warn_icon() }}{{ counts.warning }} warnings</span><span class="dx-i">{{ m.info_icon() }}{{ counts.info }} info</span></span></div></div>
+    {% if judged %}<div class="dx-v dx-bad-v" data-field="monitoring_errors">{{ counts.error }} <small>errors</small></div>
+    <div class="dx-s"><span class="dx-probs"><span class="dx-w">{{ m.warn_icon() }}{{ counts.warning }} warnings</span><span class="dx-i">{{ m.info_icon() }}{{ counts.info }} info</span></span></div>
+    {% else %}<div class="dx-v" data-field="monitoring_errors">{{ dash('Rules could not be judged') }}</div><div class="dx-s">{{ 'rules unavailable' if rules_total is none else 'no Rule Monitoring or alert counts' }}</div>{% endif %}</div>
   <div class="dx-kpi"><div class="dx-k">Analyst FP rate · {{ closure_days }}d</div>
     {% if fp_rate is number %}<div class="dx-v warn" data-field="fp_rate">{{ fp_rate }}% <small>{{ m.num(closures.fp) }} of {{ m.num(closures.closed) }}</small></div>
     <div class="dx-s">from ION case closures</div>
@@ -39,7 +40,7 @@
     {% if firing_spark %}<svg class="dx-spark" viewBox="0 0 90 28" aria-hidden="true"><polyline points="{{ firing_spark }}"/></svg>{% endif %}
     {% else %}<div class="dx-v" data-field="firing">{{ dash('No alert counts from TIDE or Kibana') }}</div><div class="dx-s">alert counts unavailable</div>{% endif %}</div>
   <div class="dx-kpi"><div class="dx-k">Needs attention</div>
-    <div class="dx-v{{ ' warn' if attention_total }}" data-field="needs_attention">{{ attention_total }}</div>
+    <div class="dx-v{{ ' warn' if attention_total }}" data-field="needs_attention"{% if not attention_known %} title="Part of TIDE could not be read"{% endif %}>{% if attention_known %}{{ attention_total }}{% elif attention_total %}≥{{ attention_total }}{% else %}{{ dash('Part of TIDE could not be read') }}{% endif %}</div>
     <div class="dx-s">{{ attention_errors }} errors · {{ attention_kev }} KEV · {{ attention_noisy }} noisy</div></div>
 </div>
 {{ m.source_notes(notes) }}
@@ -67,7 +68,8 @@
       </div>
     </div>
   {% else %}
-    <div class="dx-cb"><div class="dx-empty">Nothing needs attention: no Rule Monitoring error, KEV on a system, disabled critical rule, noisy rule, disconnected agent or overdue blind spot.</div></div>
+    {% if not attention_known %}<div class="dx-cb"><div class="dx-empty" role="alert">Part of TIDE could not be read, so ION cannot say what needs attention.</div></div>
+    {% else %}<div class="dx-cb"><div class="dx-empty">Nothing needs attention: no Rule Monitoring error, KEV on a system, disabled critical rule, noisy rule, disconnected agent or overdue blind spot.</div></div>{% endif %}
   {% endfor %}
   </section>
 

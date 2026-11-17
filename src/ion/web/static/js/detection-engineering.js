@@ -25,14 +25,19 @@ async function deLoadFragment(url, targetId, loadingMessage = 'Loading...', opti
     target.setAttribute('hx-sync', 'this:replace');
     if (!options.quiet) deMessage(target, loadingMessage, true);
     let success = false;
+    let status = 0;
     const outcome = event => {
-        if (event.detail.target === target) success = event.detail.xhr.status >= 200 && event.detail.xhr.status < 300;
+        if (event.detail.target !== target) return;
+        status = event.detail.xhr.status;
+        success = status >= 200 && status < 300;
     };
     document.addEventListener('htmx:afterRequest', outcome);
     const showFailure = () => {
         if (deFragmentRequests.get(target) !== request) return;
         if (target.tagName === 'SELECT') deMessage(target, options.failure || 'Unavailable');
-        else if (target.querySelector('[data-loading-message]') || options.quiet) deMessage(target, options.failure || 'Unable to load this panel. Refresh to try again.');
+        else if (target.querySelector('[data-loading-message]') || options.quiet) deMessage(target, status === 403
+            ? 'Your role does not include the permission this panel needs.'
+            : options.failure || 'Unable to load this panel. Refresh to try again.');
     };
     try {
         await htmx.ajax(options.method || 'GET', url, {target, source:target, swap:'innerHTML', values:options.values});

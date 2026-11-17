@@ -1406,7 +1406,7 @@ def _register_de_redirects() -> None:
             return RedirectResponse(url=f"/detection-engineering{query}#{_sub}", status_code=302)
 
         _redirect.__name__ = "redirect_" + _path.strip("/").replace("-", "_")
-        app.get(_path, include_in_schema=False)(_redirect)
+        app.api_route(_path, methods=["GET", "HEAD"], include_in_schema=False)(_redirect)
 
 
 _register_de_redirects()
@@ -1810,7 +1810,7 @@ async def investigate_redirect():
     return RedirectResponse(url="/investigation-queue", status_code=302)
 
 
-@app.get("/tuning-proposals")
+@app.api_route("/tuning-proposals", methods=["GET", "HEAD"])
 async def tuning_proposals_redirect():
     """Retired in v0.72.0 (route audit phase 8).
 

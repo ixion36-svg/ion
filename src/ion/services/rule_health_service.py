@@ -296,6 +296,17 @@ def _closures(session: Optional[Session], report: RuleHealthReport) -> Any:
         return None
 
 
+def _closure_totals(outcomes: Any) -> dict[str, int]:
+    totals = {"tp": 0, "fp": 0, "benign": 0, "other": 0, "closed": 0}
+    for rec in outcomes.records.values():
+        totals["tp"] += rec.true_positive
+        totals["fp"] += rec.false_positive
+        totals["benign"] += rec.outcomes.get("benign_true_positive", 0)
+        totals["closed"] += rec.closed
+    totals["other"] = totals["closed"] - totals["tp"] - totals["fp"] - totals["benign"]
+    return totals
+
+
 async def kibana_alert_days(days: int = ALERT_WINDOW_DAYS, silent_days: int = SILENT_DAYS) -> Optional[dict]:
     """{(rule_id, space): (daily counts oldest first, alerts in silent_days)} from
     ION's Kibana alerts index, or None when it cannot be read."""
@@ -350,6 +361,9 @@ async def rule_health(session: Optional[Session], svc: Optional[TideService] = N
     if not isinstance(reads.inventory, list):
         report.state = "failed"
         report.failure = reads.inventory if isinstance(reads.inventory, TideFailure) else TideFailure("bad_request", "no rule table")
+        # The analyst FP rate is ION's own and does not need TIDE.
+        outcomes = await asyncio.to_thread(_closures, session, report)
+        report.closures = _closure_totals(outcomes) if outcomes is not None else None
         return report
 
     for row in reads.inventory:
@@ -446,14 +460,7 @@ async def rule_health(session: Optional[Session], svc: Optional[TideService] = N
 
     outcomes = await asyncio.to_thread(_closures, session, report)
     if outcomes is not None:
-        totals = {"tp": 0, "fp": 0, "benign": 0, "other": 0, "closed": 0}
-        for rec in outcomes.records.values():
-            totals["tp"] += rec.true_positive
-            totals["fp"] += rec.false_positive
-            totals["benign"] += rec.outcomes.get("benign_true_positive", 0)
-            totals["closed"] += rec.closed
-        totals["other"] = totals["closed"] - totals["tp"] - totals["fp"] - totals["benign"]
-        report.closures = totals
+        report.closures = _closure_totals(outcomes)
         for rule in report.rules:
             rec = outcomes.get(RuleKey(rule_id=rule.rule_id)) or outcomes.get(RuleKey(rule_name=rule.name))
             if rec is not None and rec.closed:
