@@ -1,9 +1,11 @@
-"""The alert guide's three sections and the rail's failure message.
+"""The alert guide, the pin button and the rail's failure message.
 
-These are the last two runtime writes `cases.html` owns itself, and both
-are static structure, so they are templates rather than fragments. There
-is nothing to fetch: `_appendCaseOnlySections` runs after the shared
-alert-detail component mounts, on an alert object the page already holds.
+The guide and the pin button are markup in the case window's detail
+column (`_fragments/cases_panel.html`), which exists once and moves between
+Triage and Read. `selectCaseAlert` fills them after the shared alert-detail
+component mounts, on an alert object the page already holds. The failure
+message is a template, because it is static structure the page shows when
+the component did not load.
 
 A RULE NAME WITH A DOUBLE QUOTE BROKE THE PIN BUTTON
 
@@ -26,6 +28,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = ROOT / "src/ion/web/templates/cases.html"
+FRAGMENT = ROOT / "src/ion/web/templates/_fragments/cases_panel.html"
 
 
 def _scripts() -> str:
@@ -41,15 +44,13 @@ def _scripts() -> str:
 # ---------------------------------------------------------------------------
 
 
-def test_the_guide_sections_are_a_template():
-    page = PAGE.read_text(encoding="utf-8")
-    assert 'id="tpl-alert-guide"' in page
-    assert "<template" in page
-    for piece in ("cpanel-guide-sec", "cpanel-rule-guide-box",
-                  "cpanel-proc-tree", "cpanel-pin-btn",
-                  "Investigation guide", "Process tree",
-                  "Pin as evidence"):
-        assert piece in page, piece
+def test_the_guide_and_pin_are_markup_in_the_detail_column():
+    fragment = FRAGMENT.read_text(encoding="utf-8")
+    for piece in ('id="cwin-rule-guide"', "cpanel-rule-guide-box",
+                  "cpanel-pin-btn", "Investigation guide", "Pin as evidence",
+                  "data-cwin-pin"):
+        assert piece in fragment, piece
+    assert fragment.count('id="cwin-rule-guide"') == 1
 
 
 def test_the_rail_failure_message_is_a_template():
@@ -89,14 +90,16 @@ def test_the_loading_wording_is_a_label_not_markup():
 # ---------------------------------------------------------------------------
 
 
+def _select() -> str:
+    found = re.search(r"function selectCaseAlert\(.*?\n\}", _scripts(), re.S)
+    assert found, "selectCaseAlert"
+    return found.group(0)
+
+
 def test_the_pin_arguments_go_through_json_stringify():
     """Not through esc() into a single-quoted attribute, which is where a
     double quote in a rule name truncated the array."""
-    body = _scripts()
-    guide = re.search(r"function _appendCaseOnlySections\(.*?\n\}", body,
-                      re.S)
-    assert guide, "_appendCaseOnlySections"
-    source = guide.group(0)
+    source = _select()
     assert "JSON.stringify" in source
     assert "esc(pinTitle)" not in source
     assert "esc(alertId)" not in source
@@ -105,39 +108,14 @@ def test_the_pin_arguments_go_through_json_stringify():
 def test_the_pin_arguments_are_set_as_a_dom_property():
     """A `dataset` assignment stores the value literally, so no HTML
     escaping stands between the JSON and the handler that parses it."""
-    body = _scripts()
-    guide = re.search(r"function _appendCaseOnlySections\(.*?\n\}", body,
-                      re.S)
-    assert "dataset.args" in guide.group(0)
+    assert "pin.dataset.args = JSON.stringify(" in _select()
 
 
-def test_the_generated_ids_still_differ_per_alert():
-    """Two alerts' guides must not share a rule-guide container, or the
-    second load writes into the first one's box."""
-    body = _scripts()
-    guide = re.search(r"function _appendCaseOnlySections\(.*?\n\}", body,
-                      re.S).group(0)
-    assert "_railSeq" in guide
-    assert "rule-guide-" in guide
-    assert "proc-tree-" in guide
-
-
-def test_the_two_lazy_loaders_are_still_called_with_those_ids():
-    body = _scripts()
-    guide = re.search(r"function _appendCaseOnlySections\(.*?\n\}", body,
-                      re.S).group(0)
-    assert "loadRuleGuideInto" in guide
-    assert "loadProcessTreeInto" in guide
-
-
-def test_the_side_panel_is_still_preferred_over_appending():
-    """The guide replaces the previous alert's, so selecting a second
-    alert must not leave the first one's guide behind."""
-    body = _scripts()
-    guide = re.search(r"function _appendCaseOnlySections\(.*?\n\}", body,
-                      re.S).group(0)
-    assert "cpanel-alert-guide" in guide
-    assert "replaceChildren" in guide
+def test_the_two_lazy_loaders_are_still_called():
+    """The guide on every selection, the process tree when its tab opens."""
+    source = _select()
+    assert "loadRuleGuideInto(alertId, 'cwin-rule-guide')" in source
+    assert "loadProcessTreeInto(alertId, el.id, caseId)" in source
 
 
 # ---------------------------------------------------------------------------

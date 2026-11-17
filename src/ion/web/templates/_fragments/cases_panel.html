@@ -6,339 +6,599 @@
 <div class="cpanel-empty-hint">The {{ what }} is not in a shape this page
   can read, so whether this case has any is unknown.</div>
 {% endmacro %}
-{# The case detail panel, from ui/cases.py's panel_view.
+{% macro sev(s) %}<span class="cwin-sev sev-{{ s }}">{{ s }}</span>{% endmacro %}
+{% macro status_badge(a) %}<span class="cpanel-alert-badge{% if a.status_class %} status-{{ a.status_class }}{% endif %}">{{ a.status }}</span>{% endmacro %}
+{% macro blocker_items() %}
+{%- for b in blockers %}
+<li class="cwin-bl cwin-bl-{{ b.key }}">
+  <div><b>{{ b.title }}</b><span>{{ b.detail }}</span></div>
+  {%- if b.key == 'alerts' %}
+  <button type="button" class="cwin-link" data-click-action="cwFilter" data-args='["unclosed"]'>Show them</button>
+  {%- elif b.key == 'assignee' %}
+  <button type="button" class="cwin-link" data-click-action="cwGoto" data-args='["cwin-sec-meta"]'>Assign</button>
+  {%- elif b.href %}
+  <a class="cwin-link" href="{{ b.href }}" target="_blank" rel="noopener">Open in IRIS</a>
+  {%- endif %}
+</li>
+{%- endfor %}
+{% endmacro %}
+{% macro section(key, n, title, sub='') %}
+<section class="cwin-sec" id="cwin-sec-{{ key }}" data-cwin-spy>
+  <h3><span class="cwin-secn">{{ n }}</span>{{ title }}{% if sub %}<small>{{ sub }}</small>{% endif %}</h3>
+  {{ caller() }}
+</section>
+{% endmacro %}
+{# The opened case, from ui/cases.py's panel_view, in two layouts that share
+   one state: Triage (alerts and the selected alert's detail) and Read (the
+   case as a numbered file). static/js/case-window.js owns the state; this
+   is markup and data only.
 
-   renderPanelContent was 408 lines returning one string into
-   body.innerHTML, inside a try that also covered applyConfidenceMeters,
-   switchPanelTab and selectCaseAlert. Its own comment admitted a throw in
-   any of them landed indistinguishably, on a request that returned 200.
+   Three things exist once and move between the layouts rather than being
+   rendered twice: the alert-detail host (the shared component keeps
+   singleton state, so there can be only one), the observables list, and
+   the key context strip's rows. Moving a node keeps the tab, the filter and
+   the scroll the analyst left it in.
 
-   Two couplings survive deliberately. The alert rail's order is decided
-   server-side, so data-first-alert-id tells the page which alert to
-   select rather than it re-deriving the sort and disagreeing with the
-   rail. And the notes carry their raw text, because markdown rendering
-   stays client-side: ION has no HTML sanitiser, which
-   ui/template_render.py records.
-#}
+   Two couplings from the panel survive. data-first-alert-id names the alert
+   the page opens on, so the page never re-derives the order. And notes,
+   summaries and descriptions carry their raw markdown in data-note-raw,
+   because ION has no server-side HTML sanitiser (ui/template_render.py). #}
 {%- if state != 'data' %}
 <div class="cpanel-empty-hint">This case could not be read.</div>
 {%- else %}
-<div class="cpanel-sev-strip sev-{{ severity }}">
-  <span class="cpanel-sev-icon"><i class="{{ severity_icon }}"></i></span>
-  <span class="cpanel-sev-text">{{ severity }} severity</span>
-  <span class="cpanel-sev-detail">
-    {%- if alert_count is not none %}{{ alert_count }}
-      alert{% if alert_count != 1 %}s{% endif %}
-    {%- else %}<span class="an-absent" title="The alert list is not readable"></span>
-      alerts{% endif %}
-    &middot;
-    {%- if observable_count is not none %} {{ observable_count }}
-      observable{% if observable_count != 1 %}s{% endif %}
-    {%- else %} <span class="an-absent"
-        title="The observable list is not readable"></span> observables
-    {%- endif %}
-    &middot; {{ fig(age, 'No creation time recorded') }} old
-  </span>
-</div>
-{#- Filled by loadCaseSyncStatus, and empty when nothing has drifted.
-    Above the tabs on purpose: a case whose Kibana mirror is behind is
-    misleading on every tab, not just one. -#}
-<div id="case-sync-status"></div>
-<div class="cpanel-tab-nav">
-  {%- for t in tabs %}
-  <button type="button" class="cpanel-tab-btn{% if loop.first %} active{% endif %}"
-          data-tab="{{ t.key }}" data-click-action="switchPanelTab"
-          data-args='{{ [t.key]|tojson }}'
-          {% if t.key == 'actions' %}id="cpanel-actions-tab-btn"{% endif %}>
-    {{- t.label }}{% if t.count is not none %} ({{ t.count }}){% endif -%}
-  </button>
-  {%- endfor %}
-</div>
-<div class="cpanel-section" data-tab="overview">
-  <div class="cpanel-section-title">Metadata</div>
-  <div class="cpanel-meta-grid">
-    <div class="cpanel-meta-item"><label>Status</label>
-      <select data-change-action="panelUpdateField"
-              data-args='{{ [case_id, "status", "$value"]|tojson }}'>
-        {%- for s in statuses %}
-        <option value="{{ s }}"{% if status == s %} selected{% endif %}>{{ s }}</option>
-        {%- endfor %}
-      </select></div>
-    <div class="cpanel-meta-item"><label>Severity</label>
-      <select data-change-action="panelUpdateField"
-              data-args='{{ [case_id, "severity", "$value"]|tojson }}'>
-        {%- for s in severities %}
-        <option value="{{ s }}"{% if severity == s %} selected{% endif %}>{{ s }}</option>
-        {%- endfor %}
-      </select></div>
-    <div class="cpanel-meta-item"><label>Assigned To</label>
-      {#- The value is the ION user.id and the field is assigned_to_id, so
-          the PATCH endpoint's CaseUpdate receives it and resolves the
-          elastic_uid itself. -#}
-      <select data-change-action="panelUpdateField"
-              data-args='{{ [case_id, "assigned_to_id", "$value"]|tojson }}'
-              {% if users_withheld or users is none %}disabled{% endif %}>
-        {%- if users_withheld %}
-        <option value="">Assignees withheld: alert permission required</option>
-        {%- elif users is none %}
-        <option value="">Assignees unavailable</option>
-        {%- else %}
-        <option value=""{% if assigned_to_id is none %} selected{% endif %}>Unassigned</option>
-        {%- for u in users %}
-        <option value="{{ u.id }}"{% if assigned_to_id == u.id %} selected{% endif %}>
-          {{- u.display_name or u.username }}
-          {%- if u.has_elastic_profile is sameas false %} (no Kibana profile){% endif -%}
-        </option>
-        {%- endfor %}
-        {%- endif %}
-      </select>
-      {%- if kibana_pills is none %}
-      <div class="cpanel-kibana-assignees"><span class="an-absent"
-          title="The Kibana assignees are not in a readable shape"></span></div>
-      {%- elif kibana_pills %}
-      {#- A mismatch means someone edited the case in Kibana since ION
-          last wrote to it. -#}
-      <div class="cpanel-kibana-assignees"
-           title="Live state from the linked Kibana case">
-        <span class="cpanel-kibana-label">Kibana:</span>
-        {%- for p in kibana_pills %}
-        <span class="cpanel-kibana-pill{% if kibana_mismatch %} mismatch{% endif %}">{{ p.display }}</span>
-        {%- endfor %}
-        {%- if kibana_mismatch %}
-        <span class="cpanel-kibana-warn"
-              title="ION and Kibana disagree on the assignee">&#9888; mismatch</span>
-        {%- endif %}
-      </div>
-      {%- endif %}
+{%- set obs_values = (observables or []) | map(attribute='value') | map('lower') | list %}
+<div class="cwin" data-cwin data-mode="triage" data-case-id="{{ case_id }}"
+     data-first-alert-id="{{ first_alert_id or '' }}"
+     data-obs-values="{{ obs_values | tojson | forceescape }}">
+<header class="cwin-head">
+  <div class="cwin-ht">
+    <div class="cwin-ht1">
+      <span class="cwin-num">{{ case_number or ('Case %s' % case_id) }}</span>
+      <b class="cwin-title" title="{{ title or '' }}">{{ title or 'Untitled case' }}</b>
+      {{ sev(severity) }}
+      <span class="cwin-tag">{{ status or 'status unknown' }}</span>
     </div>
-    <div class="cpanel-meta-item"><label>Created</label>
-      <input type="text" value="{{ created or '' }}" disabled>
-      {%- if created is none %}<span class="an-absent"
-          title="No creation time recorded"></span>{% endif %}</div>
-  </div>
-</div>
-{%- if tags is none %}
-<div class="cpanel-section" data-tab="overview">
-  <div class="cpanel-section-title">Context</div>
-  {{ unreadable('context list') }}
-</div>
-{%- elif tags %}
-<div class="cpanel-section" data-tab="overview">
-  <div class="cpanel-section-title">Context</div>
-  <div class="cpanel-tags">
-    {%- for t in tags %}
-    <span class="cpanel-tag cpanel-tag-{{ t.kind }}" title="{{ t.kind|capitalize }}">
-      <span class="cpanel-tag-label">{{ t.label }}</span>{{ t.value }}</span>
-    {%- endfor %}
-  </div>
-</div>
-{%- endif %}
-{%- if description %}
-<div class="cpanel-section" data-tab="overview">
-  <div class="cpanel-section-title">Description</div>
-  {#- Markdown, so the page renders it for the same reason the notes are
-      rendered there: no server-side sanitiser. -#}
-  <div class="cpanel-description cpanel-note-markdown"
-       data-note-raw="{{ description }}"></div>
-</div>
-{%- endif %}
-<div class="cpanel-section" data-tab="observables">
-  <div class="cpanel-section-title">Observables
-    ({{ observable_count if observable_count is not none else '?' }})</div>
-  {%- if observables is none %}{{ unreadable('observable list') }}
-  {%- elif not observables %}
-  <div class="cpanel-empty-hint"><i class="icon-search"></i> No observables
-    extracted yet</div>
-  {%- else %}
-  <div class="awx-obsrow">
-    {%- for o in observables %}
-    {#- Enrichable types carry a threat badge; the rest get a plain chip.
-        The threat level reaches a class, so it comes from the level the
-        chip resolved rather than straight off the payload. -#}
-    <span class="awx-obschip" title="{{ o.value }}">
-      <span class="awx-ot t-{{ o.kind }}">{{ o.kind }}</span><span class="awx-ov">{{ o.short }}</span>
-      {%- if o.label is not none %}
-      <span class="awx-tl tl-{{ o.level }}" title="{{ o.tip }}">
-        <span class="awx-td"></span>{{ o.label }}</span>
+    <div class="cwin-who">{{ assignee or 'unassigned' }}
+      {%- if iris_case_id is not none %} &middot; IRIS #{{ iris_case_id }}{% endif %}
+      &middot; <span class="cwin-sevtext">{{ severity }} severity</span> &middot;
+      {%- if alert_count is not none %} {{ alert_count }}
+        alert{% if alert_count != 1 %}s{% endif %}
+      {%- else %} <span class="an-absent" title="The alert list is not readable"></span>
+        alerts{% endif %}
+      &middot;
+      {%- if observable_count is not none %} {{ observable_count }}
+        observable{% if observable_count != 1 %}s{% endif %}
+      {%- else %} <span class="an-absent"
+          title="The observable list is not readable"></span> observables
       {%- endif %}
-    </span>
-    {%- endfor %}
+      &middot; {{ fig(age, 'No creation time recorded') }} old</div>
   </div>
+  <div class="cwin-seg cwin-mode" role="tablist" aria-label="Layout">
+    <button type="button" role="tab" class="on" data-mode-btn="triage" aria-selected="true"
+            data-click-action="cwSetMode" data-args='["triage"]'>Triage</button>
+    <button type="button" role="tab" data-mode-btn="read" aria-selected="false"
+            data-click-action="cwSetMode" data-args='["read"]'>Read</button>
+    <kbd class="cwin-hide-s" title="Press r to switch">r</kbd>
+  </div>
+  <div class="cwin-pill{% if not blockers %} clear{% endif %}" data-cwin-pill>
+    <button type="button" class="cwin-pill-b" aria-expanded="false"
+            data-click-action="cwTogglePill">
+      {%- if blockers %}<b>{{ blockers | length }} block closure</b>
+      {%- else %}<b>Nothing blocks closure</b>{% endif %}
+      <span class="cwin-pill-s">derived</span></button>
+    <div class="cwin-pill-l" data-cwin-pill-list hidden>
+      <p class="cwin-note">Derived from this case's own data. ION has no closure
+        rules, so this never stops you closing.</p>
+      {%- if blockers %}<ul class="cwin-bls">{{ blocker_items() }}</ul>
+      {%- else %}<p class="cwin-note">No open alerts, an owner is set and nothing is
+        escalated elsewhere.</p>{% endif %}
+    </div>
+  </div>
+  {%- if status != 'closed' %}
+  <button type="button" class="cwin-btn primary"
+          data-click-action="panelUpdateField"
+          data-args='{{ [case_id, "status", "closed"]|tojson }}'>Close case&hellip;</button>
   {%- endif %}
-</div>
-<div class="cpanel-section" data-tab="actions">
-  <div class="cpanel-section-title">Response Actions</div>
-  <div id="response-actions-container">Loading&hellip;</div>
-</div>
-{%- if mitre is none %}
-<div class="cpanel-section" data-tab="overview">
-  <div class="cpanel-section-title">MITRE ATT&amp;CK</div>
-  {{ unreadable('technique list') }}
-</div>
-{%- elif mitre %}
-<div class="cpanel-section" data-tab="overview">
-  <div class="cpanel-section-title">MITRE ATT&amp;CK ({{ mitre | length }})</div>
-  <div class="cpanel-tags">
-    {%- for t in mitre %}
-    <span class="cpanel-tag cpanel-tag-mitre" title="{{ t.name }}">
-      {{- t.id }}{% if t.name != t.id %} &mdash; {{ t.name }}{% endif -%}
-    </span>
-    {%- endfor %}
-  </div>
-</div>
-{%- endif %}
-<div class="cpanel-section" data-tab="timeline">
-  <div class="cpanel-section-title">Attack Story Timeline</div>
-  <div class="text-[0.8rem] text-[var(--text-secondary)]"
-       id="case-timeline-container">Loading&hellip;</div>
-</div>
-<div class="cpanel-section" data-tab="attackpath">
-  <div class="cpanel-section-title">Attack Path</div>
-  <div class="apg-root" id="attack-path-container">Loading&hellip;</div>
-</div>
-<div class="cpanel-section" data-tab="overview">
-  <div class="cpanel-section-title">Similar Closed Cases</div>
-  <div class="text-[0.8rem] text-[var(--text-secondary)]"
-       id="similar-cases-container">Loading&hellip;</div>
-</div>
-<div class="cpanel-section" data-tab="observables">
-  <div class="cpanel-section-title">Cross-Case Observable Sightings</div>
-  <div class="text-[0.8rem] text-[var(--text-secondary)]"
-       id="similar-observables-container">Loading&hellip;</div>
-</div>
-<div class="cpanel-section" data-tab="alerts" data-workspace="1">
-  {%- if alerts is none %}{{ unreadable('alert list') }}
-  {%- elif not alerts %}
-  <div class="cpanel-empty-hint"><i class="icon-shield"></i> No linked
-    alerts</div>
-  {%- else %}
-  {#- data-first-alert-id is new. The page used to read c.alerts[0] after
-      this function had sorted that array in place; the order is decided
-      here now, so it is told instead of guessing. -#}
-  <div class="cpanel-workspace" data-first-alert-id="{{ first_alert_id }}"
-       data-first-alert-index="0">
-    <div class="cpanel-rail">
-      <div class="cpanel-section-title">Alerts in case ({{ alerts | length }})</div>
-      {%- for a in alerts %}
-      <div class="cpanel-rail-alert{% if loop.first %} selected{% endif %}"
-           id="rail-alert-{{ a.index }}"
-           data-click-action="selectCaseAlert"
-           data-args='{{ [a.alert_id, a.index, case_id]|tojson }}'>
-        <span class="rail-sev{% if a.severity_class %} rail-sev-{{ a.severity_class }}{% endif %}"></span>
-        <div class="cpanel-rail-alert-head">
-          <span class="cpanel-rail-alert-name">{{ a.name }}</span>
-          {#- The badge's palette was statusColors, an rgba and a var per
-              status held in JavaScript and applied through
-              data-ion-style. It is a class. -#}
-          <span class="cpanel-alert-badge{% if a.status_class %} status-{{ a.status_class }}{% endif %}">
-            {{- a.status -}}</span>
+</header>
+{#- Filled by loadCaseSyncStatus, and empty when nothing has drifted. Above
+    both layouts: a case whose Kibana mirror is behind is misleading in
+    either. -#}
+<div id="case-sync-status"></div>
+
+{# ── Triage ───────────────────────────────────────────────────────────── #}
+<div class="cwin-triage" data-cwin-pane="triage">
+  <section class="cwin-case">
+    <div class="cwin-ctabs" role="tablist">
+      <button type="button" role="tab" class="cwin-ctab on" data-ctab="kc"
+              data-click-action="cwCaseTab" data-args='["kc"]'>Key context</button>
+      <button type="button" role="tab" class="cwin-ctab" data-ctab="observables"
+              data-click-action="cwCaseTab" data-args='["observables"]'>Observables
+        <span class="cwin-mono">{{ observable_count if observable_count is not none else '?' }}</span></button>
+      <span class="cwin-grow"></span>
+      <span class="cwin-hint cwin-hide-s">tick alerts to scope both</span>
+    </div>
+    <div class="cwin-cpanel" data-cpanel="kc">
+      <div class="cwin-kc" data-cwin-kc-home="triage">
+        <div class="cwin-kc-box" id="cwin-kc" data-cwin-kc>
+          <div class="cwin-kc-head"><span data-cwin-kc-scope>Highlighted fields across the case's alerts</span>
+            <span class="cwin-grow"></span>
+            <span class="cwin-kc-legend"><span class="cwin-obsmark">&#10003;</span> observable</span>
+            <button type="button" class="cwin-link" data-cwin-kc-all hidden
+                    data-click-action="cwKcAll">Show all</button></div>
+          <div class="cwin-kc-chips" data-cwin-kc-chips>
+            <span class="cwin-note">Reading the alert documents&hellip;</span></div>
         </div>
-        {%- if a.bits %}
-        {#- Each bit is emitted on its own so autoescaping applies to it.
-            This was `a.bits | join('<br>') | safe`, which turned the
-            escaping off for the whole joined string: a process name is
-            whatever ran on the host, so that was injectable. The page it
-            replaced escaped each bit before joining, which is the part I
-            dropped. -#}
-        <div class="cpanel-rail-alert-sub">
-          {%- for bit in a.bits %}
-          {%- if not loop.first %}<br>{% endif %}{{ bit }}
+      </div>
+    </div>
+    <div class="cwin-cpanel" data-cpanel="observables" hidden>
+      <div data-cwin-obs-home="triage">
+      {#- The observables list. case-window.js moves it into Read §5 and back. -#}
+      <div class="cwin-obs" id="cwin-obs">
+        {%- if observables is none %}{{ unreadable('observable list') }}
+        {%- elif not observables %}
+        <div class="cpanel-empty-hint">No observables extracted yet</div>
+        {%- else %}
+        {%- set n_stored = observables | selectattr('sources') | list | length %}
+        <div class="cwin-obsum"><span><b>{{ observables | length }}</b> observables</span>
+          <span class="cwin-note">{{ n_stored }} with a stored enrichment &middot;
+            {{ observables | length - n_stored }} with none</span>
+          <span class="cwin-grow"></span>
+          <span class="cwin-note" data-cwin-obs-scope></span></div>
+        {%- for o in observables %}
+        <article class="cwin-ob" data-ob-value="{{ o.value | lower }}"
+                 data-ob-alerts="{{ o.alert_ids | tojson | forceescape }}">
+          <header class="cwin-obh">
+            <span class="awx-ot t-{{ o.kind }}">{{ o.kind | replace('_', ' ') }}</span>
+            <b class="cwin-mono cwin-obv" title="{{ o.value }}">{{ o.value }}</b>
+            {%- if o.label is not none %}
+            <span class="awx-tl tl-{{ o.level }}" title="{{ o.tip }}"><span class="awx-td"></span>{{ o.label }}</span>
+            {%- endif %}
+            <span class="cwin-obst{% if o.sources %} on{% endif %}"><i></i>
+              {%- if o.sources %}{{ o.sources | length }} stored source{% if o.sources | length != 1 %}s{% endif %}
+              {%- else %}not enriched{% endif %}</span>
+            <span class="cwin-grow"></span>
+            <span class="cwin-obal"><span class="cwin-note">alerts</span>
+              <span class="cwin-mono">{{ o.alert_ids | length }}/{{ alert_count if alert_count is not none else '?' }}</span>
+              {%- for a in o.alert_ids %}{% set l = o.letters[loop.index0] if loop.index0 < o.letters | length else '?' %}
+              <button type="button" class="cwin-letter" title="Open exhibit {{ l }}"
+                      data-click-action="cwFocusAlert" data-args='{{ [a]|tojson }}'>{{ l }}</button>
+              {%- endfor %}</span>
+            <button type="button" class="cwin-x" aria-expanded="false" aria-label="Show enrichment"
+                    data-click-action="cwToggleOb">&#9662;</button>
+          </header>
+          <div class="cwin-obb" hidden>
+            {%- if o.sources %}
+            <div class="cwin-srcs">
+              {%- for s in o.sources %}
+              <div class="cwin-src"><b>{{ s.name }}</b>{% if s.when %}<span class="cwin-note">{{ s.when }}</span>{% endif %}
+                <dl>{% for k, v in s.rows %}<dt>{{ k }}</dt><dd>{{ v }}</dd>{% endfor %}</dl></div>
+              {%- endfor %}
+            </div>
+            {%- endif %}
+            <p class="cwin-note">
+              {%- if o.stored_unknown %}The stored enrichments could not be read, so whether there are any is unknown.
+              {%- elif not o.sources %}No enrichment is stored for this value.
+              {%- endif %}
+              No {{ 'other ' if o.sources else '' }}VirusTotal, AbuseIPDB, Shodan or GeoIP result is stored for it.</p>
+            <div class="cwin-obacts">
+              {%- if o.lookup_type and can_enrich %}
+              <button type="button" class="cwin-btn sm" data-click-action="cwLookup"
+                      data-args='{{ [o.lookup_type, o.value]|tojson }}'>Look up now</button>
+              <span class="cwin-note">asks the enabled providers; the answer is shown, not saved</span>
+              {%- elif o.lookup_type %}
+              <span class="cwin-note">Looking it up needs the observable:enrich permission.</span>
+              {%- else %}
+              <span class="cwin-note">No on-demand lookup takes a {{ o.kind | replace('_', ' ') }}.</span>
+              {%- endif %}
+            </div>
+            <div class="cwin-lookup" data-cwin-lookup hidden></div>
+            <div class="cwin-obbob">No Bob assessment for this observable. Bob assesses
+              alerts and cases, not single values.</div>
+          </div>
+        </article>
+        {%- endfor %}
+        {%- endif %}
+        <div class="cwin-xcase">
+          <div class="cpanel-section-title">Cross-Case Observable Sightings</div>
+          <div class="text-[0.8rem] text-[var(--text-secondary)]"
+               id="similar-observables-container">Loading&hellip;</div>
+        </div>
+      </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="cwin-grid">
+    <section class="cwin-card cwin-list">
+      <header class="cwin-ch">Alerts
+        {%- if alerts is not none %}
+        <span class="cwin-n">{{ alerts | rejectattr('status', 'equalto', 'closed') | list | length }} not closed</span>{% endif %}
+        <span class="cwin-grow"></span>
+        {%- if alerts %}
+        <div class="cwin-seg cwin-filt" role="tablist" aria-label="Status filter">
+          <button type="button" class="on" data-filt-btn="all"
+                  data-click-action="cwFilter" data-args='["all"]'>All <span class="cwin-mono">{{ alerts | length }}</span></button>
+          {%- for s in ('open', 'acknowledged', 'closed') %}
+          {%- set n = alerts | selectattr('status', 'equalto', s) | list | length %}
+          {%- if n %}
+          <button type="button" data-filt-btn="{{ s }}"
+                  data-click-action="cwFilter" data-args='{{ [s]|tojson }}'>{{ s | capitalize }} <span class="cwin-mono">{{ n }}</span></button>
+          {%- endif %}
           {%- endfor %}
         </div>
         {%- endif %}
+      </header>
+      {%- if alerts is none %}{{ unreadable('alert list') }}
+      {%- elif not alerts %}
+      <div class="cpanel-empty-hint"><i class="icon-shield"></i> No linked
+        alerts</div>
+      {%- else %}
+      <div class="cwin-bulk" data-cwin-bulk hidden><b data-cwin-selcount></b>
+        <button type="button" class="cwin-link" data-click-action="cwClearPicks">Clear</button>
+        <span class="cwin-grow"></span><span class="cwin-note">key context and observables follow the ticked alerts</span></div>
+      <div class="cwin-tscroll">
+      <table class="cwin-table">
+        <thead><tr>
+          <th class="cwin-cbx"><input type="checkbox" aria-label="Tick every alert" data-cwin-pickall
+                                    data-click-action="cwPickAll" data-args='["$checked"]'></th>
+          <th>Ex</th><th>Time</th><th>Alert</th><th>Sev</th><th>Status</th></tr></thead>
+        <tbody>
+        {%- for a in alerts %}
+        <tr class="cpanel-rail-alert{% if loop.first %} selected{% endif %}" id="rail-alert-{{ a.index }}"
+            data-alert-id="{{ a.alert_id }}" data-status="{{ a.status }}"
+            data-click-action="selectCaseAlert"
+            data-args='{{ [a.alert_id, a.index, case_id]|tojson }}'>
+          <td class="cwin-cbx"><input type="checkbox" aria-label="Tick exhibit {{ a.letter }}"
+                                    data-click-action="cwPick" data-args='{{ [a.alert_id, "$checked"]|tojson }}'></td>
+          <td><span class="cwin-letter">{{ a.letter }}</span></td>
+          <td class="cwin-mono cwin-time" data-cwin-time="{{ a.alert_id }}">&hellip;</td>
+          <td class="cwin-rule"><b class="cpanel-rail-alert-name">{{ a.name }}</b>
+            <span class="cwin-mono cwin-note"><span data-cwin-host="{{ a.alert_id }}"></span>
+              {%- if a.technique %} &middot; {{ a.technique }}{% endif %}
+              {%- for bit in a.bits %} &middot; {{ bit }}{% endfor %}</span></td>
+          <td>{{ sev(a.severity) }}</td>
+          <td>{{ status_badge(a) }}</td>
+        </tr>
+        {%- endfor %}
+        </tbody>
+      </table>
+      </div>
+      <p class="cwin-keys cwin-hide-s"><span><kbd>j</kbd><kbd>k</kbd> move</span><span><kbd>x</kbd> tick</span>
+        <span><kbd>r</kbd> read the file</span><span><kbd>Esc</kbd> whole case</span></p>
+      {%- endif %}
+    </section>
+
+    <div class="cwin-detail-home" data-cwin-detail-home="triage">
+      {%- if alerts %}
+      {#- The selected alert. case-window.js moves this whole node into the
+          focused exhibit in Read mode, so its tab survives the switch. -#}
+      <section class="cwin-card cwin-detail" id="cwin-detail">
+        <header class="cwin-dh">
+          <div class="cwin-dh-t">
+            <span class="cwin-eye"><span class="cwin-mono" data-cwin-d-letter></span>
+              <span data-cwin-d-when></span></span>
+            <h3 data-cwin-d-title></h3>
+            <div class="cwin-meta" data-cwin-d-meta></div>
+          </div>
+          <button class="cpanel-pin-btn" type="button" data-cwin-pin
+                  data-click-action="pinAlertToCase">Pin as evidence</button>
+        </header>
+        <div class="cwin-bob-slot" id="cwin-bob-slot"></div>
+        <details class="cwin-guide">
+          <summary>Investigation guide</summary>
+          <div class="cpanel-rule-guide-box" id="cwin-rule-guide" data-rule-guide></div>
+        </details>
+        <div class="cpanel-detail" id="cpanel-alert-workspace">
+          <div class="loading">Loading alert&hellip;</div>
+        </div>
+      </section>
+      {%- endif %}
+    </div>
+  </div>
+</div>
+
+{# ── Read ─────────────────────────────────────────────────────────────── #}
+<div class="cwin-read" data-cwin-pane="read" hidden>
+  <nav class="cwin-toc" aria-label="Contents">
+    <span class="cwin-toc-k">Contents</span>
+    {%- for key, label in (('sum', 'Summary'), ('key', 'Key context'), ('blk', 'What stops closure'),
+                           ('ev', 'Evidence'), ('obs', 'Observables'), ('story', 'Storyline'),
+                           ('act', 'Actions'), ('notes', 'Notes'), ('similar', 'Similar cases')) %}
+    <a class="cwin-toc-a{% if loop.first %} on{% endif %}" href="#cwin-sec-{{ key }}" data-toc="cwin-sec-{{ key }}"
+       data-click-action="cwGoto" data-prevent-default data-args='{{ ["cwin-sec-" ~ key]|tojson }}'><span class="cwin-mono">{{ loop.index }}</span>{{ label }}</a>
+    {%- endfor %}
+  </nav>
+  <article class="cwin-doc">
+    <header class="cwin-doch" id="cwin-sec-meta">
+      <span class="cwin-note">Case file &middot; read live from the case</span>
+      <h2>{{ title or 'Untitled case' }}</h2>
+      <div class="cpanel-meta-grid">
+        <div class="cpanel-meta-item"><label>Status</label>
+          <select data-change-action="panelUpdateField"
+                  data-args='{{ [case_id, "status", "$value"]|tojson }}'>
+            {%- for s in statuses %}
+            <option value="{{ s }}"{% if status == s %} selected{% endif %}>{{ s }}</option>
+            {%- endfor %}
+          </select></div>
+        <div class="cpanel-meta-item"><label>Severity</label>
+          <select data-change-action="panelUpdateField"
+                  data-args='{{ [case_id, "severity", "$value"]|tojson }}'>
+            {%- for s in severities %}
+            <option value="{{ s }}"{% if severity == s %} selected{% endif %}>{{ s }}</option>
+            {%- endfor %}
+          </select></div>
+        <div class="cpanel-meta-item"><label>Assigned To</label>
+          {#- The value is the ION user.id and the field is assigned_to_id, so
+              the PATCH endpoint's CaseUpdate receives it and resolves the
+              elastic_uid itself. -#}
+          <select data-change-action="panelUpdateField"
+                  data-args='{{ [case_id, "assigned_to_id", "$value"]|tojson }}'
+                  {% if users_withheld or users is none %}disabled{% endif %}>
+            {%- if users_withheld %}
+            <option value="">Assignees withheld: alert permission required</option>
+            {%- elif users is none %}
+            <option value="">Assignees unavailable</option>
+            {%- else %}
+            <option value=""{% if assigned_to_id is none %} selected{% endif %}>Unassigned</option>
+            {%- for u in users %}
+            <option value="{{ u.id }}"{% if assigned_to_id == u.id %} selected{% endif %}>
+              {{- u.display_name or u.username }}
+              {%- if u.has_elastic_profile is sameas false %} (no Kibana profile){% endif -%}
+            </option>
+            {%- endfor %}
+            {%- endif %}
+          </select>
+          {%- if kibana_pills is none %}
+          <div class="cpanel-kibana-assignees"><span class="an-absent"
+              title="The Kibana assignees are not in a readable shape"></span></div>
+          {%- elif kibana_pills %}
+          {#- A mismatch means someone edited the case in Kibana since ION
+              last wrote to it. -#}
+          <div class="cpanel-kibana-assignees"
+               title="Live state from the linked Kibana case">
+            <span class="cpanel-kibana-label">Kibana:</span>
+            {%- for p in kibana_pills %}
+            <span class="cpanel-kibana-pill{% if kibana_mismatch %} mismatch{% endif %}">{{ p.display }}</span>
+            {%- endfor %}
+            {%- if kibana_mismatch %}
+            <span class="cpanel-kibana-warn"
+                  title="ION and Kibana disagree on the assignee">&#9888; mismatch</span>
+            {%- endif %}
+          </div>
+          {%- endif %}
+        </div>
+        <div class="cpanel-meta-item"><label>Created</label>
+          <input type="text" value="{{ created or '' }}" disabled>
+          {%- if created is none %}<span class="an-absent"
+              title="No creation time recorded"></span>{% endif %}</div>
+      </div>
+      <dl class="cwin-dl">
+        <dt>Escalation</dt><dd>{% if iris_case_id is not none %}DFIR-IRIS #{{ iris_case_id }}{% else %}none{% endif %}</dd>
+        <dt>Closure</dt><dd>{% if closure_reason %}{{ closure_reason | replace('_', ' ') }}{% if closure_notes %}: {{ closure_notes }}{% endif %}{% else %}not set{% endif %}</dd>
+      </dl>
+    </header>
+
+    {% call section('sum', 1, 'Summary', summary.label if summary else '') %}
+      {%- if summary and summary.text %}
+      {%- if summary.verdict %}<p class="cwin-by"><span class="cwin-bobav" aria-hidden="true">B</span>
+        Bob's verdict <span class="cwin-chip">{{ summary.verdict | replace('_', ' ') }}</span>
+        {%- if summary.when %} &middot; {{ summary.when }}{% endif %}</p>{% endif %}
+      <div class="cwin-narr cpanel-note-markdown" data-note-raw="{{ summary.text }}"></div>
+      {%- else %}
+      <p class="cwin-note">This case has no Bob note, no evidence summary and no description.</p>
+      {%- endif %}
+      {%- if description and summary and summary.source != 'description' %}
+      <div class="cpanel-section-title">Description</div>
+      {#- Markdown, rendered by the page for the same reason as the notes. -#}
+      <div class="cpanel-description cpanel-note-markdown" data-note-raw="{{ description }}"></div>
+      {%- endif %}
+      {%- if tags is none %}
+      <div class="cpanel-section-title">Context</div>
+      {{ unreadable('context list') }}
+      {%- elif tags %}
+      <div class="cpanel-section-title">Context</div>
+      <div class="cpanel-tags">
+        {%- for t in tags %}
+        <span class="cpanel-tag cpanel-tag-{{ t.kind }}" title="{{ t.kind|capitalize }}">
+          <span class="cpanel-tag-label">{{ t.label }}</span>{{ t.value }}</span>
+        {%- endfor %}
+      </div>
+      {%- endif %}
+      {%- if mitre is none %}
+      <div class="cpanel-section-title">MITRE ATT&amp;CK</div>
+      {{ unreadable('technique list') }}
+      {%- elif mitre %}
+      <div class="cpanel-section-title">MITRE ATT&amp;CK ({{ mitre | length }})</div>
+      <div class="cpanel-tags">
+        {%- for t in mitre %}
+        <span class="cpanel-tag cpanel-tag-mitre" title="{{ t.name }}">
+          {{- t.id }}{% if t.name != t.id %} &mdash; {{ t.name }}{% endif -%}
+        </span>
+        {%- endfor %}
+      </div>
+      {%- endif %}
+    {% endcall %}
+
+    {% call section('key', 2, 'Key context', 'follows the exhibits you tick in §4 or in triage') %}
+      <div data-cwin-kc-home="read"></div>
+    {% endcall %}
+
+    {% call section('blk', 3, 'What stops closure', 'derived from this case, not enforced') %}
+      {%- if blockers %}<ul class="cwin-bls cwin-bls-doc">{{ blocker_items() }}</ul>
+      {%- else %}<p class="cwin-note">Nothing: every linked alert is closed, an owner is set and
+        nothing is escalated elsewhere.</p>{% endif %}
+    {% endcall %}
+
+    {% call section('ev', 4, 'Evidence', 'the alert you had open in triage is open here') %}
+      <p class="cwin-fnote" data-cwin-fnote hidden>Showing <b data-cwin-fname></b> exhibits only,
+        the filter you set in triage.
+        <button type="button" class="cwin-link" data-click-action="cwFilter" data-args='["all"]'>Show all</button></p>
+      {%- if alerts is none %}{{ unreadable('alert list') }}
+      {%- elif not alerts %}<div class="cpanel-empty-hint">No linked alerts</div>
+      {%- else %}
+      {%- for a in alerts %}
+      <article class="cwin-ex" data-ex="{{ a.alert_id }}" data-status="{{ a.status }}">
+        <header class="cwin-exh">
+          <label class="cwin-exl"><input type="checkbox" aria-label="Tick exhibit {{ a.letter }}"
+                 data-click-action="cwPick" data-args='{{ [a.alert_id, "$checked"]|tojson }}'>
+            <span class="cwin-exn">Exhibit {{ a.letter }}</span></label>
+          <span class="cwin-mono cwin-note" data-cwin-time="{{ a.alert_id }}"></span>
+          <button type="button" class="cwin-exr" data-click-action="cwFocusAlert"
+                  data-args='{{ [a.alert_id]|tojson }}'>{{ a.name }}</button>
+          {{ sev(a.severity) }} {{ status_badge(a) }}
+        </header>
+        <p class="cwin-exd cwin-mono" data-cwin-exline="{{ a.alert_id }}">
+          {%- if a.technique %}{{ a.technique }}{% endif %}</p>
+        <div class="cwin-pks" data-cwin-expk="{{ a.alert_id }}"></div>
+        <div class="cwin-ex-slot" data-cwin-ex-slot="{{ a.alert_id }}"></div>
+      </article>
+      {%- endfor %}
+      {%- endif %}
+    {% endcall %}
+
+    {% call section('obs', 5, 'Observables', 'enrichment by source, as stored') %}
+      <div data-cwin-obs-home="read"></div>
+    {% endcall %}
+
+    {% call section('story', 6, 'Storyline', "the case's timeline: system, analyst and Bob events") %}
+      <div class="text-[0.8rem] text-[var(--text-secondary)]"
+           id="case-timeline-container">Loading&hellip;</div>
+      <div class="cpanel-section-title">Attack Path</div>
+      <div class="apg-root" id="attack-path-container">Loading&hellip;</div>
+      <div class="cpanel-section-title flex items-center gap-2" id="annotations-section-{{ case_id }}">
+        <i class="icon-clock"></i> Timeline Annotations
+        <span class="cpanel-section-badge" id="annotations-count-{{ case_id }}"></span>
+      </div>
+      <div id="annotations-body-{{ case_id }}">
+        <div class="cpanel-empty-hint">Loading annotations&hellip;</div>
+      </div>
+    {% endcall %}
+
+    {% call section('act', 7, 'Actions') %}
+      <div class="cpanel-actions">
+        {%- if escalated %}
+        <button class="btn" disabled title="Already escalated">Escalated to DFIR-IRIS</button>
+        {%- else %}
+        <button class="btn" data-click-action="escalateCase"
+                data-args='{{ [case_id]|tojson }}'>Escalate to DFIR-IRIS</button>
+        {%- endif %}
+        {%- if kibana_url %}
+        <a class="btn" href="{{ kibana_url }}" target="_blank" rel="noopener">View in Kibana</a>
+        {%- endif %}
+        <button class="btn" data-click-action="toggleCasePlaybookBrowser"
+                data-args='{{ [case_id]|tojson }}'>Start Playbook</button>
+        <a class="btn" href="/api/cases/{{ case_id }}/pdf" target="_blank"
+           rel="noopener" title="Export case as PDF">Export PDF</a>
+      </div>
+      <div class="hidden" id="case-playbook-browser-{{ case_id }}"></div>
+      <div class="cwin-subsec" data-cwin-actions>
+        <div class="cpanel-section-title" id="cpanel-actions-tab-btn">Response Actions</div>
+        <div id="response-actions-container">Loading&hellip;</div>
+      </div>
+      <div class="cwin-subsec" id="workbench-section-{{ case_id }}">
+        <div class="cpanel-section-title flex items-center gap-2">
+          <i class="icon-bookmark"></i> Workbench
+          <span class="cpanel-section-badge" id="workbench-pin-count-{{ case_id }}">&hellip;</span>
+          <span id="workbench-verify-banner-{{ case_id }}"
+                class="workbench-verify-banner ml-[auto]">verifying&hellip;</span>
+        </div>
+        <div id="workbench-add-{{ case_id }}" class="workbench-add-row">
+          <input type="text" id="workbench-add-title-{{ case_id }}"
+                 placeholder="Add observation (free-form pin)" maxlength="500">
+          <select id="workbench-add-severity-{{ case_id }}">
+            <option value="">severity</option>
+            {%- for s in ['critical', 'high', 'medium', 'low', 'info'] %}
+            <option value="{{ s }}">{{ s }}</option>
+            {%- endfor %}
+          </select>
+          <button type="button" class="btn btn-primary text-xs py-[0.35rem] px-3"
+                  data-click-action="addObservationPin"
+                  data-args='{{ [case_id]|tojson }}'>Pin</button>
+        </div>
+        <div id="workbench-kanban-{{ case_id }}" class="workbench-kanban">
+          <div class="cpanel-empty-hint col-span-full">Loading workbench&hellip;</div>
+        </div>
+      </div>
+    {% endcall %}
+
+    {% call section('notes', 8, 'Notes') %}
+      <div class="cpanel-section-title">Notes
+        ({{ note_count if note_count is not none else '?' }})
+        {%- if kibana_case_id %}
+        <span class="cpanel-section-badge" title="Kibana comments arrive here on the next sync, and notes added here are posted to Kibana">synced with Kibana</span>
+        {%- endif %}</div>
+      {%- if notes is none %}{{ unreadable('note list') }}
+      {%- else %}
+      {%- for n in notes %}
+      <div class="cpanel-note">
+        <div class="cpanel-note-header flex items-center gap-2">
+          <span class="cpanel-note-user">
+            <i class="icon-user text-[0.65rem] mr-[0.2rem]"></i>
+            {{- n.user or 'Unknown' -}}</span>
+          {%- if n.from_kibana %}
+          <span class="cpanel-note-source" title="Comment added in Kibana">Kibana</span>
+          {%- endif %}
+          <span>{{ fig(n.when, 'No time recorded for this note') }}</span>
+          <button class="cpanel-note-translate" type="button"
+                  data-click-action="translateCaseNote"
+                  data-args='{{ [n.note_id]|tojson }}'>Translate</button>
+        </div>
+        {#- The raw markdown rides in an attribute and the page renders it,
+            because ION has no server-side HTML sanitiser. -#}
+        <div class="cpanel-note-content cpanel-note-markdown" id="{{ n.note_id }}"
+             data-note-raw="{{ n.raw }}" data-original-raw="{{ n.raw }}"></div>
       </div>
       {%- endfor %}
-    </div>
-    <div class="cpanel-detail" id="cpanel-alert-workspace">
-      <div class="loading">Loading alert&hellip;</div>
-    </div>
-    <aside class="cpanel-guide" id="cpanel-alert-guide"></aside>
-  </div>
-  {%- endif %}
-</div>
-<div class="cpanel-section" data-tab="notes">
-  <div class="cpanel-section-title">Notes
-    ({{ note_count if note_count is not none else '?' }})
-    {%- if kibana_case_id %}
-    <span class="cpanel-section-badge" title="Kibana comments arrive here on the next sync, and notes added here are posted to Kibana">synced with Kibana</span>
-    {%- endif %}</div>
-  {%- if notes is none %}{{ unreadable('note list') }}
-  {%- else %}
-  {%- for n in notes %}
-  <div class="cpanel-note">
-    <div class="cpanel-note-header flex items-center gap-2">
-      <span class="cpanel-note-user">
-        <i class="icon-user text-[0.65rem] mr-[0.2rem]"></i>
-        {{- n.user or 'Unknown' -}}</span>
-      {%- if n.from_kibana %}
-      <span class="cpanel-note-source" title="Comment added in Kibana">Kibana</span>
       {%- endif %}
-      <span>{{ fig(n.when, 'No time recorded for this note') }}</span>
-      <button class="cpanel-note-translate" type="button"
-              data-click-action="translateCaseNote"
-              data-args='{{ [n.note_id]|tojson }}'>Translate</button>
+      <div class="cpanel-add-note">
+        <textarea id="panel-note-input" placeholder="Add a note..." rows="2"></textarea>
+        <button class="btn btn-primary self-end text-[0.8rem] py-[0.4rem] px-3"
+                data-click-action="addPanelNote"
+                data-args='{{ [case_id]|tojson }}'>Add</button>
+      </div>
+    {% endcall %}
+
+    {% call section('similar', 9, 'Similar closed cases') %}
+      <div class="text-[0.8rem] text-[var(--text-secondary)]"
+           id="similar-cases-container">Loading&hellip;</div>
+    {% endcall %}
+  </article>
+</div>
+
+{#- Bob on each alert. case-window.js copies the selected alert's into
+    #cwin-bob-slot, so the Auto-Investigate container exists once. -#}
+{%- for a in alerts or [] %}
+<template data-bob-for="{{ a.alert_id }}">
+  {%- set b = a.bob %}
+  <div class="cwin-bob{% if b.state != 'investigated' %} none{% endif %}">
+    <span class="cwin-bobav" aria-hidden="true">B</span>
+    <div class="cwin-bob-b">
+    {%- if b.state == 'investigated' %}
+      <div class="cwin-bob-h"><b>Bob's take on this alert</b>
+        {%- if b.verdict %}<span class="cwin-chip">{{ b.verdict | replace('_', ' ') }}</span>{% endif %}
+        {%- if b.confidence is not none %}<span class="cwin-chip ai">confidence {{ b.confidence }}%</span>{% endif %}
+        {%- if b.status and b.status != 'completed' %}<span class="cwin-chip">{{ b.status }}</span>{% endif %}</div>
+      {%- if b.summary %}<p class="cwin-pre">{{ b.summary }}</p>
+      {%- else %}<p class="cwin-note">The investigation finished without a summary.</p>{% endif %}
+      {%- if b.actions %}<ul class="cwin-bob-acts">{% for x in b.actions[:4] %}<li>{{ x }}</li>{% endfor %}</ul>{% endif %}
+    {%- elif b.state == 'none' %}
+      <div class="cwin-bob-h"><b>No Bob investigation for this alert</b></div>
+      <div id="autoinv-content">
+        <button type="button" class="cwin-btn sm" data-click-action="runAutoInvestigate">Run Auto-Investigate</button>
+      </div>
+    {%- else %}
+      <div class="cwin-bob-h"><b>Bob's investigations could not be read</b></div>
+      <p class="cwin-note">Whether Bob has looked at this alert is unknown.</p>
+    {%- endif %}
+    {%- if b.suggested_verdict or b.badge %}
+      <p class="cwin-note">Triage
+        {%- if b.suggested_verdict %} suggested <b>{{ b.suggested_verdict | replace('_', ' ') }}</b>
+          {%- if b.suggested_confidence %} ({{ b.suggested_confidence }}){% endif %}{% endif %}
+        {%- if b.badge %} &middot; Bob escalation: <span class="cwin-chip warn">{{ b.badge | replace('_', ' ') }}</span>{% endif %}</p>
+    {%- endif %}
     </div>
-    {#- The raw markdown rides in an attribute and the page renders it,
-        because ION has no server-side HTML sanitiser. -#}
-    <div class="cpanel-note-content cpanel-note-markdown" id="{{ n.note_id }}"
-         data-note-raw="{{ n.raw }}" data-original-raw="{{ n.raw }}"></div>
   </div>
-  {%- endfor %}
-  {%- endif %}
-  <div class="cpanel-add-note">
-    <textarea id="panel-note-input" placeholder="Add a note..." rows="2"></textarea>
-    <button class="btn btn-primary self-end text-[0.8rem] py-[0.4rem] px-3"
-            data-click-action="addPanelNote"
-            data-args='{{ [case_id]|tojson }}'>Add</button>
-  </div>
+</template>
+{%- endfor %}
 </div>
-<div class="cpanel-section" data-tab="timeline" id="workbench-section-{{ case_id }}">
-  <div class="cpanel-section-title flex items-center gap-2">
-    <i class="icon-bookmark"></i> Workbench
-    <span class="cpanel-section-badge" id="workbench-pin-count-{{ case_id }}">&hellip;</span>
-    <span id="workbench-verify-banner-{{ case_id }}"
-          class="workbench-verify-banner ml-[auto]">verifying&hellip;</span>
-  </div>
-  <div id="workbench-add-{{ case_id }}" class="workbench-add-row">
-    <input type="text" id="workbench-add-title-{{ case_id }}"
-           placeholder="Add observation (free-form pin)" maxlength="500">
-    <select id="workbench-add-severity-{{ case_id }}">
-      <option value="">severity</option>
-      {%- for s in ['critical', 'high', 'medium', 'low', 'info'] %}
-      <option value="{{ s }}">{{ s }}</option>
-      {%- endfor %}
-    </select>
-    <button type="button" class="btn btn-primary text-xs py-[0.35rem] px-3"
-            data-click-action="addObservationPin"
-            data-args='{{ [case_id]|tojson }}'>Pin</button>
-  </div>
-  <div id="workbench-kanban-{{ case_id }}" class="workbench-kanban">
-    <div class="cpanel-empty-hint col-span-full">Loading workbench&hellip;</div>
-  </div>
-</div>
-<div class="cpanel-section" data-tab="timeline" id="annotations-section-{{ case_id }}">
-  <div class="cpanel-section-title flex items-center gap-2">
-    <i class="icon-clock"></i> Timeline Annotations
-    <span class="cpanel-section-badge" id="annotations-count-{{ case_id }}"></span>
-  </div>
-  <div id="annotations-body-{{ case_id }}">
-    <div class="cpanel-empty-hint">Loading annotations&hellip;</div>
-  </div>
-</div>
-<div class="cpanel-actions">
-  {%- if escalated %}
-  <button class="btn" disabled title="Already escalated">Escalated to DFIR-IRIS</button>
-  {%- else %}
-  <button class="btn" data-click-action="escalateCase"
-          data-args='{{ [case_id]|tojson }}'>Escalate to DFIR-IRIS</button>
-  {%- endif %}
-  {%- if kibana_url %}
-  <a class="btn" href="{{ kibana_url }}" target="_blank" rel="noopener">View in Kibana</a>
-  {%- endif %}
-  <button class="btn" data-click-action="toggleCasePlaybookBrowser"
-          data-args='{{ [case_id]|tojson }}'>Start Playbook</button>
-  <a class="btn" href="/api/cases/{{ case_id }}/pdf" target="_blank"
-     rel="noopener" title="Export case as PDF">Export PDF</a>
-</div>
-<div class="hidden" id="case-playbook-browser-{{ case_id }}"></div>
 {%- endif %}

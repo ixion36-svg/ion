@@ -158,6 +158,12 @@
             <span class="case-panel-number" id="panel-case-number"></span>
             <span class="case-panel-title" id="panel-case-title"></span>
         </div>
+        <span class="case-panel-nav">
+            <button type="button" class="case-panel-step" title="Previous case"
+                    data-click-action="pmStepCase" data-args="[-1]">&larr;</button>
+            <button type="button" class="case-panel-step" title="Next case"
+                    data-click-action="pmStepCase" data-args="[1]">&rarr;</button>
+        </span>
         <button class="case-panel-close" data-click-action="closeCasePanel">&times;</button>
     </div>
     <div class="case-panel-body" id="case-panel-body">
@@ -254,7 +260,7 @@
 {% block scripts %}
 {% include "_fragments/ion_fragment_client.html" %}
 <script src="/static/js/ion-fragments.js?v={{ ion_version }}"></script>
-<script nonce="{{ csp_nonce }}" src="/static/js/ion-arrange.js?v={{ ion_version }}"></script>
+<script nonce="{{ csp_nonce }}" src="/static/js/case-window.js?v={{ ion_version }}"></script>
 {% if initial_case_id %}<script nonce="{{ csp_nonce }}">window.__initialCaseId = {{ initial_case_id }};</script>{% endif %}
 <script nonce="{{ csp_nonce }}">
 // =============================================================================
@@ -682,9 +688,6 @@ async function openCaseDetail(caseId) {
     });
     renderCaseMarkdown(body);
     applyConfidenceMeters(body);
-    // Re-apply the active tab after each render so a status or severity
-    // change does not bump the analyst back to the first tab.
-    switchPanelTab(_currentPanelTab);
 
     let c = null;
     try {
@@ -706,12 +709,19 @@ async function openCaseDetail(caseId) {
         _railAlerts[a.es_alert_id || 'unknown'] = a;
     });
 
-    // Which alert the rail selected, read from the rail rather than from a
-    // second guess at the sort.
-    const workspace = body.querySelector('.cpanel-workspace');
-    const firstAlertId = workspace && workspace.dataset.firstAlertId;
-    if (firstAlertId) {
-        selectCaseAlert(firstAlertId, 0, c.id);
+    // The two layouts' shared state, kept across a re-render of the same
+    // case (a status change re-runs this function).
+    if (window.ionCaseWindow) window.ionCaseWindow.init(body, c);
+
+    // Which alert to open on, read from the window rather than from a second
+    // guess at the sort: the fragment names the first, and a re-render keeps
+    // the one the analyst had open.
+    const win = body.querySelector('[data-cwin]');
+    const keep = window.ionCaseWindow && window.ionCaseWindow.state && window.ionCaseWindow.state.focus;
+    const openId = (keep && _railAlerts[keep]) ? keep : (win && win.dataset.firstAlertId);
+    if (openId) {
+        const row = document.querySelector('tr[data-alert-id="' + CSS.escape(openId) + '"]');
+        selectCaseAlert(openId, row ? JSON.parse(row.dataset.args)[1] : 0, c.id);
     }
 
     loadCaseTimeline(c.id);
@@ -759,6 +769,7 @@ function selectCaseAlert(alertId, idx, caseId) {
     const row = document.getElementById('rail-alert-' + idx);
     if (row) row.classList.add('selected');
     _selectedRailAlert = alertId;
+    if (window.ionCaseWindow) window.ionCaseWindow.focused(alertId);
 
     if (typeof window.ionAlertDetail === 'undefined') {
         host.replaceChildren(ionCaseTpl('tpl-alert-detail-failed'));
@@ -774,74 +785,50 @@ function selectCaseAlert(alertId, idx, caseId) {
         title: alert.rule_name || alert.title || String(alertId).substring(0, 24)
     });
 
-    // Tabs load on demand: two requests on open rather than nine. The triage
-    // bar is omitted because its loader lives in alerts.html and nothing here
-    // fills it; case status and notes are in the case panel above.
+    // The tab the analyst had open stays open on the next alert.
+    const was = host.querySelector('.detail-tab-btn.active');
+    const kept = window.ionCaseWindow && window.ionCaseWindow.state && window.ionCaseWindow.state.tab;
+    const tab = was ? was.dataset.tab : (kept || null);
+    const win = document.querySelector('[data-cwin]');
+    let obsValues = [];
+    try { obsValues = JSON.parse((win && win.dataset.obsValues) || '[]'); } catch (e) { obsValues = []; }
+
+    // layout 'case' is the component's six-tab arrangement for this window.
+    // The head (exhibit, title, Bob's take) is the window's own.
     window.ionAlertDetail.mount(host, forDetail, {
-        layout: 'tabs',
-        sections: ['related', 'timeline', 'comments', 'sequence', 'autoinvestigate', 'fields', 'rawdata'],
+        layout: 'case',
         triageBar: false,
         aiAvailable: true,
         discussEnabled: false,
         arkimeEnabled: !!window.__ionArkimeEnabled,
-        detailV2: document.querySelector('[data-alert-detail-v2]')?.dataset.alertDetailV2 === '1',
-        fieldPins: document.querySelector('[data-alert-field-pins]')?.dataset.alertFieldPins === '1',
-        bobTemplates: document.querySelector('[data-bob-templates]')?.dataset.bobTemplates === '1',
         classPrefix: 'cpanel-alert',
-        caseId: caseId
+        caseId: caseId,
+        observableValues: obsValues,
+        onSection: function (id, el) {
+            if (id === 'process' && el) loadProcessTreeInto(alertId, el.id, caseId);
+        },
     });
+    if (tab && tab !== 'highlighted') window.ionAlertDetail.showSection(tab);
 
     // Case-only extras the shared component has no business knowing about:
-    // pinning this alert as case evidence, and the two lazy panels that used to
-    // be accordions. They append as further stacked sections.
-    _appendCaseOnlySections(host, alertId, caseId, alert);
-}
-
-// The guide's three sections are tpl-alert-guide. They were a string with
-// two generated ids in it, and the pin button's arguments went through
-// esc() into a single-quoted data-args:
-//
-//   data-args='[' + caseId + ',"' + esc(alertId) + '","'
-//           + esc(pinTitle) + '","' + esc(pinSev) + '"]'
-//
-// esc turns a double quote into &quot;, which is right for an attribute
-// and wrong for JSON inside one: the parser decodes it back and the array
-// ends early, so a rule name containing a quote truncated the button's
-// arguments. The playbook Start button had the identical bug.
-//
-// Setting dataset.args from JSON.stringify removes the question: a DOM
-// property assignment stores the value literally, with no HTML escaping
-// between the JSON and the handler that parses it.
-function _appendCaseOnlySections(host, alertId, caseId, alert) {
-    const rgId = 'rule-guide-' + _railSeq;
-    const ptId = 'proc-tree-' + _railSeq;
-    _railSeq += 1;
-
-    const node = ionCaseTpl('tpl-alert-guide');
-    node.querySelector('[data-rule-guide]').id = rgId;
-    node.querySelector('[data-proc-tree]').id = ptId;
-    node.querySelector('.cpanel-pin-btn').dataset.args = JSON.stringify([
-        caseId,
-        alertId,
-        alert.rule_name || String(alertId).substring(0, 24),
-        alert.priority || '',
-    ]);
-
-    // Replaces the previous alert's guide, so selecting a second alert
-    // does not leave the first one's sections behind. Falls back to the
-    // detail column when the side panel is absent.
-    const aside = document.getElementById('cpanel-alert-guide');
-    if (aside) {
-        aside.replaceChildren(node);
-    } else {
-        host.appendChild(node);
+    // the rule's investigation guide and pinning this alert as evidence.
+    //
+    // dataset.args is set from JSON.stringify rather than interpolated into
+    // the markup. esc() turns a double quote into &quot;, which the parser
+    // decodes back inside a single-quoted data-args, so a rule name with a
+    // quote in it used to end the array early.
+    const pin = document.querySelector('[data-cwin-pin]');
+    if (pin) {
+        pin.dataset.args = JSON.stringify([
+            caseId,
+            alertId,
+            alert.rule_name || String(alertId).substring(0, 24),
+            alert.priority || '',
+        ]);
     }
-
     // Shares the component's coalesced /raw request -- no extra round trip.
-    if (typeof loadRuleGuideInto === 'function') loadRuleGuideInto(alertId, rgId);
-    if (typeof loadProcessTreeInto === 'function') loadProcessTreeInto(alertId, ptId, caseId);
+    if (typeof loadRuleGuideInto === 'function') loadRuleGuideInto(alertId, 'cwin-rule-guide');
 }
-let _railSeq = 0;
 
 // Flatten a nested alert _source into dot-path key:value pairs (arrays of
 // scalars are joined; arrays of objects are indexed).
@@ -1101,14 +1088,14 @@ function loadSimilarCases(caseId) {
 //   .apg-svg                 the connector overlay (first child of .apg-graph)
 //   .apg-node[data-apg-node] one card per node; data-apg-node = node id, the
 //                            key drawAttackPathEdges() joins edges on
-//   _apgState                module-level { redraw } handle switchPanelTab and
-//                            the ResizeObserver call to repaint edges
+//   _apgState                module-level { redraw } handle the ResizeObserver
+//                            calls to repaint edges
 
 // Edge type → CSS suffix (colour + arrowhead marker are keyed off this).
 const _APG_EDGE_TYPES = ['process_lineage', 'network_flow', 'auth_presence', 'shared_observable'];
 // Node type → short glyph label shown on the card.
 
-// Module-level handle so switchPanelTab / ResizeObserver can trigger a repaint
+// Module-level handle so the ResizeObserver can trigger a repaint
 // without re-fetching. Reset on every load.
 let _apgState = { redraw: null, ro: null };
 
@@ -1155,7 +1142,7 @@ async function loadAttackPath(caseId) {
     const redraw = function () { drawAttackPathEdges(graph, edges, cardMap); };
     _apgState.redraw = redraw;
     // First paint on rAF so layout has settled. If the tab is hidden the
-    // rects are zero and switchPanelTab repaints on reveal.
+    // rects are zero, and the ResizeObserver repaints once Read mode shows it.
     requestAnimationFrame(redraw);
 
     if (typeof ResizeObserver !== 'undefined') {
@@ -1289,13 +1276,6 @@ function loadSimilarObservables(caseId) {
     });
 }
 
-// panel tab state. Persisted across panel re-renders (e.g.
-// panelUpdateField → openCaseDetail) so changing severity / status
-// doesn't bump the analyst back to Overview. Reset on panel close.
-// default tab is Alerts. Opening a case to a metadata form was a
-// wasted click — the analyst came to look at the alerts.
-let _currentPanelTab = 'alerts';
-
 // ── Response Actions (Phase 1) ─────────────────────────────
 // Observable type → applicable response action_types (mirrors DEFAULT_ACTIONS).
 const _RESPONSE_APPLIES = {
@@ -1315,8 +1295,7 @@ async function loadResponseActions(caseId, observables) {
     if (!loaded) return;
     const state = container.querySelector('[data-response-actions-state]')?.dataset.responseActionsState;
     if (state === 'disabled') {
-        document.getElementById('cpanel-actions-tab-btn')?.remove();
-        container.closest('.cpanel-section[data-tab="actions"]')?.remove();
+        container.closest('[data-cwin-actions]')?.remove();
         return;
     }
     if (state === 'data' || state === 'empty') return loadResponseActionLog(caseId);
@@ -1341,74 +1320,6 @@ async function requestResponseAction(actionId, target, caseId) {
     } catch (e) { window.alert('Request failed: ' + e.message); }
 }
 
-function switchPanelTab(tabName) {
-    _currentPanelTab = tabName;
-    if (applyPageModeLayout()) return;
-    document.querySelectorAll('.cpanel-tab-btn').forEach(b => {
-        b.classList.toggle('active', b.dataset.tab === tabName);
-    });
-    document.querySelectorAll('.cpanel-section[data-tab]').forEach(s => {
-        s.classList.toggle('tab-hidden', s.dataset.tab !== tabName);
-    });
-
-    // the Alerts tab hosts the two-column workspace, which scrolls its
-    // own columns. The body must drop its own scroll+padding for that tab or
-    // the analyst gets two nested scrollbars.
-    const body = document.getElementById('case-panel-body');
-    if (body) body.classList.toggle('workspace-mode', tabName === 'alerts');
-    // The Attack Path SVG connectors are laid out from getBoundingClientRect,
-    // which returns zeroes while the section is display:none. Redraw once the
-    // tab is actually visible so edges land on their node cards.
-    if (tabName === 'attackpath' && typeof _apgState !== 'undefined' && _apgState.redraw) {
-        requestAnimationFrame(_apgState.redraw);
-    }
-}
-
-// ── Page-mode window arrangement (after TIDE v6) ────────────────────────
-// Every .cpanel-section is a movable, foldable, hideable unit in three
-// columns. ONE arrangement is remembered for all cases; sections a case does
-// not have keep their saved place, so arranging a small case never forgets a
-// fuller one. The machinery is static/js/ion-arrange.js, shared with the
-// alert window; what is the case window's own is below.
-// v2: alerts moved from the centre track to the full-width row, so saved v1
-// layouts have to be dropped or they would pin it back into 609px.
-const PM_LAYOUT_KEY = 'ion-case-window-layout-v2';
-// `full` is a spanning row rather than a track, so it carries no width.
-const PM_COL_WIDTHS = { left: 'minmax(230px,1fr)', centre: 'minmax(0,1.7fr)', right: 'minmax(220px,0.9fr)', full: null };
-// Alerts hosts a whole nested alert-detail view, which needs ~1100px before its
-// own two-column layout stops collapsing. The centre track is ~609px on a
-// 1600px viewport, so it gets the full-width row instead.
-const PM_TAB_COL = { alerts: 'full', timeline: 'centre', attackpath: 'centre',
-                     observables: 'left', overview: 'right', actions: 'right', notes: 'right' };
-const PM_SLUG_COL = { 'similar-cases': 'left', 'workbench': 'left',
-                      'observable-sightings': 'left' };
-const PM_PRESETS = [
-    { id: 'triage', label: 'Triage', col: null },   // the defaults above
-    { id: 'dossier', label: 'Dossier', col: function (key, sec) {
-        const tab = sec.dataset.tab;
-        if (tab === 'alerts') return 'full';
-        return (tab === 'overview' || tab === 'actions' || tab === 'notes') ? 'right' : 'centre';
-    } },
-    { id: 'review', label: 'Review', col: function (key, sec) {
-        const tab = sec.dataset.tab;
-        if (tab === 'alerts') return 'full';
-        if (tab === 'timeline' || key === 'similar-cases' || tab === 'observables') return 'left';
-        if (tab === 'overview' || tab === 'actions') return 'right';
-        return 'centre';
-    } }
-];
-
-function pmKeyFor(sec, seen) {
-    const t = sec.querySelector('.cpanel-section-title');
-    let base = (t ? t.textContent : (sec.dataset.tab || 'section'))
-        .replace(/\(.*?\)/g, '').replace(/[0-9]+/g, '')
-        .trim().toLowerCase().replace(/[^a-z]+/g, '-').replace(/^-+|-+$/g, '');
-    if (!base) base = sec.dataset.tab || 'section';
-    if (seen[base] != null) { seen[base] += 1; base = base + '-' + seen[base]; }
-    else { seen[base] = 1; }
-    return base;
-}
-
 // prev / next case, from the already-loaded list order
 function pmStepCase(delta) {
     const cur = String(window.__initialCaseId);
@@ -1417,44 +1328,6 @@ function pmStepCase(delta) {
     if (i === -1 || !ids.length) return;
     const next = ids[(i + delta + ids.length) % ids.length];
     if (next && next !== cur) window.location.assign('/cases/' + next);
-}
-
-let _pmArranger = null;
-
-function applyPageModeLayout() {
-    const panel = document.getElementById('case-panel');
-    if (!panel.classList.contains('page-mode')) return false;
-    const body = document.getElementById('case-panel-body');
-    body.classList.remove('workspace-mode');
-    body.querySelectorAll('.cpanel-section[data-tab]').forEach(sec => sec.classList.remove('tab-hidden'));
-
-    if (!_pmArranger) {
-        const header = document.querySelector('.case-panel-header');
-        _pmArranger = ionArrange.create({
-            body: body,
-            candidates: '.cpanel-section[data-tab]',
-            storageKey: PM_LAYOUT_KEY,
-            columns: PM_COL_WIDTHS,
-            defaultCol: (key, sec) => PM_SLUG_COL[key] || PM_TAB_COL[sec.dataset.tab] || 'centre',
-            presets: PM_PRESETS,
-            keyFor: pmKeyFor,
-            titleOf: sec => sec.querySelector('.cpanel-section-title'),
-            toolsHost: header,
-            toolsBefore: header.querySelector('.case-panel-close'),
-            nav: [
-                { label: '←', title: 'Previous case', onClick: () => pmStepCase(-1) },
-                { label: '→', title: 'Next case', onClick: () => pmStepCase(1) },
-            ],
-        });
-    }
-    _pmArranger.apply();
-
-    // the attack path lays edges out from getBoundingClientRect, which is all
-    // zeroes until the section is actually visible.
-    if (typeof _apgState !== 'undefined' && _apgState.redraw) {
-        requestAnimationFrame(_apgState.redraw);
-    }
-    return true;
 }
 
 function closeCasePanel() {
@@ -1469,13 +1342,7 @@ function closeCasePanel() {
     // for a different case doesn't mistakenly think the panel is showing
     // it (panel is closed, dataset would be stale).
     delete panel.dataset.caseId;
-    // reset the panel tab so the NEXT case opened lands on the
-    // default rather than wherever the previous case left off.
-    // that default is now Alerts.
-    _currentPanelTab = 'alerts';
     _selectedRailAlert = null;
-    const body = document.getElementById('case-panel-body');
-    if (body) body.classList.remove('workspace-mode');
 }
 
 // =============================================================================
@@ -1783,7 +1650,10 @@ document.addEventListener('keydown', function(e) {
             cancelClosure();
         } else if (document.getElementById('create-case-overlay').style.display === 'flex') {
             closeCreateCaseModal();
-        } else if (document.getElementById('case-panel').classList.contains('open')) {
+        } else if (document.getElementById('case-panel').classList.contains('open')
+                   && !document.getElementById('case-panel').classList.contains('page-mode')) {
+            // In page mode Esc belongs to the case window (back to the whole
+            // case); leaving the case is the header's close button.
             closeCasePanel();
         }
         return;
@@ -2100,16 +1970,12 @@ if (window.__initialCaseId) {
     document.addEventListener('DOMContentLoaded', () => {
         const panel = document.getElementById('case-panel');
         panel.classList.add('page-mode', 'open');
-        // style.display, not the .hidden utility: page chrome like
-        // .ion-page-header carries its own display:flex that outranks the
-        // utility class in the cascade. The dialogs stay untouched -- the
-        // closure modal must still open from page mode.
-        for (const sibling of panel.parentElement.children) {
-            if (sibling === panel) { continue; }
-            if (sibling.id === 'create-case-overlay' || sibling.id === 'closure-modal-overlay') { continue; }
-            if (sibling.tagName === 'STYLE' || sibling.tagName === 'SCRIPT') { continue; }
-            sibling.style.display = 'none';
-        }
+        // A class on the parent, which cases-page.css turns into hiding every
+        // sibling but the panel and its two dialogs. This was style.display
+        // on each sibling, and the board's hx-swap-oob replacements carried
+        // that inline style onto their new nodes: a CSP violation per swap,
+        // and the hide lost, so "Load more cases" showed above the case.
+        panel.parentElement.classList.add('case-page-mode');
         openCaseDetail(window.__initialCaseId);
     });
 }
@@ -2121,30 +1987,8 @@ if (window.__initialCaseId) {
 <template id="tpl-closure-ai-busy"><i class="icon-sparkles"></i> Rewriting&hellip;</template>
 <template id="tpl-closure-ai-revert"><i class="icon-rotate-ccw"></i> Revert</template>
 
-{#- The alert guide's three sections and the rail's failure message. Both
-    were innerHTML assignments from string literals, so the structure and
-    its wording sat where no stylesheet sweep reaches them. -#}
-<template id="tpl-alert-guide">
-  <div>
-    <section class="cpanel-guide-sec">
-      <h4 class="cpanel-guide-title">Investigation guide</h4>
-      <div class="cpanel-rule-guide-box" data-rule-guide>
-        <div class="loading">Loading rule guide&hellip;</div>
-      </div>
-    </section>
-    <section class="cpanel-guide-sec">
-      <h4 class="cpanel-guide-title">Process tree</h4>
-      <div class="cpanel-proc-tree" data-proc-tree>
-        <div class="loading">Loading process tree&hellip;</div>
-      </div>
-    </section>
-    <section class="cpanel-guide-sec">
-      <button class="cpanel-pin-btn" type="button"
-              data-click-action="pinAlertToCase">
-        <i class="icon-bookmark text-[0.6rem] mr-[0.2rem]"></i>Pin as evidence</button>
-    </section>
-  </div>
-</template>
+{#- The alert detail's failure message. It was an innerHTML assignment
+    from a string literal in the script block. -#}
 <template id="tpl-alert-detail-failed">
   <div class="error">Alert detail component failed to load.</div>
 </template>
