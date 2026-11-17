@@ -132,12 +132,13 @@ def test_default_is_every_section(js):
 
 def test_cases_omits_only_what_it_cannot_fill(cases_js):
     """The triage bar's loader lives in alerts.html and reaches into its state.
-    Rendering it on /cases produced a permanent spinner."""
+    Rendering it on /cases produced a permanent spinner. The case layout has
+    its own tab set, and the one tab the page must fill, the process tree,
+    it is asked for through onSection."""
     call = cases_js[cases_js.index("window.ionAlertDetail.mount(host, forDetail"):]
-    call = call[:call.index("});")]
+    call = call[:call.index("    });")]
     assert "triageBar: false" in call
-    assert "'comments'" in call, "comments IS loadable (GET /triage) and should stay"
-    assert "'case'" not in call, "a 'Case' tab inside a case is circular"
+    assert "onSection:" in call and "loadProcessTreeInto" in call
 
 
 def test_the_triage_bar_is_actually_gated(js):
@@ -147,11 +148,19 @@ def test_the_triage_bar_is_actually_gated(js):
 # ── tabs + lazy loading ──────────────────────────────────────────────────
 
 
-def test_cases_uses_tabs(cases_js):
+def test_cases_uses_the_case_layout(cases_js):
     call = cases_js[cases_js.index("window.ionAlertDetail.mount(host, forDetail"):]
-    call = call[:call.index("});")]
-    assert "layout: 'tabs'" in call
+    call = call[:call.index("    });")]
+    assert "layout: 'case'" in call
     assert "layout: 'stacked'" not in call
+
+
+def test_the_case_layout_has_the_six_tabs_in_order(js):
+    block = js[js.index("var CASE_SECTIONS = ["):]
+    block = block[:block.index("];")]
+    import re
+    assert re.findall(r"id: '(\w+)'", block) == [
+        "highlighted", "fields", "process", "rawdata", "related", "observables"]
 
 
 def test_mount_loads_only_the_visible_section(js):
@@ -238,28 +247,16 @@ def test_severity_stripe_uses_a_class(js=None):
 # ── the guide side panel ─────────────────────────────────────────────────
 
 
-def test_the_guide_renders_into_the_aside(cases_js):
-    fn = cases_js[cases_js.index("function _appendCaseOnlySections("):]
-    fn = fn[:fn.index("\nlet _railSeq")]
-    assert "cpanel-alert-guide" in fn
-    assert "iad-section" not in fn, (
-        "iad-section is STACKED-layout markup; with the component on tabs it "
-        "would dangle below the tab strip with no stack to belong to"
-    )
-
-
-def test_the_aside_exists_in_the_workspace():
-    """The workspace is _fragments/cases_panel.html now, so the aside is
-    markup the server renders rather than a string the page assembled. The
-    page still looks it up by id to put the guide in it, asserted here too
+def test_the_guide_renders_into_the_detail_column():
+    """The workspace is _fragments/cases_panel.html, so the guide's box is
+    markup the server renders. The page fills it by id, asserted here too
     so the element and its one consumer cannot drift apart."""
     root = Path(__file__).resolve().parents[1] / "src" / "ion" / "web"
     fragment = (root / "templates" / "_fragments" / "cases_panel.html"
                 ).read_text(encoding="utf-8")
-    assert '<aside class="cpanel-guide" id="cpanel-alert-guide">' in fragment
-
+    assert 'id="cwin-rule-guide"' in fragment
     page = (root / "templates" / "cases.html").read_text(encoding="utf-8")
-    assert "getElementById('cpanel-alert-guide')" in page
+    assert "loadRuleGuideInto(alertId, 'cwin-rule-guide')" in page
 
 
 def test_the_guide_shares_the_coalesced_raw_request(cases_js):

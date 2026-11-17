@@ -66,18 +66,18 @@ Server-rendered fragments. `render_view` routes also answer the view model as JS
 | GET | `/ui/cases/detail/process-tree/{alert_id}` | `case:read` | [_cases_detail_process.py:133](src/ion/web/ui/_cases_detail_process.py#L133) | `_fragments/cases_detail_process.html` | `cases.html` |
 | POST | `/ui/cases/detail/rule-guide` | `case:read` | [_cases_detail_process.py:150](src/ion/web/ui/_cases_detail_process.py#L150) | `_fragments/cases_detail_rule_guide.html` | `cases.html` |
 | POST | `/ui/cases/note-translation` | `case:read` | [_cases_detail_notes.py:90](src/ion/web/ui/_cases_detail_notes.py#L90) | `_fragments/cases_detail_translation.html` | `cases.html` |
-| GET | `/ui/cases/summary` | `case:read` | [cases.py:680](src/ion/web/ui/cases.py#L680) | `_fragments/cases_summary.html` | `cases_summary.html`, `cases.html` |
+| GET | `/ui/cases/summary` | `case:read` | [cases.py:691](src/ion/web/ui/cases.py#L691) | `_fragments/cases_summary.html` | `cases_summary.html`, `cases.html` |
 | GET | `/ui/cases/{case_id}/annotations` | `case:read` | [_cases_detail_notes.py:80](src/ion/web/ui/_cases_detail_notes.py#L80) | `_fragments/cases_detail_annotations.html`<br>`_fragments/forensics_annotations.html` | `cases.html` |
-| GET | `/ui/cases/{case_id}/attack-path` | `case:read` | [cases.py:1884](src/ion/web/ui/cases.py#L1884) | `_fragments/cases_attack_path.html` | `cases.html` |
-| GET | `/ui/cases/{case_id}/panel` | `case:read` | [cases.py:2398](src/ion/web/ui/cases.py#L2398) | `_fragments/cases_panel.html` | `cases.html` |
-| GET | `/ui/cases/{case_id}/playbooks` | `case:read` | [cases.py:1619](src/ion/web/ui/cases.py#L1619) | `_fragments/cases_playbooks.html` | `cases.html` |
+| GET | `/ui/cases/{case_id}/attack-path` | `case:read` | [cases.py:1895](src/ion/web/ui/cases.py#L1895) | `_fragments/cases_attack_path.html` | `cases.html` |
+| GET | `/ui/cases/{case_id}/panel` | `case:read` | [cases.py:2477](src/ion/web/ui/cases.py#L2477) | `_fragments/cases_panel.html` | `cases.html` |
+| GET | `/ui/cases/{case_id}/playbooks` | `case:read` | [cases.py:1630](src/ion/web/ui/cases.py#L1630) | `_fragments/cases_playbooks.html` | `cases.html` |
 | POST | `/ui/cases/{case_id}/response-actions` | `case:read + playbook:read` | [_cases_detail_response.py:174](src/ion/web/ui/_cases_detail_response.py#L174) | `_fragments/cases_detail_response_actions.html` | `cases.html` |
 | GET | `/ui/cases/{case_id}/response-log` | `case:read + playbook:read` | [_cases_detail_response.py:190](src/ion/web/ui/_cases_detail_response.py#L190) | `_fragments/cases_detail_response_log.html` | `cases.html` |
-| GET | `/ui/cases/{case_id}/similar` | `case:read` | [cases.py:811](src/ion/web/ui/cases.py#L811) | `_fragments/cases_similar.html` | `cases.html` |
-| GET | `/ui/cases/{case_id}/similar-observables` | `case:read` | [cases.py:1298](src/ion/web/ui/cases.py#L1298) | `_fragments/cases_observables.html` | `cases.html` |
+| GET | `/ui/cases/{case_id}/similar` | `case:read` | [cases.py:822](src/ion/web/ui/cases.py#L822) | `_fragments/cases_similar.html` | `cases.html` |
+| GET | `/ui/cases/{case_id}/similar-observables` | `case:read` | [cases.py:1309](src/ion/web/ui/cases.py#L1309) | `_fragments/cases_observables.html` | `cases.html` |
 | GET | `/ui/cases/{case_id}/sync-status` | `case:read + (alert:read or integration:read)` | [_cases_detail_response.py:164](src/ion/web/ui/_cases_detail_response.py#L164) | `_fragments/cases_detail_sync.html` | `cases.html` |
-| GET | `/ui/cases/{case_id}/timeline` | `case:read` | [cases.py:1114](src/ion/web/ui/cases.py#L1114) | `_fragments/cases_timeline.html` | `cases.html` |
-| GET | `/ui/cases/{case_id}/workbench` | `case:read` | [cases.py:1594](src/ion/web/ui/cases.py#L1594) | `_fragments/cases_workbench.html` | `cases.html` |
+| GET | `/ui/cases/{case_id}/timeline` | `case:read` | [cases.py:1125](src/ion/web/ui/cases.py#L1125) | `_fragments/cases_timeline.html` | `cases.html` |
+| GET | `/ui/cases/{case_id}/workbench` | `case:read` | [cases.py:1605](src/ion/web/ui/cases.py#L1605) | `_fragments/cases_workbench.html` | `cases.html` |
 | GET | `/ui/change-requests` | `system:settings` | [change_requests.py:106](src/ion/web/ui/change_requests.py#L106) | `_fragments/change_requests.html` | `change_requests.html` |
 | POST | `/ui/chat/answer-meta` | `ai:chat` | [chat.py:200](src/ion/web/ui/chat.py#L200) | `_fragments/chat_answer_meta.html` | `chat.html` |
 | GET | `/ui/chat/files` | `ai:chat` | [chat.py:405](src/ion/web/ui/chat.py#L405) | `_fragments/chat_files.html` | `chat.html` |
@@ -742,7 +742,7 @@ JSON endpoints.
 | GET | `/api/engineering/analytics/log-systems` | — | [engineering_analytics_api.py:111](src/ion/web/engineering_analytics_api.py#L111) |  |  |
 | GET | `/api/engineering/analytics/systems` | — | [engineering_analytics_api.py:28](src/ion/web/engineering_analytics_api.py#L28) |  |  |
 | GET | `/api/engineering/analytics/tide-systems` | — | [engineering_analytics_api.py:93](src/ion/web/engineering_analytics_api.py#L93) |  |  |
-| POST | `/api/enrichment/lookup` | `observable:enrich` | [enrichment_api.py:213](src/ion/web/enrichment_api.py#L213) |  |  |
+| POST | `/api/enrichment/lookup` | `observable:enrich` | [enrichment_api.py:213](src/ion/web/enrichment_api.py#L213) |  | `case-window.js` |
 | GET | `/api/enrichment/status` | `observable:enrich` | [enrichment_api.py:283](src/ion/web/enrichment_api.py#L283) |  |  |
 | GET | `/api/entity-timeline/search` | `alert:read` | [entity_timeline_api.py:17](src/ion/web/entity_timeline_api.py#L17) |  |  |
 | GET | `/api/events/stream` | — | [events_api.py:62](src/ion/web/events_api.py#L62) |  | `live-updates.js` |

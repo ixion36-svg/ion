@@ -311,10 +311,14 @@ def test_cases_uses_the_tabbed_layout(cases):
     the first tab is populated on open) while showing one section at a time.
     The click-count win is preserved by _visibleSections + the first-tab loader,
     not by rendering everything.
+
+    The opened case's window mounts it in `layout: 'case'`, the
+    six-tab arrangement that keeps the same lazy, one-section-at-a-time
+    loading.
     """
     js = _inline_js(cases)
     assert "window.ionAlertDetail.mount(" in js
-    assert "layout: 'tabs'" in js
+    assert "layout: 'case'" in js
     assert "layout: 'stacked'" not in js
 
 
@@ -341,13 +345,16 @@ def test_first_alert_is_rendered_on_open(cases):
     why that is the stronger arrangement.
     """
     js = _inline_js(cases)
-    assert "workspace.dataset.firstAlertId" in js
-    assert "selectCaseAlert(firstAlertId, 0, c.id)" in js
+    assert "win.dataset.firstAlertId" in js
+    assert "selectCaseAlert(openId," in js
 
 
-def test_case_opens_on_the_alerts_tab(cases):
+def test_case_opens_on_its_alerts(cases):
+    """There are no panel tabs to land on now: Triage shows the alerts and
+    Read the case file, and the window remembers which the viewer chose."""
     js = _inline_js(cases)
-    assert "let _currentPanelTab = 'alerts';" in js
+    assert "_currentPanelTab" not in js
+    assert "window.ionCaseWindow.init(body, c)" in js
 
 
 # ── v0.77.1: the rail is ordered by severity ─────────────────────────────
@@ -402,7 +409,7 @@ def test_the_rail_order_and_the_detail_column_cannot_disagree(cases):
     itself is what holds that.
     """
     js = _inline_js(cases)
-    assert "workspace.dataset.firstAlertId" in js
+    assert "win.dataset.firstAlertId" in js
     # Comments stripped: the note above openCaseDetail quotes the old
     # c.alerts[0] read to explain why it went, and the assertion is about
     # code.
