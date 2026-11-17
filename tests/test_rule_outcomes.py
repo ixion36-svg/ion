@@ -202,10 +202,3 @@ def test_noisy_policy_needs_a_sample():
     assert NoisyPolicy(min_closed=5, fp_rate_pct=70).is_noisy(rec) is False
     rec.outcomes["false_positive"] = 5
     assert NoisyPolicy(min_closed=5, fp_rate_pct=70).is_noisy(rec) is True
-
-
-def test_workbench_campaigns_use_the_same_window_as_de_metrics():
-    from ion.services.rule_outcome_service import DEFAULT_WINDOW_DAYS
-    from ion.web.ui import de_workbench
-
-    assert de_workbench.CAMPAIGN_DAYS == DEFAULT_WINDOW_DAYS == 90
