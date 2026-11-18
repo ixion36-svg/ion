@@ -1,5 +1,6 @@
 """Authentication service for login, logout, and session management."""
 
+import logging
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
@@ -11,6 +12,8 @@ from ion.core.config import get_config
 from ion.models.user import Permission, Role, User
 from ion.storage.auth_repository import AuditLogRepository, SessionRepository
 from ion.storage.user_repository import PermissionRepository, RoleRepository, UserRepository
+
+logger = logging.getLogger(__name__)
 
 
 class AuthService:
@@ -1127,29 +1130,30 @@ class AuthService:
     def seed_service_user(
         self, username: str, email: str, display_name: str, role_name: str,
     ) -> Optional[User]:
-        """Create (or top-up) a service user holding one role.
+        """Create, or reset, a service user holding exactly one role.
 
-        Idempotent, same shape as seed_bob_user(). Ensures:
-          - the user exists, flagged is_service_account=True, is_active=True.
-          - the user has ``role_name``.
-          - If the user already exists but is missing the flag or the role, fix it.
+        Idempotent. The user exists, is active, is flagged
+        is_service_account, and holds ``role_name`` and nothing else. The
+        seed CLIs mint a bearer token and promise it carries only that
+        role's permissions, so any role added to the account since is taken
+        back here.
+
+        A human account already holding the username is left alone and None
+        is returned: converting it would hand a token-bearing service
+        account whatever that person had been granted.
         """
         role = self.role_repo.get_by_name(role_name)
 
         existing = self.user_repo.get_by_username(username)
         if existing:
-            changed = False
-            if not getattr(existing, "is_service_account", False):
-                existing.is_service_account = True
-                changed = True
-            if not existing.is_active:
-                existing.is_active = True
-                changed = True
-            if role and not existing.has_role(role_name):
-                self.user_repo.add_role(existing, role)
-                changed = True
-            if changed:
-                self.db_session.flush()
+            if not existing.is_service_account:
+                logger.warning(
+                    "Not seeding service account %r: a non-service account "
+                    "already holds that username", username,
+                )
+                return None
+            existing.is_active = True
+            self.user_repo.set_roles(existing, [role] if role else [])
             return existing
 
         user = self.user_repo.create(
