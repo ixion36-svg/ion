@@ -44,21 +44,22 @@ def test_movers_rank_risers_and_name_new_rules():
     assert m["top"][0] == {"name": "a", "count": 9, "last": 3}
 
 
-def test_response_times_use_the_status_change_stamp():
-    since = datetime(2026, 11, 12, tzinfo=timezone.utc)
-    docs = [
-        {"@timestamp": "2026-11-13T10:00:00Z", "kibana.alert.workflow_status": "acknowledged",
-         "kibana.alert.workflow_status_updated_at": "2026-11-13T10:30:00Z"},
-        {"@timestamp": "2026-11-13T10:00:00Z", "kibana.alert.workflow_status": "closed",
-         "kibana.alert.workflow_status_updated_at": "2026-11-13T12:00:00Z"},
-        {"@timestamp": "2026-11-13T10:00:00Z", "kibana.alert.workflow_status": "open",
-         "kibana.alert.workflow_status_updated_at": "2026-11-13T10:01:00Z"},
-        {"@timestamp": "2026-11-01T10:00:00Z", "kibana.alert.workflow_status": "closed",
-         "kibana.alert.workflow_status_updated_at": "2026-11-13T10:00:00Z"},
-    ]
-    rt = sm.response_times(docs, since)
-    assert rt["mtta"]["n"] == 2 and rt["mtta"]["median"] == 75.0
-    assert rt["mttr"]["n"] == 1 and rt["mttr"]["median"] == 120.0
+def test_response_time_stats_come_from_the_aggregation():
+    agg = {"n": {"value": 12}, "mean": {"value": 31.26},
+           "pct": {"values": {"50.0": 20.04, "90.0": 75.5}}}
+    assert sm.rt_stats(agg) == {"n": 12, "mean": 31.3, "median": 20.0, "p90": 75.5}
+    assert sm.rt_stats({"n": {"value": 0}}) == {"n": 0, "mean": None, "median": None, "p90": None}
+    assert sm.rt_stats(None)["n"] == 0
+
+
+def test_response_times_are_aggregated_in_elasticsearch_not_paged():
+    """A page of hits capped the old read at 5,000 alerts."""
+    import asyncio
+    es = FakeES(datetime.now(timezone.utc))
+    asyncio.run(sm.read_alert_metrics(es, now=es.now))
+    rt = [b for b in es.bodies if "runtime_mappings" in b]
+    assert len(rt) == 1 and rt[0]["size"] == 0
+    assert all(b.get("size", 0) == 0 for b in es.bodies)
 
 
 def test_daily_rows_zero_fill_fourteen_days():
@@ -160,11 +161,12 @@ class FakeES:
             return {"aggregations": {"age": {"buckets": [
                 {"key": "under_24h", "doc_count": 4}, {"key": "1_7d", "doc_count": 6},
                 {"key": "over_7d", "doc_count": 9}]}}}
-        raised = (self.now - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
-        moved = (self.now - timedelta(days=1) + timedelta(minutes=20)).strftime("%Y-%m-%dT%H:%M:%SZ")
-        return {"hits": {"hits": [{"_source": {
-            "@timestamp": raised,
-            "kibana": {"alert": {"workflow_status": "closed", "workflow_status_updated_at": moved}}}}]}}
+        def stats(n, median):
+            return {"n": {"value": n}, "mean": {"value": median},
+                    "pct": {"values": {"50.0": median, "90.0": median}}}
+        return {"aggregations": {"weeks": {"buckets": [
+            {"key": "last", "ack": stats(0, None), "closed": stats(0, None)},
+            {"key": "this", "ack": stats(1, 20.0), "closed": stats(1, 20.0)}]}}}
 
 
 def _read(now):

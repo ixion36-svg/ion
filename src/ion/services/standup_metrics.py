@@ -134,31 +134,33 @@ def _hours(start: Any, end: Any) -> Optional[float]:
     return h if h >= 0 else None
 
 
-def _parse_ts(raw: Any) -> Optional[datetime]:
-    if not raw:
-        return None
-    try:
-        return datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
-    except ValueError:
-        return None
+# Minutes from an alert being raised to its last status change. Computed in
+# Elasticsearch so every alert counts, not a page of hits.
+RT_SCRIPT = (
+    "def u = 'kibana.alert.workflow_status_updated_at';"
+    "if (doc.containsKey(u) && doc[u].size() > 0 && doc['@timestamp'].size() > 0) {"
+    " long d = doc[u].value.toInstant().toEpochMilli() - doc['@timestamp'].value.toInstant().toEpochMilli();"
+    " if (d >= 0) { emit(d / 60000.0); } }"
+)
+_RT_STATS = {
+    "n": {"value_count": {"field": "rt_minutes"}},
+    "mean": {"avg": {"field": "rt_minutes"}},
+    "pct": {"percentiles": {"field": "rt_minutes", "percents": [50, 90]}},
+}
 
 
-def response_times(docs: List[dict], since: datetime) -> Dict[str, Any]:
-    """Alert MTTA/MTTR (minutes) for alerts raised at or after `since`."""
-    ack, close = [], []
-    for d in docs:
-        raised = _parse_ts(d.get("@timestamp"))
-        moved = _parse_ts(d.get("kibana.alert.workflow_status_updated_at"))
-        status = str(d.get("kibana.alert.workflow_status") or "").lower()
-        if not raised or not moved or raised < since or status == "open":
-            continue
-        h = _hours(raised, moved)
-        if h is None:
-            continue
-        ack.append(h * 60)
-        if status == "closed":
-            close.append(h * 60)
-    return {"mtta": spread(ack), "mttr": spread(close)}
+def rt_stats(agg: Any) -> Dict[str, Optional[float]]:
+    """A {n, mean, median, p90} from one response-time sub-aggregation."""
+    agg = agg if isinstance(agg, dict) else {}
+    n = int(((agg.get("n") or {}).get("value")) or 0)
+    if not n:
+        return {"n": 0, "mean": None, "median": None, "p90": None}
+    pct = ((agg.get("pct") or {}).get("values")) or {}
+
+    def r(v):
+        return None if v is None else round(float(v), 1)
+    return {"n": n, "mean": r((agg.get("mean") or {}).get("value")),
+            "median": r(pct.get("50.0")), "p90": r(pct.get("90.0"))}
 
 
 # ── Elasticsearch ───────────────────────────────────────────────────────────
@@ -236,19 +238,25 @@ async def read_alert_metrics(es: Any, now: Optional[datetime] = None) -> Dict[st
     backlog = await es._request("POST", f"/{es.alert_index}/_search", json=backlog_body, timeout=ES_TIMEOUT_S)
     ages = {b["key"]: int(b["doc_count"]) for b in ((backlog.get("aggregations") or {}).get("age") or {}).get("buckets", [])}
 
-    moved_body = {
-        "size": 5000,
-        "_source": ["@timestamp", "kibana.alert.workflow_status", "kibana.alert.workflow_status_updated_at"],
-        "query": {"bool": {"filter": [{"range": {"@timestamp": {"gte": "now-14d"}}},
-                                      {"exists": {"field": "kibana.alert.workflow_status_updated_at"}}],
+    rt_body = {
+        "size": 0,
+        "runtime_mappings": {"rt_minutes": {"type": "double", "script": {"source": RT_SCRIPT}}},
+        "query": {"bool": {"filter": [{"range": {"@timestamp": {"gte": "now-14d"}}}],
                            "must_not": not_bb + [{"term": {"kibana.alert.workflow_status": "open"}}]}},
+        "aggs": {"weeks": {
+            "range": {"field": "@timestamp", "ranges": [
+                {"key": "last", "from": "now-14d", "to": "now-7d"}, {"key": "this", "from": "now-7d"}]},
+            "aggs": {"ack": {"filter": {"match_all": {}}, "aggs": _RT_STATS},
+                     "closed": {"filter": {"term": {"kibana.alert.workflow_status": "closed"}},
+                                "aggs": _RT_STATS}},
+        }},
     }
-    moved = await es._request("POST", f"/{es.alert_index}/_search", json=moved_body, timeout=ES_TIMEOUT_S)
-    docs = [_flat(h.get("_source") or {}) for h in (moved.get("hits") or {}).get("hits", [])]
-    this_rt = response_times([d for d in docs if (_parse_ts(d.get("@timestamp")) or now) >= now - timedelta(days=7)],
-                             now - timedelta(days=7))
-    last_rt = response_times([d for d in docs if (_parse_ts(d.get("@timestamp")) or now) < now - timedelta(days=7)],
-                             now - timedelta(days=14))
+    rt = await es._request("POST", f"/{es.alert_index}/_search", json=rt_body, timeout=ES_TIMEOUT_S)
+    rt_weeks = {b["key"]: b for b in ((rt.get("aggregations") or {}).get("weeks") or {}).get("buckets", [])}
+    this_rt = {"mtta": rt_stats(rt_weeks.get("this", {}).get("ack")),
+               "mttr": rt_stats(rt_weeks.get("this", {}).get("closed"))}
+    last_rt = {"mtta": rt_stats(rt_weeks.get("last", {}).get("ack")),
+               "mttr": rt_stats(rt_weeks.get("last", {}).get("closed"))}
 
     return {
         "daily": daily[-7:],
@@ -265,18 +273,6 @@ async def read_alert_metrics(es: Any, now: Optional[datetime] = None) -> Dict[st
         "responded": change(this_rt["mtta"]["n"], last_rt["mtta"]["n"]),
         "_week_totals": {"this": week["this"]["total"], "last": week["last"]["total"]},
     }
-
-
-def _flat(src: dict, prefix: str = "") -> dict:
-    """Nested _source -> dotted keys, keeping keys that are already dotted."""
-    out = {}
-    for k, v in src.items():
-        key = f"{prefix}{k}"
-        if isinstance(v, dict):
-            out.update(_flat(v, key + "."))
-        else:
-            out[key] = v
-    return out
 
 
 # ── ION's tables ────────────────────────────────────────────────────────────

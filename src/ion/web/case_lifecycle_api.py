@@ -1450,6 +1450,9 @@ async def remove_alerts_from_case(
     case.source_alert_ids = [x for x in (case.source_alert_ids or []) if x not in gone]
     session.commit()
 
+    # The case's search document lists its alerts too; re-index it now
+    # rather than leave the removed ids there until the next sync.
+    await _sync_case_to_es(case, session)
     _spawn_alert_workflow_sync(reopened, "open")
     return {
         "case_id": case_id,

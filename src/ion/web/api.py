@@ -3798,7 +3798,9 @@ async def bulk_update_triage(
 
     # Adding to an existing case: the case must exist and be open.
     target_case = None
-    if data.case_id is not None and data.case_id > 0:
+    # A new case wins over case_id, as it always has for the triage rows, so
+    # the alerts are recorded on that case alone.
+    if new_case is None and data.case_id is not None and data.case_id > 0:
         target_case = session.query(AlertCase).filter_by(id=data.case_id).first()
         if target_case is None:
             raise HTTPException(status_code=404, detail="Case not found")

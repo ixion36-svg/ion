@@ -218,3 +218,28 @@ def test_the_create_lock_is_taken_only_on_postgres():
     bind.dialect.name = "sqlite"
     cl._serialise_case_creates(S(), 7)
     assert len(executed) == 1
+
+
+def test_removing_alerts_reindexes_the_case(db, es_pushes, monkeypatch):
+    session, user = db
+    case = _create(session, user, ["a1", "a2"])
+    indexed = []
+
+    async def fake_index(c, s):
+        indexed.append(list(c.source_alert_ids or []))
+    monkeypatch.setattr(cl, "_sync_case_to_es", fake_index)
+    asyncio.run(cl.remove_alerts_from_case(case["id"], cl.CaseAlertRemove(alert_ids=["a1"]), user, session))
+    assert indexed == [["a2"]]
+
+
+def test_a_new_case_in_a_bulk_update_is_the_only_case_the_alerts_join(db, es_pushes, monkeypatch):
+    from ion.web import api
+
+    session, user = db
+    existing = _create(session, user, ["a1"])
+    monkeypatch.setattr("ion.services.elasticsearch_service.ElasticsearchService.is_configured",
+                        property(lambda self: False))
+    asyncio.run(api.bulk_update_triage(api.BulkTriageUpdate(
+        alert_ids=["b1"], case_id=existing["id"], add_to_new_case=True, new_case_title="new"), user, session))
+    assert session.get(AlertCase, existing["id"]).source_alert_ids == ["a1"]
+    assert _triage(session, "b1").case_id != existing["id"]
