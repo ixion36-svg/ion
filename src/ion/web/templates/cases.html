@@ -352,9 +352,11 @@ async function reloadCaseBoard() {
 // and the open case window if there is one.
 async function refreshCases() {
     await loadAllCases();
+    // An integer, not the attribute's text: openCaseDetail can navigate, and
+    // a value read off the page is not trusted into a URL.
     const open = document.querySelector('[data-cwin][data-case-id]');
-    const id = open && open.getAttribute('data-case-id');
-    if (id && typeof openCaseDetail === 'function') openCaseDetail(id);
+    const id = open ? Number.parseInt(open.getAttribute('data-case-id'), 10) : NaN;
+    if (Number.isSafeInteger(id) && id > 0 && typeof openCaseDetail === 'function') openCaseDetail(id);
 }
 
 async function loadAllCases() {
