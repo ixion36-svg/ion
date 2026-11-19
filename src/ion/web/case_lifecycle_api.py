@@ -1146,8 +1146,9 @@ async def create_case(
     # the link appears on the case page moments later.
     kibana_url = None
     if not defer_enrichment:
-        create_assignee_uid = _resolve_kibana_assignee_uid(
-            session, new_case.assigned_to_id
+        # Off the event loop: an uncached assignee costs a blocking ES lookup.
+        create_assignee_uid = await asyncio.to_thread(
+            _resolve_kibana_assignee_uid, session, new_case.assigned_to_id
         )
         # On a worker thread: the Kibana client is synchronous, and inline it
         # froze every request on this worker for the whole exchange.

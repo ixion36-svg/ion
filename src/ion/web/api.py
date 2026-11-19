@@ -775,9 +775,10 @@ async def oidc_callback(
                 kb_svc = get_kibana_cases_service()
                 if kb_svc.enabled:
                     lookup = getattr(user, 'elastic_username', None) or user.username
-                    uid = kb_svc.resolve_user_uid(lookup)
+                    # Off the event loop: the lookup is a blocking HTTP call.
+                    uid = await asyncio.to_thread(kb_svc.resolve_user_uid, lookup)
                     if not uid and lookup != user.username:
-                        uid = kb_svc.resolve_user_uid(user.username)
+                        uid = await asyncio.to_thread(kb_svc.resolve_user_uid, user.username)
                     if uid:
                         user.elastic_uid = uid
                         if not getattr(user, 'elastic_username', None):

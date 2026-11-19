@@ -754,7 +754,7 @@ class KibanaCasesService:
         /internal/cases/_suggest_user_profiles needs a Platinum licence.
         ES's POST /_security/profile/_suggest works on any licence with
         the manage_user_profile privilege. It is synchronous because the
-        callers are, and some of them run on the event loop.
+        callers are; async callers run it with asyncio.to_thread.
 
         A profile only exists once its user has signed in to Kibana, so an
         empty list is a normal answer.
@@ -776,7 +776,7 @@ class KibanaCasesService:
                 headers=es._get_headers(),
                 auth=es._get_auth(),
                 verify=get_ssl_verify(es.verify_ssl),
-                timeout=httpx.Timeout(10.0, connect=3.0),
+                timeout=httpx.Timeout(5.0, connect=3.0),
             )
         except httpx.HTTPError as e:
             logger.debug("Elastic profile suggest failed: %s", e)
@@ -788,7 +788,12 @@ class KibanaCasesService:
                 response.status_code,
             )
             return []
-        profiles = response.json().get("profiles", [])
+        try:
+            body = response.json()
+        except ValueError:
+            logger.warning("Elastic profile suggest returned a body that is not JSON")
+            return []
+        profiles = body.get("profiles") if isinstance(body, dict) else None
         return profiles if isinstance(profiles, list) else []
 
     def resolve_user_uid(self, username: str) -> Optional[str]:

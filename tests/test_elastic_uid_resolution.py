@@ -10,7 +10,6 @@ import pytest
 
 from ion.services import kibana_cases_service as kcs
 
-
 ELASTIC_PROFILE = {"uid": "u_abc_0", "user": {"username": "r.okonjo", "email": "r@ion.lab"}}
 
 
@@ -54,3 +53,13 @@ def test_an_elasticsearch_refusal_resolves_nothing(svc, monkeypatch):
 
     assert svc.suggest_user_profiles("r.okonjo") == []
     assert svc.resolve_user_uid("r.okonjo") is None
+
+
+@pytest.mark.parametrize("raw", [b"<html>proxy error</html>", b"[]", b'{"profiles": "nope"}'])
+def test_a_malformed_success_resolves_nothing_instead_of_raising(svc, monkeypatch, raw):
+    monkeypatch.setattr(
+        kcs.httpx, "post",
+        lambda url, **kw: httpx.Response(200, content=raw, request=httpx.Request("POST", url)),
+    )
+
+    assert svc.suggest_user_profiles("r.okonjo") == []
