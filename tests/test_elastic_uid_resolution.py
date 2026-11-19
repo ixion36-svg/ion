@@ -63,3 +63,71 @@ def test_a_malformed_success_resolves_nothing_instead_of_raising(svc, monkeypatc
     )
 
     assert svc.suggest_user_profiles("r.okonjo") == []
+
+
+def test_without_elasticsearch_nothing_is_asked(monkeypatch):
+    monkeypatch.setattr(kcs, "get_kibana_config", lambda: {"enabled": True, "url": "http://kibana:5601"})
+    monkeypatch.setattr("ion.services.elasticsearch_service.get_elasticsearch_config", lambda: {})
+    monkeypatch.setattr(kcs.httpx, "post", lambda *a, **k: pytest.fail("ES was called"))
+
+    assert kcs.KibanaCasesService().suggest_user_profiles("r.okonjo") == []
+
+
+def test_an_unreachable_elasticsearch_resolves_nothing(svc, monkeypatch):
+    def refuse(url, **kw):
+        raise httpx.ConnectError("refused", request=httpx.Request("POST", url))
+    monkeypatch.setattr(kcs.httpx, "post", refuse)
+
+    assert svc.resolve_user_uid("r.okonjo") is None
+
+
+class _Session:
+    commits = 0
+
+    def commit(self):
+        self.commits += 1
+
+
+def _user(**kw):
+    from types import SimpleNamespace
+    return SimpleNamespace(**{"username": "r.okonjo", "elastic_uid": None, "elastic_username": None, **kw})
+
+
+def _login(monkeypatch, answers):
+    import asyncio
+
+    from ion.web.api import cache_elastic_uid_on_login
+
+    asked = []
+
+    class Svc:
+        enabled = True
+
+        def resolve_user_uid(self, name):
+            asked.append(name)
+            return answers.get(name)
+
+    monkeypatch.setattr(kcs, "get_kibana_cases_service", lambda: Svc())
+    return asked, lambda user, session: asyncio.run(cache_elastic_uid_on_login(user, session))
+
+
+def test_sign_in_keeps_the_uid_and_the_name_it_was_found_under(monkeypatch):
+    asked, login = _login(monkeypatch, {"r.okonjo": "u_1"})
+    user, session = _user(), _Session()
+    login(user, session)
+    assert (user.elastic_uid, user.elastic_username, session.commits) == ("u_1", "r.okonjo", 1)
+    assert asked == ["r.okonjo"]
+
+
+def test_sign_in_falls_back_from_the_elastic_name_to_the_ion_name(monkeypatch):
+    asked, login = _login(monkeypatch, {"r.okonjo": "u_2"})
+    user = _user(elastic_username="rokonjo@corp")
+    login(user, _Session())
+    assert asked == ["rokonjo@corp", "r.okonjo"]
+    assert user.elastic_uid == "u_2" and user.elastic_username == "rokonjo@corp"
+
+
+def test_a_cached_uid_is_not_looked_up_again(monkeypatch):
+    asked, login = _login(monkeypatch, {})
+    login(_user(elastic_uid="u_old"), _Session())
+    assert asked == []

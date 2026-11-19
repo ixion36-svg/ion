@@ -662,6 +662,34 @@ async def get_oidc_public_config(request: Request, response: Response):
     }
 
 
+async def cache_elastic_uid_on_login(user: User, session: Session) -> None:
+    """Resolve and keep the user's Elastic profile UID at sign-in, once.
+
+    Tries elastic_username, then the ION username. The lookup is a blocking
+    HTTP call, so it runs on a worker thread rather than the event loop.
+    Best-effort: a sign-in never fails because of it.
+    """
+    if getattr(user, "elastic_uid", None):
+        return
+    try:
+        from ion.services.kibana_cases_service import get_kibana_cases_service
+        kb_svc = get_kibana_cases_service()
+        if not kb_svc.enabled:
+            return
+        lookup = getattr(user, "elastic_username", None) or user.username
+        uid = await asyncio.to_thread(kb_svc.resolve_user_uid, lookup)
+        if not uid and lookup != user.username:
+            uid = await asyncio.to_thread(kb_svc.resolve_user_uid, user.username)
+        if uid:
+            user.elastic_uid = uid
+            if not getattr(user, "elastic_username", None):
+                user.elastic_username = lookup
+            session.commit()
+            logger.info(f"OIDC callback: resolved elastic_uid for {user.username}: {uid}")
+    except Exception as e:
+        logger.debug(f"OIDC callback: elastic_uid resolve skipped: {e}")
+
+
 @router.get("/auth/oidc/callback")
 async def oidc_callback(
     request: Request,
@@ -768,25 +796,7 @@ async def oidc_callback(
         session.commit()
         logger.info(f"OIDC callback: user synced — {user.username} (id={user.id})")
 
-        # Auto-resolve Elastic UID on login if not cached
-        if not getattr(user, 'elastic_uid', None):
-            try:
-                from ion.services.kibana_cases_service import get_kibana_cases_service
-                kb_svc = get_kibana_cases_service()
-                if kb_svc.enabled:
-                    lookup = getattr(user, 'elastic_username', None) or user.username
-                    # Off the event loop: the lookup is a blocking HTTP call.
-                    uid = await asyncio.to_thread(kb_svc.resolve_user_uid, lookup)
-                    if not uid and lookup != user.username:
-                        uid = await asyncio.to_thread(kb_svc.resolve_user_uid, user.username)
-                    if uid:
-                        user.elastic_uid = uid
-                        if not getattr(user, 'elastic_username', None):
-                            user.elastic_username = lookup
-                        session.commit()
-                        logger.info(f"OIDC callback: resolved elastic_uid for {user.username}: {uid}")
-            except Exception as e:
-                logger.debug(f"OIDC callback: elastic_uid resolve skipped: {e}")
+        await cache_elastic_uid_on_login(user, session)
 
         # Create a ION session for the user
         ip_address = get_client_ip(request)
