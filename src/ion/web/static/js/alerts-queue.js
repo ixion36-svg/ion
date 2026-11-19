@@ -253,9 +253,13 @@
         return v == null ? '' : v;
     }
 
+    // Severity is locked highest to lowest: it always orders the rows first,
+    // and the chosen column only orders alerts of the same severity.
     function sortRows(list) {
         const dir = sortKey === 'age' ? -sortDir : sortDir;   // newest first reads as "age ascending"
         return list.slice().sort((x, y) => {
+            const bySev = rank(x.severity) - rank(y.severity);
+            if (bySev || sortKey === 'sev') return bySev || (ts(y) - ts(x));
             const A = sortVal(x, sortKey), B = sortVal(y, sortKey);
             return ((A < B ? -1 : A > B ? 1 : 0) * dir) || (ts(y) - ts(x));
         });
@@ -568,7 +572,9 @@
         setDensity(v) { density = v; render(); },
         setTimezone(v) { tz = v; render(); },
         setSort(k) {
-            if (sortKey === k) sortDir = -sortDir; else { sortKey = k; sortDir = 1; }
+            if (k === 'sev') { sortKey = 'sev'; sortDir = 1; }   // locked: never lowest first
+            else if (sortKey === k) sortDir = -sortDir;
+            else { sortKey = k; sortDir = 1; }
             cur = 0; render();
         },
         // The alerts in the order the table shows them: grouped, sorted, and

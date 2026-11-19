@@ -75,6 +75,10 @@ class CaseNoteCreate(BaseModel):
     content: str
 
 
+class CaseAlertRemove(BaseModel):
+    alert_ids: List[str]
+
+
 class CaseCreate(BaseModel):
     title: str
     description: Optional[str] = None
@@ -251,6 +255,79 @@ async def _background_case_sync(case_id: int) -> None:
 # and a big multi-select create must not hold its response open past
 # reverse-proxy read timeouts.
 _ENRICH_INLINE_MAX = 25
+
+
+# A second create for the same alerts within this window returns the first
+# case instead of making another. It catches the impatient re-submit (dialog
+# reopened, clicked again) that the page's own in-flight guard cannot see.
+_DUPLICATE_CREATE_WINDOW_S = 120
+_CASE_CREATE_LOCK_NS = 0x10C4  # pg_advisory_xact_lock namespace for case creates
+
+
+def _serialise_case_creates(session, user_id: int) -> None:
+    """Make one user's case creates run one at a time (Postgres only).
+
+    Two near-simultaneous POSTs would both pass the duplicate check before
+    either commits. The transaction lock holds the second until the first
+    commits, so its check then sees the first case. Released at commit.
+    """
+    try:
+        if session.get_bind().dialect.name != "postgresql":
+            return
+        from sqlalchemy import text
+        session.execute(text("SELECT pg_advisory_xact_lock(:ns, :uid)"),
+                        {"ns": _CASE_CREATE_LOCK_NS, "uid": int(user_id)})
+    except Exception:
+        logger.debug("case-create lock unavailable; duplicate check still runs", exc_info=True)
+
+
+def _recent_duplicate_case(session, user_id: int, alert_ids: List[str]) -> Optional[AlertCase]:
+    """This user's open case, made in the last two minutes, for exactly these alerts."""
+    from datetime import timedelta
+
+    from sqlalchemy import func
+
+    wanted = set(alert_ids)
+    if not wanted:
+        return None
+    now = session.query(func.now()).scalar()
+    recent = (
+        session.query(AlertCase)
+        .filter(AlertCase.created_by_id == user_id,
+                AlertCase.status != AlertCaseStatus.CLOSED)
+        .order_by(AlertCase.id.desc())
+        .limit(5)
+        .all()
+    )
+    for case in recent:
+        created = case.created_at
+        if isinstance(now, datetime) and isinstance(created, datetime):
+            if created.tzinfo is not None and now.tzinfo is None:
+                created = created.replace(tzinfo=None)
+            elif created.tzinfo is None and now.tzinfo is not None:
+                now = now.replace(tzinfo=None)
+            if now - created > timedelta(seconds=_DUPLICATE_CREATE_WINDOW_S):
+                continue
+        if set(case.source_alert_ids or []) == wanted:
+            return case
+    return None
+
+
+_spawned_syncs: set = set()
+
+
+def _spawn_alert_workflow_sync(alert_ids: list, status: str) -> None:
+    """Push a workflow_status change to ES without holding the response.
+
+    Not BackgroundTasks: in this middleware stack those delay the response
+    until they finish (see create_case's deferred enrichment).
+    """
+    if not alert_ids:
+        return
+    task = asyncio.get_running_loop().create_task(
+        _background_alert_workflow_sync(list(alert_ids), status))
+    _spawned_syncs.add(task)
+    task.add_done_callback(_spawned_syncs.discard)
 
 
 def _resolve_kibana_assignee_uid(session, assigned_to_id) -> Optional[str]:
@@ -817,6 +894,31 @@ async def create_case(
     """Create a new investigation case, optionally linking alert IDs."""
     from ion.services.case_numbering import assign_case_number
 
+    if data.alert_ids:
+        _serialise_case_creates(session, current_user.id)
+        existing_case = _recent_duplicate_case(session, current_user.id, data.alert_ids)
+        if existing_case is not None:
+            logger.info("create_case: repeat create for %d alerts returned %s",
+                        len(data.alert_ids), existing_case.case_number)
+            session.rollback()  # release the create lock
+            return {
+                "id": existing_case.id,
+                "case_number": existing_case.case_number,
+                "title": existing_case.title,
+                "status": getattr(existing_case.status, "value", existing_case.status),
+                "linked_alerts": 0,
+                "duplicate": True,
+                "observables": existing_case.observables or [],
+                "kibana_case_id": existing_case.kibana_case_id,
+                "kibana_url": None,
+                "dfir_iris_case_id": existing_case.dfir_iris_case_id,
+                "dfir_iris_url": None,
+                "fp_suggestions": [],
+                "auto_closed": False,
+                "auto_closed_kfp": None,
+                "enrichment_deferred": False,
+            }
+
     new_case = AlertCase(
         title=data.title,
         description=data.description,
@@ -835,6 +937,9 @@ async def create_case(
 
     # Link alert IDs if provided
     linked = 0
+    # Alerts this create moves to acknowledged; ES is told after the commits
+    # so the alerts page stops reading them back as open.
+    acknowledged_ids: List[str] = []
     if data.alert_ids:
         # (Bug 2): build a lookup of alert_id -> rule_name from
         # the supplied raw_data so newly-created triage rows carry a
@@ -879,7 +984,13 @@ async def create_case(
                 )
                 session.add(triage)
                 triage_by_alert[alert_id] = triage
+                acknowledged_ids.append(alert_id)
             else:
+                # An alert in an open case is being worked: open becomes
+                # acknowledged. A closed alert stays closed.
+                if triage.status == AlertTriageStatus.OPEN:
+                    triage.status = AlertTriageStatus.ACKNOWLEDGED
+                    acknowledged_ids.append(alert_id)
                 # (Bug 3): if the alert was already linked to a
                 # different case, the previous case's source_alert_ids
                 # JSON still references it. That divergence is what made
@@ -1252,6 +1363,9 @@ async def create_case(
     # hold the response back until the task finishes (measured: a 1s
     # endpoint became a 60s+ client wait), which is the exact failure this
     # deferral exists to prevent.
+    if acknowledged_ids and not auto_closed:
+        _spawn_alert_workflow_sync(acknowledged_ids, "acknowledged")
+
     if defer_enrichment:
         import threading
         threading.Thread(
@@ -1276,6 +1390,63 @@ async def create_case(
         "auto_closed": auto_closed,
         "auto_closed_kfp": auto_closed_kfp,
         "enrichment_deferred": defer_enrichment,
+    }
+
+
+@router.post("/elasticsearch/alerts/cases/{case_id}/alerts/remove")
+async def remove_alerts_from_case(
+    case_id: int,
+    data: CaseAlertRemove,
+    current_user: User = Depends(require_permission("case:update")),
+    session: Session = Depends(get_db_session),
+):
+    """Take alerts out of a case.
+
+    The link is cleared on the triage row and the id leaves the case's
+    source_alert_ids. An alert that was acknowledged goes back to open, in
+    ION and in Elasticsearch, so it returns to the alert queue; a closed
+    alert stays closed. Kibana's case keeps its alert attachments: Kibana
+    does not expose their comment ids to a server-side client.
+    """
+    case = session.query(AlertCase).filter_by(id=case_id).first()
+    if case is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    if getattr(case.status, "value", case.status) == "closed":
+        raise HTTPException(status_code=409, detail="Reopen the case to change its alerts")
+    wanted = list(dict.fromkeys(data.alert_ids or []))
+    if not wanted:
+        raise HTTPException(status_code=400, detail="No alert IDs provided")
+
+    rows = (
+        session.query(AlertTriage)
+        .filter(AlertTriage.case_id == case_id, AlertTriage.es_alert_id.in_(wanted))
+        .all()
+    )
+    removed = [t.es_alert_id for t in rows]
+    reopened: List[str] = []
+    from ion.models.user import AuditLog as _AuditLog
+    for t in rows:
+        t.case_id = None
+        if t.status == AlertTriageStatus.ACKNOWLEDGED:
+            t.status = AlertTriageStatus.OPEN
+            reopened.append(t.es_alert_id)
+        session.add(_AuditLog(
+            user_id=current_user.id,
+            action="alert_unlinked",
+            resource_type="alert_triage",
+            resource_id=t.id,
+            details=json.dumps({"case_id": case_id, "es_alert_id": t.es_alert_id}),
+        ))
+    gone = set(removed) | set(wanted)
+    case.source_alert_ids = [x for x in (case.source_alert_ids or []) if x not in gone]
+    session.commit()
+
+    _spawn_alert_workflow_sync(reopened, "open")
+    return {
+        "case_id": case_id,
+        "removed": len(removed),
+        "reopened": len(reopened),
+        "not_in_case": [x for x in wanted if x not in set(removed)],
     }
 
 @router.post("/elasticsearch/alerts/cases/{case_id}/notes")

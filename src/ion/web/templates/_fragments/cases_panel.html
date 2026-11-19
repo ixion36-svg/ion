@@ -275,6 +275,10 @@
           {%- else %}
           <span class="cwin-note">Marking alerts needs the alert:triage permission.</span>
           {%- endif %}
+          {%- if can_unlink and status != 'closed' %}
+          <button type="button" class="cwin-btn sm" data-click-action="cwRemovePicked"
+                  title="Take the ticked alerts out of this case">Remove from case</button>
+          {%- endif %}
         </div>
         <div class="cwin-bulk-r cwin-bulk-ask" data-cwin-bulk-ask hidden>
           <span data-cwin-bulk-q></span><span class="cwin-grow"></span>
@@ -343,6 +347,10 @@
             {%- endif %}
             <button class="cpanel-pin-btn" type="button" data-cwin-pin
                     data-click-action="pinAlertToCase">Pin as evidence</button>
+            {%- if can_unlink and status != 'closed' %}
+            <button class="cwin-btn sm" type="button" data-click-action="cwRemoveFocused"
+                    title="Take this alert out of the case">Remove from case</button>
+            {%- endif %}
           </div>
         </header>
         <div class="cwin-bob-slot" id="cwin-bob-slot"></div>

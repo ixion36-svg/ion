@@ -24,6 +24,11 @@
     <label class="ci-search"><svg class="w-3.5 h-3.5" aria-hidden="true"><use href="#i-search"/></svg>
       <input type="text" id="filter-search" placeholder="Search case number or title" aria-label="Search cases" data-input-action="debouncedFilter"><kbd>/</kbd>
     </label>
+    <button type="button" data-click-action="refreshCases" class="ion-btn ion-btn-ghost"
+            title="Reload the case list and the counts" aria-label="Refresh cases">
+      <svg class="w-3.5 h-3.5" aria-hidden="true"><use href="#i-refresh"/></svg>
+      Refresh
+    </button>
     <button data-click-action="showCreateCaseModal" class="ion-btn ion-btn-primary">
       <svg class="w-3.5 h-3.5"><use href="#i-plus"/></svg>
       New Case
@@ -210,15 +215,16 @@
 
 <!-- Closure Modal -->
 <div class="cases-modal-overlay hidden" id="closure-modal-overlay" data-click-action="cancelClosure" data-only-self-click>
-    <div class="bg-base-200 border border-base-300 rounded-lg w-[90%] max-w-[480px] max-h-[80vh] overflow-auto shadow-[0_2px_8px_rgba(0,0,0,.15)]">
+    <div class="closure-dialog bg-base-200 border border-base-300 rounded-lg w-[90%] max-w-[480px] max-h-[80vh] overflow-auto shadow-[0_2px_8px_rgba(0,0,0,.15)]">
         <div class="flex justify-between items-center px-5 py-4 border-b border-base-300">
             <h3 id="closure-modal-title" class="m-0 text-[1.05rem]">Close Case</h3>
             <button class="bg-transparent border-0 text-[1.5rem] leading-none text-base-content/60 hover:text-base-content cursor-pointer" data-click-action="cancelClosure">&times;</button>
         </div>
+        <div class="closure-body">
         <div class="p-5">
             <div class="mb-3">
                 <label class="block text-[0.85rem] font-medium text-base-content mb-1">Closure Reason *</label>
-                <select id="closure-reason" class="form-control">
+                <select id="closure-reason" class="form-control" data-change-action="highlightClosureGuide">
                     <option value="">Select reason...</option>
                     <option value="true_positive">True Positive</option>
                     <option value="false_positive">False Positive</option>
@@ -239,6 +245,25 @@
                 </div>
                 <textarea id="closure-notes" class="form-control resize-y" rows="3" placeholder="Closure details..."></textarea>
             </div>
+        </div>
+        <aside class="closure-guide" aria-labelledby="closure-guide-h">
+            <h4 id="closure-guide-h">Which reason?</h4>
+            <dl>
+                <div data-reason="true_positive"><dt>True positive</dt>
+                    <dd>The activity was real and malicious or unauthorised, and the detection caught what it was built to catch. Something had to be done: contained, remediated or escalated.</dd></div>
+                <div data-reason="benign_true_positive"><dt>Benign true positive</dt>
+                    <dd>The rule fired correctly on real activity, but the activity was expected or authorised: admin work, a pen test, a vulnerability scanner, approved software. No response needed. Consider a known-FP entry or tuning so it stops recurring.</dd></div>
+                <div data-reason="false_positive"><dt>False positive</dt>
+                    <dd>The rule fired on activity that is not what it is meant to detect: faulty logic, a misparsed field, bad or test data. There was never a threat. The rule needs tuning.</dd></div>
+                <div data-reason="duplicate"><dt>Duplicate</dt>
+                    <dd>The same activity is already being investigated in another case. Name that case in the notes.</dd></div>
+                <div data-reason="insufficient_data"><dt>Insufficient data</dt>
+                    <dd>A verdict cannot be reached: logs are missing, retention has expired, the host is unreachable. Say in the notes what was missing.</dd></div>
+                <div data-reason="not_applicable"><dt>Not applicable</dt>
+                    <dd>The case needs no verdict: a test alert, an out-of-scope or decommissioned asset, a case opened by mistake.</dd></div>
+            </dl>
+            <p class="closure-guide-tip">Malicious and real &rarr; true positive. Real but allowed &rarr; benign true positive. Not what the rule is for &rarr; false positive.</p>
+        </aside>
         </div>
         <div class="flex justify-end gap-2 px-5 py-3 border-t border-base-300">
             <button class="btn" data-click-action="cancelClosure">Cancel</button>
@@ -321,6 +346,17 @@ async function reloadCaseBoard() {
     document.getElementById('attn-list').replaceChildren();
     document.getElementById('attn-banner').style.display = 'none';
     return renderBoard();
+}
+
+// The header's Refresh button: the board, the counts (via cases-changed),
+// and the open case window if there is one.
+async function refreshCases() {
+    await loadAllCases();
+    // An integer, not the attribute's text: openCaseDetail can navigate, and
+    // a value read off the page is not trusted into a URL.
+    const open = document.querySelector('[data-cwin][data-case-id]');
+    const id = open ? Number.parseInt(open.getAttribute('data-case-id'), 10) : NaN;
+    if (Number.isSafeInteger(id) && id > 0 && typeof openCaseDetail === 'function') openCaseDetail(id);
 }
 
 async function loadAllCases() {
@@ -1344,6 +1380,14 @@ function closeCasePanel() {
     _selectedRailAlert = null;
 }
 
+// The guidance beside the close dialog marks the reason currently picked.
+function highlightClosureGuide() {
+    const reason = document.getElementById('closure-reason')?.value || '';
+    document.querySelectorAll('.closure-guide [data-reason]').forEach(el => {
+        el.classList.toggle('is-current', el.getAttribute('data-reason') === reason);
+    });
+}
+
 // =============================================================================
 // Panel Inline Updates
 // =============================================================================
@@ -1356,6 +1400,7 @@ async function panelUpdateField(caseId, field, value) {
         document.getElementById('closure-notes').value = '';
         resetClosureAiButton();
         document.getElementById('closure-modal-overlay').style.display = 'flex';
+        highlightClosureGuide();
         return;
     }
 
