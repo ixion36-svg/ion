@@ -2067,6 +2067,7 @@ class PanelView(TypedDict):
     closure_notes: Optional[str]
     can_enrich: bool
     can_triage: bool
+    can_unlink: bool
     me_id: Optional[int]
     verdicts: list[dict]
     untriaged_detail: str
@@ -2394,7 +2395,7 @@ def read_case_detail(case_id, current_user, session):
 def panel_view(payload: Any, users: Any,
                users_withheld: bool, extras: Optional[dict] = None,
                can_enrich: bool = False, can_triage: bool = False,
-               me_id: Optional[int] = None) -> PanelView:
+               me_id: Optional[int] = None, can_unlink: bool = False) -> PanelView:
     empty: PanelView = {
         "state": "failed", "case_id": 0, "case_number": None,
         "title": None, "severity": "medium",
@@ -2412,7 +2413,8 @@ def panel_view(payload: Any, users: Any,
         "kibana_url": None, "escalated": False, "iris_case_id": None,
         "iris_url": None, "assignee": None, "closure_reason": None,
         "closure_notes": None, "can_enrich": can_enrich,
-        "can_triage": can_triage, "me_id": me_id, "verdicts": list(VERDICTS),
+        "can_triage": can_triage, "can_unlink": can_unlink,
+        "me_id": me_id, "verdicts": list(VERDICTS),
         "untriaged_detail": UNTRIAGED_DETAIL,
         "blockers": [],
         "summary": None, "bob_note": None,
@@ -2486,6 +2488,7 @@ def panel_view(payload: Any, users: Any,
         "closure_notes": _panel_text(payload.get("closure_notes")),
         "can_enrich": can_enrich,
         "can_triage": can_triage,
+        "can_unlink": can_unlink,
         "me_id": me_id,
         "verdicts": list(VERDICTS),
         "untriaged_detail": UNTRIAGED_DETAIL,
@@ -2551,6 +2554,7 @@ async def cases_panel_fragment(
                       not permitted, extras,
                       can_enrich=current_user.has_permission("observable:enrich"),
                       can_triage=current_user.has_permission("alert:triage"),
+                      can_unlink=current_user.has_permission("case:update"),
                       me_id=(current_user.id if current_user.has_permission("case:update")
                              else None))
     return render_view(request, PANEL_FRAGMENT, view)
