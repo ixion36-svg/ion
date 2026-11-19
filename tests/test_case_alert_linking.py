@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -175,11 +176,10 @@ def test_adding_to_a_missing_or_closed_case_is_refused(db, es_pushes):
         assert e.value.status_code == code
 
 
-def test_a_repeat_after_the_window_makes_a_new_case(db, es_pushes, monkeypatch):
+def test_a_repeat_after_the_window_makes_a_new_case(db, es_pushes):
     session, user = db
     first = _create(session, user, ["a1"])
-    session.get(AlertCase, first["id"]).created_at -= cl.timedelta(seconds=cl._DUPLICATE_CREATE_WINDOW_S + 5) \
-        if hasattr(cl, "timedelta") else __import__("datetime").timedelta(seconds=cl._DUPLICATE_CREATE_WINDOW_S + 5)
+    session.get(AlertCase, first["id"]).created_at -= timedelta(seconds=cl._DUPLICATE_CREATE_WINDOW_S + 5)
     session.commit()
     again = _create(session, user, ["a1"])
     assert not again.get("duplicate") and again["id"] != first["id"]
@@ -204,20 +204,17 @@ def test_the_background_push_tells_es_and_keeps_no_task_once_done(monkeypatch):
 
 def test_the_create_lock_is_taken_only_on_postgres():
     executed = []
-
-    class Bind:
-        class dialect:
-            name = "postgresql"
+    bind = SimpleNamespace(dialect=SimpleNamespace(name="postgresql"))
 
     class S:
         def get_bind(self):
-            return Bind()
+            return bind
 
         def execute(self, stmt, params):
             executed.append(params)
 
     cl._serialise_case_creates(S(), 7)
     assert executed == [{"ns": cl._CASE_CREATE_LOCK_NS, "uid": 7}]
-    Bind.dialect.name = "sqlite"
+    bind.dialect.name = "sqlite"
     cl._serialise_case_creates(S(), 7)
     assert len(executed) == 1
