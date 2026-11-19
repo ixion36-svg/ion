@@ -432,6 +432,56 @@ async def _check_alerts_24h() -> Dict[str, Any]:
     }
 
 
+async def _check_metrics_7d() -> Dict[str, Any]:
+    """Seven-day SOC metrics: alert trend, spikes, MTTA/MTTR, outcomes, analysts.
+
+    Two halves that fail apart: an ES outage leaves the case and analyst
+    figures standing, and the reverse. Definitions live in
+    services/standup_metrics.py.
+    """
+    from ion.core.config import get_config
+    from ion.services.elasticsearch_service import ElasticsearchService
+    from ion.services.standup_metrics import read_alert_metrics, read_case_and_analyst_metrics
+    from ion.storage.database import get_engine, get_session_factory
+
+    out: Dict[str, Any] = {"alerts": None, "alerts_error": None, "cases": None, "cases_error": None}
+    es = ElasticsearchService()
+    if es.is_configured:
+        # One retry on a timeout: the first sweep after a restart opens its
+        # ES connections while ten other checks are opening theirs, and in
+        # the lab that lost the race about once per start.
+        for attempt in (1, 2):
+            try:
+                out["alerts"] = await read_alert_metrics(es)
+                out["alerts_error"] = None
+                break
+            except Exception as e:
+                out["alerts_error"] = str(e)[:120]
+                if attempt == 2 or "timed out" not in str(e):
+                    cause = e.__cause__ or e.__context__
+                    logger.warning("standup 7-day alert metrics failed: %s (%s)", e,
+                                   type(cause).__name__ if cause else type(e).__name__)
+                    break
+    else:
+        out["alerts_error"] = "Elasticsearch is not configured"
+
+    totals = (out["alerts"] or {}).get("_week_totals") or {}
+
+    def _cases():
+        session = get_session_factory(get_engine(get_config().db_path))()
+        try:
+            return read_case_and_analyst_metrics(session, totals.get("this"), totals.get("last"))
+        finally:
+            session.close()
+
+    try:
+        out["cases"] = await asyncio.to_thread(_cases)
+    except Exception as e:
+        logger.warning("standup 7-day case metrics failed: %s", e)
+        out["cases_error"] = str(e)[:120]
+    return out
+
+
 async def _check_case_status_counts() -> Dict[str, Any]:
     """Case status snapshot — last 24 hours.
 
@@ -877,7 +927,7 @@ async def daily_checks_payload():
     (
         cluster, alerts, cases,
         dc_health, wef_health, rule_failures,
-        alerts_30d, alerts_24h, case_status, triage_throughput,
+        alerts_30d, alerts_24h, case_status, triage_throughput, metrics_7d,
     ) = await asyncio.gather(
         _check_cluster_health(),
         _check_critical_alerts(),
@@ -889,6 +939,7 @@ async def daily_checks_payload():
         _check_alerts_24h(),
         _check_case_status_counts(),
         _check_triage_throughput_24h(),
+        _check_metrics_7d(),
         return_exceptions=True,
     )
 
@@ -913,6 +964,9 @@ async def daily_checks_payload():
         # standup page. 30d data above stays in the response because
         # the pptx export still references it.
         "alerts_24h":         _safe(alerts_24h),
+        # Seven days beside the seven before: trend, spikes, MTTA/MTTR,
+        # outcomes and the per-analyst table.
+        "metrics_7d":         _safe(metrics_7d),
         # Who the rota says runs this standup. Shown before anybody
         # signs, so the question "should I be doing this?" has an answer
         # on the page rather than in somebody's memory of the rota.
