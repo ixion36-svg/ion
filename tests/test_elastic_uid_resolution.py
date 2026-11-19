@@ -103,11 +103,12 @@ def _login(monkeypatch, answers):
     class Svc:
         enabled = True
 
-        def resolve_user_uid(self, name):
+        def resolve_user_uid(self, name, email=None):
             asked.append(name)
             return answers.get(name)
 
     monkeypatch.setattr(kcs, "get_kibana_cases_service", lambda: Svc())
+    monkeypatch.setattr("ion.services.elastic_identity.uid_held_by_another", lambda *a: False)
     return asked, lambda user, session: asyncio.run(cache_elastic_uid_on_login(user, session))
 
 
@@ -131,3 +132,61 @@ def test_a_cached_uid_is_not_looked_up_again(monkeypatch):
     asked, login = _login(monkeypatch, {})
     login(_user(elastic_uid="u_old"), _Session())
     assert asked == []
+
+
+# ── a self-chosen name cannot bind someone else's profile ────────────────
+
+def test_a_profile_with_someone_elses_email_is_not_resolved(svc, monkeypatch):
+    _answer(monkeypatch, 200, {"profiles": [ELASTIC_PROFILE]}, [])
+    assert svc.resolve_user_uid("r.okonjo", "attacker@ion.lab") is None
+    assert svc.resolve_user_uid("r.okonjo", "R@ion.lab") == "u_abc_0"
+    assert svc.resolve_user_uid("r.okonjo", None) == "u_abc_0"
+
+
+def _payload(monkeypatch, session, user, profiles):
+    from ion.web import api
+
+    class Svc:
+        enabled = True
+
+        def suggest_user_profiles(self, name):
+            return profiles
+    monkeypatch.setattr(api, "get_kibana_cases_service", lambda: Svc())
+    return api.resolve_elastic_payload(user, session)
+
+
+def _users(session):
+    from ion.models.user import User
+    User.metadata.create_all(session.get_bind())
+    me = User(username="mallory", email="m@ion.lab", password_hash="x", elastic_username="r.okonjo")
+    victim = User(username="r.okonjo", email="r@ion.lab", password_hash="x")
+    session.add_all([me, victim])
+    session.commit()
+    return me, victim
+
+
+def test_resolve_never_lists_other_profiles_and_refuses_another_persons_email(session, monkeypatch):
+    me, _ = _users(session)
+    out = _payload(monkeypatch, session, me, [ELASTIC_PROFILE,
+                                              {"uid": "u_x", "user": {"username": "r.okonjo2", "email": "x@y"}}])
+    assert out["resolved"] is False and out["refused"] == "email"
+    assert "profiles_found" not in out
+    session.refresh(me)
+    assert me.elastic_uid is None
+
+
+def test_resolve_refuses_a_uid_another_user_holds(session, monkeypatch):
+    me, victim = _users(session)
+    victim.elastic_uid = "u_abc_0"
+    session.commit()
+    no_email = {"uid": "u_abc_0", "user": {"username": "r.okonjo"}}
+    out = _payload(monkeypatch, session, me, [no_email])
+    assert out["resolved"] is False and out["refused"] == "taken"
+    session.refresh(me)
+    assert me.elastic_uid is None
+
+
+def test_resolve_still_links_your_own_profile(session, monkeypatch):
+    _, victim = _users(session)
+    out = _payload(monkeypatch, session, victim, [ELASTIC_PROFILE])
+    assert out["resolved"] is True and out["elastic_uid"] == "u_abc_0"

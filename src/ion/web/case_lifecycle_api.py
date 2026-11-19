@@ -350,10 +350,15 @@ def _resolve_kibana_assignee_uid(session, assigned_to_id) -> Optional[str]:
         if not kb_svc.enabled:
             return None
         # Try elastic_username first, then ION username
+        from ion.services.elastic_identity import uid_held_by_another
+
         lookup_name = getattr(assignee_user, 'elastic_username', None) or assignee_user.username
-        uid = kb_svc.resolve_user_uid(lookup_name)
+        email = getattr(assignee_user, 'email', None)
+        uid = kb_svc.resolve_user_uid(lookup_name, email)
         if not uid and lookup_name != assignee_user.username:
-            uid = kb_svc.resolve_user_uid(assignee_user.username)
+            uid = kb_svc.resolve_user_uid(assignee_user.username, email)
+        if uid and uid_held_by_another(session, uid, assignee_user.id):
+            return None
         if uid:
             assignee_user.elastic_uid = uid
             session.commit()
@@ -512,10 +517,14 @@ async def _background_kibana_case_sync(
                         from ion.services.elasticsearch_service import ElasticsearchService
                         _es = ElasticsearchService()
                         if _es.is_configured:
+                            from ion.services.elastic_identity import uid_held_by_another
+
                             lookup_name = getattr(assignee, "elastic_username", None) or assignee.username
-                            uid = await _es.resolve_user_uid(lookup_name)
+                            uid = await _es.resolve_user_uid(lookup_name, assignee.email)
                             if not uid and lookup_name != assignee.username:
-                                uid = await _es.resolve_user_uid(assignee.username)
+                                uid = await _es.resolve_user_uid(assignee.username, assignee.email)
+                            if uid and uid_held_by_another(_session, uid, assignee.id):
+                                uid = None
                             if uid:
                                 assignee_elastic_uid = uid
                                 assignee.elastic_uid = uid

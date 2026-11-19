@@ -521,9 +521,11 @@ def resolve_elastic_payload(current_user: User, session: Session) -> dict:
     if current_user.display_name:
         candidates.append(current_user.display_name)
 
+    from ion.services.elastic_identity import email_conflicts, uid_held_by_another
+
     resolved_uid = None
     matched_username = None
-    all_profiles = []
+    refused = None
 
     for candidate in candidates:
         profiles = kb_svc.suggest_user_profiles(candidate)
@@ -531,24 +533,20 @@ def resolve_elastic_payload(current_user: User, session: Session) -> dict:
             profile_user = profile.get("user", {})
             p_username = profile_user.get("username", "") if isinstance(profile_user, dict) else ""
             p_email = profile_user.get("email", "") if isinstance(profile_user, dict) else ""
-            p_full = profile_user.get("full_name", "") if isinstance(profile_user, dict) else ""
-            all_profiles.append({
-                "uid": profile.get("uid"),
-                "username": p_username,
-                "email": p_email,
-                "full_name": p_full,
-            })
-
-            # Exact match on username
-            if p_username == candidate:
-                resolved_uid = profile.get("uid")
-                matched_username = p_username
-                break
-            # Match on email
-            if p_email and p_email == current_user.email:
-                resolved_uid = profile.get("uid")
-                matched_username = p_username
-                break
+            uid = profile.get("uid")
+            if not uid or not (p_username == candidate
+                               or (p_email and p_email == current_user.email)):
+                continue
+            # The candidate names are the user's own choosing, so a match is
+            # theirs only if its email agrees and no one else holds it.
+            if email_conflicts(profile, current_user.email):
+                refused = "email"
+                continue
+            if uid_held_by_another(session, uid, current_user.id):
+                refused = "taken"
+                continue
+            resolved_uid, matched_username = uid, p_username
+            break
 
         if resolved_uid:
             break
@@ -561,12 +559,15 @@ def resolve_elastic_payload(current_user: User, session: Session) -> dict:
                 user.elastic_username = matched_username
             session.commit()
 
+    # Other people's profiles are never listed: the lookup is fuzzy and the
+    # names it is asked for are the caller's to choose, so a list would be a
+    # directory of Elastic accounts for any signed-in user.
     return {
         "resolved": resolved_uid is not None,
         "elastic_uid": resolved_uid,
         "matched_username": matched_username,
         "candidates_tried": candidates,
-        "profiles_found": all_profiles,
+        "refused": None if resolved_uid else refused,
     }
 
 
@@ -676,10 +677,16 @@ async def cache_elastic_uid_on_login(user: User, session: Session) -> None:
         kb_svc = get_kibana_cases_service()
         if not kb_svc.enabled:
             return
+        from ion.services.elastic_identity import uid_held_by_another
+
         lookup = getattr(user, "elastic_username", None) or user.username
-        uid = await asyncio.to_thread(kb_svc.resolve_user_uid, lookup)
+        email = getattr(user, "email", None)
+        uid = await asyncio.to_thread(kb_svc.resolve_user_uid, lookup, email)
         if not uid and lookup != user.username:
-            uid = await asyncio.to_thread(kb_svc.resolve_user_uid, user.username)
+            uid = await asyncio.to_thread(kb_svc.resolve_user_uid, user.username, email)
+        if uid and uid_held_by_another(session, uid, getattr(user, "id", None)):
+            logger.warning("OIDC callback: elastic profile for %s is already linked to another user", user.username)
+            uid = None
         if uid:
             user.elastic_uid = uid
             if not getattr(user, "elastic_username", None):

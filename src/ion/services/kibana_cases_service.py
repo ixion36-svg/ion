@@ -796,16 +796,20 @@ class KibanaCasesService:
         profiles = body.get("profiles") if isinstance(body, dict) else None
         return profiles if isinstance(profiles, list) else []
 
-    def resolve_user_uid(self, username: str) -> Optional[str]:
+    def resolve_user_uid(self, username: str, email: Optional[str] = None) -> Optional[str]:
         """Resolve an ION username to a Kibana/Elastic user profile UID.
 
         Returns the profile UID string, or None if not found.
         """
+        from ion.services.elastic_identity import email_conflicts
+
         profiles = self.suggest_user_profiles(username)
         for profile in profiles:
-            # Match exact username
+            # Exact username, and not someone else's: a profile whose email
+            # differs from the ION user's is skipped (elastic_identity).
             profile_user = profile.get("user", {})
-            if isinstance(profile_user, dict) and profile_user.get("username") == username:
+            if (isinstance(profile_user, dict) and profile_user.get("username") == username
+                    and not email_conflicts(profile, email)):
                 return profile.get("uid")
         return None
 

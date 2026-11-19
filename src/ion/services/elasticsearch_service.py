@@ -707,7 +707,7 @@ class ElasticsearchService:
             logger.debug("ES profile suggest failed for %r: %s", name, e)
             return []
 
-    async def resolve_user_uid(self, username: str) -> Optional[str]:
+    async def resolve_user_uid(self, username: str, email: Optional[str] = None) -> Optional[str]:
         """Resolve an exact username to its Elasticsearch user profile UID.
 
         Calls `suggest_user_profiles` and returns only an EXACT username match
@@ -715,10 +715,13 @@ class ElasticsearchService:
         Returns None if the username has no profile (user has never logged
         into Kibana, or doesn't exist in ES).
         """
+        from ion.services.elastic_identity import email_conflicts
+
         profiles = await self.suggest_user_profiles(username, size=10)
         for p in profiles:
             user = p.get("user", {}) if isinstance(p, dict) else {}
-            if isinstance(user, dict) and user.get("username") == username:
+            if (isinstance(user, dict) and user.get("username") == username
+                    and not email_conflicts(p, email)):
                 return p.get("uid")
         return None
 

@@ -212,10 +212,7 @@ def _resolve(**over: Any) -> dict:
         "elastic_uid": "u_abc123",
         "matched_username": "lyndon.k",
         "candidates_tried": ["lyndon.k", "lyndon"],
-        "profiles_found": [
-            {"uid": "u_abc123", "username": "lyndon.k",
-             "email": "lyndon@example.test", "full_name": "Lyndon K"},
-        ],
+        "refused": None,
     }
     base.update(over)
     return base
@@ -228,31 +225,31 @@ def test_a_match_names_the_username_and_the_uid():
     assert "u_abc123" in html
 
 
-def test_no_match_lists_what_was_tried_and_what_was_found():
+def test_no_match_says_what_was_tried_and_lists_no_one_else():
+    """The lookup is fuzzy and the names are the caller's choice, so listing
+    what it found was a directory of other people's Elastic accounts."""
     html = _flat(render(
         RESOLVE_FRAGMENT,
-        result=_resolve(resolved=False, elastic_uid=None,
-                        matched_username=None),
+        result=_resolve(resolved=False, elastic_uid=None, matched_username=None,
+                        profiles_found=[{"uid": "u9", "username": "someone.else",
+                                         "email": "s@x", "full_name": "Someone Else"}]),
         lookup_error=None,
     ))
     assert "alert-warning" in html
     assert 'Tried: "lyndon.k", "lyndon"' in html
-    assert "Available profiles found" in html
-    assert "Lyndon K" in html
+    assert "No Elastic profile matched" in html
+    assert "someone.else" not in html and "Someone Else" not in html
 
 
-def test_no_match_and_no_profiles_is_not_a_silent_empty_list():
-    """`if (result.profiles_found && result.profiles_found.length)` left the
-    whole explanation out, so the user saw the names tried and nothing about
-    what to do next."""
-    html = _flat(render(
-        RESOLVE_FRAGMENT,
-        result=_resolve(resolved=False, elastic_uid=None,
-                        matched_username=None, profiles_found=[]),
-        lookup_error=None,
-    ))
-    assert "no profiles for any of those names" in html
-    assert "Available profiles found" not in html
+def test_a_refused_match_says_why():
+    for refused, words in (("taken", "another ION user is already linked"),
+                           ("email", "its email is not yours")):
+        html = _flat(render(
+            RESOLVE_FRAGMENT,
+            result=_resolve(resolved=False, elastic_uid=None, matched_username=None, refused=refused),
+            lookup_error=None,
+        ))
+        assert words in html
 
 
 def test_a_failed_lookup_is_not_a_no_match():
@@ -269,15 +266,11 @@ def test_a_failed_lookup_is_not_a_no_match():
     assert "alert-warning" not in html
 
 
-def test_a_profile_name_from_kibana_cannot_inject_markup():
-    """These names come from another system's directory, which is the one
-    place on this page the data is not the user's own typing."""
+def test_a_matched_name_from_kibana_cannot_inject_markup():
+    """The matched username comes from another system's directory."""
     html = render(
         RESOLVE_FRAGMENT,
-        result=_resolve(resolved=False, elastic_uid=None, matched_username=None,
-                        profiles_found=[{"uid": "u1",
-                                         "username": "<img src=x onerror=1>",
-                                         "email": "", "full_name": ""}]),
+        result=_resolve(matched_username="<img src=x onerror=1>"),
         lookup_error=None,
     )
     assert "<img src=x" not in html
