@@ -746,38 +746,55 @@ class KibanaCasesService:
             return False
 
     def suggest_user_profiles(self, name: str) -> List[Dict[str, Any]]:
-        """Look up Kibana/Elastic user profile UIDs by username.
+        """Look up Elastic user profiles (the UIDs Kibana case assignees use).
 
-        Uses the Kibana internal security API to find user profiles.
-        Returns list of profiles with 'uid', 'user.username', etc.
+        Asks Elasticsearch, not Kibana. Kibana has no route a server-side
+        client can use: /internal/security/user_profile/_suggest and
+        /api/security/user_profile/_suggest are 404 on 9.x, and
+        /internal/cases/_suggest_user_profiles needs a Platinum licence.
+        ES's POST /_security/profile/_suggest works on any licence with
+        the manage_user_profile privilege. It is synchronous because the
+        callers are; async callers run it with asyncio.to_thread.
+
+        A profile only exists once its user has signed in to Kibana, so an
+        empty list is a normal answer.
         """
         if not self.enabled:
             return []
 
+        from ion.core.config import get_ssl_verify
+        from ion.services.elasticsearch_service import ElasticsearchService
+
+        es = ElasticsearchService()
+        if not es.is_configured:
+            logger.debug("Elastic profile suggest skipped: Elasticsearch is not configured")
+            return []
         try:
-            # Try Kibana's internal suggest endpoint (works on 8.x and 9.x)
-            response = self.client.post(
-                "/internal/security/user_profile/_suggest",
-                json={"name": name, "size": 5},
+            response = httpx.post(
+                f"{es.url}/_security/profile/_suggest",
+                json={"name": name, "size": 10},
+                headers=es._get_headers(),
+                auth=es._get_auth(),
+                verify=get_ssl_verify(es.verify_ssl),
+                timeout=httpx.Timeout(5.0, connect=3.0),
             )
-            if response.status_code == 200:
-                data = response.json()
-                return data if isinstance(data, list) else data.get("profiles", [])
-
-            # Fallback: try the public suggest endpoint (Kibana 9.x)
-            response = self.client.post(
-                "/api/security/user_profile/_suggest",
-                json={"name": name, "size": 5},
+        except httpx.HTTPError as e:
+            logger.debug("Elastic profile suggest failed: %s", e)
+            return []
+        if response.status_code != 200:
+            logger.warning(
+                "Elastic profile suggest returned %d; the Elasticsearch "
+                "credentials need the manage_user_profile privilege",
+                response.status_code,
             )
-            if response.status_code == 200:
-                data = response.json()
-                return data if isinstance(data, list) else data.get("profiles", [])
-
-            logger.debug("Kibana user profile suggest returned %d", response.status_code)
             return []
-        except Exception as e:
-            logger.debug("Failed to suggest Kibana user profiles: %s", e)
+        try:
+            body = response.json()
+        except ValueError:
+            logger.warning("Elastic profile suggest returned a body that is not JSON")
             return []
+        profiles = body.get("profiles") if isinstance(body, dict) else None
+        return profiles if isinstance(profiles, list) else []
 
     def resolve_user_uid(self, username: str) -> Optional[str]:
         """Resolve an ION username to a Kibana/Elastic user profile UID.
