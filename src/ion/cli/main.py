@@ -726,7 +726,10 @@ def seed_metis(
         session.commit()
 
         if metis is None:
-            console.print("[red]Error: failed to seed metis user[/red]")
+            console.print(
+                "[red]Error: a non-service account named 'metis' already exists. "
+                "Rename or remove it, then re-run.[/red]"
+            )
             raise typer.Exit(code=1)
 
         console.print(f"    Service account: {metis.username}")
@@ -798,7 +801,10 @@ def seed_tide(
         tide = auth_service.seed_tide_user()
         session.commit()
         if tide is None:
-            console.print("[red]Error: failed to seed the tide user[/red]")
+            console.print(
+                "[red]Error: a non-service account named 'tide' already exists. "
+                "Rename or remove it, then re-run.[/red]"
+            )
             raise typer.Exit(code=1)
         token = auth_service.mint_service_account_token(tide.id, ttl_days=ttl_days)
         session.commit()

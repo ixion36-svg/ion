@@ -66,6 +66,14 @@ def checks(**overrides):
         "triage_throughput": {"triaged_24h": 0, "avg_mtta_minutes": 0.0,
                               "p50_mtta_minutes": 0.0, "p90_mtta_minutes": 0.0},
         "duty": {"assigned": False, "user": None, "acknowledged": False},
+        "metrics_7d": {
+            "alerts": {"daily": [], "total": {"this": 0, "last": 0}, "spikes": [],
+                       "rules": {}, "hosts": {}, "backlog": {"total": 0}},
+            "alerts_error": None,
+            "cases": {"opened": {"this": 0, "last": 0}, "closed": {"this": 0, "last": 0},
+                      "outcomes": {}, "analysts": []},
+            "cases_error": None,
+        },
     }, **overrides)
 
 

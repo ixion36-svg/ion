@@ -266,6 +266,174 @@
   </div>
 </div>
 
+<!-- S2c: Seven-day metrics -->
+{%- macro chg(c) -%}
+{%- if c.text %}<span class="ds-chg ds-chg-{{ c.tone }}" title="{{ c.title }}">{{ c.text }}</span>{% else %}<span class="ds-chg ds-chg-flat" title="{{ c.title }}">no comparison</span>{% endif -%}
+{%- endmacro -%}
+{%- macro stat(label, p, sub=None) -%}
+<div class="ds-m-stat">
+  <div class="ds-m-label">{{ label }}</div>
+  <div class="ds-m-value">{{ n(p.value) }}</div>
+  <div class="ds-m-sub">{{ chg(p.change) }}<span class="ds-m-last">last wk {{ n(p.last) }}</span></div>
+  {%- if sub %}<div class="ds-m-note">{{ sub }}</div>{% endif %}
+</div>
+{%- endmacro -%}
+{%- set m = metrics %}
+<div class="mb-6" id="ds-metrics">
+  <div class="ds-section-label">Section 2c &middot; Seven-day trends &middot; this week vs last week</div>
+  {%- if m.failed %}{{ unread('seven-day metrics') }}
+  {%- else %}
+  {%- set a = m.alerts %}{%- set c = m.cases %}
+
+  <div class="ds-m-grid ds-m-grid-4">
+    {%- if a.failed %}
+    <div class="ds-panel ds-m-span-2">{{ unread('seven-day alert metrics' ~ (' (' ~ a.error ~ ')' if a.error else '')) }}</div>
+    {%- else %}
+    {{ stat('Alerts &middot; 7 days'|safe, a.total) }}
+    {{ stat('Daily average', a.daily_avg) }}
+    {%- endif %}
+    {%- if c.failed %}
+    <div class="ds-panel ds-m-span-2">{{ unread('case and analyst metrics' ~ (' (' ~ c.error ~ ')' if c.error else '')) }}</div>
+    {%- else %}
+    {{ stat('Escalated to cases', c.escalation, 'share of alerts placed in a case') }}
+    {{ stat('False-positive rate', c.fp_rate, 'of verdict closures') }}
+    {%- endif %}
+  </div>
+
+  {%- if not a.failed %}
+  <div class="ds-m-grid ds-m-grid-chart">
+    <div class="ds-panel">
+      <div class="ds-m-head"><span class="ds-section-label mb-0">Alert volume per day</span>
+        <span class="ds-m-note">peak {{ n(a.chart.peak if a.chart else none) }}{% if a.spikes %} &middot; <span class="ds-m-spike-key">spike</span> = at least twice the week-before median{% endif %}</span></div>
+      {%- if a.chart %}
+      <div class="ds-m-scroll">
+      <svg class="ds-m-chart" viewBox="0 0 {{ a.chart.w }} {{ a.chart.h }}" role="img"
+           aria-label="Alerts per day, last 7 days">
+        <line class="ds-m-axis" x1="0" x2="{{ a.chart.w }}" y1="{{ a.chart.base }}" y2="{{ a.chart.base }}"></line>
+        {%- for b in a.chart.bars %}
+        <g class="ds-m-bar{% if b.spike %} is-spike{% endif %}" tabindex="0" aria-label="{{ b.tip }}">
+          <title>{{ b.tip }}</title>
+          <rect class="ds-m-hit" x="{{ b.x - 6 }}" y="0" width="{{ b.w + 12 }}" height="{{ a.chart.base }}"></rect>
+          {%- if b.h %}<rect class="ds-m-fill" x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="4"></rect>{% endif %}
+          <text class="ds-m-val" x="{{ b.cx }}" y="{{ b.y - 5 }}" text-anchor="middle">{{ b.total }}{% if b.spike %} &#9650;{% endif %}</text>
+          <text class="ds-m-day" x="{{ b.cx }}" y="{{ a.chart.h - 4 }}" text-anchor="middle">{{ b.label }}</text>
+        </g>
+        {%- endfor %}
+      </svg>
+      </div>
+      {%- endif %}
+      <table class="ds-m-table ds-m-sevtable">
+        <thead><tr><th>Severity</th><th>This week</th><th>Last week</th><th>Change</th></tr></thead>
+        <tbody>
+        {%- for key in ['critical', 'high', 'medium', 'low'] %}{%- set p = a.severity[key] %}
+          <tr><td class="ds-sev-text-{{ key }}">{{ key|capitalize }}</td><td>{{ n(p.value) }}</td><td>{{ n(p.last) }}</td><td>{{ chg(p.change) }}</td></tr>
+        {%- endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="ds-panel ds-m-side">
+      <div class="ds-section-label">Spikes</div>
+      {%- if a.spikes %}
+      <ul class="ds-m-list">{% for s in a.spikes %}<li><b>{{ s.label }}</b> <span>{{ s.count }} alerts</span> <span class="ds-m-note">median before {{ s.baseline }}</span></li>{% endfor %}</ul>
+      {%- else %}<p class="ds-m-note">No day this week was twice its week-before median.</p>{% endif %}
+
+      <div class="ds-section-label ds-m-gap">Rising rules</div>
+      {%- if a.rising_rules %}
+      <ul class="ds-m-list">{% for r in a.rising_rules %}<li><span class="ds-m-name" title="{{ r.name }}">{{ r.name }}</span> <span class="ds-chg ds-chg-flat">&#9650; {{ r.delta }}</span> <span class="ds-m-note">{{ r.last }} &rarr; {{ r.count }}</span></li>{% endfor %}</ul>
+      {%- else %}<p class="ds-m-note">No rule fired more than last week.</p>{% endif %}
+      {%- if a.new_rules %}
+      <div class="ds-section-label ds-m-gap">New this week</div>
+      <ul class="ds-m-list">{% for r in a.new_rules %}<li><span class="ds-m-name" title="{{ r }}">{{ r }}</span></li>{% endfor %}</ul>
+      {%- endif %}
+
+      <div class="ds-section-label ds-m-gap">Top hosts</div>
+      {%- if a.top_hosts %}
+      <ul class="ds-m-list">{% for h in a.top_hosts %}<li><span class="ds-m-name">{{ h.name }}</span> <span>{{ h.count }}</span> <span class="ds-m-note">last wk {{ h.last }}</span></li>{% endfor %}</ul>
+      {%- else %}<p class="ds-m-note">No host-named alerts this week.</p>{% endif %}
+    </div>
+  </div>
+  {%- endif %}
+
+  <div class="ds-m-grid ds-m-grid-3">
+    <div class="ds-panel">
+      <div class="ds-section-label">Response times</div>
+      <table class="ds-m-table">
+        <thead><tr><th></th><th>Median</th><th>p90</th></tr></thead>
+        <tbody>
+        {%- if not a.failed %}
+          <tr><td title="Alert raised to its first status change (an upper bound: Kibana keeps only the latest change)">Alert MTTA</td>
+              <td>{{ n(a.mtta.median.value) }} {{ chg(a.mtta.median.change) }}</td><td>{{ n(a.mtta.p90.value) }}</td></tr>
+          <tr><td title="Alert raised to closed">Alert MTTR</td>
+              <td>{{ n(a.mttr.median.value) }} {{ chg(a.mttr.median.change) }}</td><td>{{ n(a.mttr.p90.value) }}</td></tr>
+        {%- endif %}
+        {%- if not c.failed %}
+          <tr><td title="Case created to closed">Case MTTR</td>
+              <td>{{ n(c.mttr.median.value) }} {{ chg(c.mttr.median.change) }}</td><td>{{ n(c.mttr.p90.value) }}</td></tr>
+        {%- endif %}
+        </tbody>
+      </table>
+      {%- if not a.failed %}<p class="ds-m-note ds-m-gap">{{ n(a.responded.value) }} alerts responded to this week (last week {{ n(a.responded.last) }}).</p>{% endif %}
+    </div>
+
+    <div class="ds-panel">
+      <div class="ds-section-label">Case outcomes &middot; closed this week</div>
+      {%- if c.failed %}{{ unread('case outcomes') }}
+      {%- else %}
+      <div class="ds-m-pair">
+        <div><div class="ds-m-label">Opened</div><div class="ds-m-value sm">{{ n(c.opened.value) }}</div>{{ chg(c.opened.change) }}</div>
+        <div><div class="ds-m-label">Closed</div><div class="ds-m-value sm">{{ n(c.closed.value) }}</div>{{ chg(c.closed.change) }}</div>
+      </div>
+      <table class="ds-m-table ds-m-gap">
+        <tbody>
+        {%- for o in c.outcomes %}
+          <tr><td>{{ o.label }}</td><td>{{ n(o.count) }}</td><td>{{ n(o.rate) }}</td></tr>
+        {%- endfor %}
+        </tbody>
+      </table>
+      {%- if c.verdicts == '0' %}<p class="ds-m-note">No case closed with a verdict this week, so the rates are unknown.</p>{% endif %}
+      {%- endif %}
+    </div>
+
+    <div class="ds-panel">
+      <div class="ds-section-label">Backlog now</div>
+      <div class="ds-m-pair">
+        {%- if not a.failed %}<div><div class="ds-m-label">Open alerts</div><div class="ds-m-value sm">{{ n(a.backlog.total) }}</div><div class="ds-m-note">{{ n(a.backlog.over_7d) }} older than 7d</div></div>{% endif %}
+        {%- if not c.failed %}<div><div class="ds-m-label">Open cases</div><div class="ds-m-value sm">{{ n(c.open_now) }}</div><div class="ds-m-note">{{ n(c.open_over_7d) }} older than 7d</div></div>{% endif %}
+      </div>
+      {%- if not a.failed %}
+      <table class="ds-m-table ds-m-gap"><tbody>
+        <tr><td>Open alerts &lt; 24h</td><td>{{ n(a.backlog.under_24h) }}</td></tr>
+        <tr><td>Open alerts 1&ndash;7 days</td><td>{{ n(a.backlog['1_7d']) }}</td></tr>
+        <tr><td>Open alerts &gt; 7 days</td><td>{{ n(a.backlog.over_7d) }}</td></tr>
+        {%- if not c.failed %}<tr><td>Unassigned cases</td><td>{{ n(c.unassigned_now) }}</td></tr>{% endif %}
+      </tbody></table>
+      {%- endif %}
+    </div>
+  </div>
+
+  {%- if not c.failed %}
+  <div class="ds-panel">
+    <div class="ds-m-head"><span class="ds-section-label mb-0">Analysts &middot; this week</span>
+      <span class="ds-m-note">verdict rates count case closures and alerts marked from a case</span></div>
+    {%- if c.analysts %}
+    <div class="ds-m-scroll">
+    <table class="ds-m-table ds-m-analysts">
+      <thead><tr><th>Analyst</th><th>Cases closed</th><th>Alerts marked</th><th>Cases opened</th><th>Open, assigned</th><th>Median case MTTR</th><th>TP rate</th><th>FP rate</th></tr></thead>
+      <tbody>
+      {%- for r in c.analysts %}
+        <tr><td>{{ r.name }}</td><td>{{ n(r.cases_closed) }}</td><td>{{ n(r.alerts_marked) }}</td><td>{{ n(r.cases_opened) }}</td>
+            <td>{{ n(r.open_assigned) }}</td><td>{{ n(r.mttr) }}</td><td>{{ n(r.tp_rate) }}</td><td>{{ n(r.fp_rate) }}</td></tr>
+      {%- endfor %}
+      </tbody>
+    </table>
+    </div>
+    {%- else %}<p class="ds-m-note">No analyst opened, closed or marked anything this week.</p>{% endif %}
+  </div>
+  {%- endif %}
+  {%- endif %}
+</div>
+
 <!-- S3: Stale Cases -->
 <div class="mb-6"><div class="ds-section-label">Section 3</div>
   <div class="ds-panel">

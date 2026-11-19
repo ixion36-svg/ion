@@ -1,13 +1,105 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.20 -->
-<!-- ion-doc:version=0.99.20 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.21 -->
+<!-- ion-doc:version=0.99.21 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-11-17 -->
+<!-- ion-doc:date=2026-11-19 -->
 
 # Changelog
+
+## v0.99.21 — 2026-11-19
+
+Case creation is safer and the daily standup reads the week. A double
+click no longer makes two cases, alerts placed in a case stay out of the
+Open view, and alerts can be taken back out of a case. The standup gains
+a seven-day section: alert trend and spikes, MTTA and MTTR, case
+outcomes, backlog and a per-analyst table. Elastic profile UIDs resolve
+again on Kibana 9, and a self-chosen Elastic name can no longer list or
+bind other people's profiles. A re-seeded service account now holds only
+its own role.
+Net-new findings: 0C / 0H / 0M / 0L. Closed: 2 Low (see Security).
+
+### Added
+
+- **Seven-day trends on the daily standup (Section 2c).** This week beside
+  last week for alert volume (a per-day chart and a severity table),
+  spikes (a day with at least twice the median of the week before it, and
+  at least 5 alerts), rising and new rules, and top hosts. Alert MTTA and
+  MTTR come from `kibana.alert.workflow_status_updated_at`; case MTTR is
+  created to closed. Case outcomes give the true-positive, benign and
+  false-positive rates. The escalation rate is alerts placed in cases
+  over alerts raised. The backlog shows open alerts by age and open and
+  unassigned cases. A per-analyst table lists cases closed and opened,
+  alerts marked, open cases assigned, median case MTTR, and TP and FP
+  rates. Definitions are in `services/standup_metrics.py`; the
+  Elasticsearch and database halves fail independently.
+- **Remove alerts from a case.** From the selected alert or the ticked
+  alerts in the case window (`case:update`). Acknowledged alerts go back
+  to open, in ION and in Elasticsearch, so they return to the queue.
+- **Verdict buttons on the alerts bulk bar.** Mark true positive, benign
+  or false positive for the selection, as in the case window. They never
+  close the alerts' case.
+- **A Refresh button on /cases**, reloading the list, the counts and the
+  open case.
+- **Guidance in the close dialog** defining each closure reason.
+- **A warning before alerts go into a case** when any are already in
+  another case or already acknowledged.
+
+### Changed
+
+- **Case titles are deterministic:** volume and host, for example
+  "Investigation: 30 alerts on WS-01", not the latest rule's name.
+- **Case descriptions carry more:** first and last alert time and the
+  span, affected hosts and users, rules with counts, MITRE techniques, key
+  fields and the rule's highlighted fields.
+- **The alerts view sorts critical first** whatever column is chosen.
+- **Elastic profile UIDs come from Elasticsearch.** Kibana's suggest routes
+  are 404 on 9.x and its cases route needs Platinum, so no UID was ever
+  cached and cases reached Kibana without an assignee. ION now calls
+  `POST /_security/profile/_suggest`, which needs the `manage_user_profile`
+  privilege on the Elasticsearch credential. The lookup runs off the
+  event loop at sign-in and on case create.
+
+### Fixed
+
+- **Duplicate cases from a double click.** The create button disables on
+  the first click, and the server returns the existing case for a repeat
+  create of the same alerts by the same user within two minutes.
+- **Case alerts reappearing in the Open view.** Linking marked them
+  acknowledged in ION only, and the next queue load copied Elasticsearch's
+  "open" back. Linking now acknowledges in Elasticsearch too, the sync no
+  longer reopens an alert of an open case, and the queue re-reads after a
+  create. Adding to a case also records the alerts on the case.
+- **The Columns menu and the alert table's header were see-through** in
+  the glass themes.
+
+### Security
+
+- **Closed (Low): a re-seeded service account kept other roles.**
+  `ion seed-tide` and `ion seed-metis` added their role to whatever held
+  the name, so a `tide` account an administrator had widened kept those
+  roles in its new token, and a person's account named `tide` was turned
+  into a token-bearing service account. Seeding now sets exactly the one
+  role and refuses a non-service account.
+- **Closed (Low): Elastic profiles listed and bound by a self-chosen
+  name.** Resolve listed every fuzzily matched Elastic profile (username,
+  email, full name) for the names a user sets themselves, and naming
+  someone else's Elastic username bound their UID to the caller. Present
+  wherever Kibana's old suggest route answered (Kibana 8.x). Resolve no
+  longer lists other profiles, a profile with a different email is never
+  matched, and a UID another ION user holds is never stored again.
+- **Known limit:** an Elastic profile with no email, not yet linked to
+  anyone, can still be claimed by naming it. An administrator can set the
+  UID directly.
+
+### Upgrade notes
+
+- Grant the Elasticsearch credential ION uses the `manage_user_profile`
+  cluster privilege for Elastic UID resolution. Without it the lookup logs
+  a warning and cases sync without an assignee, as before.
+- The new standup section is not yet in the saved report, PDF or pptx.
 
 ## v0.99.20 — 2026-11-17
 

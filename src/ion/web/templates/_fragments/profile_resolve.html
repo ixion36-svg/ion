@@ -13,9 +13,9 @@
    one is "set your Elastic username", the other is "tell whoever runs
    Kibana".
 
-   Nothing here is a credential. The payload carries a profile UID, matched
-   and candidate usernames, and the directory entries the suggest API
-   returned. All of it is identity, and the UID is already on screen in the
+   Nothing here is a credential. The payload carries a profile UID and the
+   matched and candidate usernames. Other people's profiles are never
+   listed: the lookup is fuzzy and its names are the caller's own choice. All of it is identity, and the UID is already on screen in the
    readonly input this result sits under.
 
    The Resolve button is on the page, not in here, so a failed render cannot
@@ -46,21 +46,23 @@
         No exact match found. Tried:
         {% for c in result.candidates_tried %}"{{ c }}"{% if not loop.last %}, {% endif %}{% endfor %}
       </p>
-      {% if result.profiles_found %}
-        <p class="mt-2">Available profiles found:</p>
-        <ul class="mt-1 mr-0 mb-0 ml-4">
-          {% for p in result.profiles_found %}
-            <li><strong>{{ p.username }}</strong> ({{ p.full_name or p.email or '' }})</li>
-          {% endfor %}
-        </ul>
+      {% if result.refused == 'taken' %}
         <p class="mt-2">
-          Set your <em>Elastic Username</em> to one of these and try again.
+          A profile matched, but another ION user is already linked to it, so
+          it was not linked to you. Ask an administrator to check which
+          account it belongs to.
+        </p>
+      {% elif result.refused == 'email' %}
+        <p class="mt-2">
+          A profile matched that name, but its email is not yours, so it was
+          not linked to you. Set your <em>Elastic Username</em> to the name
+          you sign in to Kibana with, or ask an administrator to link it.
         </p>
       {% else %}
         <p class="mt-2">
-          Kibana returned no profiles for any of those names, so there is
-          nothing to pick from. Check the username you use to sign in to
-          Kibana and set it above.
+          No Elastic profile matched. A profile exists only once you have
+          signed in to Kibana. Set your <em>Elastic Username</em> to the name
+          you sign in to Kibana with, or ask an administrator to link it.
         </p>
       {% endif %}
     </div>

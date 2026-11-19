@@ -646,6 +646,7 @@
     var line = extra.querySelector('[data-cwin-cx-suggest]');
     if (s) {
       select.value = s.reason;
+      if (typeof window.highlightClosureGuide === 'function') window.highlightClosureGuide();
       line.hidden = false;
       line.textContent = suggestionText(s);
     }
@@ -680,6 +681,32 @@
     triageMany(ids, v).then(function (r) { reportBulk(r, v); });
   };
   window.cwBulkCancel = function () { if (!S) return; S.ask = null; apply(); };
+
+  // Take alerts out of the case. Acknowledged ones go back to open, so they
+  // return to the alert queue; the window then re-reads the case.
+  function removeFromCase(ids) {
+    if (!S || !S.caseId || !ids.length) return;
+    var what = ids.length === 1
+      ? 'exhibit ' + (letters[ids[0]] || '?')
+      : ids.length + ' alerts (' + lettersOf(ids).join(', ') + ')';
+    var ask = ['Remove ' + what + ' from this case?', '',
+      'Acknowledged alerts go back to open in the alert queue.'].join(String.fromCharCode(10));
+    if (!window.confirm(ask)) return;
+    post({ url: '/api/cases/' + encodeURIComponent(S.caseId) + '/alerts/remove', method: 'POST',
+           body: { alert_ids: ids } })
+      .then(function (d) {
+        var n = (d && d.removed) || 0;
+        toast(n + ' alert' + (n === 1 ? '' : 's') + ' removed from the case', n ? 'success' : 'warning');
+        S.picks = new Set();
+        if (typeof window.openCaseDetail === 'function') window.openCaseDetail(S.caseId);
+        if (typeof window.loadAllCases === 'function') window.loadAllCases();
+      }, function (e) { toast('Could not remove: ' + ((e && e.message) || e), 'error'); });
+  }
+  window.cwRemovePicked = function () {
+    if (!S) return;
+    removeFromCase(alertIds.filter(function (id) { return S.picks.has(id); }));
+  };
+  window.cwRemoveFocused = function () { if (S && S.focus) removeFromCase([S.focus]); };
   window.cwTriageThem = function () {
     if (!S) return;
     closePill();

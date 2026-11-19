@@ -380,6 +380,17 @@
         <span class="text-slate-400 mx-1">|</span>
         <button class="btn btn-secondary btn-sm" data-click-action="showCreateCaseFromSelected">Create Case</button>
         <button class="btn btn-secondary btn-sm" data-click-action="addToExistingCase">Add to Case</button>
+        <span class="text-slate-400 mx-1">|</span>
+        {#- The case window's verdicts, for the selection: the same close
+            endpoint, and like there the alerts' case is left open. #}
+        <span class="aq-bulk-verdicts" role="group" aria-label="Mark the selected alerts">
+            <button class="btn btn-secondary btn-sm aq-tv tv-true_positive" data-click-action="bulkVerdict" data-args='["escalated"]'
+                    title="Real and malicious: stays acknowledged for investigation">Mark true positive</button>
+            <button class="btn btn-secondary btn-sm aq-tv tv-benign_true_positive" data-click-action="bulkVerdict" data-args='["benign"]'
+                    title="Real but expected or authorised: closed">Mark benign</button>
+            <button class="btn btn-secondary btn-sm aq-tv tv-false_positive" data-click-action="bulkVerdict" data-args='["false_positive"]'
+                    title="Not what the rule is for: closed">Mark false positive</button>
+        </span>
     </div>
 </div>
 
@@ -1094,6 +1105,7 @@
 <!-- the triage queue. Takes every dependency through mount() rather than reading
      this page's globals, so it cannot repeat the v0.79.5 ambient-global failure. -->
 <script nonce="{{ csp_nonce }}" src="/static/js/alerts-queue.js?v={{ ion_version }}"></script>
+<script nonce="{{ csp_nonce }}" src="/static/js/case-draft.js?v={{ ion_version }}"></script>
 <script nonce="{{ csp_nonce }}" src="/static/js/ion-arrange.js?v={{ ion_version }}"></script>
 <script nonce="{{ csp_nonce }}" src="/static/js/alerts-window.js?v={{ ion_version }}"></script>
 
@@ -2444,16 +2456,10 @@ function showCreateCaseForm(alertId) {
     let prefillEvidence = '';
 
     if (alert) {
-        prefillTitle = alert.title || '';
+        const draft = IonCaseDraft.build([alert]);
+        prefillTitle = draft.title;
         prefillSeverity = (alert.severity || '').toLowerCase();
-
-        const lines = [];
-        if (alert.rule_name) lines.push(`Rule: ${alert.rule_name}`);
-        if (alert.host) lines.push(`Host: ${alert.host}`);
-        if (alert.user) lines.push(`User: ${alert.user}`);
-        if (alert.message) lines.push(`Message: ${alert.message}`);
-        if (alert.timestamp) lines.push(`Timestamp: ${new Date(alert.timestamp).toLocaleString()}`);
-        prefillDesc = lines.join('\n');
+        prefillDesc = draft.description + (alert.message ? `\nMessage: ${alert.message}` : '');
 
         const evidenceLines = [];
         evidenceLines.push(`Alert "${alert.title || 'N/A'}" triggered at ${alert.timestamp ? new Date(alert.timestamp).toLocaleString() : 'unknown time'}.`);
@@ -2478,7 +2484,7 @@ function showCreateCaseForm(alertId) {
     document.getElementById('case-title').focus();
 }
 
-async function submitCreateCase(alertId) {
+async function _submitCreateCase(alertId) {
     const title = document.getElementById('case-title').value.trim();
     const description = document.getElementById('case-description').value.trim();
     const severity = document.getElementById('case-severity').value;
@@ -2522,13 +2528,16 @@ async function submitCreateCase(alertId) {
 
         document.getElementById('case-create-overlay').remove();
         await loadCases();
-        // Reload triage for current alert
+        // Reload triage for current alert, and re-read the queue
         if (currentDetailAlert) {
             await loadTriage(currentDetailAlert.id);
         }
+        loadAlerts();
 
         // Check for auto-close or FP suggestions
-        if (result.auto_closed && result.auto_closed_kfp) {
+        if (noteDuplicateCase(result)) {
+            // nothing new was made
+        } else if (result.auto_closed && result.auto_closed_kfp) {
             const kfp = result.auto_closed_kfp;
             showNotification(`Case ${result.case_number} created and AUTO-CLOSED as known FP "${kfp.title}" (${kfp.matched_fields.join(', ')})`, 'warning');
         } else if (result.fp_suggestions && result.fp_suggestions.length > 0) {
@@ -6124,39 +6133,14 @@ function showCreateCaseFromSelected() {
     // Get selected alerts data
     const selectedAlerts = allAlerts.filter(a => selectedAlertIds.has(a.id));
 
-    // Auto-populate from multiple alerts.
-    // multi-alert title now carries the lead alert's rule name so
-    // the case is recognisable at a glance from the cases list, rather than
-    // a generic "N related alerts" placeholder.
-    const _leadName = (selectedAlerts[0] && (selectedAlerts[0].rule_name || selectedAlerts[0].title))
-        || 'Multi-Alert Investigation';
-    const prefillTitle = selectedAlerts.length === 1
-        ? selectedAlerts[0].title
-        : `Investigation: ${selectedAlerts.length} - ${_leadName}`;
-
-    // Collect hosts, users, rules from all selected alerts
-    const hosts = [...new Set(selectedAlerts.map(a => a.host).filter(Boolean))];
-    const users = [...new Set(selectedAlerts.map(a => a.user).filter(Boolean))];
-    const rules = [...new Set(selectedAlerts.map(a => a.rule_name).filter(Boolean))];
-    const severities = selectedAlerts.map(a => a.severity).filter(Boolean);
-    const highestSeverity = severities.includes('critical') ? 'critical'
-        : severities.includes('high') ? 'high'
-        : severities.includes('medium') ? 'medium'
-        : severities.includes('low') ? 'low' : '';
-
-    const descLines = [];
-    descLines.push(`Alerts: ${selectedAlerts.length}`);
-    if (hosts.length) descLines.push(`Hosts: ${hosts.join(', ')}`);
-    if (users.length) descLines.push(`Users: ${users.join(', ')}`);
-    if (rules.length) descLines.push(`Rules: ${rules.join(', ')}`);
-    const prefillDesc = descLines.join('\n');
-
-    const evidenceLines = [];
-    evidenceLines.push(`${selectedAlerts.length} alert(s) grouped for investigation.`);
-    if (hosts.length) evidenceLines.push(`Affected hosts: ${hosts.join(', ')}.`);
-    if (users.length) evidenceLines.push(`Affected users: ${users.join(', ')}.`);
-    if (rules.length) evidenceLines.push(`Triggered rules: ${rules.join(', ')}.`);
-    const prefillEvidence = evidenceLines.join(' ');
+    // Title, description and evidence come from case-draft.js: the title is
+    // deterministic (volume + host), the description carries the time window,
+    // affected entities, rules and key fields.
+    const draft = IonCaseDraft.build(selectedAlerts);
+    const prefillTitle = draft.title;
+    const prefillDesc = draft.description;
+    const prefillEvidence = draft.evidence;
+    const highestSeverity = draft.severity;
 
     // The form is the <template id="bulk-case-create-template"> in this
     // page. Field values are set as values, not interpolated into markup.
@@ -6172,6 +6156,142 @@ function showCreateCaseFromSelected() {
     document.body.appendChild(overlay);
 }
 
+// ── Case submit guards ─────────────────────────────────────────────────────
+// One create/add at a time: a double click or an impatient second click used
+// to POST twice and make two cases. The button is disabled before the first
+// await, so the second click finds the flag set and does nothing.
+let caseSubmitInFlight = false;
+
+async function runCaseSubmit(overlayId, actionName, busyLabel, fn) {
+    if (caseSubmitInFlight) return;
+    caseSubmitInFlight = true;
+    const btn = document.querySelector(`#${overlayId} [data-click-action="${actionName}"]`);
+    const label = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = busyLabel; }
+    try {
+        await fn();
+    } finally {
+        caseSubmitInFlight = false;
+        if (btn && btn.isConnected) { btn.disabled = false; btn.textContent = label; }
+    }
+}
+
+// Before alerts go into a case: say which are already in another case (they
+// will be moved) and which are already acknowledged (someone may be working
+// them), and let the analyst back out. Returns true to go ahead.
+function confirmCaseLinking(alertIds, targetCaseId) {
+    const otherCases = new Set();
+    let inOther = 0, acked = 0;
+    alertIds.forEach(id => {
+        const t = triageCache[id] || {};
+        const a = findAlert(id) || {};
+        if (t.case_id && t.case_id !== targetCaseId) {
+            inOther += 1;
+            otherCases.add(t.case_number || `case #${t.case_id}`);
+        } else if (String(t.status || a.status || '').toLowerCase() === 'acknowledged') {
+            acked += 1;
+        }
+    });
+    if (!inOther && !acked) return true;
+    const lines = [];
+    if (inOther) {
+        lines.push(`${inOther} of these alerts ${inOther === 1 ? 'is' : 'are'} already in another case `
+            + `(${[...otherCases].join(', ')}). Adding ${inOther === 1 ? 'it' : 'them'} here moves `
+            + `${inOther === 1 ? 'it' : 'them'} out of that case.`);
+    }
+    if (acked) {
+        lines.push(`${acked} of these alerts ${acked === 1 ? 'is' : 'are'} already acknowledged, `
+            + `so someone may already be working ${acked === 1 ? 'it' : 'them'}.`);
+    }
+    lines.push('', 'Do you want to add them?');
+    return confirm(lines.join('\n'));
+}
+
+function submitCreateCase(alertId) {
+    if (caseSubmitInFlight) return Promise.resolve();
+    if (!confirmCaseLinking(alertId ? [alertId] : [], null)) return Promise.resolve();
+    return runCaseSubmit('case-create-overlay', 'submitCreateCase', 'Creating…',
+        () => _submitCreateCase(alertId));
+}
+
+function submitBulkCreateCase() {
+    if (caseSubmitInFlight) return Promise.resolve();
+    if (!confirmCaseLinking(Array.from(selectedAlertIds), null)) return Promise.resolve();
+    return runCaseSubmit('bulk-case-create-overlay', 'submitBulkCreateCase', 'Creating…',
+        () => _submitBulkCreateCase());
+}
+
+function confirmAddToCase() {
+    if (caseSubmitInFlight) return Promise.resolve();
+    const caseId = parseInt(document.getElementById('target-case-id')?.value || '', 10);
+    if (!caseId) return Promise.resolve();
+    if (!confirmCaseLinking(Array.from(selectedAlertIds), caseId)) return Promise.resolve();
+    return runCaseSubmit('add-to-case-modal', 'confirmAddToCase', 'Adding…',
+        () => _confirmAddToCase());
+}
+
+// The bulk bar's verdict buttons: the case window's True positive / Benign /
+// False positive, for every selected alert. Each alert goes through
+// POST /alerts/{id}/close with close_case false, as the case window sends it,
+// so marking alerts never closes the case they sit in.
+const BULK_VERDICTS = {
+    escalated: { label: 'true positive', after: 'They stay acknowledged for investigation.' },
+    benign: { label: 'benign', after: 'They will be closed, here and in Elasticsearch.' },
+    false_positive: { label: 'false positive', after: 'They will be closed, here and in Elasticsearch.' },
+};
+
+async function bulkVerdict(closureType) {
+    const v = BULK_VERDICTS[closureType];
+    const ids = Array.from(selectedAlertIds);
+    if (!v || !ids.length || caseSubmitInFlight) return;
+    const n = ids.length;
+    if (!confirm(`Mark ${n} alert${n === 1 ? '' : 's'} ${v.label}?\n\n${v.after}`)) return;
+
+    caseSubmitInFlight = true;
+    const buttons = [...document.querySelectorAll('#bulk-actions-toolbar [data-click-action="bulkVerdict"]')];
+    buttons.forEach(b => { b.disabled = true; });
+    let done = 0;
+    const failed = [];
+    try {
+        const queue = ids.slice();
+        const worker = async () => {
+            while (queue.length) {
+                const id = queue.shift();
+                try {
+                    const r = await fetch('/api/elasticsearch/alerts/' + encodeURIComponent(id) + '/close', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ closure_type: closureType, notes: null, close_case: false }),
+                    });
+                    if (r.ok) done += 1;
+                    else {
+                        let detail = 'HTTP ' + r.status;
+                        try { const e = await r.json(); if (e && e.detail) detail = e.detail; } catch (e) { /* not JSON */ }
+                        failed.push(detail);
+                    }
+                } catch (e) {
+                    failed.push(e.message || String(e));
+                }
+            }
+        };
+        await Promise.all([worker(), worker(), worker(), worker()]);
+    } finally {
+        caseSubmitInFlight = false;
+        buttons.forEach(b => { b.disabled = false; });
+    }
+    if (done) showNotification(`${done} alert${done === 1 ? '' : 's'} marked ${v.label}`, 'success');
+    if (failed.length) showNotification(`${failed.length} could not be marked: ${failed[0]}`, 'error');
+    clearSelection();
+    loadAlerts();
+}
+
+// A repeat create for the same alerts returns the case that already exists.
+function noteDuplicateCase(result) {
+    if (!result || !result.duplicate) return false;
+    showNotification(`Case ${result.case_number} already holds these alerts — no new case was created`, 'warning');
+    return true;
+}
+
 // A failed create may not carry a JSON body: a reverse proxy that hits its
 // read timeout returns an HTML 502/504 while ION keeps working, so the case
 // usually WAS created. Feeding that body to response.json() is what used to
@@ -6185,7 +6305,7 @@ async function caseCreateFailure(response) {
     return { detail, gatewayTimeout: response.status === 502 || response.status === 504 };
 }
 
-async function submitBulkCreateCase() {
+async function _submitBulkCreateCase() {
     const title = document.getElementById('bulk-case-title').value.trim();
     const description = document.getElementById('bulk-case-description').value.trim();
     const severity = document.getElementById('bulk-case-severity').value;
@@ -6239,8 +6359,7 @@ async function submitBulkCreateCase() {
                 showNotification('The server is still processing this case (gateway timeout). It should appear in the case list shortly — do not resubmit.', 'warning');
                 clearSelection();
                 await loadCases();
-                await loadTriageBatch();
-                renderAlerts();
+                loadAlerts();
                 return;
             }
             throw new Error(fail.detail);
@@ -6250,7 +6369,9 @@ async function submitBulkCreateCase() {
         document.getElementById('bulk-case-create-overlay').remove();
 
         // Check for auto-close or FP suggestions
-        if (result.auto_closed && result.auto_closed_kfp) {
+        if (noteDuplicateCase(result)) {
+            // nothing new was made; fall through to the refresh
+        } else if (result.auto_closed && result.auto_closed_kfp) {
             const kfp = result.auto_closed_kfp;
             showNotification(`Case ${result.case_number} created with ${alertIds.length} alerts and AUTO-CLOSED as known FP "${kfp.title}" (${kfp.matched_fields.join(', ')})`, 'warning');
         } else if (result.fp_suggestions && result.fp_suggestions.length > 0) {
@@ -6261,11 +6382,11 @@ async function submitBulkCreateCase() {
             showNotification(`Case ${result.case_number} created with ${alertIds.length} alerts${deferredNote}`, 'success');
         }
 
-        // Clear selection and reload
+        // Clear selection and re-read the queue, so alerts that went into
+        // the case leave the Open view straight away.
         clearSelection();
         await loadCases();
-        await loadTriageBatch();
-        renderAlerts();
+        loadAlerts();
 
     } catch (e) {
         console.error('Error creating case:', e);
@@ -6295,7 +6416,7 @@ function closeAddToCaseModal() {
     if (modal) modal.remove();
 }
 
-async function confirmAddToCase() {
+async function _confirmAddToCase() {
     const caseId = document.getElementById('target-case-id').value;
     if (!caseId) return;
 
@@ -6332,8 +6453,7 @@ async function confirmAddToCase() {
 
         closeAddToCaseModal();
         clearSelection();
-        await loadTriageBatch();
-        renderAlerts();
+        loadAlerts();
 
     } catch (err) {
         console.error('Add to case error:', err);

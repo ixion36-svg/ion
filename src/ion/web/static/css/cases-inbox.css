@@ -236,3 +236,27 @@
     .ci-pv-title { padding-right: 36px; }
     .ci-hint { display: none; }
 }
+
+/* ── Close dialog: verdict guidance beside the form ─────────────────── */
+#closure-modal-overlay .closure-dialog { max-width: 880px; }
+.closure-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(250px, 340px); }
+.closure-guide {
+    border-left: 1px solid var(--ci-line);
+    padding: 16px 18px;
+    font-size: .78rem;
+    line-height: 1.45;
+    color: var(--ci-mute);
+    max-height: 62vh;
+    overflow: auto;
+}
+.closure-guide h4 { margin: 0 0 6px; font-size: .82rem; color: var(--ci-bright); }
+.closure-guide dl { margin: 0; }
+.closure-guide [data-reason] { padding: 6px 8px; border-left: 2px solid transparent; border-radius: 4px; }
+.closure-guide [data-reason].is-current { border-left-color: var(--ci-accent); background: var(--ci-accent-bg); }
+.closure-guide dt { color: var(--ci-text); font-weight: 600; }
+.closure-guide dd { margin: 2px 0 0; }
+.closure-guide-tip { margin: 10px 8px 0; color: var(--ci-faint); }
+@media (max-width: 767px) {
+    .closure-body { grid-template-columns: minmax(0, 1fr); }
+    .closure-guide { border-left: 0; border-top: 1px solid var(--ci-line); max-height: none; }
+}

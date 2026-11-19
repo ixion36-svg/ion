@@ -90,6 +90,7 @@ from __future__ import annotations
 
 import logging
 import math
+from datetime import datetime
 from typing import Optional, TypedDict
 
 from fastapi import APIRouter, Depends, Request
@@ -340,6 +341,7 @@ class ChecksPanel(TypedDict):
     alerts_24h: dict
     cases: dict
     triage: dict
+    metrics: dict
     duty: dict
     raw: dict
 
@@ -730,6 +732,174 @@ def _triage_view(payload: object) -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# Seven-day metrics (services/standup_metrics.py)
+# ---------------------------------------------------------------------------
+
+_CHART_W, _CHART_H, _CHART_TOP = 860, 170, 20
+
+
+def _duration(minutes: object) -> Optional[str]:
+    """Minutes as the unit a reader thinks in: 42m, 3.4h, 2.1d."""
+    n = _num(minutes)
+    if n is None:
+        return None
+    if n < 90:
+        return f"{n:.0f}m"
+    if n < 48 * 60:
+        return f"{n / 60:.1f}h"
+    return f"{n / 1440:.1f}d"
+
+
+def _chg(raw: object, better: Optional[str] = None, unit: str = "%") -> dict:
+    """A week-on-week change as words and a direction.
+
+    `better` is "down" when a fall is good (MTTA, MTTR, FP rate, backlog),
+    "up" when a rise is, None when neither (alert volume). The arrow and the
+    sign carry the direction; the colour only adds whether it is good news.
+    """
+    if not isinstance(raw, dict):
+        return {"text": None, "tone": "flat", "title": "No comparison"}
+    this, last, delta, pct = (_num(raw.get(k)) for k in ("this", "last", "delta", "pct"))
+    if this is None or last is None:
+        return {"text": None, "tone": "flat", "title": "Not measured for both weeks"}
+    if not delta:
+        return {"text": "= last week", "tone": "flat", "title": "Same as last week"}
+    arrow = "▲" if delta > 0 else "▼"
+    if unit == "pts":
+        text = f"{arrow} {abs(delta):.1f} pts"
+    elif pct is None:
+        text = f"{arrow} new" if not last else f"{arrow} {abs(delta):g}"
+    else:
+        text = f"{arrow} {abs(pct):.0f}%"
+    tone = "flat"
+    if better:
+        good = (delta < 0) if better == "down" else (delta > 0)
+        tone = "good" if good else "bad"
+    return {"text": text, "tone": tone,
+            "title": f"This week {this:g}, last week {last:g}"}
+
+
+def _pair(raw: object, fmt=_fmt_n, better: Optional[str] = None, unit: str = "%") -> dict:
+    this = raw.get("this") if isinstance(raw, dict) else None
+    last = raw.get("last") if isinstance(raw, dict) else None
+    return {"value": fmt(this), "last": fmt(last), "change": _chg(raw, better, unit)}
+
+
+def _chart(daily: object, spikes: object) -> Optional[dict]:
+    if not isinstance(daily, list) or not daily:
+        return None
+    spike_days = {s.get("date") for s in spikes if isinstance(s, dict)} if isinstance(spikes, list) else set()
+    peak = max((_num(d.get("total")) or 0) for d in daily if isinstance(d, dict)) or 1
+    step = _CHART_W / len(daily)
+    bar_w = min(44.0, step * 0.56)
+    bars = []
+    for i, d in enumerate(daily):
+        if not isinstance(d, dict):
+            continue
+        total = _num(d.get("total")) or 0
+        h = round(total / peak * _CHART_H, 1) if total else 0
+        x = round(i * step + (step - bar_w) / 2, 1)
+        day = str(d.get("date") or "")
+        try:
+            label = datetime.strptime(day, "%Y-%m-%d").strftime("%a %d")
+        except ValueError:
+            label = day
+        sev = d.get("severity") if isinstance(d.get("severity"), dict) else {}
+        bars.append({
+            "x": x, "w": round(bar_w, 1), "y": round(_CHART_TOP + _CHART_H - h, 1), "h": h,
+            "cx": round(x + bar_w / 2, 1), "label": label, "total": _fmt_n(total),
+            "spike": day in spike_days,
+            "tip": f"{label}: {_fmt_n(total)} alerts "
+                   f"(critical {sev.get('critical', 0)}, high {sev.get('high', 0)}, "
+                   f"medium {sev.get('medium', 0)}, low {sev.get('low', 0)})"
+                   + (" - spike" if day in spike_days else ""),
+        })
+    return {"bars": bars, "w": _CHART_W, "h": _CHART_TOP + _CHART_H + 22,
+            "base": _CHART_TOP + _CHART_H, "peak": _fmt_n(peak)}
+
+
+def _named(rows: object) -> list:
+    out = []
+    for r in rows if isinstance(rows, list) else []:
+        if isinstance(r, dict) and _text(r.get("name")):
+            last = _num(r.get("last")) or 0
+            out.append({"name": _text(r.get("name")), "count": _fmt_n(r.get("count")),
+                        "last": _fmt_n(last), "delta": _fmt_n(r.get("delta"))})
+    return out
+
+
+def _metrics_view(payload: object) -> dict:
+    if not isinstance(payload, dict) or "error" in payload and len(payload) == 1:
+        return {"failed": True}
+    a = payload.get("alerts") if isinstance(payload.get("alerts"), dict) else None
+    c = payload.get("cases") if isinstance(payload.get("cases"), dict) else None
+    alerts = {"failed": True, "error": _text(payload.get("alerts_error"))}
+    if a:
+        spikes = [{"label": _chart_day(s.get("date")), "count": _fmt_n(s.get("count")),
+                   "baseline": _fmt_n(s.get("baseline")), "ratio": _num(s.get("ratio"))}
+                  for s in a.get("spikes") or [] if isinstance(s, dict)]
+        backlog = a.get("backlog") if isinstance(a.get("backlog"), dict) else {}
+        alerts = {
+            "failed": False,
+            "total": _pair(a.get("total")),
+            "daily_avg": _pair(a.get("daily_avg")),
+            "severity": {s: _pair((a.get("severity") or {}).get(s), better="down")
+                         for s in ("critical", "high", "medium", "low")},
+            "chart": _chart(a.get("daily"), a.get("spikes")),
+            "spikes": spikes,
+            "rising_rules": _named((a.get("rules") or {}).get("rising")),
+            "new_rules": [n for n in (a.get("rules") or {}).get("new") or [] if _text(n)],
+            "top_rules": _named((a.get("rules") or {}).get("top")),
+            "top_hosts": _named((a.get("hosts") or {}).get("top")),
+            "backlog": {k: _fmt_n(backlog.get(k)) for k in ("total", "under_24h", "1_7d", "over_7d")},
+            "mtta": {k: _pair((a.get("mtta_minutes") or {}).get(k), _duration, "down") for k in ("median", "p90")},
+            "mttr": {k: _pair((a.get("mttr_minutes") or {}).get(k), _duration, "down") for k in ("median", "p90")},
+            "responded": _pair(a.get("responded")),
+        }
+    cases = {"failed": True, "error": _text(payload.get("cases_error"))}
+    if c:
+        out = c.get("outcomes") if isinstance(c.get("outcomes"), dict) else {}
+        counts = out.get("counts") if isinstance(out.get("counts"), dict) else {}
+        hours = lambda v: _duration(None if _num(v) is None else _num(v) * 60)  # noqa: E731
+        pct = lambda v: None if _num(v) is None else f"{_num(v):.0f}%"  # noqa: E731
+        cases = {
+            "failed": False,
+            "opened": _pair(c.get("opened")),
+            "closed": _pair(c.get("closed"), better="up"),
+            "mttr": {k: _pair((c.get("mttr_hours") or {}).get(k), hours, "down") for k in ("median", "p90")},
+            "verdicts": _fmt_n(out.get("verdicts")),
+            "outcomes": [
+                {"key": k, "label": label, "count": _fmt_n(counts.get(k, 0)), "rate": pct(out.get(rate))}
+                for k, label, rate in (("true_positive", "True positive", "tp_rate"),
+                                       ("benign_true_positive", "Benign TP", "btp_rate"),
+                                       ("false_positive", "False positive", "fp_rate"))],
+            "fp_rate": _pair(c.get("fp_rate"), pct, "down", unit="pts"),
+            "escalation": _pair(c.get("escalation_rate"), pct, unit="pts"),
+            "open_now": _fmt_n(c.get("open_now")),
+            "unassigned_now": _fmt_n(c.get("unassigned_now")),
+            "open_over_7d": _fmt_n(c.get("open_over_7d")),
+            "analysts": [{
+                "name": _text(r.get("name")),
+                "cases_closed": _fmt_n(r.get("cases_closed")),
+                "alerts_marked": _fmt_n(r.get("alerts_marked")),
+                "cases_opened": _fmt_n(r.get("cases_opened")),
+                "open_assigned": _fmt_n(r.get("open_assigned")),
+                "mttr": hours(r.get("mttr_hours")),
+                "tp_rate": pct(r.get("tp_rate")),
+                "fp_rate": pct(r.get("fp_rate")),
+            } for r in c.get("analysts") or [] if isinstance(r, dict) and _text(r.get("name"))],
+        }
+    return {"failed": False, "alerts": alerts, "cases": cases}
+
+
+def _chart_day(day: object) -> Optional[str]:
+    try:
+        return datetime.strptime(str(day), "%Y-%m-%d").strftime("%a %d %b")
+    except ValueError:
+        return _text(day)
+
+
 def _duty_view(payload: object) -> DutyPanel:
     """The rota line. `available` is False only when the lookup itself did
     not produce a row, which is not the same as the rota having a hole."""
@@ -758,7 +928,7 @@ def _checks_view(payload: object) -> ChecksPanel:
         return {
             "failed": True, "cluster": {}, "alerts": {}, "stale": {},
             "log_health": [], "rules": {}, "alerts_24h": {}, "cases": {},
-            "triage": {}, "duty": _duty_view(None), "raw": {},
+            "triage": {}, "metrics": {"failed": True}, "duty": _duty_view(None), "raw": {},
         }
     return {
         "failed": False,
@@ -775,6 +945,7 @@ def _checks_view(payload: object) -> ChecksPanel:
         "alerts_24h": _alerts_24h_view(payload.get("alerts_24h")),
         "cases": _cases_view(payload.get("case_status_counts")),
         "triage": _triage_view(payload.get("triage_throughput")),
+        "metrics": _metrics_view(payload.get("metrics_7d")),
         "duty": _duty_view(payload.get("duty")),
         # The payload itself, for the save, PDF and pptx endpoints that
         # already accept it. It is not re-derived from the regions above:

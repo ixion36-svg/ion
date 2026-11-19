@@ -120,3 +120,25 @@ def test_backfill_that_stops_on_a_failed_search_exits_non_zero(runner, project, 
     result = runner.invoke(app, ["backfill-rule-identity"])
     assert result.exit_code == 1
     assert "Backfill stopped: search timed out" in result.output
+
+
+def _human(db_path, username):
+    """A person's account holding a service account's name."""
+    from ion.auth.service import AuthService
+    session = get_session_factory(get_engine(db_path))()
+    try:
+        AuthService(session).user_repo.create(
+            username=username, email=f"{username}@example.com", password_hash="x")
+        session.commit()
+    finally:
+        session.close()
+
+
+@pytest.mark.parametrize("command", ["seed-tide", "seed-metis"])
+def test_seeding_over_a_person_named_like_the_service_account_refuses(runner, project, command):
+    name = command.split("-", 1)[1]
+    _human(project, name)
+    result = runner.invoke(app, [command])
+    assert result.exit_code == 1, result.output
+    assert f"a non-service account named '{name}' already exists" in result.output
+    assert "Bearer token" not in result.output

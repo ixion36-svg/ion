@@ -521,9 +521,11 @@ def resolve_elastic_payload(current_user: User, session: Session) -> dict:
     if current_user.display_name:
         candidates.append(current_user.display_name)
 
+    from ion.services.elastic_identity import email_conflicts, uid_held_by_another
+
     resolved_uid = None
     matched_username = None
-    all_profiles = []
+    refused = None
 
     for candidate in candidates:
         profiles = kb_svc.suggest_user_profiles(candidate)
@@ -531,24 +533,20 @@ def resolve_elastic_payload(current_user: User, session: Session) -> dict:
             profile_user = profile.get("user", {})
             p_username = profile_user.get("username", "") if isinstance(profile_user, dict) else ""
             p_email = profile_user.get("email", "") if isinstance(profile_user, dict) else ""
-            p_full = profile_user.get("full_name", "") if isinstance(profile_user, dict) else ""
-            all_profiles.append({
-                "uid": profile.get("uid"),
-                "username": p_username,
-                "email": p_email,
-                "full_name": p_full,
-            })
-
-            # Exact match on username
-            if p_username == candidate:
-                resolved_uid = profile.get("uid")
-                matched_username = p_username
-                break
-            # Match on email
-            if p_email and p_email == current_user.email:
-                resolved_uid = profile.get("uid")
-                matched_username = p_username
-                break
+            uid = profile.get("uid")
+            if not uid or not (p_username == candidate
+                               or (p_email and p_email == current_user.email)):
+                continue
+            # The candidate names are the user's own choosing, so a match is
+            # theirs only if its email agrees and no one else holds it.
+            if email_conflicts(profile, current_user.email):
+                refused = "email"
+                continue
+            if uid_held_by_another(session, uid, current_user.id):
+                refused = "taken"
+                continue
+            resolved_uid, matched_username = uid, p_username
+            break
 
         if resolved_uid:
             break
@@ -561,12 +559,15 @@ def resolve_elastic_payload(current_user: User, session: Session) -> dict:
                 user.elastic_username = matched_username
             session.commit()
 
+    # Other people's profiles are never listed: the lookup is fuzzy and the
+    # names it is asked for are the caller's to choose, so a list would be a
+    # directory of Elastic accounts for any signed-in user.
     return {
         "resolved": resolved_uid is not None,
         "elastic_uid": resolved_uid,
         "matched_username": matched_username,
         "candidates_tried": candidates,
-        "profiles_found": all_profiles,
+        "refused": None if resolved_uid else refused,
     }
 
 
@@ -660,6 +661,40 @@ async def get_oidc_public_config(request: Request, response: Response):
         "redirect_uri": redirect_uri,
         "state": state,  # Frontend must include this in auth request
     }
+
+
+async def cache_elastic_uid_on_login(user: User, session: Session) -> None:
+    """Resolve and keep the user's Elastic profile UID at sign-in, once.
+
+    Tries elastic_username, then the ION username. The lookup is a blocking
+    HTTP call, so it runs on a worker thread rather than the event loop.
+    Best-effort: a sign-in never fails because of it.
+    """
+    if getattr(user, "elastic_uid", None):
+        return
+    try:
+        from ion.services.kibana_cases_service import get_kibana_cases_service
+        kb_svc = get_kibana_cases_service()
+        if not kb_svc.enabled:
+            return
+        from ion.services.elastic_identity import uid_held_by_another
+
+        lookup = getattr(user, "elastic_username", None) or user.username
+        email = getattr(user, "email", None)
+        uid = await asyncio.to_thread(kb_svc.resolve_user_uid, lookup, email)
+        if not uid and lookup != user.username:
+            uid = await asyncio.to_thread(kb_svc.resolve_user_uid, user.username, email)
+        if uid and uid_held_by_another(session, uid, getattr(user, "id", None)):
+            logger.warning("OIDC callback: elastic profile for %s is already linked to another user", user.username)
+            uid = None
+        if uid:
+            user.elastic_uid = uid
+            if not getattr(user, "elastic_username", None):
+                user.elastic_username = lookup
+            session.commit()
+            logger.info(f"OIDC callback: resolved elastic_uid for {user.username}: {uid}")
+    except Exception as e:
+        logger.debug(f"OIDC callback: elastic_uid resolve skipped: {e}")
 
 
 @router.get("/auth/oidc/callback")
@@ -768,24 +803,7 @@ async def oidc_callback(
         session.commit()
         logger.info(f"OIDC callback: user synced — {user.username} (id={user.id})")
 
-        # Auto-resolve Elastic UID on login if not cached
-        if not getattr(user, 'elastic_uid', None):
-            try:
-                from ion.services.kibana_cases_service import get_kibana_cases_service
-                kb_svc = get_kibana_cases_service()
-                if kb_svc.enabled:
-                    lookup = getattr(user, 'elastic_username', None) or user.username
-                    uid = kb_svc.resolve_user_uid(lookup)
-                    if not uid and lookup != user.username:
-                        uid = kb_svc.resolve_user_uid(user.username)
-                    if uid:
-                        user.elastic_uid = uid
-                        if not getattr(user, 'elastic_username', None):
-                            user.elastic_username = lookup
-                        session.commit()
-                        logger.info(f"OIDC callback: resolved elastic_uid for {user.username}: {uid}")
-            except Exception as e:
-                logger.debug(f"OIDC callback: elastic_uid resolve skipped: {e}")
+        await cache_elastic_uid_on_login(user, session)
 
         # Create a ION session for the user
         ip_address = get_client_ip(request)
@@ -3678,6 +3696,13 @@ async def get_batch_triage(
                     )
                     if case_closed and es_status_lower != "closed":
                         continue
+                    # An alert in an open case is being worked. ES may still
+                    # read "open" if the acknowledge push has not landed (or
+                    # failed); replaying that put case alerts back in the
+                    # Open view.
+                    if (es_status_lower == "open" and triage.case_id is not None
+                            and not case_closed and ion_status.lower() == "acknowledged"):
+                        continue
                     if ion_status.lower() != es_status_lower:
                         triage.status = AlertTriageStatus(es_status_lower)
                         logger.debug("Synced ES status '%s' → ION triage for alert %s", es_status_lower, alert_id)
@@ -3771,6 +3796,17 @@ async def bulk_update_triage(
         # Collision-free number from the DB-assigned id (was max(id)+1 — raced).
         assign_case_number(session, new_case)
 
+    # Adding to an existing case: the case must exist and be open.
+    target_case = None
+    # A new case wins over case_id, as it always has for the triage rows, so
+    # the alerts are recorded on that case alone.
+    if new_case is None and data.case_id is not None and data.case_id > 0:
+        target_case = session.query(AlertCase).filter_by(id=data.case_id).first()
+        if target_case is None:
+            raise HTTPException(status_code=404, detail="Case not found")
+        if getattr(target_case.status, "value", target_case.status) == "closed":
+            raise HTTPException(status_code=409, detail="Reopen the case to add alerts to it")
+
     # One prefetch instead of a SELECT (and a flush) per selected alert.
     existing = {
         t.es_alert_id: t
@@ -3778,6 +3814,14 @@ async def bulk_update_triage(
         .filter(AlertTriage.es_alert_id.in_(data.alert_ids))
         .all()
     }
+    prior_case_ids = {
+        t.case_id for t in existing.values()
+        if target_case is not None and t.case_id and t.case_id != target_case.id
+    }
+    prior_cases = {
+        c.id: c for c in session.query(AlertCase).filter(AlertCase.id.in_(prior_case_ids)).all()
+    } if prior_case_ids else {}
+    acknowledged_ids: List[str] = []
 
     names = data.rule_names or {}
     for alert_id in data.alert_ids:
@@ -3797,13 +3841,36 @@ async def bulk_update_triage(
         if data.priority is not None:
             triage.priority = data.priority
         if data.case_id is not None:
+            if target_case is not None and triage.case_id and triage.case_id != target_case.id:
+                # Moving cases: the old case's JSON list lets go of it too.
+                old = prior_cases.get(triage.case_id)
+                if old is not None and old.source_alert_ids and alert_id in old.source_alert_ids:
+                    old.source_alert_ids = [x for x in old.source_alert_ids if x != alert_id]
             triage.case_id = data.case_id if data.case_id > 0 else None
+            # Same rule as create_case: open alerts in a case are acknowledged.
+            if target_case is not None and data.status is None and triage.status in (
+                    None, AlertTriageStatus.OPEN):
+                triage.status = AlertTriageStatus.ACKNOWLEDGED
+                acknowledged_ids.append(alert_id)
         if new_case:
             triage.case_id = new_case.id
 
         updated += 1
 
+    if target_case is not None:
+        ids_now = list(target_case.source_alert_ids or [])
+        target_case.source_alert_ids = ids_now + [x for x in data.alert_ids if x not in set(ids_now)]
+
     session.commit()
+
+    if acknowledged_ids:
+        try:
+            from ion.services.elasticsearch_service import ElasticsearchService
+            es = ElasticsearchService()
+            if es.is_configured:
+                await es.update_alert_workflow_status(acknowledged_ids, "acknowledged")
+        except Exception as e:
+            logger.warning(f"Failed to sync add-to-case acknowledge to ES: {e}")
 
     # Sync workflow_status to Elasticsearch when bulk-updating status
     if data.status:

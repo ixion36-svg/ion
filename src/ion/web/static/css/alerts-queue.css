@@ -53,7 +53,9 @@ table.aq th {
     color: var(--ion-text-muted, #94a3b8);
     font-weight: 600;
     padding: 7px 8px;
-    background: var(--ion-surface-2, #11141c);
+    /* Solid, not --ion-surface-2: in the glass themes that is 7% white, and
+       rows scrolling under this sticky header showed through it. */
+    background: var(--bg-elevated, #11141c);
     box-shadow: inset 0 -1px 0 var(--ion-border, #222c39);
     position: sticky;
     /* Not the height of the page chrome: offsets are against .aq-wrap, so
@@ -328,7 +330,9 @@ tr.aq-row:hover .aq-acts, tr.aq-cur .aq-acts { opacity: 1; }
     z-index: 60;
     display: none;
     min-width: 172px;
-    background: var(--ion-surface-2, #111721);
+    /* Solid, not --ion-surface-2 (7% white in the glass themes): the table
+       showed through and the column names were unreadable over it. */
+    background: var(--bg-elevated, #111721);
     border: 1px solid var(--ion-border-strong, #2a3644);
     border-radius: 8px;
     padding: 5px;
@@ -464,3 +468,10 @@ tr.aq-row:hover .aq-acts, tr.aq-cur .aq-acts { opacity: 1; }
     border: 1px solid color-mix(in srgb, var(--sev-info) 40%, transparent);
     background: color-mix(in srgb, var(--sev-info) 12%, transparent);
 }
+
+/* The bulk bar's verdict buttons, coloured as the case window's are. */
+.aq-bulk-verdicts { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.aq-tv.tv-true_positive:hover:not(:disabled) { border-color: var(--sev-critical, #ef4444); color: var(--sev-critical, #ef4444); }
+.aq-tv.tv-benign_true_positive:hover:not(:disabled) { border-color: var(--success, #3fb950); color: var(--success, #3fb950); }
+.aq-tv.tv-false_positive:hover:not(:disabled) { border-color: var(--ion-text-muted, #94a3b8); }
+.aq-tv:disabled { opacity: .55; cursor: progress; }
