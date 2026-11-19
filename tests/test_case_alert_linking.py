@@ -160,3 +160,64 @@ def test_adding_to_an_existing_case_acknowledges_and_records_the_ids(db, es_push
     assert session.get(AlertCase, other["id"]).source_alert_ids == ["b2"]
     assert _triage(session, "c1").status == AlertTriageStatus.ACKNOWLEDGED
     assert pushed == [(["c1"], "acknowledged")]
+
+
+def test_adding_to_a_missing_or_closed_case_is_refused(db, es_pushes):
+    from ion.web import api
+
+    session, user = db
+    closed = _create(session, user, ["a1"])
+    session.get(AlertCase, closed["id"]).status = AlertCaseStatus.CLOSED
+    session.commit()
+    for case_id, code in ((closed["id"], 409), (99999, 404)):
+        with pytest.raises(HTTPException) as e:
+            asyncio.run(api.bulk_update_triage(api.BulkTriageUpdate(alert_ids=["z"], case_id=case_id), user, session))
+        assert e.value.status_code == code
+
+
+def test_a_repeat_after_the_window_makes_a_new_case(db, es_pushes, monkeypatch):
+    session, user = db
+    first = _create(session, user, ["a1"])
+    session.get(AlertCase, first["id"]).created_at -= cl.timedelta(seconds=cl._DUPLICATE_CREATE_WINDOW_S + 5) \
+        if hasattr(cl, "timedelta") else __import__("datetime").timedelta(seconds=cl._DUPLICATE_CREATE_WINDOW_S + 5)
+    session.commit()
+    again = _create(session, user, ["a1"])
+    assert not again.get("duplicate") and again["id"] != first["id"]
+
+
+def test_the_background_push_tells_es_and_keeps_no_task_once_done(monkeypatch):
+    pushed = []
+
+    async def fake_sync(ids, status):
+        pushed.append((ids, status))
+    monkeypatch.setattr(cl, "_background_alert_workflow_sync", fake_sync)
+
+    async def run():
+        cl._spawn_alert_workflow_sync(["a", "b"], "acknowledged")
+        cl._spawn_alert_workflow_sync([], "open")
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+    asyncio.run(run())
+    assert pushed == [(["a", "b"], "acknowledged")]
+    assert not cl._spawned_syncs
+
+
+def test_the_create_lock_is_taken_only_on_postgres():
+    executed = []
+
+    class Bind:
+        class dialect:
+            name = "postgresql"
+
+    class S:
+        def get_bind(self):
+            return Bind()
+
+        def execute(self, stmt, params):
+            executed.append(params)
+
+    cl._serialise_case_creates(S(), 7)
+    assert executed == [{"ns": cl._CASE_CREATE_LOCK_NS, "uid": 7}]
+    Bind.dialect.name = "sqlite"
+    cl._serialise_case_creates(S(), 7)
+    assert len(executed) == 1

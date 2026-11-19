@@ -123,3 +123,103 @@ def test_a_failed_half_leaves_the_other_standing():
     assert view["alerts"]["failed"] is True
     assert "timed out" in view["alerts"]["error"]
     assert view["cases"]["failed"] is False and view["cases"]["opened"]["value"] == "1"
+
+
+# ── the Elasticsearch reader, against a fake cluster ──────────────────────
+
+def _sev(**n):
+    return {"buckets": {s: {"doc_count": n.get(s, 0)} for s in sm.SEVERITIES}}
+
+
+class FakeES:
+    alert_index = ".alerts-*"
+
+    def __init__(self, now):
+        self.now = now
+        self.bodies = []
+
+    async def _request(self, method, path, json=None, timeout=None):
+        self.bodies.append(json)
+        if "aggs" in json and "daily" in json["aggs"]:
+            days = [(self.now.date() - timedelta(days=b)).isoformat() for b in range(13, -1, -1)]
+            counts = [3] * 7 + [3, 3, 3, 3, 3, 3, 12]
+            return {"aggregations": {
+                "daily": {"buckets": [{"key_as_string": d, "doc_count": c, "sev": _sev(high=c)}
+                                      for d, c in zip(days, counts)]},
+                "weeks": {"buckets": [
+                    {"key": "last", "doc_count": 21, "sev": _sev(high=21),
+                     "rule0": {"buckets": [{"key": "Brute force", "doc_count": 21}]},
+                     "rule1": {"buckets": []}, "host": {"buckets": [{"key": "DC01", "doc_count": 21}]}},
+                    {"key": "this", "doc_count": 30, "sev": _sev(high=26, critical=4),
+                     "rule0": {"buckets": [{"key": "Brute force", "doc_count": 18}]},
+                     "rule1": {"buckets": [{"key": "Beacon", "doc_count": 12}]},
+                     "host": {"buckets": [{"key": "DC01", "doc_count": 30}]}},
+                ]},
+            }}
+        if "aggs" in json and "age" in json["aggs"]:
+            return {"aggregations": {"age": {"buckets": [
+                {"key": "under_24h", "doc_count": 4}, {"key": "1_7d", "doc_count": 6},
+                {"key": "over_7d", "doc_count": 9}]}}}
+        raised = (self.now - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        moved = (self.now - timedelta(days=1) + timedelta(minutes=20)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return {"hits": {"hits": [{"_source": {
+            "@timestamp": raised,
+            "kibana": {"alert": {"workflow_status": "closed", "workflow_status_updated_at": moved}}}}]}}
+
+
+def _read(now):
+    import asyncio
+    return asyncio.run(sm.read_alert_metrics(FakeES(now), now=now))
+
+
+def test_the_es_reader_puts_the_weeks_side_by_side():
+    now = datetime.now(timezone.utc)
+    out = _read(now)
+    assert out["total"] == {"this": 30, "last": 21, "delta": 9, "pct": 42.9}
+    assert out["severity"]["critical"]["this"] == 4
+    assert [s["date"] for s in out["spikes"]] == [now.date().isoformat()]
+    assert out["rules"]["new"] == ["Beacon"]
+    assert out["hosts"]["top"][0] == {"name": "DC01", "count": 30, "last": 21}
+    assert out["backlog"] == {"total": 19, "under_24h": 4, "1_7d": 6, "over_7d": 9}
+    assert out["mtta_minutes"]["median"]["this"] == 20.0
+    assert out["mttr_minutes"]["median"]["this"] == 20.0
+    assert len(out["daily"]) == 7
+
+
+def test_the_view_draws_the_week_and_marks_the_spike():
+    view = _metrics_view({"alerts": _read(datetime.now(timezone.utc)), "cases": None,
+                          "cases_error": "db down"})
+    a = view["alerts"]
+    assert a["failed"] is False and a["total"]["value"] == "30"
+    assert a["total"]["change"]["text"] == "▲ 43%"
+    assert [b["spike"] for b in a["chart"]["bars"]].count(True) == 1
+    assert a["mtta"]["median"]["value"] == "20m"
+    assert a["new_rules"] == ["Beacon"]
+    assert view["cases"] == {"failed": True, "error": "db down"}
+
+
+# ── the standup check: retry, and an unconfigured cluster ─────────────────
+
+def test_the_check_retries_once_on_a_timeout_and_says_when_es_is_absent(monkeypatch):
+    import asyncio
+
+    from ion.services import elasticsearch_service as ess
+    from ion.web import daily_standup_api as api
+
+    monkeypatch.setattr(sm, "read_case_and_analyst_metrics", lambda *a, **k: {"analysts": []})
+    calls = []
+
+    async def flaky(es):
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError("Request to Elasticsearch timed out: ")
+        return {"_week_totals": {"this": 3, "last": 1}}
+
+    monkeypatch.setattr(sm, "read_alert_metrics", flaky)
+    monkeypatch.setattr(ess.ElasticsearchService, "is_configured", property(lambda self: True))
+    out = asyncio.run(api._check_metrics_7d())
+    assert len(calls) == 2 and out["alerts_error"] is None and out["cases"] == {"analysts": []}
+
+    monkeypatch.setattr(ess.ElasticsearchService, "is_configured", property(lambda self: False))
+    out = asyncio.run(api._check_metrics_7d())
+    assert out["alerts"] is None and out["alerts_error"] == "Elasticsearch is not configured"
